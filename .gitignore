@@ -1,0 +1,56 @@
+/target
+/.env
+*.rs.bk
+.DS_Store
+node_modules/
+.kiro*
+.impeccable.md
+.claude/
+.vscode/
+.playwright/
+.worktrees/
+.playwright-cli/
+frontend/dist/
+
+kiro-debug.log
+kiro-debug.log
+
+# Android build artifacts
+android/.gradle/
+android/.jdk/
+android/build/
+android/*/build/
+android/*/*/build/
+android/local.properties
+tools/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.hypothesis/
+.pytest_cache/
+# K3s deployment manifests (local cluster config)
+k3s/
+
+# Git worktrees
+.worktrees/
+
+# Temp files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.~lock.*
+~$*
+*.bak
+*.old
+*.orig
+*.log
+*.cache
+
+# State store (redb)
+data/state_store.db
+
+# Kiro MCP Manager - Sensitive configuration files
+.kiro/settings/

@@ -1,0 +1,567 @@
+#![allow(clippy::needless_return)]
+use proptest::prelude::*;
+use proptest::test_runner::{Config as ProptestConfig, TestRunner};
+
+use crate::migrations;
+
+// ── Strategies ─────────────────────────────────────────────────
+
+/// Non-pendiente estado values that should trigger a 409 Conflict.
+fn non_pendiente_estado() -> impl Strategy<Value = String> {
+    prop_oneof![
+        Just("firmado".to_string()),
+        Just("expirado".to_string()),
+        Just("cancelado".to_string()),
+    ]
+}
+
+/// Arbitrary firmante name (1-30 alphanumeric chars).
+fn arbitrary_firmante_nombre() -> impl Strategy<Value = String> {
+    "[a-zA-Z][a-zA-Z ]{0,29}".prop_map(|s| s.trim().to_string())
+}
+
+/// Valid base64-encoded firma imagen (small, non-empty).
+fn valid_firma_b64() -> impl Strategy<Value = String> {
+    prop::collection::vec(any::<u8>(), 10..200).prop_map(|bytes| {
+        use base64::Engine;
+        base64::engine::general_purpose::STANDARD.encode(&bytes)
+    })
+}
+
+/// Arbitrary IP address string.
+fn arbitrary_ip() -> impl Strategy<Value = String> {
+    (1u8..255, 0u8..255, 0u8..255, 1u8..255).prop_map(|(a, b, c, d)| format!("{a}.{b}.{c}.{d}"))
+}
+
+/// Arbitrary user agent string.
+fn arbitrary_user_agent() -> impl Strategy<Value = String> {
+    "[a-zA-Z0-9/ .;()-]{10,50}"
+}
+
+// ── Async helpers ──────────────────────────────────────────────
+
+mod pbt_async {
+    use chrono::{Duration, Utc};
+    use realestate_backend::entities::{documento, firma_documento, organizacion, usuario};
+    use realestate_backend::errors::AppError;
+    use realestate_backend::services::{auth, firmas};
+    use sea_orm::{
+        ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, EntityTrait, Set,
+    };
+    use sea_orm_migration::MigratorTrait;
+    use uuid::Uuid;
+
+    fn shared_rt_and_db() -> Option<&'static (tokio::runtime::Runtime, DatabaseConnection)> {
+        static SHARED: std::sync::OnceLock<
+            Result<(tokio::runtime::Runtime, DatabaseConnection), String>,
+        > = std::sync::OnceLock::new();
+        SHARED
+            .get_or_init(|| {
+                dotenvy::dotenv().ok();
+                let url = std::env::var("DATABASE_URL")
+                    .map_err(|_| "DATABASE_URL not set".to_string())?;
+                let rt =
+                    tokio::runtime::Runtime::new().map_err(|e| format!("Runtime error: {e}"))?;
+                let db = rt.block_on(async {
+                    let mut opts = ConnectOptions::new(&url);
+                    opts.max_connections(5)
+                        .min_connections(1)
+                        .connect_timeout(std::time::Duration::from_secs(30))
+                        .idle_timeout(std::time::Duration::from_secs(60))
+                        .acquire_timeout(std::time::Duration::from_secs(30));
+                    let db = Database::connect(opts)
+                        .await
+                        .map_err(|e| format!("Failed to connect to database: {e}"))?;
+                    super::migrations::Migrator::up(&db, None)
+                        .await
+                        .map_err(|e| format!("Failed to run migrations: {e}"))?;
+                    Ok::<_, String>(db)
+                })?;
+                Ok((rt, db))
+            })
+            .as_ref()
+            .ok()
+    }
+
+    fn with_db<F, Fut>(f: F)
+    where
+        F: FnOnce(DatabaseConnection) -> Fut,
+        Fut: std::future::Future<Output = ()>,
+    {
+        dotenvy::dotenv().ok();
+        if std::env::var("DATABASE_URL").is_err() {
+            eprintln!("⚠ DATABASE_URL not set – skipping PBT");
+            return;
+        }
+        let _guard = crate::GLOBAL_DB_SERIAL
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let Some((rt, db)) = shared_rt_and_db() else {
+            eprintln!("⚠ DB not reachable – skipping PBT");
+            return;
+        };
+        rt.block_on(f(db.clone()));
+    }
+
+    async fn create_documento(db: &DatabaseConnection) -> Uuid {
+        let id = Uuid::new_v4();
+        let now = Utc::now().into();
+
+        // Create org + user to satisfy FK constraint on uploaded_by
+        let org_id = Uuid::new_v4();
+        organizacion::ActiveModel {
+            id: Set(org_id),
+            tipo: Set("persona_fisica".to_string()),
+            nombre: Set(format!("PBT Org {org_id}")),
+            estado: Set("activo".to_string()),
+            cedula: Set(None),
+            telefono: Set(None),
+            email_organizacion: Set(None),
+            rnc: Set(None),
+            razon_social: Set(None),
+            nombre_comercial: Set(None),
+            direccion_fiscal: Set(None),
+            representante_legal: Set(None),
+            dgii_data: Set(None),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .expect("create org for PBT");
+
+        let user_id = Uuid::new_v4();
+        usuario::ActiveModel {
+            id: Set(user_id),
+            nombre: Set("PBT User".to_string()),
+            email: Set(format!("pbt+{user_id}@test.com")),
+            password_hash: Set("not_used".to_string()),
+            rol: Set("admin".to_string()),
+            activo: Set(true),
+            organizacion_id: Set(org_id),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .expect("create user for PBT");
+
+        documento::ActiveModel {
+            id: Set(id),
+            entity_type: Set("contrato".to_string()),
+            entity_id: Set(Uuid::new_v4()),
+            filename: Set(format!("pbt-doc-{id}.pdf")),
+            file_path: Set(format!("/tmp/pbt-{id}.pdf")),
+            mime_type: Set("application/pdf".to_string()),
+            file_size: Set(1024),
+            uploaded_by: Set(user_id),
+            created_at: Set(now),
+            tipo_documento: Set("contrato_arrendamiento".to_string()),
+            estado_verificacion: Set("pendiente".to_string()),
+            fecha_vencimiento: Set(None),
+            verificado_por: Set(None),
+            fecha_verificacion: Set(None),
+            notas_verificacion: Set(None),
+            numero_documento: Set(None),
+            contenido_editable: Set(Some(serde_json::json!({"version": 1, "blocks": []}))),
+            updated_at: Set(Some(now)),
+            sellado: Set(false),
+            sellado_at: Set(None),
+        }
+        .insert(db)
+        .await
+        .expect("create documento for PBT");
+        id
+    }
+
+    async fn cleanup(db: &DatabaseConnection, firma_id: Uuid, documento_id: Uuid) {
+        let _ = firma_documento::Entity::delete_by_id(firma_id)
+            .exec(db)
+            .await;
+        let _ = documento::Entity::delete_by_id(documento_id).exec(db).await;
+    }
+
+    /// Property 12: Document sealing triggers on complete signatures.
+    /// Creates a document, signs as propietario then inquilino, verifies sealing.
+    pub fn p12_document_sealing(
+        propietario_nombre: String,
+        inquilino_nombre: String,
+        firma_b64_prop: String,
+        firma_b64_inq: String,
+        ip_prop: String,
+        ip_inq: String,
+        ua_prop: String,
+        ua_inq: String,
+    ) {
+        with_db(|db| async move {
+            let documento_id = create_documento(&db).await;
+
+            // Sign as propietario (admin role)
+            let result = firmas::firmar_autenticado(
+                &db,
+                documento_id,
+                &propietario_nombre,
+                "admin",
+                &firma_b64_prop,
+                ip_prop,
+                ua_prop,
+            )
+            .await;
+            assert!(
+                result.is_ok(),
+                "Propietario signing should succeed: {:?}",
+                result.err()
+            );
+            let prop_firma = result.unwrap();
+            assert_eq!(prop_firma.firmante_tipo, "propietario");
+            assert_eq!(prop_firma.estado, "firmado");
+
+            // Document should NOT be sealed yet (only propietario signed)
+            let doc = documento::Entity::find_by_id(documento_id)
+                .one(&db)
+                .await
+                .expect("DB query should succeed")
+                .expect("Document should exist");
+            assert!(
+                !doc.sellado,
+                "Document should NOT be sealed with only propietario signature"
+            );
+            assert!(
+                doc.sellado_at.is_none(),
+                "sellado_at should be None before sealing"
+            );
+
+            // Sign as inquilino
+            let result = firmas::firmar_autenticado(
+                &db,
+                documento_id,
+                &inquilino_nombre,
+                "inquilino",
+                &firma_b64_inq,
+                ip_inq,
+                ua_inq,
+            )
+            .await;
+            assert!(
+                result.is_ok(),
+                "Inquilino signing should succeed: {:?}",
+                result.err()
+            );
+            let inq_firma = result.unwrap();
+            assert_eq!(inq_firma.firmante_tipo, "inquilino");
+            assert_eq!(inq_firma.estado, "firmado");
+
+            // Document SHOULD be sealed now (both parties signed)
+            let doc = documento::Entity::find_by_id(documento_id)
+                .one(&db)
+                .await
+                .expect("DB query should succeed")
+                .expect("Document should exist");
+            assert!(
+                doc.sellado,
+                "Document should be sealed after both propietario and inquilino sign"
+            );
+            assert!(
+                doc.sellado_at.is_some(),
+                "sellado_at should be set after sealing"
+            );
+        });
+    }
+
+    /// Property 14: Signing order independence.
+    /// Creates two documents, signs in different orders, verifies both end up sealed identically.
+    pub fn p14_signing_order_independence(
+        propietario_nombre: String,
+        inquilino_nombre: String,
+        firma_b64_prop: String,
+        firma_b64_inq: String,
+        ip_prop: String,
+        ip_inq: String,
+        ua_prop: String,
+        ua_inq: String,
+    ) {
+        with_db(|db| async move {
+            // Create two documents with identical content
+            let doc_a_id = create_documento(&db).await;
+            let doc_b_id = create_documento(&db).await;
+
+            // Document A: propietario first, then inquilino
+            let result = firmas::firmar_autenticado(
+                &db,
+                doc_a_id,
+                &propietario_nombre,
+                "admin",
+                &firma_b64_prop,
+                ip_prop.clone(),
+                ua_prop.clone(),
+            )
+            .await;
+            assert!(
+                result.is_ok(),
+                "Doc A propietario signing failed: {:?}",
+                result.err()
+            );
+
+            let result = firmas::firmar_autenticado(
+                &db,
+                doc_a_id,
+                &inquilino_nombre,
+                "inquilino",
+                &firma_b64_inq,
+                ip_inq.clone(),
+                ua_inq.clone(),
+            )
+            .await;
+            assert!(
+                result.is_ok(),
+                "Doc A inquilino signing failed: {:?}",
+                result.err()
+            );
+
+            // Document B: inquilino first, then propietario (reversed order)
+            let result = firmas::firmar_autenticado(
+                &db,
+                doc_b_id,
+                &inquilino_nombre,
+                "inquilino",
+                &firma_b64_inq,
+                ip_inq,
+                ua_inq,
+            )
+            .await;
+            assert!(
+                result.is_ok(),
+                "Doc B inquilino signing failed: {:?}",
+                result.err()
+            );
+
+            let result = firmas::firmar_autenticado(
+                &db,
+                doc_b_id,
+                &propietario_nombre,
+                "admin",
+                &firma_b64_prop,
+                ip_prop,
+                ua_prop,
+            )
+            .await;
+            assert!(
+                result.is_ok(),
+                "Doc B propietario signing failed: {:?}",
+                result.err()
+            );
+
+            // Verify both documents are sealed identically
+            let doc_a = documento::Entity::find_by_id(doc_a_id)
+                .one(&db)
+                .await
+                .expect("DB query failed")
+                .expect("Document A should exist");
+            let doc_b = documento::Entity::find_by_id(doc_b_id)
+                .one(&db)
+                .await
+                .expect("DB query failed")
+                .expect("Document B should exist");
+
+            // Both should be sealed
+            assert!(
+                doc_a.sellado,
+                "Document A (propietario first) should be sealed"
+            );
+            assert!(
+                doc_b.sellado,
+                "Document B (inquilino first) should be sealed"
+            );
+
+            // Both should have sellado_at set
+            assert!(
+                doc_a.sellado_at.is_some(),
+                "Document A sellado_at should be set"
+            );
+            assert!(
+                doc_b.sellado_at.is_some(),
+                "Document B sellado_at should be set"
+            );
+
+            // Final sealed state is identical regardless of order
+            assert_eq!(
+                doc_a.sellado, doc_b.sellado,
+                "Sealed state should be identical regardless of signing order"
+            );
+        });
+    }
+
+    /// Property 11: Tenant signing state guard
+    /// For firma with estado != "pendiente", verify signing attempt returns 409.
+    pub fn p11_signing_state_guard(estado: String) {
+        with_db(|db| async move {
+            let documento_id = create_documento(&db).await;
+
+            // Generate a token and password for the firma
+            let token = Uuid::new_v4().to_string();
+            let password = "TestPassword1234";
+            let password_hash = auth::hash_password(password).expect("hash password");
+
+            let now = Utc::now();
+            let expira_at = now + Duration::hours(72);
+
+            // Create firma_documento with non-pendiente estado
+            let firma_id = Uuid::new_v4();
+            let firma = firma_documento::ActiveModel {
+                id: Set(firma_id),
+                documento_id: Set(documento_id),
+                firmante_tipo: Set("inquilino".to_string()),
+                firmante_nombre: Set("Inquilino PBT".to_string()),
+                firma_imagen: Set(None),
+                ip_address: Set(None),
+                user_agent: Set(None),
+                firmado_at: Set(None),
+                token: Set(Some(token.clone())),
+                password_hash: Set(Some(password_hash)),
+                expira_at: Set(Some(expira_at.into())),
+                estado: Set(estado.clone()),
+                created_at: Set(now.into()),
+            };
+            firma.insert(&db).await.expect("insert firma for PBT");
+
+            // Attempt to sign — should return Conflict (409)
+            use base64::Engine;
+            let firma_imagen_b64 =
+                base64::engine::general_purpose::STANDARD.encode(b"fake-png-data");
+
+            let result = firmas::firmar_con_token(
+                &db,
+                &token,
+                password,
+                &firma_imagen_b64,
+                "127.0.0.1".to_string(),
+                "PBT-Agent/1.0".to_string(),
+            )
+            .await;
+
+            assert!(
+                result.is_err(),
+                "Signing with estado='{estado}' should fail, but got Ok",
+            );
+
+            let err = result.unwrap_err();
+            assert!(
+                matches!(err, AppError::Conflict(_)),
+                "Expected AppError::Conflict for estado='{estado}', got: {err:?}",
+            );
+
+            cleanup(&db, firma_id, documento_id).await;
+        });
+    }
+}
+
+// Feature: contract-document-signing, Property 11: Tenant signing state guard
+// **Validates: Requirements 5.10**
+#[test]
+fn test_signing_state_guard_rejects_non_pendiente() {
+    let mut runner = TestRunner::new(ProptestConfig {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
+
+    runner
+        .run(&non_pendiente_estado(), |estado| {
+            pbt_async::p11_signing_state_guard(estado);
+            Ok(())
+        })
+        .unwrap();
+}
+
+// Feature: contract-document-signing, Property 12: Document sealing triggers on complete signatures
+// **Validates: Requirements 6.1, 6.5**
+#[test]
+fn test_document_sealing_triggers_on_complete_signatures() {
+    let mut runner = TestRunner::new(ProptestConfig {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
+
+    runner
+        .run(
+            &(
+                arbitrary_firmante_nombre(),
+                arbitrary_firmante_nombre(),
+                valid_firma_b64(),
+                valid_firma_b64(),
+                arbitrary_ip(),
+                arbitrary_ip(),
+                arbitrary_user_agent(),
+                arbitrary_user_agent(),
+            ),
+            |(
+                propietario_nombre,
+                inquilino_nombre,
+                firma_b64_prop,
+                firma_b64_inq,
+                ip_prop,
+                ip_inq,
+                ua_prop,
+                ua_inq,
+            )| {
+                pbt_async::p12_document_sealing(
+                    propietario_nombre,
+                    inquilino_nombre,
+                    firma_b64_prop,
+                    firma_b64_inq,
+                    ip_prop,
+                    ip_inq,
+                    ua_prop,
+                    ua_inq,
+                );
+                Ok(())
+            },
+        )
+        .unwrap();
+}
+
+// Feature: contract-document-signing, Property 14: Signing order independence
+// **Validates: Requirements 6.6**
+#[test]
+fn test_signing_order_independence() {
+    let mut runner = TestRunner::new(ProptestConfig {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
+
+    runner
+        .run(
+            &(
+                arbitrary_firmante_nombre(),
+                arbitrary_firmante_nombre(),
+                valid_firma_b64(),
+                valid_firma_b64(),
+                arbitrary_ip(),
+                arbitrary_ip(),
+                arbitrary_user_agent(),
+                arbitrary_user_agent(),
+            ),
+            |(
+                propietario_nombre,
+                inquilino_nombre,
+                firma_b64_prop,
+                firma_b64_inq,
+                ip_prop,
+                ip_inq,
+                ua_prop,
+                ua_inq,
+            )| {
+                pbt_async::p14_signing_order_independence(
+                    propietario_nombre,
+                    inquilino_nombre,
+                    firma_b64_prop,
+                    firma_b64_inq,
+                    ip_prop,
+                    ip_inq,
+                    ua_prop,
+                    ua_inq,
+                );
+                Ok(())
+            },
+        )
+        .unwrap();
+}

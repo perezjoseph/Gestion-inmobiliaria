@@ -1,0 +1,218 @@
+name: Security Scanning
+
+on:
+  workflow_call:
+    inputs:
+      is-pr:
+        type: boolean
+        required: true
+      is-fork-pr:
+        type: boolean
+        required: true
+permissions: {}
+
+jobs:
+  secret-scan:
+    name: Secret Scanning (Gitleaks)
+    runs-on: arc-runner-dind
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install security tools
+        uses: ./.github/actions/install-security-tools
+        with:
+          gitleaks: 'true'
+
+      - name: Run Gitleaks secret detection
+        run: gitleaks detect --source . --verbose --redact --exit-code 1
+
+  dependency-review:
+    name: Dependency Review (PR)
+    runs-on: arc-runner-dind
+    if: ${{ inputs.is-pr }}
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Review dependency changes for vulnerabilities and license issues
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          deny-licenses: AGPL-3.0, GPL-3.0, GPL-2.0
+          comment-summary-in-pr: on-failure
+
+  cargo-deny:
+    name: Supply Chain Policy (cargo-deny)
+    runs-on: arc-runner-dind
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Rust setup
+        uses: ./.github/actions/rust-setup
+
+      - name: Install cargo-deny
+        id: install_deny
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            for dir in "$HOME/.cargo" "$HOME/.cargo/bin"; do
+              mkdir -p "$dir" 2>/dev/null || sudo mkdir -p "$dir"
+              if [ ! -w "$dir" ]; then
+                sudo chown -R "$(id -u):$(id -g)" "$HOME/.cargo"
+              fi
+            done
+            export PATH="$HOME/.cargo/bin:$PATH"
+            if command -v cargo-deny &>/dev/null; then
+              echo "cargo-deny already installed: $(cargo-deny --version)"
+              echo "installed=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            DENY_VERSION="0.19.4"
+            DENY_SHA256="3bd58b784e83715b86ddbc9deac591890372ec77fda5741bb0826970b958506f"
+            URL="https://github.com/EmbarkStudios/cargo-deny/releases/download/${DENY_VERSION}/cargo-deny-${DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+            curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 15 --max-time 120 -o "${RUNNER_TEMP}/cargo-deny.tar.gz" "$URL"
+            echo "${DENY_SHA256}  ${RUNNER_TEMP}/cargo-deny.tar.gz" | sha256sum -c -
+            tar xzf "${RUNNER_TEMP}/cargo-deny.tar.gz" --no-same-owner --strip-components=1 -C "$HOME/.cargo/bin/" 2>/dev/null
+            chmod +x "$HOME/.cargo/bin/cargo-deny"
+            rm -f "${RUNNER_TEMP}/cargo-deny.tar.gz"
+            cargo-deny --version
+            echo "installed=true" >> $GITHUB_OUTPUT
+
+      - name: Run cargo-deny supply chain checks
+        id: cargo_deny
+        if: steps.install_deny.outputs.installed == 'true'
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 5
+          command: |
+            export PATH="$HOME/.cargo/bin:$PATH"
+            cargo deny check 2>&1 | tee "${RUNNER_TEMP}/deny-output.txt"
+            exit ${PIPESTATUS[0]}
+
+      - name: Generate cargo-deny SARIF report
+        if: "!cancelled() && steps.install_deny.outputs.installed == 'true'"
+        run: |
+          umask 077
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo deny check 2>&1 | python3 -c "
+          import sys, json, re
+          sarif = {'\$schema': 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json', 'version': '2.1.0', 'runs': [{'tool': {'driver': {'name': 'cargo-deny', 'rules': []}}, 'results': []}]}
+          for line in sys.stdin:
+            line = line.strip()
+            if not line or line.startswith('advisories') or line.startswith('licenses') or line.startswith('bans') or line.startswith('sources'): continue
+            m = re.match(r'^(warning|error)\[([^\]]+)\]:\s*(.+)', line)
+            if m:
+              sarif['runs'][0]['results'].append({'ruleId': m.group(2), 'level': 'error' if m.group(1) == 'error' else 'warning', 'message': {'text': m.group(3)}, 'locations': [{'physicalLocation': {'artifactLocation': {'uri': 'Cargo.lock'}, 'region': {'startLine': 1}}}]})
+          json.dump(sarif, sys.stdout, indent=2)
+          " > cargo-deny.sarif 2>/dev/null || echo '{\"version\":\"2.1.0\",\"runs\":[{\"tool\":{\"driver\":{\"name\":\"cargo-deny\",\"rules\":[]}},\"results\":[]}]}' > cargo-deny.sarif
+
+      - name: Upload cargo-deny SARIF to GitHub Security
+        if: "!cancelled() && steps.install_deny.outputs.installed == 'true' && hashFiles('cargo-deny.sarif') != ''"
+        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        with:
+          sarif_file: cargo-deny.sarif
+          category: cargo-deny
+        continue-on-error: true
+
+  trivy-iac:
+    name: IaC Scanning (Trivy)
+    runs-on: arc-runner-dind
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Trivy
+        id: install_trivy
+        uses: ./.github/actions/install-security-tools
+        with:
+          trivy: 'true'
+
+      - name: Scan Dockerfiles and docker-compose for misconfigurations
+        id: trivy_iac
+        if: steps.install_trivy.outputs.trivy-installed == 'true'
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 2
+          command: |
+            trivy fs --scanners misconfig --exit-code 1 --severity CRITICAL,HIGH \
+              --no-progress --format table \
+              --include-non-failures \
+              infra/docker/ 2>&1 | tee "${RUNNER_TEMP}/trivy-iac-output.txt"
+            exit ${PIPESTATUS[0]}
+
+      - name: Generate Trivy IaC SARIF report
+        if: "!cancelled() && steps.install_trivy.outputs.trivy-installed == 'true'"
+        run: |
+          umask 077
+          trivy fs --scanners misconfig --severity CRITICAL,HIGH,MEDIUM \
+            --no-progress --format sarif --output trivy-iac.sarif \
+            infra/docker/ || true
+
+      - name: Upload Trivy IaC SARIF to GitHub Security
+        if: "!cancelled() && steps.install_trivy.outputs.trivy-installed == 'true' && hashFiles('trivy-iac.sarif') != ''"
+        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        with:
+          sarif_file: trivy-iac.sarif
+          category: trivy-iac
+        continue-on-error: true
+
+  # Gate job: merges results from parallel security jobs
+  quality-gate:
+    name: Security Gate
+    runs-on: arc-runner-dind
+    if: "!cancelled() && !inputs.is-fork-pr"
+    needs: [cargo-deny, trivy-iac]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          sparse-checkout: .github
+          sparse-checkout-cone-mode: true
+
+      - name: Write quality gate summary
+        if: "!cancelled()"
+        run: |
+          {
+            echo "## Dependency Security Results"
+            echo "| Check | Status |"
+            echo "|-------|--------|"
+            echo "| cargo deny | ${{ needs.cargo-deny.result == 'success' && '✅ Pass' || (needs.cargo-deny.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
+            echo "| Trivy IaC scan | ${{ needs.trivy-iac.result == 'success' && '✅ Pass' || (needs.trivy-iac.result == 'skipped' && '⏭️ Skipped' || '⚠️ Findings') }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if any security job failed
+        if: "!cancelled() && (needs.cargo-deny.result == 'failure' || needs.trivy-iac.result == 'failure')"
+        run: exit 1

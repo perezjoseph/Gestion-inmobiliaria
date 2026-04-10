@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PropManager</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">Panel</string>
+    <string name="nav_propiedades">Propiedades</string>
+    <string name="nav_inquilinos">Inquilinos</string>
+    <string name="nav_contratos">Contratos</string>
+    <string name="nav_mas">Más</string>
+    <string name="nav_pagos">Pagos</string>
+    <string name="nav_gastos">Gastos</string>
+    <string name="nav_mantenimiento">Mantenimiento</string>
+    <string name="nav_reportes">Reportes</string>
+    <string name="nav_documentos">Documentos</string>
+    <string name="nav_notificaciones">Notificaciones</string>
+    <string name="nav_auditoria">Auditoría</string>
+    <string name="nav_perfil">Perfil</string>
+    <string name="nav_configuracion">Configuración</string>
+    <string name="nav_importacion">Importación</string>
+    <string name="navigate_back">Volver</string>
+
+    <!-- Auth -->
+    <string name="login_title">Iniciar Sesión</string>
+    <string name="email_label">Correo electrónico</string>
+    <string name="password_label">Contraseña</string>
+    <string name="login_button">Iniciar Sesión</string>
+    <string name="logout_button">Cerrar Sesión</string>
+    <string name="login_error_invalid">Correo o contraseña incorrectos</string>
+    <string name="login_error_empty_email">El correo electrónico es requerido</string>
+    <string name="login_error_empty_password">La contraseña es requerida</string>
+
+    <!-- Common actions -->
+    <string name="save">Guardar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="delete">Eliminar</string>
+    <string name="edit">Editar</string>
+    <string name="create">Crear</string>
+    <string name="search">Buscar</string>
+    <string name="filter">Filtrar</string>
+    <string name="retry">Reintentar</string>
+    <string name="close">Cerrar</string>
+    <string name="confirm">Confirmar</string>
+    <string name="select_date">Seleccionar fecha</string>
+    <string name="loading">Cargando…</string>
+
+    <!-- Confirm delete -->
+    <string name="confirm_delete_title">Confirmar eliminación</string>
+    <string name="confirm_delete_message">¿Está seguro de que desea eliminar \"%1$s\"? Esta acción no se puede deshacer.</string>
+
+    <!-- Offline / Sync -->
+    <string name="offline_banner">Sin conexión — Los cambios se guardarán localmente</string>
+    <string name="offline_no_connection">Sin conexión a internet. Los cambios se guardarán localmente.</string>
+    <string name="sync_pending">Pendiente de sincronización</string>
+    <string name="sync_complete">Sincronización completada</string>
+    <string name="sync_conflict">Conflicto de sincronización: se aplicó la versión del servidor</string>
+    <string name="last_updated">Última actualización: %1$s</string>
+
+    <!-- Propiedades -->
+    <string name="propiedades_title">Propiedades</string>
+    <string name="propiedad_create">Nueva Propiedad</string>
+    <string name="propiedad_edit">Editar Propiedad</string>
+    <string name="propiedad_detail">Detalle de Propiedad</string>
+    <string name="propiedad_titulo">Título</string>
+    <string name="propiedad_descripcion">Descripción</string>
+    <string name="propiedad_direccion">Dirección</string>
+    <string name="propiedad_ciudad">Ciudad</string>
+    <string name="propiedad_provincia">Provincia</string>
+    <string name="propiedad_tipo">Tipo de propiedad</string>
+    <string name="propiedad_habitaciones">Habitaciones</string>
+    <string name="propiedad_banos">Baños</string>
+    <string name="propiedad_area">Área (m²)</string>
+    <string name="propiedad_precio">Precio</string>
+    <string name="propiedad_moneda">Moneda</string>
+    <string name="propiedad_estado">Estado</string>
+    <string name="propiedad_empty">No hay propiedades registradas</string>
+
+    <!-- Inquilinos -->
+    <string name="inquilinos_title">Inquilinos</string>
+    <string name="inquilino_create">Nuevo Inquilino</string>
+    <string name="inquilino_edit">Editar Inquilino</string>
+    <string name="inquilino_nombre">Nombre</string>
+    <string name="inquilino_apellido">Apellido</string>
+    <string name="inquilino_cedula">Cédula</string>
+    <string name="inquilino_email">Correo electrónico</string>
+    <string name="inquilino_telefono">Teléfono</string>
+    <string name="inquilino_contacto_emergencia">Contacto de emergencia</string>
+    <string name="inquilino_notas">Notas</string>
+    <string name="inquilino_empty">No hay inquilinos registrados</string>
+    <string name="inquilino_scan_cedula">Escanear Cédula</string>
+
+    <!-- Contratos -->
+    <string name="contratos_title">Contratos</string>
+    <string name="contrato_create">Nuevo Contrato</string>
+    <string name="contrato_edit">Editar Contrato</string>
+    <string name="contrato_detail">Detalle de Contrato</string>
+    <string name="contrato_propiedad">Propiedad</string>
+    <string name="contrato_inquilino">Inquilino</string>
+    <string name="contrato_fecha_inicio">Fecha de inicio</string>
+    <string name="contrato_fecha_fin">Fecha de fin</string>
+    <string name="contrato_monto_mensual">Monto mensual</string>
+    <string name="contrato_deposito">Depósito</string>
+    <string name="contrato_moneda">Moneda</string>
+    <string name="contrato_estado">Estado</string>
+    <string name="contrato_renovar">Renovar</string>
+    <string name="contrato_terminar">Terminar</string>
+    <string name="contrato_fecha_terminacion">Fecha de terminación</string>
+    <string name="contrato_expiring">Contratos por vencer</string>
+    <string name="contrato_dias_restantes">%1$d días restantes</string>
+    <string name="contrato_empty">No hay contratos registrados</string>
+    <string name="contrato_error_fecha">La fecha de fin debe ser posterior a la fecha de inicio</string>
+
+    <!-- Pagos -->
+    <string name="pagos_title">Pagos</string>
+    <string name="pago_create">Nuevo Pago</string>
+    <string name="pago_edit">Editar Pago</string>
+    <string name="pago_contrato">Contrato</string>
+    <string name="pago_monto">Monto</string>
+    <string name="pago_moneda">Moneda</string>
+    <string name="pago_fecha_vencimiento">Fecha de vencimiento</string>
+    <string name="pago_fecha_pago">Fecha de pago</string>
+    <string name="pago_metodo">Método de pago</string>
+    <string name="pago_estado">Estado</string>
+    <string name="pago_notas">Notas</string>
+    <string name="pago_recibo">Ver recibo</string>
+    <string name="pago_empty">No hay pagos registrados</string>
+
+    <!-- Gastos -->
+    <string name="gastos_title">Gastos</string>
+    <string name="gasto_create">Nuevo Gasto</string>
+    <string name="gasto_edit">Editar Gasto</string>
+    <string name="gasto_propiedad">Propiedad</string>
+    <string name="gasto_categoria">Categoría</string>
+    <string name="gasto_descripcion">Descripción</string>
+    <string name="gasto_monto">Monto</string>
+    <string name="gasto_moneda">Moneda</string>
+    <string name="gasto_fecha">Fecha del gasto</string>
+    <string name="gasto_estado">Estado</string>
+    <string name="gasto_proveedor">Proveedor</string>
+    <string name="gasto_numero_factura">Número de factura</string>
+    <string name="gasto_notas">Notas</string>
+    <string name="gasto_resumen_categorias">Resumen por categoría</string>
+    <string name="gasto_scan_recibo">Escanear Recibo</string>
+    <string name="gasto_empty">No hay gastos registrados</string>
+
+    <!-- Mantenimiento -->
+    <string name="mantenimiento_title">Mantenimiento</string>
+    <string name="solicitud_create">Nueva Solicitud</string>
+    <string name="solicitud_edit">Editar Solicitud</string>
+    <string name="solicitud_detail">Detalle de Solicitud</string>
+    <string name="solicitud_propiedad">Propiedad</string>
+    <string name="solicitud_titulo">Título</string>
+    <string name="solicitud_descripcion">Descripción</string>
+    <string name="solicitud_estado">Estado</string>
+    <string name="solicitud_prioridad">Prioridad</string>
+    <string name="solicitud_proveedor_nombre">Nombre del proveedor</string>
+    <string name="solicitud_proveedor_telefono">Teléfono del proveedor</string>
+    <string name="solicitud_proveedor_email">Email del proveedor</string>
+    <string name="solicitud_costo">Costo</string>
+    <string name="solicitud_notas">Notas</string>
+    <string name="solicitud_agregar_nota">Agregar nota</string>
+    <string name="solicitud_cambiar_estado">Cambiar estado</string>
+    <string name="solicitud_empty">No hay solicitudes de mantenimiento</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Panel</string>
+    <string name="dashboard_total_propiedades">Total Propiedades</string>
+    <string name="dashboard_total_inquilinos">Total Inquilinos</string>
+    <string name="dashboard_contratos_activos">Contratos Activos</string>
+    <string name="dashboard_pagos_pendientes">Pagos Pendientes</string>
+    <string name="dashboard_pagos_proximos">Pagos Próximos</string>
+    <string name="dashboard_contratos_por_vencer">Contratos por Vencer</string>
+    <string name="dashboard_ocupacion">Tendencia de Ocupación</string>
+    <string name="dashboard_ingresos">Comparación de Ingresos</string>
+    <string name="dashboard_gastos">Comparación de Gastos</string>
+    <string name="dashboard_esperado">Esperado</string>
+    <string name="dashboard_cobrado">Cobrado</string>
+    <string name="dashboard_diferencia">Diferencia</string>
+    <string name="dashboard_mes_actual">Mes actual</string>
+    <string name="dashboard_mes_anterior">Mes anterior</string>
+    <string name="dashboard_cached_data">Datos en caché</string>
+
+    <!-- Reportes -->
+    <string name="reportes_title">Reportes</string>
+    <string name="reporte_ingresos">Reporte de Ingresos</string>
+    <string name="reporte_rentabilidad">Reporte de Rentabilidad</string>
+    <string name="reporte_historial_pagos">Historial de Pagos</string>
+    <string name="reporte_ocupacion">Tendencia de Ocupación</string>
+    <string name="reporte_exportar_pdf">Exportar PDF</string>
+    <string name="reporte_exportar_xlsx">Exportar XLSX</string>
+    <string name="reportes_offline">Los reportes requieren conexión a internet.</string>
+
+    <!-- Documentos -->
+    <string name="documentos_title">Documentos</string>
+    <string name="documento_subir">Subir documento</string>
+    <string name="documentos_offline">Los documentos requieren conexión a internet.</string>
+    <string name="documentos_upload_offline">La subida de documentos requiere conexión a internet.</string>
+    <string name="documentos_empty">No hay documentos</string>
+
+    <!-- Notificaciones -->
+    <string name="notificaciones_title">Notificaciones</string>
+    <string name="notificacion_dias_vencido">%1$d días vencido</string>
+    <string name="notificaciones_empty">No hay pagos vencidos</string>
+
+    <!-- Auditoría -->
+    <string name="auditoria_title">Auditoría</string>
+    <string name="auditoria_offline">El registro de auditoría requiere conexión a internet.</string>
+    <string name="auditoria_empty">No hay registros de auditoría</string>
+
+    <!-- Perfil -->
+    <string name="perfil_title">Perfil</string>
+    <string name="perfil_nombre">Nombre</string>
+    <string name="perfil_email">Correo electrónico</string>
+    <string name="perfil_rol">Rol</string>
+    <string name="perfil_cambiar_password">Cambiar contraseña</string>
+    <string name="perfil_password_actual">Contraseña actual</string>
+    <string name="perfil_password_nueva">Nueva contraseña</string>
+    <string name="perfil_password_changed">Contraseña actualizada correctamente</string>
+
+    <!-- Configuración -->
+    <string name="configuracion_title">Configuración</string>
+    <string name="configuracion_moneda">Moneda predeterminada</string>
+
+    <!-- Importación -->
+    <string name="importacion_title">Importación</string>
+    <string name="importacion_propiedades">Importar Propiedades</string>
+    <string name="importacion_inquilinos">Importar Inquilinos</string>
+    <string name="importacion_gastos">Importar Gastos</string>
+    <string name="importacion_seleccionar_archivo">Seleccionar archivo</string>
+    <string name="importacion_resultado">Resultado: %1$d de %2$d filas importadas</string>
+    <string name="importacion_offline">La importación requiere conexión a internet.</string>
+
+    <!-- Scanner -->
+    <string name="scanner_title">Escáner</string>
+    <string name="scanner_retry">Intente tomar la foto con mejor iluminación o ángulo</string>
+
+    <!-- Validation errors -->
+    <string name="error_field_required">Este campo es requerido</string>
+    <string name="error_invalid_email">Correo electrónico inválido</string>
+    <string name="error_positive_number">El valor debe ser mayor a cero</string>
+    <string name="error_invalid_date">Fecha inválida</string>
+
+    <!-- Generic errors -->
+    <string name="error_generic">Ha ocurrido un error. Intente nuevamente.</string>
+    <string name="error_server">Error interno del servidor. Intente nuevamente más tarde.</string>
+    <string name="error_network">Sin conexión a internet. Los cambios se guardarán localmente.</string>
+    <string name="error_unknown">Error desconocido</string>
+
+    <!-- Success messages -->
+    <string name="success_created">Creado correctamente</string>
+    <string name="success_updated">Actualizado correctamente</string>
+    <string name="success_deleted">Eliminado correctamente</string>
+</resources>

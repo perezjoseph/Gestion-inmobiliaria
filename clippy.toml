@@ -1,0 +1,20 @@
+# Clippy configuration — project-wide thresholds
+# https://doc.rust-lang.org/clippy/configuration.html
+
+# ── Complexity thresholds ──────────────────────────────
+# Flag functions that are too complex or have too many args.
+cognitive-complexity-threshold = 30
+too-many-arguments-threshold = 8
+type-complexity-threshold = 300
+
+# ── Length thresholds ──────────────────────────────────
+too-many-lines-threshold = 150
+large-error-threshold = 256
+
+# ── Naming ─────────────────────────────────────────────
+# Enforce minimum length for binding names (except common ones)
+min-ident-chars-threshold = 2
+
+# ── MSRV ───────────────────────────────────────────────
+# Let clippy suggest modern idioms available in our edition
+msrv = "1.85.0"

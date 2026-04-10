@@ -1,0 +1,26 @@
+{
+  "name": "baileys-service",
+  "version": "1.0.0",
+  "description": "WhatsApp Web connectivity sidecar using Baileys",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "7.0.0-rc10",
+    "express": "4.22.1",
+    "qrcode": "1.5.4",
+    "pino": "9.6.0"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.1",
+    "@types/node": "22.15.3",
+    "@types/qrcode": "1.5.5",
+    "fast-check": "3.23.2",
+    "typescript": "5.8.3",
+    "vitest": "3.1.3"
+  }
+}

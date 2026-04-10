@@ -1,0 +1,40 @@
+name: CodeQL Analysis
+
+on:
+  workflow_call:
+    inputs:
+      is-fork-pr:
+        type: boolean
+        required: true
+
+permissions: {}
+
+jobs:
+  # ── Rust: build-mode none (no build needed, uses rust-analyzer internally) ──
+  # Requires rustup and cargo on PATH. Cargo.toml must be present.
+  analyze-rust:
+    name: CodeQL (Rust)
+    runs-on: arc-runner-dind
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Rust setup
+        uses: ./.github/actions/rust-setup
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        with:
+          languages: rust
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        with:
+          category: codeql-rust

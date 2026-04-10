@@ -1,0 +1,122 @@
+name: 'Rust Setup'
+description: 'Shared setup for Rust CI jobs: OpenSSL headers, toolchain, and sccache for ARC ephemeral runners.'
+
+inputs:
+  components:
+    description: 'Comma-separated rustup components (e.g., rustfmt,clippy)'
+    required: false
+    default: ''
+  targets:
+    description: 'Comma-separated rustup targets (e.g., wasm32-unknown-unknown)'
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Ensure build tools and OpenSSL development headers are available
+      shell: bash
+      run: |
+        NEED_INSTALL=false
+        if ! command -v cc >/dev/null 2>&1; then
+          echo "C linker (cc) missing -- will install build-essential"
+          NEED_INSTALL=true
+        fi
+        if ! pkg-config --exists openssl 2>/dev/null; then
+          echo "OpenSSL headers missing -- will install libssl-dev"
+          NEED_INSTALL=true
+        fi
+        if [ "$NEED_INSTALL" = true ]; then
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends build-essential pkg-config libssl-dev
+        else
+          echo "Build tools and OpenSSL headers already available (cc: $(cc --version | head -1), openssl: $(pkg-config --modversion openssl))"
+        fi
+
+    - name: Ensure CARGO_HOME directories are writable
+      shell: bash
+      run: |
+        # Ensure directories exist and are writable.
+        # NFS-mounted dirs (registry, git) are already writable via the export.
+        # Local dirs (bin, .rustup) may need ownership fix on ephemeral runners.
+        for dir in "$HOME/.cargo" "$HOME/.cargo/bin" "$HOME/.rustup"; do
+          mkdir -p "$dir" 2>/dev/null || sudo mkdir -p "$dir"
+          if [ ! -w "$dir" ]; then
+            echo "Fixing ownership on $dir"
+            sudo chown "$(id -u):$(id -g)" "$dir"
+          fi
+        done
+        # NFS-mounted dirs — just ensure mount points exist, no chown needed
+        for dir in "$HOME/.cargo/registry" "$HOME/.cargo/git"; do
+          mkdir -p "$dir" 2>/dev/null || true
+        done
+        echo "CARGO_HOME=$HOME/.cargo" >> "$GITHUB_ENV"
+        echo "RUSTUP_HOME=$HOME/.rustup" >> "$GITHUB_ENV"
+
+        # Use a persistent target dir when the hostPath mount is available
+        if [ -d "/home/runner/_work/_target" ] && [ -w "/home/runner/_work/_target" ]; then
+          echo "CARGO_TARGET_DIR=/home/runner/_work/_target" >> "$GITHUB_ENV"
+          echo "Using persistent CARGO_TARGET_DIR=/home/runner/_work/_target"
+        fi
+
+        # Use persistent cargo registry/git cache when hostPath mounts are available
+        # (mounted from /opt/cargo-cache via arc-runner.yml)
+        if [ -d "/home/runner/.cargo/registry" ] && [ -w "/home/runner/.cargo/registry" ]; then
+          echo "Persistent cargo registry cache available at /home/runner/.cargo/registry"
+        fi
+        if [ -d "/home/runner/.cargo/git" ] && [ -w "/home/runner/.cargo/git" ]; then
+          echo "Persistent cargo git cache available at /home/runner/.cargo/git"
+        fi
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      with:
+        toolchain: "1.95.0"
+        components: ${{ inputs.components }}
+        targets: ${{ inputs.targets }}
+
+    - name: Install sccache
+      shell: bash
+      run: |
+        SCCACHE_VERSION="0.14.0"
+        SCCACHE_SHA256="8424b38cda4ecce616a1557d81328f3d7c96503a171eab79942fad618b42af44"
+
+        # Skip if already installed at the correct version
+        if command -v sccache &>/dev/null && sccache --version 2>/dev/null | grep -q "$SCCACHE_VERSION"; then
+          echo "sccache $SCCACHE_VERSION already installed"
+        else
+          ARCHIVE="${RUNNER_TEMP}/sccache.tar.gz"
+          curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          echo "${SCCACHE_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          mkdir -p "${HOME}/.local/bin"
+          tar xzf "$ARCHIVE" --no-same-owner --strip-components=1 -C "${HOME}/.local/bin" \
+            "sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache"
+          rm -f "$ARCHIVE"
+          chmod +x "${HOME}/.local/bin/sccache"
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+        fi
+
+    - name: Configure sccache
+      shell: bash
+      run: |
+        export PATH="${HOME}/.local/bin:$PATH"
+
+        # Use hostPath-mounted cache dir if available, otherwise fall back to home
+        if [ -d "/home/runner/.sccache" ] && [ -w "/home/runner/.sccache" ]; then
+          SCCACHE_DIR="/home/runner/.sccache"
+        else
+          SCCACHE_DIR="${HOME}/.cache/sccache"
+          mkdir -p "$SCCACHE_DIR"
+        fi
+
+        # 30 GB local disk cache
+        {
+          echo "SCCACHE_DIR=$SCCACHE_DIR"
+          echo "SCCACHE_CACHE_SIZE=30G"
+          echo "RUSTC_WRAPPER=sccache"
+        } >> "$GITHUB_ENV"
+
+        echo "sccache cache dir: $SCCACHE_DIR"
+        sccache --version
+        sccache --show-stats || true

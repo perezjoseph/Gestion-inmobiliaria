@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fdroid-init
+  namespace: realestate
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  containers:
+    - name: fdroid-init
+      image: python:3.12-slim
+      command:
+        - bash
+        - -c
+        - |
+          set -e
+          apt-get update -qq && apt-get install -y -qq default-jdk-headless git wget unzip > /dev/null 2>&1
+          pip install --quiet fdroidserver
+
+          # Install Android build-tools for apksigner
+          export ANDROID_HOME=/opt/android-sdk
+          mkdir -p "$ANDROID_HOME"
+          wget -q "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" -O /tmp/tools.zip
+          unzip -q /tmp/tools.zip -d "$ANDROID_HOME/cmdline-tools"
+          mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;35.0.0" > /dev/null 2>&1
+
+          cd /repo
+          mkdir -p repo
+
+          cat > config.yml <<EOF
+          repo_url: http://fdroid.local/repo
+          repo_name: PropManager Dev
+          repo_description: PropManager development builds
+          archive_older: 3
+          EOF
+
+          # Generate keystore for repo signing (skip if already exists)
+          if [ ! -f keystore.p12 ]; then
+            keytool -genkeypair \
+              -alias fdroid-repo \
+              -keyalg EC \
+              -groupname secp256r1 \
+              -validity 10000 \
+              -keystore keystore.p12 \
+              -storetype PKCS12 \
+              -storepass changeit \
+              -keypass changeit \
+              -dname "CN=PropManager F-Droid Repo, O=PropManager"
+          fi
+
+          cat >> config.yml <<EOF
+          keystore: keystore.p12
+          keystorepass: changeit
+          keypass: changeit
+          repo_keyalias: fdroid-repo
+          keydname: CN=PropManager F-Droid Repo, O=PropManager
+          EOF
+
+          fdroid update --create-metadata --rename-apks
+          echo "=== Repo contents ==="
+          ls -la repo/
+          echo "=== Done ==="
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+          ephemeral-storage: 4Gi
+        limits:
+          cpu: "2"
+          memory: 1Gi
+          ephemeral-storage: 8Gi
+      volumeMounts:
+        - name: repo
+          mountPath: /repo
+  volumes:
+    - name: repo
+      persistentVolumeClaim:
+        claimName: fdroid-repo-pvc

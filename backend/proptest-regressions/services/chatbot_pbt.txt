@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 50ff0452add21ac47cd843242a7d6ce55d4ed645e4ed13e8d149c54fc36192b6 # shrinks to input = ChatbotConfigUpdateRequest { activo: Some(false), display_name: Some("0"), language: Some("es-DO"), tone: Some("ééóíúáíaúíóúñóíaaaéaúóaáúaáéí"), greeting: Some("Bienvenido"), system_prompt: Some("Eres un asistente."), faqs: Some([]), policies: Some(""), sender_policy: Some("tenants_only"), allowlist: Some(["+18091234567"]), capabilities: Some(Capabilities { receipt_ocr: false, balance_queries: false, payment_reminders: false, maintenance_requests: false, human_handoff: false }), handoff_keywords: Some(["hablar con humano"]), history_limit: Some(1), retention_days: Some(1) }

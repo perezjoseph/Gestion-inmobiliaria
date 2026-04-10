@@ -1,0 +1,220 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      backend-digest:
+        type: string
+        required: true
+      frontend-digest:
+        type: string
+        required: true
+      ocr-service-digest:
+        type: string
+        required: true
+      baileys-digest:
+        type: string
+        required: true
+    secrets:
+      POSTGRES_PASSWORD:
+        required: true
+      JWT_SECRET:
+        required: true
+      KUBECONFIG_DATA:
+        required: true
+
+permissions: {}
+
+jobs:
+  deploy:
+    name: Deploy to Production (k3s)
+    runs-on: arc-runner-dind
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    env:
+      IMAGE_OWNER: ${{ github.repository_owner }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Configure kubeconfig
+        run: |
+          umask 077
+          mkdir -p "${HOME}/.kube"
+          echo "${{ secrets.KUBECONFIG_DATA }}" | base64 -d > "${HOME}/.kube/config"
+          kubectl cluster-info
+
+      - name: Verify backend attestation
+        id: verify-backend
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BACKEND_DIGEST: ${{ inputs.backend-digest }}
+        with:
+          timeout_minutes: 3
+          max_attempts: 5
+          retry_wait_seconds: 10
+          command: |
+            gh attestation verify \
+              "oci://ghcr.io/${IMAGE_OWNER}/realestate-backend@${BACKEND_DIGEST}" \
+              --owner "${IMAGE_OWNER}"
+
+      - name: Verify frontend attestation
+        id: verify-frontend
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FRONTEND_DIGEST: ${{ inputs.frontend-digest }}
+        with:
+          timeout_minutes: 3
+          max_attempts: 5
+          retry_wait_seconds: 10
+          command: |
+            gh attestation verify \
+              "oci://ghcr.io/${IMAGE_OWNER}/realestate-frontend@${FRONTEND_DIGEST}" \
+              --owner "${IMAGE_OWNER}"
+
+      - name: Verify OCR service attestation
+        id: verify-ocr-service
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OCR_DIGEST: ${{ inputs.ocr-service-digest }}
+        with:
+          timeout_minutes: 3
+          max_attempts: 5
+          retry_wait_seconds: 10
+          command: |
+            gh attestation verify \
+              "oci://ghcr.io/${IMAGE_OWNER}/realestate-ocr-service@${OCR_DIGEST}" \
+              --owner "${IMAGE_OWNER}"
+
+      - name: Verify Baileys attestation
+        id: verify-baileys
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BAILEYS_DIGEST: ${{ inputs.baileys-digest }}
+        with:
+          timeout_minutes: 3
+          max_attempts: 5
+          retry_wait_seconds: 10
+          command: |
+            gh attestation verify \
+              "oci://ghcr.io/${IMAGE_OWNER}/realestate-baileys@${BAILEYS_DIGEST}" \
+              --owner "${IMAGE_OWNER}"
+
+      - name: Mask secrets
+        run: |
+          echo "::add-mask::${{ secrets.POSTGRES_PASSWORD }}"
+          echo "::add-mask::${{ secrets.JWT_SECRET }}"
+
+      - name: Ensure namespace exists
+        run: kubectl get namespace realestate || kubectl create namespace realestate
+
+      - name: Update secrets
+        run: |
+          kubectl create secret generic realestate-db-secret \
+            --namespace realestate \
+            --from-literal=username=realestate \
+            --from-literal=password="${{ secrets.POSTGRES_PASSWORD }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic realestate-db-url \
+            --namespace realestate \
+            --from-literal=DATABASE_URL="postgresql://realestate:${{ secrets.POSTGRES_PASSWORD }}@db:5432/realestate" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic realestate-app-secret \
+            --namespace realestate \
+            --from-literal=jwt-secret="${{ secrets.JWT_SECRET }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Update Caddyfile ConfigMap
+        run: |
+          kubectl create configmap caddyfile \
+            --namespace realestate \
+            --from-file=Caddyfile=infra/caddy/Caddyfile \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy application manifests
+        run: kubectl apply -k infra/k8s/app/
+
+      - name: Update container images by digest
+        id: deploy
+        env:
+          BACKEND_DIGEST: ${{ inputs.backend-digest }}
+          FRONTEND_DIGEST: ${{ inputs.frontend-digest }}
+          OCR_DIGEST: ${{ inputs.ocr-service-digest }}
+          BAILEYS_DIGEST: ${{ inputs.baileys-digest }}
+        run: |
+          kubectl set image deployment/backend \
+            "backend=ghcr.io/${IMAGE_OWNER}/realestate-backend@${BACKEND_DIGEST}" \
+            --namespace realestate
+
+          kubectl set image deployment/frontend \
+            "frontend=ghcr.io/${IMAGE_OWNER}/realestate-frontend@${FRONTEND_DIGEST}" \
+            --namespace realestate
+
+          kubectl set image deployment/ocr-service \
+            "ocr-service=ghcr.io/${IMAGE_OWNER}/realestate-ocr-service@${OCR_DIGEST}" \
+            --namespace realestate
+
+          kubectl set image deployment/baileys \
+            "baileys=ghcr.io/${IMAGE_OWNER}/realestate-baileys@${BAILEYS_DIGEST}" \
+            --namespace realestate
+
+      - name: Wait for rollout
+        id: rollout
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 5
+          command: |
+            kubectl rollout status deployment/backend --namespace realestate --timeout=120s
+            kubectl rollout status deployment/frontend --namespace realestate --timeout=120s
+            kubectl rollout status deployment/ocr-service --namespace realestate --timeout=180s
+            kubectl rollout status deployment/baileys --namespace realestate --timeout=120s
+
+      - name: Health check
+        id: health-check
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 5
+          max_attempts: 5
+          command: |
+            for DEPLOY in backend frontend ocr-service baileys; do
+              READY=$(kubectl get deployment "$DEPLOY" -n realestate \
+                -o jsonpath='{.status.readyReplicas}')
+              DESIRED=$(kubectl get deployment "$DEPLOY" -n realestate \
+                -o jsonpath='{.spec.replicas}')
+              if [ "${READY:-0}" -lt "${DESIRED:-1}" ]; then
+                echo "::error::${DEPLOY}: ${READY:-0}/${DESIRED:-1} replicas ready"
+                exit 1
+              fi
+              echo "${DEPLOY}: ${READY}/${DESIRED} replicas ready"
+            done
+            echo "All deployments healthy"
+
+      - name: Rollback on failure
+        if: failure() && steps.deploy.outcome == 'success'
+        run: |
+          echo "::warning::Deployment health check failed -- rolling back"
+          kubectl rollout undo deployment/backend --namespace realestate
+          kubectl rollout undo deployment/frontend --namespace realestate
+          kubectl rollout undo deployment/ocr-service --namespace realestate
+          kubectl rollout undo deployment/baileys --namespace realestate
+          kubectl rollout status deployment/backend --namespace realestate --timeout=120s || true
+          echo "::error::Rollback attempted. Manual verification required."
+
+      - name: Credential cleanup
+        if: always()
+        run: rm -f "${HOME}/.kube/config"

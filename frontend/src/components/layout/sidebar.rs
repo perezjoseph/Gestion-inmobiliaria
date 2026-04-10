@@ -1,0 +1,345 @@
+use yew::prelude::*;
+use yew_router::prelude::*;
+
+use crate::app::{AuthContext, Route};
+
+#[derive(Properties, PartialEq)]
+pub struct SidebarProps {
+    pub is_open: bool,
+    pub on_nav_click: Callback<()>,
+}
+
+fn icon_dashboard() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1"/>
+            <rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/>
+            <rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+    }
+}
+
+fn icon_properties() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 21V9l9-6 9 6v12"/>
+            <path d="M9 21V12h6v9"/>
+        </svg>
+    }
+}
+
+fn icon_tenants() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+    }
+}
+
+fn icon_contracts() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+    }
+}
+
+fn icon_payments() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="1" x2="12" y2="23"/>
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+    }
+}
+
+fn icon_expenses() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+        </svg>
+    }
+}
+
+fn icon_maintenance() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+        </svg>
+    }
+}
+
+fn icon_reports() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+    }
+}
+
+fn icon_users() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+    }
+}
+
+fn icon_audit() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+    }
+}
+
+fn icon_import() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+    }
+}
+
+fn icon_profile() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+        </svg>
+    }
+}
+
+fn icon_settings() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+    }
+}
+
+fn icon_chatbot() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+    }
+}
+
+fn icon_plantillas() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <path d="M3 9h18"/>
+            <path d="M9 21V9"/>
+        </svg>
+    }
+}
+
+#[component]
+pub fn Sidebar(props: &SidebarProps) -> Html {
+    let current_route = use_route::<Route>();
+    let on_nav_click = props.on_nav_click.clone();
+    let auth = use_context::<AuthContext>();
+    let user_rol = auth
+        .as_ref()
+        .and_then(|a| a.user.as_ref())
+        .map_or("", |u| u.rol.as_str());
+    let is_admin = user_rol == "admin";
+    let can_write = user_rol == "admin" || user_rol == "gerente";
+
+    let link_class = |route: &Route| -> String {
+        let is_active = current_route.as_ref() == Some(route);
+        if is_active {
+            "gi-sidebar-link gi-sidebar-link-active".to_string()
+        } else {
+            "gi-sidebar-link".to_string()
+        }
+    };
+
+    let open_class = if props.is_open { " open" } else { "" };
+
+    let make_click = |on_nav: Callback<()>| -> Callback<MouseEvent> {
+        Callback::from(move |_: MouseEvent| {
+            on_nav.emit(());
+        })
+    };
+
+    html! {
+        <aside class={format!("gi-sidebar w-64 min-h-screen flex flex-col{open_class}")}
+               role="navigation" aria-label="Menú principal">
+            <div class="gi-sidebar-brand">
+                <div class="gi-logo-mark gi-logo-mark-sm">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="7" height="9" rx="1"/>
+                        <rect x="14" y="3" width="7" height="5" rx="1"/>
+                        <rect x="3" y="15" width="7" height="6" rx="1"/>
+                        <rect x="14" y="11" width="7" height="10" rx="1"/>
+                    </svg>
+                </div>
+                <div>
+                    <span class="text-display gi-sidebar-brand-name">
+                        {"GI"}
+                    </span>
+                    <p class="gi-sidebar-brand-sub">
+                        {"Rep. Dominicana"}
+                    </p>
+                </div>
+            </div>
+            <nav class="flex-1">
+                // Operaciones
+                <div class="gi-sidebar-group">
+                    <div class="gi-sidebar-group-label">{"Operaciones"}</div>
+                    <ul class="gi-sidebar-nav">
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Dashboard}
+                                classes={classes!(link_class(&Route::Dashboard))}>
+                                {icon_dashboard()}
+                                {"Panel de Control"}
+                            </Link<Route>>
+                        </li>
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Propiedades}
+                                classes={classes!(link_class(&Route::Propiedades))}>
+                                {icon_properties()}
+                                {"Propiedades"}
+                            </Link<Route>>
+                        </li>
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Inquilinos}
+                                classes={classes!(link_class(&Route::Inquilinos))}>
+                                {icon_tenants()}
+                                {"Inquilinos"}
+                            </Link<Route>>
+                        </li>
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Contratos}
+                                classes={classes!(link_class(&Route::Contratos))}>
+                                {icon_contracts()}
+                                {"Contratos"}
+                            </Link<Route>>
+                        </li>
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Pagos}
+                                classes={classes!(link_class(&Route::Pagos))}>
+                                {icon_payments()}
+                                {"Pagos"}
+                            </Link<Route>>
+                        </li>
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Gastos}
+                                classes={classes!(link_class(&Route::Gastos))}>
+                                {icon_expenses()}
+                                {"Gastos"}
+                            </Link<Route>>
+                        </li>
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Mantenimiento}
+                                classes={classes!(link_class(&Route::Mantenimiento))}>
+                                {icon_maintenance()}
+                                {"Mantenimiento"}
+                            </Link<Route>>
+                        </li>
+                    </ul>
+                </div>
+                // Herramientas
+                <div class="gi-sidebar-group">
+                    <div class="gi-sidebar-divider" />
+                    if can_write {
+                        <div class="gi-sidebar-group-label">{"Herramientas"}</div>
+                    }
+                    <ul class="gi-sidebar-nav">
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Reportes}
+                                classes={classes!(link_class(&Route::Reportes))}>
+                                {icon_reports()}
+                                {"Reportes"}
+                            </Link<Route>>
+                        </li>
+                        if can_write {
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::Importar}
+                                    classes={classes!(link_class(&Route::Importar))}>
+                                    {icon_import()}
+                                    {"Importar"}
+                                </Link<Route>>
+                            </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::Plantillas}
+                                    classes={classes!(link_class(&Route::Plantillas))}>
+                                    {icon_plantillas()}
+                                    {"Plantillas"}
+                                </Link<Route>>
+                            </li>
+                        }
+                    </ul>
+                </div>
+                // Sistema
+                <div class="gi-sidebar-group">
+                    <div class="gi-sidebar-divider" />
+                    <div class="gi-sidebar-group-label">{"Sistema"}</div>
+                    <ul class="gi-sidebar-nav">
+                        if is_admin {
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::UsuariosPage}
+                                    classes={classes!(link_class(&Route::UsuariosPage))}>
+                                    {icon_users()}
+                                    {"Usuarios"}
+                                </Link<Route>>
+                            </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::AuditoriaPage}
+                                    classes={classes!(link_class(&Route::AuditoriaPage))}>
+                                    {icon_audit()}
+                                    {"Auditoría"}
+                                </Link<Route>>
+                            </li>
+                        }
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Configuracion}
+                                classes={classes!(link_class(&Route::Configuracion))}>
+                                {icon_settings()}
+                                {"Configuración"}
+                            </Link<Route>>
+                        </li>
+                        if can_write {
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::ConfiguracionChatbot}
+                                    classes={classes!(link_class(&Route::ConfiguracionChatbot))}>
+                                    {icon_chatbot()}
+                                    {"Chatbot WhatsApp"}
+                                </Link<Route>>
+                            </li>
+                        }
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Perfil}
+                                classes={classes!(link_class(&Route::Perfil))}>
+                                {icon_profile()}
+                                {"Mi Perfil"}
+                            </Link<Route>>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+            <div class="gi-sidebar-footer">
+                {"Gestión Inmobiliaria RD"}
+            </div>
+        </aside>
+    }
+}

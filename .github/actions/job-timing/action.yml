@@ -1,0 +1,27 @@
+name: 'Job Timing'
+description: 'Record job duration from a start timestamp'
+
+inputs:
+  start-time:
+    description: 'Unix epoch start time from a previous step'
+    required: true
+
+outputs:
+  duration:
+    description: 'Human-readable duration string'
+    value: ${{ steps.timing.outputs.duration }}
+
+runs:
+  using: composite
+  steps:
+    - name: Record duration
+      id: timing
+      shell: bash
+      env:
+        START_TIME: ${{ inputs.start-time }}
+      run: |
+        if [ -n "$START_TIME" ]; then
+          echo "duration=$(( $(date +%s) - $START_TIME ))s" >> $GITHUB_OUTPUT
+        else
+          echo "duration=n/a" >> $GITHUB_OUTPUT
+        fi

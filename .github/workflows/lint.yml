@@ -1,0 +1,62 @@
+﻿name: Lint & Format
+
+on:
+  workflow_call:
+    inputs:
+      is-fork-pr:
+        type: boolean
+        required: true
+
+permissions: {}
+
+jobs:
+  fmt:
+    name: Format (rustfmt)
+    runs-on: arc-runner-dind
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Rust setup
+        id: rust-setup
+        uses: ./.github/actions/rust-setup
+        with:
+          components: rustfmt
+
+      - name: Check formatting (rustfmt)
+        id: fmt
+        run: cargo fmt --all -- --check 2>&1 | tee "${RUNNER_TEMP}/fmt-output.txt"
+
+  gate:
+    name: Lint Gate
+    runs-on: arc-runner-dind
+    if: "!cancelled() && !inputs.is-fork-pr"
+    needs: [fmt]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          sparse-checkout: .github
+          sparse-checkout-cone-mode: true
+
+      - name: Write lint summary
+        if: "!cancelled()"
+        run: |
+          {
+            echo "## Lint & Format Results"
+            echo "| Check | Status |"
+            echo "|-------|--------|"
+            echo "| rustfmt | ${{ needs.fmt.result == 'success' && '✅ Pass' || (needs.fmt.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if any lint job failed
+        if: "!cancelled() && needs.fmt.result == 'failure'"
+        run: exit 1

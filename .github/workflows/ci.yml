@@ -1,0 +1,390 @@
+﻿name: CI
+run-name: "CI [${{ github.event_name }}] ${{ github.ref_name }} @ ${{ github.sha }}"
+
+on:
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".gitignore"
+  pull_request:
+    branches: [main, develop]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".gitignore"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+  CARGO_HTTP_CHECK_REVOKE: "true"
+  CARGO_HTTP_TIMEOUT: "30"
+  CARGO_NET_RETRY: "3"
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  # ── Stage 0: Path-Based Change Detection ──
+
+  changes:
+    name: Detect Changes
+    runs-on: arc-runner-dind
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      ocr-service: ${{ steps.filter.outputs.ocr-service }}
+      baileys-service: ${{ steps.filter.outputs.baileys-service }}
+      ci: ${{ steps.filter.outputs.ci }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Detect changed paths
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            frontend:
+              - 'frontend/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            ocr-service:
+              - 'ocr-service/**'
+            baileys-service:
+              - 'baileys-service/**'
+            ci:
+              - '.github/**'
+
+  # ── Stage 1: All quality checks in parallel ──
+
+  security:
+    name: Security
+    needs: [changes]
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+      security-events: write
+    uses: ./.github/workflows/security.yml
+    with:
+      is-pr: ${{ github.event_name == 'pull_request' }}
+      is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+
+  codeql:
+    name: CodeQL
+    needs: [changes]
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/codeql.yml
+    with:
+      is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+
+  lint:
+    name: Lint
+    needs: [changes]
+    if: >-
+      github.event_name != 'pull_request' ||
+      needs.changes.outputs.backend == 'true' ||
+      needs.changes.outputs.frontend == 'true' ||
+      needs.changes.outputs.ci == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/lint.yml
+    with:
+      is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+
+  # Build & Test runs clippy + tests + release build in unified jobs
+  # (one Rust compilation per target instead of three separate ones)
+  build-and-test:
+    name: Build & Test
+    needs: [changes]
+    if: >-
+      github.event_name != 'pull_request' ||
+      needs.changes.outputs.backend == 'true' ||
+      needs.changes.outputs.frontend == 'true' ||
+      needs.changes.outputs.ci == 'true'
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/build-and-test.yml
+    with:
+      is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+      is-production: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+
+  # ── Stage 1.5: Baileys Container (Node.js — no Rust dependency, runs parallel with build-and-test) ──
+
+  baileys-container:
+    name: Baileys Container
+    needs: [changes]
+    if: >-
+      github.event_name != 'pull_request' ||
+      needs.changes.outputs.baileys-service == 'true' ||
+      needs.changes.outputs.ci == 'true'
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      id-token: write
+      attestations: write
+    runs-on: arc-runner-dind
+    timeout-minutes: 30
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    env:
+      DOCKER_CONTENT_TRUST: "1"
+      IMAGE_OWNER: ${{ github.repository_owner }}
+      IMAGE_TAG: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && github.sha || format('preprod-{0}', github.sha) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+        with:
+          buildkitd-config-inline: |
+            [registry."ghcr.io"]
+              mirrors = ["ghcr.io"]
+            [registry."ghcr.io".tls]
+              insecureSkipVerify = false
+
+      - name: Build and push Baileys container image
+        id: push
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
+        env:
+          BUILDKIT_STEP_LOG_MAX_SIZE: 10485760
+        with:
+          context: ./baileys-service
+          file: ./baileys-service/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-baileys:${{ env.IMAGE_TAG }}
+            ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && format('ghcr.io/{0}/realestate-baileys:latest', github.repository_owner) || '' }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-baileys:buildcache
+          cache-to: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && format('type=registry,ref=ghcr.io/{0}/realestate-baileys:buildcache,mode=max', github.repository_owner) || '' }}
+
+      - name: Install Trivy
+        uses: ./.github/actions/install-security-tools
+        with:
+          trivy: 'true'
+
+      - name: Scan container image for vulnerabilities
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 20
+          max_attempts: 2
+          command: |
+            trivy image --exit-code 0 --severity CRITICAL,HIGH \
+              --no-progress --format table \
+              ghcr.io/${{ env.IMAGE_OWNER }}/realestate-baileys@${{ steps.push.outputs.digest }} \
+              2>&1 | tee "${RUNNER_TEMP}/trivy-baileys-image.txt"
+
+      - name: Attest build provenance
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-baileys
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Credential cleanup
+        if: always()
+        run: |
+          docker logout ghcr.io 2>/dev/null || true
+          rm -f "${HOME}/.docker/config.json" 2>/dev/null || true
+
+  # ── Stage 1.5: OCR Container (Python — no Rust dependency, runs parallel with build-and-test) ──
+
+  ocr-container:
+    name: OCR Container
+    needs: [changes]
+    if: >-
+      github.event_name != 'pull_request' ||
+      needs.changes.outputs.ocr-service == 'true' ||
+      needs.changes.outputs.ci == 'true'
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      id-token: write
+      attestations: write
+    runs-on: arc-runner-dind
+    timeout-minutes: 60
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    env:
+      DOCKER_CONTENT_TRUST: "1"
+      IMAGE_OWNER: ${{ github.repository_owner }}
+      IMAGE_TAG: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && github.sha || format('preprod-{0}', github.sha) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+        with:
+          buildkitd-config-inline: |
+            [registry."ghcr.io"]
+              mirrors = ["ghcr.io"]
+            [registry."ghcr.io".tls]
+              insecureSkipVerify = false
+
+      - name: Build and push OCR service container image
+        id: push
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
+        env:
+          BUILDKIT_STEP_LOG_MAX_SIZE: 10485760
+        with:
+          context: ./ocr-service
+          file: ./ocr-service/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service:${{ env.IMAGE_TAG }}
+            ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && format('ghcr.io/{0}/realestate-ocr-service:latest', github.repository_owner) || '' }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-ocr-service:buildcache
+          cache-to: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && format('type=registry,ref=ghcr.io/{0}/realestate-ocr-service:buildcache,mode=max', github.repository_owner) || '' }}
+          outputs: type=registry,compression=zstd,compression-level=3,force-compression=true
+
+      - name: Install Trivy
+        uses: ./.github/actions/install-security-tools
+        with:
+          trivy: 'true'
+
+      - name: Scan container image for vulnerabilities
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 20
+          max_attempts: 2
+          command: |
+            trivy image --exit-code 0 --severity CRITICAL,HIGH \
+              --no-progress --format table \
+              ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ steps.push.outputs.digest }} \
+              2>&1 | tee "${RUNNER_TEMP}/trivy-ocr-service-image.txt"
+
+      - name: Generate SARIF report
+        if: "!cancelled()"
+        run: |
+          umask 077
+          trivy image --severity CRITICAL,HIGH,MEDIUM \
+            --no-progress --format sarif --output ocr-service-image.sarif \
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ steps.push.outputs.digest }} || true
+
+      - name: Generate container SBOM
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          umask 077
+          trivy image --format cyclonedx --output ocr-service-container-sbom.cdx.json \
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ steps.push.outputs.digest }}
+
+      - name: Upload OCR service container SBOM
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: ocr-service-container-sbom
+          path: ocr-service-container-sbom.cdx.json
+          retention-days: 30
+
+      - name: Upload SARIF to GitHub Security
+        if: "!cancelled() && hashFiles('ocr-service-image.sarif') != ''"
+        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        with:
+          sarif_file: ocr-service-image.sarif
+          category: trivy-ocr-service-image
+        continue-on-error: true
+
+      - name: Attest build provenance
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Credential cleanup
+        if: always()
+        run: |
+          docker logout ghcr.io 2>/dev/null || true
+          rm -f "${HOME}/.docker/config.json" 2>/dev/null || true
+          rm -f ocr-service-image.sarif ocr-service-container-sbom.cdx.json 2>/dev/null || true
+
+  # ── Stage 2: Container Images (after build-and-test + security + lint pass) ──
+
+  containers:
+    name: Containers
+    needs: [build-and-test, security, lint]
+    if: |
+      !cancelled() &&
+      needs.build-and-test.result == 'success' &&
+      (needs.security.result == 'success' || needs.security.result == 'skipped') &&
+      (needs.lint.result == 'success' || needs.lint.result == 'skipped')
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/containers.yml
+    with:
+      is-production: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+
+  # ── Stage 3: Deploy (after all containers are pushed) ──
+
+  deploy:
+    name: Deploy
+    needs: [containers, ocr-container, baileys-container]
+    if: >-
+      github.ref == 'refs/heads/main' && github.event_name == 'push' &&
+      needs.containers.result == 'success' &&
+      (needs.ocr-container.result == 'success' || needs.ocr-container.result == 'skipped') &&
+      (needs.baileys-container.result == 'success' || needs.baileys-container.result == 'skipped')
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/deploy.yml
+    with:
+      backend-digest: ${{ needs.containers.outputs.backend-digest }}
+      frontend-digest: ${{ needs.containers.outputs.frontend-digest }}
+      ocr-service-digest: ${{ needs.ocr-container.outputs.digest }}
+      baileys-digest: ${{ needs.baileys-container.outputs.digest }}
+    secrets:
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_DATA }}

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arc-systems-v2
+  labels:
+    app.kubernetes.io/part-of: arc
+    app.kubernetes.io/component: controller
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arc-runners-v2
+  labels:
+    app.kubernetes.io/part-of: arc
+    app.kubernetes.io/component: runners

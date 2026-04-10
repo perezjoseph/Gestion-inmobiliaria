@@ -1,0 +1,383 @@
+name: Build & Test
+
+on:
+  workflow_call:
+    inputs:
+      is-fork-pr:
+        type: boolean
+        required: true
+      is-production:
+        description: "Whether this is a production build (main push). Controls SBOM generation."
+        type: boolean
+        required: false
+        default: false
+permissions: {}
+
+jobs:
+  # ── Backend: clippy → test (with coverage) → release build ──
+  # Single Rust compilation warms sccache; subsequent steps are near-instant.
+  # Runs on dind runner because tests need a postgres service container.
+  backend:
+    name: Backend (Clippy + Test + Build)
+    runs-on: arc-runner-dind
+    timeout-minutes: 60
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      SERVER_PORT: "8080"
+      CORS_ORIGIN: http://localhost:8080
+    services:
+      postgres:
+        image: postgres:16@sha256:5a65324fe84dc41709ff914e90b07f3e2f577073ed27bf917d4873aca0c9ec51
+        env:
+          POSTGRES_DB: realestate
+          POSTGRES_USER: realestate
+          POSTGRES_PASSWORD: realestate_dev_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U realestate"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+          --health-start-period 15s
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Rust setup
+        id: rust-setup
+        uses: ./.github/actions/rust-setup
+        with:
+          components: clippy,llvm-tools-preview
+          targets: x86_64-unknown-linux-musl
+
+      # ── Phase 1: Clippy (compiles everything, warms sccache) ──
+      - name: Clippy backend
+        id: clippy
+        run: |
+          umask 077
+          set +e
+          cargo clippy --locked -p realestate-backend --message-format=json -- -D warnings \
+            > "${RUNNER_TEMP}/clippy-backend.json" 2>"${RUNNER_TEMP}/clippy-backend-stderr.txt"
+          RESULT=$?
+          set -e
+          jq -r 'select(.reason == "compiler-message") | .message.rendered // empty' \
+            "${RUNNER_TEMP}/clippy-backend.json" > "${RUNNER_TEMP}/clippy-backend-output.txt" 2>/dev/null || true
+          if [ $RESULT -ne 0 ]; then
+            if [ -s "${RUNNER_TEMP}/clippy-backend-output.txt" ]; then
+              cat "${RUNNER_TEMP}/clippy-backend-output.txt"
+            else
+              echo "--- stderr (no clippy JSON output -- likely a cargo-level error) ---"
+              cat "${RUNNER_TEMP}/clippy-backend-stderr.txt" 2>/dev/null || true
+            fi
+            echo "::error::backend clippy found warnings/errors."
+            exit 1
+          fi
+
+      - name: Upload clippy backend report
+        if: "!cancelled() && hashFiles(format('{0}/clippy-backend.json', runner.temp)) != ''"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: clippy-backend-report
+          path: ${{ runner.temp }}/clippy-backend.json
+          retention-days: 1
+
+      # ── Phase 2: Tests with coverage ──
+      - name: Mask database credentials
+        run: |
+          echo "::add-mask::realestate_dev_password"
+          echo "::add-mask::realestate"
+
+      - name: Set database URL
+        run: echo "DATABASE_URL=postgresql://realestate:realestate_dev_password@localhost:5432/realestate" >> $GITHUB_ENV
+
+      - name: Generate JWT secret for tests
+        run: |
+          JWT_SECRET=$(openssl rand -hex 32)
+          echo "::add-mask::$JWT_SECRET"
+          echo "JWT_SECRET=$JWT_SECRET" >> $GITHUB_ENV
+
+      - name: Wait for Postgres port
+        run: |
+          for i in $(seq 1 15); do
+            if bash -c 'echo > /dev/tcp/localhost/5432' 2>/dev/null; then
+              echo "Postgres port ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Postgres port not reachable"
+          exit 1
+
+      - name: Install cargo-llvm-cov
+        id: install-llvm-cov
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 5
+          retry_wait_seconds: 10
+          command: |
+            LLVM_COV_VERSION="0.8.4"
+            ARCHIVE="${RUNNER_TEMP}/cargo-llvm-cov.tar.gz"
+            curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+              "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v${LLVM_COV_VERSION}/cargo-llvm-cov-x86_64-unknown-linux-musl.tar.gz"
+            for dir in "${HOME}/.cargo" "${HOME}/.cargo/bin"; do
+              mkdir -p "$dir" 2>/dev/null || sudo mkdir -p "$dir"
+              if [ ! -w "$dir" ]; then
+                sudo chown -R "$(id -u):$(id -g)" "${HOME}/.cargo"
+              fi
+            done
+            tar xzf "$ARCHIVE" --no-same-owner -C "${HOME}/.cargo/bin" cargo-llvm-cov
+            rm -f "$ARCHIVE"
+            chmod +x "${HOME}/.cargo/bin/cargo-llvm-cov"
+            cargo llvm-cov --version
+
+      - name: Run tests with coverage (llvm-cov)
+        id: tests
+        env:
+          PROPTEST_CASES: "20"
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 30
+          max_attempts: 5
+          command: |
+            mkdir -p coverage
+            cargo llvm-cov test --locked -p realestate-backend \
+              --lcov --output-path coverage/lcov.info 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
+            exit ${PIPESTATUS[0]}
+
+      - name: Upload coverage artifact
+        if: steps.tests.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: backend-coverage
+          path: coverage/lcov.info
+          retention-days: 7
+
+      # ── Phase 3: Release build (sccache makes this fast after clippy+test) ──
+      - name: Build backend release binary
+        id: build
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 30
+          max_attempts: 5
+          command: |
+            cargo build --locked -p realestate-backend --profile ci-release --target x86_64-unknown-linux-musl 2>&1 | tee "${RUNNER_TEMP}/build-backend-output.txt"
+            exit ${PIPESTATUS[0]}
+
+      - name: Verify Cargo.lock is up to date
+        run: |
+          if ! git diff --quiet Cargo.lock; then
+            echo "::error::Cargo.lock is out of date. Run 'cargo update' locally and commit the changes."
+            git diff Cargo.lock
+            exit 1
+          fi
+
+      - name: Install security tools
+        if: inputs.is-production
+        uses: ./.github/actions/install-security-tools
+        with:
+          trivy: 'true'
+
+      - name: Generate SBOM
+        if: inputs.is-production
+        run: |
+          umask 077
+          trivy fs --format cyclonedx --output backend-sbom.cdx.json .
+
+      - name: Upload backend binary artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: backend-binary
+          path: ${{ env.CARGO_TARGET_DIR || 'target' }}/x86_64-unknown-linux-musl/ci-release/realestate-backend
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload backend SBOM
+        if: inputs.is-production
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: backend-sbom
+          path: backend-sbom.cdx.json
+          retention-days: 30
+
+      - name: Attest build provenance
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: ${{ env.CARGO_TARGET_DIR || 'target' }}/x86_64-unknown-linux-musl/ci-release/realestate-backend
+
+      - name: Write backend summary
+        if: "!cancelled()"
+        run: |
+          {
+            echo "## Backend Results"
+            echo "| Check | Status |"
+            echo "|-------|--------|"
+            echo "| Clippy | ${{ steps.clippy.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| Tests & Coverage | ${{ steps.tests.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| Release Build | ${{ steps.build.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Frontend: clippy → test → trunk release build ──
+  # Single Rust compilation warms sccache; subsequent steps are near-instant.
+  frontend:
+    name: Frontend (Clippy + Test + Build)
+    runs-on: arc-runner-dind
+    timeout-minutes: 45
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Rust setup
+        id: rust-setup
+        uses: ./.github/actions/rust-setup
+        with:
+          components: clippy
+          targets: wasm32-unknown-unknown
+
+      # ── Phase 1: Clippy (compiles everything, warms sccache) ──
+      - name: Clippy frontend
+        id: clippy
+        run: |
+          umask 077
+          set +e
+          cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend --message-format=json -- -D warnings \
+            > "${RUNNER_TEMP}/clippy-frontend.json" 2>"${RUNNER_TEMP}/clippy-frontend-stderr.txt"
+          RESULT=$?
+          set -e
+          jq -r 'select(.reason == "compiler-message") | .message.rendered // empty' \
+            "${RUNNER_TEMP}/clippy-frontend.json" > "${RUNNER_TEMP}/clippy-frontend-output.txt" 2>/dev/null || true
+          if [ $RESULT -ne 0 ]; then
+            if [ -s "${RUNNER_TEMP}/clippy-frontend-output.txt" ]; then
+              cat "${RUNNER_TEMP}/clippy-frontend-output.txt"
+            else
+              echo "--- stderr (no clippy JSON output -- likely a cargo-level error) ---"
+              cat "${RUNNER_TEMP}/clippy-frontend-stderr.txt" 2>/dev/null || true
+            fi
+            echo "::error::frontend clippy found warnings/errors."
+            exit 1
+          fi
+
+      - name: Upload clippy frontend report
+        if: "!cancelled() && hashFiles(format('{0}/clippy-frontend.json', runner.temp)) != ''"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: clippy-frontend-report
+          path: ${{ runner.temp }}/clippy-frontend.json
+          retention-days: 1
+
+      # ── Phase 2: Tests ──
+      - name: Run frontend tests
+        id: tests
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 30
+          max_attempts: 5
+          command: |
+            cargo test --locked -p realestate-frontend --all-targets 2>&1 | tee "${RUNNER_TEMP}/test-frontend-output.txt"
+            exit ${PIPESTATUS[0]}
+
+      # ── Phase 3: Trunk release build (sccache makes this fast) ──
+      - name: Install Trunk
+        id: install-trunk
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 5
+          retry_wait_seconds: 10
+          command: |
+            TRUNK_VERSION="0.21.14"
+            TRUNK_SHA256="a67f4054b249fe9acc5fabc25de1aebf19783aca3ad6ff64bf34d7da44d0ea20"
+            ARCHIVE="${RUNNER_TEMP}/trunk.tar.gz"
+            curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+              "https://github.com/trunk-rs/trunk/releases/download/v${TRUNK_VERSION}/trunk-x86_64-unknown-linux-musl.tar.gz"
+            echo "${TRUNK_SHA256}  ${ARCHIVE}" | sha256sum -c -
+            mkdir -p "${HOME}/.local/bin"
+            tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" trunk
+            rm -f "$ARCHIVE"
+            chmod +x "${HOME}/.local/bin/trunk"
+            export PATH="${HOME}/.local/bin:$PATH"
+            echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+            trunk --version
+
+      - name: Pre-install wasm-bindgen-cli
+        run: |
+          export PATH="${HOME}/.local/bin:$HOME/.cargo/bin:$PATH"
+          WASM_BINDGEN_VERSION=$(grep -A1 '^name = "wasm-bindgen"' Cargo.lock | grep -oP 'version = "\K[^"]+')
+          if [ -z "$WASM_BINDGEN_VERSION" ]; then
+            echo "::error::Could not determine wasm-bindgen version from Cargo.lock"
+            exit 1
+          fi
+          if ! wasm-bindgen --version 2>/dev/null | grep -q "$WASM_BINDGEN_VERSION"; then
+            cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION" --locked
+          fi
+
+      - name: Build frontend with Trunk
+        id: build
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 30
+          max_attempts: 5
+          command: |
+            export PATH="${HOME}/.local/bin:$HOME/.cargo/bin:$PATH"
+            cd frontend/
+            trunk build --release 2>&1 | tee "${RUNNER_TEMP}/build-frontend-output.txt"
+            exit ${PIPESTATUS[0]}
+
+      - name: Install security tools
+        if: inputs.is-production
+        uses: ./.github/actions/install-security-tools
+        with:
+          trivy: 'true'
+
+      - name: Generate SBOM
+        if: inputs.is-production
+        run: |
+          umask 077
+          trivy fs --format cyclonedx --output frontend-sbom.cdx.json frontend/
+
+      - name: Upload frontend dist artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload frontend SBOM
+        if: inputs.is-production
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: frontend-sbom
+          path: frontend-sbom.cdx.json
+          retention-days: 30
+
+      - name: Attest build provenance
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: frontend/dist/
+
+      - name: Write frontend summary
+        if: "!cancelled()"
+        run: |
+          {
+            echo "## Frontend Results"
+            echo "| Check | Status |"
+            echo "|-------|--------|"
+            echo "| Clippy | ${{ steps.clippy.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| Tests | ${{ steps.tests.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| Trunk Build | ${{ steps.build.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

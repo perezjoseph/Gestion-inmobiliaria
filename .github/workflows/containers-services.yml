@@ -1,0 +1,226 @@
+name: Service Container Images
+
+on:
+  workflow_call:
+    inputs:
+      is-production:
+        description: "Whether this is a production build (main push). Controls tagging and latest."
+        type: boolean
+        required: true
+      build-ocr:
+        description: "Whether to build the OCR service container"
+        type: boolean
+        required: false
+        default: true
+      build-baileys:
+        description: "Whether to build the Baileys service container"
+        type: boolean
+        required: false
+        default: true
+    outputs:
+      ocr-service-digest:
+        value: ${{ jobs.container-image-ocr-service.outputs.digest }}
+      baileys-digest:
+        value: ${{ jobs.container-image-baileys.outputs.digest }}
+
+permissions: {}
+
+jobs:
+  container-image-ocr-service:
+    name: Container Image (OCR Service)
+    if: inputs.build-ocr
+    runs-on: arc-runner-dind
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      id-token: write
+      attestations: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    env:
+      DOCKER_CONTENT_TRUST: "1"
+      IMAGE_OWNER: ${{ github.repository_owner }}
+      IMAGE_TAG: ${{ inputs.is-production && github.sha || format('preprod-{0}', github.sha) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+        with:
+          buildkitd-config-inline: |
+            [registry."ghcr.io"]
+              mirrors = ["ghcr.io"]
+            [registry."ghcr.io".tls]
+              insecureSkipVerify = false
+
+      - name: Build and push OCR service container image
+        id: push
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
+        env:
+          BUILDKIT_STEP_LOG_MAX_SIZE: 10485760
+        with:
+          context: ./ocr-service
+          file: ./ocr-service/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service:${{ env.IMAGE_TAG }}
+            ${{ inputs.is-production && format('ghcr.io/{0}/realestate-ocr-service:latest', github.repository_owner) || '' }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-ocr-service:buildcache
+          cache-to: ${{ inputs.is-production && format('type=registry,ref=ghcr.io/{0}/realestate-ocr-service:buildcache,mode=max', github.repository_owner) || '' }}
+          outputs: type=registry,compression=zstd,compression-level=3,force-compression=true
+
+      - name: Install Trivy
+        uses: ./.github/actions/install-security-tools
+        with:
+          trivy: 'true'
+
+      - name: Scan container image for vulnerabilities
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 20
+          max_attempts: 2
+          command: |
+            trivy image --exit-code 0 --severity CRITICAL,HIGH \
+              --no-progress --format table \
+              ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ steps.push.outputs.digest }} \
+              2>&1 | tee "${RUNNER_TEMP}/trivy-ocr-service-image.txt"
+
+      - name: Generate SARIF report
+        if: "!cancelled()"
+        run: |
+          umask 077
+          trivy image --severity CRITICAL,HIGH,MEDIUM \
+            --no-progress --format sarif --output ocr-service-image.sarif \
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ steps.push.outputs.digest }} || true
+
+      - name: Generate container SBOM
+        if: inputs.is-production
+        run: |
+          umask 077
+          trivy image --format cyclonedx --output ocr-service-container-sbom.cdx.json \
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ steps.push.outputs.digest }}
+
+      - name: Upload OCR service container SBOM
+        if: inputs.is-production
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: ocr-service-container-sbom
+          path: ocr-service-container-sbom.cdx.json
+          retention-days: 30
+
+      - name: Upload SARIF to GitHub Security
+        if: "!cancelled() && hashFiles('ocr-service-image.sarif') != ''"
+        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        with:
+          sarif_file: ocr-service-image.sarif
+          category: trivy-ocr-service-image
+        continue-on-error: true
+
+      - name: Attest build provenance
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Credential cleanup
+        if: always()
+        run: |
+          docker logout ghcr.io 2>/dev/null || true
+          rm -f "${HOME}/.docker/config.json" 2>/dev/null || true
+          rm -f ocr-service-image.sarif ocr-service-container-sbom.cdx.json 2>/dev/null || true
+
+  container-image-baileys:
+    name: Container Image (Baileys)
+    if: inputs.build-baileys
+    runs-on: arc-runner-dind
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      id-token: write
+      attestations: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    env:
+      DOCKER_CONTENT_TRUST: "1"
+      IMAGE_OWNER: ${{ github.repository_owner }}
+      IMAGE_TAG: ${{ inputs.is-production && github.sha || format('preprod-{0}', github.sha) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+        with:
+          buildkitd-config-inline: |
+            [registry."ghcr.io"]
+              mirrors = ["ghcr.io"]
+            [registry."ghcr.io".tls]
+              insecureSkipVerify = false
+
+      - name: Build and push Baileys container image
+        id: push
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
+        env:
+          BUILDKIT_STEP_LOG_MAX_SIZE: 10485760
+        with:
+          context: ./baileys-service
+          file: ./baileys-service/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-baileys:${{ env.IMAGE_TAG }}
+            ${{ inputs.is-production && format('ghcr.io/{0}/realestate-baileys:latest', github.repository_owner) || '' }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-baileys:buildcache
+          cache-to: ${{ inputs.is-production && format('type=registry,ref=ghcr.io/{0}/realestate-baileys:buildcache,mode=max', github.repository_owner) || '' }}
+
+      - name: Install Trivy
+        uses: ./.github/actions/install-security-tools
+        with:
+          trivy: 'true'
+
+      - name: Scan container image for vulnerabilities
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 20
+          max_attempts: 2
+          command: |
+            trivy image --exit-code 0 --severity CRITICAL,HIGH \
+              --no-progress --format table \
+              ghcr.io/${{ env.IMAGE_OWNER }}/realestate-baileys@${{ steps.push.outputs.digest }} \
+              2>&1 | tee "${RUNNER_TEMP}/trivy-baileys-image.txt"
+
+      - name: Attest build provenance
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-baileys
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Credential cleanup
+        if: always()
+        run: |
+          docker logout ghcr.io 2>/dev/null || true
+          rm -f "${HOME}/.docker/config.json" 2>/dev/null || true

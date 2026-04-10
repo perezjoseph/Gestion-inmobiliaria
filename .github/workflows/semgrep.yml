@@ -1,0 +1,98 @@
+on:
+  workflow_dispatch: {}
+  pull_request: {}
+  push:
+    branches:
+    - main
+    - master
+    paths:
+    - .github/workflows/semgrep.yml
+  schedule:
+  # random HH:MM to avoid a load spike on GitHub Actions at 00:00
+  - cron: 9 6 * * *
+name: Semgrep
+permissions: {}
+jobs:
+  semgrep:
+    name: semgrep/ci
+    runs-on: arc-runner-dind
+    permissions:
+      contents: read
+    env:
+      SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+    container:
+      image: semgrep/semgrep
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: false
+    - run: semgrep ci
+
+  semgrep-community:
+    name: semgrep/community-rules
+    runs-on: arc-runner-dind
+    permissions:
+      contents: read
+    container:
+      image: semgrep/semgrep
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: false
+    - name: Run enterprise security rules (SOC 1/2/3)
+      run: |
+        semgrep scan \
+          --config "p/rust" \
+          --config "p/kotlin" \
+          --config "p/java" \
+          --config "p/python" \
+          --config "p/fastapi" \
+          --config "p/owasp-top-ten" \
+          --config "p/cwe-top-25" \
+          --config "p/command-injection" \
+          --config "p/sql-injection" \
+          --config "p/xss" \
+          --config "p/jwt" \
+          --config "p/insecure-transport" \
+          --config "p/secrets" \
+          --config "p/security-audit" \
+          --config "p/trailofbits" \
+          --config "p/supply-chain" \
+          --config "p/docker" \
+          --config "p/dockerfile" \
+          --config "p/kubernetes" \
+          --config "p/github-actions" \
+          --config "p/r2c-security-audit" \
+          --config "p/r2c-best-practices" \
+          --config "p/gitleaks" \
+          --config "p/default" \
+          --error \
+          --json \
+          --output semgrep-community-results.json \
+          . || true
+        semgrep scan \
+          --config "p/rust" \
+          --config "p/kotlin" \
+          --config "p/java" \
+          --config "p/python" \
+          --config "p/fastapi" \
+          --config "p/owasp-top-ten" \
+          --config "p/cwe-top-25" \
+          --config "p/command-injection" \
+          --config "p/sql-injection" \
+          --config "p/xss" \
+          --config "p/jwt" \
+          --config "p/insecure-transport" \
+          --config "p/secrets" \
+          --config "p/security-audit" \
+          --config "p/trailofbits" \
+          --config "p/supply-chain" \
+          --config "p/docker" \
+          --config "p/dockerfile" \
+          --config "p/kubernetes" \
+          --config "p/github-actions" \
+          --config "p/r2c-security-audit" \
+          --config "p/r2c-best-practices" \
+          --config "p/gitleaks" \
+          --config "p/default" \
+          .

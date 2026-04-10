@@ -1,0 +1,46 @@
+pub mod ai_module;
+pub mod auditoria;
+pub mod auth;
+pub mod background_jobs;
+pub mod baileys_client;
+pub mod chatbot;
+#[cfg(test)]
+mod chatbot_pbt;
+pub mod configuracion;
+pub mod contratos;
+pub mod dashboard;
+pub mod documento_editor;
+#[cfg(test)]
+mod documento_editor_pbt;
+pub mod documentos;
+pub mod firmas;
+#[cfg(test)]
+mod firmas_pbt;
+pub mod gastos;
+pub mod importacion;
+pub mod inquilinos;
+pub mod invitaciones;
+pub mod mantenimiento;
+pub mod notificaciones;
+pub mod ocr_client;
+pub mod ocr_mapping;
+#[cfg(test)]
+mod ocr_mapping_pbt;
+#[cfg(test)]
+mod ocr_mapping_tests;
+pub mod ocr_preview;
+pub mod organizaciones;
+pub mod pago_generacion;
+pub mod pagos;
+pub mod perfil;
+pub mod plantillas;
+#[cfg(test)]
+mod plantillas_pbt;
+pub mod propiedades;
+pub mod recargos;
+pub mod recibos;
+pub mod reportes;
+pub mod unidades;
+pub mod usuarios;
+pub mod validacion_fiscal;
+pub mod validation;
