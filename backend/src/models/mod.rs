@@ -1,0 +1,16 @@
+pub mod contrato;
+pub mod inquilino;
+pub mod pago;
+pub mod propiedad;
+pub mod usuario;
+
+use serde::Serialize;
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PaginatedResponse<T: Serialize> {
+    pub data: Vec<T>,
+    pub total: u64,
+    pub page: u64,
+    pub per_page: u64,
+}

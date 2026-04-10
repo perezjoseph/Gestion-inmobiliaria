@@ -1,0 +1,44 @@
+mod app;
+mod config;
+mod entities;
+mod errors;
+mod handlers;
+mod middleware;
+mod models;
+mod routes;
+mod services;
+
+#[path = "../migrations/mod.rs"]
+pub mod migrations;
+
+use sea_orm::Database;
+use sea_orm_migration::MigratorTrait;
+use tracing_subscriber::EnvFilter;
+
+use crate::config::AppConfig;
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .init();
+
+    let config = AppConfig::from_env().expect("Error cargando configuración");
+
+    let db = Database::connect(&config.database_url)
+        .await
+        .expect("Error conectando a la base de datos");
+
+    migrations::Migrator::up(&db, None)
+        .await
+        .expect("Error ejecutando migraciones");
+
+    let port = config.server_port;
+
+    tracing::info!("Servidor iniciando en 0.0.0.0:{}", port);
+
+    actix_web::HttpServer::new(move || app::create_app(db.clone(), config.clone()))
+        .bind(("0.0.0.0", port))?
+        .run()
+        .await
+}

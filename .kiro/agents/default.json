@@ -1,0 +1,25 @@
+{
+  "name": "default",
+  "resources": ["file://.kiro/steering/**/*.md"],
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    }
+  },
+  "hooks": {
+    "postToolUse": [
+      {
+        "matcher": "fs_write",
+        "command": "bash .kiro/hooks/rustfmt.sh",
+        "description": "Run cargo fmt after writing Rust files"
+      }
+    ],
+    "stop": [
+      {
+        "command": "bash .kiro/hooks/clippy.sh",
+        "description": "Run cargo clippy to enforce zero warnings"
+      }
+    ]
+  }
+}

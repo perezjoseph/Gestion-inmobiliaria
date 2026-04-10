@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Optimization Agent — Post Task",
+  "description": "Runs the optimization agent in the background after each completed spec task",
+  "version": "1",
+  "when": {
+    "type": "postTaskExecution"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "start /b .kiro\\run-optimization-agent.cmd"
+  }
+}

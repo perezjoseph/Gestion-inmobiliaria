@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Optimization Agent — On Demand",
+  "description": "Manually trigger the optimization agent in the background",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "start /b .kiro\\run-optimization-agent.cmd"
+  }
+}

@@ -1,0 +1,54 @@
+use actix_cors::Cors;
+use actix_web::error::ResponseError;
+use actix_web::http::header;
+use actix_web::web;
+use actix_web::web::JsonConfig;
+use sea_orm::DatabaseConnection;
+use tracing_actix_web::TracingLogger;
+
+use crate::config::AppConfig;
+use crate::errors::AppError;
+use crate::routes;
+
+fn build_cors(config: &AppConfig) -> Cors {
+    match config.cors_origin.as_deref() {
+        Some(origin) => Cors::default()
+            .allowed_origin(origin)
+            .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+            .allowed_headers(vec![header::AUTHORIZATION, header::CONTENT_TYPE])
+            .max_age(3600),
+        None => Cors::permissive(),
+    }
+}
+
+pub fn create_app(
+    db: DatabaseConnection,
+    config: AppConfig,
+) -> actix_web::App<
+    impl actix_web::dev::ServiceFactory<
+        actix_web::dev::ServiceRequest,
+        Config = (),
+        Response = actix_web::dev::ServiceResponse<impl actix_web::body::MessageBody>,
+        Error = actix_web::Error,
+        InitError = (),
+    >,
+> {
+    let cors = build_cors(&config);
+
+    let json_cfg = JsonConfig::default().error_handler(|err, _req| {
+        let message = err.to_string();
+        actix_web::error::InternalError::from_response(
+            err,
+            AppError::Validation(message).error_response(),
+        )
+        .into()
+    });
+
+    actix_web::App::new()
+        .wrap(TracingLogger::default())
+        .wrap(cors)
+        .app_data(web::Data::new(db))
+        .app_data(web::Data::new(config))
+        .app_data(json_cfg)
+        .configure(routes::configure)
+}
