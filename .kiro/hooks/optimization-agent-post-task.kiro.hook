@@ -1,13 +1,13 @@
 {
-  "enabled": true,
-  "name": "Optimization Agent — Post Task",
-  "description": "Runs the optimization agent in the background after each completed spec task",
+  "enabled": false,
+  "name": "Orchestrator — Post Task",
+  "description": "Runs the orchestrator agent in the background after each completed spec task to coordinate optimization and security hardening",
   "version": "1",
   "when": {
     "type": "postTaskExecution"
   },
   "then": {
     "type": "runCommand",
-    "command": "start /b .kiro\\run-optimization-agent.cmd"
+    "command": "wsl -u jperez -d Ubuntu-22.04 bash -lc \"bash .kiro/run-orchestrator-agent.sh\""
   }
 }

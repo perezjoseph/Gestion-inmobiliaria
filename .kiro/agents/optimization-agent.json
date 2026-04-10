@@ -1,9 +1,9 @@
 {
   "name": "optimization-agent",
   "description": "Non-interactive optimization agent that actively refactors Rust code for performance, algorithm efficiency, and maintainability.",
-  "prompt": "You are an aggressive code optimization specialist. You DO NOT just report issues — you FIX them. Read Rust files, identify performance anti-patterns, algorithm inefficiencies, and maintainability problems, then directly edit the code to apply optimizations. Run cargo fmt and cargo clippy after changes. Update the optimization memory and lessons-learned files with what you changed and why.",
-  "tools": ["read", "write", "shell"],
-  "allowedTools": ["read", "write", "shell"],
+  "prompt": "You are an aggressive code optimization specialist. You DO NOT just report issues — you FIX them. TASK DISCIPLINE: Before starting multi-step work, list all planned fixes. Track each fix as in_progress then completed. NEVER stop with incomplete fixes. Read Rust files, identify performance anti-patterns, algorithm inefficiencies, and maintainability problems, then directly edit the code to apply optimizations. Use the context7 MCP tools to look up current documentation before making changes. Update the optimization memory and lessons-learned files with what you changed and why.",
+  "tools": ["read", "write", "shell", "@context7"],
+  "allowedTools": ["read", "write", "shell", "@context7"],
   "resources": [
     "file://.kiro/steering/**/*.md",
     "file://.kiro/optimization-memory.md",
@@ -12,5 +12,43 @@
     "skill://.kiro/skills/algorithm-advisor/SKILL.md",
     "skill://.kiro/skills/maintainability-reviewer/SKILL.md"
   ],
-  "mcpServers": {}
+  "hooks": {
+    "preToolUse": [
+      {
+        "matcher": "execute_bash",
+        "command": "bash .kiro/hooks/bash-file-read-guard.sh"
+      },
+      {
+        "matcher": "fs_write",
+        "command": "bash .kiro/hooks/write-existing-file-guard.sh"
+      }
+    ],
+    "postToolUse": [
+      {
+        "matcher": "fs_write",
+        "command": "bash .kiro/hooks/fmt-changed-file.sh"
+      },
+      {
+        "matcher": "fs_write",
+        "command": "bash .kiro/hooks/comment-checker.sh"
+      },
+      {
+        "matcher": "fs_write",
+        "command": "bash .kiro/hooks/edit-error-recovery.sh"
+      }
+    ],
+    "stop": [
+      {
+        "command": "cargo clippy --all-targets --all-features -- -D warnings",
+        "timeout_ms": 600000
+      }
+    ]
+  },
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"]
+    }
+  },
+  "includeMcpJson": false
 }

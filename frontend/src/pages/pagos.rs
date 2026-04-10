@@ -9,6 +9,7 @@ use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::loading::Loading;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{api_delete, api_get, api_post, api_put};
+use crate::types::PaginatedResponse;
 use crate::types::contrato::Contrato;
 use crate::types::pago::{CreatePago, Pago, UpdatePago};
 use crate::utils::{can_delete, can_write, format_currency, format_date_display};
@@ -55,6 +56,9 @@ pub fn Pagos() -> Html {
         .unwrap_or_default();
 
     let items = use_state(Vec::<Pago>::new);
+    let total = use_state(|| 0u64);
+    let page = use_state(|| 1u64);
+    let per_page = use_state(|| 20u64);
     let contratos = use_state(Vec::<Contrato>::new);
     let error = use_state(|| Option::<String>::None);
     let loading = use_state(|| true);
@@ -78,27 +82,32 @@ pub fn Pagos() -> Html {
 
     {
         let items = items.clone();
+        let total = total.clone();
         let error = error.clone();
         let loading = loading.clone();
         let reload_val = *reload;
+        let pg = *page;
+        let pp = *per_page;
         let f_contrato = (*filter_contrato).clone();
         let f_estado = (*filter_estado).clone();
         use_effect_with(
-            (reload_val, f_contrato.clone(), f_estado.clone()),
+            (reload_val, pg, f_contrato.clone(), f_estado.clone()),
             move |_| {
                 spawn_local(async move {
                     loading.set(true);
-                    let mut url = "/pagos?".to_string();
-                    let mut params = Vec::new();
+                    let mut params = vec![format!("page={pg}"), format!("perPage={pp}")];
                     if !f_contrato.is_empty() {
                         params.push(format!("contratoId={f_contrato}"));
                     }
                     if !f_estado.is_empty() {
                         params.push(format!("estado={f_estado}"));
                     }
-                    url.push_str(&params.join("&"));
-                    match api_get::<Vec<Pago>>(&url).await {
-                        Ok(data) => items.set(data),
+                    let url = format!("/pagos?{}", params.join("&"));
+                    match api_get::<PaginatedResponse<Pago>>(&url).await {
+                        Ok(resp) => {
+                            total.set(resp.total);
+                            items.set(resp.data);
+                        }
                         Err(err) => error.set(Some(err)),
                     }
                     loading.set(false);
@@ -111,8 +120,10 @@ pub fn Pagos() -> Html {
         let contratos = contratos.clone();
         use_effect_with((), move |_| {
             spawn_local(async move {
-                if let Ok(data) = api_get::<Vec<Contrato>>("/contratos").await {
-                    contratos.set(data);
+                if let Ok(resp) =
+                    api_get::<PaginatedResponse<Contrato>>("/contratos?perPage=100").await
+                {
+                    contratos.set(resp.data);
                 }
             });
         });
@@ -429,7 +440,9 @@ pub fn Pagos() -> Html {
 
     let on_filter_apply = {
         let reload = reload.clone();
+        let page = page.clone();
         Callback::from(move |_: MouseEvent| {
+            page.set(1);
             reload.set(*reload + 1);
         })
     };
@@ -437,10 +450,36 @@ pub fn Pagos() -> Html {
         let filter_contrato = filter_contrato.clone();
         let filter_estado = filter_estado.clone();
         let reload = reload.clone();
+        let page = page.clone();
         Callback::from(move |_: MouseEvent| {
             filter_contrato.set(String::new());
             filter_estado.set(String::new());
+            page.set(1);
             reload.set(*reload + 1);
+        })
+    };
+
+    let on_prev_page = {
+        let page = page.clone();
+        let reload = reload.clone();
+        Callback::from(move |_: MouseEvent| {
+            if *page > 1 {
+                page.set(*page - 1);
+                reload.set(*reload + 1);
+            }
+        })
+    };
+    let on_next_page = {
+        let page = page.clone();
+        let total = total.clone();
+        let per_page = per_page.clone();
+        let reload = reload.clone();
+        Callback::from(move |_: MouseEvent| {
+            let max_page = ((*total) as f64 / (*per_page) as f64).ceil() as u64;
+            if *page < max_page {
+                page.set(*page + 1);
+                reload.set(*reload + 1);
+            }
         })
     };
 
@@ -463,6 +502,7 @@ pub fn Pagos() -> Html {
     ];
     let fe = (*form_errors).clone();
     let is_editing = editing.is_some();
+    let total_pages = ((*total) as f64 / (*per_page) as f64).ceil() as u64;
 
     html! {
         <div>
@@ -636,6 +676,23 @@ pub fn Pagos() -> Html {
                         }
                     })}
                 </DataTable>
+                if total_pages > 1 {
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-3);">
+                        <span style="font-size: var(--text-sm); color: var(--text-secondary);">
+                            {format!("{} pago(s) — página {} de {}", *total, *page, total_pages)}
+                        </span>
+                        <div style="display: flex; gap: var(--space-2);">
+                            <button onclick={on_prev_page} disabled={*page <= 1} class="gi-btn gi-btn-ghost">{"← Anterior"}</button>
+                            <button onclick={on_next_page} disabled={*page >= total_pages} class="gi-btn gi-btn-ghost">{"Siguiente →"}</button>
+                        </div>
+                    </div>
+                } else {
+                    <div style="margin-top: var(--space-3);">
+                        <span style="font-size: var(--text-sm); color: var(--text-secondary);">
+                            {format!("{} pago(s) encontrado(s)", *total)}
+                        </span>
+                    </div>
+                }
             }
         </div>
     }

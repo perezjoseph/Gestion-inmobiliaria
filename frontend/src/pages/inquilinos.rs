@@ -9,6 +9,7 @@ use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::loading::Loading;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{api_delete, api_get, api_post, api_put};
+use crate::types::PaginatedResponse;
 use crate::types::inquilino::{CreateInquilino, Inquilino, UpdateInquilino};
 use crate::utils::{can_delete, can_write};
 
@@ -35,6 +36,9 @@ pub fn Inquilinos() -> Html {
         .map(|u| u.rol.clone())
         .unwrap_or_default();
     let items = use_state(Vec::<Inquilino>::new);
+    let total = use_state(|| 0u64);
+    let page = use_state(|| 1u64);
+    let per_page = use_state(|| 20u64);
     let error = use_state(|| Option::<String>::None);
     let loading = use_state(|| true);
     let show_form = use_state(|| false);
@@ -54,19 +58,26 @@ pub fn Inquilinos() -> Html {
     let applied_search = use_state(String::new);
     {
         let items = items.clone();
+        let total = total.clone();
         let error = error.clone();
         let loading = loading.clone();
         let reload_val = *reload;
         let search_val = (*applied_search).clone();
-        use_effect_with((reload_val, search_val.clone()), move |_| {
+        let pg = *page;
+        let pp = *per_page;
+        use_effect_with((reload_val, search_val.clone(), pg), move |_| {
             spawn_local(async move {
                 loading.set(true);
-                let mut url = "/inquilinos".to_string();
+                let mut params = vec![format!("page={pg}"), format!("perPage={pp}")];
                 if !search_val.is_empty() {
-                    url.push_str(&format!("?search={search_val}"));
+                    params.push(format!("search={search_val}"));
                 }
-                match api_get::<Vec<Inquilino>>(&url).await {
-                    Ok(data) => items.set(data),
+                let url = format!("/inquilinos?{}", params.join("&"));
+                match api_get::<PaginatedResponse<Inquilino>>(&url).await {
+                    Ok(resp) => {
+                        total.set(resp.total);
+                        items.set(resp.data);
+                    }
                     Err(err) => error.set(Some(err)),
                 }
                 loading.set(false);
@@ -348,8 +359,10 @@ pub fn Inquilinos() -> Html {
         let search = search.clone();
         let applied_search = applied_search.clone();
         let reload = reload.clone();
+        let page = page.clone();
         Callback::from(move |_: MouseEvent| {
             applied_search.set((*search).clone());
+            page.set(1);
             reload.set(*reload + 1);
         })
     };
@@ -357,10 +370,35 @@ pub fn Inquilinos() -> Html {
         let search = search.clone();
         let applied_search = applied_search.clone();
         let reload = reload.clone();
+        let page = page.clone();
         Callback::from(move |_: MouseEvent| {
             search.set(String::new());
             applied_search.set(String::new());
+            page.set(1);
             reload.set(*reload + 1);
+        })
+    };
+    let on_prev_page = {
+        let page = page.clone();
+        let reload = reload.clone();
+        Callback::from(move |_: MouseEvent| {
+            if *page > 1 {
+                page.set(*page - 1);
+                reload.set(*reload + 1);
+            }
+        })
+    };
+    let on_next_page = {
+        let page = page.clone();
+        let total = total.clone();
+        let per_page = per_page.clone();
+        let reload = reload.clone();
+        Callback::from(move |_: MouseEvent| {
+            let max_page = ((*total) as f64 / (*per_page) as f64).ceil() as u64;
+            if *page < max_page {
+                page.set(*page + 1);
+                reload.set(*reload + 1);
+            }
         })
     };
     if *loading {
@@ -380,6 +418,7 @@ pub fn Inquilinos() -> Html {
     ];
     let fe = (*form_errors).clone();
     let opt_open = *show_optional;
+    let total_pages = ((*total) as f64 / (*per_page) as f64).ceil() as u64;
     html! {
         <div>
             <div class="gi-page-header">
@@ -532,11 +571,23 @@ pub fn Inquilinos() -> Html {
                         }
                     })}
                 </DataTable>
-                <div style="margin-top: var(--space-3);">
-                    <span style="font-size: var(--text-sm); color: var(--text-secondary);">
-                        {format!("{} inquilino(s) encontrado(s)", (*items).len())}
-                    </span>
-                </div>
+                if total_pages > 1 {
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-3);">
+                        <span style="font-size: var(--text-sm); color: var(--text-secondary);">
+                            {format!("{} inquilino(s) — página {} de {}", *total, *page, total_pages)}
+                        </span>
+                        <div style="display: flex; gap: var(--space-2);">
+                            <button onclick={on_prev_page} disabled={*page <= 1} class="gi-btn gi-btn-ghost">{"← Anterior"}</button>
+                            <button onclick={on_next_page} disabled={*page >= total_pages} class="gi-btn gi-btn-ghost">{"Siguiente →"}</button>
+                        </div>
+                    </div>
+                } else {
+                    <div style="margin-top: var(--space-3);">
+                        <span style="font-size: var(--text-sm); color: var(--text-secondary);">
+                            {format!("{} inquilino(s) encontrado(s)", *total)}
+                        </span>
+                    </div>
+                }
             }
         </div>
     }

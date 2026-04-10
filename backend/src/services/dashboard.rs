@@ -1,11 +1,11 @@
 use rust_decimal::Decimal;
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult, PaginatorTrait,
-    QueryFilter, Statement,
+    ColumnTrait, DatabaseConnection, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter,
+    QuerySelect,
 };
 use serde::Serialize;
 
-use crate::entities::{pago, propiedad};
+use crate::entities::{contrato, pago, propiedad};
 use crate::errors::AppError;
 
 #[derive(Debug, Serialize)]
@@ -36,15 +36,15 @@ pub async fn get_stats(db: &DatabaseConnection) -> Result<DashboardStats, AppErr
         0.0
     };
 
-    let ingreso_mensual = SumResult::find_by_statement(Statement::from_sql_and_values(
-        DbBackend::Postgres,
-        "SELECT COALESCE(SUM(monto_mensual), 0) AS total FROM contratos WHERE estado = $1",
-        ["activo".into()],
-    ))
-    .one(db)
-    .await?
-    .and_then(|r| r.total)
-    .unwrap_or(Decimal::ZERO);
+    let ingreso_mensual = contrato::Entity::find()
+        .select_only()
+        .column_as(contrato::Column::MontoMensual.sum(), "total")
+        .filter(contrato::Column::Estado.eq("activo"))
+        .into_model::<SumResult>()
+        .one(db)
+        .await?
+        .and_then(|r| r.total)
+        .unwrap_or(Decimal::ZERO);
 
     let pagos_atrasados = pago::Entity::find()
         .filter(pago::Column::Estado.eq("atrasado"))

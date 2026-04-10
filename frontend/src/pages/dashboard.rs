@@ -33,8 +33,8 @@ pub fn Dashboard() -> Html {
             spawn_local(async move {
                 let (stats_res, pagos_res, contratos_res, props_res) = futures::join!(
                     api_get::<DashboardStats>("/dashboard/stats"),
-                    api_get::<Vec<Pago>>("/pagos?estado=atrasado"),
-                    api_get::<Vec<Contrato>>("/contratos"),
+                    api_get::<PaginatedResponse<Pago>>("/pagos?estado=atrasado&perPage=5"),
+                    api_get::<PaginatedResponse<Contrato>>("/contratos?perPage=20"),
                     api_get::<PaginatedResponse<Propiedad>>(
                         "/propiedades?estado=disponible&page=1&perPage=5"
                     ),
@@ -44,11 +44,12 @@ pub fn Dashboard() -> Html {
                     Ok(data) => stats.set(Some(data)),
                     Err(err) => error.set(Some(err)),
                 }
-                if let Ok(data) = pagos_res {
-                    overdue_pagos.set(data);
+                if let Ok(resp) = pagos_res {
+                    overdue_pagos.set(resp.data);
                 }
-                if let Ok(data) = contratos_res {
-                    let expiring: Vec<Contrato> = data
+                if let Ok(resp) = contratos_res {
+                    let expiring: Vec<Contrato> = resp
+                        .data
                         .into_iter()
                         .filter(|c| c.estado == "activo")
                         .take(5)

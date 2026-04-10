@@ -1,13 +1,12 @@
 {
-  "enabled": true,
-  "name": "Optimization Agent — On Agent Stop",
-  "description": "Runs a final optimization pass in the background when the main agent stops",
+  "name": "Orchestrator — On Agent Stop",
   "version": "1",
+  "description": "Runs a final orchestrator pass in the background when the main agent stops",
   "when": {
     "type": "agentStop"
   },
   "then": {
     "type": "runCommand",
-    "command": "start /b .kiro\\run-optimization-agent.cmd"
+    "command": "wsl -u jperez -d Ubuntu-22.04 bash -lc \"bash .kiro/run-orchestrator-agent.sh\""
   }
 }

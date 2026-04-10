@@ -1,12 +1,13 @@
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait, QueryFilter,
-    QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait, PaginatorTrait,
+    QueryFilter, QueryOrder, Set,
 };
 use uuid::Uuid;
 
 use crate::entities::inquilino;
 use crate::errors::AppError;
+use crate::models::PaginatedResponse;
 use crate::models::inquilino::{CreateInquilinoRequest, InquilinoResponse, UpdateInquilinoRequest};
 
 impl From<inquilino::Model> for InquilinoResponse {
@@ -72,7 +73,12 @@ pub async fn get_by_id(db: &DatabaseConnection, id: Uuid) -> Result<InquilinoRes
 pub async fn list(
     db: &DatabaseConnection,
     search: Option<String>,
-) -> Result<Vec<InquilinoResponse>, AppError> {
+    page: Option<u64>,
+    per_page: Option<u64>,
+) -> Result<PaginatedResponse<InquilinoResponse>, AppError> {
+    let page = page.unwrap_or(1).max(1);
+    let per_page = per_page.unwrap_or(20).clamp(1, 100);
+
     let mut select = inquilino::Entity::find();
 
     if let Some(ref term) = search {
@@ -83,12 +89,19 @@ pub async fn list(
         select = select.filter(condition);
     }
 
-    let records = select
+    let paginator = select
         .order_by_asc(inquilino::Column::Apellido)
-        .all(db)
-        .await?;
+        .paginate(db, per_page);
 
-    Ok(records.into_iter().map(InquilinoResponse::from).collect())
+    let total = paginator.num_items().await?;
+    let records = paginator.fetch_page(page - 1).await?;
+
+    Ok(PaginatedResponse {
+        data: records.into_iter().map(InquilinoResponse::from).collect(),
+        total,
+        page,
+        per_page,
+    })
 }
 
 pub async fn update(
@@ -132,14 +145,9 @@ pub async fn update(
 }
 
 pub async fn delete(db: &DatabaseConnection, id: Uuid) -> Result<(), AppError> {
-    let existing = inquilino::Entity::find_by_id(id)
-        .one(db)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Inquilino no encontrado".to_string()))?;
-
-    inquilino::Entity::delete_by_id(existing.id)
-        .exec(db)
-        .await?;
-
+    let result = inquilino::Entity::delete_by_id(id).exec(db).await?;
+    if result.rows_affected == 0 {
+        return Err(AppError::NotFound("Inquilino no encontrado".to_string()));
+    }
     Ok(())
 }

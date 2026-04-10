@@ -78,7 +78,7 @@ pub async fn list(
     query: PropiedadListQuery,
 ) -> Result<PaginatedResponse<PropiedadResponse>, AppError> {
     let page = query.page.unwrap_or(1).max(1);
-    let per_page = query.per_page.unwrap_or(20).max(1);
+    let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
 
     let mut select = propiedad::Entity::find();
 
@@ -175,14 +175,9 @@ pub async fn update(
 }
 
 pub async fn delete(db: &DatabaseConnection, id: Uuid) -> Result<(), AppError> {
-    let existing = propiedad::Entity::find_by_id(id)
-        .one(db)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Propiedad no encontrada".to_string()))?;
-
-    propiedad::Entity::delete_by_id(existing.id)
-        .exec(db)
-        .await?;
-
+    let result = propiedad::Entity::delete_by_id(id).exec(db).await?;
+    if result.rows_affected == 0 {
+        return Err(AppError::NotFound("Propiedad no encontrada".to_string()));
+    }
     Ok(())
 }

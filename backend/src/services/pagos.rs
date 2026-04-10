@@ -1,11 +1,13 @@
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, Set,
 };
 use uuid::Uuid;
 
 use crate::entities::{contrato, pago};
 use crate::errors::AppError;
+use crate::models::PaginatedResponse;
 use crate::models::pago::{CreatePagoRequest, PagoListQuery, PagoResponse, UpdatePagoRequest};
 
 impl From<pago::Model> for PagoResponse {
@@ -67,7 +69,10 @@ pub async fn get_by_id(db: &DatabaseConnection, id: Uuid) -> Result<PagoResponse
 pub async fn list(
     db: &DatabaseConnection,
     query: PagoListQuery,
-) -> Result<Vec<PagoResponse>, AppError> {
+) -> Result<PaginatedResponse<PagoResponse>, AppError> {
+    let page = query.page.unwrap_or(1).max(1);
+    let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
+
     let mut select = pago::Entity::find();
 
     if let Some(ref contrato_id) = query.contrato_id {
@@ -77,12 +82,19 @@ pub async fn list(
         select = select.filter(pago::Column::Estado.eq(estado));
     }
 
-    let records = select
+    let paginator = select
         .order_by_desc(pago::Column::FechaVencimiento)
-        .all(db)
-        .await?;
+        .paginate(db, per_page);
 
-    Ok(records.into_iter().map(PagoResponse::from).collect())
+    let total = paginator.num_items().await?;
+    let records = paginator.fetch_page(page - 1).await?;
+
+    Ok(PaginatedResponse {
+        data: records.into_iter().map(PagoResponse::from).collect(),
+        total,
+        page,
+        per_page,
+    })
 }
 
 pub async fn update(
@@ -120,16 +132,14 @@ pub async fn update(
 }
 
 pub async fn delete(db: &DatabaseConnection, id: Uuid) -> Result<(), AppError> {
-    let existing = pago::Entity::find_by_id(id)
-        .one(db)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Pago no encontrado".to_string()))?;
-
-    pago::Entity::delete_by_id(existing.id).exec(db).await?;
-
+    let result = pago::Entity::delete_by_id(id).exec(db).await?;
+    if result.rows_affected == 0 {
+        return Err(AppError::NotFound("Pago no encontrado".to_string()));
+    }
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn mark_overdue(db: &DatabaseConnection) -> Result<u64, AppError> {
     let today = Utc::now().date_naive();
 

@@ -14,7 +14,8 @@ pub async fn list(
     _claims: Claims,
     query: web::Query<InquilinoSearchQuery>,
 ) -> Result<HttpResponse, AppError> {
-    let result = inquilinos::list(db.get_ref(), query.into_inner().search).await?;
+    let q = query.into_inner();
+    let result = inquilinos::list(db.get_ref(), q.search, q.page, q.per_page).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 

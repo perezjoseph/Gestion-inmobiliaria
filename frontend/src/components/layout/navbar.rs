@@ -31,11 +31,10 @@ pub fn Navbar(props: &NavbarProps) -> Html {
             let new_dark = !*theme;
             theme.set(new_dark);
             if let Some(window) = web_sys::window() {
-                if let Some(doc) = window.document() {
-                    if let Some(el) = doc.document_element() {
-                        let _ =
-                            el.set_attribute("data-theme", if new_dark { "dark" } else { "light" });
-                    }
+                if let Some(doc) = window.document()
+                    && let Some(el) = doc.document_element()
+                {
+                    let _ = el.set_attribute("data-theme", if new_dark { "dark" } else { "light" });
                 }
                 if let Ok(Some(storage)) = window.local_storage() {
                     let _ = storage.set_item("theme", if new_dark { "dark" } else { "light" });
@@ -52,8 +51,8 @@ pub fn Navbar(props: &NavbarProps) -> Html {
     };
 
     html! {
-        <nav class="gi-navbar" style="padding: var(--space-3) var(--space-5); display: flex; justify-content: space-between; align-items: center;">
-            <div style="display: flex; align-items: center; gap: var(--space-3);">
+        <nav class="gi-navbar" style="padding: var(--space-3) var(--space-5); display: flex; justify-content: space-between; align-items: center; gap: var(--space-2);">
+            <div style="display: flex; align-items: center; gap: var(--space-3); min-width: 0;">
                 <button class="gi-hamburger" onclick={props.on_toggle_sidebar.clone()}
                     aria-label="Abrir menú">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -62,27 +61,25 @@ pub fn Navbar(props: &NavbarProps) -> Html {
                         <line x1="3" y1="18" x2="21" y2="18"/>
                     </svg>
                 </button>
-                <span class="text-display hidden md:inline" style="font-size: var(--text-lg); font-weight: 600; color: var(--text-primary);">
+                <span class="gi-navbar-title text-display" style="font-size: var(--text-lg); font-weight: 600; color: var(--text-primary);">
                     {"Gestión Inmobiliaria"}
                 </span>
             </div>
-            <div style="display: flex; align-items: center; gap: var(--space-4);">
-                // Theme toggle
+            <div style="display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0;">
                 <button class="gi-theme-toggle" onclick={on_toggle_theme}
                     aria-label={if *theme { "Cambiar a modo claro" } else { "Cambiar a modo oscuro" }}
                     title={if *theme { "Modo claro" } else { "Modo oscuro" }}>
                 </button>
-                // User info
-                <div style="display: flex; align-items: center; gap: var(--space-3);">
-                    <div style="text-align: right;">
-                        <div style="font-size: var(--text-sm); font-weight: 600; color: var(--text-primary);">
+                <div class="gi-navbar-user" style="display: flex; align-items: center; gap: var(--space-3);">
+                    <div class="gi-navbar-user-info" style="text-align: right;">
+                        <div class="gi-navbar-user-name" style="font-size: var(--text-sm); font-weight: 600; color: var(--text-primary);">
                             {&props.user_name}
                         </div>
                         <div class="gi-badge gi-badge-info" style="font-size: 0.65rem;">
                             {role_label}
                         </div>
                     </div>
-                    <button onclick={on_logout} class="gi-btn gi-btn-ghost"
+                    <button onclick={on_logout} class="gi-btn gi-btn-ghost gi-navbar-logout"
                         style="font-size: var(--text-xs);">
                         {"Cerrar sesión"}
                     </button>

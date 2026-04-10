@@ -4,15 +4,17 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::middleware::rbac::{AdminOnly, WriteAccess};
-use crate::models::contrato::{CreateContratoRequest, UpdateContratoRequest};
+use crate::models::contrato::{ContratoListQuery, CreateContratoRequest, UpdateContratoRequest};
 use crate::services::auth::Claims;
 use crate::services::contratos;
 
 pub async fn list(
     db: web::Data<DatabaseConnection>,
     _claims: Claims,
+    query: web::Query<ContratoListQuery>,
 ) -> Result<HttpResponse, AppError> {
-    let result = contratos::list(db.get_ref()).await?;
+    let q = query.into_inner();
+    let result = contratos::list(db.get_ref(), q.page, q.per_page).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 

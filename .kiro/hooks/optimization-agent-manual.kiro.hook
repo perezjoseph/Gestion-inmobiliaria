@@ -1,13 +1,13 @@
 {
   "enabled": true,
-  "name": "Optimization Agent — On Demand",
-  "description": "Manually trigger the optimization agent in the background",
+  "name": "Orchestrator — On Demand",
+  "description": "Manually trigger the orchestrator to coordinate optimization and security hardening",
   "version": "1",
   "when": {
     "type": "userTriggered"
   },
   "then": {
     "type": "runCommand",
-    "command": "start /b .kiro\\run-optimization-agent.cmd"
+    "command": "wsl -u jperez -d Ubuntu-22.04 bash -lc \"bash .kiro/run-orchestrator-agent.sh\""
   }
 }

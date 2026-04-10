@@ -102,7 +102,7 @@ pub fn Propiedades() -> Html {
                         params.push(format!("ciudad={fc}"));
                     }
                     if !ft.is_empty() {
-                        params.push(format!("tipo={ft}"));
+                        params.push(format!("tipoPropiedad={ft}"));
                     }
                     if !fe.is_empty() {
                         params.push(format!("estado={fe}"));

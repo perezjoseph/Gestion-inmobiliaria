@@ -1,12 +1,13 @@
 use chrono::Utc;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DatabaseConnection, EntityTrait,
-    QueryFilter, QueryOrder, Set, TransactionTrait,
+    PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
 };
 use uuid::Uuid;
 
 use crate::entities::{contrato, inquilino, propiedad};
 use crate::errors::AppError;
+use crate::models::PaginatedResponse;
 use crate::models::contrato::{ContratoResponse, CreateContratoRequest, UpdateContratoRequest};
 
 impl From<contrato::Model> for ContratoResponse {
@@ -119,12 +120,27 @@ pub async fn get_by_id(db: &DatabaseConnection, id: Uuid) -> Result<ContratoResp
     Ok(ContratoResponse::from(record))
 }
 
-pub async fn list(db: &DatabaseConnection) -> Result<Vec<ContratoResponse>, AppError> {
-    let records = contrato::Entity::find()
+pub async fn list(
+    db: &DatabaseConnection,
+    page: Option<u64>,
+    per_page: Option<u64>,
+) -> Result<PaginatedResponse<ContratoResponse>, AppError> {
+    let page = page.unwrap_or(1).max(1);
+    let per_page = per_page.unwrap_or(20).clamp(1, 100);
+
+    let paginator = contrato::Entity::find()
         .order_by_desc(contrato::Column::CreatedAt)
-        .all(db)
-        .await?;
-    Ok(records.into_iter().map(ContratoResponse::from).collect())
+        .paginate(db, per_page);
+
+    let total = paginator.num_items().await?;
+    let records = paginator.fetch_page(page - 1).await?;
+
+    Ok(PaginatedResponse {
+        data: records.into_iter().map(ContratoResponse::from).collect(),
+        total,
+        page,
+        per_page,
+    })
 }
 
 pub async fn update(
@@ -149,12 +165,10 @@ pub async fn update(
 
     let mut active: contrato::ActiveModel = existing.into();
 
-    let new_fecha_fin = input.fecha_fin.unwrap_or(fecha_inicio);
-    if input.fecha_fin.is_some() {
-        active.fecha_fin = Set(new_fecha_fin);
-        // Re-validate overlap when fecha_fin changes on an active contract
+    if let Some(fecha_fin) = input.fecha_fin {
+        active.fecha_fin = Set(fecha_fin);
         if !is_terminating {
-            validate_no_overlap(&txn, propiedad_id, fecha_inicio, new_fecha_fin, Some(id)).await?;
+            validate_no_overlap(&txn, propiedad_id, fecha_inicio, fecha_fin, Some(id)).await?;
         }
     }
     if let Some(monto_mensual) = input.monto_mensual {
@@ -188,12 +202,9 @@ pub async fn update(
 }
 
 pub async fn delete(db: &DatabaseConnection, id: Uuid) -> Result<(), AppError> {
-    let existing = contrato::Entity::find_by_id(id)
-        .one(db)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
-
-    contrato::Entity::delete_by_id(existing.id).exec(db).await?;
-
+    let result = contrato::Entity::delete_by_id(id).exec(db).await?;
+    if result.rows_affected == 0 {
+        return Err(AppError::NotFound("Contrato no encontrado".to_string()));
+    }
     Ok(())
 }

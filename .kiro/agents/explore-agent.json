@@ -1,0 +1,14 @@
+{
+  "name": "explore-agent",
+  "description": "Read-only codebase search specialist. Answers 'Where is X?', 'Which file has Y?', 'Find the code that does Z'. Fire multiple in parallel for broad searches. Contextual grep for codebases.",
+  "prompt": "file://../explore-agent-prompt.md",
+  "tools": ["read", "shell"],
+  "allowedTools": ["read", "shell"],
+  "resources": [
+    "file://.kiro/steering/**/*.md",
+    "file://.kiro/optimization-memory.md",
+    "file://.kiro/agent-notepads/learnings.md"
+  ],
+  "mcpServers": {},
+  "includeMcpJson": false
+}

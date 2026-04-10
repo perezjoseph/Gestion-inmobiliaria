@@ -669,11 +669,29 @@ h1, h2, h3, h4, h5, h6,
 }
 
 /* ============================================
-   Responsive — Mobile
+   Responsive — Tablet (≤1024px)
+   ============================================ */
+@media (max-width: 1024px) {
+  .gi-stat {
+    padding: var(--space-4);
+  }
+
+  .gi-navbar-title {
+    font-size: var(--text-base) !important;
+  }
+}
+
+/* ============================================
+   Responsive — Mobile (≤768px)
    ============================================ */
 @media (max-width: 768px) {
+  /* Sidebar: off-canvas drawer */
   .gi-hamburger {
     display: flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
   }
 
   .gi-sidebar {
@@ -694,13 +712,340 @@ h1, h2, h3, h4, h5, h6,
     display: block;
   }
 
+  /* Sidebar links: larger touch targets */
+  .gi-sidebar-link {
+    padding: var(--space-3) var(--space-4);
+    min-height: 44px;
+  }
+
+  /* Navbar: compact on mobile */
+  .gi-navbar {
+    padding: var(--space-2) var(--space-3) !important;
+  }
+
+  .gi-navbar-title {
+    display: none !important;
+  }
+
+  .gi-navbar-user-name {
+    display: none;
+  }
+
+  .gi-navbar-logout {
+    font-size: var(--text-xs) !important;
+    padding: var(--space-2) var(--space-3) !important;
+  }
+
+  /* Main content: tighter padding */
+  main {
+    padding: var(--space-4) var(--space-4) !important;
+  }
+
+  /* Page header: stack on small screens */
+  .gi-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+
+  .gi-page-header .gi-btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+
   .gi-page-title {
     font-size: var(--text-xl);
   }
 
+  /* Stat cards: 2-col grid on mobile */
+  .gi-stat {
+    padding: var(--space-3);
+  }
+
+  /* Filter bar: stack vertically */
+  .gi-filter-bar {
+    padding: var(--space-3);
+    border-radius: 8px;
+  }
+
+  /* Tables: horizontal scroll with better UX */
   .gi-table-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    margin-left: calc(-1 * var(--space-4));
+    margin-right: calc(-1 * var(--space-4));
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  .gi-table th,
+  .gi-table td {
+    padding: var(--space-2) var(--space-3);
+    white-space: nowrap;
+  }
+
+  .gi-table th:first-child,
+  .gi-table td:first-child {
+    position: sticky;
+    left: 0;
+    background-color: var(--surface-raised);
+    z-index: 1;
+  }
+
+  .gi-table thead th:first-child {
+    background-color: var(--surface-base);
+  }
+
+  /* Buttons: larger touch targets */
+  .gi-btn {
+    min-height: 44px;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .gi-btn-text {
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  /* Inputs: larger touch targets */
+  .gi-input {
+    min-height: 44px;
+    padding: var(--space-3);
+    font-size: var(--text-base);
+  }
+
+  /* Modal: full-width on mobile */
+  .gi-modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .gi-modal {
+    border-radius: 16px 16px 0 0;
+    max-width: 100%;
+    padding: var(--space-5) var(--space-4);
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+
+  /* Cards: tighter radius and padding */
+  .gi-card {
+    border-radius: 8px;
+  }
+
+  .gi-card[style*="padding: var(--space-6)"] {
+    padding: var(--space-4) !important;
+  }
+
+  /* Toast: full-width on mobile */
+  .gi-toast-container {
+    top: auto;
+    bottom: var(--space-4);
+    left: var(--space-3);
+    right: var(--space-3);
+    max-width: 100%;
+  }
+
+  .gi-toast {
+    border-radius: 8px;
+  }
+
+  /* Navbar: compact */
+  .gi-navbar {
+    padding: var(--space-2) var(--space-3) !important;
+  }
+
+  /* Footer: compact */
+  .gi-footer {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  /* Empty state: less vertical padding */
+  .gi-empty-state {
+    padding: var(--space-6) var(--space-4);
+  }
+
+  /* Welcome card: full-width */
+  .gi-welcome-card {
+    margin: var(--space-4) auto;
+    padding: var(--space-5) var(--space-4);
+  }
+
+  /* Error banner: wrap text */
+  .gi-error-banner {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  /* Pagination: stack on mobile */
+  .gi-pagination {
+    flex-direction: column;
+    gap: var(--space-2);
+    align-items: flex-start;
+  }
+
+  /* Theme toggle: larger touch target */
+  .gi-theme-toggle {
+    width: 44px;
+    height: 24px;
+    border-radius: 12px;
+  }
+
+  .gi-theme-toggle::after {
+    width: 20px;
+    height: 20px;
+  }
+
+  [data-theme="dark"] .gi-theme-toggle::after {
+    transform: translateX(20px);
+  }
+}
+
+/* ============================================
+   Responsive — Small phone (≤480px)
+   ============================================ */
+@media (max-width: 480px) {
+  .gi-page-title {
+    font-size: var(--text-lg);
+  }
+
+  .gi-stat {
+    padding: var(--space-3);
+  }
+
+  /* Single column forms */
+  form[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Navbar: hide user name, show only role badge */
+  .gi-navbar [style*="text-align: right"] > div:first-child {
+    display: none;
+  }
+
+  /* Modal: more space */
+  .gi-modal {
+    max-height: 90vh;
+  }
+}
+
+/* ============================================
+   Responsive — Landscape phone
+   ============================================ */
+@media (max-height: 500px) and (orientation: landscape) {
+  .gi-modal-overlay {
+    align-items: center;
+    padding: var(--space-3);
+  }
+
+  .gi-modal {
+    border-radius: 12px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+}
+
+/* ============================================
+   Touch device optimizations
+   ============================================ */
+@media (hover: none) and (pointer: coarse) {
+  /* Remove hover effects on touch devices */
+  .gi-card:hover {
+    box-shadow: var(--shadow-sm);
+  }
+
+  .gi-stat:hover {
+    box-shadow: none;
+    transform: none;
+  }
+
+  .gi-table tbody tr:hover {
+    background-color: transparent;
+  }
+
+  [data-theme="dark"] .gi-table tbody tr:hover {
+    background-color: transparent;
+  }
+
+  /* Active states instead of hover */
+  .gi-btn:active {
+    transform: scale(0.96);
+  }
+
+  .gi-sidebar-link:active {
+    background-color: var(--surface-sidebar-hover);
+  }
+
+  .gi-table tbody tr:active {
+    background-color: var(--color-primary-50);
+  }
+
+  [data-theme="dark"] .gi-table tbody tr:active {
+    background-color: oklch(20% 0.015 185);
+  }
+}
+
+/* ============================================
+   Safe area insets (notched phones)
+   ============================================ */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .gi-footer {
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  }
+
+  .gi-sidebar {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  @media (max-width: 768px) {
+    .gi-modal {
+      padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
+    }
+
+    .gi-toast-container {
+      bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+    }
+  }
+}
+
+/* ============================================
+   Print styles
+   ============================================ */
+@media print {
+  .gi-sidebar,
+  .gi-navbar,
+  .gi-footer,
+  .gi-hamburger,
+  .gi-sidebar-overlay,
+  .gi-toast-container,
+  .gi-theme-toggle,
+  .gi-btn,
+  .gi-filter-bar {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  .gi-card {
+    box-shadow: none;
+    border: 1px solid #ccc;
+    break-inside: avoid;
+  }
+
+  .gi-table {
+    font-size: 10pt;
+  }
+
+  body {
+    background: white;
+    color: black;
   }
 }
 

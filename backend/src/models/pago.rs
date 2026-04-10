@@ -30,6 +30,8 @@ pub struct UpdatePagoRequest {
 pub struct PagoListQuery {
     pub contrato_id: Option<Uuid>,
     pub estado: Option<String>,
+    pub page: Option<u64>,
+    pub per_page: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]

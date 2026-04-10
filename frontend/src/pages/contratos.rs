@@ -53,6 +53,9 @@ pub fn Contratos() -> Html {
         .unwrap_or_default();
 
     let items = use_state(Vec::<Contrato>::new);
+    let total = use_state(|| 0u64);
+    let page = use_state(|| 1u64);
+    let per_page = use_state(|| 20u64);
     let propiedades = use_state(Vec::<Propiedad>::new);
     let inquilinos = use_state(Vec::<Inquilino>::new);
     let error = use_state(|| Option::<String>::None);
@@ -74,14 +77,21 @@ pub fn Contratos() -> Html {
 
     {
         let items = items.clone();
+        let total = total.clone();
         let error = error.clone();
         let loading = loading.clone();
         let reload_val = *reload;
-        use_effect_with(reload_val, move |_| {
+        let pg = *page;
+        let pp = *per_page;
+        use_effect_with((reload_val, pg), move |_| {
             spawn_local(async move {
                 loading.set(true);
-                match api_get::<Vec<Contrato>>("/contratos").await {
-                    Ok(data) => items.set(data),
+                let url = format!("/contratos?page={pg}&perPage={pp}");
+                match api_get::<PaginatedResponse<Contrato>>(&url).await {
+                    Ok(resp) => {
+                        total.set(resp.total);
+                        items.set(resp.data);
+                    }
                     Err(err) => error.set(Some(err)),
                 }
                 loading.set(false);
@@ -95,13 +105,14 @@ pub fn Contratos() -> Html {
         use_effect_with((), move |_| {
             spawn_local(async move {
                 if let Ok(resp) =
-                    api_get::<PaginatedResponse<Propiedad>>("/propiedades?page=1&perPage=1000")
-                        .await
+                    api_get::<PaginatedResponse<Propiedad>>("/propiedades?page=1&perPage=100").await
                 {
                     propiedades.set(resp.data);
                 }
-                if let Ok(data) = api_get::<Vec<Inquilino>>("/inquilinos").await {
-                    inquilinos.set(data);
+                if let Ok(data) =
+                    api_get::<PaginatedResponse<Inquilino>>("/inquilinos?perPage=100").await
+                {
+                    inquilinos.set(data.data);
                 }
             });
         });
@@ -417,6 +428,30 @@ pub fn Contratos() -> Html {
         }};
     }
 
+    let on_prev_page = {
+        let page = page.clone();
+        let reload = reload.clone();
+        Callback::from(move |_: MouseEvent| {
+            if *page > 1 {
+                page.set(*page - 1);
+                reload.set(*reload + 1);
+            }
+        })
+    };
+    let on_next_page = {
+        let page = page.clone();
+        let total = total.clone();
+        let per_page = per_page.clone();
+        let reload = reload.clone();
+        Callback::from(move |_: MouseEvent| {
+            let max_page = ((*total) as f64 / (*per_page) as f64).ceil() as u64;
+            if *page < max_page {
+                page.set(*page + 1);
+                reload.set(*reload + 1);
+            }
+        })
+    };
+
     if *loading {
         return html! { <Loading /> };
     }
@@ -436,6 +471,7 @@ pub fn Contratos() -> Html {
     ];
     let fe = (*form_errors).clone();
     let is_editing = editing.is_some();
+    let total_pages = ((*total) as f64 / (*per_page) as f64).ceil() as u64;
 
     html! {
         <div>
@@ -589,6 +625,23 @@ pub fn Contratos() -> Html {
                         }
                     })}
                 </DataTable>
+                if total_pages > 1 {
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-3);">
+                        <span style="font-size: var(--text-sm); color: var(--text-secondary);">
+                            {format!("{} contrato(s) — página {} de {}", *total, *page, total_pages)}
+                        </span>
+                        <div style="display: flex; gap: var(--space-2);">
+                            <button onclick={on_prev_page} disabled={*page <= 1} class="gi-btn gi-btn-ghost">{"← Anterior"}</button>
+                            <button onclick={on_next_page} disabled={*page >= total_pages} class="gi-btn gi-btn-ghost">{"Siguiente →"}</button>
+                        </div>
+                    </div>
+                } else {
+                    <div style="margin-top: var(--space-3);">
+                        <span style="font-size: var(--text-sm); color: var(--text-secondary);">
+                            {format!("{} contrato(s) encontrado(s)", *total)}
+                        </span>
+                    </div>
+                }
             }
         </div>
     }

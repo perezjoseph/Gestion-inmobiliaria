@@ -3,8 +3,11 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InquilinoSearchQuery {
     pub search: Option<String>,
+    pub page: Option<u64>,
+    pub per_page: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]

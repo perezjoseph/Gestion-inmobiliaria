@@ -5,6 +5,13 @@ use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ContratoListQuery {
+    pub page: Option<u64>,
+    pub per_page: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateContratoRequest {
     pub propiedad_id: Uuid,
     pub inquilino_id: Uuid,
