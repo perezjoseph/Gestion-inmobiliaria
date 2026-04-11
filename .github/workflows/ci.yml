@@ -225,9 +225,21 @@ jobs:
   notify-failure:
     name: Notify Kiro on Failure
     runs-on: [self-hosted, linux, sonarqube]
-    needs: [lint, test-backend, test-frontend, quality-gate, build-frontend]
+    needs: [commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend]
     if: always() && contains(needs.*.result, 'failure')
     steps:
+      - name: Notify commit lint failure
+        if: always() && needs.commit-lint.result == 'failure'
+        run: |
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+            -H "Content-Type: application/json" \
+            -d '{
+              "job": "commit-lint",
+              "step": "commitlint",
+              "error_log": "Commit message lint failed. Commit messages must follow conventional commits format (feat:, fix:, chore:, etc.).",
+              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }' || echo "Webhook unreachable — skipping notification"
+
       - name: Notify lint failure
         if: always() && needs.lint.result == 'failure'
         run: |
@@ -285,5 +297,17 @@ jobs:
               "job": "build-frontend",
               "step": "trunk-build",
               "error_log": "Frontend WASM build failed. Run trunk build --release in frontend/ to reproduce.",
+              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }' || echo "Webhook unreachable — skipping notification"
+
+      - name: Notify sonarqube failure
+        if: always() && needs.sonarqube.result == 'failure'
+        run: |
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+            -H "Content-Type: application/json" \
+            -d '{
+              "job": "sonarqube",
+              "step": "sonar-scan",
+              "error_log": "SonarQube analysis failed. Check SonarQube server status and scan configuration.",
               "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }' || echo "Webhook unreachable — skipping notification"
