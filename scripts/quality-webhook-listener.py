@@ -66,8 +66,8 @@ def run_kiro(prompt, label):
     escaped = prompt.replace('"', '\\"').replace("'", "'\\''")
     
     cmd_variants = [
-        f'kiro-cli chat --no-interactive -a "{escaped}"',
-        f'kiro-cli chat --no-interactive --agent ci-fixer -a "{escaped}"',
+        f'kiro-cli chat --trust-tools=fs_read,fs_write,execute_bash,grep,glob,code --no-interactive "{escaped}"',
+        f'kiro-cli chat --trust-all-tools --no-interactive "{escaped}"',
     ]
 
     for i, cmd in enumerate(cmd_variants):

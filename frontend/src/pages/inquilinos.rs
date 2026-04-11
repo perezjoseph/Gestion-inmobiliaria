@@ -203,7 +203,7 @@ pub fn Inquilinos() -> Html {
                             let undo_reload = reload_for_undo;
                             if let Some(t) = &toasts {
                                 t.dispatch(ToastAction::PushWithUndo(
-                                    format!("\"{}\" eliminado", inq_name),
+                                    format!("\"{inq_name}\" eliminado"),
                                     ToastKind::Info,
                                     "Deshacer".into(),
                                     std::rc::Rc::new(move || {

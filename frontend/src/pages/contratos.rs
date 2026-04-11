@@ -273,7 +273,7 @@ pub fn Contratos() -> Html {
                             let undo_reload = reload_for_undo;
                             if let Some(t) = &toasts {
                                 t.dispatch(ToastAction::PushWithUndo(
-                                    format!("\"{}\" eliminado", contrato_short),
+                                    format!("\"{contrato_short}\" eliminado"),
                                     ToastKind::Info,
                                     "Deshacer".into(),
                                     std::rc::Rc::new(move || {

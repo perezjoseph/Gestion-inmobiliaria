@@ -284,7 +284,7 @@ pub fn Propiedades() -> Html {
                             let undo_reload = reload_for_undo;
                             if let Some(t) = &toasts {
                                 t.dispatch(ToastAction::PushWithUndo(
-                                    format!("\"{}\" eliminada", prop_titulo),
+                                    format!("\"{prop_titulo}\" eliminada"),
                                     ToastKind::Info,
                                     "Deshacer".into(),
                                     std::rc::Rc::new(move || {

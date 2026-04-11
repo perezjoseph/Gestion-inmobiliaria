@@ -304,7 +304,7 @@ pub fn Pagos() -> Html {
                             let undo_reload = reload_for_undo;
                             if let Some(t) = &toasts {
                                 t.dispatch(ToastAction::PushWithUndo(
-                                    format!("Pago de {} eliminado", pago_monto),
+                                    format!("Pago de {pago_monto} eliminado"),
                                     ToastKind::Info,
                                     "Deshacer".into(),
                                     std::rc::Rc::new(move || {
@@ -725,7 +725,7 @@ pub fn Pagos() -> Html {
                                         <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(pc.clone()))} class="gi-btn-text">{"Editar"}</button>
                                         if is_pagado {
                                             <button onclick={Callback::from(move |_: MouseEvent| {
-                                                let url = format!("{BASE_URL}/pagos/{}/recibo", recibo_id);
+                                                let url = format!("{BASE_URL}/pagos/{recibo_id}/recibo");
                                                 let _ = web_sys::window().and_then(|w| w.open_with_url(&url).ok());
                                             })} class="gi-btn-text" style="color: var(--color-primary-500);">{"Recibo"}</button>
                                         }
