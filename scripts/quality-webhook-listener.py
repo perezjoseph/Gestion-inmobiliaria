@@ -24,7 +24,7 @@ PROJECT_DIR = "/mnt/d/realestate"
 WSL_DISTRO = "Ubuntu-22.04"
 WSL_USER = "jperez"
 MAX_RETRIES = 3
-KIRO_TIMEOUT = 900
+KIRO_TIMEOUT = 3600
 TRUSTED_TOOLS = "fs_read,fs_write,execute_bash,grep,glob,code,introspect,session,use_subagent,web_fetch,web_search"
 
 
