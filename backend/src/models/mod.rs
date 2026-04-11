@@ -2,6 +2,7 @@ pub mod auditoria;
 pub mod contrato;
 pub mod dashboard;
 pub mod documento;
+pub mod gasto;
 pub mod importacion;
 pub mod inquilino;
 pub mod mantenimiento;

@@ -17,7 +17,7 @@ env:
 jobs:
   commit-lint:
     name: Commit Message Lint
-    runs-on: [self-hosted, linux, sonarqube]
+    runs-on: [self-hosted, linux]
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
 
   lint:
     name: Lint & Format
-    runs-on: [self-hosted, linux, sonarqube]
+    runs-on: [self-hosted, linux]
     steps:
       - uses: actions/checkout@v4
 
@@ -70,7 +70,7 @@ jobs:
 
   test-backend:
     name: Backend Tests
-    runs-on: [self-hosted, linux, sonarqube]
+    runs-on: [self-hosted, linux]
     services:
       postgres:
         image: postgres:16
@@ -106,7 +106,7 @@ jobs:
 
   test-frontend:
     name: Frontend Property Tests
-    runs-on: [self-hosted, linux, sonarqube]
+    runs-on: [self-hosted, linux]
     steps:
       - uses: actions/checkout@v4
 
@@ -130,7 +130,7 @@ jobs:
 
   quality-gate:
     name: Quality Gate
-    runs-on: [self-hosted, linux, sonarqube]
+    runs-on: [self-hosted, linux]
     needs: [lint, test-backend, test-frontend]
     steps:
       - name: Verify all checks passed
@@ -188,7 +188,7 @@ jobs:
 
   build-frontend:
     name: Build Frontend (WASM)
-    runs-on: [self-hosted, linux, sonarqube]
+    runs-on: [self-hosted, linux]
     needs: [quality-gate]
     steps:
       - uses: actions/checkout@v4
@@ -224,7 +224,7 @@ jobs:
 
   notify-failure:
     name: Notify Kiro on Failure
-    runs-on: [self-hosted, linux, sonarqube]
+    runs-on: [self-hosted, linux]
     needs: [commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend]
     if: always() && contains(needs.*.result, 'failure')
     steps:

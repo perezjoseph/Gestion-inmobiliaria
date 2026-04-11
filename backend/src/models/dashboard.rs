@@ -52,3 +52,11 @@ pub struct OcupacionTendenciaQuery {
 pub struct PagosProximosQuery {
     pub dias: Option<i64>,
 }
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GastosComparacion {
+    pub mes_actual: Decimal,
+    pub mes_anterior: Decimal,
+    pub porcentaje_cambio: f64,
+}

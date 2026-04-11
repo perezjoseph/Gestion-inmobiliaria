@@ -4,6 +4,7 @@ pub mod configuracion;
 pub mod contratos;
 pub mod dashboard;
 pub mod documentos;
+pub mod gastos;
 pub mod importacion;
 pub mod inquilinos;
 pub mod mantenimiento;

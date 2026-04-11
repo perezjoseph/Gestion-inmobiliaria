@@ -52,6 +52,38 @@ pub struct HistorialPagoEntry {
     pub estado: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RentabilidadReportQuery {
+    pub mes: u32,
+    pub anio: i32,
+    pub propiedad_id: Option<Uuid>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RentabilidadReportRow {
+    pub propiedad_id: Uuid,
+    pub propiedad_titulo: String,
+    pub total_ingresos: Decimal,
+    pub total_gastos: Decimal,
+    pub ingreso_neto: Decimal,
+    pub moneda: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RentabilidadReportSummary {
+    pub rows: Vec<RentabilidadReportRow>,
+    pub total_ingresos: Decimal,
+    pub total_gastos: Decimal,
+    pub total_neto: Decimal,
+    pub mes: u32,
+    pub anio: i32,
+    pub generated_at: DateTime<Utc>,
+    pub generated_by: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -160,5 +192,68 @@ mod tests {
         };
         let json = serde_json::to_value(&entry).unwrap();
         assert!(json["fechaPago"].is_null());
+    }
+
+    #[test]
+    fn rentabilidad_report_query_deserializes_all_fields() {
+        let json = r#"{
+            "mes": 4,
+            "anio": 2025,
+            "propiedadId": "550e8400-e29b-41d4-a716-446655440000"
+        }"#;
+        let query: RentabilidadReportQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(query.mes, 4);
+        assert_eq!(query.anio, 2025);
+        assert!(query.propiedad_id.is_some());
+    }
+
+    #[test]
+    fn rentabilidad_report_query_deserializes_required_only() {
+        let json = r#"{"mes": 1, "anio": 2024}"#;
+        let query: RentabilidadReportQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(query.mes, 1);
+        assert_eq!(query.anio, 2024);
+        assert!(query.propiedad_id.is_none());
+    }
+
+    #[test]
+    fn rentabilidad_report_row_serializes_to_camel_case() {
+        let row = RentabilidadReportRow {
+            propiedad_id: Uuid::new_v4(),
+            propiedad_titulo: "Apartamento Centro".into(),
+            total_ingresos: Decimal::new(50000, 0),
+            total_gastos: Decimal::new(15000, 0),
+            ingreso_neto: Decimal::new(35000, 0),
+            moneda: "DOP".into(),
+        };
+        let json = serde_json::to_value(&row).unwrap();
+        assert!(json.get("propiedadId").is_some());
+        assert!(json.get("propiedadTitulo").is_some());
+        assert!(json.get("totalIngresos").is_some());
+        assert!(json.get("totalGastos").is_some());
+        assert!(json.get("ingresoNeto").is_some());
+        assert_eq!(json["moneda"], "DOP");
+    }
+
+    #[test]
+    fn rentabilidad_report_summary_serializes_to_camel_case() {
+        let summary = RentabilidadReportSummary {
+            rows: vec![],
+            total_ingresos: Decimal::new(100000, 0),
+            total_gastos: Decimal::new(30000, 0),
+            total_neto: Decimal::new(70000, 0),
+            mes: 4,
+            anio: 2025,
+            generated_at: Utc.with_ymd_and_hms(2025, 4, 10, 12, 0, 0).unwrap(),
+            generated_by: "admin@test.com".into(),
+        };
+        let json = serde_json::to_value(&summary).unwrap();
+        assert!(json.get("totalIngresos").is_some());
+        assert!(json.get("totalGastos").is_some());
+        assert!(json.get("totalNeto").is_some());
+        assert!(json.get("generatedAt").is_some());
+        assert!(json.get("generatedBy").is_some());
+        assert_eq!(json["mes"], 4);
+        assert_eq!(json["anio"], 2025);
     }
 }

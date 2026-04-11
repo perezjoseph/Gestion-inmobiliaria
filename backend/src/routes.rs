@@ -67,6 +67,18 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     ),
             )
             .service(
+                web::scope("/gastos")
+                    .route(
+                        "/resumen-categorias",
+                        web::get().to(handlers::gastos::resumen_categorias),
+                    )
+                    .route("", web::get().to(handlers::gastos::list))
+                    .route("", web::post().to(handlers::gastos::create))
+                    .route("/{id}", web::get().to(handlers::gastos::get_by_id))
+                    .route("/{id}", web::put().to(handlers::gastos::update))
+                    .route("/{id}", web::delete().to(handlers::gastos::delete)),
+            )
+            .service(
                 web::scope("/mantenimiento")
                     .route("", web::get().to(handlers::mantenimiento::list))
                     .route("", web::post().to(handlers::mantenimiento::create))
