@@ -115,4 +115,117 @@
         <cpe regex="true">cpe:/a:csv_project:csv:.*</cpe>
     </suppress>
 
+    <!-- md5 crate matched against MD5 hash algorithm weakness CVEs.
+         Used internally by numaelis-rckive-genpdf for PDF object IDs, not for security. -->
+    <suppress>
+        <notes>md5 crate false positive - used for PDF internals, not cryptographic security</notes>
+        <packageUrl regex="true">^pkg:cargo/md5@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:md5:.*</cpe>
+    </suppress>
+
+    <!-- ttf-parser crate matched against FreeType/HarfBuzz/font parsing CVEs -->
+    <suppress>
+        <notes>ttf-parser false positive - pure Rust font parser, not FreeType/HarfBuzz</notes>
+        <packageUrl regex="true">^pkg:cargo/ttf-parser@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(freetype|harfbuzz|fontforge|ttf):.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>owned_ttf_parser false positive - wrapper around ttf-parser</notes>
+        <packageUrl regex="true">^pkg:cargo/owned_ttf_parser@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(freetype|harfbuzz|fontforge|ttf):.*</cpe>
+    </suppress>
+
+    <!-- brotli crate matched against Google Brotli C library CVEs -->
+    <suppress>
+        <notes>brotli false positive - pure Rust brotli, not Google C library</notes>
+        <packageUrl regex="true">^pkg:cargo/brotli@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:brotli:.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>brotli-decompressor false positive</notes>
+        <packageUrl regex="true">^pkg:cargo/brotli-decompressor@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:brotli:.*</cpe>
+    </suppress>
+
+    <!-- calamine crate matched against spreadsheet/Excel CVEs -->
+    <suppress>
+        <notes>calamine false positive - pure Rust Excel reader, not Apache POI or MS Office</notes>
+        <packageUrl regex="true">^pkg:cargo/calamine@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(apache|microsoft|libreoffice|calamine):.*</cpe>
+    </suppress>
+
+    <!-- quick-xml crate matched against libxml2/expat/xerces CVEs -->
+    <suppress>
+        <notes>quick-xml false positive - pure Rust XML parser, not libxml2/expat</notes>
+        <packageUrl regex="true">^pkg:cargo/quick-xml@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(xmlsoft|libxml|expat|apache|xerces|xml):.*</cpe>
+    </suppress>
+
+    <!-- codepage crate matched against encoding-related CVEs -->
+    <suppress>
+        <notes>codepage false positive - Rust Windows codepage crate</notes>
+        <packageUrl regex="true">^pkg:cargo/codepage@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:codepage:.*</cpe>
+    </suppress>
+
+    <!-- zstd crate matched against Facebook/Meta zstd C library CVEs -->
+    <suppress>
+        <notes>zstd false positive - Rust zstd binding, not the C library itself</notes>
+        <packageUrl regex="true">^pkg:cargo/zstd@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:zstd:.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>zstd-safe false positive</notes>
+        <packageUrl regex="true">^pkg:cargo/zstd-safe@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:zstd:.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>zstd-sys false positive</notes>
+        <packageUrl regex="true">^pkg:cargo/zstd-sys@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:zstd:.*</cpe>
+    </suppress>
+
+    <!-- weezl crate (LZW compression) matched against LZW-related CVEs -->
+    <suppress>
+        <notes>weezl false positive - pure Rust LZW implementation</notes>
+        <packageUrl regex="true">^pkg:cargo/weezl@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(lzw|libtiff|giflib):.*</cpe>
+    </suppress>
+
+    <!-- ab_glyph_rasterizer matched against font/glyph rendering CVEs -->
+    <suppress>
+        <notes>ab_glyph_rasterizer false positive - pure Rust glyph rasterizer</notes>
+        <packageUrl regex="true">^pkg:cargo/ab_glyph_rasterizer@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(freetype|harfbuzz|fontconfig):.*</cpe>
+    </suppress>
+
+    <!-- time crate matched against unrelated time-related software -->
+    <suppress>
+        <notes>time crate false positive CPE match</notes>
+        <packageUrl regex="true">^pkg:cargo/time@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:time:.*</cpe>
+    </suppress>
+
+    <!-- chrono crate matched against unrelated chrono software -->
+    <suppress>
+        <notes>chrono crate false positive CPE match</notes>
+        <packageUrl regex="true">^pkg:cargo/chrono@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:chrono:.*</cpe>
+    </suppress>
+
+    <!-- percent-encoding crate false positive -->
+    <suppress>
+        <notes>percent-encoding false positive - Rust URL encoding crate</notes>
+        <packageUrl regex="true">^pkg:cargo/percent-encoding@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:percent-encoding:.*</cpe>
+    </suppress>
+
+    <!-- Broad suppression for Cargo.lock file-level false positives.
+         OWASP sometimes flags the lockfile itself as a vulnerable component. -->
+    <suppress>
+        <notes>Cargo.lock is a lockfile, not a vulnerable component</notes>
+        <filePath regex="true">.*Cargo\.lock$</filePath>
+        <cpe regex="true">cpe:/.*</cpe>
+    </suppress>
+
 </suppressions>

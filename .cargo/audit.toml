@@ -13,8 +13,20 @@
 #
 # RUSTSEC-2024-0370: proc-macro-error is unmaintained (informational).
 # Transitive dep via derive_more 0.99.x. No security vulnerability.
+#
+# RUSTSEC-2025-0141: bincode is unmaintained (informational).
+# Transitive dep via sea-orm. The team considers 1.3.3 complete.
+# No security vulnerability.
+#
+# RUSTSEC-2026-0097: rand unsoundness with custom logger (informational).
+# Requires all of: custom logger, rand::thread_rng() reseeding from logger,
+# trace-level logging. We don't use custom loggers that call rand.
+# rand 0.9.x already updated to 0.9.3 (patched). Only rand 0.8.5 remains
+# as transitive dep — cannot update without upstream changes.
 ignore = [
     "RUSTSEC-2023-0071",
     "RUSTSEC-2021-0140",
     "RUSTSEC-2024-0370",
+    "RUSTSEC-2025-0141",
+    "RUSTSEC-2026-0097",
 ]

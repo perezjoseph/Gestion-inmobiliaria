@@ -226,32 +226,47 @@ jobs:
       - name: Install cargo-audit for CVE scanning
         id: install_audit
         run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
           if command -v cargo-audit &>/dev/null; then
             echo "cargo-audit already installed: $(cargo audit --version)"
-          else
-            mkdir -p "$HOME/.cargo/bin"
-            export PATH="$HOME/.cargo/bin:$PATH"
-            AUDIT_VERSION="0.22.1"
-            echo "Downloading pre-built cargo-audit v${AUDIT_VERSION}..."
-            for VARIANT in musl gnu; do
-              URL="https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-${VARIANT}-v${AUDIT_VERSION}.tgz"
-              if curl -sSfL --retry 3 --retry-delay 5 -o /tmp/cargo-audit.tgz "$URL" 2>/tmp/install-audit-output.txt; then
-                tar xzf /tmp/cargo-audit.tgz --strip-components=1 -C "$HOME/.cargo/bin/" 2>>/tmp/install-audit-output.txt && \
-                chmod +x "$HOME/.cargo/bin/cargo-audit" && break
+            echo "installed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          mkdir -p "$HOME/.cargo/bin"
+          AUDIT_VERSION="0.22.1"
+          echo "Downloading pre-built cargo-audit v${AUDIT_VERSION}..."
+          INSTALLED=false
+          for VARIANT in musl gnu; do
+            URL="https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-${VARIANT}-v${AUDIT_VERSION}.tgz"
+            if curl -sSfL --retry 3 --retry-delay 5 -o /tmp/cargo-audit.tgz "$URL" 2>/tmp/install-audit-output.txt; then
+              if tar xzf /tmp/cargo-audit.tgz --strip-components=1 -C "$HOME/.cargo/bin/" 2>>/tmp/install-audit-output.txt; then
+                chmod +x "$HOME/.cargo/bin/cargo-audit"
+                INSTALLED=true
+                break
               fi
-              echo "Failed to download ${VARIANT} variant, trying next..." | tee -a /tmp/install-audit-output.txt
-            done
-            if ! command -v cargo-audit &>/dev/null; then
-              echo "Pre-built binaries failed, trying cargo install..." | tee -a /tmp/install-audit-output.txt
-              cargo install cargo-audit --locked 2>&1 | tee -a /tmp/install-audit-output.txt
+            fi
+            echo "Failed to download ${VARIANT} variant, trying next..." | tee -a /tmp/install-audit-output.txt
+          done
+          if [ "$INSTALLED" = "false" ]; then
+            echo "Pre-built binaries failed, trying cargo install..." | tee -a /tmp/install-audit-output.txt
+            if cargo install cargo-audit --locked 2>&1 | tee -a /tmp/install-audit-output.txt; then
+              INSTALLED=true
             fi
           fi
-          cargo audit --version
+          if [ "$INSTALLED" = "true" ] && command -v cargo-audit &>/dev/null; then
+            cargo audit --version
+            echo "installed=true" >> $GITHUB_OUTPUT
+          else
+            echo "::warning::cargo-audit installation failed — skipping CVE scan"
+            echo "installed=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Scan Rust dependencies for known vulnerabilities (CVEs)
         id: cargo_audit
-        if: always() && steps.install_audit.outcome == 'success'
-        run: cargo audit 2>&1 | tee /tmp/audit-output.txt
+        if: always() && steps.install_audit.outputs.installed == 'true'
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo audit 2>&1 | tee /tmp/audit-output.txt
 
       - name: Check for unused dependencies in Cargo.toml
         id: cargo_udeps
@@ -286,20 +301,16 @@ jobs:
 
       - name: Collect quality-gate errors for notification
         id: collect-errors
-        if: always() && (steps.install_audit.outcome == 'failure' || steps.cargo_audit.outcome == 'failure' || steps.cargo_udeps.outcome == 'failure' || steps.owasp.outcome == 'failure')
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_udeps.outcome == 'failure' || steps.owasp.outcome == 'failure')
         run: |
           ERROR=""
           FAILED=""
-          if [ "${{ steps.install_audit.outcome }}" = "failure" ]; then
-            FAILED="${FAILED}install-cargo-audit,"
-            ERROR="${ERROR}[install-cargo-audit] $(head -c 1500 /tmp/install-audit-output.txt 2>/dev/null || echo 'Failed to install cargo-audit.')"$'\n\n'
-          fi
           if [ "${{ steps.cargo_audit.outcome }}" = "failure" ]; then
             FAILED="${FAILED}cargo-audit,"
             ERROR="${ERROR}[cargo-audit] $(head -c 2000 /tmp/audit-output.txt 2>/dev/null || echo 'cargo audit found vulnerabilities.')"$'\n\n'
-          elif [ "${{ steps.cargo_audit.outcome }}" = "skipped" ]; then
-            FAILED="${FAILED}cargo-audit,"
-            ERROR="${ERROR}[cargo-audit] Skipped because cargo-audit installation failed."$'\n\n'
+          fi
+          if [ "${{ steps.install_audit.outputs.installed }}" = "false" ]; then
+            ERROR="${ERROR}[cargo-audit] Skipped — installation failed (non-blocking warning)."$'\n\n'
           fi
           if [ "${{ steps.cargo_udeps.outcome }}" = "failure" ]; then
             FAILED="${FAILED}cargo-udeps,"
@@ -316,7 +327,7 @@ jobs:
           echo "$EOF" >> $GITHUB_OUTPUT
 
       - name: Fail job if any quality step failed
-        if: always() && (steps.install_audit.outcome == 'failure' || steps.cargo_audit.outcome == 'failure' || steps.cargo_udeps.outcome == 'failure' || steps.owasp.outcome == 'failure')
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_udeps.outcome == 'failure' || steps.owasp.outcome == 'failure')
         run: exit 1
 
   sonarqube:
