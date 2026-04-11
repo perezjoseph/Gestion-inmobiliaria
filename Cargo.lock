@@ -3134,6 +3134,7 @@ dependencies = [
  "futures-util",
  "genpdf",
  "jsonwebtoken",
+ "proptest",
  "rust_decimal",
  "rust_xlsxwriter",
  "sea-orm",

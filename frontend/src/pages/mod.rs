@@ -4,6 +4,7 @@ pub mod dashboard;
 pub mod importar;
 pub mod inquilinos;
 pub mod login;
+pub mod mantenimiento;
 pub mod pagos;
 pub mod perfil;
 pub mod propiedades;

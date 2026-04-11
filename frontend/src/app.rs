@@ -12,6 +12,7 @@ use crate::pages::dashboard::Dashboard;
 use crate::pages::importar::Importar;
 use crate::pages::inquilinos::Inquilinos;
 use crate::pages::login::Login;
+use crate::pages::mantenimiento::Mantenimiento;
 use crate::pages::pagos::Pagos;
 use crate::pages::perfil::Perfil;
 use crate::pages::propiedades::Propiedades;
@@ -108,6 +109,8 @@ pub enum Route {
     AuditoriaPage,
     #[at("/importar")]
     Importar,
+    #[at("/mantenimiento")]
+    Mantenimiento,
     #[not_found]
     #[at("/404")]
     NotFound,
@@ -127,6 +130,7 @@ fn switch(routes: Route) -> Html {
         Route::Perfil => html! { <ProtectedRoute><Perfil /></ProtectedRoute> },
         Route::AuditoriaPage => html! { <ProtectedRoute><Auditoria /></ProtectedRoute> },
         Route::Importar => html! { <ProtectedRoute><Importar /></ProtectedRoute> },
+        Route::Mantenimiento => html! { <ProtectedRoute><Mantenimiento /></ProtectedRoute> },
         Route::NotFound => {
             html! {
                 <div class="gi-empty-state">

@@ -60,6 +60,14 @@ fn icon_payments() -> Html {
     }
 }
 
+fn icon_maintenance() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+        </svg>
+    }
+}
+
 fn icon_reports() -> Html {
     html! {
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -192,6 +200,13 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                             classes={classes!(link_class(&Route::Pagos))}>
                             {icon_payments()}
                             {"Pagos"}
+                        </Link<Route>>
+                    </li>
+                    <li onclick={make_click(on_nav_click.clone())}>
+                        <Link<Route> to={Route::Mantenimiento}
+                            classes={classes!(link_class(&Route::Mantenimiento))}>
+                            {icon_maintenance()}
+                            {"Mantenimiento"}
                         </Link<Route>>
                     </li>
                     <li onclick={make_click(on_nav_click.clone())}>

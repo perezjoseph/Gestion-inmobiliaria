@@ -13,8 +13,7 @@ You are working on a real estate property management application for the Dominic
 - Read existing code and conventions before making changes.
 - Follow the patterns established in the codebase.
 - Check Cargo.toml before assuming a crate is available.
-- All UI text must be in Spanish.
-- Always use the `playwright-cli` skill when debugging or building frontend components. Launch the app in a browser, inspect rendered output, verify interactions, and catch visual or functional issues directly rather than guessing from code alone.
+
 
 ## Skills
 

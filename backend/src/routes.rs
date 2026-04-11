@@ -67,6 +67,22 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     ),
             )
             .service(
+                web::scope("/mantenimiento")
+                    .route("", web::get().to(handlers::mantenimiento::list))
+                    .route("", web::post().to(handlers::mantenimiento::create))
+                    .route("/{id}", web::get().to(handlers::mantenimiento::get_by_id))
+                    .route("/{id}", web::put().to(handlers::mantenimiento::update))
+                    .route(
+                        "/{id}/estado",
+                        web::put().to(handlers::mantenimiento::cambiar_estado),
+                    )
+                    .route("/{id}", web::delete().to(handlers::mantenimiento::delete))
+                    .route(
+                        "/{id}/notas",
+                        web::post().to(handlers::mantenimiento::agregar_nota),
+                    ),
+            )
+            .service(
                 web::scope("/dashboard")
                     .route("/stats", web::get().to(handlers::dashboard::stats))
                     .route(

@@ -116,12 +116,12 @@ pub async fn create<C: ConnectionTrait>(
     if let Some(ref moneda) = input.costo_moneda {
         validate_enum("moneda", moneda, MONEDAS_COSTO)?;
     }
-    if let Some(monto) = input.costo_monto {
-        if monto < Decimal::ZERO {
-            return Err(AppError::Validation(
-                "El monto debe ser mayor o igual a cero".to_string(),
-            ));
-        }
+    if let Some(monto) = input.costo_monto
+        && monto < Decimal::ZERO
+    {
+        return Err(AppError::Validation(
+            "El monto debe ser mayor o igual a cero".to_string(),
+        ));
     }
 
     let now = Utc::now().into();
@@ -229,12 +229,12 @@ pub async fn update<C: ConnectionTrait>(
     if let Some(ref moneda) = input.costo_moneda {
         validate_enum("moneda", moneda, MONEDAS_COSTO)?;
     }
-    if let Some(monto) = input.costo_monto {
-        if monto < Decimal::ZERO {
-            return Err(AppError::Validation(
-                "El monto debe ser mayor o igual a cero".to_string(),
-            ));
-        }
+    if let Some(monto) = input.costo_monto
+        && monto < Decimal::ZERO
+    {
+        return Err(AppError::Validation(
+            "El monto debe ser mayor o igual a cero".to_string(),
+        ));
     }
 
     let existing = solicitud_mantenimiento::Entity::find_by_id(id)

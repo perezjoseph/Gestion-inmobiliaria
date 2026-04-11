@@ -6,8 +6,8 @@ node_modules/
 .kiro/
 .impeccable.md
 .claude/
+.vscode/
 .playwright/
 .playwright-cli/
 frontend/dist/
-autoresearch/
-.vscode/
+

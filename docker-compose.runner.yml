@@ -1,0 +1,34 @@
+services:
+  runner-1:
+    image: myoung34/github-runner:latest
+    environment:
+      REPO_URL: ${GITHUB_REPO_URL}
+      RUNNER_TOKEN: ${GITHUB_RUNNER_TOKEN}
+      RUNNER_NAME: realestate-runner-1
+      RUNNER_WORKDIR: /tmp/runner-1
+      RUNNER_SCOPE: repo
+      LABELS: self-hosted,linux
+      DISABLE_AUTO_UPDATE: "true"
+    security_opt:
+      - label:disable
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/runner-1:/tmp/runner-1
+    restart: unless-stopped
+
+  runner-2:
+    image: myoung34/github-runner:latest
+    environment:
+      REPO_URL: ${GITHUB_REPO_URL}
+      RUNNER_TOKEN: ${GITHUB_RUNNER_TOKEN}
+      RUNNER_NAME: realestate-runner-2
+      RUNNER_WORKDIR: /tmp/runner-2
+      RUNNER_SCOPE: repo
+      LABELS: self-hosted,linux
+      DISABLE_AUTO_UPDATE: "true"
+    security_opt:
+      - label:disable
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/runner-2:/tmp/runner-2
+    restart: unless-stopped

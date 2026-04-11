@@ -6,6 +6,7 @@ pub mod dashboard;
 pub mod documentos;
 pub mod importacion;
 pub mod inquilinos;
+pub mod mantenimiento;
 pub mod notificaciones;
 pub mod pagos;
 pub mod perfil;
