@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, develop]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: "-D warnings"
@@ -37,6 +41,10 @@ jobs:
       - name: Lint commit messages
         run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
 
+      - name: Cancel workflow on failure
+        if: failure()
+        uses: andymckay/cancel-action@0.5
+
   lint:
     name: Lint & Format
     runs-on: [self-hosted, linux]
@@ -67,6 +75,10 @@ jobs:
 
       - name: Clippy (frontend)
         run: cargo clippy -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings
+
+      - name: Cancel workflow on failure
+        if: failure()
+        uses: andymckay/cancel-action@0.5
 
   test-backend:
     name: Backend Tests
@@ -104,6 +116,10 @@ jobs:
       - name: Run backend unit & integration tests
         run: cargo test -p realestate-backend --all-targets
 
+      - name: Cancel workflow on failure
+        if: failure()
+        uses: andymckay/cancel-action@0.5
+
   test-frontend:
     name: Frontend Property Tests
     runs-on: [self-hosted, linux]
@@ -127,6 +143,10 @@ jobs:
 
       - name: Run frontend tests
         run: cargo test -p realestate-frontend --all-targets
+
+      - name: Cancel workflow on failure
+        if: failure()
+        uses: andymckay/cancel-action@0.5
 
   quality-gate:
     name: Quality Gate
@@ -171,6 +191,10 @@ jobs:
           path: reports/
           retention-days: 7
 
+      - name: Cancel workflow on failure
+        if: failure()
+        uses: andymckay/cancel-action@0.5
+
   sonarqube:
     name: SonarQube Analysis
     runs-on: [self-hosted, linux, sonarqube]
@@ -185,6 +209,10 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: http://localhost:9000
+
+      - name: Cancel workflow on failure
+        if: failure()
+        uses: andymckay/cancel-action@0.5
 
   build-frontend:
     name: Build Frontend (WASM)
@@ -222,11 +250,15 @@ jobs:
           path: frontend/dist/
           retention-days: 7
 
+      - name: Cancel workflow on failure
+        if: failure()
+        uses: andymckay/cancel-action@0.5
+
   notify-failure:
     name: Notify Kiro on Failure
     runs-on: [self-hosted, linux]
     needs: [commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend]
-    if: always() && contains(needs.*.result, 'failure')
+    if: always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
     steps:
       - name: Notify commit lint failure
         if: always() && needs.commit-lint.result == 'failure'
