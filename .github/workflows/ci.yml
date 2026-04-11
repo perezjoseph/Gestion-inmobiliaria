@@ -15,8 +15,25 @@ env:
   CORS_ORIGIN: http://localhost:8080
 
 jobs:
-  check:
-    name: Check & Lint
+  commit-lint:
+    name: Commit Message Lint
+    runs-on: [self-hosted, linux]
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install commitlint
+        run: |
+          npm install --save-dev @commitlint/{cli,config-conventional}
+          echo "module.exports = { extends: ['@commitlint/config-conventional'] };" > commitlint.config.js
+
+      - name: Lint commit messages
+        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+
+  lint:
+    name: Lint & Format
     runs-on: [self-hosted, linux]
     steps:
       - uses: actions/checkout@v4
@@ -34,8 +51,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-check-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-check-
+          key: ${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-lint-
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -49,7 +66,6 @@ jobs:
   test-backend:
     name: Backend Tests
     runs-on: [self-hosted, linux]
-    needs: check
     services:
       postgres:
         image: postgres:16
@@ -64,7 +80,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
     steps:
       - uses: actions/checkout@v4
 
@@ -81,13 +96,95 @@ jobs:
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-test-
 
-      - name: Run backend tests
+      - name: Run backend unit & integration tests
         run: cargo test -p realestate-backend --all-targets
+
+  test-frontend:
+    name: Frontend Property Tests
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-frontend-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-frontend-test-
+
+      - name: Run frontend tests
+        run: cargo test -p realestate-frontend --all-targets
+
+  quality-gate:
+    name: Quality Gate
+    runs-on: [self-hosted, linux]
+    needs: [lint, test-backend, test-frontend]
+    steps:
+      - name: Verify all checks passed
+        run: echo "All lint and test jobs passed"
+
+      - name: Check dependency advisories
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked || true
+
+      - name: Audit dependencies
+        run: cargo audit
+
+      - name: Check for unused dependencies
+        run: |
+          cargo install cargo-udeps --locked || true
+          cargo +nightly udeps --all-targets 2>&1 || echo "cargo-udeps requires nightly, skipping if unavailable"
+
+      - name: OWASP dependency check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: realestate
+          path: .
+          format: HTML
+          args: >-
+            --enableExperimental
+            --failOnCVSS 7
+
+      - name: Upload OWASP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: owasp-dependency-check-report
+          path: reports/
+          retention-days: 7
+
+  sonarqube:
+    name: SonarQube Analysis
+    runs-on: [self-hosted, linux]
+    needs: [lint, test-backend, test-frontend]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: http://localhost:9000
 
   build-frontend:
     name: Build Frontend (WASM)
     runs-on: [self-hosted, linux]
-    needs: check
+    needs: [quality-gate]
     steps:
       - uses: actions/checkout@v4
 
