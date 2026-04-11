@@ -234,9 +234,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install unzip for SonarQube scanner extraction
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq unzip
+        run: which unzip || (apt-get update -qq && apt-get install -y -qq unzip)
 
       - name: Run SonarQube static analysis scan
         uses: SonarSource/sonarqube-scan-action@v6
