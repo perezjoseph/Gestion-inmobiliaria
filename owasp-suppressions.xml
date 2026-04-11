@@ -220,6 +220,184 @@
         <cpe regex="true">cpe:/a:.*:percent-encoding:.*</cpe>
     </suppress>
 
+    <!-- zip crate matched against Java/C zip library CVEs (ZipSlip, zip bombs) -->
+    <suppress>
+        <notes>zip crate false positive - pure Rust zip library, not Java/C zip</notes>
+        <packageUrl regex="true">^pkg:cargo/zip@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:zip:.*</cpe>
+    </suppress>
+
+    <!-- flate2 crate matched against zlib C library CVEs -->
+    <suppress>
+        <notes>flate2 false positive - Rust deflate wrapper, not zlib C library</notes>
+        <packageUrl regex="true">^pkg:cargo/flate2@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(zlib|flate|deflate):.*</cpe>
+    </suppress>
+
+    <!-- zlib-rs crate matched against zlib C library CVEs -->
+    <suppress>
+        <notes>zlib-rs false positive - pure Rust zlib implementation, not C zlib</notes>
+        <packageUrl regex="true">^pkg:cargo/zlib-rs@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:zlib:.*</cpe>
+    </suppress>
+
+    <!-- sha1 crate matched against SHA hash weakness CVEs -->
+    <suppress>
+        <notes>sha1 crate false positive - Rust SHA-1 impl, not OpenSSL/system SHA</notes>
+        <packageUrl regex="true">^pkg:cargo/sha1@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:sha1:.*</cpe>
+    </suppress>
+
+    <!-- sha2 crate matched against SHA hash CVEs -->
+    <suppress>
+        <notes>sha2 crate false positive - Rust SHA-2 impl, not OpenSSL/system SHA</notes>
+        <packageUrl regex="true">^pkg:cargo/sha2@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:sha2:.*</cpe>
+    </suppress>
+
+    <!-- hmac crate matched against HMAC-related CVEs -->
+    <suppress>
+        <notes>hmac crate false positive - pure Rust HMAC implementation</notes>
+        <packageUrl regex="true">^pkg:cargo/hmac@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:hmac:.*</cpe>
+    </suppress>
+
+    <!-- blake2 crate matched against blake2 hash CVEs -->
+    <suppress>
+        <notes>blake2 crate false positive - pure Rust blake2 implementation</notes>
+        <packageUrl regex="true">^pkg:cargo/blake2@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:blake2:.*</cpe>
+    </suppress>
+
+    <!-- argon2 crate matched against argon2 C reference implementation CVEs -->
+    <suppress>
+        <notes>argon2 crate false positive - pure Rust argon2, not C reference impl</notes>
+        <packageUrl regex="true">^pkg:cargo/argon2@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:argon2:.*</cpe>
+    </suppress>
+
+    <!-- encoding_rs crate matched against encoding/charset CVEs -->
+    <suppress>
+        <notes>encoding_rs false positive - Rust encoding library, not ICU/iconv</notes>
+        <packageUrl regex="true">^pkg:cargo/encoding_rs@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(encoding|iconv|icu):.*</cpe>
+    </suppress>
+
+    <!-- lopdf crate matched against PDF library CVEs (Adobe, Poppler, etc.) -->
+    <suppress>
+        <notes>lopdf false positive - pure Rust PDF library, not Adobe/Poppler</notes>
+        <packageUrl regex="true">^pkg:cargo/lopdf@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(pdf|adobe|poppler|mupdf|xpdf|foxit):.*</cpe>
+    </suppress>
+
+    <!-- printpdf crate matched against PDF library CVEs -->
+    <suppress>
+        <notes>printpdf false positive - pure Rust PDF generator, not Adobe/Poppler</notes>
+        <packageUrl regex="true">^pkg:cargo/printpdf@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(pdf|adobe|poppler|mupdf|xpdf|foxit):.*</cpe>
+    </suppress>
+
+    <!-- pem crate matched against PEM/certificate parsing CVEs -->
+    <suppress>
+        <notes>pem crate false positive - pure Rust PEM parser, not OpenSSL</notes>
+        <packageUrl regex="true">^pkg:cargo/pem@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(pem|openssl|certificate):.*</cpe>
+    </suppress>
+
+    <!-- rand crate matched against RNG-related CVEs -->
+    <suppress>
+        <notes>rand crate false positive - Rust RNG library</notes>
+        <packageUrl regex="true">^pkg:cargo/rand@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:rand:.*</cpe>
+    </suppress>
+
+    <!-- base64 crate matched against base64 encoding CVEs -->
+    <suppress>
+        <notes>base64 crate false positive - pure Rust base64 encoder</notes>
+        <packageUrl regex="true">^pkg:cargo/base64@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:base64:.*</cpe>
+    </suppress>
+
+    <!-- spin crate matched against unrelated spin software -->
+    <suppress>
+        <notes>spin crate false positive - Rust spinlock primitives</notes>
+        <packageUrl regex="true">^pkg:cargo/spin@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:spin:.*</cpe>
+    </suppress>
+
+    <!-- slab crate matched against unrelated slab software -->
+    <suppress>
+        <notes>slab crate false positive - Rust pre-allocated storage</notes>
+        <packageUrl regex="true">^pkg:cargo/slab@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:slab:.*</cpe>
+    </suppress>
+
+    <!-- zopfli crate matched against Google Zopfli C library CVEs -->
+    <suppress>
+        <notes>zopfli false positive - Rust zopfli port, not Google C library</notes>
+        <packageUrl regex="true">^pkg:cargo/zopfli@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:zopfli:.*</cpe>
+    </suppress>
+
+    <!-- whoami crate matched against unrelated software -->
+    <suppress>
+        <notes>whoami false positive - Rust system user info crate</notes>
+        <packageUrl regex="true">^pkg:cargo/whoami@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:whoami:.*</cpe>
+    </suppress>
+
+    <!-- miniz_oxide crate matched against miniz/zlib CVEs -->
+    <suppress>
+        <notes>miniz_oxide false positive - pure Rust miniz port</notes>
+        <packageUrl regex="true">^pkg:cargo/miniz_oxide@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(miniz|zlib):.*</cpe>
+    </suppress>
+
+    <!-- digest crate matched against hash/digest CVEs -->
+    <suppress>
+        <notes>digest crate false positive - Rust cryptographic digest traits</notes>
+        <packageUrl regex="true">^pkg:cargo/digest@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:digest:.*</cpe>
+    </suppress>
+
+    <!-- log crate matched against logging framework CVEs -->
+    <suppress>
+        <notes>log crate false positive - Rust logging facade, not log4j/logback</notes>
+        <packageUrl regex="true">^pkg:cargo/log@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:log:.*</cpe>
+    </suppress>
+
+    <!-- sqlx crate matched against SQL injection/database CVEs -->
+    <suppress>
+        <notes>sqlx false positive - Rust async SQL toolkit, not JDBC/ODBC drivers</notes>
+        <packageUrl regex="true">^pkg:cargo/sqlx@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(sqlx|sql|jdbc|odbc):.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>sqlx-core false positive</notes>
+        <packageUrl regex="true">^pkg:cargo/sqlx-core@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(sqlx|sql|jdbc|odbc):.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>sqlx-postgres false positive</notes>
+        <packageUrl regex="true">^pkg:cargo/sqlx-postgres@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(sqlx|sql|jdbc|odbc|postgres|postgresql):.*</cpe>
+    </suppress>
+
+    <!-- crc32fast crate matched against CRC-related CVEs -->
+    <suppress>
+        <notes>crc32fast false positive - pure Rust CRC32 implementation</notes>
+        <packageUrl regex="true">^pkg:cargo/crc32fast@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:crc:.*</cpe>
+    </suppress>
+
+    <!-- crc crate matched against CRC-related CVEs -->
+    <suppress>
+        <notes>crc crate false positive - pure Rust CRC implementation</notes>
+        <packageUrl regex="true">^pkg:cargo/crc@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:crc:.*</cpe>
+    </suppress>
+
     <!-- Broad suppression for Cargo.lock file-level false positives.
          OWASP sometimes flags the lockfile itself as a vulnerable component. -->
     <suppress>

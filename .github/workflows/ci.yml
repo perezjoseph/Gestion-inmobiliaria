@@ -227,22 +227,28 @@ jobs:
         id: install_audit
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          if command -v cargo-audit &>/dev/null; then
+          if command -v cargo-audit &>/dev/null && cargo audit --version &>/dev/null; then
             echo "cargo-audit already installed: $(cargo audit --version)"
             echo "installed=true" >> $GITHUB_OUTPUT
             exit 0
           fi
+          rm -f "$HOME/.cargo/bin/cargo-audit"
           mkdir -p "$HOME/.cargo/bin"
           AUDIT_VERSION="0.22.1"
           echo "Downloading pre-built cargo-audit v${AUDIT_VERSION}..."
           INSTALLED=false
           for VARIANT in musl gnu; do
             URL="https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-${VARIANT}-v${AUDIT_VERSION}.tgz"
-            if curl -sSfL --retry 3 --retry-delay 5 -o /tmp/cargo-audit.tgz "$URL" 2>/tmp/install-audit-output.txt; then
+            if curl -sSfL --retry 3 --retry-delay 10 --connect-timeout 30 -o /tmp/cargo-audit.tgz "$URL" 2>/tmp/install-audit-output.txt; then
               if tar xzf /tmp/cargo-audit.tgz --strip-components=1 -C "$HOME/.cargo/bin/" 2>>/tmp/install-audit-output.txt; then
                 chmod +x "$HOME/.cargo/bin/cargo-audit"
-                INSTALLED=true
-                break
+                if cargo audit --version &>/dev/null; then
+                  INSTALLED=true
+                  break
+                else
+                  echo "Binary extracted but not executable, trying next variant..." | tee -a /tmp/install-audit-output.txt
+                  rm -f "$HOME/.cargo/bin/cargo-audit"
+                fi
               fi
             fi
             echo "Failed to download ${VARIANT} variant, trying next..." | tee -a /tmp/install-audit-output.txt
