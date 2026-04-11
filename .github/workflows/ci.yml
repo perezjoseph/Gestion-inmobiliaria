@@ -337,19 +337,53 @@ jobs:
           docker compose -f .github/docker-compose.sonarqube.yml logs sonarqube | tail -50
           exit 1
 
+      - name: Bootstrap SonarQube project and token
+        id: sonar-bootstrap
+        run: |
+          SONAR_URL="http://localhost:9000"
+          
+          # Change default admin password on first boot (ignore if already changed)
+          curl -sf -u admin:admin -X POST \
+            "$SONAR_URL/api/users/change_password?login=admin&previousPassword=admin&password=${{ secrets.SONAR_ADMIN_PASSWORD || 'SonarAdmin2025!' }}" \
+            2>/dev/null || echo "Admin password already changed or custom password set."
+
+          ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD || 'SonarAdmin2025!' }}"
+
+          # Create project if it doesn't exist
+          curl -sf -u "admin:${ADMIN_PASS}" -X POST \
+            "$SONAR_URL/api/projects/create?name=Gestion+Inmobiliaria&project=gestion-inmobiliaria" \
+            2>/dev/null || echo "Project already exists."
+
+          # Generate or reuse a token
+          TOKEN="${{ secrets.SONAR_TOKEN }}"
+          if [ -z "$TOKEN" ]; then
+            # Revoke old CI token if it exists, then create a new one
+            curl -sf -u "admin:${ADMIN_PASS}" -X POST \
+              "$SONAR_URL/api/user_tokens/revoke?name=ci-token" 2>/dev/null || true
+            TOKEN=$(curl -sf -u "admin:${ADMIN_PASS}" -X POST \
+              "$SONAR_URL/api/user_tokens/generate?name=ci-token" \
+              | jq -r '.token')
+            echo "::warning::No SONAR_TOKEN secret set. Generated ephemeral token. Add SONAR_TOKEN to GitHub secrets for stable config."
+          fi
+
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
       - name: Run SonarQube static analysis scan
         uses: SonarSource/sonarqube-scan-action@v6
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ steps.sonar-bootstrap.outputs.token }}
           SONAR_HOST_URL: http://localhost:9000
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
 
       - name: Fetch SonarQube results and notify
-        if: always() && steps.sonar-check.outcome != 'failure'
+        if: always()
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ steps.sonar-bootstrap.outputs.token }}
         run: |
-          # Wait a moment for SonarQube to process the report
-          sleep 10
 
           # Fetch project status (quality gate)
           GATE=$(curl -sf -u "$SONAR_TOKEN:" \
