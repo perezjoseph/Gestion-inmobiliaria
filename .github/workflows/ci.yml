@@ -221,7 +221,7 @@ jobs:
     name: Notify Kiro on Failure
     runs-on: [self-hosted, linux]
     needs: [lint, test-backend, test-frontend, quality-gate, build-frontend]
-    if: failure()
+    if: always() && contains(needs.*.result, 'failure')
     steps:
       - name: Notify lint failure
         if: needs.lint.result == 'failure'
