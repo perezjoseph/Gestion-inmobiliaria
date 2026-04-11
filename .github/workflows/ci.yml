@@ -7,7 +7,6 @@ on:
     branches: [main, develop]
 
 permissions:
-  actions: write
   contents: read
 
 concurrency:
@@ -47,10 +46,6 @@ jobs:
 
       - name: Validate PR commit messages against conventional format
         run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
-
-      - name: Abort pipeline on commit lint failure
-        if: failure()
-        uses: andymckay/cancel-action@0.5
 
   lint:
     name: Code Formatting & Static Analysis
@@ -105,10 +100,6 @@ jobs:
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
 
-      - name: Abort pipeline on lint failure
-        if: failure()
-        uses: andymckay/cancel-action@0.5
-
   test-backend:
     name: Backend Unit & Integration Tests
     runs-on: [self-hosted, linux, docker]
@@ -162,10 +153,6 @@ jobs:
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
 
-      - name: Abort pipeline on backend test failure
-        if: failure()
-        uses: andymckay/cancel-action@0.5
-
   test-frontend:
     name: Frontend WASM Compilation & Tests
     runs-on: [self-hosted, linux]
@@ -206,10 +193,6 @@ jobs:
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
-
-      - name: Abort pipeline on frontend test failure
-        if: failure()
-        uses: andymckay/cancel-action@0.5
 
   quality-gate:
     name: Dependency Security & Health Check
@@ -267,10 +250,6 @@ jobs:
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
 
-      - name: Abort pipeline on security gate failure
-        if: failure()
-        uses: andymckay/cancel-action@0.5
-
   sonarqube:
     name: SonarQube Code Quality & Coverage Analysis
     runs-on: [self-hosted, linux, sonarqube]
@@ -288,10 +267,6 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: http://localhost:9000
-
-      - name: Abort pipeline on SonarQube failure
-        if: failure()
-        uses: andymckay/cancel-action@0.5
 
   # ── Stage 2: Build (runs only after all quality checks pass) ──
 
@@ -349,10 +324,6 @@ jobs:
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
 
-      - name: Abort pipeline on build failure
-        if: failure()
-        uses: andymckay/cancel-action@0.5
-
   build-backend:
     name: Backend Release Build
     runs-on: [self-hosted, linux]
@@ -400,10 +371,6 @@ jobs:
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
-
-      - name: Abort pipeline on build failure
-        if: failure()
-        uses: andymckay/cancel-action@0.5
 
   notify-failure:
     name: Failure Notification Webhook
