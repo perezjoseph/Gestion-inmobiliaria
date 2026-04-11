@@ -19,45 +19,49 @@ env:
   CORS_ORIGIN: http://localhost:8080
 
 jobs:
+  # ── Stage 1: Quality Checks (all run in parallel) ──
+
   commit-lint:
-    name: Commit Message Lint
+    name: Conventional Commits Check
     runs-on: [self-hosted, linux]
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository with full history
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js
+      - name: Setup Node.js 22 for commitlint
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Install commitlint
+      - name: Install commitlint CLI and conventional config
         run: |
           npm install --save-dev @commitlint/{cli,config-conventional}
           echo "module.exports = { extends: ['@commitlint/config-conventional'] };" > commitlint.config.js
 
-      - name: Lint commit messages
+      - name: Validate PR commit messages against conventional format
         run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
 
-      - name: Cancel workflow on failure
+      - name: Abort pipeline on commit lint failure
         if: failure()
         uses: andymckay/cancel-action@0.5
 
   lint:
-    name: Lint & Format
+    name: Code Formatting & Static Analysis
     runs-on: [self-hosted, linux]
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
+      - name: Install Rust stable with rustfmt, clippy, and WASM target
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
 
-      - name: Cache cargo registry & build
+      - name: Restore cargo cache (registry, git, build artifacts)
         uses: actions/cache@v4
         with:
           path: |
@@ -67,36 +71,36 @@ jobs:
           key: ${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-lint-
 
-      - name: Check formatting
+      - name: Verify rustfmt formatting across all crates
         id: fmt
         run: cargo fmt --all -- --check 2>&1 | tee /tmp/fmt-output.txt
 
-      - name: Save fmt output
+      - name: Capture rustfmt output for failure notification
         if: failure()
         run: echo "FMT_OUTPUT<<GHEOF" >> $GITHUB_ENV && head -c 3000 /tmp/fmt-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
 
-      - name: Clippy (backend)
+      - name: Run clippy lints on backend (warnings as errors)
         id: clippy_backend
         run: cargo clippy -p realestate-backend -- -D warnings 2>&1 | tee /tmp/clippy-backend-output.txt
 
-      - name: Save clippy backend output
+      - name: Capture backend clippy output for failure notification
         if: failure()
         run: echo "CLIPPY_BACKEND_OUTPUT<<GHEOF" >> $GITHUB_ENV && head -c 3000 /tmp/clippy-backend-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
 
-      - name: Clippy (frontend)
+      - name: Run clippy lints on frontend WASM target (warnings as errors)
         id: clippy_frontend
         run: cargo clippy -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings 2>&1 | tee /tmp/clippy-frontend-output.txt
 
-      - name: Save clippy frontend output
+      - name: Capture frontend clippy output for failure notification
         if: failure()
         run: echo "CLIPPY_FRONTEND_OUTPUT<<GHEOF" >> $GITHUB_ENV && head -c 3000 /tmp/clippy-frontend-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
 
-      - name: Cancel workflow on failure
+      - name: Abort pipeline on lint failure
         if: failure()
         uses: andymckay/cancel-action@0.5
 
   test-backend:
-    name: Backend Tests
+    name: Backend Unit & Integration Tests
     runs-on: [self-hosted, linux]
     services:
       postgres:
@@ -113,12 +117,13 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
+      - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache cargo registry & build
+      - name: Restore cargo cache (registry, git, build artifacts)
         uses: actions/cache@v4
         with:
           path: |
@@ -128,29 +133,30 @@ jobs:
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-test-
 
-      - name: Run backend unit & integration tests
+      - name: Run backend unit and integration tests against PostgreSQL
         run: cargo test -p realestate-backend --all-targets 2>&1 | tee /tmp/test-backend-output.txt
 
-      - name: Save backend test output
+      - name: Capture backend test output for failure notification
         if: failure()
         run: echo "TEST_BACKEND_OUTPUT<<GHEOF" >> $GITHUB_ENV && tail -c 3000 /tmp/test-backend-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
 
-      - name: Cancel workflow on failure
+      - name: Abort pipeline on backend test failure
         if: failure()
         uses: andymckay/cancel-action@0.5
 
   test-frontend:
-    name: Frontend Property Tests
+    name: Frontend WASM Compilation & Tests
     runs-on: [self-hosted, linux]
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
+      - name: Install Rust stable with WASM target
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
 
-      - name: Cache cargo registry & build
+      - name: Restore cargo cache (registry, git, build artifacts)
         uses: actions/cache@v4
         with:
           path: |
@@ -160,43 +166,39 @@ jobs:
           key: ${{ runner.os }}-cargo-frontend-test-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-frontend-test-
 
-      - name: Run frontend tests
+      - name: Run frontend tests (native target)
         run: cargo test -p realestate-frontend --all-targets 2>&1 | tee /tmp/test-frontend-output.txt
 
-      - name: Save frontend test output
+      - name: Capture frontend test output for failure notification
         if: failure()
         run: echo "TEST_FRONTEND_OUTPUT<<GHEOF" >> $GITHUB_ENV && tail -c 3000 /tmp/test-frontend-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
 
-      - name: Cancel workflow on failure
+      - name: Abort pipeline on frontend test failure
         if: failure()
         uses: andymckay/cancel-action@0.5
 
   quality-gate:
-    name: Quality Gate
+    name: Dependency Security & Health Check
     runs-on: [self-hosted, linux]
-    needs: [lint, test-backend, test-frontend]
     steps:
-      - name: Verify all checks passed
-        run: echo "All lint and test jobs passed"
-
-      - name: Check dependency advisories
+      - name: Checkout repository for dependency scanning
         uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
+      - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install cargo-audit
+      - name: Install cargo-audit for CVE scanning
         run: cargo install cargo-audit --locked || true
 
-      - name: Audit dependencies
+      - name: Scan Rust dependencies for known vulnerabilities (CVEs)
         run: cargo audit
 
-      - name: Check for unused dependencies
+      - name: Check for unused dependencies in Cargo.toml
         run: |
           cargo install cargo-udeps --locked || true
           cargo +nightly udeps --all-targets 2>&1 || echo "cargo-udeps requires nightly, skipping if unavailable"
 
-      - name: OWASP dependency check
+      - name: OWASP dependency scan (fail on CVSS >= 7)
         uses: dependency-check/Dependency-Check_Action@main
         with:
           project: realestate
@@ -206,7 +208,7 @@ jobs:
             --enableExperimental
             --failOnCVSS 7
 
-      - name: Upload OWASP report
+      - name: Upload OWASP vulnerability report as artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -214,45 +216,49 @@ jobs:
           path: reports/
           retention-days: 7
 
-      - name: Cancel workflow on failure
+      - name: Abort pipeline on security gate failure
         if: failure()
         uses: andymckay/cancel-action@0.5
 
   sonarqube:
-    name: SonarQube Analysis
+    name: SonarQube Code Quality & Coverage Analysis
     runs-on: [self-hosted, linux, sonarqube]
-    needs: [lint, test-backend, test-frontend]
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository with full history for blame analysis
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: SonarQube Scan
+      - name: Run SonarQube static analysis scan
         uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: http://localhost:9000
 
-      - name: Cancel workflow on failure
+      - name: Abort pipeline on SonarQube failure
         if: failure()
         uses: andymckay/cancel-action@0.5
 
-  build-frontend:
-    name: Build Frontend (WASM)
-    runs-on: [self-hosted, linux]
-    needs: [quality-gate]
-    steps:
-      - uses: actions/checkout@v4
+  # ── Stage 2: Build (runs only after all quality checks pass) ──
 
-      - name: Install Rust toolchain
+  build-frontend:
+    name: Frontend WASM Release Build
+    runs-on: [self-hosted, linux]
+    needs: [commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube]
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable with WASM target
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
 
-      - name: Install Trunk
+      - name: Install Trunk WASM bundler
         uses: jetli/trunk-action@v0.5.0
 
-      - name: Cache cargo registry & build
+      - name: Restore cargo cache (registry, git, build artifacts)
         uses: actions/cache@v4
         with:
           path: |
@@ -262,28 +268,72 @@ jobs:
           key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-wasm-
 
-      - name: Build frontend
-        run: trunk build --release
+      - name: Build optimized WASM frontend bundle
+        run: trunk build --release 2>&1 | tee /tmp/build-frontend-output.txt
         working-directory: frontend
 
-      - name: Upload frontend artifact
+      - name: Capture frontend build output for failure notification
+        if: failure()
+        run: echo "BUILD_FRONTEND_OUTPUT<<GHEOF" >> $GITHUB_ENV && tail -c 3000 /tmp/build-frontend-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
+
+      - name: Upload frontend dist as build artifact (7-day retention)
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
           path: frontend/dist/
           retention-days: 7
 
-      - name: Cancel workflow on failure
+      - name: Abort pipeline on build failure
+        if: failure()
+        uses: andymckay/cancel-action@0.5
+
+  build-backend:
+    name: Backend Release Build
+    runs-on: [self-hosted, linux]
+    needs: [commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube]
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Restore cargo cache (registry, git, build artifacts)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-backend-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-backend-build-
+
+      - name: Build optimized backend binary
+        run: cargo build -p realestate-backend --release 2>&1 | tee /tmp/build-backend-output.txt
+
+      - name: Capture backend build output for failure notification
+        if: failure()
+        run: echo "BUILD_BACKEND_OUTPUT<<GHEOF" >> $GITHUB_ENV && tail -c 3000 /tmp/build-backend-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
+
+      - name: Upload backend binary as build artifact (7-day retention)
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-binary
+          path: target/release/realestate-backend
+          retention-days: 7
+
+      - name: Abort pipeline on build failure
         if: failure()
         uses: andymckay/cancel-action@0.5
 
   notify-failure:
-    name: Notify Kiro on Failure
+    name: Failure Notification Webhook
     runs-on: [self-hosted, linux]
-    needs: [commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend]
+    needs: [commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend]
     if: always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
     steps:
-      - name: Notify commit lint failure
+      - name: Notify — conventional commit validation failed
         if: always() && needs.commit-lint.result == 'failure'
         run: |
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
@@ -295,7 +345,7 @@ jobs:
               "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }' || echo "Webhook unreachable — skipping notification"
 
-      - name: Notify lint failure
+      - name: Notify — code formatting or clippy lint failed
         if: always() && needs.lint.result == 'failure'
         run: |
           ERROR_LOG="${FMT_OUTPUT:-}${CLIPPY_BACKEND_OUTPUT:-}${CLIPPY_FRONTEND_OUTPUT:-}"
@@ -308,7 +358,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
 
-      - name: Notify backend test failure
+      - name: Notify — backend tests failed
         if: always() && needs.test-backend.result == 'failure'
         run: |
           ERROR_LOG="${TEST_BACKEND_OUTPUT:-Backend tests failed but no captured output. Run cargo test -p realestate-backend --all-targets to reproduce.}"
@@ -318,7 +368,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
 
-      - name: Notify frontend test failure
+      - name: Notify — frontend tests failed
         if: always() && needs.test-frontend.result == 'failure'
         run: |
           ERROR_LOG="${TEST_FRONTEND_OUTPUT:-Frontend tests failed but no captured output. Run cargo test -p realestate-frontend --all-targets to reproduce.}"
@@ -328,7 +378,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
 
-      - name: Notify quality gate failure
+      - name: Notify — dependency security gate failed
         if: always() && needs.quality-gate.result == 'failure'
         run: |
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
@@ -340,19 +390,27 @@ jobs:
               "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }' || echo "Webhook unreachable — skipping notification"
 
-      - name: Notify build failure
+      - name: Notify — frontend WASM build failed
         if: always() && needs.build-frontend.result == 'failure'
         run: |
+          ERROR_LOG="${BUILD_FRONTEND_OUTPUT:-Frontend WASM build failed but no captured output. Run trunk build --release in frontend/ to reproduce.}"
+          PAYLOAD=$(jq -n --arg job "build-frontend" --arg step "trunk-build" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
-            -d '{
-              "job": "build-frontend",
-              "step": "trunk-build",
-              "error_log": "Frontend WASM build failed. Run trunk build --release in frontend/ to reproduce.",
-              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }' || echo "Webhook unreachable — skipping notification"
+            -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
 
-      - name: Notify sonarqube failure
+      - name: Notify — backend release build failed
+        if: always() && needs.build-backend.result == 'failure'
+        run: |
+          ERROR_LOG="${BUILD_BACKEND_OUTPUT:-Backend release build failed but no captured output. Run cargo build -p realestate-backend --release to reproduce.}"
+          PAYLOAD=$(jq -n --arg job "build-backend" --arg step "cargo-build" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
+
+      - name: Notify — SonarQube analysis failed
         if: always() && needs.sonarqube.result == 'failure'
         run: |
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
