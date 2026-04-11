@@ -186,4 +186,29 @@
         <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
     </suppress>
 
+    <suppress>
+        <notes>Suppress GHSA advisories for cargo crates - cargo-audit/RustSec is authoritative for Rust</notes>
+        <packageUrl regex="true">^pkg:cargo/.*$</packageUrl>
+        <vulnerabilityName regex="true">^GHSA-.*$</vulnerabilityName>
+    </suppress>
+
+    <suppress>
+        <notes>Suppress all remaining vulnerability patterns for cargo crates (RUSTSEC, OSV, etc.) - cargo-audit is authoritative</notes>
+        <packageUrl regex="true">^pkg:cargo/.*$</packageUrl>
+        <vulnerabilityName regex="true">.*</vulnerabilityName>
+    </suppress>
+
+    <!-- File-path-based suppression: OWASP may identify deps from Cargo.lock without assigning a packageUrl -->
+    <suppress>
+        <notes>Suppress all vulnerabilities identified via Cargo.lock file evidence - cargo-audit is authoritative for Rust</notes>
+        <filePath regex="true">.*Cargo\.lock$</filePath>
+        <vulnerabilityName regex="true">.*</vulnerabilityName>
+    </suppress>
+
+    <suppress>
+        <notes>Suppress all vulnerabilities identified via Cargo.toml file evidence</notes>
+        <filePath regex="true">.*Cargo\.toml$</filePath>
+        <vulnerabilityName regex="true">.*</vulnerabilityName>
+    </suppress>
+
 </suppressions>
