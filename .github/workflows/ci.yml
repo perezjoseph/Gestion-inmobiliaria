@@ -68,13 +68,28 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-lint-
 
       - name: Check formatting
-        run: cargo fmt --all -- --check
+        id: fmt
+        run: cargo fmt --all -- --check 2>&1 | tee /tmp/fmt-output.txt
+
+      - name: Save fmt output
+        if: failure()
+        run: echo "FMT_OUTPUT<<GHEOF" >> $GITHUB_ENV && head -c 3000 /tmp/fmt-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
 
       - name: Clippy (backend)
-        run: cargo clippy -p realestate-backend -- -D warnings
+        id: clippy_backend
+        run: cargo clippy -p realestate-backend -- -D warnings 2>&1 | tee /tmp/clippy-backend-output.txt
+
+      - name: Save clippy backend output
+        if: failure()
+        run: echo "CLIPPY_BACKEND_OUTPUT<<GHEOF" >> $GITHUB_ENV && head -c 3000 /tmp/clippy-backend-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
 
       - name: Clippy (frontend)
-        run: cargo clippy -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings
+        id: clippy_frontend
+        run: cargo clippy -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings 2>&1 | tee /tmp/clippy-frontend-output.txt
+
+      - name: Save clippy frontend output
+        if: failure()
+        run: echo "CLIPPY_FRONTEND_OUTPUT<<GHEOF" >> $GITHUB_ENV && head -c 3000 /tmp/clippy-frontend-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
 
       - name: Cancel workflow on failure
         if: failure()
@@ -114,7 +129,11 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-test-
 
       - name: Run backend unit & integration tests
-        run: cargo test -p realestate-backend --all-targets
+        run: cargo test -p realestate-backend --all-targets 2>&1 | tee /tmp/test-backend-output.txt
+
+      - name: Save backend test output
+        if: failure()
+        run: echo "TEST_BACKEND_OUTPUT<<GHEOF" >> $GITHUB_ENV && tail -c 3000 /tmp/test-backend-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
 
       - name: Cancel workflow on failure
         if: failure()
@@ -142,7 +161,11 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-frontend-test-
 
       - name: Run frontend tests
-        run: cargo test -p realestate-frontend --all-targets
+        run: cargo test -p realestate-frontend --all-targets 2>&1 | tee /tmp/test-frontend-output.txt
+
+      - name: Save frontend test output
+        if: failure()
+        run: echo "TEST_FRONTEND_OUTPUT<<GHEOF" >> $GITHUB_ENV && tail -c 3000 /tmp/test-frontend-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
 
       - name: Cancel workflow on failure
         if: failure()
@@ -275,38 +298,35 @@ jobs:
       - name: Notify lint failure
         if: always() && needs.lint.result == 'failure'
         run: |
+          ERROR_LOG="${FMT_OUTPUT:-}${CLIPPY_BACKEND_OUTPUT:-}${CLIPPY_FRONTEND_OUTPUT:-}"
+          if [ -z "$ERROR_LOG" ]; then
+            ERROR_LOG="Lint job failed but no captured output. Run cargo fmt --all -- --check and cargo clippy --workspace -- -D warnings to reproduce."
+          fi
+          PAYLOAD=$(jq -n --arg job "lint" --arg step "clippy-or-fmt" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
-            -d '{
-              "job": "lint",
-              "step": "clippy-or-fmt",
-              "error_log": "Lint job failed. Check cargo fmt --all -- --check and cargo clippy --workspace -- -D warnings",
-              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }' || echo "Webhook unreachable — skipping notification"
+            -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
 
       - name: Notify backend test failure
         if: always() && needs.test-backend.result == 'failure'
         run: |
+          ERROR_LOG="${TEST_BACKEND_OUTPUT:-Backend tests failed but no captured output. Run cargo test -p realestate-backend --all-targets to reproduce.}"
+          PAYLOAD=$(jq -n --arg job "test-backend" --arg step "cargo-test" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
-            -d '{
-              "job": "test-backend",
-              "step": "cargo-test",
-              "error_log": "Backend tests failed. Run cargo test -p realestate-backend --all-targets to reproduce.",
-              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }' || echo "Webhook unreachable — skipping notification"
+            -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
 
       - name: Notify frontend test failure
         if: always() && needs.test-frontend.result == 'failure'
         run: |
+          ERROR_LOG="${TEST_FRONTEND_OUTPUT:-Frontend tests failed but no captured output. Run cargo test -p realestate-frontend --all-targets to reproduce.}"
+          PAYLOAD=$(jq -n --arg job "test-frontend" --arg step "cargo-test" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
-            -d '{
-              "job": "test-frontend",
-              "step": "cargo-test",
-              "error_log": "Frontend property tests failed. Run cargo test -p realestate-frontend --all-targets to reproduce.",
-              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }' || echo "Webhook unreachable — skipping notification"
+            -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
 
       - name: Notify quality gate failure
         if: always() && needs.quality-gate.result == 'failure'
