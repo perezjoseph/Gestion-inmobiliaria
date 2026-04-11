@@ -92,17 +92,26 @@ mod pbt_async {
 
     const JWT_SECRET: &str = "test_secret_key_that_is_long_enough_for_jwt";
 
-    async fn setup_db() -> DatabaseConnection {
-        dotenvy::dotenv().ok();
-        let url =
-            std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for integration tests");
-        let db = Database::connect(&url)
-            .await
-            .expect("Failed to connect to database");
-        super::migrations::Migrator::up(&db, None)
-            .await
-            .expect("Failed to run migrations");
-        db
+    static DB_ONCE: std::sync::OnceLock<DatabaseConnection> = std::sync::OnceLock::new();
+
+    fn setup_db() -> DatabaseConnection {
+        DB_ONCE
+            .get_or_init(|| {
+                dotenvy::dotenv().ok();
+                let url = std::env::var("DATABASE_URL")
+                    .expect("DATABASE_URL must be set for integration tests");
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    let db = Database::connect(&url)
+                        .await
+                        .expect("Failed to connect to database");
+                    super::migrations::Migrator::up(&db, None)
+                        .await
+                        .expect("Failed to run migrations");
+                    db
+                })
+            })
+            .clone()
     }
 
     fn make_config() -> AppConfig {
@@ -212,9 +221,9 @@ mod pbt_async {
         monto: Decimal,
         moneda: String,
     ) {
+        let db = setup_db();
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let db = setup_db().await;
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -265,9 +274,9 @@ mod pbt_async {
     }
 
     pub fn p2(count: u32) {
+        let db = setup_db();
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let db = setup_db().await;
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -311,9 +320,9 @@ mod pbt_async {
     }
 
     pub fn p3(prioridad_a: String, prioridad_b: String) {
+        let db = setup_db();
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let db = setup_db().await;
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -375,9 +384,9 @@ mod pbt_async {
     }
 
     pub fn p4(ot: String, op: String, nt: String, np: String, ut: bool, up: bool) {
+        let db = setup_db();
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let db = setup_db().await;
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -428,9 +437,9 @@ mod pbt_async {
     }
 
     pub fn p5(titulo: String) {
+        let db = setup_db();
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let db = setup_db().await;
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -476,9 +485,9 @@ mod pbt_async {
     }
 
     pub fn p7_prioridad(bad: String) {
+        let db = setup_db();
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let db = setup_db().await;
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -495,9 +504,9 @@ mod pbt_async {
     }
 
     pub fn p7_moneda(bad: String) {
+        let db = setup_db();
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let db = setup_db().await;
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -514,9 +523,9 @@ mod pbt_async {
     }
 
     pub fn p8(neg: Decimal) {
+        let db = setup_db();
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let db = setup_db().await;
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -533,9 +542,9 @@ mod pbt_async {
     }
 
     pub fn p9(ws: String) {
+        let db = setup_db();
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let db = setup_db().await;
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -572,9 +581,9 @@ mod pbt_async {
     }
 
     pub fn p10(note_count: u32) {
+        let db = setup_db();
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let db = setup_db().await;
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -620,9 +629,9 @@ mod pbt_async {
     }
 
     pub fn p11(note_count: u32) {
+        let db = setup_db();
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let db = setup_db().await;
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -675,9 +684,9 @@ mod pbt_async {
     }
 
     pub fn p12(titulo: String) {
+        let db = setup_db();
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let db = setup_db().await;
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -701,9 +710,9 @@ mod pbt_async {
     pub fn p13(bytes_a: [u8; 16], bytes_b: [u8; 16]) {
         let fake_propiedad_id = Uuid::from_bytes(bytes_a);
         let fake_inquilino_id = Uuid::from_bytes(bytes_b);
+        let db = setup_db();
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let db = setup_db().await;
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");

@@ -261,3 +261,27 @@ test test_notes_ordering ... FAILED
 test test_cascade_delete ... FAILED
 test test_list_ordering ... FAILED
 test test_filtering_returns_matching ... FAILED
+test test_empty_notes_rejected ... FAILED
+test test_invalid_moneda_rejected ... FAILED
+test test_valid_transitions_set_timestamps ... FAILED
+test test_negative_cost_rejected ... FAILED
+test test_invalid_prioridad_rejected ... FAILED
+
+
+[1G[0m[0m[?25herror: Tool approval required but --no-interactive was specified. Use --trust-all-tools to automatically approve tools.
+
+================================================================================
+[2026-04-11 14:25:19] CI fix (lint/fmt-check) attempt 2
+Command: kiro-cli chat --trust-tools=fs_read,fs_write,execute_bash,grep,glob,code,introspect,session,use_subagent,web_fetch,web_search --agent ci-fixer --no-interactive "The CI pipeline FAILED in job '\''lint'\'', step '\''fmt-check'\''. Error output:
+cargo fmt found formatting issues.
+ Fix the formatting an...
+================================================================================
+
+
+================================================================================
+[2026-04-11 14:25:20] CI fix (lint/fmt-check) attempt 3
+Command: kiro-cli chat --trust-tools=fs_read,fs_write,execute_bash,grep,glob,code,introspect,session,use_subagent,web_fetch,web_search --agent ci-fixer --no-interactive "The CI pipeline FAILED in job '\''lint'\'', step '\''fmt-check'\''. Error output:
+cargo fmt found formatting issues.
+ Fix the formatting an...
+================================================================================
+
