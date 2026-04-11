@@ -82,3 +82,15 @@ pub async fn importar_inquilinos(
     let result = importacion::importar_inquilinos(db.get_ref(), &file_data, formato).await?;
     Ok(HttpResponse::Ok().json(result))
 }
+
+pub async fn importar_gastos(
+    db: web::Data<DatabaseConnection>,
+    access: WriteAccess,
+    payload: Multipart,
+) -> Result<HttpResponse, AppError> {
+    let (file_data, filename) = extract_file(payload).await?;
+    let formato = detect_format(&filename)?;
+    let result =
+        importacion::importar_gastos(db.get_ref(), &file_data, formato, access.0.sub).await?;
+    Ok(HttpResponse::Ok().json(result))
+}

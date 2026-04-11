@@ -7,10 +7,10 @@ use sea_orm::{
 use serde::Serialize;
 use std::collections::HashMap;
 
-use crate::entities::{contrato, inquilino, pago, propiedad};
+use crate::entities::{contrato, gasto, inquilino, pago, propiedad};
 use crate::errors::AppError;
 use crate::models::dashboard::{
-    ContratoCalendario, IngresoComparacion, OcupacionMensual, PagoProximo,
+    ContratoCalendario, GastosComparacion, IngresoComparacion, OcupacionMensual, PagoProximo,
 };
 
 #[derive(Debug, Serialize)]
@@ -20,6 +20,7 @@ pub struct DashboardStats {
     pub tasa_ocupacion: f64,
     pub ingreso_mensual: Decimal,
     pub pagos_atrasados: u64,
+    pub total_gastos_mes: Decimal,
 }
 
 #[derive(Debug, FromQueryResult)]
@@ -28,7 +29,17 @@ struct SumResult {
 }
 
 pub async fn get_stats(db: &DatabaseConnection) -> Result<DashboardStats, AppError> {
-    let (total_propiedades, ocupadas, ingreso_result, pagos_atrasados) = tokio::try_join!(
+    let today = Utc::now().date_naive();
+    let anio = today.year();
+    let mes = today.month();
+    let primer_dia_mes = NaiveDate::from_ymd_opt(anio, mes, 1).unwrap();
+    let ultimo_dia_mes = if mes == 12 {
+        NaiveDate::from_ymd_opt(anio + 1, 1, 1).unwrap() - chrono::Days::new(1)
+    } else {
+        NaiveDate::from_ymd_opt(anio, mes + 1, 1).unwrap() - chrono::Days::new(1)
+    };
+
+    let (total_propiedades, ocupadas, ingreso_result, pagos_atrasados, gastos_result) = tokio::try_join!(
         propiedad::Entity::find().count(db),
         propiedad::Entity::find()
             .filter(propiedad::Column::Estado.eq("ocupada"))
@@ -42,6 +53,14 @@ pub async fn get_stats(db: &DatabaseConnection) -> Result<DashboardStats, AppErr
         pago::Entity::find()
             .filter(pago::Column::Estado.eq("atrasado"))
             .count(db),
+        gasto::Entity::find()
+            .select_only()
+            .column_as(gasto::Column::Monto.sum(), "total")
+            .filter(gasto::Column::Estado.eq("pagado"))
+            .filter(gasto::Column::FechaGasto.gte(primer_dia_mes))
+            .filter(gasto::Column::FechaGasto.lte(ultimo_dia_mes))
+            .into_model::<SumResult>()
+            .one(db),
     )?;
 
     let tasa_ocupacion = if total_propiedades > 0 {
@@ -54,11 +73,14 @@ pub async fn get_stats(db: &DatabaseConnection) -> Result<DashboardStats, AppErr
         .and_then(|r| r.total)
         .unwrap_or(Decimal::ZERO);
 
+    let total_gastos_mes = gastos_result.and_then(|r| r.total).unwrap_or(Decimal::ZERO);
+
     Ok(DashboardStats {
         total_propiedades,
         tasa_ocupacion,
         ingreso_mensual,
         pagos_atrasados,
+        total_gastos_mes,
     })
 }
 
@@ -298,6 +320,67 @@ pub async fn contratos_calendario(
     Ok(resultados)
 }
 
+pub fn calcular_porcentaje_cambio(actual: Decimal, anterior: Decimal) -> f64 {
+    use rust_decimal::prelude::ToPrimitive;
+
+    if anterior.is_zero() && actual.is_zero() {
+        return 0.0;
+    }
+    if anterior.is_zero() {
+        return 100.0;
+    }
+    let cambio = ((actual - anterior) / anterior) * Decimal::new(100, 0);
+    cambio.to_f64().unwrap_or(0.0)
+}
+
+pub async fn gastos_comparacion(db: &DatabaseConnection) -> Result<GastosComparacion, AppError> {
+    let today = Utc::now().date_naive();
+    let anio = today.year();
+    let mes = today.month();
+
+    let primer_dia_actual = NaiveDate::from_ymd_opt(anio, mes, 1).unwrap();
+    let ultimo_dia_actual = if mes == 12 {
+        NaiveDate::from_ymd_opt(anio + 1, 1, 1).unwrap() - chrono::Days::new(1)
+    } else {
+        NaiveDate::from_ymd_opt(anio, mes + 1, 1).unwrap() - chrono::Days::new(1)
+    };
+
+    let prev = today - chrono::Months::new(1);
+    let primer_dia_anterior = NaiveDate::from_ymd_opt(prev.year(), prev.month(), 1).unwrap();
+    let ultimo_dia_anterior = primer_dia_actual - chrono::Days::new(1);
+
+    let (actual_result, anterior_result) = tokio::try_join!(
+        gasto::Entity::find()
+            .select_only()
+            .column_as(gasto::Column::Monto.sum(), "total")
+            .filter(gasto::Column::Estado.eq("pagado"))
+            .filter(gasto::Column::FechaGasto.gte(primer_dia_actual))
+            .filter(gasto::Column::FechaGasto.lte(ultimo_dia_actual))
+            .into_model::<SumResult>()
+            .one(db),
+        gasto::Entity::find()
+            .select_only()
+            .column_as(gasto::Column::Monto.sum(), "total")
+            .filter(gasto::Column::Estado.eq("pagado"))
+            .filter(gasto::Column::FechaGasto.gte(primer_dia_anterior))
+            .filter(gasto::Column::FechaGasto.lte(ultimo_dia_anterior))
+            .into_model::<SumResult>()
+            .one(db),
+    )?;
+
+    let mes_actual = actual_result.and_then(|r| r.total).unwrap_or(Decimal::ZERO);
+    let mes_anterior = anterior_result
+        .and_then(|r| r.total)
+        .unwrap_or(Decimal::ZERO);
+    let porcentaje_cambio = calcular_porcentaje_cambio(mes_actual, mes_anterior);
+
+    Ok(GastosComparacion {
+        mes_actual,
+        mes_anterior,
+        porcentaje_cambio,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -397,5 +480,35 @@ mod tests {
         let cobrado = Decimal::new(5000, 0);
         let diferencia = esperado - cobrado;
         assert_eq!(diferencia, Decimal::ZERO);
+    }
+
+    #[test]
+    fn porcentaje_cambio_zero_previous_zero_actual() {
+        let result = calcular_porcentaje_cambio(Decimal::ZERO, Decimal::ZERO);
+        assert!((result - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn porcentaje_cambio_zero_previous_positive_actual() {
+        let result = calcular_porcentaje_cambio(Decimal::new(5000, 0), Decimal::ZERO);
+        assert!((result - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn porcentaje_cambio_equal_months() {
+        let result = calcular_porcentaje_cambio(Decimal::new(3000, 0), Decimal::new(3000, 0));
+        assert!((result - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn porcentaje_cambio_increase() {
+        let result = calcular_porcentaje_cambio(Decimal::new(6000, 0), Decimal::new(3000, 0));
+        assert!((result - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn porcentaje_cambio_decrease() {
+        let result = calcular_porcentaje_cambio(Decimal::new(2000, 0), Decimal::new(4000, 0));
+        assert!((result - (-50.0)).abs() < f64::EPSILON);
     }
 }

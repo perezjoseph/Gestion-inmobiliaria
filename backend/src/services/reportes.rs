@@ -7,10 +7,11 @@ use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
 };
 
-use crate::entities::{contrato, inquilino, pago, propiedad};
+use crate::entities::{contrato, gasto, inquilino, pago, propiedad};
 use crate::errors::AppError;
 use crate::models::reporte::{
     HistorialPagoEntry, IngresoReportQuery, IngresoReportRow, IngresoReportSummary,
+    RentabilidadReportQuery, RentabilidadReportRow, RentabilidadReportSummary,
 };
 
 pub async fn generar_reporte_ingresos(
@@ -199,6 +200,106 @@ fn empty_summary(generated_by: String) -> IngresoReportSummary {
         generated_at: Utc::now(),
         generated_by,
     }
+}
+
+pub async fn generar_reporte_rentabilidad(
+    db: &DatabaseConnection,
+    query: RentabilidadReportQuery,
+    generated_by: String,
+) -> Result<RentabilidadReportSummary, AppError> {
+    if query.mes < 1 || query.mes > 12 {
+        return Err(AppError::Validation("Mes debe estar entre 1 y 12".into()));
+    }
+
+    let first_day = NaiveDate::from_ymd_opt(query.anio, query.mes, 1)
+        .ok_or_else(|| AppError::Validation("Fecha inválida".into()))?;
+    let last_day = if query.mes == 12 {
+        NaiveDate::from_ymd_opt(query.anio + 1, 1, 1)
+    } else {
+        NaiveDate::from_ymd_opt(query.anio, query.mes + 1, 1)
+    }
+    .ok_or_else(|| AppError::Validation("Fecha inválida".into()))?
+    .pred_opt()
+    .ok_or_else(|| AppError::Validation("Fecha inválida".into()))?;
+
+    let propiedades = if let Some(pid) = query.propiedad_id {
+        propiedad::Entity::find()
+            .filter(propiedad::Column::Id.eq(pid))
+            .all(db)
+            .await?
+    } else {
+        propiedad::Entity::find().all(db).await?
+    };
+
+    let mut rows = Vec::with_capacity(propiedades.len());
+    let mut grand_ingresos = Decimal::ZERO;
+    let mut grand_gastos = Decimal::ZERO;
+
+    for prop in &propiedades {
+        let prop_id = prop.id;
+
+        let income_fut = async {
+            let contrato_ids: Vec<uuid::Uuid> = contrato::Entity::find()
+                .filter(contrato::Column::PropiedadId.eq(prop_id))
+                .all(db)
+                .await?
+                .into_iter()
+                .map(|c| c.id)
+                .collect();
+
+            if contrato_ids.is_empty() {
+                return Ok::<Decimal, AppError>(Decimal::ZERO);
+            }
+
+            let paid_pagos = pago::Entity::find()
+                .filter(pago::Column::ContratoId.is_in(contrato_ids))
+                .filter(pago::Column::Estado.eq("pagado"))
+                .filter(pago::Column::FechaVencimiento.gte(first_day))
+                .filter(pago::Column::FechaVencimiento.lte(last_day))
+                .all(db)
+                .await?;
+
+            Ok(paid_pagos.iter().map(|p| p.monto).sum())
+        };
+
+        let expense_fut = async {
+            let paid_gastos = gasto::Entity::find()
+                .filter(gasto::Column::PropiedadId.eq(prop_id))
+                .filter(gasto::Column::Estado.eq("pagado"))
+                .filter(gasto::Column::FechaGasto.gte(first_day))
+                .filter(gasto::Column::FechaGasto.lte(last_day))
+                .all(db)
+                .await?;
+
+            Ok::<Decimal, AppError>(paid_gastos.iter().map(|g| g.monto).sum())
+        };
+
+        let (total_ingresos, total_gastos) = tokio::try_join!(income_fut, expense_fut)?;
+        let ingreso_neto = total_ingresos - total_gastos;
+
+        grand_ingresos += total_ingresos;
+        grand_gastos += total_gastos;
+
+        rows.push(RentabilidadReportRow {
+            propiedad_id: prop.id,
+            propiedad_titulo: prop.titulo.clone(),
+            total_ingresos,
+            total_gastos,
+            ingreso_neto,
+            moneda: prop.moneda.clone(),
+        });
+    }
+
+    Ok(RentabilidadReportSummary {
+        rows,
+        total_ingresos: grand_ingresos,
+        total_gastos: grand_gastos,
+        total_neto: grand_ingresos - grand_gastos,
+        mes: query.mes,
+        anio: query.anio,
+        generated_at: Utc::now(),
+        generated_by,
+    })
 }
 
 fn load_font_family() -> Result<genpdf::fonts::FontFamily<genpdf::fonts::FontData>, AppError> {
@@ -461,6 +562,242 @@ pub fn exportar_xlsx(summary: &IngresoReportSummary) -> Result<Vec<u8>, AppError
     Ok(buf)
 }
 
+pub fn exportar_rentabilidad_pdf(summary: &RentabilidadReportSummary) -> Result<Vec<u8>, AppError> {
+    let font_family = load_font_family().map_err(|e| AppError::Internal(anyhow::anyhow!("{e}")))?;
+
+    let mut doc = genpdf::Document::new(font_family);
+    doc.set_title("Reporte de Rentabilidad");
+    doc.set_minimal_conformance();
+
+    let mut decorator = genpdf::SimplePageDecorator::new();
+    decorator.set_margins(15);
+    doc.set_page_decorator(decorator);
+
+    doc.push(
+        elements::Paragraph::new("Reporte de Rentabilidad")
+            .styled(style::Style::new().bold().with_font_size(18)),
+    );
+    doc.push(elements::Break::new(1.0));
+
+    let timestamp = summary.generated_at.format("%d/%m/%Y %H:%M:%S").to_string();
+    doc.push(elements::Paragraph::new(format!(
+        "Periodo: {}/{} | Generado: {} | Usuario: {}",
+        summary.mes, summary.anio, timestamp, summary.generated_by
+    )));
+    doc.push(elements::Break::new(1.5));
+
+    if summary.rows.is_empty() {
+        doc.push(
+            elements::Paragraph::new("Sin registros para el periodo")
+                .styled(style::Style::new().italic().with_font_size(12)),
+        );
+    } else {
+        let mut table = elements::TableLayout::new(vec![4, 2, 2, 2, 1]);
+        table.set_cell_decorator(elements::FrameCellDecorator::new(true, true, false));
+
+        let header_row = table.row();
+        header_row
+            .element(
+                elements::Paragraph::new("Propiedad")
+                    .styled(style::Style::new().bold().with_font_size(10)),
+            )
+            .element(
+                elements::Paragraph::new("Ingresos")
+                    .styled(style::Style::new().bold().with_font_size(10)),
+            )
+            .element(
+                elements::Paragraph::new("Gastos")
+                    .styled(style::Style::new().bold().with_font_size(10)),
+            )
+            .element(
+                elements::Paragraph::new("Neto")
+                    .styled(style::Style::new().bold().with_font_size(10)),
+            )
+            .element(
+                elements::Paragraph::new("Moneda")
+                    .styled(style::Style::new().bold().with_font_size(10)),
+            )
+            .push()
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error en tabla PDF: {e}")))?;
+
+        for row in &summary.rows {
+            let data_row = table.row();
+            data_row
+                .element(elements::Paragraph::new(&row.propiedad_titulo))
+                .element(elements::Paragraph::new(row.total_ingresos.to_string()))
+                .element(elements::Paragraph::new(row.total_gastos.to_string()))
+                .element(elements::Paragraph::new(row.ingreso_neto.to_string()))
+                .element(elements::Paragraph::new(&row.moneda))
+                .push()
+                .map_err(|e| {
+                    AppError::Internal(anyhow::anyhow!("Error en fila de tabla PDF: {e}"))
+                })?;
+        }
+
+        doc.push(table);
+    }
+
+    doc.push(elements::Break::new(1.5));
+    doc.push(
+        elements::Paragraph::new("Resumen").styled(style::Style::new().bold().with_font_size(14)),
+    );
+    doc.push(elements::Break::new(0.5));
+    doc.push(elements::Paragraph::new(format!(
+        "Total Ingresos: {}",
+        summary.total_ingresos
+    )));
+    doc.push(elements::Paragraph::new(format!(
+        "Total Gastos: {}",
+        summary.total_gastos
+    )));
+    doc.push(elements::Paragraph::new(format!(
+        "Total Neto: {}",
+        summary.total_neto
+    )));
+
+    let mut buf: Vec<u8> = Vec::new();
+    doc.render(&mut buf)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error renderizando PDF: {e}")))?;
+
+    Ok(buf)
+}
+
+pub fn exportar_rentabilidad_xlsx(
+    summary: &RentabilidadReportSummary,
+) -> Result<Vec<u8>, AppError> {
+    let mut workbook = rust_xlsxwriter::Workbook::new();
+    let worksheet = workbook.add_worksheet();
+
+    let title_format = rust_xlsxwriter::Format::new().set_bold().set_font_size(16);
+    let header_format = rust_xlsxwriter::Format::new()
+        .set_bold()
+        .set_border(rust_xlsxwriter::FormatBorder::Thin);
+    let bold_format = rust_xlsxwriter::Format::new().set_bold();
+
+    worksheet
+        .write_string_with_format(0, 0, "Reporte de Rentabilidad", &title_format)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+
+    let timestamp = summary.generated_at.format("%d/%m/%Y %H:%M:%S").to_string();
+    worksheet
+        .write_string(1, 0, format!("Periodo: {}/{}", summary.mes, summary.anio))
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+    worksheet
+        .write_string(2, 0, format!("Generado: {timestamp}"))
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+    worksheet
+        .write_string(3, 0, format!("Usuario: {}", &summary.generated_by))
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+
+    let header_row: u32 = 5;
+    let headers = ["Propiedad", "Ingresos", "Gastos", "Neto", "Moneda"];
+    for (col, header) in headers.iter().enumerate() {
+        worksheet
+            .write_string_with_format(header_row, col as u16, *header, &header_format)
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX header: {e}")))?;
+    }
+
+    worksheet
+        .set_column_width(0, 30)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+    worksheet
+        .set_column_width(1, 15)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+    worksheet
+        .set_column_width(2, 15)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+    worksheet
+        .set_column_width(3, 15)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+    worksheet
+        .set_column_width(4, 10)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+
+    if summary.rows.is_empty() {
+        worksheet
+            .write_string(header_row + 1, 0, "Sin registros para el periodo")
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+    } else {
+        for (idx, row) in summary.rows.iter().enumerate() {
+            let r = header_row + 1 + idx as u32;
+            worksheet
+                .write_string(r, 0, &row.propiedad_titulo)
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+            let ingresos_f64 = row
+                .total_ingresos
+                .to_string()
+                .parse::<f64>()
+                .unwrap_or_default();
+            worksheet
+                .write_number(r, 1, ingresos_f64)
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+            let gastos_f64 = row
+                .total_gastos
+                .to_string()
+                .parse::<f64>()
+                .unwrap_or_default();
+            worksheet
+                .write_number(r, 2, gastos_f64)
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+            let neto_f64 = row
+                .ingreso_neto
+                .to_string()
+                .parse::<f64>()
+                .unwrap_or_default();
+            worksheet
+                .write_number(r, 3, neto_f64)
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+            worksheet
+                .write_string(r, 4, &row.moneda)
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+        }
+    }
+
+    let summary_row = header_row + 2 + summary.rows.len() as u32;
+    let total_ingresos_f64 = summary
+        .total_ingresos
+        .to_string()
+        .parse::<f64>()
+        .unwrap_or_default();
+    let total_gastos_f64 = summary
+        .total_gastos
+        .to_string()
+        .parse::<f64>()
+        .unwrap_or_default();
+    let total_neto_f64 = summary
+        .total_neto
+        .to_string()
+        .parse::<f64>()
+        .unwrap_or_default();
+
+    worksheet
+        .write_string_with_format(summary_row, 0, "Total Ingresos", &bold_format)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+    worksheet
+        .write_number(summary_row, 1, total_ingresos_f64)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+
+    worksheet
+        .write_string_with_format(summary_row + 1, 0, "Total Gastos", &bold_format)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+    worksheet
+        .write_number(summary_row + 1, 2, total_gastos_f64)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+
+    worksheet
+        .write_string_with_format(summary_row + 2, 0, "Total Neto", &bold_format)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+    worksheet
+        .write_number(summary_row + 2, 3, total_neto_f64)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
+
+    let buf = workbook
+        .save_to_buffer()
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error guardando XLSX: {e}")))?;
+
+    Ok(buf)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -602,6 +939,89 @@ mod tests {
         let result = exportar_xlsx(&summary);
         assert!(result.is_ok());
         let bytes = result.unwrap();
+        assert_eq!(&bytes[0..2], b"PK");
+    }
+
+    fn sample_rentabilidad_with_rows() -> RentabilidadReportSummary {
+        RentabilidadReportSummary {
+            rows: vec![
+                RentabilidadReportRow {
+                    propiedad_id: uuid::Uuid::new_v4(),
+                    propiedad_titulo: "Apartamento Centro".into(),
+                    total_ingresos: Decimal::new(50000, 0),
+                    total_gastos: Decimal::new(15000, 0),
+                    ingreso_neto: Decimal::new(35000, 0),
+                    moneda: "DOP".into(),
+                },
+                RentabilidadReportRow {
+                    propiedad_id: uuid::Uuid::new_v4(),
+                    propiedad_titulo: "Casa Naco".into(),
+                    total_ingresos: Decimal::new(2000, 0),
+                    total_gastos: Decimal::new(500, 0),
+                    ingreso_neto: Decimal::new(1500, 0),
+                    moneda: "USD".into(),
+                },
+            ],
+            total_ingresos: Decimal::new(52000, 0),
+            total_gastos: Decimal::new(15500, 0),
+            total_neto: Decimal::new(36500, 0),
+            mes: 4,
+            anio: 2025,
+            generated_at: Utc.with_ymd_and_hms(2025, 4, 10, 12, 0, 0).unwrap(),
+            generated_by: "Admin Test".into(),
+        }
+    }
+
+    fn sample_empty_rentabilidad() -> RentabilidadReportSummary {
+        RentabilidadReportSummary {
+            rows: vec![],
+            total_ingresos: Decimal::ZERO,
+            total_gastos: Decimal::ZERO,
+            total_neto: Decimal::ZERO,
+            mes: 4,
+            anio: 2025,
+            generated_at: Utc.with_ymd_and_hms(2025, 4, 10, 12, 0, 0).unwrap(),
+            generated_by: "Admin Test".into(),
+        }
+    }
+
+    #[test]
+    fn exportar_rentabilidad_pdf_with_data_returns_valid_bytes() {
+        let summary = sample_rentabilidad_with_rows();
+        let result = exportar_rentabilidad_pdf(&summary);
+        assert!(result.is_ok());
+        let bytes = result.unwrap();
+        assert!(!bytes.is_empty());
+        assert!(bytes.starts_with(b"%PDF"));
+    }
+
+    #[test]
+    fn exportar_rentabilidad_pdf_empty_report_returns_valid_pdf() {
+        let summary = sample_empty_rentabilidad();
+        let result = exportar_rentabilidad_pdf(&summary);
+        assert!(result.is_ok());
+        let bytes = result.unwrap();
+        assert!(!bytes.is_empty());
+        assert!(bytes.starts_with(b"%PDF"));
+    }
+
+    #[test]
+    fn exportar_rentabilidad_xlsx_with_data_returns_valid_bytes() {
+        let summary = sample_rentabilidad_with_rows();
+        let result = exportar_rentabilidad_xlsx(&summary);
+        assert!(result.is_ok());
+        let bytes = result.unwrap();
+        assert!(!bytes.is_empty());
+        assert_eq!(&bytes[0..2], b"PK");
+    }
+
+    #[test]
+    fn exportar_rentabilidad_xlsx_empty_report_returns_valid_xlsx() {
+        let summary = sample_empty_rentabilidad();
+        let result = exportar_rentabilidad_xlsx(&summary);
+        assert!(result.is_ok());
+        let bytes = result.unwrap();
+        assert!(!bytes.is_empty());
         assert_eq!(&bytes[0..2], b"PK");
     }
 }

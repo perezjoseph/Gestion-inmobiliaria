@@ -3,7 +3,7 @@ use sea_orm::DatabaseConnection;
 use serde_json::json;
 
 use crate::errors::AppError;
-use crate::models::reporte::{HistorialPagosQuery, IngresoReportQuery};
+use crate::models::reporte::{HistorialPagosQuery, IngresoReportQuery, RentabilidadReportQuery};
 use crate::services::auth::Claims;
 use crate::services::reportes;
 
@@ -68,4 +68,51 @@ pub async fn ocupacion_tendencia(
 ) -> Result<HttpResponse, AppError> {
     let tasa = reportes::calcular_tasa_ocupacion(db.get_ref()).await?;
     Ok(HttpResponse::Ok().json(json!({ "tasaOcupacion": tasa })))
+}
+
+pub async fn rentabilidad(
+    db: web::Data<DatabaseConnection>,
+    claims: Claims,
+    query: web::Query<RentabilidadReportQuery>,
+) -> Result<HttpResponse, AppError> {
+    let summary =
+        reportes::generar_reporte_rentabilidad(db.get_ref(), query.into_inner(), claims.email)
+            .await?;
+    Ok(HttpResponse::Ok().json(summary))
+}
+
+pub async fn rentabilidad_pdf(
+    db: web::Data<DatabaseConnection>,
+    claims: Claims,
+    query: web::Query<RentabilidadReportQuery>,
+) -> Result<HttpResponse, AppError> {
+    let summary =
+        reportes::generar_reporte_rentabilidad(db.get_ref(), query.into_inner(), claims.email)
+            .await?;
+    let bytes = reportes::exportar_rentabilidad_pdf(&summary)?;
+    Ok(HttpResponse::Ok()
+        .content_type("application/pdf")
+        .insert_header((
+            "Content-Disposition",
+            "attachment; filename=\"reporte-rentabilidad.pdf\"",
+        ))
+        .body(bytes))
+}
+
+pub async fn rentabilidad_xlsx(
+    db: web::Data<DatabaseConnection>,
+    claims: Claims,
+    query: web::Query<RentabilidadReportQuery>,
+) -> Result<HttpResponse, AppError> {
+    let summary =
+        reportes::generar_reporte_rentabilidad(db.get_ref(), query.into_inner(), claims.email)
+            .await?;
+    let bytes = reportes::exportar_rentabilidad_xlsx(&summary)?;
+    Ok(HttpResponse::Ok()
+        .content_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        .insert_header((
+            "Content-Disposition",
+            "attachment; filename=\"reporte-rentabilidad.xlsx\"",
+        ))
+        .body(bytes))
 }

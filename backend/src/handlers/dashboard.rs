@@ -49,3 +49,11 @@ pub async fn contratos_calendario(
     let result = dashboard::contratos_calendario(db.get_ref()).await?;
     Ok(HttpResponse::Ok().json(result))
 }
+
+pub async fn gastos_comparacion(
+    db: web::Data<DatabaseConnection>,
+    _claims: Claims,
+) -> Result<HttpResponse, AppError> {
+    let result = dashboard::gastos_comparacion(db.get_ref()).await?;
+    Ok(HttpResponse::Ok().json(result))
+}

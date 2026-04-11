@@ -80,7 +80,7 @@ mod tests {
             email: "juan@example.com".to_string(),
             rol: "admin".to_string(),
             activo: true,
-            created_at: DateTime::from_timestamp(0, 0).unwrap().into(),
+            created_at: DateTime::from_timestamp(0, 0).unwrap(),
         };
         let json = serde_json::to_value(&resp).unwrap();
         assert!(json.get("createdAt").is_some());

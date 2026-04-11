@@ -112,6 +112,10 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route(
                         "/contratos-calendario",
                         web::get().to(handlers::dashboard::contratos_calendario),
+                    )
+                    .route(
+                        "/gastos-comparacion",
+                        web::get().to(handlers::dashboard::gastos_comparacion),
                     ),
             )
             .service(web::scope("/auditoria").route("", web::get().to(handlers::auditoria::list)))
@@ -148,6 +152,18 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route(
                         "/ingresos/xlsx",
                         web::get().to(handlers::reportes::ingresos_xlsx),
+                    )
+                    .route(
+                        "/rentabilidad",
+                        web::get().to(handlers::reportes::rentabilidad),
+                    )
+                    .route(
+                        "/rentabilidad/pdf",
+                        web::get().to(handlers::reportes::rentabilidad_pdf),
+                    )
+                    .route(
+                        "/rentabilidad/xlsx",
+                        web::get().to(handlers::reportes::rentabilidad_xlsx),
                     )
                     .route(
                         "/historial-pagos",
@@ -189,6 +205,10 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route(
                         "/inquilinos",
                         web::post().to(handlers::importacion::importar_inquilinos),
+                    )
+                    .route(
+                        "/gastos",
+                        web::post().to(handlers::importacion::importar_gastos),
                     ),
             ),
     );
