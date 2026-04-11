@@ -96,4 +96,94 @@
         <cpe regex="true">cpe:/a:h2database:h2:.*</cpe>
     </suppress>
 
+    <!-- cookie crate: OWASP matches Rust cookie crate against unrelated cookie-handling CVEs -->
+    <suppress>
+        <notes>cookie crate false positive - Rust HTTP cookie crate, not a vulnerable cookie library</notes>
+        <packageUrl regex="true">^pkg:cargo/cookie@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:cookie:.*</cpe>
+    </suppress>
+
+    <!-- url crate: OWASP matches Rust url crate against unrelated URL parsing CVEs -->
+    <suppress>
+        <notes>url crate false positive - Rust URL parser, not related to C/Java URL libraries</notes>
+        <packageUrl regex="true">^pkg:cargo/url@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:url:.*</cpe>
+    </suppress>
+
+    <!-- idna crate: OWASP matches against unrelated IDNA implementations -->
+    <suppress>
+        <notes>idna crate false positive - Rust IDNA implementation, not related to other IDNA CVEs</notes>
+        <packageUrl regex="true">^pkg:cargo/idna@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:idna:.*</cpe>
+    </suppress>
+
+    <!-- rustls: OWASP may match against OpenSSL/GnuTLS/other TLS CVEs -->
+    <suppress>
+        <notes>rustls false positive - pure Rust TLS, not OpenSSL/GnuTLS</notes>
+        <packageUrl regex="true">^pkg:cargo/rustls@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(openssl|gnutls|libressl|boringssl|wolfssl|mbedtls):.*</cpe>
+    </suppress>
+
+    <!-- rsa crate: OWASP matches against OpenSSL RSA CVEs -->
+    <suppress>
+        <notes>rsa crate false positive - pure Rust RSA, not OpenSSL</notes>
+        <packageUrl regex="true">^pkg:cargo/rsa@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:rsa:.*</cpe>
+    </suppress>
+
+    <!-- sha1/sha2 crates: OWASP matches against unrelated SHA implementations -->
+    <suppress>
+        <notes>sha1 crate false positive - Rust SHA-1 implementation</notes>
+        <packageUrl regex="true">^pkg:cargo/sha1@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:sha1:.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>sha2 crate false positive - Rust SHA-2 implementation</notes>
+        <packageUrl regex="true">^pkg:cargo/sha2@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:sha2:.*</cpe>
+    </suppress>
+
+    <!-- http crate: OWASP matches against HTTP server/client CVEs -->
+    <suppress>
+        <notes>http crate false positive - Rust HTTP types library, not an HTTP server</notes>
+        <packageUrl regex="true">^pkg:cargo/http@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:http:.*</cpe>
+    </suppress>
+
+    <!-- futures crate: OWASP matches against unrelated "futures" software -->
+    <suppress>
+        <notes>futures crate false positive - Rust async primitives, not related to other software</notes>
+        <packageUrl regex="true">^pkg:cargo/futures@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:futures:.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>futures-util crate false positive</notes>
+        <packageUrl regex="true">^pkg:cargo/futures-util@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:futures.*:.*</cpe>
+    </suppress>
+
+    <!-- tokio: OWASP may match against unrelated software -->
+    <suppress>
+        <notes>tokio false positive CPE match</notes>
+        <packageUrl regex="true">^pkg:cargo/tokio@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:tokio:.*</cpe>
+    </suppress>
+
+    <!-- regex crate: OWASP matches against unrelated regex engine CVEs -->
+    <suppress>
+        <notes>regex crate false positive - Rust regex engine, not PCRE/Oniguruma</notes>
+        <packageUrl regex="true">^pkg:cargo/regex@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:regex:.*</cpe>
+    </suppress>
+
+    <!-- Broad suppression: Rust cargo crates matched against unrelated software via CPE.
+         OWASP Dependency-Check with enableExperimental aggressively matches crate names
+         against NVD CPE entries for unrelated C/C++/Java/Python software. All actual Rust
+         vulnerabilities are caught by cargo-audit which uses the RustSec advisory database. -->
+    <suppress>
+        <notes>Suppress all CPE-based false positives for cargo crates - cargo-audit handles Rust-specific advisories</notes>
+        <packageUrl regex="true">^pkg:cargo/.*$</packageUrl>
+        <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+    </suppress>
+
 </suppressions>

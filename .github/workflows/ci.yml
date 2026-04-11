@@ -343,6 +343,55 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: http://localhost:9000
 
+      - name: Fetch SonarQube results and notify
+        if: always() && steps.sonar-check.outcome != 'failure'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          # Wait a moment for SonarQube to process the report
+          sleep 10
+
+          # Fetch project status (quality gate)
+          GATE=$(curl -sf -u "$SONAR_TOKEN:" \
+            "http://localhost:9000/api/qualitygates/project_status?projectKey=gestion-inmobiliaria" 2>/dev/null || echo '{}')
+          GATE_STATUS=$(echo "$GATE" | jq -r '.projectStatus.status // "UNKNOWN"')
+
+          # Fetch new issues (bugs, vulnerabilities, code smells)
+          ISSUES=$(curl -sf -u "$SONAR_TOKEN:" \
+            "http://localhost:9000/api/issues/search?projectKeys=gestion-inmobiliaria&resolved=false&ps=50&s=SEVERITY&asc=false" 2>/dev/null || echo '{}')
+          TOTAL=$(echo "$ISSUES" | jq -r '.total // 0')
+          
+          # Build a summary of issues by severity
+          SUMMARY=$(echo "$ISSUES" | jq -r '
+            [.issues // [] | group_by(.severity) | .[] |
+              {severity: .[0].severity, count: length}] |
+            map("\(.count) \(.severity)") | join(", ")' 2>/dev/null || echo "Could not parse issues")
+
+          # Build top issues list (file, line, message)
+          TOP_ISSUES=$(echo "$ISSUES" | jq -r '
+            [.issues[:20] | .[] |
+              "\(.severity) | \(.component | split(":") | last):\(.line // "?") | \(.message)"] |
+            join("\n")' 2>/dev/null || echo "")
+
+          ERROR_LOG="Quality Gate: ${GATE_STATUS}\nTotal open issues: ${TOTAL}\nBreakdown: ${SUMMARY}\n\nTop issues:\n${TOP_ISSUES}"
+
+          PAYLOAD=$(jq -n \
+            --arg job "sonarqube" \
+            --arg step "quality-gate-${GATE_STATUS}" \
+            --arg error_log "$ERROR_LOG" \
+            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
+
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
+
+          # Fail the step if quality gate failed
+          if [ "$GATE_STATUS" = "ERROR" ]; then
+            echo "::error::SonarQube quality gate failed"
+            exit 1
+          fi
+
   # ── Stage 2: Build (runs only after all quality checks pass) ──
 
   build-frontend:
