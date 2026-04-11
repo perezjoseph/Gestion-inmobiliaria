@@ -305,7 +305,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install unzip for SonarQube scanner extraction
-        run: apt-get update -qq && apt-get install -y -qq unzip
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq unzip
 
       - name: Run SonarQube static analysis scan
         uses: SonarSource/sonarqube-scan-action@v6
@@ -453,8 +453,9 @@ jobs:
 
       - name: Notify — backend tests failed
         if: always() && needs.test-backend.result == 'failure'
+        env:
+          ERROR_LOG: ${{ needs.test-backend.outputs.error_log }}
         run: |
-          ERROR_LOG="${{ needs.test-backend.outputs.error_log }}"
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Backend tests failed but no captured output. Run cargo test -p realestate-backend --all-targets to reproduce."
           fi
@@ -466,8 +467,9 @@ jobs:
 
       - name: Notify — frontend tests failed
         if: always() && needs.test-frontend.result == 'failure'
+        env:
+          ERROR_LOG: ${{ needs.test-frontend.outputs.error_log }}
         run: |
-          ERROR_LOG="${{ needs.test-frontend.outputs.error_log }}"
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Frontend tests failed but no captured output. Run cargo test -p realestate-frontend --all-targets to reproduce."
           fi
@@ -479,9 +481,10 @@ jobs:
 
       - name: Notify — dependency security gate failed
         if: always() && needs.quality-gate.result == 'failure'
+        env:
+          ERROR_LOG: ${{ needs.quality-gate.outputs.error_log }}
+          FAILED_STEPS: ${{ needs.quality-gate.outputs.failed_steps }}
         run: |
-          ERROR_LOG="${{ needs.quality-gate.outputs.error_log }}"
-          FAILED_STEPS="${{ needs.quality-gate.outputs.failed_steps }}"
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Quality gate failed but no captured output. Run cargo audit and check OWASP scan to reproduce."
           fi
@@ -494,8 +497,9 @@ jobs:
 
       - name: Notify — frontend WASM build failed
         if: always() && needs.build-frontend.result == 'failure'
+        env:
+          ERROR_LOG: ${{ needs.build-frontend.outputs.error_log }}
         run: |
-          ERROR_LOG="${{ needs.build-frontend.outputs.error_log }}"
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Frontend WASM build failed but no captured output. Run trunk build --release in frontend/ to reproduce."
           fi
@@ -507,8 +511,9 @@ jobs:
 
       - name: Notify — backend release build failed
         if: always() && needs.build-backend.result == 'failure'
+        env:
+          ERROR_LOG: ${{ needs.build-backend.outputs.error_log }}
         run: |
-          ERROR_LOG="${{ needs.build-backend.outputs.error_log }}"
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Backend release build failed but no captured output. Run cargo build -p realestate-backend --release to reproduce."
           fi
