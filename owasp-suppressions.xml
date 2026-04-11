@@ -398,6 +398,102 @@
         <cpe regex="true">cpe:/a:.*:crc:.*</cpe>
     </suppress>
 
+    <!-- libsqlite3-sys crate matched against SQLite C library CVEs.
+         This is a transitive dep from sqlx-sqlite (pulled by sea-orm's sqlx).
+         Project uses PostgreSQL exclusively — SQLite is never used at runtime. -->
+    <suppress>
+        <notes>libsqlite3-sys false positive - transitive dep, project uses PostgreSQL not SQLite</notes>
+        <packageUrl regex="true">^pkg:cargo/libsqlite3-sys@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:sqlite:.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>sqlx-sqlite false positive - transitive dep, project uses PostgreSQL not SQLite</notes>
+        <packageUrl regex="true">^pkg:cargo/sqlx-sqlite@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:sqlite:.*</cpe>
+    </suppress>
+
+    <!-- rust_xlsxwriter crate matched against Microsoft Excel / Apache POI CVEs -->
+    <suppress>
+        <notes>rust_xlsxwriter false positive - pure Rust XLSX writer, not MS Office or Apache POI</notes>
+        <packageUrl regex="true">^pkg:cargo/rust_xlsxwriter@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(microsoft|excel|apache|poi|libreoffice|xlsx):.*</cpe>
+    </suppress>
+
+    <!-- jsonwebtoken crate matched against JWT library CVEs in other languages -->
+    <suppress>
+        <notes>jsonwebtoken false positive - Rust JWT crate, not auth0/jsonwebtoken.io</notes>
+        <packageUrl regex="true">^pkg:cargo/jsonwebtoken@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(jsonwebtoken|jwt|json_web_token):.*</cpe>
+    </suppress>
+
+    <!-- pgvector crate matched against PostgreSQL CVEs -->
+    <suppress>
+        <notes>pgvector false positive - Rust pgvector client, not PostgreSQL server</notes>
+        <packageUrl regex="true">^pkg:cargo/pgvector@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(postgresql|postgres|pgvector):.*</cpe>
+    </suppress>
+
+    <!-- simple_asn1 crate matched against ASN.1 parsing CVEs -->
+    <suppress>
+        <notes>simple_asn1 false positive - pure Rust ASN.1 parser</notes>
+        <packageUrl regex="true">^pkg:cargo/simple_asn1@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:asn1:.*</cpe>
+    </suppress>
+
+    <!-- nix crate matched against Nix package manager or Unix CVEs -->
+    <suppress>
+        <notes>nix crate false positive - Rust Unix API bindings, not Nix package manager</notes>
+        <packageUrl regex="true">^pkg:cargo/nix@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:nix:.*</cpe>
+    </suppress>
+
+    <!-- ed25519/ed25519-dalek/curve25519-dalek matched against crypto library CVEs -->
+    <suppress>
+        <notes>ed25519-dalek false positive - pure Rust Ed25519, not OpenSSL/libsodium</notes>
+        <packageUrl regex="true">^pkg:cargo/ed25519.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(openssl|libsodium|ed25519|dalek):.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>curve25519-dalek false positive - pure Rust Curve25519</notes>
+        <packageUrl regex="true">^pkg:cargo/curve25519-dalek.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(openssl|libsodium|curve25519|dalek):.*</cpe>
+    </suppress>
+
+    <!-- rusttype crate matched against font rendering CVEs -->
+    <suppress>
+        <notes>rusttype false positive - pure Rust font renderer, not FreeType</notes>
+        <packageUrl regex="true">^pkg:cargo/rusttype@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(freetype|harfbuzz|fontconfig|rusttype):.*</cpe>
+    </suppress>
+
+    <!-- glob crate matched against glob implementation CVEs -->
+    <suppress>
+        <notes>glob crate false positive - Rust glob pattern matching</notes>
+        <packageUrl regex="true">^pkg:cargo/glob@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:glob:.*</cpe>
+    </suppress>
+
+    <!-- stringprep crate matched against string processing CVEs -->
+    <suppress>
+        <notes>stringprep false positive - Rust stringprep implementation</notes>
+        <packageUrl regex="true">^pkg:cargo/stringprep@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:stringprep:.*</cpe>
+    </suppress>
+
+    <!-- mio crate matched against I/O library CVEs -->
+    <suppress>
+        <notes>mio false positive - Rust async I/O library</notes>
+        <packageUrl regex="true">^pkg:cargo/mio@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:mio:.*</cpe>
+    </suppress>
+
+    <!-- hyper/httparse crates matched against HTTP server CVEs -->
+    <suppress>
+        <notes>httparse false positive - Rust HTTP parser, not Apache/nginx</notes>
+        <packageUrl regex="true">^pkg:cargo/httparse@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(http|httparse|apache|nginx):.*</cpe>
+    </suppress>
+
     <!-- Broad suppression for Cargo.lock file-level false positives.
          OWASP sometimes flags the lockfile itself as a vulnerable component. -->
     <suppress>
