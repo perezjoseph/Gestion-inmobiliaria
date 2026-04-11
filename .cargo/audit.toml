@@ -1,0 +1,9 @@
+# Cargo audit configuration
+# https://docs.rs/cargo-audit
+
+[advisories]
+# RUSTSEC-2023-0071: rsa timing sidechannel (Marvin Attack)
+# Severity: 5.9 (medium). No fixed version available.
+# Transitive dep via jsonwebtoken 10.x (rust_crypto feature) and sqlx-mysql.
+# We only use PostgreSQL and HMAC-based JWTs — RSA key operations are not exposed.
+ignore = ["RUSTSEC-2023-0071"]

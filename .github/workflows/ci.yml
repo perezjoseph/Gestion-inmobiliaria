@@ -101,7 +101,7 @@ jobs:
 
   test-backend:
     name: Backend Unit & Integration Tests
-    runs-on: [self-hosted, linux]
+    runs-on: [self-hosted, linux, docker]
     services:
       postgres:
         image: postgres:16

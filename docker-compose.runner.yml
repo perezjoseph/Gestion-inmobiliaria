@@ -7,7 +7,7 @@ services:
       RUNNER_NAME: realestate-runner-1
       RUNNER_WORKDIR: /tmp/runner-1
       RUNNER_SCOPE: repo
-      LABELS: self-hosted,linux
+      LABELS: self-hosted,linux,docker
       DISABLE_AUTO_UPDATE: "true"
     security_opt:
       - label:disable
@@ -24,7 +24,7 @@ services:
       RUNNER_NAME: realestate-runner-2
       RUNNER_WORKDIR: /tmp/runner-2
       RUNNER_SCOPE: repo
-      LABELS: self-hosted,linux
+      LABELS: self-hosted,linux,docker
       DISABLE_AUTO_UPDATE: "true"
     security_opt:
       - label:disable
