@@ -184,6 +184,8 @@ jobs:
   quality-gate:
     name: Dependency Security & Health Check
     runs-on: [self-hosted, linux]
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
     steps:
       - name: Checkout repository for dependency scanning
         uses: actions/checkout@v4
@@ -195,12 +197,20 @@ jobs:
         run: cargo install cargo-audit --locked || true
 
       - name: Scan Rust dependencies for known vulnerabilities (CVEs)
-        run: cargo audit
+        run: cargo audit 2>&1 | tee /tmp/audit-output.txt
+
+      - name: Capture cargo audit output for failure notification
+        if: failure()
+        run: echo "AUDIT_OUTPUT<<GHEOF" >> $GITHUB_ENV && head -c 3000 /tmp/audit-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
 
       - name: Check for unused dependencies in Cargo.toml
         run: |
           cargo install cargo-udeps --locked || true
-          cargo +nightly udeps --all-targets 2>&1 || echo "cargo-udeps requires nightly, skipping if unavailable"
+          cargo +nightly udeps --all-targets 2>&1 | tee /tmp/udeps-output.txt || echo "cargo-udeps requires nightly, skipping if unavailable"
+
+      - name: Capture cargo-udeps output for failure notification
+        if: failure()
+        run: echo "UDEPS_OUTPUT<<GHEOF" >> $GITHUB_ENV && head -c 3000 /tmp/udeps-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
 
       - name: OWASP dependency scan (fail on CVSS >= 7)
         uses: dependency-check/Dependency-Check_Action@main
@@ -211,6 +221,10 @@ jobs:
           args: >-
             --enableExperimental
             --failOnCVSS 7
+
+      - name: Capture OWASP output for failure notification
+        if: failure()
+        run: echo "OWASP_OUTPUT<<GHEOF" >> $GITHUB_ENV && echo "OWASP dependency check failed with CVSS >= 7. See uploaded report artifact for details." >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
 
       - name: Upload OWASP vulnerability report as artifact
         if: always()
@@ -388,14 +402,15 @@ jobs:
       - name: Notify — dependency security gate failed
         if: always() && needs.quality-gate.result == 'failure'
         run: |
+          ERROR_LOG="${AUDIT_OUTPUT:-}${UDEPS_OUTPUT:-}${OWASP_OUTPUT:-}"
+          if [ -z "$ERROR_LOG" ]; then
+            ERROR_LOG="Quality gate failed but no captured output. Run cargo audit, cargo-udeps, or check OWASP dependency scan to reproduce."
+          fi
+          PAYLOAD=$(jq -n --arg job "quality-gate" --arg step "audit-or-owasp" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
-            -d '{
-              "job": "quality-gate",
-              "step": "audit-or-owasp",
-              "error_log": "Quality gate failed. Check cargo audit, cargo-udeps, or OWASP dependency check.",
-              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }' || echo "Webhook unreachable — skipping notification"
+            -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
 
       - name: Notify — frontend WASM build failed
         if: always() && needs.build-frontend.result == 'failure'
