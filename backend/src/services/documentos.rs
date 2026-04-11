@@ -45,18 +45,18 @@ pub async fn upload(
     validate_mime_type(mime_type)?;
 
     let upload_dir = get_upload_dir();
-    let dir_path = format!("{}/{}/{}", upload_dir, entity_type, entity_id);
+    let dir_path = format!("{upload_dir}/{entity_type}/{entity_id}");
     std::fs::create_dir_all(&dir_path)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error creando directorio: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error creando directorio: {e}")))?;
 
     let file_uuid = Uuid::new_v4();
-    let stored_filename = format!("{}-{}", file_uuid, filename);
-    let full_path = format!("{}/{}", dir_path, stored_filename);
+    let stored_filename = format!("{file_uuid}-{filename}");
+    let full_path = format!("{dir_path}/{stored_filename}");
 
     std::fs::write(&full_path, file_data)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error escribiendo archivo: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error escribiendo archivo: {e}")))?;
 
-    let relative_path = format!("{}/{}/{}", entity_type, entity_id, stored_filename);
+    let relative_path = format!("{entity_type}/{entity_id}/{stored_filename}");
     let id = Uuid::new_v4();
     let now = Utc::now().into();
 
@@ -182,14 +182,18 @@ mod tests {
         assert!(validate_mime_type("").is_err());
     }
 
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn get_upload_dir_returns_default() {
+        let _guard = ENV_LOCK.lock().unwrap();
         unsafe { std::env::remove_var("UPLOAD_DIR") };
         assert_eq!(get_upload_dir(), "./uploads");
     }
 
     #[test]
     fn get_upload_dir_returns_env_value() {
+        let _guard = ENV_LOCK.lock().unwrap();
         unsafe { std::env::set_var("UPLOAD_DIR", "/tmp/test-uploads") };
         assert_eq!(get_upload_dir(), "/tmp/test-uploads");
         unsafe { std::env::remove_var("UPLOAD_DIR") };

@@ -16,7 +16,7 @@ fn parse_csv_rows(data: &[u8]) -> Result<Vec<Vec<String>>, AppError> {
 
     let headers: Vec<String> = reader
         .headers()
-        .map_err(|e| AppError::Validation(format!("Error leyendo encabezados CSV: {}", e)))?
+        .map_err(|e| AppError::Validation(format!("Error leyendo encabezados CSV: {e}")))?
         .iter()
         .map(|h| h.trim().to_lowercase())
         .collect();
@@ -26,7 +26,7 @@ fn parse_csv_rows(data: &[u8]) -> Result<Vec<Vec<String>>, AppError> {
 
     for result in reader.records() {
         let record =
-            result.map_err(|e| AppError::Validation(format!("Error leyendo fila CSV: {}", e)))?;
+            result.map_err(|e| AppError::Validation(format!("Error leyendo fila CSV: {e}")))?;
         let row: Vec<String> = record.iter().map(|f| f.trim().to_string()).collect();
         rows.push(row);
     }
@@ -39,7 +39,7 @@ fn parse_xlsx_rows(data: &[u8]) -> Result<Vec<Vec<String>>, AppError> {
 
     let cursor = Cursor::new(data);
     let mut workbook: Xlsx<_> = Xlsx::new(cursor)
-        .map_err(|e| AppError::Validation(format!("Error abriendo archivo XLSX: {}", e)))?;
+        .map_err(|e| AppError::Validation(format!("Error abriendo archivo XLSX: {e}")))?;
 
     let sheet_name = workbook
         .sheet_names()
@@ -49,7 +49,7 @@ fn parse_xlsx_rows(data: &[u8]) -> Result<Vec<Vec<String>>, AppError> {
 
     let range = workbook
         .worksheet_range(&sheet_name)
-        .map_err(|e| AppError::Validation(format!("Error leyendo hoja XLSX: {}", e)))?;
+        .map_err(|e| AppError::Validation(format!("Error leyendo hoja XLSX: {e}")))?;
 
     let mut rows = Vec::new();
     for (i, row) in range.rows().enumerate() {
@@ -159,7 +159,7 @@ pub async fn importar_propiedades(
             Err(_) => {
                 fallidos.push(ImportError {
                     fila,
-                    error: format!("precio inválido: {}", precio_str),
+                    error: format!("precio inválido: {precio_str}"),
                 });
                 continue;
             }
@@ -204,7 +204,7 @@ pub async fn importar_propiedades(
             Err(e) => {
                 fallidos.push(ImportError {
                     fila,
-                    error: format!("Error insertando: {}", e),
+                    error: format!("Error insertando: {e}"),
                 });
             }
         }
@@ -276,7 +276,7 @@ pub async fn importar_inquilinos(
         if existing.is_some() {
             fallidos.push(ImportError {
                 fila,
-                error: format!("Cédula duplicada: {}", cedula),
+                error: format!("Cédula duplicada: {cedula}"),
             });
             continue;
         }
@@ -312,7 +312,7 @@ pub async fn importar_inquilinos(
             Err(e) => {
                 fallidos.push(ImportError {
                     fila,
-                    error: format!("Error insertando: {}", e),
+                    error: format!("Error insertando: {e}"),
                 });
             }
         }

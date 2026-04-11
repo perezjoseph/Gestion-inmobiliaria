@@ -11,20 +11,20 @@ fn load_font_family() -> Result<genpdf::fonts::FontFamily<genpdf::fonts::FontDat
         include_bytes!("../../fonts/Arial-Regular.ttf").to_vec(),
         None,
     )
-    .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente regular: {}", e)))?;
+    .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente regular: {e}")))?;
     let bold =
         genpdf::fonts::FontData::new(include_bytes!("../../fonts/Arial-Bold.ttf").to_vec(), None)
-            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente bold: {}", e)))?;
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente bold: {e}")))?;
     let italic = genpdf::fonts::FontData::new(
         include_bytes!("../../fonts/Arial-Italic.ttf").to_vec(),
         None,
     )
-    .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente italic: {}", e)))?;
+    .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente italic: {e}")))?;
     let bold_italic = genpdf::fonts::FontData::new(
         include_bytes!("../../fonts/Arial-BoldItalic.ttf").to_vec(),
         None,
     )
-    .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente bold-italic: {}", e)))?;
+    .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente bold-italic: {e}")))?;
 
     Ok(genpdf::fonts::FontFamily {
         regular,
@@ -39,7 +39,7 @@ fn format_date_dr(date: chrono::NaiveDate) -> String {
 }
 
 fn format_currency_dr(monto: rust_decimal::Decimal, moneda: &str) -> String {
-    let monto_str = format!("{:.2}", monto);
+    let monto_str = format!("{monto:.2}");
     let parts: Vec<&str> = monto_str.split('.').collect();
     let integer_part = parts[0];
     let decimal_part = parts.get(1).unwrap_or(&"00");
@@ -60,7 +60,7 @@ fn format_currency_dr(monto: rust_decimal::Decimal, moneda: &str) -> String {
     let formatted: String = formatted.chars().rev().collect();
 
     let sign = if negative { "-" } else { "" };
-    format!("{}{} {},{}", sign, moneda, formatted, decimal_part)
+    format!("{sign}{moneda} {formatted},{decimal_part}")
 }
 
 pub async fn generar_recibo(db: &DatabaseConnection, pago_id: Uuid) -> Result<Vec<u8>, AppError> {
@@ -113,8 +113,7 @@ pub async fn generar_recibo(db: &DatabaseConnection, pago_id: Uuid) -> Result<Ve
     doc.push(elements::Break::new(1.0));
 
     doc.push(elements::Paragraph::new(format!(
-        "No. Recibo: {}",
-        receipt_number
+        "No. Recibo: {receipt_number}"
     )));
 
     let fecha_emision = chrono::Utc::now().date_naive();
@@ -156,8 +155,7 @@ pub async fn generar_recibo(db: &DatabaseConnection, pago_id: Uuid) -> Result<Ve
 
     if let Some(ref metodo) = pago_model.metodo_pago {
         doc.push(elements::Paragraph::new(format!(
-            "Método de Pago: {}",
-            metodo
+            "Método de Pago: {metodo}"
         )));
     }
 
@@ -169,7 +167,7 @@ pub async fn generar_recibo(db: &DatabaseConnection, pago_id: Uuid) -> Result<Ve
 
     let mut buf: Vec<u8> = Vec::new();
     doc.render(&mut buf)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error renderizando PDF: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error renderizando PDF: {e}")))?;
 
     Ok(buf)
 }

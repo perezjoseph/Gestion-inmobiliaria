@@ -27,7 +27,7 @@ async fn extract_file(mut payload: Multipart) -> Result<(Vec<u8>, String), AppEr
 
     while let Some(item) = payload.next().await {
         let mut field =
-            item.map_err(|e| AppError::Validation(format!("Error procesando multipart: {}", e)))?;
+            item.map_err(|e| AppError::Validation(format!("Error procesando multipart: {e}")))?;
 
         let disposition = field.content_disposition();
         let field_name = disposition
@@ -44,9 +44,8 @@ async fn extract_file(mut payload: Multipart) -> Result<(Vec<u8>, String), AppEr
 
             let mut data = Vec::new();
             while let Some(chunk) = field.next().await {
-                let chunk = chunk.map_err(|e| {
-                    AppError::Internal(anyhow::anyhow!("Error leyendo chunk: {}", e))
-                })?;
+                let chunk = chunk
+                    .map_err(|e| AppError::Internal(anyhow::anyhow!("Error leyendo chunk: {e}")))?;
                 data.extend_from_slice(&chunk);
             }
             file_data = Some(data);

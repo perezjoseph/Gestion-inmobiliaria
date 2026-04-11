@@ -50,7 +50,7 @@ mod recibos_handler_tests {
 
         let pago_id = Uuid::new_v4();
         let req = test::TestRequest::get()
-            .uri(&format!("/api/pagos/{}/recibo", pago_id))
+            .uri(&format!("/api/pagos/{pago_id}/recibo"))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
@@ -68,8 +68,8 @@ mod recibos_handler_tests {
         let pago_id = Uuid::new_v4();
         let token = make_token("admin");
         let req = test::TestRequest::get()
-            .uri(&format!("/api/pagos/{}/recibo", pago_id))
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .uri(&format!("/api/pagos/{pago_id}/recibo"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
@@ -88,15 +88,14 @@ mod recibos_handler_tests {
             let pago_id = Uuid::new_v4();
             let token = make_token(role);
             let req = test::TestRequest::get()
-                .uri(&format!("/api/pagos/{}/recibo", pago_id))
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .uri(&format!("/api/pagos/{pago_id}/recibo"))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             assert_eq!(
                 resp.status(),
                 StatusCode::OK,
-                "Role '{}' should be allowed",
-                role
+                "Role '{role}' should be allowed"
             );
         }
     }

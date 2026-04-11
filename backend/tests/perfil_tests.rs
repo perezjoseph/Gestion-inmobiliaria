@@ -71,7 +71,7 @@ mod perfil_handler_tests {
         let token = make_token("visualizador");
         let req = test::TestRequest::get()
             .uri("/api/perfil")
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
@@ -89,7 +89,7 @@ mod perfil_handler_tests {
         let token = make_token("gerente");
         let req = test::TestRequest::get()
             .uri("/api/perfil")
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
@@ -107,7 +107,7 @@ mod perfil_handler_tests {
         let token = make_token("admin");
         let req = test::TestRequest::get()
             .uri("/api/perfil")
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
@@ -145,15 +145,14 @@ mod perfil_handler_tests {
             let token = make_token(rol);
             let req = test::TestRequest::put()
                 .uri("/api/perfil")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(serde_json::json!({"nombre": "Nuevo"}))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             assert_eq!(
                 resp.status(),
                 StatusCode::OK,
-                "Role '{}' should be allowed to update profile",
-                rol
+                "Role '{rol}' should be allowed to update profile"
             );
         }
     }
@@ -193,7 +192,7 @@ mod perfil_handler_tests {
             let token = make_token(rol);
             let req = test::TestRequest::put()
                 .uri("/api/perfil/password")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(serde_json::json!({
                     "passwordActual": "old",
                     "passwordNuevo": "new"
@@ -203,8 +202,7 @@ mod perfil_handler_tests {
             assert_eq!(
                 resp.status(),
                 StatusCode::OK,
-                "Role '{}' should be allowed to change password",
-                rol
+                "Role '{rol}' should be allowed to change password"
             );
         }
     }

@@ -147,6 +147,12 @@ pub async fn login(
 mod tests {
     use super::*;
 
+    fn install_crypto_provider() {
+        let _ = jsonwebtoken::crypto::CryptoProvider::install_default(
+            jsonwebtoken::crypto::rust_crypto::DEFAULT_PROVIDER,
+        );
+    }
+
     #[test]
     fn hash_and_verify_password_succeeds() {
         let password = "mi_contraseña_segura";
@@ -162,6 +168,7 @@ mod tests {
 
     #[test]
     fn encode_decode_jwt_roundtrip() {
+        install_crypto_provider();
         let secret = "test_secret_key";
         let claims = Claims {
             sub: Uuid::new_v4(),
@@ -180,6 +187,7 @@ mod tests {
 
     #[test]
     fn decode_jwt_with_wrong_secret_fails() {
+        install_crypto_provider();
         let claims = Claims {
             sub: Uuid::new_v4(),
             email: "test@example.com".to_string(),
@@ -194,6 +202,7 @@ mod tests {
 
     #[test]
     fn decode_expired_jwt_fails() {
+        install_crypto_provider();
         let secret = "test_secret";
         let claims = Claims {
             sub: Uuid::new_v4(),

@@ -17,7 +17,7 @@ pub async fn generar_recibo(
         .content_type("application/pdf")
         .insert_header((
             "Content-Disposition",
-            format!("attachment; filename=\"recibo-{}.pdf\"", pago_id),
+            format!("attachment; filename=\"recibo-{pago_id}.pdf\""),
         ))
         .body(bytes))
 }

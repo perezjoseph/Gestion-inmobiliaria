@@ -206,20 +206,20 @@ fn load_font_family() -> Result<genpdf::fonts::FontFamily<genpdf::fonts::FontDat
         include_bytes!("../../fonts/Arial-Regular.ttf").to_vec(),
         None,
     )
-    .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente regular: {}", e)))?;
+    .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente regular: {e}")))?;
     let bold =
         genpdf::fonts::FontData::new(include_bytes!("../../fonts/Arial-Bold.ttf").to_vec(), None)
-            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente bold: {}", e)))?;
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente bold: {e}")))?;
     let italic = genpdf::fonts::FontData::new(
         include_bytes!("../../fonts/Arial-Italic.ttf").to_vec(),
         None,
     )
-    .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente italic: {}", e)))?;
+    .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente italic: {e}")))?;
     let bold_italic = genpdf::fonts::FontData::new(
         include_bytes!("../../fonts/Arial-BoldItalic.ttf").to_vec(),
         None,
     )
-    .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente bold-italic: {}", e)))?;
+    .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente bold-italic: {e}")))?;
 
     Ok(genpdf::fonts::FontFamily {
         regular,
@@ -230,8 +230,7 @@ fn load_font_family() -> Result<genpdf::fonts::FontFamily<genpdf::fonts::FontDat
 }
 
 pub fn exportar_pdf(summary: &IngresoReportSummary) -> Result<Vec<u8>, AppError> {
-    let font_family =
-        load_font_family().map_err(|e| AppError::Internal(anyhow::anyhow!("{}", e)))?;
+    let font_family = load_font_family().map_err(|e| AppError::Internal(anyhow::anyhow!("{e}")))?;
 
     let mut doc = genpdf::Document::new(font_family);
     doc.set_title("Reporte de Ingresos");
@@ -286,7 +285,7 @@ pub fn exportar_pdf(summary: &IngresoReportSummary) -> Result<Vec<u8>, AppError>
                     .styled(style::Style::new().bold().with_font_size(10)),
             )
             .push()
-            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error en tabla PDF: {}", e)))?;
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error en tabla PDF: {e}")))?;
 
         for row in &summary.rows {
             let data_row = table.row();
@@ -298,7 +297,7 @@ pub fn exportar_pdf(summary: &IngresoReportSummary) -> Result<Vec<u8>, AppError>
                 .element(elements::Paragraph::new(&row.estado))
                 .push()
                 .map_err(|e| {
-                    AppError::Internal(anyhow::anyhow!("Error en fila de tabla PDF: {}", e))
+                    AppError::Internal(anyhow::anyhow!("Error en fila de tabla PDF: {e}"))
                 })?;
         }
 
@@ -329,7 +328,7 @@ pub fn exportar_pdf(summary: &IngresoReportSummary) -> Result<Vec<u8>, AppError>
 
     let mut buf: Vec<u8> = Vec::new();
     doc.render(&mut buf)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error renderizando PDF: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error renderizando PDF: {e}")))?;
 
     Ok(buf)
 }
@@ -346,63 +345,63 @@ pub fn exportar_xlsx(summary: &IngresoReportSummary) -> Result<Vec<u8>, AppError
 
     worksheet
         .write_string_with_format(0, 0, "Reporte de Ingresos", &title_format)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
 
     let timestamp = summary.generated_at.format("%d/%m/%Y %H:%M:%S").to_string();
     worksheet
-        .write_string(1, 0, format!("Generado: {}", timestamp))
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+        .write_string(1, 0, format!("Generado: {timestamp}"))
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
     worksheet
         .write_string(2, 0, format!("Usuario: {}", &summary.generated_by))
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
 
     let header_row: u32 = 4;
     let headers = ["Propiedad", "Inquilino", "Monto", "Moneda", "Estado"];
     for (col, header) in headers.iter().enumerate() {
         worksheet
             .write_string_with_format(header_row, col as u16, *header, &header_format)
-            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX header: {}", e)))?;
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX header: {e}")))?;
     }
 
     worksheet
         .set_column_width(0, 25)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
     worksheet
         .set_column_width(1, 25)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
     worksheet
         .set_column_width(2, 15)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
     worksheet
         .set_column_width(3, 10)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
     worksheet
         .set_column_width(4, 15)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
 
     if summary.rows.is_empty() {
         worksheet
             .write_string(header_row + 1, 0, "Sin registros para el periodo")
-            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
     } else {
         for (idx, row) in summary.rows.iter().enumerate() {
             let r = header_row + 1 + idx as u32;
             worksheet
                 .write_string(r, 0, &row.propiedad_titulo)
-                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
             worksheet
                 .write_string(r, 1, &row.inquilino_nombre)
-                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
             let monto_f64 = row.monto.to_string().parse::<f64>().unwrap_or_default();
             worksheet
                 .write_number(r, 2, monto_f64)
-                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
             worksheet
                 .write_string(r, 3, &row.moneda)
-                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
             worksheet
                 .write_string(r, 4, &row.estado)
-                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
         }
     }
 
@@ -425,39 +424,39 @@ pub fn exportar_xlsx(summary: &IngresoReportSummary) -> Result<Vec<u8>, AppError
 
     worksheet
         .write_string_with_format(summary_row, 0, "Total Pagado", &bold_format)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
     worksheet
         .write_number(summary_row, 2, pagado_f64)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
 
     worksheet
         .write_string_with_format(summary_row + 1, 0, "Total Pendiente", &bold_format)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
     worksheet
         .write_number(summary_row + 1, 2, pendiente_f64)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
 
     worksheet
         .write_string_with_format(summary_row + 2, 0, "Total Atrasado", &bold_format)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
     worksheet
         .write_number(summary_row + 2, 2, atrasado_f64)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
 
     worksheet
         .write_string_with_format(summary_row + 3, 0, "Tasa de Ocupacion", &bold_format)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
     worksheet
         .write_string(
             summary_row + 3,
             2,
             format!("{:.1}%", summary.tasa_ocupacion),
         )
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error XLSX: {e}")))?;
 
     let buf = workbook
         .save_to_buffer()
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error guardando XLSX: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error guardando XLSX: {e}")))?;
 
     Ok(buf)
 }

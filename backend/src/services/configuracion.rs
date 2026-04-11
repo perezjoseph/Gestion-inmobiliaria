@@ -28,7 +28,7 @@ pub async fn obtener_moneda(db: &DatabaseConnection) -> Result<MonedaConfig, App
         .ok_or_else(|| AppError::NotFound("Configuración de moneda no encontrada".to_string()))?;
 
     let moneda: MonedaConfig = serde_json::from_value(config.valor)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error deserializando config: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error deserializando config: {e}")))?;
 
     Ok(moneda)
 }
@@ -44,7 +44,7 @@ pub async fn actualizar_moneda(
         actualizado: now.format("%Y-%m-%d").to_string(),
     };
     let valor_json = serde_json::to_value(&valor)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error serializando config: {}", e)))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error serializando config: {e}")))?;
 
     let existing = configuracion::Entity::find_by_id(CLAVE_TASA_CAMBIO)
         .one(db)

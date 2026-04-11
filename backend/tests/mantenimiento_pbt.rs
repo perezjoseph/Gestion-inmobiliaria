@@ -25,7 +25,7 @@ fn valid_titulo() -> impl Strategy<Value = String> {
 }
 
 fn valid_descripcion() -> impl Strategy<Value = Option<String>> {
-    prop_oneof![Just(None), "[a-zA-Z0-9 ]{5,100}".prop_map(|s| Some(s)),]
+    prop_oneof![Just(None), "[a-zA-Z0-9 ]{5,100}".prop_map(Some),]
 }
 
 fn non_negative_decimal() -> impl Strategy<Value = Decimal> {
@@ -117,7 +117,7 @@ mod pbt_async {
     fn make_token(user_id: Uuid, rol: &str) -> String {
         let claims = Claims {
             sub: user_id,
-            email: format!("{}@test.com", rol),
+            email: format!("{rol}@test.com"),
             rol: rol.to_string(),
             exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
         };
@@ -130,8 +130,8 @@ mod pbt_async {
         let now = Utc::now().into();
         usuario::ActiveModel {
             id: Set(id),
-            nombre: Set(format!("Test {}", rol)),
-            email: Set(format!("{}+{}@test.com", rol, id)),
+            nombre: Set(format!("Test {rol}")),
+            email: Set(format!("{rol}+{id}@test.com")),
             password_hash: Set("not_used".to_string()),
             rol: Set(rol.to_string()),
             activo: Set(true),
@@ -179,7 +179,7 @@ mod pbt_async {
         unidad::ActiveModel {
             id: Set(id),
             propiedad_id: Set(propiedad_id),
-            numero_unidad: Set(format!("U-{}", id)),
+            numero_unidad: Set(format!("U-{id}")),
             piso: Set(Some(1)),
             habitaciones: Set(Some(2)),
             banos: Set(Some(1)),
@@ -223,7 +223,7 @@ mod pbt_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
                     "propiedadId": propiedad_id,
                     "titulo": titulo,
@@ -250,8 +250,8 @@ mod pbt_async {
             }
 
             let req = test::TestRequest::get()
-                .uri(&format!("/api/mantenimiento/{}", solicitud_id))
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .uri(&format!("/api/mantenimiento/{solicitud_id}"))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 200);
@@ -278,7 +278,7 @@ mod pbt_async {
             for i in 0..count {
                 let req = test::TestRequest::post()
                     .uri("/api/mantenimiento")
-                    .insert_header(("Authorization", format!("Bearer {}", token)))
+                    .insert_header(("Authorization", format!("Bearer {token}")))
                     .set_json(json!({
                         "propiedadId": propiedad_id,
                         "titulo": format!("Ordering test {}", i),
@@ -291,8 +291,8 @@ mod pbt_async {
             }
 
             let req = test::TestRequest::get()
-                .uri(&format!("/api/mantenimiento?propiedadId={}", propiedad_id))
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .uri(&format!("/api/mantenimiento?propiedadId={propiedad_id}"))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             let body: Value = test::read_body_json(resp).await;
@@ -301,7 +301,7 @@ mod pbt_async {
             for window in items.windows(2) {
                 let a = window[0]["createdAt"].as_str().unwrap();
                 let b = window[1]["createdAt"].as_str().unwrap();
-                assert!(a >= b, "List not in descending order: {} < {}", a, b);
+                assert!(a >= b, "List not in descending order: {a} < {b}");
             }
 
             for id in &created_ids {
@@ -323,7 +323,7 @@ mod pbt_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_a, "titulo": "Filter A", "prioridad": prioridad_a }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -332,7 +332,7 @@ mod pbt_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_b, "titulo": "Filter B", "prioridad": prioridad_b }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -340,8 +340,8 @@ mod pbt_async {
             let id2: Uuid = b2["id"].as_str().unwrap().parse().unwrap();
 
             let req = test::TestRequest::get()
-                .uri(&format!("/api/mantenimiento?prioridad={}", prioridad_a))
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .uri(&format!("/api/mantenimiento?prioridad={prioridad_a}"))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             let body: Value = test::read_body_json(resp).await;
@@ -351,7 +351,7 @@ mod pbt_async {
 
             let req = test::TestRequest::get()
                 .uri("/api/mantenimiento?estado=pendiente")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             let body: Value = test::read_body_json(resp).await;
@@ -360,8 +360,8 @@ mod pbt_async {
             }
 
             let req = test::TestRequest::get()
-                .uri(&format!("/api/mantenimiento?propiedadId={}", propiedad_a))
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .uri(&format!("/api/mantenimiento?propiedadId={propiedad_a}"))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             let body: Value = test::read_body_json(resp).await;
@@ -386,7 +386,7 @@ mod pbt_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_id, "titulo": ot, "prioridad": op }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -403,8 +403,8 @@ mod pbt_async {
             }
 
             let req = test::TestRequest::put()
-                .uri(&format!("/api/mantenimiento/{}", solicitud_id))
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .uri(&format!("/api/mantenimiento/{solicitud_id}"))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(&update_body)
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -439,7 +439,7 @@ mod pbt_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_id, "titulo": titulo }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -450,8 +450,8 @@ mod pbt_async {
             assert!(body["fechaFin"].is_null());
 
             let req = test::TestRequest::put()
-                .uri(&format!("/api/mantenimiento/{}/estado", sid))
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .uri(&format!("/api/mantenimiento/{sid}/estado"))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "estado": "en_progreso" }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -461,8 +461,8 @@ mod pbt_async {
             assert!(body["fechaFin"].is_null());
 
             let req = test::TestRequest::put()
-                .uri(&format!("/api/mantenimiento/{}/estado", sid))
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .uri(&format!("/api/mantenimiento/{sid}/estado"))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "estado": "completado" }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -486,7 +486,7 @@ mod pbt_async {
             let app = test::init_service(create_app(db.clone(), config)).await;
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_id, "titulo": "Test invalid prioridad", "prioridad": bad }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -505,7 +505,7 @@ mod pbt_async {
             let app = test::init_service(create_app(db.clone(), config)).await;
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_id, "titulo": "Test invalid moneda", "costoMonto": "100.00", "costoMoneda": bad }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -524,7 +524,7 @@ mod pbt_async {
             let app = test::init_service(create_app(db.clone(), config)).await;
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_id, "titulo": "Test negative cost", "costoMonto": neg.to_string(), "costoMoneda": "DOP" }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -544,7 +544,7 @@ mod pbt_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_id, "titulo": "Test empty notes" }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -552,16 +552,16 @@ mod pbt_async {
             let sid = body["id"].as_str().unwrap().to_string();
 
             let req = test::TestRequest::post()
-                .uri(&format!("/api/mantenimiento/{}/notas", sid))
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .uri(&format!("/api/mantenimiento/{sid}/notas"))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "contenido": ws }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 422);
 
             let req = test::TestRequest::get()
-                .uri(&format!("/api/mantenimiento/{}", sid))
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .uri(&format!("/api/mantenimiento/{sid}"))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             let detail: Value = test::read_body_json(resp).await;
@@ -583,7 +583,7 @@ mod pbt_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_id, "titulo": "Notes ordering test" }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -592,8 +592,8 @@ mod pbt_async {
 
             for i in 0..note_count {
                 let req = test::TestRequest::post()
-                    .uri(&format!("/api/mantenimiento/{}/notas", sid))
-                    .insert_header(("Authorization", format!("Bearer {}", token)))
+                    .uri(&format!("/api/mantenimiento/{sid}/notas"))
+                    .insert_header(("Authorization", format!("Bearer {token}")))
                     .set_json(json!({ "contenido": format!("Nota {}", i) }))
                     .to_request();
                 let resp = test::call_service(&app, req).await;
@@ -602,8 +602,8 @@ mod pbt_async {
             }
 
             let req = test::TestRequest::get()
-                .uri(&format!("/api/mantenimiento/{}", sid))
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .uri(&format!("/api/mantenimiento/{sid}"))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             let detail: Value = test::read_body_json(resp).await;
@@ -612,7 +612,7 @@ mod pbt_async {
             for window in notas.windows(2) {
                 let a = window[0]["createdAt"].as_str().unwrap();
                 let b = window[1]["createdAt"].as_str().unwrap();
-                assert!(a >= b, "Notes not in descending order: {} < {}", a, b);
+                assert!(a >= b, "Notes not in descending order: {a} < {b}");
             }
 
             cleanup_solicitud(&db, sid.parse().unwrap()).await;
@@ -631,7 +631,7 @@ mod pbt_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_id, "titulo": "Cascade delete test" }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -640,8 +640,8 @@ mod pbt_async {
 
             for i in 0..note_count {
                 let req = test::TestRequest::post()
-                    .uri(&format!("/api/mantenimiento/{}/notas", sid))
-                    .insert_header(("Authorization", format!("Bearer {}", token)))
+                    .uri(&format!("/api/mantenimiento/{sid}/notas"))
+                    .insert_header(("Authorization", format!("Bearer {token}")))
                     .set_json(json!({ "contenido": format!("Nota cascade {}", i) }))
                     .to_request();
                 let resp = test::call_service(&app, req).await;
@@ -649,15 +649,15 @@ mod pbt_async {
             }
 
             let req = test::TestRequest::delete()
-                .uri(&format!("/api/mantenimiento/{}", sid))
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .uri(&format!("/api/mantenimiento/{sid}"))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 204);
 
             let req = test::TestRequest::get()
-                .uri(&format!("/api/mantenimiento/{}", sid))
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .uri(&format!("/api/mantenimiento/{sid}"))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 404);
@@ -688,7 +688,7 @@ mod pbt_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_a, "titulo": titulo, "unidadId": unidad_on_b }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -712,7 +712,7 @@ mod pbt_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": fake_propiedad_id, "titulo": "FK test propiedad" }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -720,7 +720,7 @@ mod pbt_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": real_propiedad_id, "titulo": "FK test inquilino", "inquilinoId": fake_inquilino_id }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -844,9 +844,7 @@ fn test_invalid_transitions_rejected() {
                 let result = validar_transicion(&estado_actual, &nuevo_estado);
                 assert!(
                     result.is_err(),
-                    "Transition {}→{} should be rejected",
-                    estado_actual,
-                    nuevo_estado
+                    "Transition {estado_actual}→{nuevo_estado} should be rejected"
                 );
                 Ok(())
             },

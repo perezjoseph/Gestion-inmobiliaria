@@ -71,8 +71,7 @@ pub fn validar_transicion(estado_actual: &str, nuevo_estado: &str) -> Result<(),
             "No se puede revertir una solicitud en progreso a pendiente".to_string(),
         )),
         _ => Err(AppError::Validation(format!(
-            "Transición de estado no válida: '{}' → '{}'",
-            estado_actual, nuevo_estado
+            "Transición de estado no válida: '{estado_actual}' → '{nuevo_estado}'"
         ))),
     }
 }

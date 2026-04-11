@@ -125,7 +125,7 @@ mod reportes_handler_tests {
         let token = make_token("admin");
         let req = test::TestRequest::get()
             .uri("/api/reportes/ingresos")
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
@@ -144,14 +144,13 @@ mod reportes_handler_tests {
             let token = make_token(role);
             let req = test::TestRequest::get()
                 .uri("/api/reportes/ingresos")
-                .insert_header(("Authorization", format!("Bearer {}", token)))
+                .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             assert_eq!(
                 resp.status(),
                 StatusCode::OK,
-                "Role '{}' should be allowed",
-                role
+                "Role '{role}' should be allowed"
             );
         }
     }

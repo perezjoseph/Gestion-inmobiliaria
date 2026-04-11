@@ -61,7 +61,7 @@ mod auditoria_handler_tests {
         let token = make_token("visualizador");
         let req = test::TestRequest::get()
             .uri("/api/auditoria")
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
@@ -79,7 +79,7 @@ mod auditoria_handler_tests {
         let token = make_token("gerente");
         let req = test::TestRequest::get()
             .uri("/api/auditoria")
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
@@ -97,7 +97,7 @@ mod auditoria_handler_tests {
         let token = make_token("admin");
         let req = test::TestRequest::get()
             .uri("/api/auditoria")
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);

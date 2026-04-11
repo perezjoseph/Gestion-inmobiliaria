@@ -39,7 +39,7 @@ fn make_config() -> AppConfig {
 fn make_token(user_id: Uuid, rol: &str) -> String {
     let claims = Claims {
         sub: user_id,
-        email: format!("{}@test.com", rol),
+        email: format!("{rol}@test.com"),
         rol: rol.to_string(),
         exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
     };
@@ -52,8 +52,8 @@ async fn create_test_usuario(db: &DatabaseConnection, rol: &str) -> Uuid {
     let now = Utc::now().into();
     usuario::ActiveModel {
         id: Set(id),
-        nombre: Set(format!("Test {}", rol)),
-        email: Set(format!("{}+{}@test.com", rol, id)),
+        nombre: Set(format!("Test {rol}")),
+        email: Set(format!("{rol}+{id}@test.com")),
         password_hash: Set("not_used".to_string()),
         rol: Set(rol.to_string()),
         activo: Set(true),
@@ -103,9 +103,9 @@ async fn create_test_inquilino(db: &DatabaseConnection) -> Uuid {
         id: Set(id),
         nombre: Set("Inquilino".to_string()),
         apellido: Set("Test".to_string()),
-        email: Set(Some(format!("inquilino+{}@test.com", id))),
+        email: Set(Some(format!("inquilino+{id}@test.com"))),
         telefono: Set(None),
-        cedula: Set(format!("CED-{}", id)),
+        cedula: Set(format!("CED-{id}")),
         contacto_emergencia: Set(None),
         notas: Set(None),
         documentos: Set(None),
@@ -125,7 +125,7 @@ async fn create_test_unidad(db: &DatabaseConnection, propiedad_id: Uuid) -> Uuid
     unidad::ActiveModel {
         id: Set(id),
         propiedad_id: Set(propiedad_id),
-        numero_unidad: Set(format!("U-{}", id)),
+        numero_unidad: Set(format!("U-{id}")),
         piso: Set(Some(1)),
         habitaciones: Set(Some(2)),
         banos: Set(Some(1)),
@@ -164,7 +164,7 @@ async fn test_crud_cycle() {
     // Create
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "propiedadId": propiedad_id,
             "titulo": "Reparar tubería",
@@ -186,8 +186,8 @@ async fn test_crud_cycle() {
 
     // Get by ID
     let req = test::TestRequest::get()
-        .uri(&format!("/api/mantenimiento/{}", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 200);
@@ -197,8 +197,8 @@ async fn test_crud_cycle() {
 
     // Update
     let req = test::TestRequest::put()
-        .uri(&format!("/api/mantenimiento/{}", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "titulo": "Reparar tubería urgente",
             "prioridad": "urgente"
@@ -213,7 +213,7 @@ async fn test_crud_cycle() {
     // List
     let req = test::TestRequest::get()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 200);
@@ -223,16 +223,16 @@ async fn test_crud_cycle() {
 
     // Delete (admin only)
     let req = test::TestRequest::delete()
-        .uri(&format!("/api/mantenimiento/{}", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 204);
 
     // Verify deleted
     let req = test::TestRequest::get()
-        .uri(&format!("/api/mantenimiento/{}", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 404);
@@ -253,7 +253,7 @@ async fn test_state_machine_flow() {
     // Create solicitud
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "propiedadId": propiedad_id,
             "titulo": "Pintar paredes"
@@ -268,8 +268,8 @@ async fn test_state_machine_flow() {
 
     // Transition to en_progreso
     let req = test::TestRequest::put()
-        .uri(&format!("/api/mantenimiento/{}/estado", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}/estado"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({ "estado": "en_progreso" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -280,8 +280,8 @@ async fn test_state_machine_flow() {
 
     // Transition to completado
     let req = test::TestRequest::put()
-        .uri(&format!("/api/mantenimiento/{}/estado", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}/estado"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({ "estado": "completado" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -306,7 +306,7 @@ async fn test_invalid_state_transitions() {
     // Create solicitud (pendiente)
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "propiedadId": propiedad_id,
             "titulo": "Test transiciones"
@@ -318,8 +318,8 @@ async fn test_invalid_state_transitions() {
 
     // pendiente → completado (invalid, must go through en_progreso)
     let req = test::TestRequest::put()
-        .uri(&format!("/api/mantenimiento/{}/estado", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}/estado"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({ "estado": "completado" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -327,8 +327,8 @@ async fn test_invalid_state_transitions() {
 
     // Move to en_progreso first
     let req = test::TestRequest::put()
-        .uri(&format!("/api/mantenimiento/{}/estado", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}/estado"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({ "estado": "en_progreso" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -336,8 +336,8 @@ async fn test_invalid_state_transitions() {
 
     // en_progreso → pendiente (invalid)
     let req = test::TestRequest::put()
-        .uri(&format!("/api/mantenimiento/{}/estado", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}/estado"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({ "estado": "pendiente" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -345,8 +345,8 @@ async fn test_invalid_state_transitions() {
 
     // Move to completado
     let req = test::TestRequest::put()
-        .uri(&format!("/api/mantenimiento/{}/estado", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}/estado"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({ "estado": "completado" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -354,8 +354,8 @@ async fn test_invalid_state_transitions() {
 
     // completado → en_progreso (invalid)
     let req = test::TestRequest::put()
-        .uri(&format!("/api/mantenimiento/{}/estado", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}/estado"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({ "estado": "en_progreso" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -363,8 +363,8 @@ async fn test_invalid_state_transitions() {
 
     // completado → pendiente (invalid)
     let req = test::TestRequest::put()
-        .uri(&format!("/api/mantenimiento/{}/estado", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}/estado"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({ "estado": "pendiente" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -386,7 +386,7 @@ async fn test_notes_add_and_list() {
     // Create solicitud
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "propiedadId": propiedad_id,
             "titulo": "Test notas"
@@ -398,8 +398,8 @@ async fn test_notes_add_and_list() {
 
     // Add first note
     let req = test::TestRequest::post()
-        .uri(&format!("/api/mantenimiento/{}/notas", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}/notas"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({ "contenido": "Primera nota" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -410,8 +410,8 @@ async fn test_notes_add_and_list() {
 
     // Add second note
     let req = test::TestRequest::post()
-        .uri(&format!("/api/mantenimiento/{}/notas", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}/notas"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({ "contenido": "Segunda nota" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -419,8 +419,8 @@ async fn test_notes_add_and_list() {
 
     // Get solicitud detail — should include notes ordered by created_at DESC
     let req = test::TestRequest::get()
-        .uri(&format!("/api/mantenimiento/{}", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 200);
@@ -447,7 +447,7 @@ async fn test_filters() {
     // Create solicitud with alta priority on propiedad 1
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "propiedadId": propiedad_id,
             "titulo": "Filtro test 1",
@@ -461,7 +461,7 @@ async fn test_filters() {
     // Create solicitud with baja priority on propiedad 2
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "propiedadId": propiedad_id2,
             "titulo": "Filtro test 2",
@@ -474,8 +474,8 @@ async fn test_filters() {
 
     // Move id1 to en_progreso
     let req = test::TestRequest::put()
-        .uri(&format!("/api/mantenimiento/{}/estado", id1))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{id1}/estado"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({ "estado": "en_progreso" }))
         .to_request();
     let _ = test::call_service(&app, req).await;
@@ -483,7 +483,7 @@ async fn test_filters() {
     // Filter by estado=en_progreso
     let req = test::TestRequest::get()
         .uri("/api/mantenimiento?estado=en_progreso")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     let resp = test::call_service(&app, req).await;
     let body: Value = test::read_body_json(resp).await;
@@ -494,7 +494,7 @@ async fn test_filters() {
     // Filter by prioridad=baja
     let req = test::TestRequest::get()
         .uri("/api/mantenimiento?prioridad=baja")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     let resp = test::call_service(&app, req).await;
     let body: Value = test::read_body_json(resp).await;
@@ -504,8 +504,8 @@ async fn test_filters() {
 
     // Filter by propiedad_id
     let req = test::TestRequest::get()
-        .uri(&format!("/api/mantenimiento?propiedadId={}", propiedad_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento?propiedadId={propiedad_id}"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     let resp = test::call_service(&app, req).await;
     let body: Value = test::read_body_json(resp).await;
@@ -534,7 +534,7 @@ async fn test_access_control() {
     // Visualizador can list (Claims only)
     let req = test::TestRequest::get()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", viewer_token)))
+        .insert_header(("Authorization", format!("Bearer {viewer_token}")))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 200);
@@ -542,7 +542,7 @@ async fn test_access_control() {
     // Visualizador cannot create (WriteAccess required)
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", viewer_token)))
+        .insert_header(("Authorization", format!("Bearer {viewer_token}")))
         .set_json(json!({
             "propiedadId": propiedad_id,
             "titulo": "No debería crearse"
@@ -554,7 +554,7 @@ async fn test_access_control() {
     // Gerente can create (WriteAccess)
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", gerente_token)))
+        .insert_header(("Authorization", format!("Bearer {gerente_token}")))
         .set_json(json!({
             "propiedadId": propiedad_id,
             "titulo": "Creada por gerente"
@@ -567,8 +567,8 @@ async fn test_access_control() {
 
     // Visualizador cannot update (WriteAccess required)
     let req = test::TestRequest::put()
-        .uri(&format!("/api/mantenimiento/{}", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", viewer_token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}"))
+        .insert_header(("Authorization", format!("Bearer {viewer_token}")))
         .set_json(json!({ "titulo": "Modificada" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -576,8 +576,8 @@ async fn test_access_control() {
 
     // Visualizador cannot cambiar_estado (WriteAccess required)
     let req = test::TestRequest::put()
-        .uri(&format!("/api/mantenimiento/{}/estado", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", viewer_token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}/estado"))
+        .insert_header(("Authorization", format!("Bearer {viewer_token}")))
         .set_json(json!({ "estado": "en_progreso" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -585,8 +585,8 @@ async fn test_access_control() {
 
     // Visualizador cannot agregar_nota (WriteAccess required)
     let req = test::TestRequest::post()
-        .uri(&format!("/api/mantenimiento/{}/notas", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", viewer_token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}/notas"))
+        .insert_header(("Authorization", format!("Bearer {viewer_token}")))
         .set_json(json!({ "contenido": "No debería crearse" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -594,24 +594,24 @@ async fn test_access_control() {
 
     // Gerente cannot delete (AdminOnly required)
     let req = test::TestRequest::delete()
-        .uri(&format!("/api/mantenimiento/{}", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", gerente_token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}"))
+        .insert_header(("Authorization", format!("Bearer {gerente_token}")))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 403);
 
     // Visualizador cannot delete (AdminOnly required)
     let req = test::TestRequest::delete()
-        .uri(&format!("/api/mantenimiento/{}", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", viewer_token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}"))
+        .insert_header(("Authorization", format!("Bearer {viewer_token}")))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 403);
 
     // Admin can delete
     let req = test::TestRequest::delete()
-        .uri(&format!("/api/mantenimiento/{}", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", admin_token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}"))
+        .insert_header(("Authorization", format!("Bearer {admin_token}")))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 204);
@@ -632,7 +632,7 @@ async fn test_fk_validations() {
     // Non-existent propiedad_id → 404
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "propiedadId": Uuid::new_v4(),
             "titulo": "Propiedad inexistente"
@@ -644,7 +644,7 @@ async fn test_fk_validations() {
     // Non-existent inquilino_id → 404
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "propiedadId": propiedad_id,
             "titulo": "Inquilino inexistente",
@@ -657,7 +657,7 @@ async fn test_fk_validations() {
     // Unidad not belonging to propiedad → 422
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "propiedadId": propiedad_id,
             "titulo": "Unidad no pertenece",
@@ -683,7 +683,7 @@ async fn test_validations() {
     // Empty titulo → 422
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "propiedadId": propiedad_id,
             "titulo": ""
@@ -695,7 +695,7 @@ async fn test_validations() {
     // Invalid prioridad → 422
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "propiedadId": propiedad_id,
             "titulo": "Test prioridad",
@@ -708,7 +708,7 @@ async fn test_validations() {
     // Invalid moneda → 422
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "propiedadId": propiedad_id,
             "titulo": "Test moneda",
@@ -722,7 +722,7 @@ async fn test_validations() {
     // Negative costo_monto → 422
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "propiedadId": propiedad_id,
             "titulo": "Test monto negativo",
@@ -737,7 +737,7 @@ async fn test_validations() {
     // First create a solicitud to add a note to
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "propiedadId": propiedad_id,
             "titulo": "Para nota vacía"
@@ -748,8 +748,8 @@ async fn test_validations() {
     let solicitud_id = body["id"].as_str().unwrap().to_string();
 
     let req = test::TestRequest::post()
-        .uri(&format!("/api/mantenimiento/{}/notas", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}/notas"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({ "contenido": "" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -757,8 +757,8 @@ async fn test_validations() {
 
     // Whitespace-only note contenido → 422
     let req = test::TestRequest::post()
-        .uri(&format!("/api/mantenimiento/{}/notas", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}/notas"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({ "contenido": "   " }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -780,7 +780,7 @@ async fn test_auditoria_entries() {
     // Create solicitud
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "propiedadId": propiedad_id,
             "titulo": "Auditoría test"
@@ -795,10 +795,9 @@ async fn test_auditoria_entries() {
     // Check audit entry for create
     let req = test::TestRequest::get()
         .uri(&format!(
-            "/api/auditoria?entity_type=solicitud_mantenimiento&entity_id={}",
-            solicitud_id
+            "/api/auditoria?entity_type=solicitud_mantenimiento&entity_id={solicitud_id}"
         ))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 200);
@@ -808,8 +807,8 @@ async fn test_auditoria_entries() {
 
     // Update solicitud
     let req = test::TestRequest::put()
-        .uri(&format!("/api/mantenimiento/{}", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({ "titulo": "Auditoría test actualizado" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -817,8 +816,8 @@ async fn test_auditoria_entries() {
 
     // Cambiar estado
     let req = test::TestRequest::put()
-        .uri(&format!("/api/mantenimiento/{}/estado", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}/estado"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({ "estado": "en_progreso" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -826,8 +825,8 @@ async fn test_auditoria_entries() {
 
     // Add note
     let req = test::TestRequest::post()
-        .uri(&format!("/api/mantenimiento/{}/notas", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}/notas"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({ "contenido": "Nota de auditoría" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -836,10 +835,9 @@ async fn test_auditoria_entries() {
     // Check all audit entries exist
     let req = test::TestRequest::get()
         .uri(&format!(
-            "/api/auditoria?entity_type=solicitud_mantenimiento&entity_id={}",
-            solicitud_id
+            "/api/auditoria?entity_type=solicitud_mantenimiento&entity_id={solicitud_id}"
         ))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     let resp = test::call_service(&app, req).await;
     let body: Value = test::read_body_json(resp).await;
@@ -850,18 +848,17 @@ async fn test_auditoria_entries() {
 
     // Delete and check audit
     let req = test::TestRequest::delete()
-        .uri(&format!("/api/mantenimiento/{}", solicitud_id))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .uri(&format!("/api/mantenimiento/{solicitud_id}"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 204);
 
     let req = test::TestRequest::get()
         .uri(&format!(
-            "/api/auditoria?entity_type=solicitud_mantenimiento&entity_id={}",
-            solicitud_id
+            "/api/auditoria?entity_type=solicitud_mantenimiento&entity_id={solicitud_id}"
         ))
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     let resp = test::call_service(&app, req).await;
     let body: Value = test::read_body_json(resp).await;
@@ -884,7 +881,7 @@ async fn test_default_prioridad() {
     // Create without specifying prioridad → defaults to "media"
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "propiedadId": propiedad_id,
             "titulo": "Sin prioridad"

@@ -55,7 +55,7 @@ mod contratos_lifecycle_tests {
         .await;
 
         let req = test::TestRequest::post()
-            .uri(&format!("/api/contratos/{}/renovar", id))
+            .uri(&format!("/api/contratos/{id}/renovar"))
             .set_json(serde_json::json!({"fechaFin":"2026-12-31","montoMensual":"25000"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
@@ -73,8 +73,8 @@ mod contratos_lifecycle_tests {
 
         let token = make_token("visualizador");
         let req = test::TestRequest::post()
-            .uri(&format!("/api/contratos/{}/renovar", id))
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .uri(&format!("/api/contratos/{id}/renovar"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({"fechaFin":"2026-12-31","montoMensual":"25000"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
@@ -92,8 +92,8 @@ mod contratos_lifecycle_tests {
 
         let token = make_token("admin");
         let req = test::TestRequest::post()
-            .uri(&format!("/api/contratos/{}/renovar", id))
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .uri(&format!("/api/contratos/{id}/renovar"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({"fechaFin":"2026-12-31","montoMensual":"25000"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
@@ -111,8 +111,8 @@ mod contratos_lifecycle_tests {
 
         let token = make_token("gerente");
         let req = test::TestRequest::post()
-            .uri(&format!("/api/contratos/{}/renovar", id))
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .uri(&format!("/api/contratos/{id}/renovar"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({"fechaFin":"2026-12-31","montoMensual":"25000"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
@@ -131,7 +131,7 @@ mod contratos_lifecycle_tests {
         .await;
 
         let req = test::TestRequest::post()
-            .uri(&format!("/api/contratos/{}/terminar", id))
+            .uri(&format!("/api/contratos/{id}/terminar"))
             .set_json(serde_json::json!({"fechaTerminacion":"2025-06-15"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
@@ -149,8 +149,8 @@ mod contratos_lifecycle_tests {
 
         let token = make_token("visualizador");
         let req = test::TestRequest::post()
-            .uri(&format!("/api/contratos/{}/terminar", id))
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .uri(&format!("/api/contratos/{id}/terminar"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({"fechaTerminacion":"2025-06-15"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
@@ -168,8 +168,8 @@ mod contratos_lifecycle_tests {
 
         let token = make_token("admin");
         let req = test::TestRequest::post()
-            .uri(&format!("/api/contratos/{}/terminar", id))
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .uri(&format!("/api/contratos/{id}/terminar"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({"fechaTerminacion":"2025-06-15"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
@@ -187,8 +187,8 @@ mod contratos_lifecycle_tests {
 
         let token = make_token("gerente");
         let req = test::TestRequest::post()
-            .uri(&format!("/api/contratos/{}/terminar", id))
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .uri(&format!("/api/contratos/{id}/terminar"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({"fechaTerminacion":"2025-06-15"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
@@ -225,7 +225,7 @@ mod contratos_lifecycle_tests {
         let token = make_token("visualizador");
         let req = test::TestRequest::get()
             .uri("/api/contratos/por-vencer")
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
@@ -243,7 +243,7 @@ mod contratos_lifecycle_tests {
         let token = make_token("admin");
         let req = test::TestRequest::get()
             .uri("/api/contratos/por-vencer")
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
@@ -261,7 +261,7 @@ mod contratos_lifecycle_tests {
         let token = make_token("gerente");
         let req = test::TestRequest::get()
             .uri("/api/contratos/por-vencer")
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);

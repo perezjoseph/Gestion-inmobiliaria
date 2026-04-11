@@ -27,6 +27,8 @@ MAX_RETRIES = 3
 KIRO_TIMEOUT = 3600
 TRUSTED_TOOLS = "fs_read,fs_write,execute_bash,grep,glob,code,introspect,session,use_subagent,web_fetch,web_search"
 
+_fix_lock = threading.Lock()
+
 
 def get_local_ip():
     try:
@@ -69,8 +71,15 @@ def run_kiro(prompt, label):
         stderr = stderr or ""
     except subprocess.TimeoutExpired:
         proc.kill()
-        proc.communicate()
+        try:
+            proc.communicate(timeout=10)
+        except Exception:
+            pass
         print(f"  ⚠ kiro-cli timed out after {KIRO_TIMEOUT // 60} minutes")
+        return False
+    except Exception as e:
+        proc.kill()
+        print(f"  ⚠ kiro-cli process error: {e}")
         return False
 
     print(f"  kiro-cli exit code: {proc.returncode}")
@@ -87,42 +96,57 @@ def run_kiro(prompt, label):
         print(f"  ⚠ Tool denied in non-interactive mode")
         return False
 
+    if proc.returncode != 0 and proc.returncode != 1:
+        print(f"  ⚠ kiro-cli exited with unexpected code {proc.returncode}")
+        return False
+
     return True
 
 
 def fix_with_retry(job, step, error_log):
-    for attempt in range(1, MAX_RETRIES + 1):
-        print(f"\n  === Attempt {attempt}/{MAX_RETRIES} for {job}/{step} ===")
+    if job == "commit-lint":
+        print(f"  ⏭ Skipping commit-lint — cannot auto-fix commit messages")
+        return False
 
-        prompt_parts = [
-            f"The CI pipeline FAILED in job '{job}', step '{step}'.",
-            f"Error output:\n{error_log}\n",
-        ]
+    if not _fix_lock.acquire(blocking=False):
+        print(f"  ⏭ Another fix is already running — skipping {job}/{step}")
+        return False
 
-        job_instructions = {
-            "lint": "Fix the formatting and clippy warnings.",
-            "test-backend": "Fix the failing backend tests.",
-            "test-frontend": "Fix the failing frontend tests.",
-            "quality-gate": "Fix the quality gate failures (dependency audit, unused deps, or OWASP issues).",
-            "commit-lint": "The commit message format is wrong. This cannot be auto-fixed.",
-            "sonarqube": "Fix the SonarQube analysis failures.",
-        }
-        prompt_parts.append(job_instructions.get(job, "Analyze the error and fix the issue."))
+    try:
+        for attempt in range(1, MAX_RETRIES + 1):
+            print(f"\n  === Attempt {attempt}/{MAX_RETRIES} for {job}/{step} ===")
 
-        prompt_parts.append(
-            "After fixing, verify with cargo fmt --all, cargo clippy --workspace -- -D warnings, "
-            "and cargo test --workspace. Then commit and push: "
-            "git add -A && git commit -m 'fix: resolve CI failures (auto-fix)' && git push origin main"
-        )
+            prompt_parts = [
+                f"The CI pipeline FAILED in job '{job}', step '{step}'.",
+                f"Error output:\n{error_log}\n",
+            ]
 
-        if run_kiro(" ".join(prompt_parts), f"CI fix ({job}/{step}) attempt {attempt}"):
-            print(f"  ✓ Attempt {attempt} completed")
-            return True
+            job_instructions = {
+                "lint": "Fix the formatting and clippy warnings.",
+                "test-backend": "Fix the failing backend tests.",
+                "test-frontend": "Fix the failing frontend tests.",
+                "quality-gate": "Fix the quality gate failures (dependency audit, unused deps, or OWASP issues).",
+                "sonarqube": "Fix the SonarQube analysis failures.",
+            }
+            prompt_parts.append(job_instructions.get(job, "Analyze the error and fix the issue."))
 
-        print(f"  ✗ Attempt {attempt} failed")
+            prompt_parts.append(
+                "After fixing, verify with cargo fmt --all, cargo clippy --workspace -- -D warnings, "
+                "and cargo test --workspace. Then commit and push: "
+                "git add -A && git commit -m 'fix: resolve CI failures (auto-fix)' && git push origin main. "
+                "If push fails due to remote changes, run git pull --rebase origin main first then push again."
+            )
 
-    print(f"  ✗ Failed after {MAX_RETRIES} attempts. Manual intervention needed.")
-    return False
+            if run_kiro(" ".join(prompt_parts), f"CI fix ({job}/{step}) attempt {attempt}"):
+                print(f"  ✓ Attempt {attempt} completed")
+                return True
+
+            print(f"  ✗ Attempt {attempt} failed")
+
+        print(f"  ✗ Failed after {MAX_RETRIES} attempts. Manual intervention needed.")
+        return False
+    finally:
+        _fix_lock.release()
 
 
 class WebhookHandler(BaseHTTPRequestHandler):
