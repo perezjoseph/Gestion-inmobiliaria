@@ -52,6 +52,7 @@ jobs:
     runs-on: [self-hosted, linux]
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
+      failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -74,31 +75,46 @@ jobs:
 
       - name: Verify rustfmt formatting across all crates
         id: fmt
+        if: always()
         run: cargo fmt --all -- --check 2>&1 | tee /tmp/fmt-output.txt
 
       - name: Run clippy lints on backend (warnings as errors)
         id: clippy_backend
+        if: always()
         run: cargo clippy -p realestate-backend -- -D warnings 2>&1 | tee /tmp/clippy-backend-output.txt
 
       - name: Run clippy lints on frontend WASM target (warnings as errors)
         id: clippy_frontend
+        if: always()
         run: cargo clippy -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings 2>&1 | tee /tmp/clippy-frontend-output.txt
 
       - name: Collect lint errors for notification
         id: collect-errors
-        if: failure()
+        if: always() && (steps.fmt.outcome == 'failure' || steps.clippy_backend.outcome == 'failure' || steps.clippy_frontend.outcome == 'failure')
         run: |
           ERROR=""
-          [ -f /tmp/fmt-output.txt ] && ERROR="${ERROR}$(head -c 1500 /tmp/fmt-output.txt)"
-          [ -f /tmp/clippy-backend-output.txt ] && ERROR="${ERROR}$(head -c 1500 /tmp/clippy-backend-output.txt)"
-          [ -f /tmp/clippy-frontend-output.txt ] && ERROR="${ERROR}$(head -c 1000 /tmp/clippy-frontend-output.txt)"
-          if [ -z "$ERROR" ]; then
-            ERROR="Lint job failed but no captured output. Run cargo fmt --all -- --check and cargo clippy --workspace -- -D warnings to reproduce."
+          FAILED=""
+          if [ "${{ steps.fmt.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}fmt-check,"
+            ERROR="${ERROR}[fmt-check] $(head -c 1500 /tmp/fmt-output.txt 2>/dev/null || echo 'cargo fmt found formatting issues.')\n\n"
+          fi
+          if [ "${{ steps.clippy_backend.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}clippy-backend,"
+            ERROR="${ERROR}[clippy-backend] $(head -c 1500 /tmp/clippy-backend-output.txt 2>/dev/null || echo 'Backend clippy failed.')\n\n"
+          fi
+          if [ "${{ steps.clippy_frontend.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}clippy-frontend,"
+            ERROR="${ERROR}[clippy-frontend] $(head -c 1000 /tmp/clippy-frontend-output.txt 2>/dev/null || echo 'Frontend clippy failed.')\n\n"
           fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT
-          echo "$ERROR" >> $GITHUB_OUTPUT
+          printf "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Fail job if any lint step failed
+        if: always() && (steps.fmt.outcome == 'failure' || steps.clippy_backend.outcome == 'failure' || steps.clippy_frontend.outcome == 'failure')
+        run: exit 1
 
   test-backend:
     name: Backend Unit & Integration Tests
@@ -199,6 +215,7 @@ jobs:
     runs-on: [self-hosted, linux]
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
+      failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
     steps:
       - name: Checkout repository for dependency scanning
         uses: actions/checkout@v4
@@ -207,17 +224,24 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-audit for CVE scanning
-        run: cargo install cargo-audit --locked || true
+        id: install_audit
+        run: cargo install cargo-audit --locked 2>&1 | tee /tmp/install-audit-output.txt
 
       - name: Scan Rust dependencies for known vulnerabilities (CVEs)
+        id: cargo_audit
+        if: always() && steps.install_audit.outcome == 'success'
         run: cargo audit 2>&1 | tee /tmp/audit-output.txt
 
       - name: Check for unused dependencies in Cargo.toml
+        id: cargo_udeps
+        if: always()
         run: |
           cargo install cargo-udeps --locked || true
           cargo +nightly udeps --all-targets 2>&1 | tee /tmp/udeps-output.txt || echo "cargo-udeps requires nightly, skipping if unavailable"
 
       - name: OWASP dependency scan (fail on CVSS >= 7)
+        id: owasp
+        if: always()
         uses: dependency-check/Dependency-Check_Action@main
         with:
           project: realestate
@@ -237,18 +261,38 @@ jobs:
 
       - name: Collect quality-gate errors for notification
         id: collect-errors
-        if: failure()
+        if: always() && (steps.install_audit.outcome == 'failure' || steps.cargo_audit.outcome == 'failure' || steps.cargo_udeps.outcome == 'failure' || steps.owasp.outcome == 'failure')
         run: |
           ERROR=""
-          [ -f /tmp/audit-output.txt ] && ERROR="${ERROR}$(head -c 2000 /tmp/audit-output.txt)"
-          [ -f /tmp/udeps-output.txt ] && ERROR="${ERROR}$(head -c 1000 /tmp/udeps-output.txt)"
-          if [ -z "$ERROR" ]; then
-            ERROR="Quality gate failed but no captured output. Run cargo audit and check OWASP scan to reproduce."
+          FAILED=""
+          if [ "${{ steps.install_audit.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}install-cargo-audit,"
+            ERROR="${ERROR}[install-cargo-audit] $(head -c 1500 /tmp/install-audit-output.txt 2>/dev/null || echo 'Failed to install cargo-audit.')\n\n"
+          fi
+          if [ "${{ steps.cargo_audit.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}cargo-audit,"
+            ERROR="${ERROR}[cargo-audit] $(head -c 2000 /tmp/audit-output.txt 2>/dev/null || echo 'cargo audit found vulnerabilities.')\n\n"
+          elif [ "${{ steps.cargo_audit.outcome }}" = "skipped" ]; then
+            FAILED="${FAILED}cargo-audit,"
+            ERROR="${ERROR}[cargo-audit] Skipped because cargo-audit installation failed.\n\n"
+          fi
+          if [ "${{ steps.cargo_udeps.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}cargo-udeps,"
+            ERROR="${ERROR}[cargo-udeps] $(head -c 1000 /tmp/udeps-output.txt 2>/dev/null || echo 'Unused dependency check failed.')\n\n"
+          fi
+          if [ "${{ steps.owasp.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}owasp-scan,"
+            ERROR="${ERROR}[owasp-scan] OWASP dependency check failed with CVSS >= 7. See uploaded report artifact for details.\n\n"
           fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT
-          echo "$ERROR" >> $GITHUB_OUTPUT
+          printf "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Fail job if any quality step failed
+        if: always() && (steps.install_audit.outcome == 'failure' || steps.cargo_audit.outcome == 'failure' || steps.cargo_udeps.outcome == 'failure' || steps.owasp.outcome == 'failure')
+        run: exit 1
 
   sonarqube:
     name: SonarQube Code Quality & Coverage Analysis
@@ -394,10 +438,12 @@ jobs:
         if: always() && needs.lint.result == 'failure'
         run: |
           ERROR_LOG="${{ needs.lint.outputs.error_log }}"
+          FAILED_STEPS="${{ needs.lint.outputs.failed_steps }}"
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Lint job failed but no captured output. Run cargo fmt --all -- --check and cargo clippy --workspace -- -D warnings to reproduce."
           fi
-          PAYLOAD=$(jq -n --arg job "lint" --arg step "clippy-or-fmt" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+          STEP="${FAILED_STEPS:-clippy-or-fmt}"
+          PAYLOAD=$(jq -n --arg job "lint" --arg step "$STEP" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
@@ -433,10 +479,12 @@ jobs:
         if: always() && needs.quality-gate.result == 'failure'
         run: |
           ERROR_LOG="${{ needs.quality-gate.outputs.error_log }}"
+          FAILED_STEPS="${{ needs.quality-gate.outputs.failed_steps }}"
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Quality gate failed but no captured output. Run cargo audit and check OWASP scan to reproduce."
           fi
-          PAYLOAD=$(jq -n --arg job "quality-gate" --arg step "audit-or-owasp" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+          STEP="${FAILED_STEPS:-audit-or-owasp}"
+          PAYLOAD=$(jq -n --arg job "quality-gate" --arg step "$STEP" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
