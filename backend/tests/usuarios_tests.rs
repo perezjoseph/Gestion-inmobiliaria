@@ -78,7 +78,7 @@ mod usuarios_handler_tests {
         let token = make_token("visualizador");
         let req = test::TestRequest::get()
             .uri("/api/usuarios")
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
@@ -96,7 +96,7 @@ mod usuarios_handler_tests {
         let token = make_token("gerente");
         let req = test::TestRequest::get()
             .uri("/api/usuarios")
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
@@ -114,7 +114,7 @@ mod usuarios_handler_tests {
         let token = make_token("admin");
         let req = test::TestRequest::get()
             .uri("/api/usuarios")
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
@@ -132,7 +132,7 @@ mod usuarios_handler_tests {
         .await;
 
         let req = test::TestRequest::put()
-            .uri(&format!("/api/usuarios/{}/rol", id))
+            .uri(&format!("/api/usuarios/{id}/rol"))
             .set_json(serde_json::json!({"nuevoRol": "gerente"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
@@ -150,8 +150,8 @@ mod usuarios_handler_tests {
 
         let token = make_token("visualizador");
         let req = test::TestRequest::put()
-            .uri(&format!("/api/usuarios/{}/rol", id))
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .uri(&format!("/api/usuarios/{id}/rol"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({"nuevoRol": "gerente"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
@@ -169,8 +169,8 @@ mod usuarios_handler_tests {
 
         let token = make_token("gerente");
         let req = test::TestRequest::put()
-            .uri(&format!("/api/usuarios/{}/rol", id))
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .uri(&format!("/api/usuarios/{id}/rol"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({"nuevoRol": "gerente"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
@@ -188,8 +188,8 @@ mod usuarios_handler_tests {
 
         let token = make_token("admin");
         let req = test::TestRequest::put()
-            .uri(&format!("/api/usuarios/{}/rol", id))
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .uri(&format!("/api/usuarios/{id}/rol"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({"nuevoRol": "gerente"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
@@ -208,7 +208,7 @@ mod usuarios_handler_tests {
         .await;
 
         let req = test::TestRequest::put()
-            .uri(&format!("/api/usuarios/{}/activar", id))
+            .uri(&format!("/api/usuarios/{id}/activar"))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
@@ -225,8 +225,8 @@ mod usuarios_handler_tests {
 
         let token = make_token("visualizador");
         let req = test::TestRequest::put()
-            .uri(&format!("/api/usuarios/{}/activar", id))
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .uri(&format!("/api/usuarios/{id}/activar"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
@@ -243,8 +243,8 @@ mod usuarios_handler_tests {
 
         let token = make_token("gerente");
         let req = test::TestRequest::put()
-            .uri(&format!("/api/usuarios/{}/activar", id))
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .uri(&format!("/api/usuarios/{id}/activar"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
@@ -261,8 +261,8 @@ mod usuarios_handler_tests {
 
         let token = make_token("admin");
         let req = test::TestRequest::put()
-            .uri(&format!("/api/usuarios/{}/activar", id))
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .uri(&format!("/api/usuarios/{id}/activar"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
@@ -280,7 +280,7 @@ mod usuarios_handler_tests {
         .await;
 
         let req = test::TestRequest::put()
-            .uri(&format!("/api/usuarios/{}/desactivar", id))
+            .uri(&format!("/api/usuarios/{id}/desactivar"))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
@@ -297,8 +297,8 @@ mod usuarios_handler_tests {
 
         let token = make_token("visualizador");
         let req = test::TestRequest::put()
-            .uri(&format!("/api/usuarios/{}/desactivar", id))
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .uri(&format!("/api/usuarios/{id}/desactivar"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
@@ -315,8 +315,8 @@ mod usuarios_handler_tests {
 
         let token = make_token("gerente");
         let req = test::TestRequest::put()
-            .uri(&format!("/api/usuarios/{}/desactivar", id))
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .uri(&format!("/api/usuarios/{id}/desactivar"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
@@ -333,8 +333,8 @@ mod usuarios_handler_tests {
 
         let token = make_token("admin");
         let req = test::TestRequest::put()
-            .uri(&format!("/api/usuarios/{}/desactivar", id))
-            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .uri(&format!("/api/usuarios/{id}/desactivar"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);

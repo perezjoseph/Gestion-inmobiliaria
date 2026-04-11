@@ -148,9 +148,7 @@ mod tests {
     use super::*;
 
     fn install_crypto_provider() {
-        let _ = jsonwebtoken::crypto::CryptoProvider::install_default(
-            jsonwebtoken::crypto::rust_crypto::DEFAULT_PROVIDER,
-        );
+        let _ = jsonwebtoken::crypto::rust_crypto::DEFAULT_PROVIDER.install_default();
     }
 
     #[test]
