@@ -55,6 +55,8 @@ jobs:
   lint:
     name: Code Formatting & Static Analysis
     runs-on: [self-hosted, linux]
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -79,25 +81,29 @@ jobs:
         id: fmt
         run: cargo fmt --all -- --check 2>&1 | tee /tmp/fmt-output.txt
 
-      - name: Capture rustfmt output for failure notification
-        if: failure()
-        run: echo "FMT_OUTPUT<<GHEOF" >> $GITHUB_ENV && head -c 3000 /tmp/fmt-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
-
       - name: Run clippy lints on backend (warnings as errors)
         id: clippy_backend
         run: cargo clippy -p realestate-backend -- -D warnings 2>&1 | tee /tmp/clippy-backend-output.txt
-
-      - name: Capture backend clippy output for failure notification
-        if: failure()
-        run: echo "CLIPPY_BACKEND_OUTPUT<<GHEOF" >> $GITHUB_ENV && head -c 3000 /tmp/clippy-backend-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
 
       - name: Run clippy lints on frontend WASM target (warnings as errors)
         id: clippy_frontend
         run: cargo clippy -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings 2>&1 | tee /tmp/clippy-frontend-output.txt
 
-      - name: Capture frontend clippy output for failure notification
+      - name: Collect lint errors for notification
+        id: collect-errors
         if: failure()
-        run: echo "CLIPPY_FRONTEND_OUTPUT<<GHEOF" >> $GITHUB_ENV && head -c 3000 /tmp/clippy-frontend-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
+        run: |
+          ERROR=""
+          [ -f /tmp/fmt-output.txt ] && ERROR="${ERROR}$(head -c 1500 /tmp/fmt-output.txt)"
+          [ -f /tmp/clippy-backend-output.txt ] && ERROR="${ERROR}$(head -c 1500 /tmp/clippy-backend-output.txt)"
+          [ -f /tmp/clippy-frontend-output.txt ] && ERROR="${ERROR}$(head -c 1000 /tmp/clippy-frontend-output.txt)"
+          if [ -z "$ERROR" ]; then
+            ERROR="Lint job failed but no captured output. Run cargo fmt --all -- --check and cargo clippy --workspace -- -D warnings to reproduce."
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
 
       - name: Abort pipeline on lint failure
         if: failure()
@@ -106,6 +112,8 @@ jobs:
   test-backend:
     name: Backend Unit & Integration Tests
     runs-on: [self-hosted, linux, docker]
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
     services:
       postgres:
         image: postgres:16
@@ -140,9 +148,19 @@ jobs:
       - name: Run backend unit and integration tests against PostgreSQL
         run: cargo test -p realestate-backend --all-targets 2>&1 | tee /tmp/test-backend-output.txt
 
-      - name: Capture backend test output for failure notification
+      - name: Collect backend test errors for notification
+        id: collect-errors
         if: failure()
-        run: echo "TEST_BACKEND_OUTPUT<<GHEOF" >> $GITHUB_ENV && tail -c 3000 /tmp/test-backend-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
+        run: |
+          ERROR=""
+          [ -f /tmp/test-backend-output.txt ] && ERROR="$(tail -c 3000 /tmp/test-backend-output.txt)"
+          if [ -z "$ERROR" ]; then
+            ERROR="Backend tests failed but no captured output. Run cargo test -p realestate-backend --all-targets to reproduce."
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
 
       - name: Abort pipeline on backend test failure
         if: failure()
@@ -151,6 +169,8 @@ jobs:
   test-frontend:
     name: Frontend WASM Compilation & Tests
     runs-on: [self-hosted, linux]
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -173,9 +193,19 @@ jobs:
       - name: Run frontend tests (native target)
         run: cargo test -p realestate-frontend --all-targets 2>&1 | tee /tmp/test-frontend-output.txt
 
-      - name: Capture frontend test output for failure notification
+      - name: Collect frontend test errors for notification
+        id: collect-errors
         if: failure()
-        run: echo "TEST_FRONTEND_OUTPUT<<GHEOF" >> $GITHUB_ENV && tail -c 3000 /tmp/test-frontend-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
+        run: |
+          ERROR=""
+          [ -f /tmp/test-frontend-output.txt ] && ERROR="$(tail -c 3000 /tmp/test-frontend-output.txt)"
+          if [ -z "$ERROR" ]; then
+            ERROR="Frontend tests failed but no captured output. Run cargo test -p realestate-frontend --all-targets to reproduce."
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
 
       - name: Abort pipeline on frontend test failure
         if: failure()
@@ -199,18 +229,10 @@ jobs:
       - name: Scan Rust dependencies for known vulnerabilities (CVEs)
         run: cargo audit 2>&1 | tee /tmp/audit-output.txt
 
-      - name: Capture cargo audit output for failure notification
-        if: failure()
-        run: echo "AUDIT_OUTPUT<<GHEOF" >> $GITHUB_ENV && head -c 3000 /tmp/audit-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
-
       - name: Check for unused dependencies in Cargo.toml
         run: |
           cargo install cargo-udeps --locked || true
           cargo +nightly udeps --all-targets 2>&1 | tee /tmp/udeps-output.txt || echo "cargo-udeps requires nightly, skipping if unavailable"
-
-      - name: Capture cargo-udeps output for failure notification
-        if: failure()
-        run: echo "UDEPS_OUTPUT<<GHEOF" >> $GITHUB_ENV && head -c 3000 /tmp/udeps-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
 
       - name: OWASP dependency scan (fail on CVSS >= 7)
         uses: dependency-check/Dependency-Check_Action@main
@@ -222,10 +244,6 @@ jobs:
             --enableExperimental
             --failOnCVSS 7
 
-      - name: Capture OWASP output for failure notification
-        if: failure()
-        run: echo "OWASP_OUTPUT<<GHEOF" >> $GITHUB_ENV && echo "OWASP dependency check failed with CVSS >= 7. See uploaded report artifact for details." >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
-
       - name: Upload OWASP vulnerability report as artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -233,6 +251,21 @@ jobs:
           name: owasp-dependency-check-report
           path: reports/
           retention-days: 7
+
+      - name: Collect quality-gate errors for notification
+        id: collect-errors
+        if: failure()
+        run: |
+          ERROR=""
+          [ -f /tmp/audit-output.txt ] && ERROR="${ERROR}$(head -c 2000 /tmp/audit-output.txt)"
+          [ -f /tmp/udeps-output.txt ] && ERROR="${ERROR}$(head -c 1000 /tmp/udeps-output.txt)"
+          if [ -z "$ERROR" ]; then
+            ERROR="Quality gate failed but no captured output. Run cargo audit and check OWASP scan to reproduce."
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
 
       - name: Abort pipeline on security gate failure
         if: failure()
@@ -265,6 +298,8 @@ jobs:
   build-frontend:
     name: Frontend WASM Release Build
     runs-on: [self-hosted, linux]
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
     needs: [commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube]
     if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     steps:
@@ -293,16 +328,26 @@ jobs:
         run: trunk build --release 2>&1 | tee /tmp/build-frontend-output.txt
         working-directory: frontend
 
-      - name: Capture frontend build output for failure notification
-        if: failure()
-        run: echo "BUILD_FRONTEND_OUTPUT<<GHEOF" >> $GITHUB_ENV && tail -c 3000 /tmp/build-frontend-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
-
       - name: Upload frontend dist as build artifact (7-day retention)
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
           path: frontend/dist/
           retention-days: 7
+
+      - name: Collect frontend build errors for notification
+        id: collect-errors
+        if: failure()
+        run: |
+          ERROR=""
+          [ -f /tmp/build-frontend-output.txt ] && ERROR="$(tail -c 3000 /tmp/build-frontend-output.txt)"
+          if [ -z "$ERROR" ]; then
+            ERROR="Frontend WASM build failed but no captured output. Run trunk build --release in frontend/ to reproduce."
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
 
       - name: Abort pipeline on build failure
         if: failure()
@@ -311,6 +356,8 @@ jobs:
   build-backend:
     name: Backend Release Build
     runs-on: [self-hosted, linux]
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
     needs: [commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube]
     if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     steps:
@@ -333,16 +380,26 @@ jobs:
       - name: Build optimized backend binary
         run: cargo build -p realestate-backend --release 2>&1 | tee /tmp/build-backend-output.txt
 
-      - name: Capture backend build output for failure notification
-        if: failure()
-        run: echo "BUILD_BACKEND_OUTPUT<<GHEOF" >> $GITHUB_ENV && tail -c 3000 /tmp/build-backend-output.txt >> $GITHUB_ENV && echo "GHEOF" >> $GITHUB_ENV
-
       - name: Upload backend binary as build artifact (7-day retention)
         uses: actions/upload-artifact@v4
         with:
           name: backend-binary
           path: target/release/realestate-backend
           retention-days: 7
+
+      - name: Collect backend build errors for notification
+        id: collect-errors
+        if: failure()
+        run: |
+          ERROR=""
+          [ -f /tmp/build-backend-output.txt ] && ERROR="$(tail -c 3000 /tmp/build-backend-output.txt)"
+          if [ -z "$ERROR" ]; then
+            ERROR="Backend release build failed but no captured output. Run cargo build -p realestate-backend --release to reproduce."
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
 
       - name: Abort pipeline on build failure
         if: failure()
@@ -369,7 +426,7 @@ jobs:
       - name: Notify — code formatting or clippy lint failed
         if: always() && needs.lint.result == 'failure'
         run: |
-          ERROR_LOG="${FMT_OUTPUT:-}${CLIPPY_BACKEND_OUTPUT:-}${CLIPPY_FRONTEND_OUTPUT:-}"
+          ERROR_LOG="${{ needs.lint.outputs.error_log }}"
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Lint job failed but no captured output. Run cargo fmt --all -- --check and cargo clippy --workspace -- -D warnings to reproduce."
           fi
@@ -382,7 +439,10 @@ jobs:
       - name: Notify — backend tests failed
         if: always() && needs.test-backend.result == 'failure'
         run: |
-          ERROR_LOG="${TEST_BACKEND_OUTPUT:-Backend tests failed but no captured output. Run cargo test -p realestate-backend --all-targets to reproduce.}"
+          ERROR_LOG="${{ needs.test-backend.outputs.error_log }}"
+          if [ -z "$ERROR_LOG" ]; then
+            ERROR_LOG="Backend tests failed but no captured output. Run cargo test -p realestate-backend --all-targets to reproduce."
+          fi
           PAYLOAD=$(jq -n --arg job "test-backend" --arg step "cargo-test" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
@@ -392,7 +452,10 @@ jobs:
       - name: Notify — frontend tests failed
         if: always() && needs.test-frontend.result == 'failure'
         run: |
-          ERROR_LOG="${TEST_FRONTEND_OUTPUT:-Frontend tests failed but no captured output. Run cargo test -p realestate-frontend --all-targets to reproduce.}"
+          ERROR_LOG="${{ needs.test-frontend.outputs.error_log }}"
+          if [ -z "$ERROR_LOG" ]; then
+            ERROR_LOG="Frontend tests failed but no captured output. Run cargo test -p realestate-frontend --all-targets to reproduce."
+          fi
           PAYLOAD=$(jq -n --arg job "test-frontend" --arg step "cargo-test" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
@@ -402,9 +465,9 @@ jobs:
       - name: Notify — dependency security gate failed
         if: always() && needs.quality-gate.result == 'failure'
         run: |
-          ERROR_LOG="${AUDIT_OUTPUT:-}${UDEPS_OUTPUT:-}${OWASP_OUTPUT:-}"
+          ERROR_LOG="${{ needs.quality-gate.outputs.error_log }}"
           if [ -z "$ERROR_LOG" ]; then
-            ERROR_LOG="Quality gate failed but no captured output. Run cargo audit, cargo-udeps, or check OWASP dependency scan to reproduce."
+            ERROR_LOG="Quality gate failed but no captured output. Run cargo audit and check OWASP scan to reproduce."
           fi
           PAYLOAD=$(jq -n --arg job "quality-gate" --arg step "audit-or-owasp" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
@@ -415,7 +478,10 @@ jobs:
       - name: Notify — frontend WASM build failed
         if: always() && needs.build-frontend.result == 'failure'
         run: |
-          ERROR_LOG="${BUILD_FRONTEND_OUTPUT:-Frontend WASM build failed but no captured output. Run trunk build --release in frontend/ to reproduce.}"
+          ERROR_LOG="${{ needs.build-frontend.outputs.error_log }}"
+          if [ -z "$ERROR_LOG" ]; then
+            ERROR_LOG="Frontend WASM build failed but no captured output. Run trunk build --release in frontend/ to reproduce."
+          fi
           PAYLOAD=$(jq -n --arg job "build-frontend" --arg step "trunk-build" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
@@ -425,7 +491,10 @@ jobs:
       - name: Notify — backend release build failed
         if: always() && needs.build-backend.result == 'failure'
         run: |
-          ERROR_LOG="${BUILD_BACKEND_OUTPUT:-Backend release build failed but no captured output. Run cargo build -p realestate-backend --release to reproduce.}"
+          ERROR_LOG="${{ needs.build-backend.outputs.error_log }}"
+          if [ -z "$ERROR_LOG" ]; then
+            ERROR_LOG="Backend release build failed but no captured output. Run cargo build -p realestate-backend --release to reproduce."
+          fi
           PAYLOAD=$(jq -n --arg job "build-backend" --arg step "cargo-build" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
