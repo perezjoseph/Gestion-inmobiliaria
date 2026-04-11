@@ -1,0 +1,263 @@
+
+================================================================================
+[2026-04-11 14:10:10] CI fix (lint/fmt-check) attempt 1
+Command: kiro-cli chat --trust-tools=fs_read,fs_write,execute_bash,grep,glob,code,introspect,session,use_subagent,web_fetch,web_search --agent ci-fixer --no-interactive "The CI pipeline FAILED in job '\''lint'\'', step '\''fmt-check'\''. Error output:
+cargo fmt found formatting issues.
+ Fix the formatting an...
+================================================================================
+
+[38;5;11mWARNING: [0mYou have trusted [38;5;10mshell[0m tool, which overrides the toolsSettings: [38;5;141mallowedCommands: ["cargo *","git *","rustfmt *","trunk *","ls *","cat *","echo *","find *","head *","tail *","wc *","sed *","grep *"][0m
+
+[38;5;252m[0m[?25l[38;5;141m> [0m[0m[0m
+[0m[0m
+Let me start by running [38;5;10mcargo fmt[0m to fix formatting, then check for clippy warnings.[0m[0m
+[?25l[0m[0mI will run the following command: [38;5;141mcd /mnt/d/realestate && cargo fmt --all 2>&1[0m[38;5;244m (using tool: shell)[0m
+Purpose: Run cargo fmt to fix all formatting issues
+
+[38;5;244m - Completed in 4.27s[0m
+
+[?25l[0m[38;5;141m> [0mFormatting fixed. Now let's check clippy:[0m[0m
+[?25l[0m[0mI will run the following command: [38;5;141mcd /mnt/d/realestate && cargo clippy --workspace -- -D warnings 2>&1[0m[38;5;244m (using tool: shell)[0m
+Purpose: Run cargo clippy to check for lint warnings
+
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.99s
+[38;5;244m - Completed in 11.122s[0m
+
+[?25l[0m[38;5;141m> [0mNo clippy warnings. Now let's run the tests:[0m[0m
+[?25l[0m[0mI will run the following command: [38;5;141mcd /mnt/d/realestate && cargo test --workspace 2>&1[0m[38;5;244m (using tool: shell)[0m
+Purpose: Run all workspace tests to verify nothing is broken
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 11.88s
+     Running unittests src/lib.rs (target/debug/deps/realestate_backend-29f05ab9948ff4c6)
+
+running 147 tests
+test handlers::inquilinos::tests::search_term_empty_string_filtered_to_none ... ok
+test handlers::inquilinos::tests::search_term_single_char_filtered_to_none ... ok
+test errors::tests::validation_returns_422 ... ok
+test errors::tests::conflict_returns_409 ... ok
+test errors::tests::db_err_converts_to_app_error ... ok
+test errors::tests::unauthorized_returns_401 ... ok
+test handlers::inquilinos::tests::both_none_returns_none ... ok
+test errors::tests::internal_returns_500 ... ok
+test errors::tests::forbidden_returns_403 ... ok
+test handlers::inquilinos::tests::short_fallback_search_filtered_to_none ... ok
+test handlers::inquilinos::tests::falls_back_to_search_when_busqueda_is_none ... ok
+test errors::tests::internal_error_hides_details ... ok
+test handlers::inquilinos::tests::busqueda_takes_precedence_over_search ... ok
+test handlers::inquilinos::tests::search_term_at_least_2_chars_passes ... ok
+test handlers::perfil::tests::actualizar_perfil_request_deserializes_camel_case ... ok
+test handlers::perfil::tests::cambiar_password_request_deserializes_camel_case ... ok
+test handlers::perfil::tests::actualizar_perfil_request_allows_empty_object ... ok
+test handlers::perfil::tests::actualizar_perfil_request_allows_partial_fields ... ok
+test errors::tests::error_response_contains_json_body ... ok
+test middleware::rbac::tests::check_role_admin_has_full_access ... ok
+test middleware::rbac::tests::check_role_allows_matching_role ... ok
+test middleware::rbac::tests::check_role_denies_non_matching_role ... ok
+test middleware::rbac::tests::check_role_gerente_write_access ... ok
+test middleware::rbac::tests::check_role_visualizador_read_only ... ok
+test models::contrato::tests::por_vencer_query_deserializes_with_dias ... ok
+test models::auditoria::tests::auditoria_query_deserializes_empty_filters ... ok
+test models::contrato::tests::por_vencer_query_deserializes_without_dias ... ok
+test models::auditoria::tests::auditoria_query_deserializes_partial_filters ... ok
+test models::auditoria::tests::auditoria_query_deserializes_all_fields ... ok
+test models::auditoria::tests::auditoria_response_serializes_to_camel_case ... ok
+test models::auditoria::tests::auditoria_response_serializes_complex_cambios ... ok
+test models::contrato::tests::terminar_contrato_request_deserializes_camel_case ... ok
+test models::documento::tests::documento_response_serializes_to_camel_case ... ok
+test models::inquilino::tests::search_query_empty_object ... ok
+test models::inquilino::tests::search_query_with_busqueda ... ok
+test models::inquilino::tests::search_query_with_search_field_backward_compat ... ok
+test models::mantenimiento::tests::solicitud_list_query_deserializes_with_filters ... ok
+test config::tests::from_env_with_all_vars ... ok
+test models::mantenimiento::tests::solicitud_response_serializes_camel_case ... ok
+test models::notificacion::tests::pago_vencido_serializes_large_days_overdue ... ok
+test models::notificacion::tests::pago_vencido_serializes_zero_days_overdue ... ok
+test models::notificacion::tests::pago_vencido_serializes_to_camel_case ... ok
+test models::pago::tests::pago_list_query_with_date_range ... ok
+test models::contrato::tests::renovar_contrato_request_deserializes_camel_case ... ok
+test models::mantenimiento::tests::create_solicitud_request_deserializes_camel_case ... ok
+test models::contrato::tests::contrato_response_serializes_to_camel_case ... ok
+test models::pago::tests::pago_list_query_with_only_fecha_desde ... ok
+test models::pago::tests::pago_list_query_with_only_fecha_hasta ... ok
+test models::pago::tests::pago_list_query_without_date_range ... ok
+test models::reporte::tests::historial_pago_entry_serializes_null_fecha_pago ... ok
+test models::reporte::tests::historial_pago_entry_serializes_to_camel_case ... ok
+test models::reporte::tests::historial_pagos_query_deserializes_camel_case ... ok
+test models::reporte::tests::ingreso_report_query_deserializes_camel_case_all_fields ... ok
+test models::reporte::tests::ingreso_report_query_deserializes_partial_fields ... ok
+test models::reporte::tests::ingreso_report_row_serializes_to_camel_case ... ok
+test models::reporte::tests::ingreso_report_summary_serializes_to_camel_case ... ok
+test models::usuario::tests::cambiar_rol_request_deserializes_camel_case ... ok
+test models::usuario::tests::cambiar_rol_request_rejects_missing_field ... ok
+test models::usuario::tests::usuario_response_serializes_to_camel_case ... ok
+test services::auditoria::tests::create_auditoria_entry_holds_correct_fields ... ok
+test services::auditoria::tests::create_entry_with_empty_cambios ... ok
+test services::auditoria::tests::from_model_all_action_types ... ok
+test services::auditoria::tests::from_model_all_entity_types ... ok
+test services::auditoria::tests::from_model_converts_all_fields ... ok
+test services::auditoria::tests::from_model_converts_created_at_to_utc ... ok
+test services::auditoria::tests::from_model_preserves_complex_cambios ... ok
+test errors::tests::not_found_returns_404 ... ok
+test services::auth::tests::inactive_user_error_message_is_cuenta_inactiva ... ok
+test services::configuracion::tests::moneda_config_serialization_roundtrip ... ok
+test services::configuracion::tests::update_moneda_request_deserialization ... ok
+test services::dashboard::tests::color_coding_amarillo_30_to_60_days ... ok
+test services::dashboard::tests::color_coding_boundary_30_days ... ok
+test services::dashboard::tests::color_coding_boundary_60_days ... ok
+test services::dashboard::tests::color_coding_rojo_under_30_days ... ok
+test services::dashboard::tests::color_coding_verde_over_60_days ... ok
+test services::dashboard::tests::ingreso_diferencia_calculation ... ok
+test services::dashboard::tests::ingreso_diferencia_when_fully_collected ... ok
+test services::dashboard::tests::ocupacion_tasa_zero_properties ... ok
+test services::documentos::tests::get_upload_dir_returns_default ... ok
+test services::documentos::tests::get_upload_dir_returns_env_value ... ok
+test services::documentos::tests::validate_file_size_accepts_exactly_10mb ... ok
+test services::documentos::tests::validate_file_size_accepts_small_file ... ok
+test services::documentos::tests::validate_file_size_accepts_zero ... ok
+test services::documentos::tests::validate_mime_type_accepts_jpeg ... ok
+test services::documentos::tests::validate_mime_type_accepts_pdf ... ok
+test services::documentos::tests::validate_mime_type_accepts_png ... ok
+test services::documentos::tests::validate_mime_type_rejects_empty ... ok
+test services::documentos::tests::validate_mime_type_rejects_text ... ok
+test services::importacion::tests::find_column_index_finds_existing_column ... ok
+test services::importacion::tests::find_column_index_returns_none_for_missing ... ok
+test services::importacion::tests::get_field_returns_empty_for_none_index ... ok
+test services::importacion::tests::get_field_returns_empty_for_out_of_bounds ... ok
+test services::importacion::tests::get_field_returns_value_at_index ... ok
+test services::importacion::tests::import_format_equality ... ok
+test services::importacion::tests::precio_parsing_invalid ... ok
+test services::importacion::tests::precio_parsing_valid ... ok
+test handlers::perfil::tests::cambiar_password_request_rejects_missing_fields ... ok
+test handlers::perfil::tests::cambiar_password_request_rejects_empty_object ... ok
+test services::mantenimiento::tests::from_nota_model_converts_all_fields ... ok
+test services::mantenimiento::tests::from_nota_model_converts_created_at_to_utc ... ok
+test services::mantenimiento::tests::from_solicitud_model_converts_all_fields ... ok
+test services::mantenimiento::tests::from_solicitud_model_with_none_optional_fields ... ok
+test services::mantenimiento::tests::validar_transicion_completado_a_en_progreso_err ... ok
+test services::mantenimiento::tests::validar_transicion_completado_a_pendiente_err ... ok
+test services::mantenimiento::tests::validar_transicion_en_progreso_a_completado_ok ... ok
+test services::mantenimiento::tests::validar_transicion_en_progreso_a_pendiente_err ... ok
+test services::mantenimiento::tests::validar_transicion_pendiente_a_completado_err ... ok
+test services::mantenimiento::tests::validar_transicion_pendiente_a_en_progreso_ok ... ok
+test config::tests::from_env_defaults_port_when_not_set ... ok
+test services::importacion::tests::parse_csv_rows_parses_headers_and_data ... ok
+test services::importacion::tests::parse_csv_rows_trims_whitespace ... ok
+test services::mantenimiento::tests::validar_transicion_completado_a_completado_err ... ok
+test services::documentos::tests::validate_mime_type_rejects_gif ... ok
+test services::recibos::tests::format_date_dr_formats_correctly ... ok
+test services::documentos::tests::validate_file_size_rejects_over_10mb ... ok
+test services::importacion::tests::parse_csv_rows_empty_file_returns_headers_only ... ok
+test services::recibos::tests::format_date_dr_single_digit_day_and_month ... ok
+test services::reportes::tests::empty_summary_preserves_generated_by ... ok
+test services::reportes::tests::empty_summary_returns_correct_defaults ... ok
+test services::recibos::tests::format_currency_dr_dop ... ok
+test services::recibos::tests::format_currency_dr_large_amount ... ok
+test services::importacion::tests::validate_inquilino_required_fields ... ok
+test services::recibos::tests::format_currency_dr_small_amount ... ok
+test services::recibos::tests::format_currency_dr_zero ... ok
+test services::importacion::tests::validate_propiedad_required_fields ... ok
+test services::recibos::tests::format_currency_dr_usd ... ok
+test services::reportes::tests::sample_summary_mixed_statuses_has_correct_totals ... ok
+test services::validation::tests::validate_enum_accepts_valid_role_gerente ... ok
+test services::validation::tests::validate_enum_accepts_valid_role_admin ... ok
+test services::validation::tests::validate_enum_is_case_sensitive ... ok
+test services::validation::tests::validate_enum_accepts_valid_role_visualizador ... ok
+test services::validation::tests::validate_enum_rejects_empty_string ... ok
+test config::tests::from_env_fails_with_invalid_port ... ok
+test services::validation::tests::validate_enum_rejects_invalid_role ... ok
+test models::mantenimiento::tests::solicitud_list_query_deserializes_optional_fields ... ok
+test services::dashboard::tests::ocupacion_tasa_calculation ... ok
+test services::auth::tests::decode_expired_jwt_fails ... ok
+test services::auth::tests::decode_jwt_with_wrong_secret_fails ... ok
+test services::auth::tests::encode_decode_jwt_roundtrip ... ok
+test services::reportes::tests::exportar_xlsx_with_data_returns_valid_bytes ... ok
+test services::reportes::tests::exportar_xlsx_empty_report_returns_valid_xlsx ... ok
+test services::reportes::tests::exportar_xlsx_with_mixed_statuses_produces_valid_file ... ok
+test services::auth::tests::verify_wrong_password_fails ... ok
+test services::auth::tests::hash_and_verify_password_succeeds ... ok
+test services::reportes::tests::exportar_pdf_with_mixed_statuses_includes_all_rows ... ok
+test services::reportes::tests::exportar_pdf_empty_report_returns_valid_pdf ... ok
+test services::reportes::tests::exportar_pdf_with_data_returns_valid_bytes ... ok
+
+test result: ok. 147 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running unittests src/main.rs (target/debug/deps/realestate_backend-202a274984c476fd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/auditoria_tests.rs (target/debug/deps/auditoria_tests-2424389fe3d4e8c3)
+
+running 4 tests
+test auditoria_handler_tests::auditoria_list_rejects_unauthenticated_request ... ok
+test auditoria_handler_tests::auditoria_list_allows_admin_role ... ok
+test auditoria_handler_tests::auditoria_list_rejects_gerente_role ... ok
+test auditoria_handler_tests::auditoria_list_rejects_visualizador_role ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/auth_tests.rs (target/debug/deps/auth_tests-45b5720faaa20db1)
+
+running 2 tests
+test auth_tests::test_login ... ignored
+test auth_tests::test_register ... ignored
+
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/contratos_tests.rs (target/debug/deps/contratos_tests-8a6987afb1e5e060)
+
+running 12 tests
+test contratos_lifecycle_tests::por_vencer_rejects_unauthenticated ... ok
+test contratos_lifecycle_tests::terminar_rejects_unauthenticated ... ok
+test contratos_lifecycle_tests::renovar_rejects_unauthenticated ... ok
+test contratos_lifecycle_tests::terminar_rejects_visualizador ... ok
+test contratos_lifecycle_tests::renovar_allows_admin ... ok
+test contratos_lifecycle_tests::terminar_allows_gerente ... ok
+test contratos_lifecycle_tests::por_vencer_allows_admin ... ok
+test contratos_lifecycle_tests::por_vencer_allows_gerente ... ok
+test contratos_lifecycle_tests::por_vencer_allows_visualizador ... ok
+test contratos_lifecycle_tests::terminar_allows_admin ... ok
+test contratos_lifecycle_tests::renovar_rejects_visualizador ... ok
+test contratos_lifecycle_tests::renovar_allows_gerente ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/documentos_tests.rs (target/debug/deps/documentos_tests-044b4468b12cc588)
+
+running 3 tests
+test documentos_tests::test_listar_documentos ... ignored
+test documentos_tests::test_upload_auth_required ... ignored
+test documentos_tests::test_upload_stores_file_and_metadata ... ignored
+
+test result: ok. 0 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/inquilinos_tests.rs (target/debug/deps/inquilinos_tests-fd23f4b5e03ec376)
+
+running 2 tests
+test inquilinos_tests::test_create_inquilino ... ignored
+test inquilinos_tests::test_list_inquilinos ... ignored
+
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/mantenimiento_pbt.rs (target/debug/deps/mantenimiento_pbt-9f12515caf0f6e69)
+
+running 14 tests
+test test_invalid_transitions_rejected ... ok
+test test_cascade_delete has been running for over 60 seconds
+test test_creation_round_trip has been running for over 60 seconds
+test test_empty_notes_rejected has been running for over 60 seconds
+test test_filtering_returns_matching has been running for over 60 seconds
+test test_invalid_moneda_rejected has been running for over 60 seconds
+test test_invalid_prioridad_rejected has been running for over 60 seconds
+test test_list_ordering has been running for over 60 seconds
+test test_negative_cost_rejected has been running for over 60 seconds
+test test_nonexistent_fk_rejected has been running for over 60 seconds
+test test_notes_ordering has been running for over 60 seconds
+test test_unit_property_ownership has been running for over 60 seconds
+test test_update_preserves_and_replaces has been running for over 60 seconds
+test test_valid_transitions_set_timestamps has been running for over 60 seconds
+test test_notes_ordering ... FAILED
+test test_cascade_delete ... FAILED
+test test_list_ordering ... FAILED
+test test_filtering_returns_matching ... FAILED
