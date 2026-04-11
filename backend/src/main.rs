@@ -16,7 +16,7 @@ async fn main() -> std::io::Result<()> {
 
     let config = AppConfig::from_env().expect("Error cargando configuración");
 
-    let db = Database::connect(&config.database_url)
+    let db = Database::connect(config.connect_options())
         .await
         .expect("Error conectando a la base de datos");
 

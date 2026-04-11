@@ -10,6 +10,7 @@ pub mod m20250409_000004_add_documentos_columns;
 pub mod m20250410_000001_create_unidades;
 pub mod m20250411_000001_create_solicitudes_mantenimiento;
 pub mod m20250411_000002_create_notas_mantenimiento;
+pub mod m20250412_000001_create_gastos;
 
 use sea_orm_migration::prelude::*;
 
@@ -31,6 +32,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250410_000001_create_unidades::Migration),
             Box::new(m20250411_000001_create_solicitudes_mantenimiento::Migration),
             Box::new(m20250411_000002_create_notas_mantenimiento::Migration),
+            Box::new(m20250412_000001_create_gastos::Migration),
         ]
     }
 }

@@ -33,6 +33,7 @@ fn make_config() -> AppConfig {
         jwt_secret: JWT_SECRET.to_string(),
         server_port: 0,
         cors_origin: None,
+        pool: realestate_backend::config::PoolConfig::default(),
     }
 }
 

@@ -92,30 +92,42 @@ mod pbt_async {
 
     const JWT_SECRET: &str = "test_secret_key_that_is_long_enough_for_jwt";
 
-    static DB_ONCE: std::sync::OnceLock<DatabaseConnection> = std::sync::OnceLock::new();
+    static MIGRATIONS_DONE: std::sync::Once = std::sync::Once::new();
 
-    fn setup_db() -> DatabaseConnection {
-        DB_ONCE
-            .get_or_init(|| {
-                dotenvy::dotenv().ok();
-                let url = std::env::var("DATABASE_URL")
-                    .expect("DATABASE_URL must be set for integration tests");
-                let rt = tokio::runtime::Runtime::new().unwrap();
-                rt.block_on(async {
-                    let db = Database::connect(&url)
-                        .await
-                        .expect("Failed to connect to database");
-                    super::migrations::Migrator::up(&db, None)
-                        .await
-                        .expect("Failed to run migrations");
-                    db
-                })
-            })
-            .clone()
+    fn db_url() -> String {
+        dotenvy::dotenv().ok();
+        std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for integration tests")
+    }
+
+    fn with_db<F, Fut>(f: F)
+    where
+        F: FnOnce(DatabaseConnection) -> Fut,
+        Fut: std::future::Future<Output = ()>,
+    {
+        MIGRATIONS_DONE.call_once(|| {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async {
+                let db = Database::connect(db_url())
+                    .await
+                    .expect("Failed to connect to database for migrations");
+                super::migrations::Migrator::up(&db, None)
+                    .await
+                    .expect("Failed to run migrations");
+                db.close().await.ok();
+            });
+        });
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let db = Database::connect(db_url())
+                .await
+                .expect("Failed to connect to database");
+            f(db).await;
+        });
     }
 
     fn make_config() -> AppConfig {
         AppConfig {
+            pool: realestate_backend::config::PoolConfig::default(),
             database_url: String::new(),
             jwt_secret: JWT_SECRET.to_string(),
             server_port: 0,
@@ -221,9 +233,7 @@ mod pbt_async {
         monto: Decimal,
         moneda: String,
     ) {
-        let db = setup_db();
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
+        with_db(|db| async move {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -274,9 +284,7 @@ mod pbt_async {
     }
 
     pub fn p2(count: u32) {
-        let db = setup_db();
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
+        with_db(|db| async move {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -320,9 +328,7 @@ mod pbt_async {
     }
 
     pub fn p3(prioridad_a: String, prioridad_b: String) {
-        let db = setup_db();
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
+        with_db(|db| async move {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -384,9 +390,7 @@ mod pbt_async {
     }
 
     pub fn p4(ot: String, op: String, nt: String, np: String, ut: bool, up: bool) {
-        let db = setup_db();
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
+        with_db(|db| async move {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -437,9 +441,7 @@ mod pbt_async {
     }
 
     pub fn p5(titulo: String) {
-        let db = setup_db();
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
+        with_db(|db| async move {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -485,9 +487,7 @@ mod pbt_async {
     }
 
     pub fn p7_prioridad(bad: String) {
-        let db = setup_db();
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
+        with_db(|db| async move {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -504,9 +504,7 @@ mod pbt_async {
     }
 
     pub fn p7_moneda(bad: String) {
-        let db = setup_db();
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
+        with_db(|db| async move {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -523,9 +521,7 @@ mod pbt_async {
     }
 
     pub fn p8(neg: Decimal) {
-        let db = setup_db();
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
+        with_db(|db| async move {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -542,9 +538,7 @@ mod pbt_async {
     }
 
     pub fn p9(ws: String) {
-        let db = setup_db();
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
+        with_db(|db| async move {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -581,9 +575,7 @@ mod pbt_async {
     }
 
     pub fn p10(note_count: u32) {
-        let db = setup_db();
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
+        with_db(|db| async move {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -629,9 +621,7 @@ mod pbt_async {
     }
 
     pub fn p11(note_count: u32) {
-        let db = setup_db();
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
+        with_db(|db| async move {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -684,9 +674,7 @@ mod pbt_async {
     }
 
     pub fn p12(titulo: String) {
-        let db = setup_db();
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
+        with_db(|db| async move {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -710,9 +698,7 @@ mod pbt_async {
     pub fn p13(bytes_a: [u8; 16], bytes_b: [u8; 16]) {
         let fake_propiedad_id = Uuid::from_bytes(bytes_a);
         let fake_inquilino_id = Uuid::from_bytes(bytes_b);
-        let db = setup_db();
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
+        with_db(|db| async move {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
@@ -722,7 +708,9 @@ mod pbt_async {
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
-                .set_json(json!({ "propiedadId": fake_propiedad_id, "titulo": "FK test propiedad" }))
+                .set_json(
+                    json!({ "propiedadId": fake_propiedad_id, "titulo": "FK test propiedad" }),
+                )
                 .to_request();
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 404);

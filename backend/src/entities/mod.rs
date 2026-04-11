@@ -3,6 +3,7 @@ pub mod configuracion;
 pub mod contrato;
 #[allow(dead_code)]
 pub mod documento;
+pub mod gasto;
 pub mod inquilino;
 pub mod nota_mantenimiento;
 pub mod pago;

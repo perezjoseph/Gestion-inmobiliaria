@@ -18,6 +18,7 @@ mod contratos_lifecycle_tests {
             jwt_secret: JWT_SECRET.to_string(),
             server_port: 8080,
             cors_origin: None,
+            pool: realestate_backend::config::PoolConfig::default(),
         }
     }
 
