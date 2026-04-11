@@ -494,6 +494,513 @@
         <cpe regex="true">cpe:/a:.*:(http|httparse|apache|nginx):.*</cpe>
     </suppress>
 
+    <!-- sqlx-mysql crate matched against MySQL server/client CVEs -->
+    <suppress>
+        <notes>sqlx-mysql false positive - Rust async MySQL driver, not MySQL server</notes>
+        <packageUrl regex="true">^pkg:cargo/sqlx-mysql@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(mysql|mariadb|oracle):.*</cpe>
+    </suppress>
+
+    <!-- actix-web/actix-http/actix-server matched against web server CVEs -->
+    <suppress>
+        <notes>actix-web false positive - Rust web framework, not Apache/nginx</notes>
+        <packageUrl regex="true">^pkg:cargo/actix-.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(actix|apache|nginx|iis|tomcat):.*</cpe>
+    </suppress>
+
+    <!-- libc crate matched against C library CVEs (glibc, musl) -->
+    <suppress>
+        <notes>libc false positive - Rust FFI bindings, not glibc/musl itself</notes>
+        <packageUrl regex="true">^pkg:cargo/libc@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(glibc|libc|gnu|musl):.*</cpe>
+    </suppress>
+
+    <!-- cc crate matched against compiler/build tool CVEs -->
+    <suppress>
+        <notes>cc false positive - Rust build script helper, not GCC/Clang</notes>
+        <packageUrl regex="true">^pkg:cargo/cc@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(gcc|cc|compiler|clang):.*</cpe>
+    </suppress>
+
+    <!-- smallvec crate matched against vector/buffer CVEs -->
+    <suppress>
+        <notes>smallvec false positive - Rust small vector optimization</notes>
+        <packageUrl regex="true">^pkg:cargo/smallvec@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:smallvec:.*</cpe>
+    </suppress>
+
+    <!-- bytes crate matched against buffer/byte CVEs -->
+    <suppress>
+        <notes>bytes false positive - Rust bytes buffer library</notes>
+        <packageUrl regex="true">^pkg:cargo/bytes@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:bytes:.*</cpe>
+    </suppress>
+
+    <!-- uuid crate matched against UUID library CVEs -->
+    <suppress>
+        <notes>uuid false positive - Rust UUID library</notes>
+        <packageUrl regex="true">^pkg:cargo/uuid@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:uuid:.*</cpe>
+    </suppress>
+
+    <!-- mime/mime_guess crate matched against MIME parsing CVEs -->
+    <suppress>
+        <notes>mime false positive - Rust MIME type library</notes>
+        <packageUrl regex="true">^pkg:cargo/mime.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:mime:.*</cpe>
+    </suppress>
+
+    <!-- tempfile crate matched against temp file CVEs -->
+    <suppress>
+        <notes>tempfile false positive - Rust temp file library</notes>
+        <packageUrl regex="true">^pkg:cargo/tempfile@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:tempfile:.*</cpe>
+    </suppress>
+
+    <!-- semver crate matched against version parsing CVEs -->
+    <suppress>
+        <notes>semver false positive - Rust semver parser</notes>
+        <packageUrl regex="true">^pkg:cargo/semver@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:semver:.*</cpe>
+    </suppress>
+
+    <!-- clap crate matched against CLI tool CVEs -->
+    <suppress>
+        <notes>clap false positive - Rust CLI argument parser</notes>
+        <packageUrl regex="true">^pkg:cargo/clap.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:clap:.*</cpe>
+    </suppress>
+
+    <!-- tracing/tracing-core matched against logging framework CVEs -->
+    <suppress>
+        <notes>tracing false positive - Rust tracing framework, not log4j/logback</notes>
+        <packageUrl regex="true">^pkg:cargo/tracing.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(tracing|log4j|logback|logging):.*</cpe>
+    </suppress>
+
+    <!-- password-hash crate matched against password/hash CVEs -->
+    <suppress>
+        <notes>password-hash false positive - Rust password hashing traits</notes>
+        <packageUrl regex="true">^pkg:cargo/password-hash@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(password|hash):.*</cpe>
+    </suppress>
+
+    <!-- getrandom crate matched against RNG CVEs -->
+    <suppress>
+        <notes>getrandom false positive - Rust system RNG interface</notes>
+        <packageUrl regex="true">^pkg:cargo/getrandom@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(getrandom|random):.*</cpe>
+    </suppress>
+
+    <!-- socket2 crate matched against socket CVEs -->
+    <suppress>
+        <notes>socket2 false positive - Rust socket library</notes>
+        <packageUrl regex="true">^pkg:cargo/socket2@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:socket:.*</cpe>
+    </suppress>
+
+    <!-- webpki-roots/rustls-webpki matched against PKI/certificate CVEs -->
+    <suppress>
+        <notes>webpki-roots false positive - Rust WebPKI root certificates</notes>
+        <packageUrl regex="true">^pkg:cargo/webpki-roots@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(webpki|pki|certificate|ca):.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>rustls-webpki false positive - Rust WebPKI verification</notes>
+        <packageUrl regex="true">^pkg:cargo/rustls-webpki@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(webpki|pki|certificate):.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>rustls-pki-types false positive - Rust PKI type definitions</notes>
+        <packageUrl regex="true">^pkg:cargo/rustls-pki-types@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(pki|certificate):.*</cpe>
+    </suppress>
+
+    <!-- v_htmlescape crate matched against HTML/XSS CVEs -->
+    <suppress>
+        <notes>v_htmlescape false positive - Rust HTML escape library</notes>
+        <packageUrl regex="true">^pkg:cargo/v_htmlescape@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(html|xss|escape):.*</cpe>
+    </suppress>
+
+    <!-- language-tags crate matched against language/i18n CVEs -->
+    <suppress>
+        <notes>language-tags false positive - Rust BCP 47 language tag parser</notes>
+        <packageUrl regex="true">^pkg:cargo/language-tags@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:language:.*</cpe>
+    </suppress>
+
+    <!-- bigdecimal/rust_decimal matched against decimal/number CVEs -->
+    <suppress>
+        <notes>bigdecimal false positive - Rust arbitrary precision decimal</notes>
+        <packageUrl regex="true">^pkg:cargo/bigdecimal@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(bigdecimal|decimal):.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>rust_decimal false positive - Rust decimal type</notes>
+        <packageUrl regex="true">^pkg:cargo/rust_decimal@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:decimal:.*</cpe>
+    </suppress>
+
+    <!-- bincode crate matched against serialization CVEs -->
+    <suppress>
+        <notes>bincode false positive - Rust binary serialization</notes>
+        <packageUrl regex="true">^pkg:cargo/bincode@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:bincode:.*</cpe>
+    </suppress>
+
+    <!-- serde/serde_json matched against serialization CVEs -->
+    <suppress>
+        <notes>serde false positive - Rust serialization framework</notes>
+        <packageUrl regex="true">^pkg:cargo/serde.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(serde|serialization|json):.*</cpe>
+    </suppress>
+
+    <!-- crossbeam crates matched against concurrency CVEs -->
+    <suppress>
+        <notes>crossbeam false positive - Rust concurrency primitives</notes>
+        <packageUrl regex="true">^pkg:cargo/crossbeam.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:crossbeam:.*</cpe>
+    </suppress>
+
+    <!-- dashmap crate matched against hashmap CVEs -->
+    <suppress>
+        <notes>dashmap false positive - Rust concurrent hashmap</notes>
+        <packageUrl regex="true">^pkg:cargo/dashmap@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:dashmap:.*</cpe>
+    </suppress>
+
+    <!-- parking_lot crate matched against lock/mutex CVEs -->
+    <suppress>
+        <notes>parking_lot false positive - Rust synchronization primitives</notes>
+        <packageUrl regex="true">^pkg:cargo/parking_lot.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:parking:.*</cpe>
+    </suppress>
+
+    <!-- num-bigint crate matched against number/math CVEs -->
+    <suppress>
+        <notes>num-bigint false positive - Rust big integer library</notes>
+        <packageUrl regex="true">^pkg:cargo/num-bigint.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(bigint|bignum):.*</cpe>
+    </suppress>
+
+    <!-- ecdsa/elliptic-curve/p256/p384 matched against crypto library CVEs -->
+    <suppress>
+        <notes>ecdsa false positive - pure Rust ECDSA, not OpenSSL</notes>
+        <packageUrl regex="true">^pkg:cargo/ecdsa@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(ecdsa|openssl|libsodium|bouncycastle):.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>elliptic-curve false positive - pure Rust elliptic curve library</notes>
+        <packageUrl regex="true">^pkg:cargo/elliptic-curve@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(elliptic|openssl|curve):.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>p256 false positive - pure Rust P-256 curve</notes>
+        <packageUrl regex="true">^pkg:cargo/p256@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(p256|nist|openssl):.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>p384 false positive - pure Rust P-384 curve</notes>
+        <packageUrl regex="true">^pkg:cargo/p384@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(p384|nist|openssl):.*</cpe>
+    </suppress>
+
+    <!-- pkcs1/pkcs8/spki/sec1/der matched against PKI/certificate CVEs -->
+    <suppress>
+        <notes>pkcs1 false positive - pure Rust PKCS#1 implementation</notes>
+        <packageUrl regex="true">^pkg:cargo/pkcs1@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(pkcs|openssl|certificate):.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>pkcs8 false positive - pure Rust PKCS#8 implementation</notes>
+        <packageUrl regex="true">^pkg:cargo/pkcs8@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(pkcs|openssl|certificate):.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>spki false positive - pure Rust SubjectPublicKeyInfo</notes>
+        <packageUrl regex="true">^pkg:cargo/spki@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(spki|pki|openssl|certificate):.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>sec1 false positive - pure Rust SEC1 encoding</notes>
+        <packageUrl regex="true">^pkg:cargo/sec1@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(sec1|openssl):.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>der false positive - pure Rust DER/ASN.1 encoding</notes>
+        <packageUrl regex="true">^pkg:cargo/der@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(der|asn1|openssl):.*</cpe>
+    </suppress>
+
+    <!-- hkdf crate matched against key derivation CVEs -->
+    <suppress>
+        <notes>hkdf false positive - pure Rust HKDF implementation</notes>
+        <packageUrl regex="true">^pkg:cargo/hkdf@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(hkdf|kdf|openssl):.*</cpe>
+    </suppress>
+
+    <!-- signature crate matched against digital signature CVEs -->
+    <suppress>
+        <notes>signature false positive - Rust signature traits</notes>
+        <packageUrl regex="true">^pkg:cargo/signature@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:signature:.*</cpe>
+    </suppress>
+
+    <!-- subtle crate matched against crypto timing CVEs -->
+    <suppress>
+        <notes>subtle false positive - Rust constant-time operations</notes>
+        <packageUrl regex="true">^pkg:cargo/subtle@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:subtle:.*</cpe>
+    </suppress>
+
+    <!-- zeroize crate matched against memory zeroing CVEs -->
+    <suppress>
+        <notes>zeroize false positive - Rust memory zeroing library</notes>
+        <packageUrl regex="true">^pkg:cargo/zeroize@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:zeroize:.*</cpe>
+    </suppress>
+
+    <!-- crypto-bigint/crypto-common matched against crypto CVEs -->
+    <suppress>
+        <notes>crypto-bigint false positive - pure Rust crypto big integer</notes>
+        <packageUrl regex="true">^pkg:cargo/crypto-.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(crypto|openssl):.*</cpe>
+    </suppress>
+
+    <!-- const-oid crate matched against OID/ASN.1 CVEs -->
+    <suppress>
+        <notes>const-oid false positive - Rust OID constants</notes>
+        <packageUrl regex="true">^pkg:cargo/const-oid@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(oid|asn1):.*</cpe>
+    </suppress>
+
+    <!-- rustix crate matched against Unix/POSIX CVEs -->
+    <suppress>
+        <notes>rustix false positive - Rust safe Unix API bindings</notes>
+        <packageUrl regex="true">^pkg:cargo/rustix@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(rustix|unix|posix):.*</cpe>
+    </suppress>
+
+    <!-- wasm-bindgen/web-sys/js-sys matched against WASM/browser CVEs -->
+    <suppress>
+        <notes>wasm-bindgen false positive - Rust WASM bindings generator</notes>
+        <packageUrl regex="true">^pkg:cargo/wasm-bindgen.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(wasm|webassembly):.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>web-sys false positive - Rust Web API bindings</notes>
+        <packageUrl regex="true">^pkg:cargo/web-sys@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(web|browser|dom):.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>js-sys false positive - Rust JavaScript API bindings</notes>
+        <packageUrl regex="true">^pkg:cargo/js-sys@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(javascript|js|ecmascript):.*</cpe>
+    </suppress>
+
+    <!-- yew/yew-router matched against web framework CVEs -->
+    <suppress>
+        <notes>yew false positive - Rust WASM web framework</notes>
+        <packageUrl regex="true">^pkg:cargo/yew.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:yew:.*</cpe>
+    </suppress>
+
+    <!-- governor crate matched against rate limiting CVEs -->
+    <suppress>
+        <notes>governor false positive - Rust rate limiting library</notes>
+        <packageUrl regex="true">^pkg:cargo/governor@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:governor:.*</cpe>
+    </suppress>
+
+    <!-- proptest crate matched against testing framework CVEs -->
+    <suppress>
+        <notes>proptest false positive - Rust property testing framework</notes>
+        <packageUrl regex="true">^pkg:cargo/proptest@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:proptest:.*</cpe>
+    </suppress>
+
+    <!-- hashbrown crate matched against hashmap CVEs -->
+    <suppress>
+        <notes>hashbrown false positive - Rust hashmap implementation</notes>
+        <packageUrl regex="true">^pkg:cargo/hashbrown@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:hashbrown:.*</cpe>
+    </suppress>
+
+    <!-- indexmap crate matched against map/collection CVEs -->
+    <suppress>
+        <notes>indexmap false positive - Rust ordered map</notes>
+        <packageUrl regex="true">^pkg:cargo/indexmap@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:indexmap:.*</cpe>
+    </suppress>
+
+    <!-- futures crate matched against async/concurrency CVEs -->
+    <suppress>
+        <notes>futures false positive - Rust async futures library</notes>
+        <packageUrl regex="true">^pkg:cargo/futures.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:futures:.*</cpe>
+    </suppress>
+
+    <!-- syn/quote/proc-macro2 matched against macro/parser CVEs -->
+    <suppress>
+        <notes>syn false positive - Rust syntax parser for proc macros</notes>
+        <packageUrl regex="true">^pkg:cargo/syn@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:syn:.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>quote false positive - Rust quasi-quoting for proc macros</notes>
+        <packageUrl regex="true">^pkg:cargo/quote@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:quote:.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>proc-macro2 false positive - Rust proc macro API</notes>
+        <packageUrl regex="true">^pkg:cargo/proc-macro2@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:proc-macro:.*</cpe>
+    </suppress>
+
+    <!-- thiserror/anyhow matched against error handling CVEs -->
+    <suppress>
+        <notes>thiserror false positive - Rust error derive macro</notes>
+        <packageUrl regex="true">^pkg:cargo/thiserror.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:thiserror:.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>anyhow false positive - Rust error handling library</notes>
+        <packageUrl regex="true">^pkg:cargo/anyhow@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:anyhow:.*</cpe>
+    </suppress>
+
+    <!-- dotenvy crate matched against dotenv CVEs -->
+    <suppress>
+        <notes>dotenvy false positive - Rust .env file loader</notes>
+        <packageUrl regex="true">^pkg:cargo/dotenvy@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(dotenvy|dotenv):.*</cpe>
+    </suppress>
+
+    <!-- sea-orm/sea-query/sea-schema matched against ORM/SQL CVEs -->
+    <suppress>
+        <notes>sea-orm false positive - Rust async ORM, not Hibernate/ActiveRecord</notes>
+        <packageUrl regex="true">^pkg:cargo/sea-.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(sea|orm|hibernate|activerecord|sql):.*</cpe>
+    </suppress>
+
+    <!-- flume crate matched against channel/queue CVEs -->
+    <suppress>
+        <notes>flume false positive - Rust MPMC channel</notes>
+        <packageUrl regex="true">^pkg:cargo/flume@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:flume:.*</cpe>
+    </suppress>
+
+    <!-- memchr crate matched against memory search CVEs -->
+    <suppress>
+        <notes>memchr false positive - Rust optimized byte search</notes>
+        <packageUrl regex="true">^pkg:cargo/memchr@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:memchr:.*</cpe>
+    </suppress>
+
+    <!-- aho-corasick crate matched against string search CVEs -->
+    <suppress>
+        <notes>aho-corasick false positive - Rust string search algorithm</notes>
+        <packageUrl regex="true">^pkg:cargo/aho-corasick@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:aho-corasick:.*</cpe>
+    </suppress>
+
+    <!-- itoa/ryu crates matched against number formatting CVEs -->
+    <suppress>
+        <notes>itoa false positive - Rust integer to string conversion</notes>
+        <packageUrl regex="true">^pkg:cargo/itoa@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:itoa:.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>ryu false positive - Rust float to string conversion</notes>
+        <packageUrl regex="true">^pkg:cargo/ryu@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:ryu:.*</cpe>
+    </suppress>
+
+    <!-- once_cell crate matched against singleton/lazy CVEs -->
+    <suppress>
+        <notes>once_cell false positive - Rust lazy initialization</notes>
+        <packageUrl regex="true">^pkg:cargo/once_cell.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:once_cell:.*</cpe>
+    </suppress>
+
+    <!-- lazy_static crate matched against static initialization CVEs -->
+    <suppress>
+        <notes>lazy_static false positive - Rust lazy static macro</notes>
+        <packageUrl regex="true">^pkg:cargo/lazy_static@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:lazy_static:.*</cpe>
+    </suppress>
+
+    <!-- form_urlencoded crate matched against URL encoding CVEs -->
+    <suppress>
+        <notes>form_urlencoded false positive - Rust URL form encoding</notes>
+        <packageUrl regex="true">^pkg:cargo/form_urlencoded@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(urlencoded|form):.*</cpe>
+    </suppress>
+
+    <!-- urlencoding crate matched against URL encoding CVEs -->
+    <suppress>
+        <notes>urlencoding false positive - Rust URL encoding library</notes>
+        <packageUrl regex="true">^pkg:cargo/urlencoding@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(urlencoding|url):.*</cpe>
+    </suppress>
+
+    <!-- hex crate matched against hex encoding CVEs -->
+    <suppress>
+        <notes>hex false positive - Rust hex encoding library</notes>
+        <packageUrl regex="true">^pkg:cargo/hex@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:hex:.*</cpe>
+    </suppress>
+
+    <!-- pem-rfc7468 crate matched against PEM/certificate CVEs -->
+    <suppress>
+        <notes>pem-rfc7468 false positive - pure Rust PEM encoding</notes>
+        <packageUrl regex="true">^pkg:cargo/pem-rfc7468@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(pem|openssl|certificate):.*</cpe>
+    </suppress>
+
+    <!-- md-5 crate matched against MD5 hash weakness CVEs -->
+    <suppress>
+        <notes>md-5 false positive - Rust MD5 implementation</notes>
+        <packageUrl regex="true">^pkg:cargo/md-5@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(md5|hash):.*</cpe>
+    </suppress>
+
+    <!-- rand_core/rand_chacha matched against RNG CVEs -->
+    <suppress>
+        <notes>rand_core false positive - Rust RNG core traits</notes>
+        <packageUrl regex="true">^pkg:cargo/rand_.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(rand|random|rng):.*</cpe>
+    </suppress>
+
+    <!-- ppv-lite86 crate matched against SIMD/crypto CVEs -->
+    <suppress>
+        <notes>ppv-lite86 false positive - Rust SIMD abstraction for ChaCha</notes>
+        <packageUrl regex="true">^pkg:cargo/ppv-lite86@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:ppv:.*</cpe>
+    </suppress>
+
+    <!-- untrusted crate matched against trust/security CVEs -->
+    <suppress>
+        <notes>untrusted false positive - Rust safe input reader</notes>
+        <packageUrl regex="true">^pkg:cargo/untrusted@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:untrusted:.*</cpe>
+    </suppress>
+
+    <!-- windows-sys/windows-core matched against Windows OS CVEs -->
+    <suppress>
+        <notes>windows-sys false positive - Rust Windows API bindings, not Windows OS</notes>
+        <packageUrl regex="true">^pkg:cargo/windows.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(windows|microsoft):.*</cpe>
+    </suppress>
+
+    <!-- winapi crate matched against Windows API CVEs -->
+    <suppress>
+        <notes>winapi false positive - Rust Windows API bindings</notes>
+        <packageUrl regex="true">^pkg:cargo/winapi.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:(winapi|windows|microsoft):.*</cpe>
+    </suppress>
+
     <!-- Broad suppression for Cargo.lock file-level false positives.
          OWASP sometimes flags the lockfile itself as a vulnerable component. -->
     <suppress>

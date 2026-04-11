@@ -212,7 +212,7 @@ jobs:
 
   quality-gate:
     name: Dependency Security & Health Check
-    runs-on: [self-hosted, linux]
+    runs-on: [self-hosted, linux, docker, sonarqube]
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
