@@ -64,7 +64,7 @@ def run_kiro(prompt, label):
 
     escaped = prompt.replace('"', '\\"').replace("'", "'\\''")
     code, stdout, stderr = run_shell(
-        f"kiro-cli chat --no-interactive --agent ci-fixer \"{escaped}\"",
+        f"kiro-cli chat --no-interactive --trust-all-tools --agent ci-fixer \"{escaped}\"",
         timeout=600
     )
     print(f"  kiro-cli exit code: {code}")

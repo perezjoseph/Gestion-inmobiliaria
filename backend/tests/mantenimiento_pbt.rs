@@ -72,6 +72,9 @@ fn invalid_transition_pair() -> impl Strategy<Value = (String, String)> {
     proptest::sample::select(invalid_pairs)
 }
 
+#[path = "../migrations/mod.rs"]
+mod migrations;
+
 // All async test logic lives in a separate module so that calling async fns
 // from sync #[test] functions (Rust 2024 edition restriction) is avoided.
 // Each public function in this module creates its own tokio runtime.
@@ -87,9 +90,6 @@ mod pbt_async {
     use serde_json::{Value, json};
     use uuid::Uuid;
 
-    #[path = "../../migrations/mod.rs"]
-    mod migrations;
-
     const JWT_SECRET: &str = "test_secret_key_that_is_long_enough_for_jwt";
 
     async fn setup_db() -> DatabaseConnection {
@@ -99,7 +99,7 @@ mod pbt_async {
         let db = Database::connect(&url)
             .await
             .expect("Failed to connect to database");
-        migrations::Migrator::up(&db, None)
+        super::migrations::Migrator::up(&db, None)
             .await
             .expect("Failed to run migrations");
         db
