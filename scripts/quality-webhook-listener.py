@@ -2,8 +2,7 @@
 """
 Quality Check Webhook Listener
 Receives webhooks from SonarQube and GitHub Actions CI pipeline,
-then triggers kiro-cli to auto-fix issues in a retry loop until
-all checks pass.
+then triggers kiro-cli to auto-fix issues.
 
 Endpoints:
     POST /sonarqube    — SonarQube quality gate webhook
@@ -25,6 +24,8 @@ PROJECT_DIR = "/mnt/d/realestate"
 WSL_DISTRO = "Ubuntu-22.04"
 WSL_USER = "jperez"
 MAX_RETRIES = 3
+KIRO_TIMEOUT = 900
+TRUSTED_TOOLS = "fs_read,fs_write,execute_bash,grep,glob,code,introspect,session,use_subagent,web_fetch,web_search"
 
 
 def get_local_ip():
@@ -46,119 +47,50 @@ def wsl_cmd(command):
     ]
 
 
-def run_shell(command, timeout=120):
-    try:
-        result = subprocess.run(
-            wsl_cmd(command), capture_output=True, text=True, timeout=timeout,
-            encoding="utf-8", errors="replace"
-        )
-        return result.returncode, result.stdout or "", result.stderr or ""
-    except subprocess.TimeoutExpired:
-        return -1, "", "Timed out"
-    except Exception as e:
-        return -1, "", str(e)
-
-
 def run_kiro(prompt, label):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"  [{timestamp}] Triggering kiro-cli for: {label}")
 
     escaped = prompt.replace('"', '\\"').replace("'", "'\\''")
-    
-    cmd_variants = [
-        f'kiro-cli chat --trust-tools=fs_read,fs_write,execute_bash,grep,glob,code,introspect,session,use_subagent,web_fetch,web_search --agent ci-fixer --no-interactive "{escaped}"',
-    ]
+    cmd = f'kiro-cli chat --trust-tools={TRUSTED_TOOLS} --agent ci-fixer --no-interactive "{escaped}"'
 
-    for i, cmd in enumerate(cmd_variants):
-        print(f"  Trying command variant {i + 1}/{len(cmd_variants)}")
-        
-        proc = subprocess.Popen(
-            wsl_cmd(cmd),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace"
-        )
-
-        try:
-            stdout, stderr = proc.communicate(timeout=900)
-            stdout = stdout or ""
-            stderr = stderr or ""
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            stdout, stderr = proc.communicate()
-            stdout = stdout or ""
-            stderr = stderr or ""
-            print(f"  ⚠ kiro-cli timed out after 15 minutes")
-            continue
-
-        print(f"  kiro-cli exit code: {proc.returncode}")
-        if stdout:
-            print(f"  stdout (last 500 chars): ...{stdout[-500:]}")
-        if stderr:
-            print(f"  stderr (last 300 chars): ...{stderr[-300:]}")
-
-        if "Tool approval required" in stderr or "Tool approval required" in stdout:
-            print(f"  ⚠ Tool approval error detected, trying next variant...")
-            continue
-
-        if "denied list" in stderr or "denied list" in stdout:
-            print(f"  ⚠ Tool denied in non-interactive mode, trying next variant...")
-            continue
-        
-        return proc.returncode == 0
-    
-    print(f"  ✗ All command variants failed")
-    return False
-
-
-def verify_and_push(job):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    checks = {
-        "lint": [
-            ("cargo fmt --all -- --check", "Formatting check"),
-            ("cargo clippy --workspace -- -D warnings", "Clippy check"),
-        ],
-        "test-backend": [
-            ("cargo test -p realestate-backend --all-targets", "Backend tests"),
-        ],
-        "test-frontend": [
-            ("cargo test -p realestate-frontend --all-targets", "Frontend tests"),
-        ],
-        "quality-gate": [
-            ("cargo audit", "Dependency audit"),
-        ],
-    }
-
-    verification_cmds = checks.get(job, [("cargo check --workspace", "Compile check")])
-
-    for cmd, label in verification_cmds:
-        print(f"  [{timestamp}] Verifying: {label}")
-        code, stdout, stderr = run_shell(cmd)
-        if code != 0:
-            print(f"  ✗ {label} still failing")
-            return False
-        print(f"  ✓ {label} passed")
-
-    print(f"  [{timestamp}] All checks passed. Committing and pushing...")
-    run_shell("git add -A")
-    code, _, _ = run_shell(
-        'git diff --cached --quiet || git commit -m "fix: resolve CI pipeline failures (auto-fix)"'
+    proc = subprocess.Popen(
+        wsl_cmd(cmd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace"
     )
-    code, stdout, stderr = run_shell("git push origin main")
-    if code == 0:
-        print(f"  ✓ Pushed successfully")
-        return True
-    else:
-        print(f"  ✗ Push failed: {stderr[:200]}")
+
+    try:
+        stdout, stderr = proc.communicate(timeout=KIRO_TIMEOUT)
+        stdout = stdout or ""
+        stderr = stderr or ""
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.communicate()
+        print(f"  ⚠ kiro-cli timed out after {KIRO_TIMEOUT // 60} minutes")
         return False
+
+    print(f"  kiro-cli exit code: {proc.returncode}")
+    if stdout:
+        print(f"  stdout (last 500 chars): ...{stdout[-500:]}")
+    if stderr:
+        print(f"  stderr (last 300 chars): ...{stderr[-300:]}")
+
+    if "Tool approval required" in stderr or "Tool approval required" in stdout:
+        print(f"  ⚠ Tool approval error detected")
+        return False
+
+    if "denied list" in stderr or "denied list" in stdout:
+        print(f"  ⚠ Tool denied in non-interactive mode")
+        return False
+
+    return True
 
 
 def fix_with_retry(job, step, error_log):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
     for attempt in range(1, MAX_RETRIES + 1):
         print(f"\n  === Attempt {attempt}/{MAX_RETRIES} for {job}/{step} ===")
 
@@ -167,49 +99,30 @@ def fix_with_retry(job, step, error_log):
             f"Error output:\n{error_log}\n",
         ]
 
-        if job == "lint":
-            prompt_parts.append(
-                "Fix the formatting and clippy warnings. "
-                "Run cargo fmt --all and cargo clippy --workspace -- -D warnings to verify."
-            )
-        elif job == "test-backend":
-            prompt_parts.append(
-                "Fix the failing backend tests. "
-                "Run cargo test -p realestate-backend --all-targets to verify."
-            )
-        elif job == "test-frontend":
-            prompt_parts.append(
-                "Fix the failing frontend tests. "
-                "Run cargo test -p realestate-frontend --all-targets to verify."
-            )
-        elif job == "quality-gate":
-            prompt_parts.append(
-                "Fix the quality gate failures (dependency audit, unused deps, or OWASP issues). "
-                "Run cargo audit and check Cargo.toml dependencies."
-            )
-        else:
-            prompt_parts.append(
-                "Analyze the error and fix the issue. "
-                "Run cargo check --workspace to verify the fix compiles."
-            )
+        job_instructions = {
+            "lint": "Fix the formatting and clippy warnings.",
+            "test-backend": "Fix the failing backend tests.",
+            "test-frontend": "Fix the failing frontend tests.",
+            "quality-gate": "Fix the quality gate failures (dependency audit, unused deps, or OWASP issues).",
+            "commit-lint": "The commit message format is wrong. This cannot be auto-fixed.",
+            "sonarqube": "Fix the SonarQube analysis failures.",
+        }
+        prompt_parts.append(job_instructions.get(job, "Analyze the error and fix the issue."))
 
         prompt_parts.append(
-            "After fixing, run cargo fmt, cargo clippy, and cargo test to verify everything passes. "
-            "Do NOT commit or push — just fix the code."
+            "After fixing, verify with cargo fmt --all, cargo clippy --workspace -- -D warnings, "
+            "and cargo test --workspace. Then commit and push: "
+            "git add -A && git commit -m 'fix: resolve CI failures (auto-fix)' && git push origin main"
         )
 
-        prompt = " ".join(prompt_parts)
-        kiro_ok = run_kiro(prompt, f"CI fix ({job}/{step}) attempt {attempt}")
-
-        if verify_and_push(job):
-            print(f"  ✓ Fixed and pushed on attempt {attempt}")
+        if run_kiro(" ".join(prompt_parts), f"CI fix ({job}/{step}) attempt {attempt}"):
+            print(f"  ✓ Attempt {attempt} completed")
             return True
 
-        print(f"  ✗ Attempt {attempt} did not fully resolve the issue")
+        print(f"  ✗ Attempt {attempt} failed")
 
-    print(f"  ✗ Failed to fix {job}/{step} after {MAX_RETRIES} attempts. Manual intervention needed.")
+    print(f"  ✗ Failed after {MAX_RETRIES} attempts. Manual intervention needed.")
     return False
-
 
 
 class WebhookHandler(BaseHTTPRequestHandler):
@@ -230,13 +143,9 @@ class WebhookHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"OK")
 
         if self.path == "/sonarqube":
-            threading.Thread(
-                target=self._handle_sonarqube, args=(payload,), daemon=True
-            ).start()
+            threading.Thread(target=self._handle_sonarqube, args=(payload,), daemon=True).start()
         elif self.path == "/ci-failure":
-            threading.Thread(
-                target=self._handle_ci_failure, args=(payload,), daemon=True
-            ).start()
+            threading.Thread(target=self._handle_ci_failure, args=(payload,), daemon=True).start()
         else:
             print(f"  Unknown endpoint: {self.path}")
 
@@ -253,7 +162,6 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
         conditions = payload.get("qualityGate", {}).get("conditions", [])
         failed = [c for c in conditions if c.get("status") == "ERROR"]
-
         if not failed:
             print("  No failed conditions found.")
             return
@@ -267,21 +175,17 @@ class WebhookHandler(BaseHTTPRequestHandler):
         prompt = (
             f"The SonarQube quality gate FAILED for project '{project}'. "
             f"Failed conditions: {failures_summary}. "
-            f"Use the SonarQube MCP tools to fetch the specific issues, "
-            f"then fix them in the codebase. After fixing, run cargo fmt, "
-            f"cargo clippy, and cargo test to verify. "
-            f"Do NOT commit or push — just fix the code."
+            f"Fetch the specific issues, fix them, verify with cargo fmt, clippy, and test. "
+            f"Then commit and push: git add -A && git commit -m 'fix: resolve SonarQube failures (auto-fix)' && git push origin main"
         )
 
         for attempt in range(1, MAX_RETRIES + 1):
             print(f"\n  === SonarQube fix attempt {attempt}/{MAX_RETRIES} ===")
-            run_kiro(prompt, f"SonarQube fix attempt {attempt}")
-
-            if verify_and_push("quality-gate"):
-                print(f"  ✓ SonarQube issues fixed and pushed on attempt {attempt}")
+            if run_kiro(prompt, f"SonarQube fix attempt {attempt}"):
+                print(f"  ✓ Completed on attempt {attempt}")
                 return
 
-        print(f"  ✗ Failed to fix SonarQube issues after {MAX_RETRIES} attempts.")
+        print(f"  ✗ Failed after {MAX_RETRIES} attempts.")
 
     def _handle_ci_failure(self, payload):
         job = payload.get("job", "unknown")
@@ -291,7 +195,6 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
         print(f"\n[{timestamp}] CI failure webhook: job={job}, step={step}")
         print(f"  Error: {error_log[:200]}")
-
         fix_with_retry(job, step, error_log)
 
     def log_message(self, format, *args):
@@ -302,7 +205,7 @@ def main():
     local_ip = get_local_ip()
     server = HTTPServer(("0.0.0.0", PORT), WebhookHandler)
     print(f"Quality webhook listener running on port {PORT}")
-    print(f"Max retries per failure: {MAX_RETRIES}")
+    print(f"Max retries: {MAX_RETRIES} | Timeout: {KIRO_TIMEOUT // 60}min")
     print(f"Endpoints:")
     print(f"  SonarQube:  http://{local_ip}:{PORT}/sonarqube")
     print(f"  CI failure: http://{local_ip}:{PORT}/ci-failure")
