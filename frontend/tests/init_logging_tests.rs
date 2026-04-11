@@ -74,9 +74,8 @@ mod structural_checks {
         for idx in 0..ROUTE_COUNT {
             let variant = route_variant_name(idx);
             assert!(
-                switch_fn.contains(&format!("Route::{}", variant)),
-                "switch() must handle Route::{}",
-                variant,
+                switch_fn.contains(&format!("Route::{variant}")),
+                "switch() must handle Route::{variant}",
             );
         }
     }
@@ -149,14 +148,14 @@ proptest! {
         let switch_fn = extract_switch_fn(SWITCH_FN_SOURCE);
 
         prop_assert!(
-            switch_fn.contains(&format!("Route::{}", variant)),
+            switch_fn.contains(&format!("Route::{variant}")),
             "switch() must handle Route::{} — routing preservation violated",
             variant,
         );
 
         if PUBLIC_ROUTES.contains(&variant) {
             prop_assert!(
-                !switch_fn.contains(&format!("Route::{} => html! {{ <ProtectedRoute>", variant)),
+                !switch_fn.contains(&format!("Route::{variant} => html! {{ <ProtectedRoute>")),
                 "Route::{} should render directly without ProtectedRoute wrapper",
                 variant,
             );
@@ -173,19 +172,18 @@ mod preservation_routing {
     fn public_routes_render_directly() {
         let switch_fn = extract_switch_fn(SWITCH_FN_SOURCE);
         for variant in &PUBLIC_ROUTES {
-            let arm = format!("Route::{}", variant);
+            let arm = format!("Route::{variant}");
             let arm_start = switch_fn
                 .find(&arm)
-                .unwrap_or_else(|| panic!("switch() must contain {}", arm));
+                .unwrap_or_else(|| panic!("switch() must contain {arm}"));
             let arm_rest = &switch_fn[arm_start..];
             let arm_end = arm_rest
                 .find('}')
-                .unwrap_or_else(|| panic!("Could not find end of arm for {}", arm));
+                .unwrap_or_else(|| panic!("Could not find end of arm for {arm}"));
             let arm_text = &arm_rest[..arm_end + 1];
             assert!(
                 !arm_text.contains("ProtectedRoute"),
-                "Route::{} must render directly without ProtectedRoute wrapper",
-                variant,
+                "Route::{variant} must render directly without ProtectedRoute wrapper",
             );
         }
     }
@@ -195,10 +193,10 @@ mod preservation_routing {
     fn protected_routes_wrapped_in_protected_route() {
         let switch_fn = extract_switch_fn(SWITCH_FN_SOURCE);
         for variant in &PROTECTED_ROUTES {
-            let arm = format!("Route::{}", variant);
+            let arm = format!("Route::{variant}");
             let arm_start = switch_fn
                 .find(&arm)
-                .unwrap_or_else(|| panic!("switch() must contain {}", arm));
+                .unwrap_or_else(|| panic!("switch() must contain {arm}"));
             let arm_rest = &switch_fn[arm_start..];
             let next_route = arm_rest[1..].find("Route::");
             let arm_text = match next_route {
@@ -207,8 +205,7 @@ mod preservation_routing {
             };
             assert!(
                 arm_text.contains("ProtectedRoute"),
-                "Route::{} must be wrapped in <ProtectedRoute>",
-                variant,
+                "Route::{variant} must be wrapped in <ProtectedRoute>",
             );
         }
     }
