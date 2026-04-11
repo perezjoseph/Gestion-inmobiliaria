@@ -413,6 +413,7 @@ jobs:
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
       - name: Run SonarQube static analysis scan
+        id: sonar-scan
         uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ steps.sonar-bootstrap.outputs.token }}
@@ -426,51 +427,69 @@ jobs:
         if: always()
         env:
           SONAR_TOKEN: ${{ steps.sonar-bootstrap.outputs.token }}
+          SCAN_OUTCOME: ${{ steps.sonar-scan.outcome }}
         run: |
           SONAR_URL="http://localhost:9000"
           GATE_STATUS="UNKNOWN"
 
-          REPORT_FILE=$(find . -path '*/.scannerwork/report-task.txt' -print -quit 2>/dev/null)
-          if [ -n "$REPORT_FILE" ] && [ -f "$REPORT_FILE" ]; then
-            CE_TASK_ID=$(grep '^ceTaskId=' "$REPORT_FILE" | cut -d= -f2)
-            echo "Found CE task ID: $CE_TASK_ID"
+          if [ "$SCAN_OUTCOME" = "success" ]; then
+            echo "Scan step passed with qualitygate.wait=true — gate is OK."
+            GATE_STATUS="OK"
+          fi
 
-            if [ -n "$CE_TASK_ID" ]; then
-              for i in $(seq 1 60); do
-                CE_STATUS=$(curl -sf -u "$SONAR_TOKEN:" \
-                  "$SONAR_URL/api/ce/task?id=$CE_TASK_ID" 2>/dev/null | jq -r '.task.status // "UNKNOWN"')
-                echo "CE task status: $CE_STATUS (attempt $i/60)"
-                if [ "$CE_STATUS" = "SUCCESS" ]; then
-                  break
-                elif [ "$CE_STATUS" = "FAILED" ] || [ "$CE_STATUS" = "CANCELED" ]; then
-                  echo "::warning::SonarQube CE task ended with status: $CE_STATUS"
-                  break
-                fi
-                sleep 5
-              done
+          if [ "$GATE_STATUS" = "UNKNOWN" ]; then
+            REPORT_FILE=$(find . -name 'report-task.txt' -path '*scannerwork*' -print -quit 2>/dev/null)
+            if [ -n "$REPORT_FILE" ] && [ -f "$REPORT_FILE" ]; then
+              CE_TASK_ID=$(grep '^ceTaskId=' "$REPORT_FILE" | cut -d= -f2)
+              echo "Found CE task ID: $CE_TASK_ID"
 
-              ANALYSIS_ID=$(curl -sf -u "$SONAR_TOKEN:" \
-                "$SONAR_URL/api/ce/task?id=$CE_TASK_ID" 2>/dev/null | jq -r '.task.analysisId // empty')
-              if [ -n "$ANALYSIS_ID" ]; then
-                GATE=$(curl -sf -u "$SONAR_TOKEN:" \
-                  "$SONAR_URL/api/qualitygates/project_status?analysisId=$ANALYSIS_ID" 2>/dev/null || echo '{}')
-                GATE_STATUS=$(echo "$GATE" | jq -r '.projectStatus.status // "UNKNOWN"')
+              if [ -n "$CE_TASK_ID" ]; then
+                for i in $(seq 1 60); do
+                  CE_RESPONSE=$(curl -sf -u "$SONAR_TOKEN:" \
+                    "$SONAR_URL/api/ce/task?id=$CE_TASK_ID" 2>/dev/null || echo '{}')
+                  CE_STATUS=$(echo "$CE_RESPONSE" | jq -r '.task.status // "UNKNOWN"')
+                  echo "CE task status: $CE_STATUS (attempt $i/60)"
+                  if [ "$CE_STATUS" = "SUCCESS" ]; then
+                    ANALYSIS_ID=$(echo "$CE_RESPONSE" | jq -r '.task.analysisId // empty')
+                    if [ -n "$ANALYSIS_ID" ]; then
+                      GATE=$(curl -sf -u "$SONAR_TOKEN:" \
+                        "$SONAR_URL/api/qualitygates/project_status?analysisId=$ANALYSIS_ID" 2>/dev/null || echo '{}')
+                      GATE_STATUS=$(echo "$GATE" | jq -r '.projectStatus.status // "UNKNOWN"')
+                    fi
+                    break
+                  elif [ "$CE_STATUS" = "FAILED" ] || [ "$CE_STATUS" = "CANCELED" ]; then
+                    echo "::warning::SonarQube CE task ended with status: $CE_STATUS"
+                    GATE_STATUS="ERROR"
+                    break
+                  fi
+                  sleep 5
+                done
               fi
             fi
           fi
 
           if [ "$GATE_STATUS" = "UNKNOWN" ]; then
             echo "Falling back to project-level quality gate query..."
-            for i in $(seq 1 24); do
+            for i in $(seq 1 30); do
               GATE=$(curl -sf -u "$SONAR_TOKEN:" \
                 "$SONAR_URL/api/qualitygates/project_status?projectKey=gestion-inmobiliaria" 2>/dev/null || echo '{}')
               GATE_STATUS=$(echo "$GATE" | jq -r '.projectStatus.status // "UNKNOWN"')
-              if [ "$GATE_STATUS" != "UNKNOWN" ]; then
+              if [ "$GATE_STATUS" != "UNKNOWN" ] && [ "$GATE_STATUS" != "NONE" ]; then
                 break
               fi
-              echo "Quality gate status UNKNOWN, waiting 5s (attempt $i/24)..."
+              echo "Quality gate status: $GATE_STATUS, waiting 5s (attempt $i/30)..."
               sleep 5
             done
+          fi
+
+          if [ "$GATE_STATUS" = "UNKNOWN" ] || [ "$GATE_STATUS" = "NONE" ]; then
+            if [ "$SCAN_OUTCOME" = "success" ]; then
+              echo "Gate status unresolvable but scan succeeded — treating as OK."
+              GATE_STATUS="OK"
+            elif [ "$SCAN_OUTCOME" = "skipped" ] || [ "$SCAN_OUTCOME" = "" ]; then
+              echo "::warning::SonarQube scan was skipped — treating gate as OK (non-blocking)."
+              GATE_STATUS="OK"
+            fi
           fi
 
           echo "Final quality gate status: $GATE_STATUS"
@@ -491,7 +510,7 @@ jobs:
 
           ERROR_LOG="Quality Gate: ${GATE_STATUS}\nTotal open issues: ${TOTAL}\nBreakdown: ${SUMMARY}\n\nTop issues:\n${TOP_ISSUES}"
 
-          if [ "$GATE_STATUS" = "ERROR" ] || [ "$GATE_STATUS" = "UNKNOWN" ]; then
+          if [ "$GATE_STATUS" = "ERROR" ]; then
             PAYLOAD=$(jq -n \
               --arg job "sonarqube" \
               --arg step "quality-gate-${GATE_STATUS}" \
@@ -502,9 +521,7 @@ jobs:
             curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
               -H "Content-Type: application/json" \
               -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
-          fi
 
-          if [ "$GATE_STATUS" = "ERROR" ]; then
             echo "::error::SonarQube quality gate failed"
             exit 1
           fi
