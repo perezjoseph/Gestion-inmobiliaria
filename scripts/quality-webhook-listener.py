@@ -27,7 +27,7 @@ WSL_DISTRO = "Ubuntu-22.04"
 WSL_USER = "jperez"
 MAX_RETRIES = 3
 KIRO_TIMEOUT = 3600
-TRUSTED_TOOLS = "fs_read,fs_write,execute_bash,grep,glob,code,introspect,session,use_subagent,web_fetch,web_search"
+TRUST_ALL_TOOLS = True
 
 _fix_lock = threading.Lock()
 
@@ -64,7 +64,7 @@ def run_kiro(prompt, label):
     log.info(f"Triggering kiro-cli for: {label}")
 
     escaped = prompt.replace('"', '\\"').replace("'", "'\\''")
-    cmd = f'kiro-cli chat --trust-tools={TRUSTED_TOOLS} --agent ci-fixer --no-interactive "{escaped}"'
+    cmd = f'kiro-cli chat --trust-all-tools --agent ci-fixer --no-interactive "{escaped}"'
     log.debug(f"Full kiro command: {cmd[:200]}...")
 
     log_file = os.path.join(os.path.dirname(__file__), "..", "kiro-debug.log")
@@ -267,7 +267,7 @@ def main():
     server = HTTPServer(("0.0.0.0", PORT), WebhookHandler)
     log.info(f"Quality webhook listener running on port {PORT}")
     log.info(f"Max retries: {MAX_RETRIES} | Timeout: {KIRO_TIMEOUT // 60}min")
-    log.info(f"Trusted tools: {TRUSTED_TOOLS}")
+    log.info(f"Trust all tools: {TRUST_ALL_TOOLS}")
     log.info(f"Endpoints:")
     log.info(f"  SonarQube:  http://{local_ip}:{PORT}/sonarqube")
     log.info(f"  CI failure: http://{local_ip}:{PORT}/ci-failure")
