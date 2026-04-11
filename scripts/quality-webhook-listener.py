@@ -82,7 +82,7 @@ def run_kiro(prompt, label):
         )
 
         try:
-            stdout, stderr = proc.communicate(timeout=300)
+            stdout, stderr = proc.communicate(timeout=900)
             stdout = stdout or ""
             stderr = stderr or ""
         except subprocess.TimeoutExpired:
@@ -90,7 +90,7 @@ def run_kiro(prompt, label):
             stdout, stderr = proc.communicate()
             stdout = stdout or ""
             stderr = stderr or ""
-            print(f"  ⚠ kiro-cli timed out after 5 minutes — likely stuck on approval")
+            print(f"  ⚠ kiro-cli timed out after 15 minutes")
             continue
 
         print(f"  kiro-cli exit code: {proc.returncode}")
