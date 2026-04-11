@@ -66,15 +66,34 @@ def run_kiro(prompt, label):
     escaped = prompt.replace('"', '\\"').replace("'", "'\\''")
     
     cmd_variants = [
-        f'kiro-cli chat --trust-tools=fs_read,fs_write,execute_bash,grep,glob,code --no-interactive "{escaped}"',
-        f'kiro-cli chat --trust-all-tools --no-interactive "{escaped}"',
+        f'kiro-cli chat --trust-tools=fs_read,fs_write,execute_bash,grep,glob,code,introspect,session,use_subagent,web_fetch,web_search --agent ci-fixer --no-interactive "{escaped}"',
     ]
 
     for i, cmd in enumerate(cmd_variants):
         print(f"  Trying command variant {i + 1}/{len(cmd_variants)}")
-        code, stdout, stderr = run_shell(cmd, timeout=600)
         
-        print(f"  kiro-cli exit code: {code}")
+        proc = subprocess.Popen(
+            wsl_cmd(cmd),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace"
+        )
+
+        try:
+            stdout, stderr = proc.communicate(timeout=300)
+            stdout = stdout or ""
+            stderr = stderr or ""
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            stdout, stderr = proc.communicate()
+            stdout = stdout or ""
+            stderr = stderr or ""
+            print(f"  ⚠ kiro-cli timed out after 5 minutes — likely stuck on approval")
+            continue
+
+        print(f"  kiro-cli exit code: {proc.returncode}")
         if stdout:
             print(f"  stdout (last 500 chars): ...{stdout[-500:]}")
         if stderr:
@@ -83,10 +102,14 @@ def run_kiro(prompt, label):
         if "Tool approval required" in stderr or "Tool approval required" in stdout:
             print(f"  ⚠ Tool approval error detected, trying next variant...")
             continue
+
+        if "denied list" in stderr or "denied list" in stdout:
+            print(f"  ⚠ Tool denied in non-interactive mode, trying next variant...")
+            continue
         
-        return code == 0
+        return proc.returncode == 0
     
-    print(f"  ✗ All command variants failed with tool approval errors")
+    print(f"  ✗ All command variants failed")
     return False
 
 
