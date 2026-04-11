@@ -118,7 +118,7 @@ jobs:
 
   test-backend:
     name: Backend Unit & Integration Tests
-    runs-on: [self-hosted, linux, docker]
+    runs-on: [self-hosted, linux, docker, sonarqube]
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
     services:
@@ -338,7 +338,7 @@ jobs:
 
   sonarqube:
     name: SonarQube Code Quality & Coverage Analysis
-    runs-on: [self-hosted, linux, sonarqube]
+    runs-on: [self-hosted, linux, docker, sonarqube]
     continue-on-error: true
     steps:
       - name: Checkout repository with full history for blame analysis
