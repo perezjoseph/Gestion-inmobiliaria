@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions:
+  actions: write
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -228,6 +232,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Install unzip for SonarQube scanner extraction
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq unzip
 
       - name: Run SonarQube static analysis scan
         uses: SonarSource/sonarqube-scan-action@v6
