@@ -229,16 +229,22 @@ jobs:
           if command -v cargo-audit &>/dev/null; then
             echo "cargo-audit already installed: $(cargo audit --version)"
           else
+            mkdir -p "$HOME/.cargo/bin"
+            export PATH="$HOME/.cargo/bin:$PATH"
             AUDIT_VERSION="0.22.1"
             echo "Downloading pre-built cargo-audit v${AUDIT_VERSION}..."
-            curl -sSfL -o /tmp/cargo-audit.tgz \
-              "https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-musl-v${AUDIT_VERSION}.tgz" \
-              2>&1 | tee /tmp/install-audit-output.txt && \
-            tar xzf /tmp/cargo-audit.tgz --strip-components=1 -C "$HOME/.cargo/bin/" 2>&1 | tee -a /tmp/install-audit-output.txt && \
-            chmod +x "$HOME/.cargo/bin/cargo-audit" || {
-              echo "Pre-built binary failed, trying cargo install..."
+            for VARIANT in musl gnu; do
+              URL="https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-${VARIANT}-v${AUDIT_VERSION}.tgz"
+              if curl -sSfL --retry 3 --retry-delay 5 -o /tmp/cargo-audit.tgz "$URL" 2>/tmp/install-audit-output.txt; then
+                tar xzf /tmp/cargo-audit.tgz --strip-components=1 -C "$HOME/.cargo/bin/" 2>>/tmp/install-audit-output.txt && \
+                chmod +x "$HOME/.cargo/bin/cargo-audit" && break
+              fi
+              echo "Failed to download ${VARIANT} variant, trying next..." | tee -a /tmp/install-audit-output.txt
+            done
+            if ! command -v cargo-audit &>/dev/null; then
+              echo "Pre-built binaries failed, trying cargo install..." | tee -a /tmp/install-audit-output.txt
               cargo install cargo-audit --locked 2>&1 | tee -a /tmp/install-audit-output.txt
-            }
+            fi
           fi
           cargo audit --version
 
@@ -266,6 +272,9 @@ jobs:
             --enableExperimental
             --failOnCVSS 7
             --suppression owasp-suppressions.xml
+            --exclude target/**
+            --exclude node_modules/**
+            --exclude dist/**
 
       - name: Upload OWASP vulnerability report as artifact
         if: always()
