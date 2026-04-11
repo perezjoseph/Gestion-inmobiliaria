@@ -1,32 +1,37 @@
-use genpdf::Element as _;
-use genpdf::{elements, style};
+use numaelis_rckive_genpdf::Element as _;
+use numaelis_rckive_genpdf::{elements, style};
 use sea_orm::{DatabaseConnection, EntityTrait};
 use uuid::Uuid;
 
 use crate::entities::{contrato, inquilino, pago, propiedad};
 use crate::errors::AppError;
 
-fn load_font_family() -> Result<genpdf::fonts::FontFamily<genpdf::fonts::FontData>, AppError> {
-    let regular = genpdf::fonts::FontData::new(
+fn load_font_family() -> Result<
+    numaelis_rckive_genpdf::fonts::FontFamily<numaelis_rckive_genpdf::fonts::FontData>,
+    AppError,
+> {
+    let regular = numaelis_rckive_genpdf::fonts::FontData::new(
         include_bytes!("../../fonts/Arial-Regular.ttf").to_vec(),
         None,
     )
     .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente regular: {e}")))?;
-    let bold =
-        genpdf::fonts::FontData::new(include_bytes!("../../fonts/Arial-Bold.ttf").to_vec(), None)
-            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente bold: {e}")))?;
-    let italic = genpdf::fonts::FontData::new(
+    let bold = numaelis_rckive_genpdf::fonts::FontData::new(
+        include_bytes!("../../fonts/Arial-Bold.ttf").to_vec(),
+        None,
+    )
+    .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente bold: {e}")))?;
+    let italic = numaelis_rckive_genpdf::fonts::FontData::new(
         include_bytes!("../../fonts/Arial-Italic.ttf").to_vec(),
         None,
     )
     .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente italic: {e}")))?;
-    let bold_italic = genpdf::fonts::FontData::new(
+    let bold_italic = numaelis_rckive_genpdf::fonts::FontData::new(
         include_bytes!("../../fonts/Arial-BoldItalic.ttf").to_vec(),
         None,
     )
     .map_err(|e| AppError::Internal(anyhow::anyhow!("Error cargando fuente bold-italic: {e}")))?;
 
-    Ok(genpdf::fonts::FontFamily {
+    Ok(numaelis_rckive_genpdf::fonts::FontFamily {
         regular,
         bold,
         italic,
@@ -93,11 +98,11 @@ pub async fn generar_recibo(db: &DatabaseConnection, pago_id: Uuid) -> Result<Ve
     let receipt_number = format!("REC-{}", Uuid::new_v4().to_string()[..8].to_uppercase());
 
     let font_family = load_font_family()?;
-    let mut doc = genpdf::Document::new(font_family);
+    let mut doc = numaelis_rckive_genpdf::Document::new(font_family);
     doc.set_title("Recibo de Pago");
     doc.set_minimal_conformance();
 
-    let mut decorator = genpdf::SimplePageDecorator::new();
+    let mut decorator = numaelis_rckive_genpdf::SimplePageDecorator::new();
     decorator.set_margins(15);
     doc.set_page_decorator(decorator);
 

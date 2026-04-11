@@ -1,238 +1,118 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
 
-    <!-- time 0.2.27: CVE-2020-26235 (CVSS 7.5) - localtime_r environment variable race condition.
-         Transitive dep via genpdf -> printpdf -> lopdf -> time 0.2.x.
-         Not exploitable: backend runs single-timezone (no localtime_r calls from our code),
-         and this crate is only used for PDF metadata timestamps. -->
+    <!-- h2 0.3.x: CVE-2024-27316 / RUSTSEC-2024-0332 (CONTINUATION Flood, CVSS 7.5).
+         Pinned by actix-http 3.x — cannot upgrade without actix-web 5.x (not yet stable).
+         Mitigated: actix-governor rate limiting and actix-web connection handling limits. -->
     <suppress>
-        <notes>time 0.2.x localtime_r race - transitive via genpdf, not exploitable in our context</notes>
-        <cpe>cpe:/a:time_project:time</cpe>
-        <cve>CVE-2020-26235</cve>
-    </suppress>
-    <suppress>
-        <notes>time 0.2.x localtime_r race - alternate CPE match</notes>
-        <packageUrl regex="true">^pkg:cargo/time@0\.2\..*$</packageUrl>
-        <cve>CVE-2020-26235</cve>
-    </suppress>
-
-    <!-- stdweb 0.4.20: unmaintained, no specific CVE but OWASP may flag via NVD.
-         Transitive dep via time 0.2.x (optional feature). Not used at runtime. -->
-    <suppress>
-        <notes>stdweb unmaintained - transitive via time 0.2.x, not used at runtime</notes>
-        <packageUrl regex="true">^pkg:cargo/stdweb@.*$</packageUrl>
-        <vulnerabilityName regex="true">.*</vulnerabilityName>
-    </suppress>
-
-    <!-- rand 0.8.5 / 0.9.2: RUSTSEC-2026-0097 unsoundness with custom logger.
-         We do not use custom loggers with rand::rng(). Transitive dep via sqlx, actix, etc. -->
-    <suppress>
-        <notes>rand unsoundness with custom logger - not applicable, no custom logger used</notes>
-        <packageUrl regex="true">^pkg:cargo/rand@.*$</packageUrl>
-        <vulnerabilityName regex="true">.*RUSTSEC-2026-0097.*</vulnerabilityName>
-    </suppress>
-
-    <!-- encoding 0.2.33: unmaintained. Transitive via lopdf -> genpdf. -->
-    <suppress>
-        <notes>encoding unmaintained - transitive via genpdf PDF generation chain</notes>
-        <packageUrl regex="true">^pkg:cargo/encoding@.*$</packageUrl>
-        <vulnerabilityName regex="true">.*</vulnerabilityName>
-    </suppress>
-
-    <!-- lzw 0.10.0: unmaintained. Transitive via lopdf -> genpdf. -->
-    <suppress>
-        <notes>lzw unmaintained - transitive via genpdf PDF generation chain</notes>
-        <packageUrl regex="true">^pkg:cargo/lzw@.*$</packageUrl>
-        <vulnerabilityName regex="true">.*</vulnerabilityName>
-    </suppress>
-
-    <!-- h2 0.3.x: CVE-2024-27316 / RUSTSEC-2024-0332 (CONTINUATION Flood, CVSS 7.5)
-         and CVE-2024-25510 / RUSTSEC-2024-0003 (resource exhaustion).
-         Transitive dep via actix-http 3.x which pins h2 to 0.3.x series.
-         Mitigated: actix-governor rate limiting (10 req/min burst), and actix-web's
-         own connection handling limits concurrent streams. Upgrading requires
-         actix-web 5.x (not yet stable). -->
-    <suppress>
-        <notes>h2 0.3.x CONTINUATION Flood - mitigated by rate limiting, pinned by actix-http 3.x</notes>
+        <notes>h2 0.3.x CONTINUATION Flood - pinned by actix-http 3.x, mitigated by rate limiting</notes>
         <packageUrl regex="true">^pkg:cargo/h2@0\.3\..*$</packageUrl>
-        <vulnerabilityName regex="true">.*</vulnerabilityName>
+        <cve>CVE-2024-27316</cve>
+    </suppress>
+    <suppress>
+        <notes>h2 0.3.x resource exhaustion - pinned by actix-http 3.x</notes>
+        <packageUrl regex="true">^pkg:cargo/h2@0\.3\..*$</packageUrl>
+        <cve>CVE-2024-25510</cve>
     </suppress>
 
-    <!-- time 0.2.x: RUSTSEC-2026-0009 (DoS via stack exhaustion, MEDIUM).
-         Transitive dep via genpdf -> lopdf. Only used for PDF metadata timestamps,
-         not for parsing untrusted input. -->
+    <!-- rsa 0.9.x: Marvin Attack timing sidechannel (CVSS 5.9 medium).
+         No patched version available. We use HMAC-based JWTs, not RSA keys. -->
     <suppress>
-        <notes>time 0.2.x stack exhaustion DoS - transitive via genpdf, no untrusted input parsing</notes>
-        <packageUrl regex="true">^pkg:cargo/time@0\.2\..*$</packageUrl>
-        <vulnerabilityName regex="true">.*</vulnerabilityName>
+        <notes>rsa Marvin Attack - not exploitable, we use HMAC JWTs not RSA</notes>
+        <packageUrl regex="true">^pkg:cargo/rsa@0\.9\..*$</packageUrl>
+        <cve>CVE-2023-49092</cve>
     </suppress>
 
-    <!-- ring: OWASP may match the Rust "ring" crate against unrelated CVEs for
-         other software named "ring". Our ring 0.17.14 is current and maintained. -->
+    <!-- ══════════════════════════════════════════════════════════════════
+         FALSE POSITIVE CPE SUPPRESSIONS
+         OWASP Dependency-Check with enableExperimental aggressively matches
+         Rust crate names against NVD CPE entries for unrelated C/C++/Java
+         software. These are name-collision false positives only.
+         Actual Rust vulnerabilities are caught by cargo-audit (RustSec DB).
+         ══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ring crate matched against unrelated "ring" software -->
     <suppress>
-        <notes>ring crate false positive CPE matches against unrelated software</notes>
+        <notes>ring crate false positive - Rust crypto, not unrelated ring software</notes>
         <packageUrl regex="true">^pkg:cargo/ring@.*$</packageUrl>
         <cpe regex="true">cpe:/a:.*:ring:.*</cpe>
     </suppress>
 
-    <!-- False positives: OWASP may match Rust crates against unrelated C/C++ CVEs
-         based on name similarity (e.g., "openssl" crate vs OpenSSL C library). -->
+    <!-- Rust openssl-sys/openssl crate matched against OpenSSL C library CVEs -->
     <suppress>
-        <notes>Suppress false positive CPE matches for Rust crates misidentified as C libraries</notes>
+        <notes>Rust openssl crate false positive CPE match against C OpenSSL</notes>
         <packageUrl regex="true">^pkg:cargo/.*$</packageUrl>
         <cpe regex="true">cpe:/a:openssl:openssl:.*</cpe>
     </suppress>
 
-    <!-- Generic false positive: OWASP matches Rust crate names against unrelated
-         C/C++/Java CVEs via CPE name similarity (e.g., "csv", "futures", "image"). -->
+    <!-- h2 crate matched against H2 Java database -->
     <suppress>
-        <notes>Suppress false positive CPE matches for common Rust crate names</notes>
-        <packageUrl regex="true">^pkg:cargo/.*$</packageUrl>
-        <cpe regex="true">cpe:/a:csv_project:csv:.*</cpe>
-    </suppress>
-    <suppress>
-        <notes>Suppress false positive CPE matches for h2 crate vs H2 database</notes>
+        <notes>h2 crate false positive - Rust HTTP/2, not H2 Java database</notes>
         <packageUrl regex="true">^pkg:cargo/h2@.*$</packageUrl>
         <cpe regex="true">cpe:/a:h2database:h2:.*</cpe>
     </suppress>
 
-    <!-- cookie crate: OWASP matches Rust cookie crate against unrelated cookie-handling CVEs -->
+    <!-- cookie crate matched against unrelated cookie-handling CVEs -->
     <suppress>
-        <notes>cookie crate false positive - Rust HTTP cookie crate, not a vulnerable cookie library</notes>
+        <notes>cookie crate false positive - Rust HTTP cookie crate</notes>
         <packageUrl regex="true">^pkg:cargo/cookie@.*$</packageUrl>
         <cpe regex="true">cpe:/a:.*:cookie:.*</cpe>
     </suppress>
 
-    <!-- url crate: OWASP matches Rust url crate against unrelated URL parsing CVEs -->
+    <!-- url crate matched against unrelated URL parsing CVEs -->
     <suppress>
-        <notes>url crate false positive - Rust URL parser, not related to C/Java URL libraries</notes>
+        <notes>url crate false positive - Rust URL parser</notes>
         <packageUrl regex="true">^pkg:cargo/url@.*$</packageUrl>
         <cpe regex="true">cpe:/a:.*:url:.*</cpe>
     </suppress>
 
-    <!-- idna crate: OWASP matches against unrelated IDNA implementations -->
+    <!-- idna crate matched against unrelated IDNA implementations -->
     <suppress>
-        <notes>idna crate false positive - Rust IDNA implementation, not related to other IDNA CVEs</notes>
+        <notes>idna crate false positive - Rust IDNA implementation</notes>
         <packageUrl regex="true">^pkg:cargo/idna@.*$</packageUrl>
         <cpe regex="true">cpe:/a:.*:idna:.*</cpe>
     </suppress>
 
-    <!-- rustls: OWASP may match against OpenSSL/GnuTLS/other TLS CVEs -->
+    <!-- rustls matched against OpenSSL/GnuTLS/other TLS CVEs -->
     <suppress>
         <notes>rustls false positive - pure Rust TLS, not OpenSSL/GnuTLS</notes>
         <packageUrl regex="true">^pkg:cargo/rustls@.*$</packageUrl>
         <cpe regex="true">cpe:/a:.*:(openssl|gnutls|libressl|boringssl|wolfssl|mbedtls):.*</cpe>
     </suppress>
 
-    <!-- rsa crate: OWASP matches against OpenSSL RSA CVEs -->
+    <!-- rsa crate matched against OpenSSL RSA CVEs -->
     <suppress>
         <notes>rsa crate false positive - pure Rust RSA, not OpenSSL</notes>
         <packageUrl regex="true">^pkg:cargo/rsa@.*$</packageUrl>
-        <cpe regex="true">cpe:/a:.*:rsa:.*</cpe>
+        <cpe regex="true">cpe:/a:openssl:openssl:.*</cpe>
     </suppress>
 
-    <!-- sha1/sha2 crates: OWASP matches against unrelated SHA implementations -->
+    <!-- http crate matched against HTTP server/client CVEs -->
     <suppress>
-        <notes>sha1 crate false positive - Rust SHA-1 implementation</notes>
-        <packageUrl regex="true">^pkg:cargo/sha1@.*$</packageUrl>
-        <cpe regex="true">cpe:/a:.*:sha1:.*</cpe>
-    </suppress>
-    <suppress>
-        <notes>sha2 crate false positive - Rust SHA-2 implementation</notes>
-        <packageUrl regex="true">^pkg:cargo/sha2@.*$</packageUrl>
-        <cpe regex="true">cpe:/a:.*:sha2:.*</cpe>
-    </suppress>
-
-    <!-- http crate: OWASP matches against HTTP server/client CVEs -->
-    <suppress>
-        <notes>http crate false positive - Rust HTTP types library, not an HTTP server</notes>
+        <notes>http crate false positive - Rust HTTP types library, not a server</notes>
         <packageUrl regex="true">^pkg:cargo/http@.*$</packageUrl>
         <cpe regex="true">cpe:/a:.*:http:.*</cpe>
     </suppress>
 
-    <!-- futures crate: OWASP matches against unrelated "futures" software -->
-    <suppress>
-        <notes>futures crate false positive - Rust async primitives, not related to other software</notes>
-        <packageUrl regex="true">^pkg:cargo/futures@.*$</packageUrl>
-        <cpe regex="true">cpe:/a:.*:futures:.*</cpe>
-    </suppress>
-    <suppress>
-        <notes>futures-util crate false positive</notes>
-        <packageUrl regex="true">^pkg:cargo/futures-util@.*$</packageUrl>
-        <cpe regex="true">cpe:/a:.*:futures.*:.*</cpe>
-    </suppress>
-
-    <!-- tokio: OWASP may match against unrelated software -->
+    <!-- tokio matched against unrelated software named tokio -->
     <suppress>
         <notes>tokio false positive CPE match</notes>
         <packageUrl regex="true">^pkg:cargo/tokio@.*$</packageUrl>
         <cpe regex="true">cpe:/a:.*:tokio:.*</cpe>
     </suppress>
 
-    <!-- regex crate: OWASP matches against unrelated regex engine CVEs -->
+    <!-- regex crate matched against PCRE/Oniguruma CVEs -->
     <suppress>
-        <notes>regex crate false positive - Rust regex engine, not PCRE/Oniguruma</notes>
+        <notes>regex crate false positive - Rust regex engine, not PCRE</notes>
         <packageUrl regex="true">^pkg:cargo/regex@.*$</packageUrl>
         <cpe regex="true">cpe:/a:.*:regex:.*</cpe>
     </suppress>
 
-    <!-- Broad suppression: Rust cargo crates matched against unrelated software via CPE.
-         OWASP Dependency-Check with enableExperimental aggressively matches crate names
-         against NVD CPE entries for unrelated C/C++/Java/Python software. All actual Rust
-         vulnerabilities are caught by cargo-audit which uses the RustSec advisory database. -->
+    <!-- csv crate matched against unrelated CSV software -->
     <suppress>
-        <notes>Suppress all CPE-based false positives for cargo crates - cargo-audit handles Rust-specific advisories</notes>
-        <packageUrl regex="true">^pkg:cargo/.*$</packageUrl>
-        <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
-    </suppress>
-
-    <suppress>
-        <notes>Suppress GHSA advisories for cargo crates - cargo-audit/RustSec is authoritative for Rust</notes>
-        <packageUrl regex="true">^pkg:cargo/.*$</packageUrl>
-        <vulnerabilityName regex="true">^GHSA-.*$</vulnerabilityName>
-    </suppress>
-
-    <suppress>
-        <notes>Suppress all remaining vulnerability patterns for cargo crates (RUSTSEC, OSV, etc.) - cargo-audit is authoritative</notes>
-        <packageUrl regex="true">^pkg:cargo/.*$</packageUrl>
-        <vulnerabilityName regex="true">.*</vulnerabilityName>
-    </suppress>
-
-    <!-- File-path-based suppression: OWASP may identify deps from Cargo.lock without assigning a packageUrl -->
-    <suppress>
-        <notes>Suppress all vulnerabilities identified via Cargo.lock file evidence - cargo-audit is authoritative for Rust</notes>
-        <filePath regex="true">.*Cargo\.lock$</filePath>
-        <vulnerabilityName regex="true">.*</vulnerabilityName>
-    </suppress>
-
-    <suppress>
-        <notes>Suppress all vulnerabilities identified via Cargo.toml file evidence</notes>
-        <filePath regex="true">.*Cargo\.toml$</filePath>
-        <vulnerabilityName regex="true">.*</vulnerabilityName>
-    </suppress>
-
-    <!-- Suppress any evidence from Rust build artifacts or source files -->
-    <suppress>
-        <notes>Suppress vulnerabilities from .rs source files - false positive file evidence</notes>
-        <filePath regex="true">.*\.rs$</filePath>
-        <vulnerabilityName regex="true">.*</vulnerabilityName>
-    </suppress>
-    <suppress>
-        <notes>Suppress vulnerabilities from .rlib build artifacts</notes>
-        <filePath regex="true">.*\.rlib$</filePath>
-        <vulnerabilityName regex="true">.*</vulnerabilityName>
-    </suppress>
-    <suppress>
-        <notes>Suppress vulnerabilities from target directory build artifacts</notes>
-        <filePath regex="true">.*target[/\\].*</filePath>
-        <vulnerabilityName regex="true">.*</vulnerabilityName>
-    </suppress>
-
-    <!-- Suppress docker-compose evidence - OWASP may flag postgres image version -->
-    <suppress>
-        <notes>Suppress vulnerabilities from docker-compose files - infrastructure config, not runtime deps</notes>
-        <filePath regex="true">.*docker-compose.*\.(yml|yaml)$</filePath>
-        <vulnerabilityName regex="true">.*</vulnerabilityName>
+        <notes>csv crate false positive CPE match</notes>
+        <packageUrl regex="true">^pkg:cargo/csv@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:csv_project:csv:.*</cpe>
     </suppress>
 
 </suppressions>
