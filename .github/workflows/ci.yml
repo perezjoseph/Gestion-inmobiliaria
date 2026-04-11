@@ -230,7 +230,8 @@ jobs:
             echo "cargo install failed, falling back to pre-built binary..."
             AUDIT_VERSION="0.22.1"
             curl -sSfL "https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-musl-v${AUDIT_VERSION}.tgz" \
-              | tar xz -C "$HOME/.cargo/bin/" 2>&1 | tee -a /tmp/install-audit-output.txt
+              | tar xz --strip-components=1 -C "$HOME/.cargo/bin/" 2>&1 | tee -a /tmp/install-audit-output.txt
+            chmod +x "$HOME/.cargo/bin/cargo-audit"
           }
 
       - name: Scan Rust dependencies for known vulnerabilities (CVEs)
@@ -311,21 +312,32 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install unzip for SonarQube scanner extraction
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq unzip
-
-      - name: Verify SonarQube server is reachable
-        id: sonar-check
+      - name: Set vm.max_map_count for Elasticsearch
         run: |
-          if ! curl -sf --connect-timeout 5 --max-time 10 http://localhost:9000/api/system/status; then
-            echo "reachable=false" >> $GITHUB_OUTPUT
-            echo "::warning::SonarQube server is not reachable at localhost:9000"
-          else
-            echo "reachable=true" >> $GITHUB_OUTPUT
+          CURRENT=$(cat /proc/sys/vm/max_map_count)
+          if [ "$CURRENT" -lt 524288 ]; then
+            echo "Setting vm.max_map_count=524288 (current: $CURRENT)"
+            sudo sysctl -w vm.max_map_count=524288 || echo "::warning::Could not set vm.max_map_count — SonarQube may fail to start"
           fi
 
+      - name: Deploy SonarQube via docker-compose
+        run: |
+          docker compose -f .github/docker-compose.sonarqube.yml up -d
+          echo "Waiting for SonarQube to be ready..."
+          for i in $(seq 1 40); do
+            STATUS=$(curl -sf --connect-timeout 5 --max-time 10 http://localhost:9000/api/system/status 2>/dev/null | grep -o '"status":"[^"]*"' | cut -d'"' -f4 || true)
+            if [ "$STATUS" = "UP" ]; then
+              echo "SonarQube is ready."
+              exit 0
+            fi
+            echo "Attempt $i/40 — status: ${STATUS:-unreachable}. Retrying in 10s..."
+            sleep 10
+          done
+          echo "::error::SonarQube did not become ready within ~7 minutes"
+          docker compose -f .github/docker-compose.sonarqube.yml logs sonarqube | tail -50
+          exit 1
+
       - name: Run SonarQube static analysis scan
-        if: steps.sonar-check.outputs.reachable == 'true'
         uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

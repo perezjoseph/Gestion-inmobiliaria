@@ -1,17 +1,25 @@
 services:
   sonarqube-db:
     image: postgres:16
+    restart: unless-stopped
     environment:
       POSTGRES_DB: sonarqube
       POSTGRES_USER: sonar
       POSTGRES_PASSWORD: sonar_password
     volumes:
       - sonarqube_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonar -d sonarqube"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   sonarqube:
     image: sonarqube:community
+    restart: unless-stopped
     depends_on:
-      - sonarqube-db
+      sonarqube-db:
+        condition: service_healthy
     ports:
       - "9000:9000"
     environment:
