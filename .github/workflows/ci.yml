@@ -17,7 +17,7 @@ env:
 jobs:
   commit-lint:
     name: Commit Message Lint
-    runs-on: [self-hosted, linux]
+    runs-on: [self-hosted, linux, sonarqube]
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
@@ -34,7 +34,7 @@ jobs:
 
   lint:
     name: Lint & Format
-    runs-on: [self-hosted, linux]
+    runs-on: [self-hosted, linux, sonarqube]
     steps:
       - uses: actions/checkout@v4
 
@@ -65,7 +65,7 @@ jobs:
 
   test-backend:
     name: Backend Tests
-    runs-on: [self-hosted, linux]
+    runs-on: [self-hosted, linux, sonarqube]
     services:
       postgres:
         image: postgres:16
@@ -101,7 +101,7 @@ jobs:
 
   test-frontend:
     name: Frontend Property Tests
-    runs-on: [self-hosted, linux]
+    runs-on: [self-hosted, linux, sonarqube]
     steps:
       - uses: actions/checkout@v4
 
@@ -125,7 +125,7 @@ jobs:
 
   quality-gate:
     name: Quality Gate
-    runs-on: [self-hosted, linux]
+    runs-on: [self-hosted, linux, sonarqube]
     needs: [lint, test-backend, test-frontend]
     steps:
       - name: Verify all checks passed
@@ -183,7 +183,7 @@ jobs:
 
   build-frontend:
     name: Build Frontend (WASM)
-    runs-on: [self-hosted, linux]
+    runs-on: [self-hosted, linux, sonarqube]
     needs: [quality-gate]
     steps:
       - uses: actions/checkout@v4
@@ -219,66 +219,66 @@ jobs:
 
   notify-failure:
     name: Notify Kiro on Failure
-    runs-on: [self-hosted, linux]
+    runs-on: [self-hosted, linux, sonarqube]
     needs: [lint, test-backend, test-frontend, quality-gate, build-frontend]
     if: always() && contains(needs.*.result, 'failure')
     steps:
       - name: Notify lint failure
         if: always() && needs.lint.result == 'failure'
         run: |
-          curl -s -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
             -d '{
               "job": "lint",
               "step": "clippy-or-fmt",
               "error_log": "Lint job failed. Check cargo fmt --all -- --check and cargo clippy --workspace -- -D warnings",
               "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }'
+            }' || echo "Webhook unreachable — skipping notification"
 
       - name: Notify backend test failure
         if: always() && needs.test-backend.result == 'failure'
         run: |
-          curl -s -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
             -d '{
               "job": "test-backend",
               "step": "cargo-test",
               "error_log": "Backend tests failed. Run cargo test -p realestate-backend --all-targets to reproduce.",
               "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }'
+            }' || echo "Webhook unreachable — skipping notification"
 
       - name: Notify frontend test failure
         if: always() && needs.test-frontend.result == 'failure'
         run: |
-          curl -s -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
             -d '{
               "job": "test-frontend",
               "step": "cargo-test",
               "error_log": "Frontend property tests failed. Run cargo test -p realestate-frontend --all-targets to reproduce.",
               "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }'
+            }' || echo "Webhook unreachable — skipping notification"
 
       - name: Notify quality gate failure
         if: always() && needs.quality-gate.result == 'failure'
         run: |
-          curl -s -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
             -d '{
               "job": "quality-gate",
               "step": "audit-or-owasp",
               "error_log": "Quality gate failed. Check cargo audit, cargo-udeps, or OWASP dependency check.",
               "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }'
+            }' || echo "Webhook unreachable — skipping notification"
 
       - name: Notify build failure
         if: always() && needs.build-frontend.result == 'failure'
         run: |
-          curl -s -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
             -d '{
               "job": "build-frontend",
               "step": "trunk-build",
               "error_log": "Frontend WASM build failed. Run trunk build --release in frontend/ to reproduce.",
               "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }'
+            }' || echo "Webhook unreachable — skipping notification"
