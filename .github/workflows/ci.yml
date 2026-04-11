@@ -371,6 +371,15 @@ jobs:
             "$SONAR_URL/api/projects/create?name=Gestion+Inmobiliaria&project=gestion-inmobiliaria" \
             2>/dev/null || echo "Project already exists."
 
+          # Assign the default quality gate to the project
+          DEFAULT_QG=$(curl -sf -u "admin:${ADMIN_PASS}" \
+            "$SONAR_URL/api/qualitygates/list" | jq -r '.qualitygates[] | select(.isDefault==true) | .name' 2>/dev/null || echo "Sonar way")
+          if [ -n "$DEFAULT_QG" ]; then
+            curl -sf -u "admin:${ADMIN_PASS}" -X POST \
+              "$SONAR_URL/api/qualitygates/select?projectKey=gestion-inmobiliaria&gateName=$(echo "$DEFAULT_QG" | jq -sRr @uri)" \
+              2>/dev/null || echo "Quality gate already assigned."
+          fi
+
           # Generate or reuse a token
           TOKEN="${{ secrets.SONAR_TOKEN }}"
           if [ -z "$TOKEN" ]; then
@@ -402,10 +411,18 @@ jobs:
           SONAR_TOKEN: ${{ steps.sonar-bootstrap.outputs.token }}
         run: |
 
-          # Fetch project status (quality gate)
-          GATE=$(curl -sf -u "$SONAR_TOKEN:" \
-            "http://localhost:9000/api/qualitygates/project_status?projectKey=gestion-inmobiliaria" 2>/dev/null || echo '{}')
-          GATE_STATUS=$(echo "$GATE" | jq -r '.projectStatus.status // "UNKNOWN"')
+          # Wait for the analysis task to complete (up to 60s)
+          GATE_STATUS="UNKNOWN"
+          for i in $(seq 1 12); do
+            GATE=$(curl -sf -u "$SONAR_TOKEN:" \
+              "http://localhost:9000/api/qualitygates/project_status?projectKey=gestion-inmobiliaria" 2>/dev/null || echo '{}')
+            GATE_STATUS=$(echo "$GATE" | jq -r '.projectStatus.status // "UNKNOWN"')
+            if [ "$GATE_STATUS" != "UNKNOWN" ]; then
+              break
+            fi
+            echo "Quality gate status UNKNOWN, waiting 5s (attempt $i/12)..."
+            sleep 5
+          done
 
           # Fetch new issues (bugs, vulnerabilities, code smells)
           ISSUES=$(curl -sf -u "$SONAR_TOKEN:" \
@@ -426,16 +443,19 @@ jobs:
 
           ERROR_LOG="Quality Gate: ${GATE_STATUS}\nTotal open issues: ${TOTAL}\nBreakdown: ${SUMMARY}\n\nTop issues:\n${TOP_ISSUES}"
 
-          PAYLOAD=$(jq -n \
-            --arg job "sonarqube" \
-            --arg step "quality-gate-${GATE_STATUS}" \
-            --arg error_log "$ERROR_LOG" \
-            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
+          # Only send webhook notification on ERROR or UNKNOWN (actual problems)
+          if [ "$GATE_STATUS" = "ERROR" ] || [ "$GATE_STATUS" = "UNKNOWN" ]; then
+            PAYLOAD=$(jq -n \
+              --arg job "sonarqube" \
+              --arg step "quality-gate-${GATE_STATUS}" \
+              --arg error_log "$ERROR_LOG" \
+              --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+              '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
 
-          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
+            curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
+          fi
 
           # Fail the step if quality gate failed
           if [ "$GATE_STATUS" = "ERROR" ]; then
