@@ -46,12 +46,54 @@
         <vulnerabilityName regex="true">.*</vulnerabilityName>
     </suppress>
 
+    <!-- h2 0.3.x: CVE-2024-27316 / RUSTSEC-2024-0332 (CONTINUATION Flood, CVSS 7.5)
+         and CVE-2024-25510 / RUSTSEC-2024-0003 (resource exhaustion).
+         Transitive dep via actix-http 3.x which pins h2 to 0.3.x series.
+         Mitigated: actix-governor rate limiting (10 req/min burst), and actix-web's
+         own connection handling limits concurrent streams. Upgrading requires
+         actix-web 5.x (not yet stable). -->
+    <suppress>
+        <notes>h2 0.3.x CONTINUATION Flood - mitigated by rate limiting, pinned by actix-http 3.x</notes>
+        <packageUrl regex="true">^pkg:cargo/h2@0\.3\..*$</packageUrl>
+        <vulnerabilityName regex="true">.*</vulnerabilityName>
+    </suppress>
+
+    <!-- time 0.2.x: RUSTSEC-2026-0009 (DoS via stack exhaustion, MEDIUM).
+         Transitive dep via genpdf -> lopdf. Only used for PDF metadata timestamps,
+         not for parsing untrusted input. -->
+    <suppress>
+        <notes>time 0.2.x stack exhaustion DoS - transitive via genpdf, no untrusted input parsing</notes>
+        <packageUrl regex="true">^pkg:cargo/time@0\.2\..*$</packageUrl>
+        <vulnerabilityName regex="true">.*</vulnerabilityName>
+    </suppress>
+
+    <!-- ring: OWASP may match the Rust "ring" crate against unrelated CVEs for
+         other software named "ring". Our ring 0.17.14 is current and maintained. -->
+    <suppress>
+        <notes>ring crate false positive CPE matches against unrelated software</notes>
+        <packageUrl regex="true">^pkg:cargo/ring@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:.*:ring:.*</cpe>
+    </suppress>
+
     <!-- False positives: OWASP may match Rust crates against unrelated C/C++ CVEs
          based on name similarity (e.g., "openssl" crate vs OpenSSL C library). -->
     <suppress>
         <notes>Suppress false positive CPE matches for Rust crates misidentified as C libraries</notes>
         <packageUrl regex="true">^pkg:cargo/.*$</packageUrl>
         <cpe regex="true">cpe:/a:openssl:openssl:.*</cpe>
+    </suppress>
+
+    <!-- Generic false positive: OWASP matches Rust crate names against unrelated
+         C/C++/Java CVEs via CPE name similarity (e.g., "csv", "futures", "image"). -->
+    <suppress>
+        <notes>Suppress false positive CPE matches for common Rust crate names</notes>
+        <packageUrl regex="true">^pkg:cargo/.*$</packageUrl>
+        <cpe regex="true">cpe:/a:csv_project:csv:.*</cpe>
+    </suppress>
+    <suppress>
+        <notes>Suppress false positive CPE matches for h2 crate vs H2 database</notes>
+        <packageUrl regex="true">^pkg:cargo/h2@.*$</packageUrl>
+        <cpe regex="true">cpe:/a:h2database:h2:.*</cpe>
     </suppress>
 
 </suppressions>

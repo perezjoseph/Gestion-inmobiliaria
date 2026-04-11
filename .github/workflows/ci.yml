@@ -225,7 +225,13 @@ jobs:
 
       - name: Install cargo-audit for CVE scanning
         id: install_audit
-        run: cargo install cargo-audit --locked 2>&1 | tee /tmp/install-audit-output.txt
+        run: |
+          cargo install cargo-audit --locked 2>&1 | tee /tmp/install-audit-output.txt || {
+            echo "cargo install failed, falling back to pre-built binary..."
+            AUDIT_VERSION="0.22.1"
+            curl -sSfL "https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-musl-v${AUDIT_VERSION}.tgz" \
+              | tar xz -C "$HOME/.cargo/bin/" 2>&1 | tee -a /tmp/install-audit-output.txt
+          }
 
       - name: Scan Rust dependencies for known vulnerabilities (CVEs)
         id: cargo_audit
