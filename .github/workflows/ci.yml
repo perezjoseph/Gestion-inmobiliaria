@@ -298,6 +298,7 @@ jobs:
   sonarqube:
     name: SonarQube Code Quality & Coverage Analysis
     runs-on: [self-hosted, linux, sonarqube]
+    continue-on-error: true
     steps:
       - name: Checkout repository with full history for blame analysis
         uses: actions/checkout@v4
@@ -307,7 +308,18 @@ jobs:
       - name: Install unzip for SonarQube scanner extraction
         run: sudo apt-get update -qq && sudo apt-get install -y -qq unzip
 
+      - name: Verify SonarQube server is reachable
+        id: sonar-check
+        run: |
+          if ! curl -sf --connect-timeout 5 --max-time 10 http://localhost:9000/api/system/status; then
+            echo "reachable=false" >> $GITHUB_OUTPUT
+            echo "::warning::SonarQube server is not reachable at localhost:9000"
+          else
+            echo "reachable=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run SonarQube static analysis scan
+        if: steps.sonar-check.outputs.reachable == 'true'
         uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
