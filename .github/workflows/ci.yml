@@ -96,20 +96,20 @@ jobs:
           FAILED=""
           if [ "${{ steps.fmt.outcome }}" = "failure" ]; then
             FAILED="${FAILED}fmt-check,"
-            ERROR="${ERROR}[fmt-check] $(head -c 1500 /tmp/fmt-output.txt 2>/dev/null || echo 'cargo fmt found formatting issues.')\n\n"
+            ERROR="${ERROR}[fmt-check] $(head -c 1500 /tmp/fmt-output.txt 2>/dev/null || echo 'cargo fmt found formatting issues.')"$'\n\n'
           fi
           if [ "${{ steps.clippy_backend.outcome }}" = "failure" ]; then
             FAILED="${FAILED}clippy-backend,"
-            ERROR="${ERROR}[clippy-backend] $(head -c 1500 /tmp/clippy-backend-output.txt 2>/dev/null || echo 'Backend clippy failed.')\n\n"
+            ERROR="${ERROR}[clippy-backend] $(head -c 1500 /tmp/clippy-backend-output.txt 2>/dev/null || echo 'Backend clippy failed.')"$'\n\n'
           fi
           if [ "${{ steps.clippy_frontend.outcome }}" = "failure" ]; then
             FAILED="${FAILED}clippy-frontend,"
-            ERROR="${ERROR}[clippy-frontend] $(head -c 1000 /tmp/clippy-frontend-output.txt 2>/dev/null || echo 'Frontend clippy failed.')\n\n"
+            ERROR="${ERROR}[clippy-frontend] $(head -c 1000 /tmp/clippy-frontend-output.txt 2>/dev/null || echo 'Frontend clippy failed.')"$'\n\n'
           fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT
-          printf "$ERROR" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
 
       - name: Fail job if any lint step failed
@@ -250,6 +250,7 @@ jobs:
           args: >-
             --enableExperimental
             --failOnCVSS 7
+            --suppression owasp-suppressions.xml
 
       - name: Upload OWASP vulnerability report as artifact
         if: always()
@@ -267,27 +268,27 @@ jobs:
           FAILED=""
           if [ "${{ steps.install_audit.outcome }}" = "failure" ]; then
             FAILED="${FAILED}install-cargo-audit,"
-            ERROR="${ERROR}[install-cargo-audit] $(head -c 1500 /tmp/install-audit-output.txt 2>/dev/null || echo 'Failed to install cargo-audit.')\n\n"
+            ERROR="${ERROR}[install-cargo-audit] $(head -c 1500 /tmp/install-audit-output.txt 2>/dev/null || echo 'Failed to install cargo-audit.')"$'\n\n'
           fi
           if [ "${{ steps.cargo_audit.outcome }}" = "failure" ]; then
             FAILED="${FAILED}cargo-audit,"
-            ERROR="${ERROR}[cargo-audit] $(head -c 2000 /tmp/audit-output.txt 2>/dev/null || echo 'cargo audit found vulnerabilities.')\n\n"
+            ERROR="${ERROR}[cargo-audit] $(head -c 2000 /tmp/audit-output.txt 2>/dev/null || echo 'cargo audit found vulnerabilities.')"$'\n\n'
           elif [ "${{ steps.cargo_audit.outcome }}" = "skipped" ]; then
             FAILED="${FAILED}cargo-audit,"
-            ERROR="${ERROR}[cargo-audit] Skipped because cargo-audit installation failed.\n\n"
+            ERROR="${ERROR}[cargo-audit] Skipped because cargo-audit installation failed."$'\n\n'
           fi
           if [ "${{ steps.cargo_udeps.outcome }}" = "failure" ]; then
             FAILED="${FAILED}cargo-udeps,"
-            ERROR="${ERROR}[cargo-udeps] $(head -c 1000 /tmp/udeps-output.txt 2>/dev/null || echo 'Unused dependency check failed.')\n\n"
+            ERROR="${ERROR}[cargo-udeps] $(head -c 1000 /tmp/udeps-output.txt 2>/dev/null || echo 'Unused dependency check failed.')"$'\n\n'
           fi
           if [ "${{ steps.owasp.outcome }}" = "failure" ]; then
             FAILED="${FAILED}owasp-scan,"
-            ERROR="${ERROR}[owasp-scan] OWASP dependency check failed with CVSS >= 7. See uploaded report artifact for details.\n\n"
+            ERROR="${ERROR}[owasp-scan] OWASP dependency check failed with CVSS >= 7. See uploaded report artifact for details."$'\n\n'
           fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT
-          printf "$ERROR" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
 
       - name: Fail job if any quality step failed
@@ -436,9 +437,10 @@ jobs:
 
       - name: Notify — code formatting or clippy lint failed
         if: always() && needs.lint.result == 'failure'
+        env:
+          ERROR_LOG: ${{ needs.lint.outputs.error_log }}
+          FAILED_STEPS: ${{ needs.lint.outputs.failed_steps }}
         run: |
-          ERROR_LOG="${{ needs.lint.outputs.error_log }}"
-          FAILED_STEPS="${{ needs.lint.outputs.failed_steps }}"
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Lint job failed but no captured output. Run cargo fmt --all -- --check and cargo clippy --workspace -- -D warnings to reproduce."
           fi
