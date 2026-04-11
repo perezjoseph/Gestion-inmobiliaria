@@ -49,9 +49,10 @@ def wsl_cmd(command):
 def run_shell(command, timeout=120):
     try:
         result = subprocess.run(
-            wsl_cmd(command), capture_output=True, text=True, timeout=timeout
+            wsl_cmd(command), capture_output=True, text=True, timeout=timeout,
+            encoding="utf-8", errors="replace"
         )
-        return result.returncode, result.stdout, result.stderr
+        return result.returncode, result.stdout or "", result.stderr or ""
     except subprocess.TimeoutExpired:
         return -1, "", "Timed out"
     except Exception as e:
