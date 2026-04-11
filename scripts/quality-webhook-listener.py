@@ -63,16 +63,30 @@ def run_kiro(prompt, label):
     print(f"  [{timestamp}] Triggering kiro-cli for: {label}")
 
     escaped = prompt.replace('"', '\\"').replace("'", "'\\''")
-    code, stdout, stderr = run_shell(
-        f"kiro-cli chat --no-interactive --agent ci-fixer -a \"{escaped}\"",
-        timeout=600
-    )
-    print(f"  kiro-cli exit code: {code}")
-    if stdout:
-        print(f"  stdout (last 500 chars): ...{stdout[-500:]}")
-    if code != 0 and stderr:
-        print(f"  stderr: {stderr[-300:]}")
-    return code == 0
+    
+    cmd_variants = [
+        f'kiro-cli chat --no-interactive --agent ci-fixer -a "{escaped}"',
+        f'kiro-cli chat --no-interactive -a "{escaped}"',
+    ]
+
+    for i, cmd in enumerate(cmd_variants):
+        print(f"  Trying command variant {i + 1}/{len(cmd_variants)}")
+        code, stdout, stderr = run_shell(cmd, timeout=600)
+        
+        print(f"  kiro-cli exit code: {code}")
+        if stdout:
+            print(f"  stdout (last 500 chars): ...{stdout[-500:]}")
+        if stderr:
+            print(f"  stderr (last 300 chars): ...{stderr[-300:]}")
+
+        if "Tool approval required" in stderr or "Tool approval required" in stdout:
+            print(f"  ⚠ Tool approval error detected, trying next variant...")
+            continue
+        
+        return code == 0
+    
+    print(f"  ✗ All command variants failed with tool approval errors")
+    return False
 
 
 def verify_and_push(job):
