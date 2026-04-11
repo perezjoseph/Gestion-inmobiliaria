@@ -159,9 +159,10 @@ def fix_with_retry(job, step, error_log):
             log.debug(f"Job instruction: {instruction}")
 
             prompt_parts.append(
-                "After fixing, verify with cargo fmt --all, cargo clippy --workspace -- -D warnings, "
-                "and cargo test --workspace. Then commit and push: "
-                "git add -A && git commit -m 'fix: resolve CI failures (auto-fix)' && git push origin main. "
+                "The error output above contains the actual CI failure details. "
+                "Fix the specific issues reported — do NOT re-run the full test suite to discover failures. "
+                "After fixing, only run targeted verification for what you changed. "
+                "Then commit and push: git add -A && git commit -m 'fix: resolve CI failures (auto-fix)' && git push origin main. "
                 "If push fails due to remote changes, run git pull --rebase origin main first then push again."
             )
 
