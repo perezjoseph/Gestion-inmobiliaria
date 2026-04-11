@@ -1,12 +1,14 @@
+use gloo_events::EventListener;
 use wasm_bindgen::JsCast;
-use wasm_bindgen::closure::Closure;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
+use yew_router::prelude::*;
 
-use crate::app::AuthContext;
+use crate::app::{AuthContext, Route};
 use crate::components::common::data_table::DataTable;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::loading::Loading;
+use crate::components::common::pagination::Pagination;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{api_delete, api_get, api_post, api_put};
 use crate::types::PaginatedResponse;
@@ -44,6 +46,7 @@ pub fn Inquilinos() -> Html {
     let show_form = use_state(|| false);
     let editing = use_state(|| Option::<Inquilino>::None);
     let delete_target = use_state(|| Option::<Inquilino>::None);
+    let submitting = use_state(|| false);
     let form_errors = use_state(FormErrors::default);
     let reload = use_state(|| 0u32);
     let show_optional = use_state(|| false);
@@ -110,35 +113,34 @@ pub fn Inquilinos() -> Html {
             show_optional.set(false);
         }
     };
+    let escape_handler = use_mut_ref(|| Option::<Box<dyn Fn()>>::None);
     {
         let delete_target = delete_target.clone();
         let show_form = show_form.clone();
         let reset_form = reset_form.clone();
-        use_effect(move || {
-            let doc = web_sys::window().and_then(|w| w.document());
-            let closure =
-                Closure::<dyn Fn(web_sys::KeyboardEvent)>::new(move |e: web_sys::KeyboardEvent| {
-                    if e.key() == "Escape" {
-                        if delete_target.is_some() {
-                            delete_target.set(None);
-                        } else if *show_form {
-                            reset_form();
-                        }
+        let handler = escape_handler.clone();
+        *handler.borrow_mut() = Some(Box::new(move || {
+            if delete_target.is_some() {
+                delete_target.set(None);
+            } else if *show_form {
+                reset_form();
+            }
+        }) as Box<dyn Fn()>);
+    }
+    {
+        let escape_handler = escape_handler.clone();
+        use_effect_with((), move |_| {
+            let listener = web_sys::window().and_then(|w| w.document()).map(|doc| {
+                EventListener::new(&doc, "keydown", move |event| {
+                    let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
+                    if event.key() == "Escape"
+                        && let Some(ref cb) = *escape_handler.borrow()
+                    {
+                        cb();
                     }
-                });
-            if let Some(ref d) = doc {
-                let _ =
-                    d.add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref());
-            }
-            let doc_clone = doc.clone();
-            move || {
-                if let Some(ref d) = doc_clone {
-                    let _ = d.remove_event_listener_with_callback(
-                        "keydown",
-                        closure.as_ref().unchecked_ref(),
-                    );
-                }
-            }
+                })
+            });
+            move || drop(listener)
         });
     }
     let on_new = {
@@ -187,19 +189,26 @@ pub fn Inquilinos() -> Html {
         Callback::from(move |_: MouseEvent| {
             if let Some(ref i) = *delete_target {
                 let id = i.id.clone();
+                let inq_name = format!("{} {}", i.nombre, i.apellido);
                 let error = error.clone();
                 let reload = reload.clone();
                 let delete_target = delete_target.clone();
                 let toasts = toasts.clone();
+                let reload_for_undo = reload.clone();
                 spawn_local(async move {
                     match api_delete(&format!("/inquilinos/{id}")).await {
                         Ok(()) => {
                             delete_target.set(None);
                             reload.set(*reload + 1);
+                            let undo_reload = reload_for_undo;
                             if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::Push(
-                                    "Inquilino eliminado exitosamente".into(),
-                                    ToastKind::Success,
+                                t.dispatch(ToastAction::PushWithUndo(
+                                    format!("\"{}\" eliminado", inq_name),
+                                    ToastKind::Info,
+                                    "Deshacer".into(),
+                                    std::rc::Rc::new(move || {
+                                        undo_reload.set(*undo_reload + 1);
+                                    }),
                                 ));
                             }
                         }
@@ -253,11 +262,16 @@ pub fn Inquilinos() -> Html {
         let reset_form = reset_form.clone();
         let validate_form = validate_form.clone();
         let toasts = toasts.clone();
+        let submitting = submitting.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
+            if *submitting {
+                return;
+            }
             if !validate_form() {
                 return;
             }
+            submitting.set(true);
             let email_val = if email.trim().is_empty() {
                 None
             } else {
@@ -282,6 +296,7 @@ pub fn Inquilinos() -> Html {
             let reload = reload.clone();
             let reset_form = reset_form.clone();
             let toasts = toasts.clone();
+            let submitting_handle = submitting.clone();
             if let Some(ref ed) = *editing {
                 let update = UpdateInquilino {
                     nombre: Some((*nombre).clone()),
@@ -293,6 +308,7 @@ pub fn Inquilinos() -> Html {
                     notas: notas_val,
                 };
                 let id = ed.id.clone();
+                let submitting = submitting_handle.clone();
                 spawn_local(async move {
                     match api_put::<Inquilino, _>(&format!("/inquilinos/{id}"), &update).await {
                         Ok(_) => {
@@ -300,13 +316,14 @@ pub fn Inquilinos() -> Html {
                             reload.set(*reload + 1);
                             if let Some(t) = &toasts {
                                 t.dispatch(ToastAction::Push(
-                                    "Inquilino actualizado exitosamente".into(),
+                                    "Inquilino actualizado".into(),
                                     ToastKind::Success,
                                 ));
                             }
                         }
                         Err(err) => error.set(Some(err)),
                     }
+                    submitting.set(false);
                 });
             } else {
                 let create = CreateInquilino {
@@ -318,6 +335,7 @@ pub fn Inquilinos() -> Html {
                     contacto_emergencia: ce_val,
                     notas: notas_val,
                 };
+                let submitting = submitting_handle;
                 spawn_local(async move {
                     match api_post::<Inquilino, _>("/inquilinos", &create).await {
                         Ok(_) => {
@@ -325,13 +343,14 @@ pub fn Inquilinos() -> Html {
                             reload.set(*reload + 1);
                             if let Some(t) = &toasts {
                                 t.dispatch(ToastAction::Push(
-                                    "Inquilino registrado exitosamente".into(),
+                                    "Inquilino registrado".into(),
                                     ToastKind::Success,
                                 ));
                             }
                         }
                         Err(err) => error.set(Some(err)),
                     }
+                    submitting.set(false);
                 });
             }
         })
@@ -378,27 +397,22 @@ pub fn Inquilinos() -> Html {
             reload.set(*reload + 1);
         })
     };
-    let on_prev_page = {
+    let on_page_change = {
         let page = page.clone();
         let reload = reload.clone();
-        Callback::from(move |_: MouseEvent| {
-            if *page > 1 {
-                page.set(*page - 1);
-                reload.set(*reload + 1);
-            }
+        Callback::from(move |p: u64| {
+            page.set(p);
+            reload.set(*reload + 1);
         })
     };
-    let on_next_page = {
-        let page = page.clone();
-        let total = total.clone();
+    let on_per_page_change = {
         let per_page = per_page.clone();
+        let page = page.clone();
         let reload = reload.clone();
-        Callback::from(move |_: MouseEvent| {
-            let max_page = ((*total) as f64 / (*per_page) as f64).ceil() as u64;
-            if *page < max_page {
-                page.set(*page + 1);
-                reload.set(*reload + 1);
-            }
+        Callback::from(move |pp: u64| {
+            per_page.set(pp);
+            page.set(1);
+            reload.set(*reload + 1);
         })
     };
     if *loading {
@@ -418,7 +432,6 @@ pub fn Inquilinos() -> Html {
     ];
     let fe = (*form_errors).clone();
     let opt_open = *show_optional;
-    let total_pages = ((*total) as f64 / (*per_page) as f64).ceil() as u64;
     html! {
         <div>
             <div class="gi-page-header">
@@ -482,7 +495,7 @@ pub fn Inquilinos() -> Html {
                             if let Some(ref msg) = fe.apellido { <p class="gi-field-error">{msg}</p> }
                         </div>
                         <div>
-                            <label class="gi-label">{"Cédula *"}</label>
+                            <label class="gi-label" title="Documento de identidad dominicano. Formato: XXX-XXXXXXX-X">{"Cédula *"}</label>
                             <input type="text" value={(*cedula).clone()} oninput={input_cb!(cedula)}
                                 class={if fe.cedula.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
                             if let Some(ref msg) = fe.cedula { <p class="gi-field-error">{msg}</p> }
@@ -518,7 +531,9 @@ pub fn Inquilinos() -> Html {
                         </div>
                         <div style="grid-column: 1 / -1; display: flex; gap: var(--space-2); justify-content: flex-end;">
                             <button type="button" onclick={on_cancel} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                            <button type="submit" class="gi-btn gi-btn-primary">{"Guardar"}</button>
+                            <button type="submit" disabled={*submitting} class="gi-btn gi-btn-primary">
+                                {if *submitting { "Guardando..." } else { "Guardar" }}
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -535,12 +550,18 @@ pub fn Inquilinos() -> Html {
                         </svg>
                     </div>
                     <div class="gi-empty-state-title">{"Sin inquilinos registrados"}</div>
-                    <p class="gi-empty-state-text">{"Agregue su primer inquilino para comenzar a gestionar sus arrendamientos."}</p>
+                    <p class="gi-empty-state-text">{"Registre sus inquilinos con nombre y cédula. Luego podrá vincularlos a propiedades mediante contratos."}</p>
                     if can_write(&user_rol) {
                         <button onclick={on_new.clone()} class="gi-btn gi-btn-primary" style="margin-top: var(--space-4);">
                             {"+ Nuevo Inquilino"}
                         </button>
                     }
+                    <div class="gi-empty-state-hint">
+                        {"¿Aún no tiene propiedades? "}
+                        <Link<Route> to={Route::Propiedades} classes="gi-btn-text">
+                            {"Agregar propiedad primero"}
+                        </Link<Route>>
+                    </div>
                 </div>
             } else {
                 <DataTable headers={headers}>
@@ -571,23 +592,13 @@ pub fn Inquilinos() -> Html {
                         }
                     })}
                 </DataTable>
-                if total_pages > 1 {
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-3);">
-                        <span style="font-size: var(--text-sm); color: var(--text-secondary);">
-                            {format!("{} inquilino(s) — página {} de {}", *total, *page, total_pages)}
-                        </span>
-                        <div style="display: flex; gap: var(--space-2);">
-                            <button onclick={on_prev_page} disabled={*page <= 1} class="gi-btn gi-btn-ghost">{"← Anterior"}</button>
-                            <button onclick={on_next_page} disabled={*page >= total_pages} class="gi-btn gi-btn-ghost">{"Siguiente →"}</button>
-                        </div>
-                    </div>
-                } else {
-                    <div style="margin-top: var(--space-3);">
-                        <span style="font-size: var(--text-sm); color: var(--text-secondary);">
-                            {format!("{} inquilino(s) encontrado(s)", *total)}
-                        </span>
-                    </div>
-                }
+                <Pagination
+                    total={*total}
+                    page={*page}
+                    per_page={*per_page}
+                    on_page_change={on_page_change}
+                    on_per_page_change={on_per_page_change}
+                />
             }
         </div>
     }

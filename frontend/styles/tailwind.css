@@ -1,12 +1,9 @@
-@import "tailwindcss";
-
 /* ============================================
    Gestión Inmobiliaria RD — Design System
    Tropical Professional Theme
    ============================================ */
 
-/* Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Bitter:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;500;600;700&display=swap');
+/* Google Fonts loaded via index.html <link> — no duplicate @import needed */
 
 /* ============================================
    Design Tokens — Light Mode (default)
@@ -215,6 +212,19 @@ h1, h2, h3, h4, h5, h6,
   background-color: var(--surface-raised);
   border-bottom: 1px solid var(--border-default);
   box-shadow: var(--shadow-sm);
+}
+
+.gi-navbar-search {
+  animation: gi-search-in 0.2s var(--ease-out);
+}
+
+.gi-navbar-search-btn {
+  background: none !important;
+}
+
+@keyframes gi-search-in {
+  from { width: 0; opacity: 0; }
+  to { width: 260px; opacity: 1; }
 }
 
 /* Cards / Raised surfaces */
@@ -725,6 +735,16 @@ h1, h2, h3, h4, h5, h6,
 
   .gi-navbar-title {
     display: none !important;
+  }
+
+  .gi-navbar-search {
+    width: 160px !important;
+    font-size: var(--text-xs) !important;
+  }
+
+  @keyframes gi-search-in {
+    from { width: 0; opacity: 0; }
+    to { width: 160px; opacity: 1; }
   }
 
   .gi-navbar-user-name {
@@ -1269,3 +1289,352 @@ h1, h2, h3, h4, h5, h6,
    ============================================ */
 .text-display { font-family: var(--font-display); }
 .text-body { font-family: var(--font-body); }
+
+/* ============================================
+   Utility classes — replace inline styles
+   ============================================ */
+.gi-text-sm { font-size: var(--text-sm); }
+.gi-text-xs { font-size: var(--text-xs); }
+.gi-text-base { font-size: var(--text-base); }
+.gi-text-secondary { color: var(--text-secondary); }
+.gi-text-tertiary { color: var(--text-tertiary); }
+.gi-text-primary { color: var(--text-primary); }
+.gi-text-error { color: var(--color-error); }
+.gi-text-success { color: var(--color-success); }
+
+.gi-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.gi-modal-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+  color: var(--text-primary);
+}
+
+.gi-modal-body {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-5);
+}
+
+.gi-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.gi-section-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin-bottom: var(--space-4);
+  color: var(--text-primary);
+}
+
+.gi-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+.gi-stat-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+}
+
+.gi-stat-value {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: var(--space-1);
+}
+
+.gi-pagination-info {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* ============================================
+   SVG Logo Mark
+   ============================================ */
+.gi-logo-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background-color: var(--color-primary-500);
+  color: var(--text-on-primary);
+  flex-shrink: 0;
+}
+
+.gi-logo-mark svg {
+  width: 24px;
+  height: 24px;
+}
+
+.gi-logo-mark-sm {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+
+.gi-logo-mark-sm svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ============================================
+   Dashboard — Purpose-built stats
+   ============================================ */
+.gi-dashboard-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.gi-dashboard-hero {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: var(--space-5) var(--space-6);
+}
+
+.gi-dashboard-hero-metric {
+  flex: 1;
+  min-width: 0;
+}
+
+.gi-dashboard-hero-metric .gi-stat-label {
+  font-size: var(--text-sm);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-secondary);
+}
+
+.gi-dashboard-hero-metric .gi-stat-value {
+  font-size: var(--text-3xl);
+  line-height: 1.1;
+}
+
+.gi-occupancy-ring {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+}
+
+.gi-occupancy-ring svg {
+  width: 80px;
+  height: 80px;
+  transform: rotate(-90deg);
+}
+
+.gi-occupancy-ring-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.gi-dashboard-secondary {
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.gi-dashboard-secondary .gi-stat-value {
+  font-size: var(--text-2xl);
+}
+
+.gi-dashboard-alert {
+  background-color: var(--color-error-light);
+  border: 1px solid oklch(80% 0.06 25 / 0.3);
+}
+
+.gi-dashboard-alert .gi-stat-label {
+  color: var(--color-error-dark);
+}
+
+.gi-dashboard-alert .gi-stat-value {
+  color: var(--color-error);
+}
+
+[data-theme="dark"] .gi-dashboard-alert {
+  background-color: oklch(18% 0.03 25);
+  border-color: oklch(30% 0.06 25 / 0.4);
+}
+
+[data-theme="dark"] .gi-dashboard-alert .gi-stat-label {
+  color: oklch(75% 0.08 25);
+}
+
+[data-theme="dark"] .gi-dashboard-alert .gi-stat-value {
+  color: oklch(70% 0.12 25);
+}
+
+/* ============================================
+   Workflow-aware empty states
+   ============================================ */
+.gi-empty-state-hint {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-top: var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.gi-empty-state-hint a,
+.gi-empty-state-hint .gi-btn-text {
+  font-size: var(--text-xs);
+}
+
+@media (max-width: 768px) {
+  .gi-dashboard-header {
+    grid-template-columns: 1fr;
+  }
+
+  .gi-dashboard-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+
+  .gi-occupancy-ring {
+    width: 64px;
+    height: 64px;
+  }
+
+  .gi-occupancy-ring svg {
+    width: 64px;
+    height: 64px;
+  }
+
+  .gi-occupancy-ring-label {
+    font-size: var(--text-base);
+  }
+
+  .gi-dashboard-hero-metric .gi-stat-value {
+    font-size: var(--text-2xl);
+  }
+}
+
+/* ============================================
+   Reduced Motion (accessibility)
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .gi-spinner {
+    animation: none;
+    border-top-color: var(--color-primary-500);
+    opacity: 0.6;
+  }
+
+  .gi-stat:hover {
+    transform: none;
+  }
+
+  .gi-btn:active {
+    transform: none;
+  }
+}
+
+/* ============================================
+   Small button variant
+   ============================================ */
+.gi-btn-sm {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  min-height: auto;
+}
+
+@media (max-width: 768px) {
+  .gi-btn-sm {
+    min-height: 36px;
+    padding: var(--space-2) var(--space-3);
+  }
+}
+
+/* Secondary button variant */
+.gi-btn-secondary {
+  background-color: var(--surface-raised);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+}
+
+.gi-btn-secondary:hover {
+  background-color: var(--color-sand-100);
+  border-color: var(--border-strong);
+}
+
+[data-theme="dark"] .gi-btn-secondary:hover {
+  background-color: oklch(22% 0.012 185);
+}
+
+/* ============================================
+   Inline stat (for use inside cards — avoids nesting cards)
+   ============================================ */
+.gi-inline-stat {
+  padding: var(--space-3);
+  text-align: center;
+  background-color: var(--surface-base);
+  border-radius: 8px;
+}
+
+/* ============================================
+   Tailwind Utility Classes (manual)
+   ============================================ */
+.flex { display: flex; }
+.inline-flex { display: inline-flex; }
+.flex-1 { flex: 1 1 0%; }
+.flex-col { flex-direction: column; }
+.flex-wrap { flex-wrap: wrap; }
+.items-center { align-items: center; }
+.items-end { align-items: flex-end; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.gap-1 { gap: 0.25rem; }
+.gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 0.75rem; }
+.gap-4 { gap: 1rem; }
+.min-h-screen { min-height: 100vh; }
+.min-w-0 { min-width: 0; }
+.w-64 { width: 16rem; }
+.py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.px-1 { padding-left: 0.25rem; padding-right: 0.25rem; }

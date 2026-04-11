@@ -1,8 +1,6 @@
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
-use yew_router::prelude::*;
 
-use crate::app::Route;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::services::auth::login;
 use crate::types::usuario::{LoginRequest, LoginResponse};
@@ -20,7 +18,6 @@ pub fn LoginForm(props: &LoginFormProps) -> Html {
     let password_error = use_state(|| Option::<String>::None);
     let server_error = use_state(|| Option::<String>::None);
     let loading = use_state(|| false);
-    let navigator = use_navigator().unwrap();
     let on_success = props.on_success.clone();
 
     let validate = {
@@ -64,14 +61,12 @@ pub fn LoginForm(props: &LoginFormProps) -> Html {
             };
             let server_error = server_error.clone();
             let loading = loading.clone();
-            let navigator = navigator.clone();
             let on_success = on_success.clone();
             loading.set(true);
             spawn_local(async move {
                 match login(request).await {
                     Ok(response) => {
                         on_success.emit(response);
-                        navigator.push(&Route::Dashboard);
                     }
                     Err(err) => {
                         server_error.set(Some(err));

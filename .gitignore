@@ -3,3 +3,11 @@
 *.rs.bk
 .DS_Store
 node_modules/
+.kiro/
+.impeccable.md
+.claude/
+.playwright/
+.playwright-cli/
+frontend/dist/
+autoresearch/
+.vscode/

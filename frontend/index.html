@@ -9,9 +9,25 @@
   <title>Gestión Inmobiliaria — República Dominicana</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bitter:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bitter:wght@600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   <link data-trunk rel="css" href="styles/tailwind.css" />
-  <link data-trunk rel="rust" data-wasm-opt="z" />
+  <link data-trunk rel="rust" data-wasm-opt="0" />
+  <script>
+    window.addEventListener('error', function(e) {
+      console.error('[WASM DEBUG] Global error:', e.message, e.filename, e.lineno);
+      var el = document.getElementById('loading');
+      if (el) {
+        el.innerHTML = '<div style="text-align:center;padding:2rem;"><h2 style="color:red;">Error loading app</h2><pre style="text-align:left;max-width:600px;margin:1rem auto;overflow:auto;font-size:12px;">' + e.message + '\n' + (e.filename || '') + ':' + (e.lineno || '') + '</pre></div>';
+      }
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      console.error('[WASM DEBUG] Unhandled rejection:', e.reason);
+      var el = document.getElementById('loading');
+      if (el) {
+        el.innerHTML = '<div style="text-align:center;padding:2rem;"><h2 style="color:red;">Error loading app</h2><pre style="text-align:left;max-width:600px;margin:1rem auto;overflow:auto;font-size:12px;">' + (e.reason && e.reason.message ? e.reason.message : e.reason) + '\n' + (e.reason && e.reason.stack ? e.reason.stack : '') + '</pre></div>';
+      }
+    });
+  </script>
   <script>
     (function() {
       var t = localStorage.getItem('theme');
@@ -22,5 +38,13 @@
   </script>
 </head>
 <body>
+  <div id="loading" style="display:flex;align-items:center;justify-content:center;min-height:100vh;background-color:var(--surface-base, #faf9f7);">
+    <div style="text-align:center;">
+      <div style="width:36px;height:36px;border:3px solid #e0ddd8;border-top-color:#3d8b8b;border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 16px;"></div>
+      <p style="font-family:'Source Sans 3',system-ui,sans-serif;font-size:0.875rem;color:#6d6862;">Cargando aplicación…</p>
+    </div>
+  </div>
+  <style>@keyframes sp{to{transform:rotate(360deg)}}</style>
+  <script>window.addEventListener("TrunkApplicationStarted",function(){var el=document.getElementById("loading");if(el)el.remove();});</script>
 </body>
 </html>

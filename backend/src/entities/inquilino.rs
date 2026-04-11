@@ -16,6 +16,8 @@ pub struct Model {
     pub contacto_emergencia: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub notas: Option<String>,
+    #[sea_orm(column_type = "JsonBinary", nullable)]
+    pub documentos: Option<Json>,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }

@@ -1,7 +1,14 @@
+pub mod auditoria;
 pub mod contrato;
+pub mod dashboard;
+pub mod documento;
+pub mod importacion;
 pub mod inquilino;
+pub mod mantenimiento;
+pub mod notificacion;
 pub mod pago;
 pub mod propiedad;
+pub mod reporte;
 pub mod usuario;
 
 use serde::Serialize;

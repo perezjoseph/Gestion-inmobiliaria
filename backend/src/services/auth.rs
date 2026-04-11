@@ -52,7 +52,7 @@ pub fn decode_jwt(token: &str, secret: &str) -> Result<Claims, AppError> {
         &DecodingKey::from_secret(secret.as_bytes()),
         &Validation::default(),
     )
-    .map_err(|_| AppError::Unauthorized)?;
+    .map_err(|_| AppError::Unauthorized(None))?;
     Ok(token_data.claims)
 }
 
@@ -75,12 +75,14 @@ pub async fn register(
     let now = Utc::now().into();
     let id = Uuid::new_v4();
 
+    // Self-registration always assigns "visualizador" — role promotion requires an admin
+    let _ = &input.rol;
     let model = usuario::ActiveModel {
         id: Set(id),
         nombre: Set(input.nombre),
         email: Set(input.email),
         password_hash: Set(password_hash),
-        rol: Set(input.rol),
+        rol: Set("visualizador".to_string()),
         activo: Set(true),
         created_at: Set(now),
         updated_at: Set(now),
@@ -107,15 +109,15 @@ pub async fn login(
         .filter(usuario::Column::Email.eq(&input.email))
         .one(db)
         .await?
-        .ok_or(AppError::Unauthorized)?;
+        .ok_or(AppError::Unauthorized(None))?;
 
     if !user.activo {
-        return Err(AppError::Unauthorized);
+        return Err(AppError::Unauthorized(Some("Cuenta inactiva".to_string())));
     }
 
     let valid = verify_password(&user.password_hash, &input.password)?;
     if !valid {
-        return Err(AppError::Unauthorized);
+        return Err(AppError::Unauthorized(None));
     }
 
     let exp = (Utc::now() + chrono::Duration::hours(24)).timestamp() as usize;
@@ -203,5 +205,14 @@ mod tests {
         let token = encode_jwt(&claims, secret).unwrap();
         let result = decode_jwt(&token, secret);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn inactive_user_error_message_is_cuenta_inactiva() {
+        let err = AppError::Unauthorized(Some("Cuenta inactiva".to_string()));
+        assert_eq!(err.to_string(), "Cuenta inactiva");
+
+        use actix_web::error::ResponseError;
+        assert_eq!(err.status_code(), actix_web::http::StatusCode::UNAUTHORIZED);
     }
 }

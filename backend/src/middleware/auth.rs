@@ -26,11 +26,11 @@ fn extract_claims(req: &HttpRequest) -> Result<Claims, AppError> {
         .headers()
         .get("Authorization")
         .and_then(|v| v.to_str().ok())
-        .ok_or(AppError::Unauthorized)?;
+        .ok_or(AppError::Unauthorized(None))?;
 
     let token = auth_header
         .strip_prefix("Bearer ")
-        .ok_or(AppError::Unauthorized)?;
+        .ok_or(AppError::Unauthorized(None))?;
 
     decode_jwt(token, &config.jwt_secret)
 }

@@ -1,19 +1,22 @@
+use gloo_events::EventListener;
 use wasm_bindgen::JsCast;
-use wasm_bindgen::closure::Closure;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
+use yew_router::prelude::*;
 
-use crate::app::AuthContext;
+use crate::app::{AuthContext, Route};
+use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::data_table::DataTable;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::loading::Loading;
+use crate::components::common::pagination::Pagination;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{api_delete, api_get, api_post, api_put};
 use crate::types::PaginatedResponse;
 use crate::types::contrato::{Contrato, CreateContrato, UpdateContrato};
 use crate::types::inquilino::Inquilino;
 use crate::types::propiedad::Propiedad;
-use crate::utils::{can_delete, can_write, format_currency, format_date_display};
+use crate::utils::{can_delete, can_write, format_date_display};
 
 fn estado_badge(estado: &str) -> (&'static str, &'static str) {
     match estado {
@@ -63,6 +66,7 @@ pub fn Contratos() -> Html {
     let show_form = use_state(|| false);
     let editing = use_state(|| Option::<Contrato>::None);
     let delete_target = use_state(|| Option::<Contrato>::None);
+    let submitting = use_state(|| false);
     let form_errors = use_state(FormErrors::default);
     let reload = use_state(|| 0u32);
 
@@ -74,6 +78,12 @@ pub fn Contratos() -> Html {
     let deposito = use_state(String::new);
     let moneda = use_state(|| "DOP".to_string());
     let estado = use_state(|| "activo".to_string());
+
+    let renew_target = use_state(|| Option::<Contrato>::None);
+    let renew_fecha_fin = use_state(String::new);
+    let renew_monto = use_state(String::new);
+    let terminate_target = use_state(|| Option::<Contrato>::None);
+    let terminate_fecha = use_state(String::new);
 
     {
         let items = items.clone();
@@ -167,35 +177,34 @@ pub fn Contratos() -> Html {
         }
     };
 
+    let escape_handler = use_mut_ref(|| None::<Box<dyn Fn()>>);
     {
         let delete_target = delete_target.clone();
         let show_form = show_form.clone();
         let reset_form = reset_form.clone();
-        use_effect(move || {
-            let doc = web_sys::window().and_then(|w| w.document());
-            let closure =
-                Closure::<dyn Fn(web_sys::KeyboardEvent)>::new(move |e: web_sys::KeyboardEvent| {
-                    if e.key() == "Escape" {
-                        if delete_target.is_some() {
-                            delete_target.set(None);
-                        } else if *show_form {
-                            reset_form();
-                        }
+        let handler = escape_handler.clone();
+        *handler.borrow_mut() = Some(Box::new(move || {
+            if delete_target.is_some() {
+                delete_target.set(None);
+            } else if *show_form {
+                reset_form();
+            }
+        }) as Box<dyn Fn()>);
+    }
+    {
+        let escape_handler = escape_handler.clone();
+        use_effect_with((), move |_| {
+            let listener = web_sys::window().and_then(|w| w.document()).map(|doc| {
+                EventListener::new(&doc, "keydown", move |event| {
+                    let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
+                    if event.key() == "Escape"
+                        && let Some(ref cb) = *escape_handler.borrow()
+                    {
+                        cb();
                     }
-                });
-            if let Some(ref d) = doc {
-                let _ =
-                    d.add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref());
-            }
-            let doc_clone = doc.clone();
-            move || {
-                if let Some(ref d) = doc_clone {
-                    let _ = d.remove_event_listener_with_callback(
-                        "keydown",
-                        closure.as_ref().unchecked_ref(),
-                    );
-                }
-            }
+                })
+            });
+            move || drop(listener)
         });
     }
 
@@ -250,19 +259,26 @@ pub fn Contratos() -> Html {
         Callback::from(move |_: MouseEvent| {
             if let Some(ref c) = *delete_target {
                 let id = c.id.clone();
+                let contrato_short = format!("Contrato {}", &c.id[..8.min(c.id.len())]);
                 let error = error.clone();
                 let reload = reload.clone();
                 let delete_target = delete_target.clone();
                 let toasts = toasts.clone();
+                let reload_for_undo = reload.clone();
                 spawn_local(async move {
                     match api_delete(&format!("/contratos/{id}")).await {
                         Ok(()) => {
                             delete_target.set(None);
                             reload.set(*reload + 1);
+                            let undo_reload = reload_for_undo;
                             if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::Push(
-                                    "Contrato eliminado exitosamente".into(),
-                                    ToastKind::Success,
+                                t.dispatch(ToastAction::PushWithUndo(
+                                    format!("\"{}\" eliminado", contrato_short),
+                                    ToastKind::Info,
+                                    "Deshacer".into(),
+                                    std::rc::Rc::new(move || {
+                                        undo_reload.set(*undo_reload + 1);
+                                    }),
                                 ));
                             }
                         }
@@ -338,11 +354,16 @@ pub fn Contratos() -> Html {
         let reset_form = reset_form.clone();
         let validate_form = validate_form.clone();
         let toasts = toasts.clone();
+        let submitting = submitting.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
+            if *submitting {
+                return;
+            }
             if !validate_form() {
                 return;
             }
+            submitting.set(true);
             let monto_val: f64 = match monto_mensual.parse() {
                 Ok(v) => v,
                 Err(_) => return,
@@ -352,6 +373,7 @@ pub fn Contratos() -> Html {
             let reload = reload.clone();
             let reset_form = reset_form.clone();
             let toasts = toasts.clone();
+            let submitting_handle = submitting.clone();
             if let Some(ref ed) = *editing {
                 let update = UpdateContrato {
                     fecha_fin: Some((*fecha_fin).clone()),
@@ -360,6 +382,7 @@ pub fn Contratos() -> Html {
                     estado: Some((*estado).clone()),
                 };
                 let id = ed.id.clone();
+                let submitting = submitting_handle.clone();
                 spawn_local(async move {
                     match api_put::<Contrato, _>(&format!("/contratos/{id}"), &update).await {
                         Ok(_) => {
@@ -367,13 +390,14 @@ pub fn Contratos() -> Html {
                             reload.set(*reload + 1);
                             if let Some(t) = &toasts {
                                 t.dispatch(ToastAction::Push(
-                                    "Contrato actualizado exitosamente".into(),
+                                    "Contrato actualizado".into(),
                                     ToastKind::Success,
                                 ));
                             }
                         }
                         Err(err) => error.set(Some(err)),
                     }
+                    submitting.set(false);
                 });
             } else {
                 let create = CreateContrato {
@@ -385,6 +409,7 @@ pub fn Contratos() -> Html {
                     deposito: dep,
                     moneda: Some((*moneda).clone()),
                 };
+                let submitting = submitting_handle;
                 spawn_local(async move {
                     match api_post::<Contrato, _>("/contratos", &create).await {
                         Ok(_) => {
@@ -392,13 +417,14 @@ pub fn Contratos() -> Html {
                             reload.set(*reload + 1);
                             if let Some(t) = &toasts {
                                 t.dispatch(ToastAction::Push(
-                                    "Contrato creado exitosamente".into(),
+                                    "Contrato creado".into(),
                                     ToastKind::Success,
                                 ));
                             }
                         }
                         Err(err) => error.set(Some(err)),
                     }
+                    submitting.set(false);
                 });
             }
         })
@@ -428,27 +454,124 @@ pub fn Contratos() -> Html {
         }};
     }
 
-    let on_prev_page = {
-        let page = page.clone();
+    let on_renew_click = {
+        let renew_target = renew_target.clone();
+        let renew_monto = renew_monto.clone();
+        Callback::from(move |c: Contrato| {
+            renew_monto.set(c.monto_mensual.to_string());
+            renew_target.set(Some(c));
+        })
+    };
+
+    let on_renew_confirm = {
+        let renew_target = renew_target.clone();
+        let renew_fecha_fin = renew_fecha_fin.clone();
+        let renew_monto = renew_monto.clone();
+        let error = error.clone();
         let reload = reload.clone();
+        let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
-            if *page > 1 {
-                page.set(*page - 1);
-                reload.set(*reload + 1);
+            if let Some(ref c) = *renew_target {
+                let id = c.id.clone();
+                let body = serde_json::json!({
+                    "fechaFin": *renew_fecha_fin,
+                    "montoMensual": renew_monto.parse::<f64>().unwrap_or(0.0),
+                });
+                let error = error.clone();
+                let reload = reload.clone();
+                let renew_target = renew_target.clone();
+                let renew_fecha_fin = renew_fecha_fin.clone();
+                let toasts = toasts.clone();
+                spawn_local(async move {
+                    match api_post::<Contrato, _>(&format!("/contratos/{id}/renovar"), &body).await
+                    {
+                        Ok(_) => {
+                            renew_target.set(None);
+                            renew_fecha_fin.set(String::new());
+                            reload.set(*reload + 1);
+                            if let Some(t) = &toasts {
+                                t.dispatch(ToastAction::Push(
+                                    "Contrato renovado".into(),
+                                    ToastKind::Success,
+                                ));
+                            }
+                        }
+                        Err(err) => error.set(Some(err)),
+                    }
+                });
             }
         })
     };
-    let on_next_page = {
-        let page = page.clone();
-        let total = total.clone();
-        let per_page = per_page.clone();
+
+    let on_renew_cancel = {
+        let renew_target = renew_target.clone();
+        Callback::from(move |_: MouseEvent| renew_target.set(None))
+    };
+
+    let on_terminate_click = {
+        let terminate_target = terminate_target.clone();
+        Callback::from(move |c: Contrato| {
+            terminate_target.set(Some(c));
+        })
+    };
+
+    let on_terminate_confirm = {
+        let terminate_target = terminate_target.clone();
+        let terminate_fecha = terminate_fecha.clone();
+        let error = error.clone();
         let reload = reload.clone();
+        let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
-            let max_page = ((*total) as f64 / (*per_page) as f64).ceil() as u64;
-            if *page < max_page {
-                page.set(*page + 1);
-                reload.set(*reload + 1);
+            if let Some(ref c) = *terminate_target {
+                let id = c.id.clone();
+                let body = serde_json::json!({ "fechaTerminacion": *terminate_fecha });
+                let error = error.clone();
+                let reload = reload.clone();
+                let terminate_target = terminate_target.clone();
+                let terminate_fecha = terminate_fecha.clone();
+                let toasts = toasts.clone();
+                spawn_local(async move {
+                    match api_post::<Contrato, _>(&format!("/contratos/{id}/terminar"), &body).await
+                    {
+                        Ok(_) => {
+                            terminate_target.set(None);
+                            terminate_fecha.set(String::new());
+                            reload.set(*reload + 1);
+                            if let Some(t) = &toasts {
+                                t.dispatch(ToastAction::Push(
+                                    "Contrato terminado".into(),
+                                    ToastKind::Success,
+                                ));
+                            }
+                        }
+                        Err(err) => error.set(Some(err)),
+                    }
+                });
             }
+        })
+    };
+
+    let on_terminate_cancel = {
+        let terminate_target = terminate_target.clone();
+        Callback::from(move |_: MouseEvent| terminate_target.set(None))
+    };
+
+    let on_page_change = {
+        let page = page.clone();
+        let reload = reload.clone();
+        Callback::from(move |p: u64| {
+            page.set(p);
+            reload.set(*reload + 1);
+        })
+    };
+    let on_per_page_change = {
+        let per_page = per_page.clone();
+        let page = page.clone();
+        let reload = reload.clone();
+        Callback::from(move |pp: u64| {
+            per_page.set(pp);
+            page.set(1);
+            reload.set(*reload + 1);
         })
     };
 
@@ -471,7 +594,6 @@ pub fn Contratos() -> Html {
     ];
     let fe = (*form_errors).clone();
     let is_editing = editing.is_some();
-    let total_pages = ((*total) as f64 / (*per_page) as f64).ceil() as u64;
 
     html! {
         <div>
@@ -497,6 +619,68 @@ pub fn Contratos() -> Html {
                         <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
                             <button onclick={on_delete_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
                             <button onclick={on_delete_confirm.clone()} class="gi-btn gi-btn-danger">{"Eliminar"}</button>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            if let Some(ref _target) = *renew_target {
+                <div class="gi-modal-overlay">
+                    <div class="gi-modal">
+                        <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">{"Renovar Contrato"}</h3>
+                        <div style="display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-4);">
+                            <div>
+                                <label class="gi-label">{"Nueva Fecha de Fin *"}</label>
+                                <input type="date" value={(*renew_fecha_fin).clone()}
+                                    oninput={Callback::from({
+                                        let renew_fecha_fin = renew_fecha_fin.clone();
+                                        move |e: InputEvent| {
+                                            let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+                                            renew_fecha_fin.set(input.value());
+                                        }
+                                    })}
+                                    class="gi-input" />
+                            </div>
+                            <div>
+                                <label class="gi-label">{"Nuevo Monto Mensual *"}</label>
+                                <input type="number" step="0.01" min="0" value={(*renew_monto).clone()}
+                                    oninput={Callback::from({
+                                        let renew_monto = renew_monto.clone();
+                                        move |e: InputEvent| {
+                                            let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+                                            renew_monto.set(input.value());
+                                        }
+                                    })}
+                                    class="gi-input" />
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
+                            <button onclick={on_renew_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
+                            <button onclick={on_renew_confirm.clone()} class="gi-btn gi-btn-primary">{"Renovar"}</button>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            if let Some(ref _target) = *terminate_target {
+                <div class="gi-modal-overlay">
+                    <div class="gi-modal">
+                        <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">{"Terminar Contrato Anticipadamente"}</h3>
+                        <div style="margin-bottom: var(--space-4);">
+                            <label class="gi-label">{"Fecha de Terminación *"}</label>
+                            <input type="date" value={(*terminate_fecha).clone()}
+                                oninput={Callback::from({
+                                    let terminate_fecha = terminate_fecha.clone();
+                                    move |e: InputEvent| {
+                                        let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+                                        terminate_fecha.set(input.value());
+                                    }
+                                })}
+                                class="gi-input" />
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
+                            <button onclick={on_terminate_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
+                            <button onclick={on_terminate_confirm.clone()} class="gi-btn gi-btn-danger">{"Terminar"}</button>
                         </div>
                     </div>
                 </div>
@@ -532,13 +716,13 @@ pub fn Contratos() -> Html {
                             if let Some(ref msg) = fe.inquilino_id { <p class="gi-field-error">{msg}</p> }
                         </div>
                         <div>
-                            <label class="gi-label">{"Fecha Inicio *"}</label>
+                            <label class="gi-label" title="No puede solaparse con otro contrato activo de la misma propiedad">{"Fecha Inicio *"}</label>
                             <input type="date" value={(*fecha_inicio).clone()} oninput={input_cb!(fecha_inicio)} disabled={is_editing}
                                 class={if fe.fecha_inicio.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
                             if let Some(ref msg) = fe.fecha_inicio { <p class="gi-field-error">{msg}</p> }
                         </div>
                         <div>
-                            <label class="gi-label">{"Fecha Fin *"}</label>
+                            <label class="gi-label" title="Debe ser posterior a la fecha de inicio. No puede solaparse con otro contrato activo">{"Fecha Fin *"}</label>
                             <input type="date" value={(*fecha_fin).clone()} oninput={input_cb!(fecha_fin)}
                                 class={if fe.fecha_fin.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
                             if let Some(ref msg) = fe.fecha_fin { <p class="gi-field-error">{msg}</p> }
@@ -572,7 +756,9 @@ pub fn Contratos() -> Html {
                         }
                         <div style="grid-column: 1 / -1; display: flex; gap: var(--space-2); justify-content: flex-end;">
                             <button type="button" onclick={on_cancel} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                            <button type="submit" class="gi-btn gi-btn-primary">{"Guardar"}</button>
+                            <button type="submit" disabled={*submitting} class="gi-btn gi-btn-primary">
+                                {if *submitting { "Guardando..." } else { "Guardar" }}
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -589,33 +775,50 @@ pub fn Contratos() -> Html {
                         </svg>
                     </div>
                     <div class="gi-empty-state-title">{"Sin contratos registrados"}</div>
-                    <p class="gi-empty-state-text">{"Cree su primer contrato vinculando una propiedad con un inquilino."}</p>
+                    <p class="gi-empty-state-text">{"Un contrato vincula una propiedad con un inquilino. Necesita tener al menos una propiedad y un inquilino registrados antes de crear un contrato."}</p>
                     if can_write(&user_rol) {
                         <button onclick={Callback::from({
                             let show_form = show_form.clone();
                             move |_: MouseEvent| show_form.set(true)
                         })} class="gi-btn gi-btn-primary" style="margin-top: var(--space-3);">{"+ Nuevo Contrato"}</button>
                     }
+                    <div class="gi-empty-state-hint">
+                        <Link<Route> to={Route::Propiedades} classes="gi-btn-text">
+                            {"Propiedades"}
+                        </Link<Route>>
+                        {" · "}
+                        <Link<Route> to={Route::Inquilinos} classes="gi-btn-text">
+                            {"Inquilinos"}
+                        </Link<Route>>
+                    </div>
                 </div>
             } else {
                 <DataTable headers={headers}>
                     { for (*items).iter().map(|c| {
                         let on_edit = on_edit.clone(); let on_delete_click = on_delete_click.clone();
-                        let cc = c.clone(); let cd = c.clone(); let user_rol = user_rol.clone();
+                        let on_renew_click = on_renew_click.clone(); let on_terminate_click = on_terminate_click.clone();
+                        let cc = c.clone(); let cd = c.clone(); let cr = c.clone(); let ct = c.clone();
+                        let user_rol = user_rol.clone();
                         let p_label = prop_label(&c.propiedad_id);
                         let i_label = inq_label(&c.inquilino_id);
                         let (badge_cls, badge_label) = estado_badge(&c.estado);
+                        let is_active = c.estado == "activo";
                         html! {
                             <tr>
                                 <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{p_label}</td>
                                 <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{i_label}</td>
                                 <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&c.fecha_inicio)}</td>
                                 <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&c.fecha_fin)}</td>
-                                <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_currency(&c.moneda, c.monto_mensual)}</td>
+                                <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={c.monto_mensual} moneda={c.moneda.clone()} /></td>
                                 <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
                                 if can_write(&user_rol) {
-                                    <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2);">
+                                    <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2); flex-wrap: wrap;">
                                         <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(cc.clone()))} class="gi-btn-text">{"Editar"}</button>
+                                        if is_active {
+                                            <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-success">{"Registrar Pago"}</Link<Route>>
+                                            <button onclick={Callback::from(move |_: MouseEvent| on_renew_click.emit(cr.clone()))} class="gi-btn-text" style="color: var(--color-primary-500);">{"Renovar"}</button>
+                                            <button onclick={Callback::from(move |_: MouseEvent| on_terminate_click.emit(ct.clone()))} class="gi-btn-text" style="color: var(--color-warning);">{"Terminar"}</button>
+                                        }
                                         if can_delete(&user_rol) {
                                             <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(cd.clone()))} class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button>
                                         }
@@ -625,23 +828,13 @@ pub fn Contratos() -> Html {
                         }
                     })}
                 </DataTable>
-                if total_pages > 1 {
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-3);">
-                        <span style="font-size: var(--text-sm); color: var(--text-secondary);">
-                            {format!("{} contrato(s) — página {} de {}", *total, *page, total_pages)}
-                        </span>
-                        <div style="display: flex; gap: var(--space-2);">
-                            <button onclick={on_prev_page} disabled={*page <= 1} class="gi-btn gi-btn-ghost">{"← Anterior"}</button>
-                            <button onclick={on_next_page} disabled={*page >= total_pages} class="gi-btn gi-btn-ghost">{"Siguiente →"}</button>
-                        </div>
-                    </div>
-                } else {
-                    <div style="margin-top: var(--space-3);">
-                        <span style="font-size: var(--text-sm); color: var(--text-secondary);">
-                            {format!("{} contrato(s) encontrado(s)", *total)}
-                        </span>
-                    </div>
-                }
+                <Pagination
+                    total={*total}
+                    page={*page}
+                    per_page={*per_page}
+                    on_page_change={on_page_change}
+                    on_per_page_change={on_per_page_change}
+                />
             }
         </div>
     }

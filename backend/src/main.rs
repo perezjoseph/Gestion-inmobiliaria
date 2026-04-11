@@ -1,12 +1,5 @@
-mod app;
-mod config;
-mod entities;
-mod errors;
-mod handlers;
-mod middleware;
-mod models;
-mod routes;
-mod services;
+use realestate_backend::app;
+use realestate_backend::config::AppConfig;
 
 #[path = "../migrations/mod.rs"]
 pub mod migrations;
@@ -14,8 +7,6 @@ pub mod migrations;
 use sea_orm::Database;
 use sea_orm_migration::MigratorTrait;
 use tracing_subscriber::EnvFilter;
-
-use crate::config::AppConfig;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {

@@ -1,17 +1,22 @@
+use gloo_events::EventListener;
 use wasm_bindgen::JsCast;
-use wasm_bindgen::closure::Closure;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
+use yew_router::prelude::*;
 
-use crate::app::AuthContext;
+use crate::app::{AuthContext, Route};
+use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::data_table::DataTable;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::loading::Loading;
+use crate::components::common::pagination::Pagination;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
-use crate::services::api::{api_delete, api_get, api_post, api_put};
+use crate::services::api::{BASE_URL, api_delete, api_get, api_post, api_put};
 use crate::types::PaginatedResponse;
 use crate::types::contrato::Contrato;
+use crate::types::inquilino::Inquilino;
 use crate::types::pago::{CreatePago, Pago, UpdatePago};
+use crate::types::propiedad::Propiedad;
 use crate::utils::{can_delete, can_write, format_currency, format_date_display};
 
 fn estado_badge(estado: &str) -> (&'static str, &'static str) {
@@ -60,11 +65,14 @@ pub fn Pagos() -> Html {
     let page = use_state(|| 1u64);
     let per_page = use_state(|| 20u64);
     let contratos = use_state(Vec::<Contrato>::new);
+    let propiedades = use_state(Vec::<Propiedad>::new);
+    let inquilinos_list = use_state(Vec::<Inquilino>::new);
     let error = use_state(|| Option::<String>::None);
     let loading = use_state(|| true);
     let show_form = use_state(|| false);
     let editing = use_state(|| Option::<Pago>::None);
     let delete_target = use_state(|| Option::<Pago>::None);
+    let submitting = use_state(|| false);
     let form_errors = use_state(FormErrors::default);
     let reload = use_state(|| 0u32);
 
@@ -118,6 +126,8 @@ pub fn Pagos() -> Html {
 
     {
         let contratos = contratos.clone();
+        let propiedades = propiedades.clone();
+        let inquilinos_list = inquilinos_list.clone();
         use_effect_with((), move |_| {
             spawn_local(async move {
                 if let Ok(resp) =
@@ -125,23 +135,47 @@ pub fn Pagos() -> Html {
                 {
                     contratos.set(resp.data);
                 }
+                if let Ok(resp) =
+                    api_get::<PaginatedResponse<Propiedad>>("/propiedades?perPage=200").await
+                {
+                    propiedades.set(resp.data);
+                }
+                if let Ok(resp) =
+                    api_get::<PaginatedResponse<Inquilino>>("/inquilinos?perPage=200").await
+                {
+                    inquilinos_list.set(resp.data);
+                }
             });
         });
     }
 
     let contrato_label = {
         let contratos = contratos.clone();
+        let propiedades = propiedades.clone();
+        let inquilinos_list = inquilinos_list.clone();
         move |id: &str| -> String {
             contratos
                 .iter()
                 .find(|c| c.id == id)
                 .map(|c| {
-                    format!(
-                        "Contrato {} — {} {}",
-                        &c.id[..8.min(c.id.len())],
-                        c.moneda,
-                        c.monto_mensual
-                    )
+                    let prop_name = propiedades
+                        .iter()
+                        .find(|p| p.id == c.propiedad_id)
+                        .map(|p| p.titulo.as_str())
+                        .unwrap_or("—");
+                    let tenant_name = inquilinos_list
+                        .iter()
+                        .find(|i| i.id == c.inquilino_id)
+                        .map(|i| format!("{} {}", i.nombre, i.apellido))
+                        .unwrap_or_default();
+                    if tenant_name.is_empty() {
+                        format!("{} — {} {}", prop_name, c.moneda, c.monto_mensual)
+                    } else {
+                        format!(
+                            "{} ({}) — {} {}",
+                            prop_name, tenant_name, c.moneda, c.monto_mensual
+                        )
+                    }
                 })
                 .unwrap_or_else(|| id.to_string())
         }
@@ -174,35 +208,34 @@ pub fn Pagos() -> Html {
         }
     };
 
+    let escape_handler = use_mut_ref(|| None::<Box<dyn Fn()>>);
     {
         let delete_target = delete_target.clone();
         let show_form = show_form.clone();
         let reset_form = reset_form.clone();
-        use_effect(move || {
-            let doc = web_sys::window().and_then(|w| w.document());
-            let closure =
-                Closure::<dyn Fn(web_sys::KeyboardEvent)>::new(move |e: web_sys::KeyboardEvent| {
-                    if e.key() == "Escape" {
-                        if delete_target.is_some() {
-                            delete_target.set(None);
-                        } else if *show_form {
-                            reset_form();
-                        }
+        let handler = escape_handler.clone();
+        *handler.borrow_mut() = Some(Box::new(move || {
+            if delete_target.is_some() {
+                delete_target.set(None);
+            } else if *show_form {
+                reset_form();
+            }
+        }) as Box<dyn Fn()>);
+    }
+    {
+        let escape_handler = escape_handler.clone();
+        use_effect_with((), move |_| {
+            let listener = web_sys::window().and_then(|w| w.document()).map(|doc| {
+                EventListener::new(&doc, "keydown", move |event| {
+                    let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
+                    if event.key() == "Escape"
+                        && let Some(ref cb) = *escape_handler.borrow()
+                    {
+                        cb();
                     }
-                });
-            if let Some(ref d) = doc {
-                let _ =
-                    d.add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref());
-            }
-            let doc_clone = doc.clone();
-            move || {
-                if let Some(ref d) = doc_clone {
-                    let _ = d.remove_event_listener_with_callback(
-                        "keydown",
-                        closure.as_ref().unchecked_ref(),
-                    );
-                }
-            }
+                })
+            });
+            move || drop(listener)
         });
     }
 
@@ -257,19 +290,26 @@ pub fn Pagos() -> Html {
         Callback::from(move |_: MouseEvent| {
             if let Some(ref p) = *delete_target {
                 let id = p.id.clone();
+                let pago_monto = format_currency(&p.moneda, p.monto);
                 let error = error.clone();
                 let reload = reload.clone();
                 let delete_target = delete_target.clone();
                 let toasts = toasts.clone();
+                let reload_for_undo = reload.clone();
                 spawn_local(async move {
                     match api_delete(&format!("/pagos/{id}")).await {
                         Ok(()) => {
                             delete_target.set(None);
                             reload.set(*reload + 1);
+                            let undo_reload = reload_for_undo;
                             if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::Push(
-                                    "Pago eliminado exitosamente".into(),
-                                    ToastKind::Success,
+                                t.dispatch(ToastAction::PushWithUndo(
+                                    format!("Pago de {} eliminado", pago_monto),
+                                    ToastKind::Info,
+                                    "Deshacer".into(),
+                                    std::rc::Rc::new(move || {
+                                        undo_reload.set(*undo_reload + 1);
+                                    }),
                                 ));
                             }
                         }
@@ -333,11 +373,16 @@ pub fn Pagos() -> Html {
         let reset_form = reset_form.clone();
         let validate_form = validate_form.clone();
         let toasts = toasts.clone();
+        let submitting = submitting.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
+            if *submitting {
+                return;
+            }
             if !validate_form() {
                 return;
             }
+            submitting.set(true);
             let monto_val: f64 = match monto.parse() {
                 Ok(v) => v,
                 Err(_) => return,
@@ -361,6 +406,7 @@ pub fn Pagos() -> Html {
             let reload = reload.clone();
             let reset_form = reset_form.clone();
             let toasts = toasts.clone();
+            let submitting_handle = submitting.clone();
             if let Some(ref ed) = *editing {
                 let update = UpdatePago {
                     monto: Some(monto_val),
@@ -370,6 +416,7 @@ pub fn Pagos() -> Html {
                     notas: n,
                 };
                 let id = ed.id.clone();
+                let submitting = submitting_handle.clone();
                 spawn_local(async move {
                     match api_put::<Pago, _>(&format!("/pagos/{id}"), &update).await {
                         Ok(_) => {
@@ -377,13 +424,14 @@ pub fn Pagos() -> Html {
                             reload.set(*reload + 1);
                             if let Some(t) = &toasts {
                                 t.dispatch(ToastAction::Push(
-                                    "Pago actualizado exitosamente".into(),
+                                    "Pago actualizado".into(),
                                     ToastKind::Success,
                                 ));
                             }
                         }
                         Err(err) => error.set(Some(err)),
                     }
+                    submitting.set(false);
                 });
             } else {
                 let create = CreatePago {
@@ -395,6 +443,7 @@ pub fn Pagos() -> Html {
                     metodo_pago: mp,
                     notas: n,
                 };
+                let submitting = submitting_handle;
                 spawn_local(async move {
                     match api_post::<Pago, _>("/pagos", &create).await {
                         Ok(_) => {
@@ -402,13 +451,14 @@ pub fn Pagos() -> Html {
                             reload.set(*reload + 1);
                             if let Some(t) = &toasts {
                                 t.dispatch(ToastAction::Push(
-                                    "Pago registrado exitosamente".into(),
+                                    "Pago registrado".into(),
                                     ToastKind::Success,
                                 ));
                             }
                         }
                         Err(err) => error.set(Some(err)),
                     }
+                    submitting.set(false);
                 });
             }
         })
@@ -459,27 +509,22 @@ pub fn Pagos() -> Html {
         })
     };
 
-    let on_prev_page = {
+    let on_page_change = {
         let page = page.clone();
         let reload = reload.clone();
-        Callback::from(move |_: MouseEvent| {
-            if *page > 1 {
-                page.set(*page - 1);
-                reload.set(*reload + 1);
-            }
+        Callback::from(move |p: u64| {
+            page.set(p);
+            reload.set(*reload + 1);
         })
     };
-    let on_next_page = {
-        let page = page.clone();
-        let total = total.clone();
+    let on_per_page_change = {
         let per_page = per_page.clone();
+        let page = page.clone();
         let reload = reload.clone();
-        Callback::from(move |_: MouseEvent| {
-            let max_page = ((*total) as f64 / (*per_page) as f64).ceil() as u64;
-            if *page < max_page {
-                page.set(*page + 1);
-                reload.set(*reload + 1);
-            }
+        Callback::from(move |pp: u64| {
+            per_page.set(pp);
+            page.set(1);
+            reload.set(*reload + 1);
         })
     };
 
@@ -502,7 +547,6 @@ pub fn Pagos() -> Html {
     ];
     let fe = (*form_errors).clone();
     let is_editing = editing.is_some();
-    let total_pages = ((*total) as f64 / (*per_page) as f64).ceil() as u64;
 
     html! {
         <div>
@@ -542,7 +586,8 @@ pub fn Pagos() -> Html {
                             <option value="" selected={filter_contrato.is_empty()}>{"Todos"}</option>
                             { for (*contratos).iter().map(|c| {
                                 let sel = *filter_contrato == c.id;
-                                html! { <option value={c.id.clone()} selected={sel}>{format!("Contrato {} — {} {}", &c.id[..8.min(c.id.len())], c.moneda, c.monto_mensual)}</option> }
+                                let label = contrato_label(&c.id);
+                                html! { <option value={c.id.clone()} selected={sel}>{label}</option> }
                             })}
                         </select>
                     </div>
@@ -574,7 +619,8 @@ pub fn Pagos() -> Html {
                                 <option value="" selected={contrato_id.is_empty()}>{"— Seleccionar contrato —"}</option>
                                 { for (*contratos).iter().map(|c| {
                                     let sel = *contrato_id == c.id;
-                                    html! { <option value={c.id.clone()} selected={sel}>{format!("Contrato {} — {} {}", &c.id[..8.min(c.id.len())], c.moneda, c.monto_mensual)}</option> }
+                                    let label = contrato_label(&c.id);
+                                    html! { <option value={c.id.clone()} selected={sel}>{label}</option> }
                                 })}
                             </select>
                             if let Some(ref msg) = fe.contrato_id { <p class="gi-field-error">{msg}</p> }
@@ -627,7 +673,9 @@ pub fn Pagos() -> Html {
                         </div>
                         <div style="grid-column: 1 / -1; display: flex; gap: var(--space-2); justify-content: flex-end;">
                             <button type="button" onclick={on_cancel} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                            <button type="submit" class="gi-btn gi-btn-primary">{"Guardar"}</button>
+                            <button type="submit" disabled={*submitting} class="gi-btn gi-btn-primary">
+                                {if *submitting { "Guardando..." } else { "Guardar" }}
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -642,10 +690,16 @@ pub fn Pagos() -> Html {
                         </svg>
                     </div>
                     <div class="gi-empty-state-title">{"Sin pagos registrados"}</div>
-                    <p class="gi-empty-state-text">{"Registre pagos asociados a sus contratos activos."}</p>
+                    <p class="gi-empty-state-text">{"Los pagos se registran contra contratos activos. Necesita al menos un contrato vigente para comenzar a registrar cobros."}</p>
                     if can_write(&user_rol) {
                         <button onclick={on_new.clone()} class="gi-btn gi-btn-primary" style="margin-top: var(--space-3);">{"+ Nuevo Pago"}</button>
                     }
+                    <div class="gi-empty-state-hint">
+                        {"¿No tiene contratos? "}
+                        <Link<Route> to={Route::Contratos} classes="gi-btn-text">
+                            {"Crear contrato primero"}
+                        </Link<Route>>
+                    </div>
                 </div>
             } else {
                 <DataTable headers={headers}>
@@ -654,10 +708,12 @@ pub fn Pagos() -> Html {
                         let pc = p.clone(); let pd = p.clone(); let user_rol = user_rol.clone();
                         let c_label = contrato_label(&p.contrato_id);
                         let (badge_cls, badge_label) = estado_badge(&p.estado);
+                        let is_pagado = p.estado == "pagado";
+                        let recibo_id = p.id.clone();
                         html! {
                             <tr>
                                 <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{c_label}</td>
-                                <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_currency(&p.moneda, p.monto)}</td>
+                                <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={p.monto} moneda={p.moneda.clone()} /></td>
                                 <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
                                     {p.fecha_pago.as_deref().map(format_date_display).unwrap_or_else(|| "—".into())}</td>
                                 <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&p.fecha_vencimiento)}</td>
@@ -667,6 +723,12 @@ pub fn Pagos() -> Html {
                                 if can_write(&user_rol) {
                                     <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2);">
                                         <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(pc.clone()))} class="gi-btn-text">{"Editar"}</button>
+                                        if is_pagado {
+                                            <button onclick={Callback::from(move |_: MouseEvent| {
+                                                let url = format!("{BASE_URL}/pagos/{}/recibo", recibo_id);
+                                                let _ = web_sys::window().and_then(|w| w.open_with_url(&url).ok());
+                                            })} class="gi-btn-text" style="color: var(--color-primary-500);">{"Recibo"}</button>
+                                        }
                                         if can_delete(&user_rol) {
                                             <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(pd.clone()))} class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button>
                                         }
@@ -676,23 +738,13 @@ pub fn Pagos() -> Html {
                         }
                     })}
                 </DataTable>
-                if total_pages > 1 {
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-3);">
-                        <span style="font-size: var(--text-sm); color: var(--text-secondary);">
-                            {format!("{} pago(s) — página {} de {}", *total, *page, total_pages)}
-                        </span>
-                        <div style="display: flex; gap: var(--space-2);">
-                            <button onclick={on_prev_page} disabled={*page <= 1} class="gi-btn gi-btn-ghost">{"← Anterior"}</button>
-                            <button onclick={on_next_page} disabled={*page >= total_pages} class="gi-btn gi-btn-ghost">{"Siguiente →"}</button>
-                        </div>
-                    </div>
-                } else {
-                    <div style="margin-top: var(--space-3);">
-                        <span style="font-size: var(--text-sm); color: var(--text-secondary);">
-                            {format!("{} pago(s) encontrado(s)", *total)}
-                        </span>
-                    </div>
-                }
+                <Pagination
+                    total={*total}
+                    page={*page}
+                    per_page={*per_page}
+                    on_page_change={on_page_change}
+                    on_per_page_change={on_per_page_change}
+                />
             }
         </div>
     }

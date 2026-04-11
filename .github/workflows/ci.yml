@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+  DATABASE_URL: postgresql://realestate:realestate_dev_password@localhost:5432/realestate
+  JWT_SECRET: ci_test_secret_not_for_production
+  SERVER_PORT: 8080
+  CORS_ORIGIN: http://localhost:8080
+
+jobs:
+  check:
+    name: Check & Lint
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-check-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-check-
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (backend)
+        run: cargo clippy -p realestate-backend -- -D warnings
+
+      - name: Clippy (frontend)
+        run: cargo clippy -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings
+
+  test-backend:
+    name: Backend Tests
+    runs-on: [self-hosted, linux]
+    needs: check
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: realestate
+          POSTGRES_USER: realestate
+          POSTGRES_PASSWORD: realestate_dev_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U realestate"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-test-
+
+      - name: Run backend tests
+        run: cargo test -p realestate-backend --all-targets
+
+  build-frontend:
+    name: Build Frontend (WASM)
+    runs-on: [self-hosted, linux]
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install Trunk
+        uses: jetli/trunk-action@v0.5.0
+
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-wasm-
+
+      - name: Build frontend
+        run: trunk build --release
+        working-directory: frontend
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 7

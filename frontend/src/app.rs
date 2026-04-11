@@ -1,17 +1,24 @@
 use yew::prelude::*;
 use yew_router::prelude::*;
 
+use crate::components::common::offline_banner::OfflineBanner;
 use crate::components::common::toast::{ToastContainer, ToastContext, ToastState};
 use crate::components::layout::footer::Footer;
 use crate::components::layout::navbar::Navbar;
 use crate::components::layout::sidebar::Sidebar;
+use crate::pages::auditoria::Auditoria;
 use crate::pages::contratos::Contratos;
 use crate::pages::dashboard::Dashboard;
+use crate::pages::importar::Importar;
 use crate::pages::inquilinos::Inquilinos;
 use crate::pages::login::Login;
 use crate::pages::pagos::Pagos;
+use crate::pages::perfil::Perfil;
 use crate::pages::propiedades::Propiedades;
 use crate::pages::registro::Registro;
+use crate::pages::reportes::Reportes;
+use crate::pages::usuarios::Usuarios;
+use crate::services::api::api_get;
 use crate::services::auth::{clear_token, get_token, set_token};
 use crate::types::usuario::User;
 
@@ -75,7 +82,7 @@ pub type AuthContext = UseReducerHandle<AuthState>;
 
 pub type ThemeContext = UseStateHandle<bool>;
 
-#[derive(Clone, Routable, PartialEq)]
+#[derive(Clone, Debug, Routable, PartialEq)]
 pub enum Route {
     #[at("/")]
     Login,
@@ -91,6 +98,16 @@ pub enum Route {
     Pagos,
     #[at("/registro")]
     Registro,
+    #[at("/reportes")]
+    Reportes,
+    #[at("/usuarios")]
+    UsuariosPage,
+    #[at("/perfil")]
+    Perfil,
+    #[at("/auditoria")]
+    AuditoriaPage,
+    #[at("/importar")]
+    Importar,
     #[not_found]
     #[at("/404")]
     NotFound,
@@ -105,6 +122,11 @@ fn switch(routes: Route) -> Html {
         Route::Inquilinos => html! { <ProtectedRoute><Inquilinos /></ProtectedRoute> },
         Route::Contratos => html! { <ProtectedRoute><Contratos /></ProtectedRoute> },
         Route::Pagos => html! { <ProtectedRoute><Pagos /></ProtectedRoute> },
+        Route::Reportes => html! { <ProtectedRoute><Reportes /></ProtectedRoute> },
+        Route::UsuariosPage => html! { <ProtectedRoute><Usuarios /></ProtectedRoute> },
+        Route::Perfil => html! { <ProtectedRoute><Perfil /></ProtectedRoute> },
+        Route::AuditoriaPage => html! { <ProtectedRoute><Auditoria /></ProtectedRoute> },
+        Route::Importar => html! { <ProtectedRoute><Importar /></ProtectedRoute> },
         Route::NotFound => {
             html! {
                 <div class="gi-empty-state">
@@ -198,6 +220,7 @@ pub fn ProtectedRoute(props: &ProtectedRouteProps) -> Html {
                     {props.children.clone()}
                 </main>
                 <Footer />
+                <OfflineBanner />
             </div>
         </div>
     }
@@ -207,6 +230,25 @@ pub fn ProtectedRoute(props: &ProtectedRouteProps) -> Html {
 pub fn App() -> Html {
     let auth = use_reducer(AuthState::default);
     let toasts = use_reducer(ToastState::default);
+    let fetched = use_state(|| false);
+
+    let needs_restore = auth.token.is_some() && auth.user.is_none() && !*fetched;
+
+    {
+        let auth = auth.clone();
+        let fetched = fetched.clone();
+        use_effect_with((), move |_| {
+            if auth.token.is_some() && auth.user.is_none() {
+                wasm_bindgen_futures::spawn_local(async move {
+                    match api_get::<User>("/perfil").await {
+                        Ok(user) => auth.dispatch(AuthAction::SetUser(user)),
+                        Err(_) => auth.dispatch(AuthAction::Logout),
+                    }
+                    fetched.set(true);
+                });
+            }
+        });
+    }
 
     let is_dark = use_state(|| {
         web_sys::window()
@@ -219,6 +261,17 @@ pub fn App() -> Html {
             })
             .unwrap_or(false)
     });
+
+    if needs_restore {
+        return html! {
+            <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background-color: var(--surface-base);">
+                <div style="text-align: center;">
+                    <div class="gi-spinner" style="margin: 0 auto var(--space-3);"></div>
+                    <span style="font-size: var(--text-sm); color: var(--text-tertiary);">{"Cargando sesión..."}</span>
+                </div>
+            </div>
+        };
+    }
 
     html! {
         <ContextProvider<AuthContext> context={auth}>

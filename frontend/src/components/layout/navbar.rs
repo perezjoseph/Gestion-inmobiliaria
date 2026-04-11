@@ -15,6 +15,8 @@ pub fn Navbar(props: &NavbarProps) -> Html {
     let auth = use_context::<AuthContext>().unwrap();
     let navigator = use_navigator().unwrap();
     let theme = use_context::<ThemeContext>().unwrap();
+    let search_query = use_state(String::new);
+    let search_open = use_state(|| false);
 
     let on_logout = {
         let auth = auth.clone();
@@ -43,6 +45,53 @@ pub fn Navbar(props: &NavbarProps) -> Html {
         })
     };
 
+    let on_toggle_search = {
+        let search_open = search_open.clone();
+        let search_query = search_query.clone();
+        Callback::from(move |_: MouseEvent| {
+            let opening = !*search_open;
+            search_open.set(opening);
+            if !opening {
+                search_query.set(String::new());
+            }
+        })
+    };
+
+    let on_search_input = {
+        let search_query = search_query.clone();
+        Callback::from(move |e: InputEvent| {
+            let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+            search_query.set(input.value());
+        })
+    };
+
+    let on_search_keydown = {
+        let search_query = search_query.clone();
+        let navigator = navigator.clone();
+        let search_open = search_open.clone();
+        Callback::from(move |e: KeyboardEvent| {
+            if e.key() == "Enter" {
+                let q = (*search_query).trim().to_lowercase();
+                if !q.is_empty() {
+                    if q.contains("pago") || q.contains("cobr") {
+                        navigator.push(&Route::Pagos);
+                    } else if q.contains("contrat") {
+                        navigator.push(&Route::Contratos);
+                    } else if q.contains("inquilin") || q.contains("arrendat") {
+                        navigator.push(&Route::Inquilinos);
+                    } else {
+                        navigator.push(&Route::Propiedades);
+                    }
+                    search_query.set(String::new());
+                    search_open.set(false);
+                }
+            } else if e.key() == "Escape" {
+                search_query.set(String::new());
+                search_open.set(false);
+            }
+        })
+    };
+
     let role_label = match props.user_role.as_str() {
         "admin" => "Administrador",
         "gerente" => "Gerente",
@@ -66,13 +115,32 @@ pub fn Navbar(props: &NavbarProps) -> Html {
                 </span>
             </div>
             <div style="display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0;">
+                // Quick search
+                if *search_open {
+                    <input type="text"
+                        class="gi-input gi-navbar-search"
+                        placeholder="Ir a sección... (propiedades, pagos, contratos)"
+                        value={(*search_query).clone()}
+                        oninput={on_search_input}
+                        onkeydown={on_search_keydown}
+                        style="width: 260px; font-size: var(--text-sm);"
+                    />
+                }
+                <button class="gi-btn gi-btn-ghost gi-navbar-search-btn" onclick={on_toggle_search}
+                    aria-label="Ir a sección" title="Ir a sección"
+                    style="padding: var(--space-2); border: none; display: flex; align-items: center; gap: var(--space-1);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                    <span style="font-size: var(--text-xs); font-weight: 500;">{"Ir a…"}</span>
+                </button>
                 <button class="gi-theme-toggle" onclick={on_toggle_theme}
                     aria-label={if *theme { "Cambiar a modo claro" } else { "Cambiar a modo oscuro" }}
                     title={if *theme { "Modo claro" } else { "Modo oscuro" }}>
                 </button>
                 <div class="gi-navbar-user" style="display: flex; align-items: center; gap: var(--space-3);">
                     <div class="gi-navbar-user-info" style="text-align: right;">
-                        <div class="gi-navbar-user-name" style="font-size: var(--text-sm); font-weight: 600; color: var(--text-primary);">
+                        <div class="gi-navbar-user-name gi-text-sm" style="font-weight: 600; color: var(--text-primary);">
                             {&props.user_name}
                         </div>
                         <div class="gi-badge gi-badge-info" style="font-size: 0.65rem;">

@@ -17,6 +17,8 @@ pub struct Model {
     pub deposito: Option<Decimal>,
     pub moneda: String,
     pub estado: String,
+    #[sea_orm(column_type = "JsonBinary", nullable)]
+    pub documentos: Option<Json>,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }

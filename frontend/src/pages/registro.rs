@@ -37,7 +37,12 @@ pub fn Registro() -> Html {
             <div style="width: 100%; max-width: 420px; padding: var(--space-4);">
                 <div class="gi-card" style="padding: var(--space-7) var(--space-6);">
                     <div style="text-align: center; margin-bottom: var(--space-6);">
-                        <div style="font-size: 2.5rem; margin-bottom: var(--space-3);">{"🏠"}</div>
+                        <div class="gi-logo-mark" style="margin: 0 auto var(--space-3);">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 21V9l9-7 9 7v12"/>
+                                <path d="M9 21V12h6v9"/>
+                            </svg>
+                        </div>
                         <h1 class="text-display" style="font-size: var(--text-xl); font-weight: 700; color: var(--color-primary-500);">
                             {"Gestión Inmobiliaria"}
                         </h1>

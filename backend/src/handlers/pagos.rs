@@ -1,5 +1,5 @@
 use actix_web::{HttpResponse, web};
-use sea_orm::DatabaseConnection;
+use sea_orm::{DatabaseConnection, TransactionTrait};
 use uuid::Uuid;
 
 use crate::errors::AppError;
@@ -29,30 +29,39 @@ pub async fn get_by_id(
 
 pub async fn create(
     db: web::Data<DatabaseConnection>,
-    _access: WriteAccess,
+    access: WriteAccess,
     body: web::Json<CreatePagoRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let result = pagos::create(db.get_ref(), body.into_inner()).await?;
+    let usuario_id = access.0.sub;
+    let txn = db.begin().await?;
+    let result = pagos::create(&txn, body.into_inner(), usuario_id).await?;
+    txn.commit().await?;
     Ok(HttpResponse::Created().json(result))
 }
 
 pub async fn update(
     db: web::Data<DatabaseConnection>,
-    _access: WriteAccess,
+    access: WriteAccess,
     path: web::Path<Uuid>,
     body: web::Json<UpdatePagoRequest>,
 ) -> Result<HttpResponse, AppError> {
+    let usuario_id = access.0.sub;
     let id = path.into_inner();
-    let result = pagos::update(db.get_ref(), id, body.into_inner()).await?;
+    let txn = db.begin().await?;
+    let result = pagos::update(&txn, id, body.into_inner(), usuario_id).await?;
+    txn.commit().await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
 pub async fn delete(
     db: web::Data<DatabaseConnection>,
-    _admin: AdminOnly,
+    admin: AdminOnly,
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
+    let usuario_id = admin.0.sub;
     let id = path.into_inner();
-    pagos::delete(db.get_ref(), id).await?;
+    let txn = db.begin().await?;
+    pagos::delete(&txn, id, usuario_id).await?;
+    txn.commit().await?;
     Ok(HttpResponse::NoContent().finish())
 }

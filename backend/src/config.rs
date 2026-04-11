@@ -16,6 +16,12 @@ impl AppConfig {
         let jwt_secret = std::env::var("JWT_SECRET")
             .map_err(|_| anyhow::anyhow!("JWT_SECRET no está configurado"))?;
 
+        if jwt_secret.len() < 32 {
+            return Err(anyhow::anyhow!(
+                "JWT_SECRET debe tener al menos 32 caracteres"
+            ));
+        }
+
         let server_port = std::env::var("SERVER_PORT")
             .unwrap_or_else(|_| "8080".to_string())
             .parse::<u16>()
@@ -55,14 +61,14 @@ mod tests {
         unsafe {
             clear_env_vars();
             env::set_var("DATABASE_URL", "postgres://localhost/test");
-            env::set_var("JWT_SECRET", "supersecret");
+            env::set_var("JWT_SECRET", "supersecretkeythatis32charslong!");
             env::set_var("SERVER_PORT", "3000");
             env::set_var("CORS_ORIGIN", "http://localhost:3000");
         }
 
         let config = AppConfig::from_env().unwrap();
         assert_eq!(config.database_url, "postgres://localhost/test");
-        assert_eq!(config.jwt_secret, "supersecret");
+        assert_eq!(config.jwt_secret, "supersecretkeythatis32charslong!");
         assert_eq!(config.server_port, 3000);
         assert_eq!(config.cors_origin.as_deref(), Some("http://localhost:3000"));
 
@@ -75,7 +81,7 @@ mod tests {
         unsafe {
             clear_env_vars();
             env::set_var("DATABASE_URL", "postgres://localhost/test");
-            env::set_var("JWT_SECRET", "supersecret");
+            env::set_var("JWT_SECRET", "supersecretkeythatis32charslong!");
         }
 
         // dotenvy may load SERVER_PORT from .env; just verify it parses successfully
@@ -91,7 +97,7 @@ mod tests {
         unsafe {
             clear_env_vars();
             env::set_var("DATABASE_URL", "postgres://localhost/test");
-            env::set_var("JWT_SECRET", "supersecret");
+            env::set_var("JWT_SECRET", "supersecretkeythatis32charslong!");
             env::set_var("SERVER_PORT", "not_a_number");
         }
 

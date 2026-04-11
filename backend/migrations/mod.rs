@@ -3,6 +3,13 @@ pub mod m20250408_000002_create_propiedades;
 pub mod m20250408_000003_create_inquilinos;
 pub mod m20250408_000004_create_contratos;
 pub mod m20250408_000005_create_pagos;
+pub mod m20250409_000001_create_registros_auditoria;
+pub mod m20250409_000002_create_documentos;
+pub mod m20250409_000003_create_configuracion;
+pub mod m20250409_000004_add_documentos_columns;
+pub mod m20250410_000001_create_unidades;
+pub mod m20250411_000001_create_solicitudes_mantenimiento;
+pub mod m20250411_000002_create_notas_mantenimiento;
 
 use sea_orm_migration::prelude::*;
 
@@ -17,6 +24,13 @@ impl MigratorTrait for Migrator {
             Box::new(m20250408_000003_create_inquilinos::Migration),
             Box::new(m20250408_000004_create_contratos::Migration),
             Box::new(m20250408_000005_create_pagos::Migration),
+            Box::new(m20250409_000001_create_registros_auditoria::Migration),
+            Box::new(m20250409_000002_create_documentos::Migration),
+            Box::new(m20250409_000003_create_configuracion::Migration),
+            Box::new(m20250409_000004_add_documentos_columns::Migration),
+            Box::new(m20250410_000001_create_unidades::Migration),
+            Box::new(m20250411_000001_create_solicitudes_mantenimiento::Migration),
+            Box::new(m20250411_000002_create_notas_mantenimiento::Migration),
         ]
     }
 }

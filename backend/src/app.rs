@@ -1,4 +1,5 @@
 use actix_cors::Cors;
+use actix_files::Files;
 use actix_web::error::ResponseError;
 use actix_web::http::header;
 use actix_web::web;
@@ -44,6 +45,8 @@ pub fn create_app(
         .into()
     });
 
+    let upload_dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
+
     actix_web::App::new()
         .wrap(TracingLogger::default())
         .wrap(cors)
@@ -51,4 +54,5 @@ pub fn create_app(
         .app_data(web::Data::new(config))
         .app_data(json_cfg)
         .configure(routes::configure)
+        .service(Files::new("/uploads", &upload_dir).show_files_listing())
 }

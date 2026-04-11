@@ -1,7 +1,7 @@
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
+    PaginatorTrait, QueryFilter, QueryOrder, Set,
 };
 use uuid::Uuid;
 
@@ -11,6 +11,19 @@ use crate::models::PaginatedResponse;
 use crate::models::propiedad::{
     CreatePropiedadRequest, PropiedadListQuery, PropiedadResponse, UpdatePropiedadRequest,
 };
+use crate::services::auditoria::{self, CreateAuditoriaEntry};
+use crate::services::validation::validate_enum;
+
+const TIPOS_PROPIEDAD: &[&str] = &[
+    "casa",
+    "apartamento",
+    "comercial",
+    "terreno",
+    "local",
+    "oficina",
+];
+const ESTADOS_PROPIEDAD: &[&str] = &["disponible", "ocupada", "mantenimiento"];
+const MONEDAS: &[&str] = &["DOP", "USD"];
 
 impl From<propiedad::Model> for PropiedadResponse {
     fn from(m: propiedad::Model) -> Self {
@@ -35,10 +48,19 @@ impl From<propiedad::Model> for PropiedadResponse {
     }
 }
 
-pub async fn create(
-    db: &DatabaseConnection,
+pub async fn create<C: ConnectionTrait>(
+    db: &C,
     input: CreatePropiedadRequest,
+    usuario_id: Uuid,
 ) -> Result<PropiedadResponse, AppError> {
+    validate_enum("tipo_propiedad", &input.tipo_propiedad, TIPOS_PROPIEDAD)?;
+    if let Some(ref estado) = input.estado {
+        validate_enum("estado", estado, ESTADOS_PROPIEDAD)?;
+    }
+    if let Some(ref moneda) = input.moneda {
+        validate_enum("moneda", moneda, MONEDAS)?;
+    }
+
     let now = Utc::now().into();
     let id = Uuid::new_v4();
 
@@ -62,6 +84,19 @@ pub async fn create(
     };
 
     let record = model.insert(db).await?;
+
+    auditoria::registrar(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "propiedad".to_string(),
+            entity_id: id,
+            accion: "crear".to_string(),
+            cambios: serde_json::json!(PropiedadResponse::from(record.clone())),
+        },
+    )
+    .await?;
+
     Ok(PropiedadResponse::from(record))
 }
 
@@ -116,11 +151,22 @@ pub async fn list(
     })
 }
 
-pub async fn update(
-    db: &DatabaseConnection,
+pub async fn update<C: ConnectionTrait>(
+    db: &C,
     id: Uuid,
     input: UpdatePropiedadRequest,
+    usuario_id: Uuid,
 ) -> Result<PropiedadResponse, AppError> {
+    if let Some(ref tipo_propiedad) = input.tipo_propiedad {
+        validate_enum("tipo_propiedad", tipo_propiedad, TIPOS_PROPIEDAD)?;
+    }
+    if let Some(ref estado) = input.estado {
+        validate_enum("estado", estado, ESTADOS_PROPIEDAD)?;
+    }
+    if let Some(ref moneda) = input.moneda {
+        validate_enum("moneda", moneda, MONEDAS)?;
+    }
+
     let existing = propiedad::Entity::find_by_id(id)
         .one(db)
         .await?
@@ -171,13 +217,43 @@ pub async fn update(
     active.updated_at = Set(Utc::now().into());
 
     let updated = active.update(db).await?;
+
+    auditoria::registrar(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "propiedad".to_string(),
+            entity_id: id,
+            accion: "actualizar".to_string(),
+            cambios: serde_json::json!(PropiedadResponse::from(updated.clone())),
+        },
+    )
+    .await?;
+
     Ok(PropiedadResponse::from(updated))
 }
 
-pub async fn delete(db: &DatabaseConnection, id: Uuid) -> Result<(), AppError> {
+pub async fn delete<C: ConnectionTrait>(
+    db: &C,
+    id: Uuid,
+    usuario_id: Uuid,
+) -> Result<(), AppError> {
     let result = propiedad::Entity::delete_by_id(id).exec(db).await?;
     if result.rows_affected == 0 {
         return Err(AppError::NotFound("Propiedad no encontrada".to_string()));
     }
+
+    auditoria::registrar(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "propiedad".to_string(),
+            entity_id: id,
+            accion: "eliminar".to_string(),
+            cambios: serde_json::json!({ "id": id }),
+        },
+    )
+    .await?;
+
     Ok(())
 }

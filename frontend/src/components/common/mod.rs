@@ -1,4 +1,9 @@
+pub mod currency_display;
 pub mod data_table;
+pub mod document_gallery;
 pub mod error_banner;
 pub mod loading;
+pub mod offline_banner;
+pub mod pagination;
+pub mod sortable_header;
 pub mod toast;

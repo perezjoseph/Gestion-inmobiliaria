@@ -6,8 +6,8 @@ use serde_json::json;
 pub enum AppError {
     #[error("No encontrado: {0}")]
     NotFound(String),
-    #[error("No autorizado")]
-    Unauthorized,
+    #[error("{}", .0.as_deref().unwrap_or("No autorizado"))]
+    Unauthorized(Option<String>),
     #[error("Acceso denegado")]
     Forbidden,
     #[error("{0}")]
@@ -22,7 +22,7 @@ impl actix_web::error::ResponseError for AppError {
     fn status_code(&self) -> StatusCode {
         match self {
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
-            AppError::Unauthorized => StatusCode::UNAUTHORIZED,
+            AppError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             AppError::Forbidden => StatusCode::FORBIDDEN,
             AppError::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
             AppError::Conflict(_) => StatusCode::CONFLICT,
@@ -33,7 +33,7 @@ impl actix_web::error::ResponseError for AppError {
     fn error_response(&self) -> HttpResponse {
         let (error_type, message) = match self {
             AppError::NotFound(msg) => ("not_found", msg.clone()),
-            AppError::Unauthorized => ("unauthorized", self.to_string()),
+            AppError::Unauthorized(_) => ("unauthorized", self.to_string()),
             AppError::Forbidden => ("forbidden", self.to_string()),
             AppError::Validation(msg) => ("validation", msg.clone()),
             AppError::Conflict(msg) => ("conflict", msg.clone()),
@@ -66,7 +66,7 @@ mod tests {
 
     #[test]
     fn unauthorized_returns_401() {
-        let err = AppError::Unauthorized;
+        let err = AppError::Unauthorized(None);
         assert_eq!(err.status_code(), StatusCode::UNAUTHORIZED);
     }
 

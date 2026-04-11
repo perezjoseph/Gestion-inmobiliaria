@@ -1,7 +1,7 @@
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait, PaginatorTrait,
-    QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DatabaseConnection, EntityTrait,
+    PaginatorTrait, QueryFilter, QueryOrder, Set,
 };
 use uuid::Uuid;
 
@@ -9,6 +9,7 @@ use crate::entities::inquilino;
 use crate::errors::AppError;
 use crate::models::PaginatedResponse;
 use crate::models::inquilino::{CreateInquilinoRequest, InquilinoResponse, UpdateInquilinoRequest};
+use crate::services::auditoria::{self, CreateAuditoriaEntry};
 
 impl From<inquilino::Model> for InquilinoResponse {
     fn from(m: inquilino::Model) -> Self {
@@ -27,9 +28,10 @@ impl From<inquilino::Model> for InquilinoResponse {
     }
 }
 
-pub async fn create(
-    db: &DatabaseConnection,
+pub async fn create<C: ConnectionTrait>(
+    db: &C,
     input: CreateInquilinoRequest,
+    usuario_id: Uuid,
 ) -> Result<InquilinoResponse, AppError> {
     let existing = inquilino::Entity::find()
         .filter(inquilino::Column::Cedula.eq(&input.cedula))
@@ -54,11 +56,25 @@ pub async fn create(
         cedula: Set(input.cedula),
         contacto_emergencia: Set(input.contacto_emergencia),
         notas: Set(input.notas),
+        documentos: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
     };
 
     let record = model.insert(db).await?;
+
+    auditoria::registrar(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "inquilino".to_string(),
+            entity_id: id,
+            accion: "crear".to_string(),
+            cambios: serde_json::json!(InquilinoResponse::from(record.clone())),
+        },
+    )
+    .await?;
+
     Ok(InquilinoResponse::from(record))
 }
 
@@ -104,10 +120,11 @@ pub async fn list(
     })
 }
 
-pub async fn update(
-    db: &DatabaseConnection,
+pub async fn update<C: ConnectionTrait>(
+    db: &C,
     id: Uuid,
     input: UpdateInquilinoRequest,
+    usuario_id: Uuid,
 ) -> Result<InquilinoResponse, AppError> {
     let existing = inquilino::Entity::find_by_id(id)
         .one(db)
@@ -141,13 +158,43 @@ pub async fn update(
     active.updated_at = Set(Utc::now().into());
 
     let updated = active.update(db).await?;
+
+    auditoria::registrar(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "inquilino".to_string(),
+            entity_id: id,
+            accion: "actualizar".to_string(),
+            cambios: serde_json::json!(InquilinoResponse::from(updated.clone())),
+        },
+    )
+    .await?;
+
     Ok(InquilinoResponse::from(updated))
 }
 
-pub async fn delete(db: &DatabaseConnection, id: Uuid) -> Result<(), AppError> {
+pub async fn delete<C: ConnectionTrait>(
+    db: &C,
+    id: Uuid,
+    usuario_id: Uuid,
+) -> Result<(), AppError> {
     let result = inquilino::Entity::delete_by_id(id).exec(db).await?;
     if result.rows_affected == 0 {
         return Err(AppError::NotFound("Inquilino no encontrado".to_string()));
     }
+
+    auditoria::registrar(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "inquilino".to_string(),
+            entity_id: id,
+            accion: "eliminar".to_string(),
+            cambios: serde_json::json!({ "id": id }),
+        },
+    )
+    .await?;
+
     Ok(())
 }

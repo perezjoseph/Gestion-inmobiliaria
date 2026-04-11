@@ -1,7 +1,12 @@
+pub mod auditoria;
 pub mod contratos;
 pub mod dashboard;
+pub mod importar;
 pub mod inquilinos;
 pub mod login;
 pub mod pagos;
+pub mod perfil;
 pub mod propiedades;
 pub mod registro;
+pub mod reportes;
+pub mod usuarios;

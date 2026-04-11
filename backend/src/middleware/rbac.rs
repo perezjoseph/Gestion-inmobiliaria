@@ -10,9 +10,7 @@ pub fn check_role(claims: &Claims, allowed_roles: &[&str]) -> Result<(), AppErro
     }
 }
 
-#[expect(dead_code)]
 pub struct AdminOnly(pub Claims);
-#[expect(dead_code)]
 pub struct WriteAccess(pub Claims);
 
 impl actix_web::FromRequest for AdminOnly {
