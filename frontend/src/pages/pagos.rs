@@ -333,6 +333,40 @@ fn build_pagos_url(pg: u64, pp: u64, f_contrato: &str, f_estado: &str) -> String
     format!("/pagos?{}", params.join("&"))
 }
 
+fn load_pago_refs(
+    contratos: UseStateHandle<Vec<Contrato>>,
+    propiedades: UseStateHandle<Vec<Propiedad>>,
+    inquilinos_list: UseStateHandle<Vec<Inquilino>>,
+) {
+    spawn_local(async move {
+        if let Ok(resp) = api_get::<PaginatedResponse<Contrato>>("/contratos?perPage=100").await {
+            contratos.set(resp.data);
+        }
+        if let Ok(resp) = api_get::<PaginatedResponse<Propiedad>>("/propiedades?perPage=200").await
+        {
+            propiedades.set(resp.data);
+        }
+        if let Ok(resp) = api_get::<PaginatedResponse<Inquilino>>("/inquilinos?perPage=200").await {
+            inquilinos_list.set(resp.data);
+        }
+    });
+}
+
+fn register_escape_listener(
+    escape_handler: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>>,
+) -> Option<EventListener> {
+    web_sys::window().and_then(|w| w.document()).map(|doc| {
+        EventListener::new(&doc, "keydown", move |event| {
+            let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
+            if event.key() == "Escape" {
+                if let Some(ref cb) = *escape_handler.borrow() {
+                    cb();
+                }
+            }
+        })
+    })
+}
+
 fn validate_pago_fields(contrato_id: &str, monto: &str, fecha_vencimiento: &str) -> FormErrors {
     let mut errs = FormErrors::default();
     if contrato_id.is_empty() {
@@ -350,20 +384,40 @@ fn validate_pago_fields(contrato_id: &str, monto: &str, fecha_vencimiento: &str)
 }
 
 fn non_empty(s: &str) -> Option<String> {
-    if s.trim().is_empty() { None } else { Some(s.to_string()) }
+    if s.trim().is_empty() {
+        None
+    } else {
+        Some(s.to_string())
+    }
 }
 
-fn format_contrato_label(id: &str, contratos: &[Contrato], propiedades: &[Propiedad], inquilinos: &[Inquilino]) -> String {
+fn format_contrato_label(
+    id: &str,
+    contratos: &[Contrato],
+    propiedades: &[Propiedad],
+    inquilinos: &[Inquilino],
+) -> String {
     contratos
         .iter()
         .find(|c| c.id == id)
         .map(|c| {
-            let prop_name = propiedades.iter().find(|p| p.id == c.propiedad_id).map(|p| p.titulo.as_str()).unwrap_or("—");
-            let tenant_name = inquilinos.iter().find(|i| i.id == c.inquilino_id).map(|i| format!("{} {}", i.nombre, i.apellido)).unwrap_or_default();
+            let prop_name = propiedades
+                .iter()
+                .find(|p| p.id == c.propiedad_id)
+                .map(|p| p.titulo.as_str())
+                .unwrap_or("—");
+            let tenant_name = inquilinos
+                .iter()
+                .find(|i| i.id == c.inquilino_id)
+                .map(|i| format!("{} {}", i.nombre, i.apellido))
+                .unwrap_or_default();
             if tenant_name.is_empty() {
                 format!("{} — {} {}", prop_name, c.moneda, c.monto_mensual)
             } else {
-                format!("{} ({}) — {} {}", prop_name, tenant_name, c.moneda, c.monto_mensual)
+                format!(
+                    "{} ({}) — {} {}",
+                    prop_name, tenant_name, c.moneda, c.monto_mensual
+                )
             }
         })
         .unwrap_or_else(|| id.to_string())
@@ -381,7 +435,9 @@ fn do_save_pago(
 ) {
     spawn_local(async move {
         let res = match editing_id {
-            Some(id) => api_put::<Pago, _>(&format!("/pagos/{id}"), &update).await.map(|_| ()),
+            Some(id) => api_put::<Pago, _>(&format!("/pagos/{id}"), &update)
+                .await
+                .map(|_| ()),
             None => api_post::<Pago, _>("/pagos", &create).await.map(|_| ()),
         };
         match res {
@@ -502,23 +558,7 @@ pub fn Pagos() -> Html {
         let propiedades = propiedades.clone();
         let inquilinos_list = inquilinos_list.clone();
         use_effect_with((), move |_| {
-            spawn_local(async move {
-                if let Ok(resp) =
-                    api_get::<PaginatedResponse<Contrato>>("/contratos?perPage=100").await
-                {
-                    contratos.set(resp.data);
-                }
-                if let Ok(resp) =
-                    api_get::<PaginatedResponse<Propiedad>>("/propiedades?perPage=200").await
-                {
-                    propiedades.set(resp.data);
-                }
-                if let Ok(resp) =
-                    api_get::<PaginatedResponse<Inquilino>>("/inquilinos?perPage=200").await
-                {
-                    inquilinos_list.set(resp.data);
-                }
-            });
+            load_pago_refs(contratos, propiedades, inquilinos_list);
         });
     }
 
@@ -575,16 +615,7 @@ pub fn Pagos() -> Html {
     {
         let escape_handler = escape_handler.clone();
         use_effect_with((), move |_| {
-            let listener = web_sys::window().and_then(|w| w.document()).map(|doc| {
-                EventListener::new(&doc, "keydown", move |event| {
-                    let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
-                    if event.key() == "Escape"
-                        && let Some(ref cb) = *escape_handler.borrow()
-                    {
-                        cb();
-                    }
-                })
-            });
+            let listener = register_escape_listener(escape_handler);
             move || drop(listener)
         });
     }
@@ -640,7 +671,15 @@ pub fn Pagos() -> Html {
         Callback::from(move |_: MouseEvent| {
             if let Some(ref p) = *delete_target {
                 let label = format_currency(&p.moneda, p.monto);
-                do_delete_pago(p.id.clone(), label, delete_target.clone(), reload.clone(), error.clone(), toasts.clone(), reload.clone());
+                do_delete_pago(
+                    p.id.clone(),
+                    label,
+                    delete_target.clone(),
+                    reload.clone(),
+                    error.clone(),
+                    toasts.clone(),
+                    reload.clone(),
+                );
             }
         })
     };
@@ -686,7 +725,9 @@ pub fn Pagos() -> Html {
             if *submitting || !validate_form() {
                 return;
             }
-            let Ok(monto_val) = monto.parse::<f64>() else { return };
+            let Ok(monto_val) = monto.parse::<f64>() else {
+                return;
+            };
             submitting.set(true);
             let editing_id = editing.as_ref().map(|e| e.id.clone());
             let update = UpdatePago {
@@ -705,7 +746,16 @@ pub fn Pagos() -> Html {
                 metodo_pago: non_empty(&metodo_pago),
                 notas: non_empty(&notas),
             };
-            do_save_pago(editing_id, update, create, reset_form.clone(), reload.clone(), error.clone(), toasts.clone(), submitting.clone());
+            do_save_pago(
+                editing_id,
+                update,
+                create,
+                reset_form.clone(),
+                reload.clone(),
+                error.clone(),
+                toasts.clone(),
+                submitting.clone(),
+            );
         })
     };
 

@@ -353,7 +353,11 @@ fn ContratoList(props: &ContratoListProps) -> Html {
 }
 
 fn validate_contrato_fields(
-    propiedad_id: &str, inquilino_id: &str, fecha_inicio: &str, fecha_fin: &str, monto_mensual: &str,
+    propiedad_id: &str,
+    inquilino_id: &str,
+    fecha_inicio: &str,
+    fecha_fin: &str,
+    monto_mensual: &str,
 ) -> FormErrors {
     let mut errs = FormErrors::default();
     if propiedad_id.is_empty() {
@@ -391,8 +395,12 @@ fn do_save_contrato(
 ) {
     spawn_local(async move {
         let res = match editing_id {
-            Some(id) => api_put::<Contrato, _>(&format!("/contratos/{id}"), &update).await.map(|_| ()),
-            None => api_post::<Contrato, _>("/contratos", &create).await.map(|_| ()),
+            Some(id) => api_put::<Contrato, _>(&format!("/contratos/{id}"), &update)
+                .await
+                .map(|_| ()),
+            None => api_post::<Contrato, _>("/contratos", &create)
+                .await
+                .map(|_| ()),
         };
         match res {
             Ok(()) => {
@@ -426,7 +434,9 @@ fn do_delete_contrato(
                         format!("\"{label}\" eliminado"),
                         ToastKind::Info,
                         "Deshacer".into(),
-                        std::rc::Rc::new(move || { undo_reload.set(*undo_reload + 1); }),
+                        std::rc::Rc::new(move || {
+                            undo_reload.set(*undo_reload + 1);
+                        }),
                     ));
                 }
             }
@@ -483,6 +493,37 @@ fn do_terminate_contrato(
             Err(err) => error.set(Some(err)),
         }
     });
+}
+
+fn load_contrato_refs(
+    propiedades: UseStateHandle<Vec<Propiedad>>,
+    inquilinos: UseStateHandle<Vec<Inquilino>>,
+) {
+    spawn_local(async move {
+        if let Ok(resp) =
+            api_get::<PaginatedResponse<Propiedad>>("/propiedades?page=1&perPage=100").await
+        {
+            propiedades.set(resp.data);
+        }
+        if let Ok(data) = api_get::<PaginatedResponse<Inquilino>>("/inquilinos?perPage=100").await {
+            inquilinos.set(data.data);
+        }
+    });
+}
+
+fn register_escape_listener(
+    escape_handler: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>>,
+) -> Option<EventListener> {
+    web_sys::window().and_then(|w| w.document()).map(|doc| {
+        EventListener::new(&doc, "keydown", move |event| {
+            let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
+            if event.key() == "Escape" {
+                if let Some(ref cb) = *escape_handler.borrow() {
+                    cb();
+                }
+            }
+        })
+    })
 }
 
 #[function_component]
@@ -553,18 +594,7 @@ pub fn Contratos() -> Html {
         let propiedades = propiedades.clone();
         let inquilinos = inquilinos.clone();
         use_effect_with((), move |_| {
-            spawn_local(async move {
-                if let Ok(resp) =
-                    api_get::<PaginatedResponse<Propiedad>>("/propiedades?page=1&perPage=100").await
-                {
-                    propiedades.set(resp.data);
-                }
-                if let Ok(data) =
-                    api_get::<PaginatedResponse<Inquilino>>("/inquilinos?perPage=100").await
-                {
-                    inquilinos.set(data.data);
-                }
-            });
+            load_contrato_refs(propiedades, inquilinos);
         });
     }
 
@@ -634,16 +664,7 @@ pub fn Contratos() -> Html {
     {
         let escape_handler = escape_handler.clone();
         use_effect_with((), move |_| {
-            let listener = web_sys::window().and_then(|w| w.document()).map(|doc| {
-                EventListener::new(&doc, "keydown", move |event| {
-                    let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
-                    if event.key() == "Escape"
-                        && let Some(ref cb) = *escape_handler.borrow()
-                    {
-                        cb();
-                    }
-                })
-            });
+            let listener = register_escape_listener(escape_handler);
             move || drop(listener)
         });
     }
@@ -699,7 +720,15 @@ pub fn Contratos() -> Html {
         Callback::from(move |_: MouseEvent| {
             if let Some(ref c) = *delete_target {
                 let label = format!("Contrato {}", &c.id[..8.min(c.id.len())]);
-                do_delete_contrato(c.id.clone(), label, delete_target.clone(), reload.clone(), error.clone(), toasts.clone(), reload.clone());
+                do_delete_contrato(
+                    c.id.clone(),
+                    label,
+                    delete_target.clone(),
+                    reload.clone(),
+                    error.clone(),
+                    toasts.clone(),
+                    reload.clone(),
+                );
             }
         })
     };
@@ -719,7 +748,13 @@ pub fn Contratos() -> Html {
         let monto_mensual = monto_mensual.clone();
         let form_errors = form_errors.clone();
         move || -> bool {
-            let errs = validate_contrato_fields(&propiedad_id, &inquilino_id, &fecha_inicio, &fecha_fin, &monto_mensual);
+            let errs = validate_contrato_fields(
+                &propiedad_id,
+                &inquilino_id,
+                &fecha_inicio,
+                &fecha_fin,
+                &monto_mensual,
+            );
             let valid = !errs.has_errors();
             form_errors.set(errs);
             valid
@@ -747,7 +782,9 @@ pub fn Contratos() -> Html {
             if *submitting || !validate_form() {
                 return;
             }
-            let Ok(monto_val) = monto_mensual.parse::<f64>() else { return };
+            let Ok(monto_val) = monto_mensual.parse::<f64>() else {
+                return;
+            };
             submitting.set(true);
             let dep = deposito.parse::<f64>().ok();
             let editing_id = editing.as_ref().map(|e| e.id.clone());
@@ -766,7 +803,16 @@ pub fn Contratos() -> Html {
                 deposito: dep,
                 moneda: Some((*moneda).clone()),
             };
-            do_save_contrato(editing_id, update, create, reset_form.clone(), reload.clone(), error.clone(), toasts.clone(), submitting.clone());
+            do_save_contrato(
+                editing_id,
+                update,
+                create,
+                reset_form.clone(),
+                reload.clone(),
+                error.clone(),
+                toasts.clone(),
+                submitting.clone(),
+            );
         })
     };
 
@@ -793,7 +839,16 @@ pub fn Contratos() -> Html {
         let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
             if let Some(ref c) = *renew_target {
-                do_renew_contrato(c.id.clone(), (*renew_fecha_fin).clone(), renew_monto.parse::<f64>().unwrap_or(0.0), renew_target.clone(), renew_fecha_fin.clone(), reload.clone(), error.clone(), toasts.clone());
+                do_renew_contrato(
+                    c.id.clone(),
+                    (*renew_fecha_fin).clone(),
+                    renew_monto.parse::<f64>().unwrap_or(0.0),
+                    renew_target.clone(),
+                    renew_fecha_fin.clone(),
+                    reload.clone(),
+                    error.clone(),
+                    toasts.clone(),
+                );
             }
         })
     };
@@ -818,7 +873,15 @@ pub fn Contratos() -> Html {
         let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
             if let Some(ref c) = *terminate_target {
-                do_terminate_contrato(c.id.clone(), (*terminate_fecha).clone(), terminate_target.clone(), terminate_fecha.clone(), reload.clone(), error.clone(), toasts.clone());
+                do_terminate_contrato(
+                    c.id.clone(),
+                    (*terminate_fecha).clone(),
+                    terminate_target.clone(),
+                    terminate_fecha.clone(),
+                    reload.clone(),
+                    error.clone(),
+                    toasts.clone(),
+                );
             }
         })
     };

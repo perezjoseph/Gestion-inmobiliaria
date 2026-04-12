@@ -371,7 +371,13 @@ fn PropiedadList(props: &PropiedadListProps) -> Html {
     }
 }
 
-fn validate_propiedad_fields(titulo: &str, direccion: &str, ciudad: &str, provincia: &str, precio: &str) -> FormErrors {
+fn validate_propiedad_fields(
+    titulo: &str,
+    direccion: &str,
+    ciudad: &str,
+    provincia: &str,
+    precio: &str,
+) -> FormErrors {
     let mut errs = FormErrors::default();
     if titulo.trim().is_empty() {
         errs.titulo = Some("El título es obligatorio".into());
@@ -394,7 +400,11 @@ fn validate_propiedad_fields(titulo: &str, direccion: &str, ciudad: &str, provin
 }
 
 fn non_empty_prop(s: &str) -> Option<String> {
-    if s.trim().is_empty() { None } else { Some(s.to_string()) }
+    if s.trim().is_empty() {
+        None
+    } else {
+        Some(s.to_string())
+    }
 }
 
 fn do_save_propiedad(
@@ -409,8 +419,12 @@ fn do_save_propiedad(
 ) {
     spawn_local(async move {
         let res = match editing_id {
-            Some(id) => api_put::<Propiedad, _>(&format!("/propiedades/{id}"), &update).await.map(|_| ()),
-            None => api_post::<Propiedad, _>("/propiedades", &create).await.map(|_| ()),
+            Some(id) => api_put::<Propiedad, _>(&format!("/propiedades/{id}"), &update)
+                .await
+                .map(|_| ()),
+            None => api_post::<Propiedad, _>("/propiedades", &create)
+                .await
+                .map(|_| ()),
         };
         match res {
             Ok(()) => {
@@ -444,7 +458,9 @@ fn do_delete_propiedad(
                         format!("\"{label}\" eliminada"),
                         ToastKind::Info,
                         "Deshacer".into(),
-                        std::rc::Rc::new(move || { undo_reload.set(*undo_reload + 1); }),
+                        std::rc::Rc::new(move || {
+                            undo_reload.set(*undo_reload + 1);
+                        }),
                     ));
                 }
             }
@@ -456,13 +472,46 @@ fn do_delete_propiedad(
     });
 }
 
-fn build_propiedades_url(pg: u64, pp: u64, fc: &str, ft: &str, fe: &str, sf: &Option<String>, so: &Option<String>) -> String {
+fn register_escape_listener_p(
+    escape_handler: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>>,
+) -> Option<EventListener> {
+    web_sys::window().and_then(|w| w.document()).map(|doc| {
+        EventListener::new(&doc, "keydown", move |event| {
+            let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
+            if event.key() == "Escape" {
+                if let Some(ref cb) = *escape_handler.borrow() {
+                    cb();
+                }
+            }
+        })
+    })
+}
+
+fn build_propiedades_url(
+    pg: u64,
+    pp: u64,
+    fc: &str,
+    ft: &str,
+    fe: &str,
+    sf: &Option<String>,
+    so: &Option<String>,
+) -> String {
     let mut params = vec![format!("page={pg}"), format!("perPage={pp}")];
-    if !fc.is_empty() { params.push(format!("ciudad={fc}")); }
-    if !ft.is_empty() { params.push(format!("tipoPropiedad={ft}")); }
-    if !fe.is_empty() { params.push(format!("estado={fe}")); }
-    if let Some(field) = sf { params.push(format!("sortBy={field}")); }
-    if let Some(order) = so { params.push(format!("sortOrder={order}")); }
+    if !fc.is_empty() {
+        params.push(format!("ciudad={fc}"));
+    }
+    if !ft.is_empty() {
+        params.push(format!("tipoPropiedad={ft}"));
+    }
+    if !fe.is_empty() {
+        params.push(format!("estado={fe}"));
+    }
+    if let Some(field) = sf {
+        params.push(format!("sortBy={field}"));
+    }
+    if let Some(order) = so {
+        params.push(format!("sortOrder={order}"));
+    }
     format!("/propiedades?{}", params.join("&"))
 }
 
@@ -600,16 +649,7 @@ pub fn Propiedades() -> Html {
     {
         let escape_handler = escape_handler.clone();
         use_effect_with((), move |_| {
-            let listener = web_sys::window().and_then(|w| w.document()).map(|doc| {
-                EventListener::new(&doc, "keydown", move |event| {
-                    let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
-                    if event.key() == "Escape"
-                        && let Some(ref cb) = *escape_handler.borrow()
-                    {
-                        cb();
-                    }
-                })
-            });
+            let listener = register_escape_listener_p(escape_handler);
             move || drop(listener)
         });
     }
@@ -672,7 +712,15 @@ pub fn Propiedades() -> Html {
         let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
             if let Some(ref p) = *delete_target {
-                do_delete_propiedad(p.id.clone(), p.titulo.clone(), delete_target.clone(), reload.clone(), error.clone(), toasts.clone(), reload.clone());
+                do_delete_propiedad(
+                    p.id.clone(),
+                    p.titulo.clone(),
+                    delete_target.clone(),
+                    reload.clone(),
+                    error.clone(),
+                    toasts.clone(),
+                    reload.clone(),
+                );
             }
         })
     };
@@ -724,7 +772,9 @@ pub fn Propiedades() -> Html {
             if *submitting || !validate_form() {
                 return;
             }
-            let Ok(precio_val) = precio.parse::<f64>() else { return };
+            let Ok(precio_val) = precio.parse::<f64>() else {
+                return;
+            };
             submitting.set(true);
             let desc = non_empty_prop(&descripcion);
             let hab = habitaciones.parse::<i32>().ok();
@@ -761,7 +811,16 @@ pub fn Propiedades() -> Html {
                 estado: Some((*estado).clone()),
                 imagenes: None,
             };
-            do_save_propiedad(editing_id, update, create, reset_form.clone(), reload.clone(), error.clone(), toasts.clone(), submitting.clone());
+            do_save_propiedad(
+                editing_id,
+                update,
+                create,
+                reset_form.clone(),
+                reload.clone(),
+                error.clone(),
+                toasts.clone(),
+                submitting.clone(),
+            );
         })
     };
 

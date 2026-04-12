@@ -31,6 +31,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
   RUSTFLAGS: "-D warnings"
 
 jobs:
@@ -523,6 +524,79 @@ jobs:
           path: reports/
           retention-days: 7
 
+      - name: Install Trivy for IaC scanning
+        id: install_trivy
+        if: always()
+        run: |
+          TRIVY_VERSION="0.69.3"
+          TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
+          if command -v trivy &>/dev/null && [ "$(trivy --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" = "$TRIVY_VERSION" ]; then
+            echo "installed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          ARCHIVE="/tmp/trivy.tar.gz"
+          curl -sSfL -o "$ARCHIVE" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          sudo tar xzf "$ARCHIVE" -C /usr/local/bin trivy
+          rm -f "$ARCHIVE"
+          echo "installed=true" >> $GITHUB_OUTPUT
+
+      - name: Scan Dockerfiles and docker-compose for misconfigurations (Trivy)
+        id: trivy_iac
+        if: always() && steps.install_trivy.outputs.installed == 'true'
+        run: |
+          trivy fs --scanners misconfig --exit-code 1 --severity CRITICAL,HIGH \
+            --no-progress --format table \
+            --include-non-failures \
+            Dockerfile.backend Dockerfile.frontend docker-compose.prod.yml docker-compose.dev.yml 2>&1 | tee /tmp/trivy-iac-output.txt
+
+      - name: Generate cargo-audit SARIF report
+        id: cargo_audit_sarif
+        if: always() && steps.install_audit.outputs.installed == 'true'
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo audit --json 2>/dev/null | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          sarif = {
+            '\$schema': 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json',
+            'version': '2.1.0',
+            'runs': [{
+              'tool': {'driver': {'name': 'cargo-audit', 'version': '0.22.1', 'rules': []}},
+              'results': []
+            }]
+          }
+          rules = {}
+          for vuln in data.get('vulnerabilities', {}).get('list', []):
+            adv = vuln.get('advisory', {})
+            vid = adv.get('id', 'UNKNOWN')
+            pkg = vuln.get('package', {})
+            if vid not in rules:
+              rules[vid] = {
+                'id': vid,
+                'shortDescription': {'text': adv.get('title', vid)},
+                'helpUri': adv.get('url', ''),
+                'properties': {'tags': ['security', 'vulnerability']}
+              }
+            sarif['runs'][0]['results'].append({
+              'ruleId': vid,
+              'level': 'error',
+              'message': {'text': f\"{adv.get('title', '')} in {pkg.get('name', '?')} {pkg.get('version', '?')}\"},
+              'locations': [{'physicalLocation': {'artifactLocation': {'uri': 'Cargo.lock'}, 'region': {'startLine': 1}}}]
+            })
+          sarif['runs'][0]['tool']['driver']['rules'] = list(rules.values())
+          json.dump(sarif, sys.stdout, indent=2)
+          " > cargo-audit.sarif 2>/dev/null || echo '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"cargo-audit","rules":[]}},"results":[]}]}' > cargo-audit.sarif
+
+      - name: Upload cargo-audit SARIF to GitHub Security
+        if: always() && steps.install_audit.outputs.installed == 'true'
+        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3.28.18
+        with:
+          sarif_file: cargo-audit.sarif
+          category: cargo-audit
+        continue-on-error: true
+
       - name: Write quality gate summary
         if: always()
         run: |
@@ -532,11 +606,12 @@ jobs:
             echo "|-------|--------|"
             echo "| cargo audit | ${{ steps.cargo_audit.outcome == 'success' && '✅ Pass' || (steps.install_audit.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
             echo "| OWASP scan | ${{ steps.owasp.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| Trivy IaC scan | ${{ steps.trivy_iac.outcome == 'success' && '✅ Pass' || (steps.install_trivy.outputs.installed != 'true' && '⏭️ Skipped' || '⚠️ Findings') }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect quality-gate errors for notification
         id: collect-errors
-        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.owasp.outcome == 'failure')
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.owasp.outcome == 'failure' || steps.trivy_iac.outcome == 'failure')
         run: |
           ERROR=""
           FAILED=""
@@ -551,6 +626,10 @@ jobs:
             FAILED="${FAILED}owasp-scan,"
             ERROR="${ERROR}[owasp-scan] OWASP dependency check failed with CVSS >= 7. See uploaded report artifact for details."$'\n\n'
           fi
+          if [ "${{ steps.trivy_iac.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}trivy-iac,"
+            ERROR="${ERROR}[trivy-iac] $(head -c 2000 /tmp/trivy-iac-output.txt 2>/dev/null || echo 'Trivy found Dockerfile/compose misconfigurations.')"$'\n\n'
+          fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT
@@ -563,7 +642,7 @@ jobs:
         run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
 
       - name: Fail job if any quality step failed
-        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.owasp.outcome == 'failure')
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.owasp.outcome == 'failure' || steps.trivy_iac.outcome == 'failure')
         run: exit 1
 
   sonarqube:
@@ -667,8 +746,10 @@ jobs:
           docker run --rm \
             --network host \
             --security-opt no-new-privileges \
+            --cap-drop ALL \
             --read-only \
-            --tmpfs /tmp:rw,noexec,nosuid \
+            --memory 1g \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev \
             -e SONAR_TOKEN="${{ steps.sonar-bootstrap.outputs.token }}" \
             -e SONAR_HOST_URL="http://192.168.88.25:9000" \
             -v "${{ github.workspace }}:/usr/src" \
@@ -985,6 +1066,8 @@ jobs:
       contents: read
       packages: write
       security-events: write
+    outputs:
+      digest: ${{ steps.push-backend.outputs.digest }}
     needs: [build-backend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
@@ -1041,6 +1124,21 @@ jobs:
             --format sarif --output trivy-backend.sarif \
             ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }} || true
 
+      - name: Generate SBOM for backend image (SPDX)
+        if: always()
+        run: |
+          trivy image --format spdx-json --output backend-sbom.spdx.json \
+            --no-progress \
+            ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }} || true
+
+      - name: Upload backend SBOM artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: backend-sbom
+          path: backend-sbom.spdx.json
+          retention-days: 30
+
       - name: Upload Trivy SARIF to GitHub Security
         if: always()
         uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3.28.18
@@ -1050,7 +1148,13 @@ jobs:
         continue-on-error: true
 
       - name: Push backend image to GHCR
-        run: docker push ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }}
+        id: push-backend
+        run: |
+          docker push ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }}
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' \
+            ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }} 2>/dev/null \
+            | grep -oP '@sha256:[a-f0-9]+' || true)
+          echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
 
   container-image-frontend:
     name: Build & Push Frontend Image to GHCR
@@ -1060,6 +1164,8 @@ jobs:
       contents: read
       packages: write
       security-events: write
+    outputs:
+      digest: ${{ steps.push-frontend.outputs.digest }}
     needs: [build-frontend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
@@ -1116,6 +1222,21 @@ jobs:
             --format sarif --output trivy-frontend.sarif \
             ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }} || true
 
+      - name: Generate SBOM for frontend image (SPDX)
+        if: always()
+        run: |
+          trivy image --format spdx-json --output frontend-sbom.spdx.json \
+            --no-progress \
+            ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }} || true
+
+      - name: Upload frontend SBOM artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: frontend-sbom
+          path: frontend-sbom.spdx.json
+          retention-days: 30
+
       - name: Upload Trivy SARIF to GitHub Security
         if: always()
         uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3.28.18
@@ -1125,7 +1246,13 @@ jobs:
         continue-on-error: true
 
       - name: Push frontend image to GHCR
-        run: docker push ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }}
+        id: push-frontend
+        run: |
+          docker push ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }}
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' \
+            ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }} 2>/dev/null \
+            | grep -oP '@sha256:[a-f0-9]+' || true)
+          echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
 
   # ── Stage 4: Deploy (runs after both images are pushed) ──
 
@@ -1159,13 +1286,35 @@ jobs:
           POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
           JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
           IMAGE_TAG: ${{ github.sha }}
+          BACKEND_DIGEST: ${{ needs.container-image-backend.outputs.digest }}
+          FRONTEND_DIGEST: ${{ needs.container-image-frontend.outputs.digest }}
         run: |
           # Capture current image digests for rollback
           PREV_BACKEND=$(docker compose -f docker-compose.prod.yml images backend --format json 2>/dev/null | jq -r '.[0].ID // empty' || true)
           PREV_FRONTEND=$(docker compose -f docker-compose.prod.yml images frontend --format json 2>/dev/null | jq -r '.[0].ID // empty' || true)
           echo "PREV_BACKEND=$PREV_BACKEND" >> "$GITHUB_ENV"
           echo "PREV_FRONTEND=$PREV_FRONTEND" >> "$GITHUB_ENV"
-          docker compose -f docker-compose.prod.yml pull
+
+          # Pull by digest when available to prevent TOCTOU between scan and deploy
+          if [ -n "$BACKEND_DIGEST" ]; then
+            echo "Pulling backend by digest: $BACKEND_DIGEST"
+            docker pull "ghcr.io/${{ github.repository_owner }}/realestate-backend${BACKEND_DIGEST}"
+            docker tag "ghcr.io/${{ github.repository_owner }}/realestate-backend${BACKEND_DIGEST}" \
+              "ghcr.io/${{ github.repository_owner }}/realestate-backend:${IMAGE_TAG}"
+          fi
+          if [ -n "$FRONTEND_DIGEST" ]; then
+            echo "Pulling frontend by digest: $FRONTEND_DIGEST"
+            docker pull "ghcr.io/${{ github.repository_owner }}/realestate-frontend${FRONTEND_DIGEST}"
+            docker tag "ghcr.io/${{ github.repository_owner }}/realestate-frontend${FRONTEND_DIGEST}" \
+              "ghcr.io/${{ github.repository_owner }}/realestate-frontend:${IMAGE_TAG}"
+          fi
+
+          # Fall back to tag-based pull if digests unavailable
+          if [ -z "$BACKEND_DIGEST" ] || [ -z "$FRONTEND_DIGEST" ]; then
+            echo "::warning::Digest unavailable for one or both images -- falling back to tag pull"
+            docker compose -f docker-compose.prod.yml pull
+          fi
+
           docker compose -f docker-compose.prod.yml up -d --remove-orphans
           docker compose -f docker-compose.prod.yml ps
 

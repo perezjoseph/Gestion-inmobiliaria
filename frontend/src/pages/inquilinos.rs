@@ -269,7 +269,11 @@ fn validate_inquilino_fields(nombre: &str, apellido: &str, cedula: &str) -> Form
 }
 
 fn non_empty_inq(s: &str) -> Option<String> {
-    if s.trim().is_empty() { None } else { Some(s.to_string()) }
+    if s.trim().is_empty() {
+        None
+    } else {
+        Some(s.to_string())
+    }
 }
 
 fn do_save_inquilino(
@@ -284,8 +288,12 @@ fn do_save_inquilino(
 ) {
     spawn_local(async move {
         let res = match editing_id {
-            Some(id) => api_put::<Inquilino, _>(&format!("/inquilinos/{id}"), &update).await.map(|_| ()),
-            None => api_post::<Inquilino, _>("/inquilinos", &create).await.map(|_| ()),
+            Some(id) => api_put::<Inquilino, _>(&format!("/inquilinos/{id}"), &update)
+                .await
+                .map(|_| ()),
+            None => api_post::<Inquilino, _>("/inquilinos", &create)
+                .await
+                .map(|_| ()),
         };
         match res {
             Ok(()) => {
@@ -319,7 +327,9 @@ fn do_delete_inquilino(
                         format!("\"{label}\" eliminado"),
                         ToastKind::Info,
                         "Deshacer".into(),
-                        std::rc::Rc::new(move || { undo_reload.set(*undo_reload + 1); }),
+                        std::rc::Rc::new(move || {
+                            undo_reload.set(*undo_reload + 1);
+                        }),
                     ));
                 }
             }
@@ -329,6 +339,21 @@ fn do_delete_inquilino(
             }
         }
     });
+}
+
+fn register_escape_listener_i(
+    escape_handler: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>>,
+) -> Option<EventListener> {
+    web_sys::window().and_then(|w| w.document()).map(|doc| {
+        EventListener::new(&doc, "keydown", move |event| {
+            let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
+            if event.key() == "Escape" {
+                if let Some(ref cb) = *escape_handler.borrow() {
+                    cb();
+                }
+            }
+        })
+    })
 }
 
 #[function_component]
@@ -433,16 +458,7 @@ pub fn Inquilinos() -> Html {
     {
         let escape_handler = escape_handler.clone();
         use_effect_with((), move |_| {
-            let listener = web_sys::window().and_then(|w| w.document()).map(|doc| {
-                EventListener::new(&doc, "keydown", move |event| {
-                    let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
-                    if event.key() == "Escape"
-                        && let Some(ref cb) = *escape_handler.borrow()
-                    {
-                        cb();
-                    }
-                })
-            });
+            let listener = register_escape_listener_i(escape_handler);
             move || drop(listener)
         });
     }
@@ -496,7 +512,15 @@ pub fn Inquilinos() -> Html {
         Callback::from(move |_: MouseEvent| {
             if let Some(ref i) = *delete_target {
                 let label = format!("{} {}", i.nombre, i.apellido);
-                do_delete_inquilino(i.id.clone(), label, delete_target.clone(), reload.clone(), error.clone(), toasts.clone(), reload.clone());
+                do_delete_inquilino(
+                    i.id.clone(),
+                    label,
+                    delete_target.clone(),
+                    reload.clone(),
+                    error.clone(),
+                    toasts.clone(),
+                    reload.clone(),
+                );
             }
         })
     };
@@ -561,7 +585,16 @@ pub fn Inquilinos() -> Html {
                 contacto_emergencia: non_empty_inq(&contacto_emergencia),
                 notas: non_empty_inq(&notas),
             };
-            do_save_inquilino(editing_id, update, create, reset_form.clone(), reload.clone(), error.clone(), toasts.clone(), submitting.clone());
+            do_save_inquilino(
+                editing_id,
+                update,
+                create,
+                reset_form.clone(),
+                reload.clone(),
+                error.clone(),
+                toasts.clone(),
+                submitting.clone(),
+            );
         })
     };
 

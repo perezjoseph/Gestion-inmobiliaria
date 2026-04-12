@@ -482,7 +482,11 @@ fn validate_mantenimiento_fields(titulo: &str, propiedad_id: &str) -> FormErrors
 }
 
 fn non_empty_mant(s: &str) -> Option<String> {
-    if s.trim().is_empty() { None } else { Some(s.to_string()) }
+    if s.trim().is_empty() {
+        None
+    } else {
+        Some(s.to_string())
+    }
 }
 
 fn do_save_solicitud(
@@ -497,8 +501,12 @@ fn do_save_solicitud(
 ) {
     spawn_local(async move {
         let res = match editing_id {
-            Some(id) => api_put::<Solicitud, _>(&format!("/mantenimiento/{id}"), &update).await.map(|_| ()),
-            None => api_post::<Solicitud, _>("/mantenimiento", &create).await.map(|_| ()),
+            Some(id) => api_put::<Solicitud, _>(&format!("/mantenimiento/{id}"), &update)
+                .await
+                .map(|_| ()),
+            None => api_post::<Solicitud, _>("/mantenimiento", &create)
+                .await
+                .map(|_| ()),
         };
         match res {
             Ok(()) => {
@@ -525,7 +533,11 @@ fn do_delete_solicitud(
             Ok(()) => {
                 delete_target.set(None);
                 reload.set(*reload + 1);
-                push_toast(&toasts, &format!("\"{}\" eliminada", label), ToastKind::Info);
+                push_toast(
+                    &toasts,
+                    &format!("\"{}\" eliminada", label),
+                    ToastKind::Info,
+                );
             }
             Err(err) => {
                 delete_target.set(None);
@@ -545,12 +557,18 @@ fn do_cambiar_estado(
 ) {
     let estado_label = nuevo_estado.clone();
     spawn_local(async move {
-        let body = CambiarEstado { estado: nuevo_estado };
+        let body = CambiarEstado {
+            estado: nuevo_estado,
+        };
         match api_put::<Solicitud, _>(&format!("/mantenimiento/{id}/estado"), &body).await {
             Ok(updated) => {
                 detail_item.set(Some(updated));
                 reload.set(*reload + 1);
-                push_toast(&toasts, &format!("Estado cambiado a {estado_label}"), ToastKind::Success);
+                push_toast(
+                    &toasts,
+                    &format!("Estado cambiado a {estado_label}"),
+                    ToastKind::Success,
+                );
             }
             Err(err) => error.set(Some(err)),
         }
@@ -580,8 +598,12 @@ fn do_add_nota(
 
 fn build_mantenimiento_url(pg: u64, pp: u64, fe: &str, fp: &str) -> String {
     let mut params = vec![format!("page={pg}"), format!("perPage={pp}")];
-    if !fe.is_empty() { params.push(format!("estado={fe}")); }
-    if !fp.is_empty() { params.push(format!("prioridad={fp}")); }
+    if !fe.is_empty() {
+        params.push(format!("estado={fe}"));
+    }
+    if !fp.is_empty() {
+        params.push(format!("prioridad={fp}"));
+    }
     format!("/mantenimiento?{}", params.join("&"))
 }
 
@@ -666,18 +688,7 @@ pub fn Mantenimiento() -> Html {
         let propiedades = propiedades.clone();
         let inquilinos_list = inquilinos_list.clone();
         use_effect_with((), move |_| {
-            spawn_local(async move {
-                if let Ok(resp) =
-                    api_get::<PaginatedResponse<Propiedad>>("/propiedades?perPage=1000").await
-                {
-                    propiedades.set(resp.data);
-                }
-                if let Ok(resp) =
-                    api_get::<PaginatedResponse<Inquilino>>("/inquilinos?perPage=1000").await
-                {
-                    inquilinos_list.set(resp.data);
-                }
-            });
+            load_mant_refs(propiedades, inquilinos_list);
         });
     }
 
@@ -731,16 +742,7 @@ pub fn Mantenimiento() -> Html {
     {
         let escape_handler = escape_handler.clone();
         use_effect_with((), move |_| {
-            let listener = web_sys::window().and_then(|w| w.document()).map(|doc| {
-                EventListener::new(&doc, "keydown", move |event| {
-                    let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
-                    if event.key() == "Escape"
-                        && let Some(ref cb) = *escape_handler.borrow()
-                    {
-                        cb();
-                    }
-                })
-            });
+            let listener = register_escape_listener_m(escape_handler);
             move || drop(listener)
         });
     }
@@ -833,7 +835,14 @@ pub fn Mantenimiento() -> Html {
         let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
             if let Some(ref s) = *delete_target {
-                do_delete_solicitud(s.id.clone(), s.titulo.clone(), delete_target.clone(), reload.clone(), error.clone(), toasts.clone());
+                do_delete_solicitud(
+                    s.id.clone(),
+                    s.titulo.clone(),
+                    delete_target.clone(),
+                    reload.clone(),
+                    error.clone(),
+                    toasts.clone(),
+                );
             }
         })
     };
@@ -909,7 +918,16 @@ pub fn Mantenimiento() -> Html {
                 costo_monto: costo,
                 costo_moneda: non_empty_mant(&f_costo_moneda),
             };
-            do_save_solicitud(editing_id, update, create, reset_form.clone(), reload.clone(), error.clone(), toasts.clone(), submitting.clone());
+            do_save_solicitud(
+                editing_id,
+                update,
+                create,
+                reset_form.clone(),
+                reload.clone(),
+                error.clone(),
+                toasts.clone(),
+                submitting.clone(),
+            );
         })
     };
 
@@ -924,7 +942,14 @@ pub fn Mantenimiento() -> Html {
         let reload = reload.clone();
         let toasts = toasts.clone();
         Callback::from(move |(id, nuevo_estado): (String, String)| {
-            do_cambiar_estado(id, nuevo_estado, detail_item.clone(), reload.clone(), error.clone(), toasts.clone());
+            do_cambiar_estado(
+                id,
+                nuevo_estado,
+                detail_item.clone(),
+                reload.clone(),
+                error.clone(),
+                toasts.clone(),
+            );
         })
     };
 
@@ -941,7 +966,14 @@ pub fn Mantenimiento() -> Html {
             }
             nota_submitting.set(true);
             if let Some(ref sol) = *detail_item {
-                do_add_nota(sol.id.clone(), contenido, nota_contenido.clone(), nota_submitting.clone(), detail_item.clone(), error.clone());
+                do_add_nota(
+                    sol.id.clone(),
+                    contenido,
+                    nota_contenido.clone(),
+                    nota_submitting.clone(),
+                    detail_item.clone(),
+                    error.clone(),
+                );
             }
         })
     };
