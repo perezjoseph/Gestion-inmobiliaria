@@ -11,7 +11,7 @@ import com.propmanager.core.model.Propiedad
 import com.propmanager.core.model.ValidationResult
 import com.propmanager.core.model.dto.CreateGastoRequest
 import com.propmanager.core.model.dto.UpdateGastoRequest
-import com.propmanager.core.network.NetworkMonitor
+import com.propmanager.core.network.ConnectivityObserver
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,7 +63,7 @@ class GastosViewModel
     constructor(
         private val gastosRepository: GastosRepository,
         private val propiedadesRepository: PropiedadesRepository,
-        private val networkMonitor: NetworkMonitor,
+        private val networkMonitor: ConnectivityObserver,
     ) : ViewModel() {
         private val _filters = MutableStateFlow(GastosFilterState())
         val filters: StateFlow<GastosFilterState> = _filters.asStateFlow()
