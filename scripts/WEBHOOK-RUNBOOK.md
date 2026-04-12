@@ -128,7 +128,7 @@ The timeout is `KIRO_TIMEOUT = 3600` seconds (1 hour). If kiro-cli hangs, check:
 
 ```bash
 # Set your secret
-SECRET="bf6ae5a797fcdd69294420054f3bc692957ef9fd63231117cecce1a23e8c0a9b"
+SECRET="<your-webhook-secret-here>"
 
 # Build payload
 PAYLOAD='{"job":"lint","step":"clippy","error_log":"test error","commit":"abc","branch":"main","actor":"test"}'

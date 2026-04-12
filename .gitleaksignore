@@ -23,3 +23,9 @@ b1d2107d44fa48c3f0faa025d6386249961b84d4:.github/workflows/ci.yml:curl-auth-user
 b1d2107d44fa48c3f0faa025d6386249961b84d4:.github/workflows/ci.yml:curl-auth-user:2084
 # Commit 7f66b33 — earlier version of SonarQube measures API call
 7f66b33dd9f34456f21cb6b86fc78049cb65ff2c:.github/workflows/ci.yml:curl-auth-user:913
+
+# Commit 44d43ed — android-ci.yml SonarQube API calls using $TOKEN from secrets (not hardcoded)
+44d43ed7fb38cd65d1bec035010076ae7b2eb9ae:.github/workflows/android-ci.yml:curl-auth-user:920
+44d43ed7fb38cd65d1bec035010076ae7b2eb9ae:.github/workflows/android-ci.yml:curl-auth-user:935
+# Commit 74023aa — WEBHOOK-RUNBOOK.md example placeholder (remediated to remove real secret)
+74023aaa8969eeae4f3ace1d94ee2ee25cce365b:scripts/WEBHOOK-RUNBOOK.md:generic-api-key:131

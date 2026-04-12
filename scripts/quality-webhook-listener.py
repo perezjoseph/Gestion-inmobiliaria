@@ -171,20 +171,24 @@ def get_local_ip():
         return "127.0.0.1"
 
 
-def wsl_cmd(command):
+def wsl_cmd(args):
+    """Build a WSL command list. args is a list of strings (no shell interpretation)."""
     return [
         "wsl", "-u", WSL_USER, "-d", WSL_DISTRO,
-        "bash", "-lc",
-        f"cd {PROJECT_DIR} && {command}",
-    ]
+        "--cd", PROJECT_DIR,
+        "--",
+    ] + args
 
 
 def run_kiro(prompt, label):
     log.info(f"Triggering kiro-cli for: {label}")
 
+    if not prompt or not prompt.strip():
+        log.error(f"Empty prompt for {label} — skipping")
+        return False
+
     log_file = os.path.join(os.path.dirname(__file__), "..", "kiro-debug.log")
 
-    # Rotate log if it exceeds MAX_LOG_BYTES to prevent disk exhaustion
     try:
         if os.path.isfile(log_file) and os.path.getsize(log_file) > MAX_LOG_BYTES:
             rotated = log_file + ".1"
@@ -195,26 +199,17 @@ def run_kiro(prompt, label):
     except OSError as e:
         log.warning(f"Log rotation failed: {e}")
 
-    # Write prompt to a temp file in the project directory (guaranteed
-    # accessible from WSL via /mnt/d/...). Avoid Windows TEMP — it may
-    # point to C:\Windows\Temp (permission denied in WSL) or use 8.3
-    # short path names that WSL's drvfs cannot resolve.
-    prompt_file_win = _win_project_dir / f".kiro-prompt-{uuid.uuid4().hex[:8]}.txt"
-    prompt_file_wsl = _to_wsl_path(prompt_file_win)
-    try:
-        prompt_file_win.write_text(prompt, encoding="utf-8")
-    except OSError as e:
-        log.error(f"Failed to write prompt file {prompt_file_win}: {e}")
-        return False
-
-    # Read file via cat and verify it's non-empty before passing to kiro-cli.
-    # $(<file) silently returns empty on permission denied or missing files.
-    cmd = (
-        f"KIRO_INPUT=$(cat '{prompt_file_wsl}') && "
-        f"[ -n \"$KIRO_INPUT\" ] && "
-        f"kiro-cli chat --trust-all-tools --agent sisyphus-kiro --no-interactive \"$KIRO_INPUT\" || "
-        f"{{ echo 'ERROR: prompt file empty or unreadable: {prompt_file_wsl}' >&2; exit 1; }}"
-    )
+    # Pass prompt directly as a positional argument in the argv list.
+    # No shell involved — WSL's -- separator ensures everything after
+    # it is passed verbatim to the target process, so newlines, backticks,
+    # dollar signs, and other metacharacters are never interpreted.
+    cmd = wsl_cmd([
+        "kiro-cli", "chat",
+        "--trust-all-tools",
+        "--agent", "sisyphus-kiro",
+        "--no-interactive",
+        prompt,
+    ])
 
     flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
     if hasattr(os, "O_NOFOLLOW"):
@@ -229,7 +224,7 @@ def run_kiro(prompt, label):
         timed_out = False
         try:
             result = subprocess.run(
-                wsl_cmd(cmd),
+                cmd,
                 stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
@@ -252,11 +247,6 @@ def run_kiro(prompt, label):
             f.write(f"\n[ERROR] {e}\n")
             f.flush()
             log.error(f"kiro-cli process error: {e}", exc_info=True)
-        finally:
-            try:
-                prompt_file_win.unlink(missing_ok=True)
-            except OSError:
-                pass
 
     if timed_out:
         return False

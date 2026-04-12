@@ -148,6 +148,15 @@ jobs:
           umask 077
           ./gradlew detekt --no-daemon --stacktrace 2>&1 | tee "${RUNNER_TEMP}/detekt-output.txt"
 
+      - name: Check ktfmt formatting (via Spotless)
+        id: ktfmt
+        if: always()
+        timeout-minutes: 5
+        working-directory: android
+        run: |
+          umask 077
+          ./gradlew spotlessCheck --no-daemon --stacktrace 2>&1 | tee "${RUNNER_TEMP}/ktfmt-output.txt"
+
       - name: Upload lint XML report for SonarQube
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -184,11 +193,12 @@ jobs:
             echo "|-------|--------|"
             echo "| Android Lint | ${{ steps.android-lint.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
             echo "| Detekt | ${{ steps.detekt.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| ktfmt (Spotless) | ${{ steps.ktfmt.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect lint errors
         id: collect-errors
-        if: always() && (steps.android-lint.outcome == 'failure' || steps.detekt.outcome == 'failure')
+        if: always() && (steps.android-lint.outcome == 'failure' || steps.detekt.outcome == 'failure' || steps.ktfmt.outcome == 'failure')
         run: |
           ERROR=""
           FAILED=""
@@ -199,6 +209,10 @@ jobs:
           if [ "${{ steps.detekt.outcome }}" = "failure" ]; then
             FAILED="${FAILED:+${FAILED},}detekt"
             ERROR="${ERROR:+${ERROR}\n\n}[detekt] $(tail -c 3000 "${RUNNER_TEMP}/detekt-output.txt" 2>/dev/null || echo 'Detekt found issues.')"
+          fi
+          if [ "${{ steps.ktfmt.outcome }}" = "failure" ]; then
+            FAILED="${FAILED:+${FAILED},}ktfmt"
+            ERROR="${ERROR:+${ERROR}\n\n}[ktfmt] $(tail -c 3000 "${RUNNER_TEMP}/ktfmt-output.txt" 2>/dev/null || echo 'ktfmt formatting check failed. Run ./gradlew spotlessApply in android/ to fix.')"
           fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED}" >> $GITHUB_OUTPUT
@@ -212,12 +226,12 @@ jobs:
         run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
 
       - name: Fail job if lint failed
-        if: always() && (steps.android-lint.outcome == 'failure' || steps.detekt.outcome == 'failure')
+        if: always() && (steps.android-lint.outcome == 'failure' || steps.detekt.outcome == 'failure' || steps.ktfmt.outcome == 'failure')
         run: exit 1
 
       - name: Clean up temp files
         if: always()
-        run: rm -f "${RUNNER_TEMP}/lint-output.txt" "${RUNNER_TEMP}/detekt-output.txt"
+        run: rm -f "${RUNNER_TEMP}/lint-output.txt" "${RUNNER_TEMP}/detekt-output.txt" "${RUNNER_TEMP}/ktfmt-output.txt"
 
   unit-test:
     name: Android Unit Tests
