@@ -446,13 +446,15 @@ jobs:
 
       - name: Run SonarQube static analysis scan
         id: sonar-scan
-        uses: SonarSource/sonarqube-scan-action@v6
-        env:
-          SONAR_TOKEN: ${{ steps.sonar-bootstrap.outputs.token }}
-          SONAR_HOST_URL: http://192.168.88.25:9000
-        with:
-          args: >
-            -Dsonar.qualitygate.wait=true
+        run: |
+          docker run --rm \
+            --network host \
+            -e SONAR_TOKEN="${{ steps.sonar-bootstrap.outputs.token }}" \
+            -e SONAR_HOST_URL="http://192.168.88.25:9000" \
+            -v "${{ github.workspace }}:/usr/src" \
+            sonarsource/sonar-scanner-cli:latest \
+            -Dsonar.projectBaseDir=/usr/src \
+            -Dsonar.qualitygate.wait=true \
             -Dsonar.qualitygate.timeout=300
 
       - name: Fetch SonarQube results and notify
