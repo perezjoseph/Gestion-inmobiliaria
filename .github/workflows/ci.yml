@@ -3,8 +3,24 @@ name: CI
 on:
   push:
     branches: [main, develop]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".gitignore"
   pull_request:
     branches: [main, develop]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".gitignore"
+  workflow_dispatch:
+    inputs:
+      skip_sonarqube:
+        description: "Skip SonarQube analysis"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -24,21 +40,45 @@ env:
 jobs:
   # ── Stage 1: Quality Checks (all run in parallel) ──
 
+  secret-scan:
+    name: Secret Scanning (Gitleaks)
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Clean workspace
+        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks secret detection
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
   commit-lint:
     name: Conventional Commits Check
     runs-on: [self-hosted, linux]
+    timeout-minutes: 5
     if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
     steps:
-      - name: Clean workspace of root-owned files from Docker jobs
+      - name: Clean workspace
         run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
 
       - name: Checkout repository with full history
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
 
       - name: Setup Node.js 22 for commitlint
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
 
@@ -53,24 +93,27 @@ jobs:
   lint:
     name: Code Formatting & Static Analysis
     runs-on: [self-hosted, linux]
+    timeout-minutes: 20
+    permissions:
+      contents: read
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
     steps:
-      - name: Clean workspace of root-owned files from Docker jobs
+      - name: Clean workspace
         run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install Rust stable with rustfmt, clippy, and WASM target
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
 
-      - name: Restore cargo cache (registry, git, build artifacts)
-        uses: actions/cache@v4
+      - name: Restore cargo cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.cargo/registry
@@ -82,17 +125,41 @@ jobs:
       - name: Verify rustfmt formatting across all crates
         id: fmt
         if: always()
-        run: cargo fmt --all -- --check 2>&1 | tee /tmp/fmt-output.txt
+        run: |
+          if ! cargo fmt --all -- --check 2>&1 | tee /tmp/fmt-output.txt; then
+            echo "::error::Code formatting check failed. Run 'cargo fmt --all' to fix."
+            exit 1
+          fi
 
-      - name: Run clippy lints on backend (warnings as errors)
+      - name: Run clippy lints on backend
         id: clippy_backend
         if: always()
-        run: cargo clippy -p realestate-backend -- -D warnings 2>&1 | tee /tmp/clippy-backend-output.txt
+        run: |
+          if ! cargo clippy -p realestate-backend -- -D warnings 2>&1 | tee /tmp/clippy-backend-output.txt; then
+            echo "::error::Backend clippy found warnings/errors."
+            exit 1
+          fi
 
-      - name: Run clippy lints on frontend WASM target (warnings as errors)
+      - name: Run clippy lints on frontend WASM target
         id: clippy_frontend
         if: always()
-        run: cargo clippy -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings 2>&1 | tee /tmp/clippy-frontend-output.txt
+        run: |
+          if ! cargo clippy -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings 2>&1 | tee /tmp/clippy-frontend-output.txt; then
+            echo "::error::Frontend clippy found warnings/errors."
+            exit 1
+          fi
+
+      - name: Write lint summary
+        if: always()
+        run: |
+          {
+            echo "## Lint Results"
+            echo "| Check | Status |"
+            echo "|-------|--------|"
+            echo "| rustfmt | ${{ steps.fmt.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| clippy (backend) | ${{ steps.clippy_backend.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| clippy (frontend) | ${{ steps.clippy_frontend.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect lint errors for notification
         id: collect-errors
@@ -110,7 +177,7 @@ jobs:
           fi
           if [ "${{ steps.clippy_frontend.outcome }}" = "failure" ]; then
             FAILED="${FAILED}clippy-frontend,"
-            ERROR="${ERROR}[clippy-frontend] $(head -c 1000 /tmp/clippy-frontend-output.txt 2>/dev/null || echo 'Frontend clippy failed.')"$'\n\n'
+            ERROR="${ERROR}[clippy-frontend] $(head -c 1500 /tmp/clippy-frontend-output.txt 2>/dev/null || echo 'Frontend clippy failed.')"$'\n\n'
           fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
@@ -125,6 +192,9 @@ jobs:
   test-backend:
     name: Backend Unit & Integration Tests
     runs-on: [self-hosted, linux, docker]
+    timeout-minutes: 30
+    permissions:
+      contents: read
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
     services:
@@ -142,17 +212,17 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - name: Clean workspace of root-owned files from Docker jobs
+      - name: Clean workspace
         run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install Rust stable toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
-      - name: Restore cargo cache (registry, git, build artifacts)
-        uses: actions/cache@v4
+      - name: Restore cargo cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.cargo/registry
@@ -161,8 +231,26 @@ jobs:
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-test-
 
-      - name: Run backend unit and integration tests against PostgreSQL
+      - name: Run backend tests
+        id: backend-tests
         run: cargo test -p realestate-backend --all-targets 2>&1 | tee /tmp/test-backend-output.txt
+
+      - name: Write test summary
+        if: always()
+        run: |
+          {
+            echo "## Backend Test Results"
+            if [ "${{ steps.backend-tests.outcome }}" = "success" ]; then
+              PASS=$(grep -c "^test .* ok$" /tmp/test-backend-output.txt 2>/dev/null || echo "?")
+              echo "✅ All tests passed ($PASS tests)"
+            else
+              FAIL_COUNT=$(grep -c "^test .* FAILED$" /tmp/test-backend-output.txt 2>/dev/null || echo "?")
+              echo "❌ $FAIL_COUNT test(s) failed"
+              echo '```'
+              grep "^test .* FAILED$" /tmp/test-backend-output.txt 2>/dev/null | head -20 || true
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect backend test errors for notification
         id: collect-errors
@@ -181,22 +269,25 @@ jobs:
   test-frontend:
     name: Frontend WASM Compilation & Tests
     runs-on: [self-hosted, linux]
+    timeout-minutes: 20
+    permissions:
+      contents: read
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
     steps:
-      - name: Clean workspace of root-owned files from Docker jobs
+      - name: Clean workspace
         run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install Rust stable with WASM target
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
           targets: wasm32-unknown-unknown
 
-      - name: Restore cargo cache (registry, git, build artifacts)
-        uses: actions/cache@v4
+      - name: Restore cargo cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.cargo/registry
@@ -206,7 +297,25 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-frontend-test-v2-
 
       - name: Run frontend tests (native target)
+        id: frontend-tests
         run: cargo test -p realestate-frontend --all-targets 2>&1 | tee /tmp/test-frontend-output.txt
+
+      - name: Write test summary
+        if: always()
+        run: |
+          {
+            echo "## Frontend Test Results"
+            if [ "${{ steps.frontend-tests.outcome }}" = "success" ]; then
+              PASS=$(grep -c "^test .* ok$" /tmp/test-frontend-output.txt 2>/dev/null || echo "?")
+              echo "✅ All tests passed ($PASS tests)"
+            else
+              FAIL_COUNT=$(grep -c "^test .* FAILED$" /tmp/test-frontend-output.txt 2>/dev/null || echo "?")
+              echo "❌ $FAIL_COUNT test(s) failed"
+              echo '```'
+              grep "^test .* FAILED$" /tmp/test-frontend-output.txt 2>/dev/null | head -20 || true
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect frontend test errors for notification
         id: collect-errors
@@ -225,23 +334,26 @@ jobs:
   quality-gate:
     name: Dependency Security & Health Check
     runs-on: [self-hosted, linux, docker]
+    timeout-minutes: 30
+    permissions:
+      contents: read
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
     steps:
-      - name: Clean workspace of root-owned files from Docker jobs
+      - name: Clean workspace
         run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
 
       - name: Clean up OWASP reports from previous runs
         run: sudo rm -rf reports/
 
-      - name: Checkout repository for dependency scanning
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           clean: false
 
       - name: Install Rust stable toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
       - name: Install cargo-audit for CVE scanning
         id: install_audit
@@ -255,7 +367,6 @@ jobs:
           rm -f "$HOME/.cargo/bin/cargo-audit"
           mkdir -p "$HOME/.cargo/bin"
           AUDIT_VERSION="0.22.1"
-          echo "Downloading pre-built cargo-audit v${AUDIT_VERSION}..."
           INSTALLED=false
           for VARIANT in musl gnu; do
             URL="https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-${VARIANT}-v${AUDIT_VERSION}.tgz"
@@ -265,16 +376,12 @@ jobs:
                 if cargo audit --version &>/dev/null; then
                   INSTALLED=true
                   break
-                else
-                  echo "Binary extracted but not executable, trying next variant..." | tee -a /tmp/install-audit-output.txt
-                  rm -f "$HOME/.cargo/bin/cargo-audit"
                 fi
+                rm -f "$HOME/.cargo/bin/cargo-audit"
               fi
             fi
-            echo "Failed to download ${VARIANT} variant, trying next..." | tee -a /tmp/install-audit-output.txt
           done
           if [ "$INSTALLED" = "false" ]; then
-            echo "Pre-built binaries failed, trying cargo install..." | tee -a /tmp/install-audit-output.txt
             if cargo install cargo-audit --locked 2>&1 | tee -a /tmp/install-audit-output.txt; then
               INSTALLED=true
             fi
@@ -283,7 +390,7 @@ jobs:
             cargo audit --version
             echo "installed=true" >> $GITHUB_OUTPUT
           else
-            echo "::warning::cargo-audit installation failed — skipping CVE scan"
+            echo "::warning::cargo-audit installation failed -- skipping CVE scan"
             echo "installed=false" >> $GITHUB_OUTPUT
           fi
 
@@ -294,17 +401,10 @@ jobs:
           export PATH="$HOME/.cargo/bin:$PATH"
           cargo audit 2>&1 | tee /tmp/audit-output.txt
 
-      - name: Check for unused dependencies in Cargo.toml
-        id: cargo_udeps
-        if: always()
-        run: |
-          cargo install cargo-udeps --locked || true
-          cargo +nightly udeps --all-targets 2>&1 | tee /tmp/udeps-output.txt || echo "cargo-udeps requires nightly, skipping if unavailable"
-
       - name: OWASP dependency scan (fail on CVSS >= 7)
         id: owasp
         if: always()
-        uses: dependency-check/Dependency-Check_Action@main
+        uses: dependency-check/Dependency-Check_Action@1e54355a8b4c8abaa8cc7d0b70aa655a3bb15a6c # main
         with:
           project: realestate
           path: .
@@ -316,17 +416,28 @@ jobs:
             --exclude node_modules/**
             --exclude dist/**
 
-      - name: Upload OWASP vulnerability report as artifact
+      - name: Upload OWASP vulnerability report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: owasp-dependency-check-report
           path: reports/
           retention-days: 7
 
+      - name: Write quality gate summary
+        if: always()
+        run: |
+          {
+            echo "## Dependency Security Results"
+            echo "| Check | Status |"
+            echo "|-------|--------|"
+            echo "| cargo audit | ${{ steps.cargo_audit.outcome == 'success' && '✅ Pass' || (steps.install_audit.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
+            echo "| OWASP scan | ${{ steps.owasp.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Collect quality-gate errors for notification
         id: collect-errors
-        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_udeps.outcome == 'failure' || steps.owasp.outcome == 'failure')
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.owasp.outcome == 'failure')
         run: |
           ERROR=""
           FAILED=""
@@ -335,11 +446,7 @@ jobs:
             ERROR="${ERROR}[cargo-audit] $(head -c 2000 /tmp/audit-output.txt 2>/dev/null || echo 'cargo audit found vulnerabilities.')"$'\n\n'
           fi
           if [ "${{ steps.install_audit.outputs.installed }}" = "false" ]; then
-            ERROR="${ERROR}[cargo-audit] Skipped — installation failed (non-blocking warning)."$'\n\n'
-          fi
-          if [ "${{ steps.cargo_udeps.outcome }}" = "failure" ]; then
-            FAILED="${FAILED}cargo-udeps,"
-            ERROR="${ERROR}[cargo-udeps] $(head -c 1000 /tmp/udeps-output.txt 2>/dev/null || echo 'Unused dependency check failed.')"$'\n\n'
+            ERROR="${ERROR}[cargo-audit] Skipped -- installation failed (non-blocking warning)."$'\n\n'
           fi
           if [ "${{ steps.owasp.outcome }}" = "failure" ]; then
             FAILED="${FAILED}owasp-scan,"
@@ -352,59 +459,36 @@ jobs:
           echo "$EOF" >> $GITHUB_OUTPUT
 
       - name: Fail job if any quality step failed
-        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_udeps.outcome == 'failure' || steps.owasp.outcome == 'failure')
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.owasp.outcome == 'failure')
         run: exit 1
 
   sonarqube:
     name: SonarQube Code Quality & Coverage Analysis
     runs-on: [self-hosted, linux, sonarqube]
+    timeout-minutes: 20
+    permissions:
+      contents: read
     continue-on-error: true
+    if: ${{ !(inputs.skip_sonarqube || false) }}
     steps:
-      - name: Clean workspace of root-owned files from Docker jobs
+      - name: Clean workspace
         run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
 
       - name: Checkout repository with full history for blame analysis
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
-
-      # ── Using external SonarQube at 192.168.88.25:9000 ──
-      # To switch to a local docker-compose instance, uncomment the two steps
-      # below and change SONAR_URL references from 192.168.88.25 to localhost.
-
-      # - name: Set vm.max_map_count for Elasticsearch
-      #   run: |
-      #     CURRENT=$(cat /proc/sys/vm/max_map_count)
-      #     if [ "$CURRENT" -lt 524288 ]; then
-      #       echo "Setting vm.max_map_count=524288 (current: $CURRENT)"
-      #       sudo sysctl -w vm.max_map_count=524288 || echo "::warning::Could not set vm.max_map_count"
-      #     fi
-
-      # - name: Deploy SonarQube via docker-compose
-      #   run: |
-      #     docker compose -f .github/docker-compose.sonarqube.yml up -d
-      #     echo "Waiting for SonarQube to be ready..."
-      #     for i in $(seq 1 40); do
-      #       STATUS=$(curl -sf --connect-timeout 5 --max-time 10 http://localhost:9000/api/system/status 2>/dev/null | grep -o '"status":"[^"]*"' | cut -d'"' -f4 || true)
-      #       if [ "$STATUS" = "UP" ]; then echo "SonarQube is ready."; exit 0; fi
-      #       echo "Attempt $i/40 — status: ${STATUS:-unreachable}. Retrying in 10s..."
-      #       sleep 10
-      #     done
-      #     echo "::error::SonarQube did not become ready within ~7 minutes"
-      #     docker compose -f .github/docker-compose.sonarqube.yml logs sonarqube | tail -50
-      #     exit 1
 
       - name: Verify SonarQube server is reachable
         run: |
           SONAR_URL="http://192.168.88.25:9000"
-          echo "Checking SonarQube at $SONAR_URL ..."
           for i in $(seq 1 12); do
-            STATUS=$(curl -sf --connect-timeout 5 --max-time 10 "$SONAR_URL/api/system/status" 2>/dev/null | grep -o '"status":"[^"]*"' | cut -d'"' -f4 || true)
+            STATUS=$(curl -sf --connect-timeout 5 --max-time 10 "$SONAR_URL/api/system/status" 2>/dev/null | jq -r '.status // "UNREACHABLE"')
             if [ "$STATUS" = "UP" ]; then
               echo "SonarQube is ready."
               exit 0
             fi
-            echo "Attempt $i/12 — status: ${STATUS:-unreachable}. Retrying in 5s..."
+            echo "Attempt $i/12 -- status: $STATUS. Retrying in 5s..."
             sleep 5
           done
           echo "::error::SonarQube at $SONAR_URL did not respond within ~60 seconds"
@@ -414,14 +498,17 @@ jobs:
         id: sonar-bootstrap
         run: |
           SONAR_URL="http://192.168.88.25:9000"
-          ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD || 'SonarAdmin2025!' }}"
+          ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD }}"
 
-          # Create project if it doesn't exist
+          if [ -z "$ADMIN_PASS" ]; then
+            echo "::error::SONAR_ADMIN_PASSWORD secret is not set. Configure it in GitHub repository secrets."
+            exit 1
+          fi
+
           curl -sf -u "admin:${ADMIN_PASS}" -X POST \
             "$SONAR_URL/api/projects/create?name=Gestion+Inmobiliaria&project=gestion-inmobiliaria" \
             2>/dev/null || echo "Project already exists."
 
-          # Assign the default quality gate to the project
           DEFAULT_QG=$(curl -sf -u "admin:${ADMIN_PASS}" \
             "$SONAR_URL/api/qualitygates/list" | jq -r '.qualitygates[] | select(.isDefault==true) | .name' 2>/dev/null || echo "Sonar way")
           if [ -n "$DEFAULT_QG" ]; then
@@ -430,7 +517,6 @@ jobs:
               2>/dev/null || echo "Quality gate already assigned."
           fi
 
-          # Use existing token from secrets, or generate one via admin API
           TOKEN="${{ secrets.SONAR_TOKEN }}"
           if [ -z "$TOKEN" ]; then
             curl -sf -u "admin:${ADMIN_PASS}" -X POST \
@@ -452,7 +538,7 @@ jobs:
             -e SONAR_TOKEN="${{ steps.sonar-bootstrap.outputs.token }}" \
             -e SONAR_HOST_URL="http://192.168.88.25:9000" \
             -v "${{ github.workspace }}:/usr/src" \
-            sonarsource/sonar-scanner-cli:latest \
+            sonarsource/sonar-scanner-cli:11.3 \
             -Dsonar.projectBaseDir=/usr/src \
             -Dsonar.qualitygate.wait=true \
             -Dsonar.qualitygate.timeout=300
@@ -467,7 +553,6 @@ jobs:
           GATE_STATUS="UNKNOWN"
 
           if [ "$SCAN_OUTCOME" = "success" ]; then
-            echo "Scan step passed with qualitygate.wait=true — gate is OK."
             GATE_STATUS="OK"
           fi
 
@@ -475,14 +560,11 @@ jobs:
             REPORT_FILE=$(find . -name 'report-task.txt' -path '*scannerwork*' -print -quit 2>/dev/null)
             if [ -n "$REPORT_FILE" ] && [ -f "$REPORT_FILE" ]; then
               CE_TASK_ID=$(grep '^ceTaskId=' "$REPORT_FILE" | cut -d= -f2)
-              echo "Found CE task ID: $CE_TASK_ID"
-
               if [ -n "$CE_TASK_ID" ]; then
                 for i in $(seq 1 60); do
                   CE_RESPONSE=$(curl -sf -u "$SONAR_TOKEN:" \
                     "$SONAR_URL/api/ce/task?id=$CE_TASK_ID" 2>/dev/null || echo '{}')
                   CE_STATUS=$(echo "$CE_RESPONSE" | jq -r '.task.status // "UNKNOWN"')
-                  echo "CE task status: $CE_STATUS (attempt $i/60)"
                   if [ "$CE_STATUS" = "SUCCESS" ]; then
                     ANALYSIS_ID=$(echo "$CE_RESPONSE" | jq -r '.task.analysisId // empty')
                     if [ -n "$ANALYSIS_ID" ]; then
@@ -503,7 +585,6 @@ jobs:
           fi
 
           if [ "$GATE_STATUS" = "UNKNOWN" ]; then
-            echo "Falling back to project-level quality gate query..."
             for i in $(seq 1 30); do
               GATE=$(curl -sf -u "$SONAR_TOKEN:" \
                 "$SONAR_URL/api/qualitygates/project_status?projectKey=gestion-inmobiliaria" 2>/dev/null || echo '{}')
@@ -511,17 +592,15 @@ jobs:
               if [ "$GATE_STATUS" != "UNKNOWN" ] && [ "$GATE_STATUS" != "NONE" ]; then
                 break
               fi
-              echo "Quality gate status: $GATE_STATUS, waiting 5s (attempt $i/30)..."
               sleep 5
             done
           fi
 
           if [ "$GATE_STATUS" = "UNKNOWN" ] || [ "$GATE_STATUS" = "NONE" ]; then
             if [ "$SCAN_OUTCOME" = "success" ]; then
-              echo "Gate status unresolvable but scan succeeded — treating as OK."
               GATE_STATUS="OK"
-            elif [ "$SCAN_OUTCOME" = "skipped" ] || [ "$SCAN_OUTCOME" = "" ]; then
-              echo "::warning::SonarQube scan was skipped — treating gate as OK (non-blocking)."
+            elif [ "$SCAN_OUTCOME" = "skipped" ] || [ -z "$SCAN_OUTCOME" ]; then
+              echo "::warning::SonarQube scan was skipped -- treating gate as OK (non-blocking)."
               GATE_STATUS="OK"
             fi
           fi
@@ -531,30 +610,45 @@ jobs:
           ISSUES=$(curl -sf -u "$SONAR_TOKEN:" \
             "$SONAR_URL/api/issues/search?projectKeys=gestion-inmobiliaria&resolved=false&ps=50&s=SEVERITY&asc=false" 2>/dev/null || echo '{}')
           TOTAL=$(echo "$ISSUES" | jq -r '.total // 0')
-
           SUMMARY=$(echo "$ISSUES" | jq -r '
             [.issues // [] | group_by(.severity) | .[] |
               {severity: .[0].severity, count: length}] |
             map("\(.count) \(.severity)") | join(", ")' 2>/dev/null || echo "Could not parse issues")
 
-          TOP_ISSUES=$(echo "$ISSUES" | jq -r '
-            [.issues[:20] | .[] |
-              "\(.severity) | \(.component | split(":") | last):\(.line // "?") | \(.message)"] |
-            join("\n")' 2>/dev/null || echo "")
-
-          ERROR_LOG="Quality Gate: ${GATE_STATUS}\nTotal open issues: ${TOTAL}\nBreakdown: ${SUMMARY}\n\nTop issues:\n${TOP_ISSUES}"
+          # Write summary
+          {
+            echo "## SonarQube Results"
+            echo "- Quality Gate: **$GATE_STATUS**"
+            echo "- Open Issues: **$TOTAL** ($SUMMARY)"
+            if [ "$GATE_STATUS" = "ERROR" ]; then
+              echo ""
+              echo "### Top Issues"
+              echo '```'
+              echo "$ISSUES" | jq -r '.issues[:10] | .[] | "\(.severity) \(.component | split(":") | last):\(.line // "?") \(.message)"' 2>/dev/null || true
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "$GATE_STATUS" = "ERROR" ]; then
+            TOP_ISSUES=$(echo "$ISSUES" | jq -r '
+              [.issues[:20] | .[] |
+                "\(.severity) | \(.component | split(":") | last):\(.line // "?") | \(.message)"] |
+              join("\n")' 2>/dev/null || echo "")
+            ERROR_LOG="Quality Gate: ${GATE_STATUS}\nTotal open issues: ${TOTAL}\nBreakdown: ${SUMMARY}\n\nTop issues:\n${TOP_ISSUES}"
+
             PAYLOAD=$(jq -n \
               --arg job "sonarqube" \
               --arg step "quality-gate-${GATE_STATUS}" \
               --arg error_log "$ERROR_LOG" \
               --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-              '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
+              --arg commit "${{ github.sha }}" \
+              --arg branch "${{ github.ref_name }}" \
+              --arg actor "${{ github.actor }}" \
+              '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
 
             curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
               -H "Content-Type: application/json" \
-              -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
+              -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
 
             echo "::error::SonarQube quality gate failed"
             exit 1
@@ -565,27 +659,30 @@ jobs:
   build-frontend:
     name: Frontend WASM Release Build
     runs-on: [self-hosted, linux]
+    timeout-minutes: 30
+    permissions:
+      contents: read
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
     needs: [commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube]
     if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     steps:
-      - name: Clean workspace of root-owned files from Docker jobs
+      - name: Clean workspace
         run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install Rust stable with WASM target
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
           targets: wasm32-unknown-unknown
 
       - name: Install Trunk WASM bundler
-        uses: jetli/trunk-action@v0.5.0
+        uses: jetli/trunk-action@1346cc09eace4beb84e403e199a471346d4684c9 # v0.5.1
 
-      - name: Restore cargo cache (registry, git, build artifacts)
-        uses: actions/cache@v4
+      - name: Restore cargo cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.cargo/registry
@@ -598,8 +695,8 @@ jobs:
         run: trunk build --release 2>&1 | tee /tmp/build-frontend-output.txt
         working-directory: frontend
 
-      - name: Upload frontend dist as build artifact (7-day retention)
-        uses: actions/upload-artifact@v4
+      - name: Upload frontend dist artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: frontend-dist
           path: frontend/dist/
@@ -622,22 +719,25 @@ jobs:
   build-backend:
     name: Backend Release Build
     runs-on: [self-hosted, linux]
+    timeout-minutes: 30
+    permissions:
+      contents: read
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
     needs: [commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube]
     if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     steps:
-      - name: Clean workspace of root-owned files from Docker jobs
+      - name: Clean workspace
         run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install Rust stable toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
-      - name: Restore cargo cache (registry, git, build artifacts)
-        uses: actions/cache@v4
+      - name: Restore cargo cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.cargo/registry
@@ -649,8 +749,8 @@ jobs:
       - name: Build optimized backend binary
         run: cargo build -p realestate-backend --release 2>&1 | tee /tmp/build-backend-output.txt
 
-      - name: Upload backend binary as build artifact (7-day retention)
-        uses: actions/upload-artifact@v4
+      - name: Upload backend binary artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: backend-binary
           path: target/release/realestate-backend
@@ -673,22 +773,29 @@ jobs:
   notify-failure:
     name: Failure Notification Webhook
     runs-on: [self-hosted, linux]
+    timeout-minutes: 5
+    permissions:
+      contents: read
     needs: [commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend]
-    if: always() && contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    if: always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
     steps:
-      - name: Notify — conventional commit validation failed
+      - name: Notify -- conventional commit validation failed
         if: always() && needs.commit-lint.result == 'failure'
         run: |
+          PAYLOAD=$(jq -n \
+            --arg job "commit-lint" \
+            --arg step "commitlint" \
+            --arg error_log "Commit message lint failed. Commit messages must follow conventional commits format (feat:, fix:, chore:, etc.)." \
+            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg commit "${{ github.sha }}" \
+            --arg branch "${{ github.ref_name }}" \
+            --arg actor "${{ github.actor }}" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
-            -d '{
-              "job": "commit-lint",
-              "step": "commitlint",
-              "error_log": "Commit message lint failed. Commit messages must follow conventional commits format (feat:, fix:, chore:, etc.).",
-              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }' || echo "Webhook unreachable — skipping notification"
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
 
-      - name: Notify — code formatting or clippy lint failed
+      - name: Notify -- code formatting or clippy lint failed
         if: always() && needs.lint.result == 'failure'
         env:
           ERROR_LOG: ${{ needs.lint.outputs.error_log }}
@@ -698,13 +805,15 @@ jobs:
             ERROR_LOG="Lint job failed but no captured output. Run cargo fmt --all -- --check and cargo clippy --workspace -- -D warnings to reproduce."
           fi
           STEP="${FAILED_STEPS:-clippy-or-fmt}"
-          PAYLOAD=$(jq -n --arg job "lint" --arg step "$STEP" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
+          PAYLOAD=$(jq -n --arg job "lint" --arg step "$STEP" --arg error_log "$ERROR_LOG" \
+            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
 
-      - name: Notify — backend tests failed
+      - name: Notify -- backend tests failed
         if: always() && needs.test-backend.result == 'failure'
         env:
           ERROR_LOG: ${{ needs.test-backend.outputs.error_log }}
@@ -712,13 +821,15 @@ jobs:
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Backend tests failed but no captured output. Run cargo test -p realestate-backend --all-targets to reproduce."
           fi
-          PAYLOAD=$(jq -n --arg job "test-backend" --arg step "cargo-test" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
+          PAYLOAD=$(jq -n --arg job "test-backend" --arg step "cargo-test" --arg error_log "$ERROR_LOG" \
+            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
 
-      - name: Notify — frontend tests failed
+      - name: Notify -- frontend tests failed
         if: always() && needs.test-frontend.result == 'failure'
         env:
           ERROR_LOG: ${{ needs.test-frontend.outputs.error_log }}
@@ -726,13 +837,15 @@ jobs:
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Frontend tests failed but no captured output. Run cargo test -p realestate-frontend --all-targets to reproduce."
           fi
-          PAYLOAD=$(jq -n --arg job "test-frontend" --arg step "cargo-test" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
+          PAYLOAD=$(jq -n --arg job "test-frontend" --arg step "cargo-test" --arg error_log "$ERROR_LOG" \
+            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
 
-      - name: Notify — dependency security gate failed
+      - name: Notify -- dependency security gate failed
         if: always() && needs.quality-gate.result == 'failure'
         env:
           ERROR_LOG: ${{ needs.quality-gate.outputs.error_log }}
@@ -742,13 +855,15 @@ jobs:
             ERROR_LOG="Quality gate failed but no captured output. Run cargo audit and check OWASP scan to reproduce."
           fi
           STEP="${FAILED_STEPS:-audit-or-owasp}"
-          PAYLOAD=$(jq -n --arg job "quality-gate" --arg step "$STEP" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
+          PAYLOAD=$(jq -n --arg job "quality-gate" --arg step "$STEP" --arg error_log "$ERROR_LOG" \
+            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
 
-      - name: Notify — frontend WASM build failed
+      - name: Notify -- frontend WASM build failed
         if: always() && needs.build-frontend.result == 'failure'
         env:
           ERROR_LOG: ${{ needs.build-frontend.outputs.error_log }}
@@ -756,13 +871,15 @@ jobs:
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Frontend WASM build failed but no captured output. Run trunk build --release in frontend/ to reproduce."
           fi
-          PAYLOAD=$(jq -n --arg job "build-frontend" --arg step "trunk-build" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
+          PAYLOAD=$(jq -n --arg job "build-frontend" --arg step "trunk-build" --arg error_log "$ERROR_LOG" \
+            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
 
-      - name: Notify — backend release build failed
+      - name: Notify -- backend release build failed
         if: always() && needs.build-backend.result == 'failure'
         env:
           ERROR_LOG: ${{ needs.build-backend.outputs.error_log }}
@@ -770,29 +887,69 @@ jobs:
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Backend release build failed but no captured output. Run cargo build -p realestate-backend --release to reproduce."
           fi
-          PAYLOAD=$(jq -n --arg job "build-backend" --arg step "cargo-build" --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url}')
+          PAYLOAD=$(jq -n --arg job "build-backend" --arg step "cargo-build" --arg error_log "$ERROR_LOG" \
+            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD" || echo "Webhook unreachable — skipping notification"
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
 
-      - name: Notify — SonarQube analysis failed
+      - name: Notify -- SonarQube analysis failed
         if: always() && needs.sonarqube.result == 'failure'
         run: |
+          PAYLOAD=$(jq -n \
+            --arg job "sonarqube" \
+            --arg step "sonar-scan" \
+            --arg error_log "SonarQube analysis failed. Check SonarQube server status and scan configuration." \
+            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg commit "${{ github.sha }}" \
+            --arg branch "${{ github.ref_name }}" \
+            --arg actor "${{ github.actor }}" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
             -H "Content-Type: application/json" \
-            -d '{
-              "job": "sonarqube",
-              "step": "sonar-scan",
-              "error_log": "SonarQube analysis failed. Check SonarQube server status and scan configuration.",
-              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }' || echo "Webhook unreachable — skipping notification"
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
+
+      - name: Write failure summary
+        if: always()
+        run: |
+          {
+            echo "## Pipeline Failure Summary"
+            echo "| Job | Result |"
+            echo "|-----|--------|"
+            for JOB in commit-lint lint test-backend test-frontend quality-gate sonarqube build-frontend build-backend; do
+              case "$JOB" in
+                commit-lint) RESULT="${{ needs.commit-lint.result }}" ;;
+                lint) RESULT="${{ needs.lint.result }}" ;;
+                test-backend) RESULT="${{ needs.test-backend.result }}" ;;
+                test-frontend) RESULT="${{ needs.test-frontend.result }}" ;;
+                quality-gate) RESULT="${{ needs.quality-gate.result }}" ;;
+                sonarqube) RESULT="${{ needs.sonarqube.result }}" ;;
+                build-frontend) RESULT="${{ needs.build-frontend.result }}" ;;
+                build-backend) RESULT="${{ needs.build-backend.result }}" ;;
+              esac
+              case "$RESULT" in
+                success) ICON="✅" ;;
+                failure) ICON="❌" ;;
+                cancelled) ICON="⏹️" ;;
+                skipped) ICON="⏭️" ;;
+                *) ICON="❓" ;;
+              esac
+              echo "| $JOB | $ICON $RESULT |"
+            done
+            echo ""
+            echo "Commit: \`${{ github.sha }}\` by @${{ github.actor }}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # ── Stage 3: Pipeline Self-Improvement (runs after everything else) ──
 
   pipeline-improve:
     name: CI/CD Pipeline Self-Improvement
     runs-on: [self-hosted, linux]
+    timeout-minutes: 10
+    permissions:
+      contents: read
     needs: [commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend, notify-failure]
     if: always() && github.ref == 'refs/heads/main'
     steps:
@@ -800,7 +957,7 @@ jobs:
         run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Collect SonarQube open issues
         id: sonar-issues
@@ -810,41 +967,40 @@ jobs:
           PROJECT_KEY="gestion-inmobiliaria"
 
           if [ -z "$TOKEN" ]; then
-            ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD || 'SonarAdmin2025!' }}"
+            ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD }}"
+            if [ -z "$ADMIN_PASS" ]; then
+              echo "sonar_report=SonarQube credentials unavailable -- skipping issue collection." >> $GITHUB_OUTPUT
+              exit 0
+            fi
             TOKEN=$(curl -sf -u "admin:${ADMIN_PASS}" -X POST \
               "$SONAR_URL/api/user_tokens/generate?name=ci-improve-token" 2>/dev/null \
               | jq -r '.token // empty' || true)
             if [ -z "$TOKEN" ]; then
-              echo "sonar_report=SonarQube token unavailable — skipping issue collection." >> $GITHUB_OUTPUT
+              echo "sonar_report=SonarQube token unavailable -- skipping issue collection." >> $GITHUB_OUTPUT
               exit 0
             fi
           fi
 
-          # Fetch open issues sorted by severity (worst first), up to 100
           ISSUES_JSON=$(curl -sf -u "$TOKEN:" \
             "$SONAR_URL/api/issues/search?projectKeys=${PROJECT_KEY}&resolved=false&ps=100&s=SEVERITY&asc=false&statuses=OPEN,CONFIRMED,REOPENED" \
             2>/dev/null || echo '{}')
 
           TOTAL=$(echo "$ISSUES_JSON" | jq -r '.total // 0')
-
           BREAKDOWN=$(echo "$ISSUES_JSON" | jq -r '
             [.issues // [] | group_by(.severity) | .[] |
               {severity: .[0].severity, count: length}] |
             map("\(.count) \(.severity)") | join(", ")' 2>/dev/null || echo "unknown")
 
-          # Build detailed issue list: severity | file:line | rule | message
           ISSUE_LIST=$(echo "$ISSUES_JSON" | jq -r '
             [.issues[:80] | .[] |
               "\(.severity) | \(.component | split(":") | last):\(.line // "?") | \(.rule) | \(.message)"] |
             join("\n")' 2>/dev/null || echo "")
 
-          # Fetch security hotspots
           HOTSPOTS_JSON=$(curl -sf -u "$TOKEN:" \
             "$SONAR_URL/api/hotspots/search?projectKey=${PROJECT_KEY}&status=TO_REVIEW&ps=50" \
             2>/dev/null || echo '{}')
 
           HOTSPOT_TOTAL=$(echo "$HOTSPOTS_JSON" | jq -r '.paging.total // 0')
-
           HOTSPOT_LIST=$(echo "$HOTSPOTS_JSON" | jq -r '
             [.hotspots[:30] | .[] |
               "\(.vulnerabilityProbability) | \(.component | split(":") | last):\(.line // "?") | \(.securityCategory) | \(.message)"] |
@@ -868,7 +1024,6 @@ jobs:
           FOCUS="general"
           REPORT=""
 
-          # Collect job outcomes
           REPORT="${REPORT}Pipeline Run Summary:\n"
           REPORT="${REPORT}  commit-lint:    ${{ needs.commit-lint.result }}\n"
           REPORT="${REPORT}  lint:           ${{ needs.lint.result }}\n"
@@ -879,7 +1034,6 @@ jobs:
           REPORT="${REPORT}  build-frontend: ${{ needs.build-frontend.result }}\n"
           REPORT="${REPORT}  build-backend:  ${{ needs.build-backend.result }}\n"
 
-          # Determine focus based on what failed
           if [ "${{ needs.quality-gate.result }}" = "failure" ]; then
             FOCUS="security"
             REPORT="${REPORT}\nSecurity-related job failed. Focus on dependency vulnerabilities, audit findings, and OWASP results.\n"
@@ -893,11 +1047,10 @@ jobs:
             FOCUS="pipeline"
             REPORT="${REPORT}\nBuild jobs failed. Focus on build reliability, caching, and error reporting.\n"
           else
-            FOCUS="security,pipeline,reporting"
-            REPORT="${REPORT}\nAll jobs passed. Focus on proactive security hardening, pipeline optimization, and reporting improvements.\n"
+            FOCUS="security,pipeline,reporting,sonarqube"
+            REPORT="${REPORT}\nAll jobs passed. Focus on proactive security hardening, pipeline optimization, reporting improvements, and resolving SonarQube issues.\n"
           fi
 
-          # Add workflow file metadata
           REPORT="${REPORT}\nWorkflow file: .github/workflows/ci.yml\n"
           REPORT="${REPORT}Webhook listener: scripts/quality-webhook-listener.py\n"
           REPORT="${REPORT}Trigger: ${{ github.event_name }} on ${{ github.ref }}\n"
@@ -913,29 +1066,30 @@ jobs:
         env:
           FOCUS: ${{ steps.analyze.outputs.focus }}
           REPORT: ${{ steps.analyze.outputs.report }}
+          SONAR_REPORT: ${{ steps.sonar-issues.outputs.sonar_report }}
         run: |
           PAYLOAD=$(jq -n \
             --arg focus "$FOCUS" \
             --arg pipeline_report "$REPORT" \
+            --arg sonar_report "$SONAR_REPORT" \
             --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            '{focus: $focus, pipeline_report: $pipeline_report, run_url: $run_url}')
+            '{focus: $focus, pipeline_report: $pipeline_report, sonar_report: $sonar_report, run_url: $run_url}')
 
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-improve \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD" || echo "Webhook unreachable — skipping pipeline improvement"
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping pipeline improvement"
 
       - name: Send SonarQube issues to dedicated fix webhook
         env:
           SONAR_REPORT: ${{ steps.sonar-issues.outputs.sonar_report }}
         run: |
-          if [ -z "$SONAR_REPORT" ] || echo "$SONAR_REPORT" | grep -q "token unavailable"; then
-            echo "No SonarQube data available — skipping sonar-fix webhook"
+          if [ -z "$SONAR_REPORT" ] || echo "$SONAR_REPORT" | grep -q "unavailable"; then
+            echo "No SonarQube data available -- skipping sonar-fix webhook"
             exit 0
           fi
 
-          # Only send if there are actual open issues
           if echo "$SONAR_REPORT" | grep -q "Total open issues: 0"; then
-            echo "No open SonarQube issues — skipping sonar-fix webhook"
+            echo "No open SonarQube issues -- skipping sonar-fix webhook"
             exit 0
           fi
 
@@ -946,4 +1100,4 @@ jobs:
 
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/sonar-fix \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD" || echo "Webhook unreachable — skipping SonarQube fix"
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping SonarQube fix"
