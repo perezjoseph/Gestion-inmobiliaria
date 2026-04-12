@@ -428,6 +428,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+      security-events: write
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
@@ -497,6 +498,37 @@ jobs:
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           cargo audit 2>&1 | tee /tmp/audit-output.txt
+
+      - name: Install cargo-deny for supply chain policy checks
+        id: install_deny
+        if: always()
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if command -v cargo-deny &>/dev/null; then
+            echo "cargo-deny already installed: $(cargo-deny --version)"
+            echo "installed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          DENY_VERSION="0.16.4"
+          URL="https://github.com/EmbarkStudios/cargo-deny/releases/download/${DENY_VERSION}/cargo-deny-${DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          if curl -sSfL --retry 3 -o /tmp/cargo-deny.tar.gz "$URL"; then
+            tar xzf /tmp/cargo-deny.tar.gz --strip-components=1 -C "$HOME/.cargo/bin/" 2>/dev/null
+            chmod +x "$HOME/.cargo/bin/cargo-deny"
+            rm -f /tmp/cargo-deny.tar.gz
+          fi
+          if command -v cargo-deny &>/dev/null; then
+            cargo-deny --version
+            echo "installed=true" >> $GITHUB_OUTPUT
+          else
+            cargo install cargo-deny --locked 2>/dev/null && echo "installed=true" >> $GITHUB_OUTPUT || echo "installed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run cargo-deny supply chain checks (advisories, licenses, bans, sources)
+        id: cargo_deny
+        if: always() && steps.install_deny.outputs.installed == 'true'
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo deny check 2>&1 | tee /tmp/deny-output.txt
 
       - name: OWASP dependency scan (fail on CVSS >= 7)
         id: owasp
@@ -602,13 +634,14 @@ jobs:
             echo "| Check | Status |"
             echo "|-------|--------|"
             echo "| cargo audit | ${{ steps.cargo_audit.outcome == 'success' && '✅ Pass' || (steps.install_audit.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
+            echo "| cargo deny | ${{ steps.cargo_deny.outcome == 'success' && '✅ Pass' || (steps.install_deny.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
             echo "| OWASP scan | ${{ steps.owasp.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
             echo "| Trivy IaC scan | ${{ steps.trivy_iac.outcome == 'success' && '✅ Pass' || (steps.install_trivy.outputs.installed != 'true' && '⏭️ Skipped' || '⚠️ Findings') }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect quality-gate errors for notification
         id: collect-errors
-        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.owasp.outcome == 'failure' || steps.trivy_iac.outcome == 'failure')
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.owasp.outcome == 'failure' || steps.trivy_iac.outcome == 'failure')
         run: |
           ERROR=""
           FAILED=""
@@ -618,6 +651,10 @@ jobs:
           fi
           if [ "${{ steps.install_audit.outputs.installed }}" = "false" ]; then
             ERROR="${ERROR}[cargo-audit] Skipped -- installation failed (non-blocking warning)."$'\n\n'
+          fi
+          if [ "${{ steps.cargo_deny.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}cargo-deny,"
+            ERROR="${ERROR}[cargo-deny] $(head -c 2000 /tmp/deny-output.txt 2>/dev/null || echo 'cargo deny found policy violations.')"$'\n\n'
           fi
           if [ "${{ steps.owasp.outcome }}" = "failure" ]; then
             FAILED="${FAILED}owasp-scan,"
@@ -639,7 +676,7 @@ jobs:
         run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
 
       - name: Fail job if any quality step failed
-        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.owasp.outcome == 'failure' || steps.trivy_iac.outcome == 'failure')
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.owasp.outcome == 'failure' || steps.trivy_iac.outcome == 'failure')
         run: exit 1
 
   sonarqube:
@@ -936,6 +973,22 @@ jobs:
         run: trunk build --release 2>&1 | tee /tmp/build-frontend-output.txt
         working-directory: frontend
 
+      - name: Scan frontend dist for leaked secrets
+        run: |
+          if command -v gitleaks &>/dev/null; then
+            gitleaks detect --source frontend/dist --no-git --verbose --redact --exit-code 1
+          else
+            GITLEAKS_VERSION="8.24.3"
+            GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
+            ARCHIVE="/tmp/gitleaks.tar.gz"
+            curl -sSfL -o "$ARCHIVE" \
+              "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+            echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
+            sudo tar xzf "$ARCHIVE" -C /usr/local/bin gitleaks
+            rm -f "$ARCHIVE"
+            gitleaks detect --source frontend/dist --no-git --verbose --redact --exit-code 1
+          fi
+
       - name: Upload frontend dist artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -1020,6 +1073,22 @@ jobs:
       - name: Build optimized backend binary
         run: cargo build --locked -p realestate-backend --release 2>&1 | tee /tmp/build-backend-output.txt
 
+      - name: Scan backend build output for leaked secrets
+        run: |
+          if command -v gitleaks &>/dev/null; then
+            gitleaks detect --source target/release --no-git --verbose --redact --exit-code 1
+          else
+            GITLEAKS_VERSION="8.24.3"
+            GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
+            ARCHIVE="/tmp/gitleaks.tar.gz"
+            curl -sSfL -o "$ARCHIVE" \
+              "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+            echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
+            sudo tar xzf "$ARCHIVE" -C /usr/local/bin gitleaks
+            rm -f "$ARCHIVE"
+            gitleaks detect --source target/release --no-git --verbose --redact --exit-code 1
+          fi
+
       - name: Upload backend binary artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -1061,6 +1130,8 @@ jobs:
       contents: read
       packages: write
       security-events: write
+      id-token: write
+      attestations: write
     outputs:
       digest: ${{ steps.push-backend.outputs.digest }}
     needs: [build-backend]
@@ -1148,8 +1219,16 @@ jobs:
           docker push ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }}
           DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' \
             ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }} 2>/dev/null \
-            | grep -oP '@sha256:[a-f0-9]+' || true)
+            | grep -oP 'sha256:[a-f0-9]+' || true)
           echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+
+      - name: Attest backend container image provenance
+        if: steps.push-backend.outputs.digest != ''
+        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        with:
+          subject-name: ghcr.io/${{ github.repository_owner }}/realestate-backend
+          subject-digest: ${{ steps.push-backend.outputs.digest }}
+          push-to-registry: true
 
   container-image-frontend:
     name: Build & Push Frontend Image to GHCR
@@ -1159,6 +1238,8 @@ jobs:
       contents: read
       packages: write
       security-events: write
+      id-token: write
+      attestations: write
     outputs:
       digest: ${{ steps.push-frontend.outputs.digest }}
     needs: [build-frontend]
@@ -1246,8 +1327,16 @@ jobs:
           docker push ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }}
           DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' \
             ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }} 2>/dev/null \
-            | grep -oP '@sha256:[a-f0-9]+' || true)
+            | grep -oP 'sha256:[a-f0-9]+' || true)
           echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+
+      - name: Attest frontend container image provenance
+        if: steps.push-frontend.outputs.digest != ''
+        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        with:
+          subject-name: ghcr.io/${{ github.repository_owner }}/realestate-frontend
+          subject-digest: ${{ steps.push-frontend.outputs.digest }}
+          push-to-registry: true
 
   # ── Stage 4: Deploy (runs after both images are pushed) ──
 

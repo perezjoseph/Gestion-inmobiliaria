@@ -2,6 +2,8 @@ services:
   db:
     image: postgres:16
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-realestate}
       POSTGRES_USER: ${POSTGRES_USER:-realestate}
@@ -17,6 +19,11 @@ services:
   backend:
     image: ghcr.io/perezjoseph/realestate-backend:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,nodev
     depends_on:
       db:
         condition: service_healthy
@@ -31,6 +38,11 @@ services:
   frontend:
     image: ghcr.io/perezjoseph/realestate-frontend:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,nodev
     depends_on:
       - backend
     ports:
