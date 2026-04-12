@@ -29,6 +29,9 @@ jobs:
     runs-on: [self-hosted, linux]
     if: github.event_name == 'pull_request'
     steps:
+      - name: Clean workspace of root-owned files from Docker jobs
+        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+
       - name: Checkout repository with full history
         uses: actions/checkout@v4
         with:
@@ -54,6 +57,9 @@ jobs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
     steps:
+      - name: Clean workspace of root-owned files from Docker jobs
+        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -136,6 +142,9 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
+      - name: Clean workspace of root-owned files from Docker jobs
+        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -175,6 +184,9 @@ jobs:
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
     steps:
+      - name: Clean workspace of root-owned files from Docker jobs
+        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -217,6 +229,9 @@ jobs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
     steps:
+      - name: Clean workspace of root-owned files from Docker jobs
+        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+
       - name: Clean up OWASP reports from previous runs
         run: sudo rm -rf reports/
 
@@ -346,6 +361,9 @@ jobs:
     runs-on: [self-hosted, linux, sonarqube]
     continue-on-error: true
     steps:
+      - name: Clean workspace of root-owned files from Docker jobs
+        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+
       - name: Checkout repository with full history for blame analysis
         uses: actions/checkout@v4
         with:
@@ -551,6 +569,9 @@ jobs:
     needs: [commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube]
     if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     steps:
+      - name: Clean workspace of root-owned files from Docker jobs
+        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -605,6 +626,9 @@ jobs:
     needs: [commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube]
     if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     steps:
+      - name: Clean workspace of root-owned files from Docker jobs
+        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
