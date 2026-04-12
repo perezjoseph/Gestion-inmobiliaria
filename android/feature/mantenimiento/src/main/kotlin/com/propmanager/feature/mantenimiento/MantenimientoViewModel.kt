@@ -13,7 +13,7 @@ import com.propmanager.core.model.dto.CreateNotaRequest
 import com.propmanager.core.model.dto.CreateSolicitudRequest
 import com.propmanager.core.model.dto.UpdateEstadoRequest
 import com.propmanager.core.model.dto.UpdateSolicitudRequest
-import com.propmanager.core.network.NetworkMonitor
+import com.propmanager.core.network.ConnectivityObserver
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -74,7 +74,7 @@ class MantenimientoViewModel
     constructor(
         private val mantenimientoRepository: MantenimientoRepository,
         private val propiedadesRepository: PropiedadesRepository,
-        private val networkMonitor: NetworkMonitor,
+        private val networkMonitor: ConnectivityObserver,
     ) : ViewModel() {
         private val _filters = MutableStateFlow(MantenimientoFilterState())
         val filters: StateFlow<MantenimientoFilterState> = _filters.asStateFlow()

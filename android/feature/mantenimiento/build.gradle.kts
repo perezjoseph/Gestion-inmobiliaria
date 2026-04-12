@@ -25,6 +25,11 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions {
+        unitTests.all {
+            it.useJUnitPlatform()
+        }
+    }
 }
 
 dependencies {
@@ -37,6 +42,7 @@ dependencies {
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     implementation(libs.bundles.compose)
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.hilt.navigation.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -47,4 +53,7 @@ dependencies {
 
     testImplementation(libs.bundles.unit.test)
     testImplementation(libs.bundles.kotest)
+    testImplementation(project(":core:database"))
+    testImplementation(libs.retrofit2)
+    testImplementation(libs.kotlinx.serialization)
 }
