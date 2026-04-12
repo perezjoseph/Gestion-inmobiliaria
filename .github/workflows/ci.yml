@@ -281,7 +281,7 @@ jobs:
 
       - name: Generate test coverage report (LCOV)
         id: coverage
-        if: success()
+        if: success() && github.ref == 'refs/heads/main'
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           if ! command -v cargo-tarpaulin &>/dev/null; then
@@ -802,11 +802,21 @@ jobs:
         id: sonar-scan
         env:
           HAS_COVERAGE: ${{ steps.download-coverage.outcome == 'success' }}
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+          PR_KEY: ${{ github.event.pull_request.number }}
+          PR_BRANCH: ${{ github.head_ref }}
+          PR_BASE: ${{ github.base_ref }}
         run: |
-          COVERAGE_ARGS=""
+          EXTRA_ARGS=""
           if [ "$HAS_COVERAGE" = "true" ] && [ -f coverage/lcov.info ]; then
             echo "Coverage report found -- including in SonarQube analysis"
-            COVERAGE_ARGS="-Dsonar.rust.lcov.reportPaths=/usr/src/coverage/lcov.info"
+            EXTRA_ARGS="-Dsonar.rust.lcov.reportPaths=/usr/src/coverage/lcov.info"
+          fi
+          if [ "$IS_PR" = "true" ] && [ -n "$PR_KEY" ]; then
+            echo "PR detected (#${PR_KEY}) -- enabling PR decoration"
+            EXTRA_ARGS="$EXTRA_ARGS -Dsonar.pullrequest.key=$PR_KEY"
+            EXTRA_ARGS="$EXTRA_ARGS -Dsonar.pullrequest.branch=$PR_BRANCH"
+            EXTRA_ARGS="$EXTRA_ARGS -Dsonar.pullrequest.base=$PR_BASE"
           fi
           docker run --rm \
             --network host \
@@ -824,7 +834,7 @@ jobs:
             -Dsonar.projectBaseDir=/usr/src \
             -Dsonar.qualitygate.wait=true \
             -Dsonar.qualitygate.timeout=300 \
-            $COVERAGE_ARGS
+            $EXTRA_ARGS
 
       - name: Fetch SonarQube results and notify
         if: always()
@@ -899,11 +909,27 @@ jobs:
               {severity: .[0].severity, count: length}] |
             map("\(.count) \(.severity)") | join(", ")' 2>/dev/null || echo "Could not parse issues")
 
+          # Fetch coverage metrics
+          MEASURES=$(curl -sf -u "$SONAR_TOKEN:" \
+            "$SONAR_URL/api/measures/component?component=gestion-inmobiliaria&metricKeys=coverage,lines_to_cover,uncovered_lines,duplicated_lines_density,ncloc" 2>/dev/null || echo '{}')
+          COVERAGE=$(echo "$MEASURES" | jq -r '.component.measures[]? | select(.metric=="coverage") | .value // "N/A"' 2>/dev/null || echo "N/A")
+          NCLOC=$(echo "$MEASURES" | jq -r '.component.measures[]? | select(.metric=="ncloc") | .value // "N/A"' 2>/dev/null || echo "N/A")
+          DUPLICATION=$(echo "$MEASURES" | jq -r '.component.measures[]? | select(.metric=="duplicated_lines_density") | .value // "N/A"' 2>/dev/null || echo "N/A")
+
           # Write summary
           {
             echo "## SonarQube Results"
             echo "- Quality Gate: **$GATE_STATUS**"
             echo "- Open Issues: **$TOTAL** ($SUMMARY)"
+            if [ "$COVERAGE" != "N/A" ]; then
+              echo "- Coverage: **${COVERAGE}%**"
+            fi
+            if [ "$NCLOC" != "N/A" ]; then
+              echo "- Lines of Code: **$NCLOC**"
+            fi
+            if [ "$DUPLICATION" != "N/A" ]; then
+              echo "- Duplication: **${DUPLICATION}%**"
+            fi
             echo "- [View Dashboard](http://192.168.88.25:9000/dashboard?id=gestion-inmobiliaria)"
             if [ "$GATE_STATUS" = "ERROR" ]; then
               echo ""

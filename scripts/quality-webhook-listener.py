@@ -139,25 +139,6 @@ def run_kiro(prompt, label):
             log.error(f"kiro-cli process error: {e}", exc_info=True)
             return False
 
-        output_lines = []
-        try:
-            for line in proc.stdout:
-                f.write(line)
-                f.flush()
-                output_lines.append(line)
-            proc.wait(timeout=KIRO_TIMEOUT)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
-            f.write("\n[TIMEOUT] Process killed\n")
-            log.warning(f"kiro-cli timed out after {KIRO_TIMEOUT // 60} minutes")
-            return False
-        except Exception as e:
-            proc.kill()
-            f.write(f"\n[ERROR] {e}\n")
-            log.error(f"kiro-cli process error: {e}", exc_info=True)
-            return False
-
     full_output = "".join(output_lines)
     log.info(f"kiro-cli exit code: {proc.returncode}")
     if full_output:
@@ -367,10 +348,16 @@ class WebhookHandler(BaseHTTPRequestHandler):
         body = self.rfile.read(content_length)
 
         if WEBHOOK_SECRET:
-            sig_header = self.headers.get("X-Signature-256", "")
-            expected = "sha256=" + hmac.new(
-                WEBHOOK_SECRET.encode(), body, hashlib.sha256
-            ).hexdigest()
+            if self.path == "/sonarqube":
+                sig_header = self.headers.get("X-Sonar-Webhook-HMAC-SHA256", "")
+                expected = hmac.new(
+                    WEBHOOK_SECRET.encode(), body, hashlib.sha256
+                ).hexdigest()
+            else:
+                sig_header = self.headers.get("X-Signature-256", "")
+                expected = "sha256=" + hmac.new(
+                    WEBHOOK_SECRET.encode(), body, hashlib.sha256
+                ).hexdigest()
             if not hmac.compare_digest(expected, sig_header):
                 log.warning(f"Invalid HMAC signature on {self.path} from {self.client_address[0]}")
                 self.send_response(401)

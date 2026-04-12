@@ -13,3 +13,11 @@ frontend/dist/
 
 kiro-debug.log
 kiro-debug.log
+
+# Android build artifacts
+android/.gradle/
+android/.jdk/
+android/jdk17.zip
+android/build/
+android/*/build/
+android/local.properties
