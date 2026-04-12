@@ -20,6 +20,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import socket
 import subprocess
 import threading
@@ -35,7 +36,10 @@ WSL_USER = "jperez"
 MAX_RETRIES = 3
 KIRO_TIMEOUT = 3600
 MAX_PAYLOAD_BYTES = 512 * 1024  # 512 KB
+MAX_FIELD_LENGTH = 50_000
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
+
+_SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9_\-]{1,64}$")
 
 _fix_lock = threading.Lock()
 _sonar_fix_lock = threading.Lock()
@@ -63,6 +67,22 @@ class RateLimiter:
 
 
 _rate_limiter = RateLimiter(max_requests=30, window_seconds=60)
+
+
+def _sanitize_text(value, max_len=MAX_FIELD_LENGTH):
+    """Strip null bytes and control chars (except newline/tab), truncate to max_len."""
+    if not isinstance(value, str):
+        return ""
+    value = value.replace("\x00", "")
+    value = re.sub(r"[\x01-\x08\x0b\x0c\x0e-\x1f\x7f]", "", value)
+    return value[:max_len]
+
+
+def _validate_name(value):
+    """Return value if it matches safe name pattern, else 'unknown'."""
+    if isinstance(value, str) and _SAFE_NAME_RE.match(value):
+        return value
+    return "unknown"
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -394,8 +414,8 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self.wfile.write(b"Not found")
 
     def _handle_sonarqube(self, payload):
-        project = payload.get("project", {}).get("key", "unknown")
-        gate_status = payload.get("qualityGate", {}).get("status", "unknown")
+        project = _sanitize_text(payload.get("project", {}).get("key", "unknown"), 128)
+        gate_status = _validate_name(payload.get("qualityGate", {}).get("status", "unknown"))
 
         log.info(f"SonarQube webhook: project={project}, status={gate_status}")
 
@@ -430,30 +450,30 @@ class WebhookHandler(BaseHTTPRequestHandler):
         log.error(f"Failed after {MAX_RETRIES} attempts.")
 
     def _handle_ci_failure(self, payload):
-        job = payload.get("job", "unknown")
-        step = payload.get("step", "unknown")
-        error_log = payload.get("error_log", "No error details provided")
+        job = _validate_name(payload.get("job", "unknown"))
+        step = _validate_name(payload.get("step", "unknown"))
+        error_log = _sanitize_text(payload.get("error_log", "No error details provided"))
         context = {
-            "commit": payload.get("commit", ""),
-            "branch": payload.get("branch", ""),
-            "actor": payload.get("actor", ""),
+            "commit": _sanitize_text(payload.get("commit", ""), 64),
+            "branch": _sanitize_text(payload.get("branch", ""), 128),
+            "actor": _sanitize_text(payload.get("actor", ""), 64),
         }
 
         log.info(f"CI failure webhook: job={job}, step={step}, commit={context['commit'][:8]}, branch={context['branch']}")
         fix_with_retry(job, step, error_log, context)
 
     def _handle_ci_improve(self, payload):
-        focus = payload.get("focus", "general")
-        pipeline_report = payload.get("pipeline_report", "")
-        sonar_report = payload.get("sonar_report", "")
-        run_url = payload.get("run_url", "")
+        focus = _validate_name(payload.get("focus", "general").split(",")[0]) if "," not in payload.get("focus", "") else _sanitize_text(payload.get("focus", "general"), 128)
+        pipeline_report = _sanitize_text(payload.get("pipeline_report", ""))
+        sonar_report = _sanitize_text(payload.get("sonar_report", ""))
+        run_url = _sanitize_text(payload.get("run_url", ""), 256)
 
         log.info(f"CI improve webhook: focus={focus}")
         improve_pipeline(focus, pipeline_report, run_url, sonar_report)
 
     def _handle_sonar_fix(self, payload):
-        sonar_report = payload.get("sonar_report", "")
-        run_url = payload.get("run_url", "")
+        sonar_report = _sanitize_text(payload.get("sonar_report", ""))
+        run_url = _sanitize_text(payload.get("run_url", ""), 256)
 
         log.info("SonarQube fix webhook received")
         fix_sonar_issues(sonar_report, run_url)

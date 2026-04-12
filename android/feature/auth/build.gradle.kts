@@ -30,6 +30,7 @@ buildFeatures {
 dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:model"))
+    implementation(project(":core:network"))
     implementation(project(":core:ui"))
     implementation(project(":core:common"))
 
@@ -41,6 +42,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
 
     implementation(libs.hilt.android)
+    implementation(libs.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
 
     testImplementation(libs.bundles.unit.test)

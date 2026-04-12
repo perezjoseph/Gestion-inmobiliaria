@@ -549,7 +549,7 @@ jobs:
         if: always() && steps.install_audit.outputs.installed == 'true'
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          cargo audit 2>&1 | tee /tmp/audit-output.txt
+          cargo audit --deny yanked --deny unmaintained 2>&1 | tee /tmp/audit-output.txt
 
       - name: Install cargo-deny for supply chain policy checks
         id: install_deny
@@ -1076,6 +1076,21 @@ jobs:
 
             echo "::error::SonarQube quality gate failed"
             exit 1
+          fi
+
+      - name: Revoke bootstrap SonarQube token
+        if: always() && steps.sonar-bootstrap.outputs.SONAR_ANALYSIS_TOKEN != '' && env.SONAR_ANALYSIS_TOKEN != ''
+        run: |
+          TOKEN="${{ secrets.SONAR_TOKEN }}"
+          if [ -n "$TOKEN" ]; then
+            echo "Using persistent SONAR_TOKEN -- skipping revocation"
+            exit 0
+          fi
+          ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD }}"
+          if [ -n "$ADMIN_PASS" ]; then
+            curl -sf -u "admin:${ADMIN_PASS}" -X POST \
+              "${SONAR_HOST_URL}/api/user_tokens/revoke?name=ci-token" 2>/dev/null || true
+            echo "Bootstrap token revoked."
           fi
 
       - name: Record duration
@@ -1670,8 +1685,7 @@ jobs:
     name: Failure Notification Webhook
     runs-on: [self-hosted, linux]
     timeout-minutes: 5
-    permissions:
-      contents: read
+    permissions: {}
     env:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
     needs: [secret-scan, commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend, container-image-backend, container-image-frontend, deploy]
