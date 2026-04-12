@@ -64,7 +64,7 @@ def run_kiro(prompt, label):
     log.info(f"Triggering kiro-cli for: {label}")
 
     escaped = prompt.replace('"', '\\"').replace("'", "'\\''")
-    cmd = f'kiro-cli chat --trust-all-tools --agent ci-fixer --no-interactive "{escaped}"'
+    cmd = f'kiro-cli chat --trust-all-tools --agent sisyphus-kiro --no-interactive "{escaped}"'
     log.debug(f"Full kiro command: {cmd[:200]}...")
 
     log_file = os.path.join(os.path.dirname(__file__), "..", "kiro-debug.log")
