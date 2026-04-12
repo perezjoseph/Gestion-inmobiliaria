@@ -69,6 +69,7 @@ MAX_PAYLOAD_BYTES = 512 * 1024  # 512 KB
 MAX_FIELD_LENGTH = 50_000
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
+KIRO_CLI = f"/home/{WSL_USER}/.local/bin/kiro-cli"
 MAX_LOG_BYTES = 50 * 1024 * 1024  # 50 MB
 
 _SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9_\-]{1,64}$")
@@ -171,13 +172,38 @@ def get_local_ip():
         return "127.0.0.1"
 
 
-def wsl_cmd(args):
-    """Build a WSL command list. args is a list of strings (no shell interpretation)."""
-    return [
-        "wsl", "-u", WSL_USER, "-d", WSL_DISTRO,
-        "--cd", PROJECT_DIR,
-        "--",
-    ] + args
+def _wsl_bash(bash_command, timeout=60):
+    """Run a bash command inside WSL via a temp script file.
+
+    Using ``bash -l <script>`` instead of ``bash -lc <string>`` because
+    wsl.exe re-interprets ``$()``, backticks, and other shell metacharacters
+    in the ``-c`` argument before bash sees them.  A script file is parsed
+    by bash alone, so command substitutions work correctly.
+    """
+    uid = uuid.uuid4().hex[:8]
+    script_file = _win_project_dir / f".kiro-wsl-cmd-{uid}.sh"
+    script_file_wsl = _to_wsl_path(script_file)
+    try:
+        script_file.write_text(
+            f"#!/bin/bash\ncd {PROJECT_DIR} && {bash_command}\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        cmd = [
+            "wsl", "-u", WSL_USER, "-d", WSL_DISTRO,
+            "bash", "-l", script_file_wsl,
+        ]
+        return subprocess.run(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+        )
+    finally:
+        script_file.unlink(missing_ok=True)
 
 
 def run_kiro(prompt, label):
@@ -199,17 +225,24 @@ def run_kiro(prompt, label):
     except OSError as e:
         log.warning(f"Log rotation failed: {e}")
 
-    # Pass prompt directly as a positional argument in the argv list.
-    # No shell involved — WSL's -- separator ensures everything after
-    # it is passed verbatim to the target process, so newlines, backticks,
-    # dollar signs, and other metacharacters are never interpreted.
-    cmd = wsl_cmd([
-        "kiro-cli", "chat",
-        "--trust-all-tools",
-        "--agent", "sisyphus-kiro",
-        "--no-interactive",
-        prompt,
-    ])
+    # Write prompt to a file in the project directory (accessible from both
+    # Windows and WSL). bash reads it with cat into a variable, then passes
+    # the variable as kiro-cli's positional argument. The variable expansion
+    # in "$KIRO_PROMPT" is safe — bash does not re-interpret variable values.
+    uid = uuid.uuid4().hex[:8]
+    prompt_file_win = _win_project_dir / f".kiro-prompt-{uid}.txt"
+    prompt_file_wsl = _to_wsl_path(prompt_file_win)
+    try:
+        prompt_file_win.write_text(prompt, encoding="utf-8", newline="\n")
+    except OSError as e:
+        log.error(f"Failed to write prompt file {prompt_file_win}: {e}")
+        return False
+
+    bash_cmd = (
+        f"KIRO_PROMPT=$(cat '{prompt_file_wsl}') && "
+        f"[ -n \"$KIRO_PROMPT\" ] && "
+        f"{KIRO_CLI} chat --trust-all-tools --agent sisyphus-kiro --no-interactive -- \"$KIRO_PROMPT\""
+    )
 
     flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
     if hasattr(os, "O_NOFOLLOW"):
@@ -223,15 +256,7 @@ def run_kiro(prompt, label):
 
         timed_out = False
         try:
-            result = subprocess.run(
-                cmd,
-                stdin=subprocess.DEVNULL,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=KIRO_TIMEOUT,
-            )
+            result = _wsl_bash(bash_cmd, timeout=KIRO_TIMEOUT)
             full_output = (result.stdout or "") + (result.stderr or "")
             f.write(full_output)
             f.flush()
@@ -247,6 +272,11 @@ def run_kiro(prompt, label):
             f.write(f"\n[ERROR] {e}\n")
             f.flush()
             log.error(f"kiro-cli process error: {e}", exc_info=True)
+        finally:
+            try:
+                prompt_file_win.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     if timed_out:
         return False
@@ -621,6 +651,62 @@ def main():
         raise SystemExit(1)
 
     local_ip = get_local_ip()
+
+    log.info("Running startup checks...")
+    try:
+        result = _wsl_bash(f"{KIRO_CLI} --version", timeout=30)
+        if result.returncode != 0:
+            log.error(f"kiro-cli check failed (exit {result.returncode}): {result.stderr.strip()}")
+            raise SystemExit(1)
+        log.info(f"  kiro-cli: {result.stdout.strip()}")
+    except FileNotFoundError:
+        log.error("'wsl' command not found — this script must run on Windows")
+        raise SystemExit(1)
+    except subprocess.TimeoutExpired:
+        log.error("WSL timed out — is the distro running?")
+        raise SystemExit(1)
+
+    result = _wsl_bash("test -d .", timeout=10)
+    if result.returncode != 0:
+        log.error(f"Project dir not accessible from WSL: {PROJECT_DIR}")
+        raise SystemExit(1)
+    log.info(f"  Project dir: {PROJECT_DIR} ✓")
+
+    result = _wsl_bash(f"{KIRO_CLI} chat --help", timeout=30)
+    if result.returncode != 0:
+        log.error(f"kiro-cli chat --help failed (exit {result.returncode}): {result.stderr.strip()}")
+        raise SystemExit(1)
+    log.info("  kiro-cli chat args: ✓")
+
+    test_prompt = (
+        "--- TEST ---\n"
+        "Shell metacharacters: `backticks` $(command) $HOME\n"
+        "Parens: (test) and dashes: --- END ---\n"
+    )
+    test_file = _win_project_dir / ".kiro-prompt-init-test.txt"
+    test_file_wsl = _to_wsl_path(test_file)
+    try:
+        test_file.write_text(test_prompt, encoding="utf-8", newline="\n")
+        result = _wsl_bash(
+            f"KIRO_PROMPT=$(cat '{test_file_wsl}') && "
+            f"[ -n \"$KIRO_PROMPT\" ] && "
+            f"{KIRO_CLI} chat --no-interactive -- \"$KIRO_PROMPT\"",
+            timeout=120,
+        )
+    finally:
+        test_file.unlink(missing_ok=True)
+
+    if result.returncode not in (0, 1):
+        log.error(
+            f"kiro-cli prompt delivery test failed (exit {result.returncode}).\n"
+            f"  stderr: {result.stderr.strip()[:500]}\n"
+            f"  This means the prompt file is not being delivered correctly."
+        )
+        raise SystemExit(1)
+    log.info("  kiro-cli prompt delivery: ✓")
+
+    log.info("Startup checks passed")
+
     server = TimeoutHTTPServer((BIND_ADDRESS, PORT), WebhookHandler)
     server.timeout = 30
     server.request_queue_size = 8
