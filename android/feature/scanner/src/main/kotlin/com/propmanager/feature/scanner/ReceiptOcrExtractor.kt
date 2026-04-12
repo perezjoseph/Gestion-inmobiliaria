@@ -23,7 +23,9 @@ data class ReceiptOcrResult(
 class ReceiptOcrExtractor
     @Inject
     constructor() {
-        private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        private val recognizer by lazy {
+            TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        }
 
         private val montoPattern = Regex("""(?:RD\$|US\$|\$)\s*([\d,]+\.?\d*)""")
         private val montoPlainPattern = Regex("""(?:total|monto|amount)\s*:?\s*\$?\s*([\d,]+\.?\d*)""", RegexOption.IGNORE_CASE)
@@ -45,6 +47,10 @@ class ReceiptOcrExtractor
                 text.textBlocks.flatMap { block ->
                     block.lines.map { it.text.trim() }
                 }
+            return parseReceiptLines(allLines)
+        }
+
+        internal fun parseReceiptLines(allLines: List<String>): ReceiptOcrResult {
             val fullText = allLines.joinToString("\n")
 
             val monto = extractMonto(fullText)

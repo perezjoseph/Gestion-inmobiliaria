@@ -19,7 +19,9 @@ data class CedulaOcrResult(
 class CedulaOcrExtractor
     @Inject
     constructor() {
-        private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        private val recognizer by lazy {
+            TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        }
 
         private val cedulaPattern = Regex("""(\d{3})-?(\d{7})-?(\d)""")
         private val nameLinePattern = Regex("""^[A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ\s]+$""")
@@ -34,7 +36,10 @@ class CedulaOcrExtractor
                 text.textBlocks.flatMap { block ->
                     block.lines.map { it.text.trim() }
                 }
+            return parseCedulaLines(allLines)
+        }
 
+        internal fun parseCedulaLines(allLines: List<String>): CedulaOcrResult {
             val cedula =
                 allLines.firstNotNullOfOrNull { line ->
                     cedulaPattern.find(line)?.let { match ->

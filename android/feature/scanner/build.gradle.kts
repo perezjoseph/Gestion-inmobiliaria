@@ -22,6 +22,11 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+    testOptions {
+        unitTests.all {
+            it.useJUnitPlatform()
+        }
+    }
     buildFeatures {
         compose = true
     }
@@ -43,6 +48,7 @@ dependencies {
 
     // ML Kit text recognition (on-device OCR)
     implementation(libs.mlkit.text.recognition)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
