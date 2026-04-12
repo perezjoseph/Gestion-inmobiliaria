@@ -47,6 +47,8 @@ MAX_PAYLOAD_BYTES = 512 * 1024  # 512 KB
 MAX_FIELD_LENGTH = 50_000
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
+MAX_LOG_BYTES = 50 * 1024 * 1024  # 50 MB
+
 _SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9_\-]{1,64}$")
 _SAFE_URL_RE = re.compile(r"^https://github\.com/[a-zA-Z0-9._\-]+/[a-zA-Z0-9._\-]+/actions/runs/\d+$")
 
@@ -135,6 +137,17 @@ def run_kiro(prompt, label):
     cmd = "kiro-cli chat --trust-all-tools --agent sisyphus-kiro --no-interactive -"
 
     log_file = os.path.join(os.path.dirname(__file__), "..", "kiro-debug.log")
+
+    # Rotate log if it exceeds MAX_LOG_BYTES to prevent disk exhaustion
+    try:
+        if os.path.isfile(log_file) and os.path.getsize(log_file) > MAX_LOG_BYTES:
+            rotated = log_file + ".1"
+            if os.path.isfile(rotated):
+                os.remove(rotated)
+            os.rename(log_file, rotated)
+            log.info(f"Rotated {log_file} ({MAX_LOG_BYTES // (1024*1024)}MB limit)")
+    except OSError as e:
+        log.warning(f"Log rotation failed: {e}")
 
     fd = os.open(log_file, os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, "a", encoding="utf-8") as f:

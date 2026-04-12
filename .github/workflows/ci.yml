@@ -75,7 +75,7 @@ jobs:
           curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
-          sudo tar xzf "$ARCHIVE" --no-same-owner -C /usr/local/bin gitleaks
+          sudo tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C /usr/local/bin gitleaks
           rm -f "$ARCHIVE"
           gitleaks version
 
@@ -112,7 +112,7 @@ jobs:
       - name: Install commitlint CLI and conventional config
         run: |
           umask 077
-          npm install --ignore-scripts --no-fund --no-audit --no-optional --save-dev @commitlint/cli@20.5.0 @commitlint/config-conventional@20.5.0
+          npm install --ignore-scripts --no-fund --no-audit --no-optional --prefer-offline --save-dev @commitlint/cli@20.5.0 @commitlint/config-conventional@20.5.0
           echo "module.exports = { extends: ['@commitlint/config-conventional'] };" > commitlint.config.js
 
       - name: Validate PR commit messages against conventional format
@@ -140,7 +140,7 @@ jobs:
         uses: actions/dependency-review-action@da24556b548a50705dd671f47852072ea4c105d9 # v4.7.1
         with:
           fail-on-severity: high
-          deny-licenses: AGPL-3.0, GPL-3.0
+          deny-licenses: AGPL-3.0, GPL-3.0, GPL-2.0
           comment-summary-in-pr: on-failure
 
   lint:
@@ -195,6 +195,7 @@ jobs:
       - name: Verify rustfmt formatting across all crates
         id: fmt
         if: always()
+        timeout-minutes: 5
         run: |
           umask 077
           if ! cargo fmt --all -- --check 2>&1 | tee "${RUNNER_TEMP}/fmt-output.txt"; then
@@ -205,6 +206,7 @@ jobs:
       - name: Run clippy lints on backend
         id: clippy_backend
         if: always()
+        timeout-minutes: 15
         run: |
           umask 077
           if ! cargo clippy --locked -p realestate-backend -- -D warnings 2>&1 | tee "${RUNNER_TEMP}/clippy-backend-output.txt"; then
@@ -215,6 +217,7 @@ jobs:
       - name: Run clippy lints on frontend WASM target
         id: clippy_frontend
         if: always()
+        timeout-minutes: 15
         run: |
           umask 077
           if ! cargo clippy --locked -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings 2>&1 | tee "${RUNNER_TEMP}/clippy-frontend-output.txt"; then
@@ -355,6 +358,7 @@ jobs:
 
       - name: Run backend tests
         id: backend-tests
+        timeout-minutes: 25
         run: |
           umask 077
           cargo test --locked -p realestate-backend --all-targets 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
@@ -510,6 +514,7 @@ jobs:
 
       - name: Run frontend tests (native target)
         id: frontend-tests
+        timeout-minutes: 15
         run: |
           umask 077
           cargo test --locked -p realestate-frontend --all-targets 2>&1 | tee "${RUNNER_TEMP}/test-frontend-output.txt"
@@ -730,7 +735,7 @@ jobs:
           curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
             "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
           echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
-          sudo tar xzf "$ARCHIVE" --no-same-owner -C /usr/local/bin trivy
+          sudo tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C /usr/local/bin trivy
           rm -f "$ARCHIVE"
           echo "installed=true" >> $GITHUB_OUTPUT
 
@@ -925,6 +930,8 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+    env:
+      DOCKER_CONTENT_TRUST: "1"
     continue-on-error: true
     needs: [test-backend, test-frontend]
     if: |
@@ -1299,6 +1306,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Build optimized WASM frontend bundle
+        timeout-minutes: 25
         run: trunk build --release 2>&1 | tee "${RUNNER_TEMP}/build-frontend-output.txt"
         working-directory: frontend
 
@@ -1320,7 +1328,7 @@ jobs:
             curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
               "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
             echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
-            sudo tar xzf "$ARCHIVE" --no-same-owner -C /usr/local/bin gitleaks
+            sudo tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C /usr/local/bin gitleaks
             rm -f "$ARCHIVE"
             gitleaks detect --source frontend/dist --no-git --verbose --redact --exit-code 1
           fi
@@ -1343,7 +1351,7 @@ jobs:
             curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
               "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
             echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
-            sudo tar xzf "$ARCHIVE" --no-same-owner -C /usr/local/bin trivy
+            sudo tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C /usr/local/bin trivy
             rm -f "$ARCHIVE"
           fi
           trivy rootfs --format spdx-json --output frontend-build-sbom.spdx.json \
@@ -1460,6 +1468,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Build optimized backend binary
+        timeout-minutes: 25
         run: cargo build --frozen -p realestate-backend --release 2>&1 | tee "${RUNNER_TEMP}/build-backend-output.txt"
 
       - name: Scan backend build output for leaked secrets
@@ -1473,7 +1482,7 @@ jobs:
             curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
               "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
             echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
-            sudo tar xzf "$ARCHIVE" --no-same-owner -C /usr/local/bin gitleaks
+            sudo tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C /usr/local/bin gitleaks
             rm -f "$ARCHIVE"
             gitleaks detect --source target/release --no-git --verbose --redact --exit-code 1
           fi
@@ -1495,7 +1504,7 @@ jobs:
             curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
               "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
             echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
-            sudo tar xzf "$ARCHIVE" --no-same-owner -C /usr/local/bin trivy
+            sudo tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C /usr/local/bin trivy
             rm -f "$ARCHIVE"
           fi
           trivy rootfs --format spdx-json --output backend-build-sbom.spdx.json \
@@ -1624,7 +1633,7 @@ jobs:
             curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
               "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
             echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
-            sudo tar xzf "$ARCHIVE" --no-same-owner -C /usr/local/bin trivy
+            sudo tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C /usr/local/bin trivy
             rm -f "$ARCHIVE"
           fi
           trivy --version
@@ -1756,7 +1765,7 @@ jobs:
             curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
               "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
             echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
-            sudo tar xzf "$ARCHIVE" --no-same-owner -C /usr/local/bin trivy
+            sudo tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C /usr/local/bin trivy
             rm -f "$ARCHIVE"
           fi
           trivy --version
