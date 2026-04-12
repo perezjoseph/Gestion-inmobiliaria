@@ -6,6 +6,7 @@ use yew::prelude::*;
 use crate::app::AuthContext;
 use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::data_table::DataTable;
+use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::document_gallery::DocumentGallery;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::loading::Loading;
@@ -15,6 +16,75 @@ use crate::services::api::{api_delete, api_get, api_post, api_put};
 use crate::types::PaginatedResponse;
 use crate::types::propiedad::{CreatePropiedad, Propiedad, UpdatePropiedad};
 use crate::utils::{can_delete, can_write};
+
+fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
+    if let Some(t) = toasts {
+        t.dispatch(ToastAction::Push(msg.into(), kind));
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct PropiedadFilterBarProps {
+    filter_ciudad: UseStateHandle<String>,
+    filter_tipo: UseStateHandle<String>,
+    filter_estado: UseStateHandle<String>,
+    on_apply: Callback<MouseEvent>,
+    on_clear: Callback<MouseEvent>,
+}
+
+#[function_component]
+fn PropiedadFilterBar(props: &PropiedadFilterBarProps) -> Html {
+    let fc = props.filter_ciudad.clone();
+    let on_ciudad_input = Callback::from(move |e: InputEvent| {
+        let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+        fc.set(input.value());
+    });
+    let ft = props.filter_tipo.clone();
+    let on_tipo_change = Callback::from(move |e: Event| {
+        let el: web_sys::HtmlSelectElement = e.target_unchecked_into();
+        ft.set(el.value());
+    });
+    let fe = props.filter_estado.clone();
+    let on_estado_change = Callback::from(move |e: Event| {
+        let el: web_sys::HtmlSelectElement = e.target_unchecked_into();
+        fe.set(el.value());
+    });
+    html! {
+        <div class="gi-filter-bar">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); align-items: end;">
+                <div>
+                    <label class="gi-label">{"Ciudad"}</label>
+                    <input type="text" value={(*props.filter_ciudad).clone()} oninput={on_ciudad_input}
+                        class="gi-input" placeholder="Filtrar por ciudad" />
+                </div>
+                <div>
+                    <label class="gi-label">{"Tipo"}</label>
+                    <select onchange={on_tipo_change} class="gi-input">
+                        <option value="" selected={props.filter_tipo.is_empty()}>{"Todos"}</option>
+                        <option value="casa" selected={*props.filter_tipo == "casa"}>{"Casa"}</option>
+                        <option value="apartamento" selected={*props.filter_tipo == "apartamento"}>{"Apartamento"}</option>
+                        <option value="local" selected={*props.filter_tipo == "local"}>{"Local"}</option>
+                        <option value="terreno" selected={*props.filter_tipo == "terreno"}>{"Terreno"}</option>
+                        <option value="oficina" selected={*props.filter_tipo == "oficina"}>{"Oficina"}</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="gi-label">{"Estado"}</label>
+                    <select onchange={on_estado_change} class="gi-input">
+                        <option value="" selected={props.filter_estado.is_empty()}>{"Todos"}</option>
+                        <option value="disponible" selected={*props.filter_estado == "disponible"}>{"Disponible"}</option>
+                        <option value="ocupada" selected={*props.filter_estado == "ocupada"}>{"Ocupada"}</option>
+                        <option value="mantenimiento" selected={*props.filter_estado == "mantenimiento"}>{"Mantenimiento"}</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: var(--space-2);">
+                    <button onclick={props.on_apply.clone()} class="gi-btn gi-btn-primary">{"Filtrar"}</button>
+                    <button onclick={props.on_clear.clone()} class="gi-btn gi-btn-ghost">{"Limpiar"}</button>
+                </div>
+            </div>
+        </div>
+    }
+}
 
 fn estado_badge(estado: &str) -> (&'static str, &'static str) {
     match estado {
@@ -531,9 +601,10 @@ pub fn Propiedades() -> Html {
                 let toasts = toasts.clone();
                 let reload_for_undo = reload.clone();
                 spawn_local(async move {
-                    match api_delete(&format!("/propiedades/{id}")).await {
+                    let result = api_delete(&format!("/propiedades/{id}")).await;
+                    delete_target.set(None);
+                    match result {
                         Ok(()) => {
-                            delete_target.set(None);
                             reload.set(*reload + 1);
                             let undo_reload = reload_for_undo;
                             if let Some(t) = &toasts {
@@ -547,10 +618,7 @@ pub fn Propiedades() -> Html {
                                 ));
                             }
                         }
-                        Err(err) => {
-                            delete_target.set(None);
-                            error.set(Some(err));
-                        }
+                        Err(err) => error.set(Some(err)),
                     }
                 });
             }
@@ -669,12 +737,7 @@ pub fn Propiedades() -> Html {
                         Ok(_) => {
                             reset_form();
                             reload.set(*reload + 1);
-                            if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::Push(
-                                    "Propiedad actualizada".into(),
-                                    ToastKind::Success,
-                                ));
-                            }
+                            push_toast(&toasts, "Propiedad actualizada", ToastKind::Success);
                         }
                         Err(err) => error.set(Some(err)),
                     }
@@ -702,12 +765,7 @@ pub fn Propiedades() -> Html {
                         Ok(_) => {
                             reset_form();
                             reload.set(*reload + 1);
-                            if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::Push(
-                                    "Propiedad creada".into(),
-                                    ToastKind::Success,
-                                ));
-                            }
+                            push_toast(&toasts, "Propiedad creada", ToastKind::Success);
                         }
                         Err(err) => error.set(Some(err)),
                     }
@@ -721,25 +779,6 @@ pub fn Propiedades() -> Html {
         let reset_form = reset_form.clone();
         Callback::from(move |_: MouseEvent| reset_form())
     };
-
-    macro_rules! input_cb {
-        ($state:expr) => {{
-            let s = $state.clone();
-            Callback::from(move |e: InputEvent| {
-                let input: web_sys::HtmlInputElement = e.target_unchecked_into();
-                s.set(input.value());
-            })
-        }};
-    }
-    macro_rules! select_cb {
-        ($state:expr) => {{
-            let s = $state.clone();
-            Callback::from(move |e: Event| {
-                let el: web_sys::HtmlSelectElement = e.target_unchecked_into();
-                s.set(el.value());
-            })
-        }};
-    }
 
     let on_filter_apply = {
         let reload = reload.clone();
@@ -847,53 +886,20 @@ pub fn Propiedades() -> Html {
             }
 
             if let Some(ref target) = *delete_target {
-                <div class="gi-modal-overlay">
-                    <div class="gi-modal">
-                        <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-2); color: var(--text-primary);">
-                            {"Confirmar eliminación"}</h3>
-                        <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-5);">
-                            {format!("¿Está seguro de que desea eliminar la propiedad \"{}\"? Esta acción no se puede deshacer.", target.titulo)}</p>
-                        <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
-                            <button onclick={on_delete_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                            <button onclick={on_delete_confirm.clone()} class="gi-btn gi-btn-danger">{"Eliminar"}</button>
-                        </div>
-                    </div>
-                </div>
+                <DeleteConfirmModal
+                    message={format!("¿Está seguro de que desea eliminar la propiedad \"{}\"? Esta acción no se puede deshacer.", target.titulo)}
+                    on_confirm={on_delete_confirm.clone()}
+                    on_cancel={on_delete_cancel.clone()}
+                />
             }
 
-            <div class="gi-filter-bar">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); align-items: end;">
-                    <div>
-                        <label class="gi-label">{"Ciudad"}</label>
-                        <input type="text" value={(*filter_ciudad).clone()} oninput={input_cb!(filter_ciudad)}
-                            class="gi-input" placeholder="Filtrar por ciudad" />
-                    </div>
-                    <div>
-                        <label class="gi-label">{"Tipo"}</label>
-                        <select onchange={select_cb!(filter_tipo)} class="gi-input">
-                            <option value="" selected={filter_tipo.is_empty()}>{"Todos"}</option>
-                            <option value="casa" selected={*filter_tipo == "casa"}>{"Casa"}</option>
-                            <option value="apartamento" selected={*filter_tipo == "apartamento"}>{"Apartamento"}</option>
-                            <option value="local" selected={*filter_tipo == "local"}>{"Local"}</option>
-                            <option value="terreno" selected={*filter_tipo == "terreno"}>{"Terreno"}</option>
-                            <option value="oficina" selected={*filter_tipo == "oficina"}>{"Oficina"}</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="gi-label">{"Estado"}</label>
-                        <select onchange={select_cb!(filter_estado)} class="gi-input">
-                            <option value="" selected={filter_estado.is_empty()}>{"Todos"}</option>
-                            <option value="disponible" selected={*filter_estado == "disponible"}>{"Disponible"}</option>
-                            <option value="ocupada" selected={*filter_estado == "ocupada"}>{"Ocupada"}</option>
-                            <option value="mantenimiento" selected={*filter_estado == "mantenimiento"}>{"Mantenimiento"}</option>
-                        </select>
-                    </div>
-                    <div style="display: flex; gap: var(--space-2);">
-                        <button onclick={on_filter_apply} class="gi-btn gi-btn-primary">{"Filtrar"}</button>
-                        <button onclick={on_filter_clear} class="gi-btn gi-btn-ghost">{"Limpiar"}</button>
-                    </div>
-                </div>
-            </div>
+            <PropiedadFilterBar
+                filter_ciudad={filter_ciudad.clone()}
+                filter_tipo={filter_tipo.clone()}
+                filter_estado={filter_estado.clone()}
+                on_apply={on_filter_apply}
+                on_clear={on_filter_clear}
+            />
 
             if *show_form {
                 <PropiedadForm

@@ -123,7 +123,9 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-lint-
+          restore-keys: |
+            ${{ runner.os }}-cargo-lint-
+            ${{ runner.os }}-cargo-
 
       - name: Verify rustfmt formatting across all crates
         id: fmt
@@ -249,7 +251,9 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-test-
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-
+            ${{ runner.os }}-cargo-
 
       - name: Run backend tests
         id: backend-tests
@@ -326,7 +330,9 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-frontend-test-v2-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-frontend-test-v2-
+          restore-keys: |
+            ${{ runner.os }}-cargo-frontend-test-v2-
+            ${{ runner.os }}-cargo-
 
       - name: Run frontend tests (native target)
         id: frontend-tests
@@ -595,7 +601,7 @@ jobs:
             -e SONAR_TOKEN="${{ steps.sonar-bootstrap.outputs.token }}" \
             -e SONAR_HOST_URL="http://192.168.88.25:9000" \
             -v "${{ github.workspace }}:/usr/src" \
-            sonarsource/sonar-scanner-cli:11.3 \
+            sonarsource/sonar-scanner-cli:11.3@sha256:7462f132388135e32b948f8f18ff0db9ae28a87c6777f1df5b2207e04a6d7c5c \
             -Dsonar.projectBaseDir=/usr/src \
             -Dsonar.qualitygate.wait=true \
             -Dsonar.qualitygate.timeout=300
@@ -732,7 +738,14 @@ jobs:
       duration: ${{ steps.timing.outputs.duration }}
       cache_hit: ${{ steps.cache.outputs.cache-hit }}
     needs: [secret-scan, commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube]
-    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    if: |
+      always() &&
+      needs.secret-scan.result == 'success' &&
+      needs.lint.result == 'success' &&
+      needs.test-backend.result == 'success' &&
+      needs.test-frontend.result == 'success' &&
+      needs.quality-gate.result == 'success' &&
+      (needs.commit-lint.result == 'success' || needs.commit-lint.result == 'skipped')
     steps:
       - name: Record start time
         id: start
@@ -761,7 +774,9 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-wasm-
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-
+            ${{ runner.os }}-cargo-
 
       - name: Build optimized WASM frontend bundle
         run: trunk build --release 2>&1 | tee /tmp/build-frontend-output.txt
@@ -804,7 +819,14 @@ jobs:
       duration: ${{ steps.timing.outputs.duration }}
       cache_hit: ${{ steps.cache.outputs.cache-hit }}
     needs: [secret-scan, commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube]
-    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    if: |
+      always() &&
+      needs.secret-scan.result == 'success' &&
+      needs.lint.result == 'success' &&
+      needs.test-backend.result == 'success' &&
+      needs.test-frontend.result == 'success' &&
+      needs.quality-gate.result == 'success' &&
+      (needs.commit-lint.result == 'success' || needs.commit-lint.result == 'skipped')
     steps:
       - name: Record start time
         id: start
@@ -828,7 +850,9 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-backend-build-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-backend-build-
+          restore-keys: |
+            ${{ runner.os }}-cargo-backend-build-
+            ${{ runner.os }}-cargo-
 
       - name: Build optimized backend binary
         run: cargo build -p realestate-backend --release 2>&1 | tee /tmp/build-backend-output.txt
@@ -859,16 +883,16 @@ jobs:
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
 
-  # ── Stage 3: Container Images (runs after builds pass, main branch only) ──
+  # ── Stage 3: Container Images (parallel, runs after builds pass, main branch only) ──
 
-  container-images:
-    name: Build & Push Container Images to GHCR
+  container-image-backend:
+    name: Build & Push Backend Image to GHCR
     runs-on: [self-hosted, linux, docker]
     timeout-minutes: 45
     permissions:
       contents: read
       packages: write
-    needs: [build-frontend, build-backend]
+    needs: [build-backend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Clean workspace
@@ -878,7 +902,11 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Log in to GitHub Container Registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push backend image
         run: |
@@ -887,6 +915,29 @@ jobs:
           docker push "$IMAGE:${{ github.sha }}"
           docker push "$IMAGE:latest"
 
+  container-image-frontend:
+    name: Build & Push Frontend Image to GHCR
+    runs-on: [self-hosted, linux, docker]
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    needs: [build-frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Clean workspace
+        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build and push frontend image
         run: |
           IMAGE="ghcr.io/${{ github.repository_owner }}/realestate-frontend"
@@ -894,7 +945,7 @@ jobs:
           docker push "$IMAGE:${{ github.sha }}"
           docker push "$IMAGE:latest"
 
-  # ── Stage 4: Deploy (runs after images are pushed) ──
+  # ── Stage 4: Deploy (runs after both images are pushed) ──
 
   deploy:
     name: Deploy to Production
@@ -903,7 +954,7 @@ jobs:
     permissions:
       contents: read
       packages: read
-    needs: [container-images]
+    needs: [container-image-backend, container-image-frontend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Clean workspace
@@ -913,7 +964,11 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Log in to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull latest images and deploy
         env:
@@ -932,7 +987,7 @@ jobs:
       contents: read
     env:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
-    needs: [secret-scan, commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend, container-images, deploy]
+    needs: [secret-scan, commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend, container-image-backend, container-image-frontend, deploy]
     if: always() && contains(needs.*.result, 'failure')
     steps:
       - name: Notify -- secret scanning detected leaked secrets
@@ -1142,7 +1197,7 @@ jobs:
       contents: read
     env:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
-    needs: [secret-scan, commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend, container-images, deploy, notify-failure]
+    needs: [secret-scan, commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend, container-image-backend, container-image-frontend, deploy, notify-failure]
     if: always() && github.ref == 'refs/heads/main'
     steps:
       - name: Clean workspace
@@ -1224,15 +1279,15 @@ jobs:
           REPORT=""
 
           REPORT="${REPORT}Pipeline Run Summary:\n"
-          REPORT="${REPORT}  commit-lint:    ${{ needs.commit-lint.result }}\n"
-          REPORT="${REPORT}  secret-scan:    ${{ needs.secret-scan.result }}\n"
-          REPORT="${REPORT}  lint:           ${{ needs.lint.result }}\n"
-          REPORT="${REPORT}  test-backend:   ${{ needs.test-backend.result }}\n"
-          REPORT="${REPORT}  test-frontend:  ${{ needs.test-frontend.result }}\n"
-          REPORT="${REPORT}  quality-gate:   ${{ needs.quality-gate.result }}\n"
-          REPORT="${REPORT}  sonarqube:      ${{ needs.sonarqube.result }}\n"
-          REPORT="${REPORT}  build-frontend: ${{ needs.build-frontend.result }}\n"
-          REPORT="${REPORT}  build-backend:  ${{ needs.build-backend.result }}\n"
+          REPORT="${REPORT}  Job                | Result   | Duration | Cache\n"
+          REPORT="${REPORT}  -------------------|----------|----------|------\n"
+          REPORT="${REPORT}  lint               | ${{ needs.lint.result }} | ${{ needs.lint.outputs.duration || 'n/a' }} | ${{ needs.lint.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }}\n"
+          REPORT="${REPORT}  test-backend       | ${{ needs.test-backend.result }} | ${{ needs.test-backend.outputs.duration || 'n/a' }} | ${{ needs.test-backend.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }}\n"
+          REPORT="${REPORT}  test-frontend      | ${{ needs.test-frontend.result }} | ${{ needs.test-frontend.outputs.duration || 'n/a' }} | ${{ needs.test-frontend.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }}\n"
+          REPORT="${REPORT}  quality-gate       | ${{ needs.quality-gate.result }} | ${{ needs.quality-gate.outputs.duration || 'n/a' }} | n/a\n"
+          REPORT="${REPORT}  sonarqube          | ${{ needs.sonarqube.result }} | ${{ needs.sonarqube.outputs.duration || 'n/a' }} | n/a\n"
+          REPORT="${REPORT}  build-frontend     | ${{ needs.build-frontend.result }} | ${{ needs.build-frontend.outputs.duration || 'n/a' }} | ${{ needs.build-frontend.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }}\n"
+          REPORT="${REPORT}  build-backend      | ${{ needs.build-backend.result }} | ${{ needs.build-backend.outputs.duration || 'n/a' }} | ${{ needs.build-backend.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }}\n"
 
           # Collect error logs from all failed jobs
           ERRORS=""

@@ -7,6 +7,7 @@ use yew_router::prelude::*;
 use crate::app::{AuthContext, Route};
 use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::data_table::DataTable;
+use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::loading::Loading;
 use crate::components::common::pagination::Pagination;
@@ -17,6 +18,12 @@ use crate::types::contrato::{Contrato, CreateContrato, UpdateContrato};
 use crate::types::inquilino::Inquilino;
 use crate::types::propiedad::Propiedad;
 use crate::utils::{can_delete, can_write, format_date_display};
+
+fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
+    if let Some(t) = toasts {
+        t.dispatch(ToastAction::Push(msg.into(), kind));
+    }
+}
 
 fn estado_badge(estado: &str) -> (&'static str, &'static str) {
     match estado {
@@ -566,9 +573,10 @@ pub fn Contratos() -> Html {
                 let toasts = toasts.clone();
                 let reload_for_undo = reload.clone();
                 spawn_local(async move {
-                    match api_delete(&format!("/contratos/{id}")).await {
+                    let result = api_delete(&format!("/contratos/{id}")).await;
+                    delete_target.set(None);
+                    match result {
                         Ok(()) => {
-                            delete_target.set(None);
                             reload.set(*reload + 1);
                             let undo_reload = reload_for_undo;
                             if let Some(t) = &toasts {
@@ -582,10 +590,7 @@ pub fn Contratos() -> Html {
                                 ));
                             }
                         }
-                        Err(err) => {
-                            delete_target.set(None);
-                            error.set(Some(err));
-                        }
+                        Err(err) => error.set(Some(err)),
                     }
                 });
             }

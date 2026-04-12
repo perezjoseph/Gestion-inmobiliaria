@@ -7,6 +7,7 @@ use yew_router::prelude::*;
 use crate::app::{AuthContext, Route};
 use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::data_table::DataTable;
+use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::loading::Loading;
 use crate::components::common::pagination::Pagination;
@@ -18,6 +19,66 @@ use crate::types::inquilino::Inquilino;
 use crate::types::pago::{CreatePago, Pago, UpdatePago};
 use crate::types::propiedad::Propiedad;
 use crate::utils::{can_delete, can_write, format_currency, format_date_display};
+
+fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
+    if let Some(t) = toasts {
+        t.dispatch(ToastAction::Push(msg.into(), kind));
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct PagoFilterBarProps {
+    filter_contrato: UseStateHandle<String>,
+    filter_estado: UseStateHandle<String>,
+    contratos: Vec<Contrato>,
+    contrato_label: Callback<String, String>,
+    on_apply: Callback<MouseEvent>,
+    on_clear: Callback<MouseEvent>,
+}
+
+#[function_component]
+fn PagoFilterBar(props: &PagoFilterBarProps) -> Html {
+    let fc = props.filter_contrato.clone();
+    let on_contrato_change = Callback::from(move |e: Event| {
+        let el: web_sys::HtmlSelectElement = e.target_unchecked_into();
+        fc.set(el.value());
+    });
+    let fe = props.filter_estado.clone();
+    let on_estado_change = Callback::from(move |e: Event| {
+        let el: web_sys::HtmlSelectElement = e.target_unchecked_into();
+        fe.set(el.value());
+    });
+    html! {
+        <div class="gi-filter-bar">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); align-items: end;">
+                <div>
+                    <label class="gi-label">{"Contrato"}</label>
+                    <select onchange={on_contrato_change} class="gi-input">
+                        <option value="" selected={props.filter_contrato.is_empty()}>{"Todos"}</option>
+                        { for props.contratos.iter().map(|c| {
+                            let sel = *props.filter_contrato == c.id;
+                            let label = props.contrato_label.emit(c.id.clone());
+                            html! { <option value={c.id.clone()} selected={sel}>{label}</option> }
+                        })}
+                    </select>
+                </div>
+                <div>
+                    <label class="gi-label">{"Estado"}</label>
+                    <select onchange={on_estado_change} class="gi-input">
+                        <option value="" selected={props.filter_estado.is_empty()}>{"Todos"}</option>
+                        <option value="pendiente" selected={*props.filter_estado == "pendiente"}>{"Pendiente"}</option>
+                        <option value="pagado" selected={*props.filter_estado == "pagado"}>{"Pagado"}</option>
+                        <option value="atrasado" selected={*props.filter_estado == "atrasado"}>{"Atrasado"}</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: var(--space-2);">
+                    <button onclick={props.on_apply.clone()} class="gi-btn gi-btn-primary">{"Filtrar"}</button>
+                    <button onclick={props.on_clear.clone()} class="gi-btn gi-btn-ghost">{"Limpiar"}</button>
+                </div>
+            </div>
+        </div>
+    }
+}
 
 fn estado_badge(estado: &str) -> (&'static str, &'static str) {
     match estado {
@@ -508,9 +569,10 @@ pub fn Pagos() -> Html {
                 let toasts = toasts.clone();
                 let reload_for_undo = reload.clone();
                 spawn_local(async move {
-                    match api_delete(&format!("/pagos/{id}")).await {
+                    let result = api_delete(&format!("/pagos/{id}")).await;
+                    delete_target.set(None);
+                    match result {
                         Ok(()) => {
-                            delete_target.set(None);
                             reload.set(*reload + 1);
                             let undo_reload = reload_for_undo;
                             if let Some(t) = &toasts {
@@ -524,10 +586,7 @@ pub fn Pagos() -> Html {
                                 ));
                             }
                         }
-                        Err(err) => {
-                            delete_target.set(None);
-                            error.set(Some(err));
-                        }
+                        Err(err) => error.set(Some(err)),
                     }
                 });
             }
@@ -633,12 +692,7 @@ pub fn Pagos() -> Html {
                         Ok(_) => {
                             reset_form();
                             reload.set(*reload + 1);
-                            if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::Push(
-                                    "Pago actualizado".into(),
-                                    ToastKind::Success,
-                                ));
-                            }
+                            push_toast(&toasts, "Pago actualizado", ToastKind::Success);
                         }
                         Err(err) => error.set(Some(err)),
                     }
@@ -660,12 +714,7 @@ pub fn Pagos() -> Html {
                         Ok(_) => {
                             reset_form();
                             reload.set(*reload + 1);
-                            if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::Push(
-                                    "Pago registrado".into(),
-                                    ToastKind::Success,
-                                ));
-                            }
+                            push_toast(&toasts, "Pago registrado", ToastKind::Success);
                         }
                         Err(err) => error.set(Some(err)),
                     }
@@ -679,16 +728,6 @@ pub fn Pagos() -> Html {
         let reset_form = reset_form.clone();
         Callback::from(move |_: MouseEvent| reset_form())
     };
-
-    macro_rules! select_cb {
-        ($state:expr) => {{
-            let s = $state.clone();
-            Callback::from(move |e: Event| {
-                let el: web_sys::HtmlSelectElement = e.target_unchecked_into();
-                s.set(el.value());
-            })
-        }};
-    }
 
     let on_filter_apply = {
         let reload = reload.clone();
@@ -764,47 +803,21 @@ pub fn Pagos() -> Html {
             }
 
             if let Some(ref target) = *delete_target {
-                <div class="gi-modal-overlay">
-                    <div class="gi-modal">
-                        <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-2); color: var(--text-primary);">{"Confirmar eliminación"}</h3>
-                        <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-5);">
-                            {format!("¿Está seguro de que desea eliminar el pago de {}? Esta acción no se puede deshacer.", format_currency(&target.moneda, target.monto))}</p>
-                        <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
-                            <button onclick={on_delete_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                            <button onclick={on_delete_confirm.clone()} class="gi-btn gi-btn-danger">{"Eliminar"}</button>
-                        </div>
-                    </div>
-                </div>
+                <DeleteConfirmModal
+                    message={format!("¿Está seguro de que desea eliminar el pago de {}? Esta acción no se puede deshacer.", format_currency(&target.moneda, target.monto))}
+                    on_confirm={on_delete_confirm.clone()}
+                    on_cancel={on_delete_cancel.clone()}
+                />
             }
 
-            <div class="gi-filter-bar">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); align-items: end;">
-                    <div>
-                        <label class="gi-label">{"Contrato"}</label>
-                        <select onchange={select_cb!(filter_contrato)} class="gi-input">
-                            <option value="" selected={filter_contrato.is_empty()}>{"Todos"}</option>
-                            { for (*contratos).iter().map(|c| {
-                                let sel = *filter_contrato == c.id;
-                                let label = contrato_label.emit(c.id.clone());
-                                html! { <option value={c.id.clone()} selected={sel}>{label}</option> }
-                            })}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="gi-label">{"Estado"}</label>
-                        <select onchange={select_cb!(filter_estado)} class="gi-input">
-                            <option value="" selected={filter_estado.is_empty()}>{"Todos"}</option>
-                            <option value="pendiente" selected={*filter_estado == "pendiente"}>{"Pendiente"}</option>
-                            <option value="pagado" selected={*filter_estado == "pagado"}>{"Pagado"}</option>
-                            <option value="atrasado" selected={*filter_estado == "atrasado"}>{"Atrasado"}</option>
-                        </select>
-                    </div>
-                    <div style="display: flex; gap: var(--space-2);">
-                        <button onclick={on_filter_apply} class="gi-btn gi-btn-primary">{"Filtrar"}</button>
-                        <button onclick={on_filter_clear} class="gi-btn gi-btn-ghost">{"Limpiar"}</button>
-                    </div>
-                </div>
-            </div>
+            <PagoFilterBar
+                filter_contrato={filter_contrato.clone()}
+                filter_estado={filter_estado.clone()}
+                contratos={(*contratos).clone()}
+                contrato_label={contrato_label.clone()}
+                on_apply={on_filter_apply}
+                on_clear={on_filter_clear}
+            />
 
             if *show_form {
                 <PagoForm

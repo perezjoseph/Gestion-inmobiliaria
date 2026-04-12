@@ -85,6 +85,19 @@ fn resolve_search_route(q: &str) -> Route {
     }
 }
 
+fn apply_theme(is_dark: bool) {
+    let Some(window) = web_sys::window() else {
+        return;
+    };
+    let theme_str = if is_dark { "dark" } else { "light" };
+    if let Some(el) = window.document().and_then(|d| d.document_element()) {
+        let _ = el.set_attribute("data-theme", theme_str);
+    }
+    if let Ok(Some(storage)) = window.local_storage() {
+        let _ = storage.set_item("theme", theme_str);
+    }
+}
+
 #[function_component]
 fn ThemeToggle() -> Html {
     let theme = use_context::<ThemeContext>().unwrap();
@@ -94,16 +107,7 @@ fn ThemeToggle() -> Html {
         Callback::from(move |_: MouseEvent| {
             let new_dark = !*theme;
             theme.set(new_dark);
-            if let Some(window) = web_sys::window() {
-                if let Some(doc) = window.document()
-                    && let Some(el) = doc.document_element()
-                {
-                    let _ = el.set_attribute("data-theme", if new_dark { "dark" } else { "light" });
-                }
-                if let Ok(Some(storage)) = window.local_storage() {
-                    let _ = storage.set_item("theme", if new_dark { "dark" } else { "light" });
-                }
-            }
+            apply_theme(new_dark);
         })
     };
 

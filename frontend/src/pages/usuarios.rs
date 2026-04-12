@@ -10,6 +10,12 @@ use crate::services::api::{api_get, api_put};
 use crate::types::PaginatedResponse;
 use crate::types::usuario::User;
 
+fn push_toast(toasts: &Option<ToastContext>, msg: &str) {
+    if let Some(t) = toasts {
+        t.dispatch(ToastAction::Push(msg.into(), ToastKind::Success));
+    }
+}
+
 #[derive(Properties, PartialEq)]
 struct UsuarioRowProps {
     user: User,
@@ -128,12 +134,7 @@ pub fn Usuarios() -> Html {
                 match api_put::<User, _>(&format!("/usuarios/{id}/rol"), &body).await {
                     Ok(_) => {
                         reload.set(*reload + 1);
-                        if let Some(t) = &toasts {
-                            t.dispatch(ToastAction::Push(
-                                "Rol actualizado".into(),
-                                ToastKind::Success,
-                            ));
-                        }
+                        push_toast(&toasts, "Rol actualizado");
                     }
                     Err(err) => error.set(Some(err)),
                 }
@@ -155,14 +156,12 @@ pub fn Usuarios() -> Html {
                 match api_put::<User, _>(&url, &serde_json::json!({})).await {
                     Ok(_) => {
                         reload.set(*reload + 1);
-                        if let Some(t) = &toasts {
-                            let msg = if activo {
-                                "Usuario desactivado"
-                            } else {
-                                "Usuario activado"
-                            };
-                            t.dispatch(ToastAction::Push(msg.into(), ToastKind::Success));
-                        }
+                        let msg = if activo {
+                            "Usuario desactivado"
+                        } else {
+                            "Usuario activado"
+                        };
+                        push_toast(&toasts, msg);
                     }
                     Err(err) => error.set(Some(err)),
                 }

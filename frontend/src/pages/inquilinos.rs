@@ -6,6 +6,7 @@ use yew_router::prelude::*;
 
 use crate::app::{AuthContext, Route};
 use crate::components::common::data_table::DataTable;
+use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::loading::Loading;
 use crate::components::common::pagination::Pagination;
@@ -14,6 +15,43 @@ use crate::services::api::{api_delete, api_get, api_post, api_put};
 use crate::types::PaginatedResponse;
 use crate::types::inquilino::{CreateInquilino, Inquilino, UpdateInquilino};
 use crate::utils::{can_delete, can_write};
+
+fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
+    if let Some(t) = toasts {
+        t.dispatch(ToastAction::Push(msg.into(), kind));
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct InquilinoSearchBarProps {
+    search: UseStateHandle<String>,
+    on_apply: Callback<MouseEvent>,
+    on_clear: Callback<MouseEvent>,
+}
+
+#[function_component]
+fn InquilinoSearchBar(props: &InquilinoSearchBarProps) -> Html {
+    let s = props.search.clone();
+    let on_input = Callback::from(move |e: InputEvent| {
+        let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+        s.set(input.value());
+    });
+    html! {
+        <div class="gi-filter-bar">
+            <div style="display: grid; grid-template-columns: 1fr auto; gap: var(--space-3); align-items: end;">
+                <div>
+                    <label class="gi-label">{"Buscar"}</label>
+                    <input type="text" value={(*props.search).clone()} oninput={on_input}
+                        class="gi-input" placeholder="Buscar por nombre, apellido o cédula" />
+                </div>
+                <div style="display: flex; gap: var(--space-2);">
+                    <button onclick={props.on_apply.clone()} class="gi-btn gi-btn-primary">{"Buscar"}</button>
+                    <button onclick={props.on_clear.clone()} class="gi-btn gi-btn-ghost">{"Limpiar"}</button>
+                </div>
+            </div>
+        </div>
+    }
+}
 
 #[derive(Clone, Default, PartialEq)]
 struct FormErrors {
@@ -388,9 +426,10 @@ pub fn Inquilinos() -> Html {
                 let toasts = toasts.clone();
                 let reload_for_undo = reload.clone();
                 spawn_local(async move {
-                    match api_delete(&format!("/inquilinos/{id}")).await {
+                    let result = api_delete(&format!("/inquilinos/{id}")).await;
+                    delete_target.set(None);
+                    match result {
                         Ok(()) => {
-                            delete_target.set(None);
                             reload.set(*reload + 1);
                             let undo_reload = reload_for_undo;
                             if let Some(t) = &toasts {
@@ -404,10 +443,7 @@ pub fn Inquilinos() -> Html {
                                 ));
                             }
                         }
-                        Err(err) => {
-                            delete_target.set(None);
-                            error.set(Some(err));
-                        }
+                        Err(err) => error.set(Some(err)),
                     }
                 });
             }
@@ -509,12 +545,7 @@ pub fn Inquilinos() -> Html {
                         Ok(_) => {
                             reset_form();
                             reload.set(*reload + 1);
-                            if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::Push(
-                                    "Inquilino actualizado".into(),
-                                    ToastKind::Success,
-                                ));
-                            }
+                            push_toast(&toasts, "Inquilino actualizado", ToastKind::Success);
                         }
                         Err(err) => error.set(Some(err)),
                     }
@@ -536,12 +567,7 @@ pub fn Inquilinos() -> Html {
                         Ok(_) => {
                             reset_form();
                             reload.set(*reload + 1);
-                            if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::Push(
-                                    "Inquilino registrado".into(),
-                                    ToastKind::Success,
-                                ));
-                            }
+                            push_toast(&toasts, "Inquilino registrado", ToastKind::Success);
                         }
                         Err(err) => error.set(Some(err)),
                     }
@@ -555,16 +581,6 @@ pub fn Inquilinos() -> Html {
         let reset_form = reset_form.clone();
         Callback::from(move |_: MouseEvent| reset_form())
     };
-
-    macro_rules! input_cb {
-        ($state:expr) => {{
-            let s = $state.clone();
-            Callback::from(move |e: InputEvent| {
-                let input: web_sys::HtmlInputElement = e.target_unchecked_into();
-                s.set(input.value());
-            })
-        }};
-    }
 
     let on_search_apply = {
         let search = search.clone();
@@ -642,33 +658,18 @@ pub fn Inquilinos() -> Html {
             }
 
             if let Some(ref target) = *delete_target {
-                <div class="gi-modal-overlay">
-                    <div class="gi-modal">
-                        <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-2); color: var(--text-primary);">
-                            {"Confirmar eliminación"}</h3>
-                        <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-5);">
-                            {format!("¿Está seguro de que desea eliminar al inquilino \"{} {}\"? Esta acción no se puede deshacer.", target.nombre, target.apellido)}</p>
-                        <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
-                            <button onclick={on_delete_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                            <button onclick={on_delete_confirm.clone()} class="gi-btn gi-btn-danger">{"Eliminar"}</button>
-                        </div>
-                    </div>
-                </div>
+                <DeleteConfirmModal
+                    message={format!("¿Está seguro de que desea eliminar al inquilino \"{} {}\"? Esta acción no se puede deshacer.", target.nombre, target.apellido)}
+                    on_confirm={on_delete_confirm.clone()}
+                    on_cancel={on_delete_cancel.clone()}
+                />
             }
 
-            <div class="gi-filter-bar">
-                <div style="display: grid; grid-template-columns: 1fr auto; gap: var(--space-3); align-items: end;">
-                    <div>
-                        <label class="gi-label">{"Buscar"}</label>
-                        <input type="text" value={(*search).clone()} oninput={input_cb!(search)}
-                            class="gi-input" placeholder="Buscar por nombre, apellido o cédula" />
-                    </div>
-                    <div style="display: flex; gap: var(--space-2);">
-                        <button onclick={on_search_apply} class="gi-btn gi-btn-primary">{"Buscar"}</button>
-                        <button onclick={on_search_clear} class="gi-btn gi-btn-ghost">{"Limpiar"}</button>
-                    </div>
-                </div>
-            </div>
+            <InquilinoSearchBar
+                search={search.clone()}
+                on_apply={on_search_apply}
+                on_clear={on_search_clear}
+            />
 
             if *show_form {
                 <InquilinoForm
