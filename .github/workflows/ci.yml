@@ -1,4 +1,5 @@
 name: CI
+run-name: "CI [${{ github.event_name }}] ${{ github.ref_name }} @ ${{ github.sha }}"
 
 on:
   push:
@@ -70,8 +71,8 @@ jobs:
         run: |
           GITLEAKS_VERSION="8.24.3"
           GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
-          ARCHIVE="/tmp/gitleaks.tar.gz"
-          curl -sSfL --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+          ARCHIVE="${RUNNER_TEMP}/gitleaks.tar.gz"
+          curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
           sudo tar xzf "$ARCHIVE" -C /usr/local/bin gitleaks
@@ -110,6 +111,7 @@ jobs:
 
       - name: Install commitlint CLI and conventional config
         run: |
+          umask 077
           npm install --ignore-scripts --no-fund --no-audit --save-dev @commitlint/cli@20.5.0 @commitlint/config-conventional@20.5.0
           echo "module.exports = { extends: ['@commitlint/config-conventional'] };" > commitlint.config.js
 
@@ -194,7 +196,7 @@ jobs:
         if: always()
         run: |
           umask 077
-          if ! cargo fmt --all -- --check 2>&1 | tee /tmp/fmt-output.txt; then
+          if ! cargo fmt --all -- --check 2>&1 | tee "${RUNNER_TEMP}/fmt-output.txt"; then
             echo "::error::Code formatting check failed. Run 'cargo fmt --all' to fix."
             exit 1
           fi
@@ -204,7 +206,7 @@ jobs:
         if: always()
         run: |
           umask 077
-          if ! cargo clippy --locked -p realestate-backend -- -D warnings 2>&1 | tee /tmp/clippy-backend-output.txt; then
+          if ! cargo clippy --locked -p realestate-backend -- -D warnings 2>&1 | tee "${RUNNER_TEMP}/clippy-backend-output.txt"; then
             echo "::error::Backend clippy found warnings/errors."
             exit 1
           fi
@@ -214,7 +216,7 @@ jobs:
         if: always()
         run: |
           umask 077
-          if ! cargo clippy --locked -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings 2>&1 | tee /tmp/clippy-frontend-output.txt; then
+          if ! cargo clippy --locked -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings 2>&1 | tee "${RUNNER_TEMP}/clippy-frontend-output.txt"; then
             echo "::error::Frontend clippy found warnings/errors."
             exit 1
           fi
@@ -239,15 +241,15 @@ jobs:
           FAILED=""
           if [ "${{ steps.fmt.outcome }}" = "failure" ]; then
             FAILED="${FAILED}fmt-check,"
-            ERROR="${ERROR}[fmt-check] $(head -c 1500 /tmp/fmt-output.txt 2>/dev/null || echo 'cargo fmt found formatting issues.')"$'\n\n'
+            ERROR="${ERROR}[fmt-check] $(head -c 1500 "${RUNNER_TEMP}/fmt-output.txt" 2>/dev/null || echo 'cargo fmt found formatting issues.')"$'\n\n'
           fi
           if [ "${{ steps.clippy_backend.outcome }}" = "failure" ]; then
             FAILED="${FAILED}clippy-backend,"
-            ERROR="${ERROR}[clippy-backend] $(head -c 1500 /tmp/clippy-backend-output.txt 2>/dev/null || echo 'Backend clippy failed.')"$'\n\n'
+            ERROR="${ERROR}[clippy-backend] $(head -c 1500 "${RUNNER_TEMP}/clippy-backend-output.txt" 2>/dev/null || echo 'Backend clippy failed.')"$'\n\n'
           fi
           if [ "${{ steps.clippy_frontend.outcome }}" = "failure" ]; then
             FAILED="${FAILED}clippy-frontend,"
-            ERROR="${ERROR}[clippy-frontend] $(head -c 1500 /tmp/clippy-frontend-output.txt 2>/dev/null || echo 'Frontend clippy failed.')"$'\n\n'
+            ERROR="${ERROR}[clippy-frontend] $(head -c 1500 "${RUNNER_TEMP}/clippy-frontend-output.txt" 2>/dev/null || echo 'Frontend clippy failed.')"$'\n\n'
           fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
@@ -266,7 +268,7 @@ jobs:
 
       - name: Clean up sensitive temp files
         if: always()
-        run: rm -f /tmp/fmt-output.txt /tmp/clippy-backend-output.txt /tmp/clippy-frontend-output.txt
+        run: rm -f "${RUNNER_TEMP}/fmt-output.txt" "${RUNNER_TEMP}/clippy-backend-output.txt" "${RUNNER_TEMP}/clippy-frontend-output.txt"
 
   test-backend:
     name: Backend Unit & Integration Tests
@@ -354,7 +356,7 @@ jobs:
         id: backend-tests
         run: |
           umask 077
-          cargo test --locked -p realestate-backend --all-targets 2>&1 | tee /tmp/test-backend-output.txt
+          cargo test --locked -p realestate-backend --all-targets 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
 
       - name: Generate test coverage report (LCOV)
         id: coverage
@@ -364,9 +366,9 @@ jobs:
           if ! command -v cargo-tarpaulin &>/dev/null; then
             TARPAULIN_VERSION="0.32.7"
             TARPAULIN_SHA256="67a61b2b271488e2d0cb718ccec384d0f296703f3c810f80ea5d46484c5d463b"
-            ARCHIVE="/tmp/cargo-tarpaulin.tar.gz"
+            ARCHIVE="${RUNNER_TEMP}/cargo-tarpaulin.tar.gz"
             mkdir -p "$HOME/.cargo/bin"
-            if curl -sSfL --retry 3 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            if curl -sSfL --proto =https --retry 3 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
               "https://github.com/xd009642/tarpaulin/releases/download/${TARPAULIN_VERSION}/cargo-tarpaulin-x86_64-unknown-linux-musl.tar.gz"; then
               if echo "${TARPAULIN_SHA256}  ${ARCHIVE}" | sha256sum -c -; then
                 tar xzf "$ARCHIVE" -C "$HOME/.cargo/bin" 2>/dev/null
@@ -381,7 +383,7 @@ jobs:
             fi
           fi
           mkdir -p coverage
-          cargo tarpaulin -p realestate-backend --out lcov --output-dir coverage/ --skip-clean 2>&1 | tee /tmp/tarpaulin-output.txt || true
+          cargo tarpaulin -p realestate-backend --out lcov --output-dir coverage/ --skip-clean 2>&1 | tee "${RUNNER_TEMP}/tarpaulin-output.txt" || true
           if [ -f coverage/lcov.info ]; then
             echo "generated=true" >> $GITHUB_OUTPUT
             LINES=$(grep -c "^DA:" coverage/lcov.info 2>/dev/null || echo 0)
@@ -407,13 +409,13 @@ jobs:
           {
             echo "## Backend Test Results"
             if [ "${{ steps.backend-tests.outcome }}" = "success" ]; then
-              PASS=$(grep -c "^test .* ok$" /tmp/test-backend-output.txt 2>/dev/null || echo "?")
+              PASS=$(grep -c "^test .* ok$" "${RUNNER_TEMP}/test-backend-output.txt" 2>/dev/null || echo "?")
               echo "✅ All tests passed ($PASS tests)"
             else
-              FAIL_COUNT=$(grep -c "^test .* FAILED$" /tmp/test-backend-output.txt 2>/dev/null || echo "?")
+              FAIL_COUNT=$(grep -c "^test .* FAILED$" "${RUNNER_TEMP}/test-backend-output.txt" 2>/dev/null || echo "?")
               echo "❌ $FAIL_COUNT test(s) failed"
               echo '```'
-              grep "^test .* FAILED$" /tmp/test-backend-output.txt 2>/dev/null | head -20 || true
+              grep "^test .* FAILED$" "${RUNNER_TEMP}/test-backend-output.txt" 2>/dev/null | head -20 || true
               echo '```'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
@@ -428,7 +430,7 @@ jobs:
         if: failure()
         run: |
           ERROR=""
-          [ -f /tmp/test-backend-output.txt ] && ERROR="$(tail -c 3000 /tmp/test-backend-output.txt)"
+          [ -f "${RUNNER_TEMP}/test-backend-output.txt" ] && ERROR="$(tail -c 3000 "${RUNNER_TEMP}/test-backend-output.txt")"
           if [ -z "$ERROR" ]; then
             ERROR="Backend tests failed but no captured output. Run cargo test -p realestate-backend --all-targets to reproduce."
           fi
@@ -439,7 +441,7 @@ jobs:
 
       - name: Clean up sensitive temp files
         if: always()
-        run: rm -f /tmp/test-backend-output.txt /tmp/tarpaulin-output.txt
+        run: rm -f "${RUNNER_TEMP}/test-backend-output.txt" "${RUNNER_TEMP}/tarpaulin-output.txt"
 
   test-frontend:
     name: Frontend WASM Compilation & Tests
@@ -492,7 +494,7 @@ jobs:
         id: frontend-tests
         run: |
           umask 077
-          cargo test --locked -p realestate-frontend --all-targets 2>&1 | tee /tmp/test-frontend-output.txt
+          cargo test --locked -p realestate-frontend --all-targets 2>&1 | tee "${RUNNER_TEMP}/test-frontend-output.txt"
 
       - name: Write test summary
         if: always()
@@ -500,13 +502,13 @@ jobs:
           {
             echo "## Frontend Test Results"
             if [ "${{ steps.frontend-tests.outcome }}" = "success" ]; then
-              PASS=$(grep -c "^test .* ok$" /tmp/test-frontend-output.txt 2>/dev/null || echo "?")
+              PASS=$(grep -c "^test .* ok$" "${RUNNER_TEMP}/test-frontend-output.txt" 2>/dev/null || echo "?")
               echo "✅ All tests passed ($PASS tests)"
             else
-              FAIL_COUNT=$(grep -c "^test .* FAILED$" /tmp/test-frontend-output.txt 2>/dev/null || echo "?")
+              FAIL_COUNT=$(grep -c "^test .* FAILED$" "${RUNNER_TEMP}/test-frontend-output.txt" 2>/dev/null || echo "?")
               echo "❌ $FAIL_COUNT test(s) failed"
               echo '```'
-              grep "^test .* FAILED$" /tmp/test-frontend-output.txt 2>/dev/null | head -20 || true
+              grep "^test .* FAILED$" "${RUNNER_TEMP}/test-frontend-output.txt" 2>/dev/null | head -20 || true
               echo '```'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
@@ -521,7 +523,7 @@ jobs:
         if: failure()
         run: |
           ERROR=""
-          [ -f /tmp/test-frontend-output.txt ] && ERROR="$(tail -c 3000 /tmp/test-frontend-output.txt)"
+          [ -f "${RUNNER_TEMP}/test-frontend-output.txt" ] && ERROR="$(tail -c 3000 "${RUNNER_TEMP}/test-frontend-output.txt")"
           if [ -z "$ERROR" ]; then
             ERROR="Frontend tests failed but no captured output. Run cargo test -p realestate-frontend --all-targets to reproduce."
           fi
@@ -532,7 +534,7 @@ jobs:
 
       - name: Clean up sensitive temp files
         if: always()
-        run: rm -f /tmp/test-frontend-output.txt
+        run: rm -f "${RUNNER_TEMP}/test-frontend-output.txt"
 
   quality-gate:
     name: Dependency Security & Health Check
@@ -590,13 +592,13 @@ jobs:
           for VARIANT in musl gnu; do
             URL="https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-${VARIANT}-v${AUDIT_VERSION}.tgz"
             EXPECTED_SHA=$(eval echo "\$AUDIT_SHA256_${VARIANT}")
-            if curl -sSfL --retry 3 --retry-delay 10 --connect-timeout 30 -o /tmp/cargo-audit.tgz "$URL" 2>/tmp/install-audit-output.txt; then
-              if ! echo "${EXPECTED_SHA}  /tmp/cargo-audit.tgz" | sha256sum -c -; then
+            if curl -sSfL --proto =https --retry 3 --retry-delay 10 --connect-timeout 30 -o "${RUNNER_TEMP}/cargo-audit.tgz" "$URL" 2>"${RUNNER_TEMP}/install-audit-output.txt"; then
+              if ! echo "${EXPECTED_SHA}  ${RUNNER_TEMP}/cargo-audit.tgz" | sha256sum -c -; then
                 echo "::warning::Checksum mismatch for cargo-audit ${VARIANT} binary -- skipping"
-                rm -f /tmp/cargo-audit.tgz
+                rm -f "${RUNNER_TEMP}/cargo-audit.tgz"
                 continue
               fi
-              if tar xzf /tmp/cargo-audit.tgz --strip-components=1 -C "$HOME/.cargo/bin/" 2>>/tmp/install-audit-output.txt; then
+              if tar xzf "${RUNNER_TEMP}/cargo-audit.tgz" --strip-components=1 -C "$HOME/.cargo/bin/" 2>>"${RUNNER_TEMP}/install-audit-output.txt"; then
                 chmod +x "$HOME/.cargo/bin/cargo-audit"
                 if cargo audit --version &>/dev/null; then
                   INSTALLED=true
@@ -607,7 +609,7 @@ jobs:
             fi
           done
           if [ "$INSTALLED" = "false" ]; then
-            if cargo install cargo-audit --locked 2>&1 | tee -a /tmp/install-audit-output.txt; then
+            if cargo install cargo-audit --locked 2>&1 | tee -a "${RUNNER_TEMP}/install-audit-output.txt"; then
               INSTALLED=true
             fi
           fi
@@ -622,9 +624,10 @@ jobs:
       - name: Scan Rust dependencies for known vulnerabilities (CVEs)
         id: cargo_audit
         if: always() && steps.install_audit.outputs.installed == 'true'
+        timeout-minutes: 5
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          cargo audit --deny yanked --deny unmaintained 2>&1 | tee /tmp/audit-output.txt
+          cargo audit --deny yanked --deny unmaintained 2>&1 | tee "${RUNNER_TEMP}/audit-output.txt"
 
       - name: Install cargo-deny for supply chain policy checks
         id: install_deny
@@ -640,11 +643,11 @@ jobs:
           DENY_VERSION="0.16.4"
           DENY_SHA256="28b7f8e12df46a9ce186547e38278c851905fc4bda59a0cc57d2aade9fdf6962"
           URL="https://github.com/EmbarkStudios/cargo-deny/releases/download/${DENY_VERSION}/cargo-deny-${DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz"
-          if curl -sSfL --retry 3 --connect-timeout 15 --max-time 120 -o /tmp/cargo-deny.tar.gz "$URL"; then
-            echo "${DENY_SHA256}  /tmp/cargo-deny.tar.gz" | sha256sum -c -
-            tar xzf /tmp/cargo-deny.tar.gz --strip-components=1 -C "$HOME/.cargo/bin/" 2>/dev/null
+          if curl -sSfL --proto =https --retry 3 --connect-timeout 15 --max-time 120 -o "${RUNNER_TEMP}/cargo-deny.tar.gz" "$URL"; then
+            echo "${DENY_SHA256}  ${RUNNER_TEMP}/cargo-deny.tar.gz" | sha256sum -c -
+            tar xzf "${RUNNER_TEMP}/cargo-deny.tar.gz" --strip-components=1 -C "$HOME/.cargo/bin/" 2>/dev/null
             chmod +x "$HOME/.cargo/bin/cargo-deny"
-            rm -f /tmp/cargo-deny.tar.gz
+            rm -f "${RUNNER_TEMP}/cargo-deny.tar.gz"
           fi
           if command -v cargo-deny &>/dev/null; then
             cargo-deny --version
@@ -656,9 +659,10 @@ jobs:
       - name: Run cargo-deny supply chain checks (advisories, licenses, bans, sources)
         id: cargo_deny
         if: always() && steps.install_deny.outputs.installed == 'true'
+        timeout-minutes: 5
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          cargo deny check 2>&1 | tee /tmp/deny-output.txt
+          cargo deny check 2>&1 | tee "${RUNNER_TEMP}/deny-output.txt"
 
       - name: OWASP dependency scan (fail on CVSS >= 7)
         id: owasp
@@ -697,8 +701,8 @@ jobs:
             echo "installed=true" >> $GITHUB_OUTPUT
             exit 0
           fi
-          ARCHIVE="/tmp/trivy.tar.gz"
-          curl -sSfL --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+          ARCHIVE="${RUNNER_TEMP}/trivy.tar.gz"
+          curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
             "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
           echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
           sudo tar xzf "$ARCHIVE" -C /usr/local/bin trivy
@@ -708,11 +712,12 @@ jobs:
       - name: Scan Dockerfiles and docker-compose for misconfigurations (Trivy)
         id: trivy_iac
         if: always() && steps.install_trivy.outputs.installed == 'true'
+        timeout-minutes: 5
         run: |
           trivy fs --scanners misconfig --exit-code 1 --severity CRITICAL,HIGH \
             --no-progress --format table \
             --include-non-failures \
-            Dockerfile.backend Dockerfile.frontend docker-compose.prod.yml docker-compose.dev.yml 2>&1 | tee /tmp/trivy-iac-output.txt
+            Dockerfile.backend Dockerfile.frontend docker-compose.prod.yml docker-compose.dev.yml 2>&1 | tee "${RUNNER_TEMP}/trivy-iac-output.txt"
 
       - name: Generate Trivy IaC SARIF report
         if: always() && steps.install_trivy.outputs.installed == 'true'
@@ -732,10 +737,11 @@ jobs:
       - name: Scan source code for embedded secrets (Trivy)
         id: trivy_secret
         if: always() && steps.install_trivy.outputs.installed == 'true'
+        timeout-minutes: 5
         run: |
           trivy fs --scanners secret --exit-code 1 --no-progress --format table \
             --skip-dirs target --skip-dirs node_modules --skip-dirs dist --skip-dirs .git \
-            . 2>&1 | tee /tmp/trivy-secret-output.txt
+            . 2>&1 | tee "${RUNNER_TEMP}/trivy-secret-output.txt"
 
       - name: Generate cargo-audit SARIF report
         id: cargo_audit_sarif
@@ -843,14 +849,14 @@ jobs:
           FAILED=""
           if [ "${{ steps.cargo_audit.outcome }}" = "failure" ]; then
             FAILED="${FAILED}cargo-audit,"
-            ERROR="${ERROR}[cargo-audit] $(head -c 2000 /tmp/audit-output.txt 2>/dev/null || echo 'cargo audit found vulnerabilities.')"$'\n\n'
+            ERROR="${ERROR}[cargo-audit] $(head -c 2000 "${RUNNER_TEMP}/audit-output.txt" 2>/dev/null || echo 'cargo audit found vulnerabilities.')"$'\n\n'
           fi
           if [ "${{ steps.install_audit.outputs.installed }}" = "false" ]; then
             ERROR="${ERROR}[cargo-audit] Skipped -- installation failed (non-blocking warning)."$'\n\n'
           fi
           if [ "${{ steps.cargo_deny.outcome }}" = "failure" ]; then
             FAILED="${FAILED}cargo-deny,"
-            ERROR="${ERROR}[cargo-deny] $(head -c 2000 /tmp/deny-output.txt 2>/dev/null || echo 'cargo deny found policy violations.')"$'\n\n'
+            ERROR="${ERROR}[cargo-deny] $(head -c 2000 "${RUNNER_TEMP}/deny-output.txt" 2>/dev/null || echo 'cargo deny found policy violations.')"$'\n\n'
           fi
           if [ "${{ steps.owasp.outcome }}" = "failure" ]; then
             FAILED="${FAILED}owasp-scan,"
@@ -858,11 +864,11 @@ jobs:
           fi
           if [ "${{ steps.trivy_iac.outcome }}" = "failure" ]; then
             FAILED="${FAILED}trivy-iac,"
-            ERROR="${ERROR}[trivy-iac] $(head -c 2000 /tmp/trivy-iac-output.txt 2>/dev/null || echo 'Trivy found Dockerfile/compose misconfigurations.')"$'\n\n'
+            ERROR="${ERROR}[trivy-iac] $(head -c 2000 "${RUNNER_TEMP}/trivy-iac-output.txt" 2>/dev/null || echo 'Trivy found Dockerfile/compose misconfigurations.')"$'\n\n'
           fi
           if [ "${{ steps.trivy_secret.outcome }}" = "failure" ]; then
             FAILED="${FAILED}trivy-secret,"
-            ERROR="${ERROR}[trivy-secret] $(head -c 2000 /tmp/trivy-secret-output.txt 2>/dev/null || echo 'Trivy found embedded secrets in source code.')"$'\n\n'
+            ERROR="${ERROR}[trivy-secret] $(head -c 2000 "${RUNNER_TEMP}/trivy-secret-output.txt" 2>/dev/null || echo 'Trivy found embedded secrets in source code.')"$'\n\n'
           fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
@@ -881,7 +887,9 @@ jobs:
 
       - name: Clean up sensitive temp files
         if: always()
-        run: rm -f /tmp/audit-output.txt /tmp/deny-output.txt /tmp/trivy-iac-output.txt /tmp/trivy-secret-output.txt /tmp/install-audit-output.txt /tmp/cargo-audit.tgz /tmp/cargo-deny.tar.gz
+        run: |
+          rm -f "${RUNNER_TEMP}/audit-output.txt" "${RUNNER_TEMP}/deny-output.txt" "${RUNNER_TEMP}/trivy-iac-output.txt" "${RUNNER_TEMP}/trivy-secret-output.txt" "${RUNNER_TEMP}/install-audit-output.txt" "${RUNNER_TEMP}/cargo-audit.tgz" "${RUNNER_TEMP}/cargo-deny.tar.gz"
+          rm -f cargo-audit.sarif cargo-deny.sarif trivy-iac.sarif
 
   sonarqube:
     name: SonarQube Code Quality & Coverage Analysis
@@ -925,6 +933,7 @@ jobs:
         continue-on-error: true
 
       - name: Verify SonarQube server is reachable
+        timeout-minutes: 2
         run: |
           SONAR_URL="${SONAR_HOST_URL}"
           for i in $(seq 1 12); do
@@ -941,6 +950,7 @@ jobs:
 
       - name: Bootstrap SonarQube project and token
         id: sonar-bootstrap
+        timeout-minutes: 2
         run: |
           SONAR_URL="${SONAR_HOST_URL}"
           TOKEN="${{ secrets.SONAR_TOKEN }}"
@@ -999,21 +1009,24 @@ jobs:
           PR_BASE: ${{ github.base_ref }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
-          EXTRA_ARGS=""
+          SCAN_ARGS=()
+          SCAN_ARGS+=("-Dsonar.projectBaseDir=/usr/src")
+          SCAN_ARGS+=("-Dsonar.qualitygate.wait=true")
+          SCAN_ARGS+=("-Dsonar.qualitygate.timeout=300")
           if [ "$HAS_COVERAGE" = "true" ] && [ -f coverage/lcov.info ]; then
             echo "Coverage report found -- including in SonarQube analysis"
-            EXTRA_ARGS="-Dsonar.rust.lcov.reportPaths=/usr/src/coverage/lcov.info"
+            SCAN_ARGS+=("-Dsonar.rust.lcov.reportPaths=/usr/src/coverage/lcov.info")
           fi
           if [ "$IS_PR" = "true" ] && [ -n "$PR_KEY" ]; then
             echo "PR detected (#${PR_KEY}) -- enabling PR decoration"
-            EXTRA_ARGS="$EXTRA_ARGS -Dsonar.pullrequest.key=${PR_KEY}"
-            EXTRA_ARGS="$EXTRA_ARGS -Dsonar.pullrequest.branch=${PR_BRANCH}"
-            EXTRA_ARGS="$EXTRA_ARGS -Dsonar.pullrequest.base=${PR_BASE}"
+            SCAN_ARGS+=("-Dsonar.pullrequest.key=${PR_KEY}")
+            SCAN_ARGS+=("-Dsonar.pullrequest.branch=${PR_BRANCH}")
+            SCAN_ARGS+=("-Dsonar.pullrequest.base=${PR_BASE}")
           else
             BRANCH_NAME="${GITHUB_REF_NAME}"
             if [ -n "$BRANCH_NAME" ]; then
               echo "Branch push detected -- setting sonar.branch.name=$BRANCH_NAME"
-              EXTRA_ARGS="$EXTRA_ARGS -Dsonar.branch.name=${BRANCH_NAME}"
+              SCAN_ARGS+=("-Dsonar.branch.name=${BRANCH_NAME}")
             fi
           fi
           docker run --rm \
@@ -1029,13 +1042,11 @@ jobs:
             -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
             -v "${GITHUB_WORKSPACE}:/usr/src" \
             sonarsource/sonar-scanner-cli:11.3@sha256:7462f132388135e32b948f8f18ff0db9ae28a87c6777f1df5b2207e04a6d7c5c \
-            -Dsonar.projectBaseDir=/usr/src \
-            -Dsonar.qualitygate.wait=true \
-            -Dsonar.qualitygate.timeout=300 \
-            $EXTRA_ARGS
+            "${SCAN_ARGS[@]}"
 
       - name: Fetch SonarQube results and notify
         if: always()
+        timeout-minutes: 8
         env:
           SONAR_TOKEN: ${{ env.SONAR_ANALYSIS_TOKEN }}
           SCAN_OUTCOME: ${{ steps.sonar-scan.outcome }}
@@ -1258,7 +1269,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Build optimized WASM frontend bundle
-        run: trunk build --release 2>&1 | tee /tmp/build-frontend-output.txt
+        run: trunk build --release 2>&1 | tee "${RUNNER_TEMP}/build-frontend-output.txt"
         working-directory: frontend
 
       - name: Verify Cargo.lock was not modified during build
@@ -1275,8 +1286,8 @@ jobs:
           else
             GITLEAKS_VERSION="8.24.3"
             GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
-            ARCHIVE="/tmp/gitleaks.tar.gz"
-            curl -sSfL --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            ARCHIVE="${RUNNER_TEMP}/gitleaks.tar.gz"
+            curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
               "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
             echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
             sudo tar xzf "$ARCHIVE" -C /usr/local/bin gitleaks
@@ -1308,7 +1319,7 @@ jobs:
         if: failure()
         run: |
           ERROR=""
-          [ -f /tmp/build-frontend-output.txt ] && ERROR="$(tail -c 3000 /tmp/build-frontend-output.txt)"
+          [ -f "${RUNNER_TEMP}/build-frontend-output.txt" ] && ERROR="$(tail -c 3000 "${RUNNER_TEMP}/build-frontend-output.txt")"
           if [ -z "$ERROR" ]; then
             ERROR="Frontend WASM build failed but no captured output. Run trunk build --release in frontend/ to reproduce."
           fi
@@ -1375,7 +1386,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Build optimized backend binary
-        run: cargo build --frozen -p realestate-backend --release 2>&1 | tee /tmp/build-backend-output.txt
+        run: cargo build --frozen -p realestate-backend --release 2>&1 | tee "${RUNNER_TEMP}/build-backend-output.txt"
 
       - name: Scan backend build output for leaked secrets
         run: |
@@ -1384,8 +1395,8 @@ jobs:
           else
             GITLEAKS_VERSION="8.24.3"
             GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
-            ARCHIVE="/tmp/gitleaks.tar.gz"
-            curl -sSfL --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            ARCHIVE="${RUNNER_TEMP}/gitleaks.tar.gz"
+            curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
               "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
             echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
             sudo tar xzf "$ARCHIVE" -C /usr/local/bin gitleaks
@@ -1417,7 +1428,7 @@ jobs:
         if: failure()
         run: |
           ERROR=""
-          [ -f /tmp/build-backend-output.txt ] && ERROR="$(tail -c 3000 /tmp/build-backend-output.txt)"
+          [ -f "${RUNNER_TEMP}/build-backend-output.txt" ] && ERROR="$(tail -c 3000 "${RUNNER_TEMP}/build-backend-output.txt")"
           if [ -z "$ERROR" ]; then
             ERROR="Backend release build failed but no captured output. Run cargo build -p realestate-backend --release to reproduce."
           fi
@@ -1486,8 +1497,8 @@ jobs:
           TRIVY_VERSION="0.69.3"
           TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
           if ! command -v trivy &>/dev/null || [ "$(trivy --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" != "$TRIVY_VERSION" ]; then
-            ARCHIVE="/tmp/trivy.tar.gz"
-            curl -sSfL --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            ARCHIVE="${RUNNER_TEMP}/trivy.tar.gz"
+            curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
               "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
             echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
             sudo tar xzf "$ARCHIVE" -C /usr/local/bin trivy
@@ -1614,8 +1625,8 @@ jobs:
           TRIVY_VERSION="0.69.3"
           TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
           if ! command -v trivy &>/dev/null || [ "$(trivy --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" != "$TRIVY_VERSION" ]; then
-            ARCHIVE="/tmp/trivy.tar.gz"
-            curl -sSfL --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            ARCHIVE="${RUNNER_TEMP}/trivy.tar.gz"
+            curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
               "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
             echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
             sudo tar xzf "$ARCHIVE" -C /usr/local/bin trivy
