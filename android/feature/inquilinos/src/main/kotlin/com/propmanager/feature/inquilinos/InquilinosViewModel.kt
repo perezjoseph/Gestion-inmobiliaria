@@ -8,7 +8,7 @@ import com.propmanager.core.model.Inquilino
 import com.propmanager.core.model.ValidationResult
 import com.propmanager.core.model.dto.CreateInquilinoRequest
 import com.propmanager.core.model.dto.UpdateInquilinoRequest
-import com.propmanager.core.network.NetworkMonitor
+import com.propmanager.core.network.ConnectivityObserver
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,7 +47,7 @@ class InquilinosViewModel
     @Inject
     constructor(
         private val repository: InquilinosRepository,
-        private val networkMonitor: NetworkMonitor,
+        private val networkMonitor: ConnectivityObserver,
     ) : ViewModel() {
         private val _searchQuery = MutableStateFlow("")
         val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
