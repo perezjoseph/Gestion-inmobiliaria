@@ -42,7 +42,7 @@ jobs:
             echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
             exit 1
           fi
-          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -59,8 +59,10 @@ jobs:
           curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
-          sudo tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C /usr/local/bin gitleaks
+          mkdir -p "${HOME}/.local/bin"
+          tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" gitleaks
           rm -f "$ARCHIVE"
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
           gitleaks version
 
       - name: Run Gitleaks secret detection
@@ -80,7 +82,7 @@ jobs:
             echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
             exit 1
           fi
-          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository with full history
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -144,7 +146,7 @@ jobs:
             echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
             exit 1
           fi
-          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -230,7 +232,7 @@ jobs:
             echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
             exit 1
           fi
-          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -315,7 +317,7 @@ jobs:
             echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
             exit 1
           fi
-          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -431,7 +433,7 @@ jobs:
             echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
             exit 1
           fi
-          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
