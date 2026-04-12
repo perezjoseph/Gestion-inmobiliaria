@@ -35,7 +35,7 @@ env:
   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
   CARGO_NET_GIT_FETCH_WITH_CLI: "true"
   RUSTFLAGS: "-D warnings"
-  SONAR_HOST_URL: "http://192.168.88.25:9000"
+  SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
 
 jobs:
   # ── Stage 1: Quality Checks (all run in parallel) ──
@@ -101,6 +101,27 @@ jobs:
 
       - name: Validate PR commit messages against conventional format
         run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+
+  dependency-review:
+    name: Dependency Review (PR)
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: Review dependency changes for vulnerabilities and license issues
+        uses: actions/dependency-review-action@da24556b548a50705dd671f47852072ea4c105d9 # v4.7.1
+        with:
+          fail-on-severity: high
+          deny-licenses: AGPL-3.0, GPL-3.0
+          comment-summary-in-pr: on-failure
 
   lint:
     name: Code Formatting & Static Analysis
@@ -235,7 +256,7 @@ jobs:
       contents: read
     env:
       DATABASE_URL: postgresql://realestate:realestate_dev_password@localhost:5432/realestate
-      JWT_SECRET: ci_test_secret_not_for_production
+      JWT_SECRET: ${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
       SERVER_PORT: 8080
       CORS_ORIGIN: http://localhost:8080
     outputs:
@@ -1112,7 +1133,7 @@ jobs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       duration: ${{ steps.timing.outputs.duration }}
       cache_hit: ${{ steps.cache.outputs.cache-hit }}
-    needs: [secret-scan, commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube]
+    needs: [secret-scan, commit-lint, dependency-review, lint, test-backend, test-frontend, quality-gate, sonarqube]
     if: |
       always() &&
       needs.secret-scan.result == 'success' &&
@@ -1121,6 +1142,7 @@ jobs:
       needs.test-frontend.result == 'success' &&
       needs.quality-gate.result == 'success' &&
       (needs.commit-lint.result == 'success' || needs.commit-lint.result == 'skipped') &&
+      (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped') &&
       (needs.sonarqube.result == 'success' || needs.sonarqube.result == 'skipped' || needs.sonarqube.result == 'cancelled')
     steps:
       - name: Record start time
@@ -1182,7 +1204,7 @@ jobs:
         with:
           name: frontend-dist
           path: frontend/dist/
-          retention-days: 7
+          retention-days: 3
 
       - name: Attest frontend build provenance
         uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
@@ -1220,7 +1242,7 @@ jobs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       duration: ${{ steps.timing.outputs.duration }}
       cache_hit: ${{ steps.cache.outputs.cache-hit }}
-    needs: [secret-scan, commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube]
+    needs: [secret-scan, commit-lint, dependency-review, lint, test-backend, test-frontend, quality-gate, sonarqube]
     if: |
       always() &&
       needs.secret-scan.result == 'success' &&
@@ -1229,6 +1251,7 @@ jobs:
       needs.test-frontend.result == 'success' &&
       needs.quality-gate.result == 'success' &&
       (needs.commit-lint.result == 'success' || needs.commit-lint.result == 'skipped') &&
+      (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped') &&
       (needs.sonarqube.result == 'success' || needs.sonarqube.result == 'skipped' || needs.sonarqube.result == 'cancelled')
     steps:
       - name: Record start time
@@ -1284,7 +1307,7 @@ jobs:
         with:
           name: backend-binary
           path: target/release/realestate-backend
-          retention-days: 7
+          retention-days: 3
 
       - name: Attest backend build provenance
         uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
@@ -1322,6 +1345,8 @@ jobs:
       security-events: write
       id-token: write
       attestations: write
+    env:
+      DOCKER_CONTENT_TRUST: "1"
     outputs:
       digest: ${{ steps.push-backend.outputs.digest }}
     needs: [build-backend]
@@ -1352,6 +1377,8 @@ jobs:
           file: Dockerfile.backend
           load: true
           tags: ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }}
+          provenance: mode=max
+          sbom: true
 
       - name: Install Trivy (with checksum verification)
         run: |
@@ -1436,6 +1463,8 @@ jobs:
       security-events: write
       id-token: write
       attestations: write
+    env:
+      DOCKER_CONTENT_TRUST: "1"
     outputs:
       digest: ${{ steps.push-frontend.outputs.digest }}
     needs: [build-frontend]
@@ -1466,6 +1495,8 @@ jobs:
           file: Dockerfile.frontend
           load: true
           tags: ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }}
+          provenance: mode=max
+          sbom: true
 
       - name: Install Trivy (with checksum verification)
         run: |
@@ -1688,9 +1719,24 @@ jobs:
     permissions: {}
     env:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
-    needs: [secret-scan, commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend, container-image-backend, container-image-frontend, deploy]
+    needs: [secret-scan, commit-lint, dependency-review, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend, container-image-backend, container-image-frontend, deploy]
     if: always() && contains(needs.*.result, 'failure')
     steps:
+      - name: Define payload sanitizer
+        id: sanitizer
+        run: |
+          # Create a reusable sanitizer script that strips potential secrets from error payloads
+          cat > /tmp/sanitize-payload.sh << 'SANITIZE_EOF'
+          #!/usr/bin/env bash
+          # Strip common secret patterns from webhook payloads
+          sed -E \
+            -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' \
+            -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' \
+            -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' \
+            -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' \
+            -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'
+          SANITIZE_EOF
+          chmod +x /tmp/sanitize-payload.sh
       - name: Notify -- secret scanning detected leaked secrets
         if: always() && needs.secret-scan.result == 'failure'
         run: |
@@ -1736,6 +1782,7 @@ jobs:
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Lint job failed but no captured output. Run cargo fmt --all -- --check and cargo clippy --workspace -- -D warnings to reproduce."
           fi
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | /tmp/sanitize-payload.sh)
           STEP="${FAILED_STEPS:-clippy-or-fmt}"
           PAYLOAD=$(jq -n --arg job "lint" --arg step "$STEP" --arg error_log "$ERROR_LOG" \
             --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
@@ -1755,6 +1802,7 @@ jobs:
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Backend tests failed but no captured output. Run cargo test -p realestate-backend --all-targets to reproduce."
           fi
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | /tmp/sanitize-payload.sh)
           PAYLOAD=$(jq -n --arg job "test-backend" --arg step "cargo-test" --arg error_log "$ERROR_LOG" \
             --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
@@ -1773,6 +1821,7 @@ jobs:
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Frontend tests failed but no captured output. Run cargo test -p realestate-frontend --all-targets to reproduce."
           fi
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | /tmp/sanitize-payload.sh)
           PAYLOAD=$(jq -n --arg job "test-frontend" --arg step "cargo-test" --arg error_log "$ERROR_LOG" \
             --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
@@ -1792,6 +1841,7 @@ jobs:
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Quality gate failed but no captured output. Run cargo audit and check OWASP scan to reproduce."
           fi
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | /tmp/sanitize-payload.sh)
           STEP="${FAILED_STEPS:-audit-or-owasp}"
           PAYLOAD=$(jq -n --arg job "quality-gate" --arg step "$STEP" --arg error_log "$ERROR_LOG" \
             --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
@@ -1811,6 +1861,7 @@ jobs:
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Frontend WASM build failed but no captured output. Run trunk build --release in frontend/ to reproduce."
           fi
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | /tmp/sanitize-payload.sh)
           PAYLOAD=$(jq -n --arg job "build-frontend" --arg step "trunk-build" --arg error_log "$ERROR_LOG" \
             --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
@@ -1829,6 +1880,7 @@ jobs:
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Backend release build failed but no captured output. Run cargo build -p realestate-backend --release to reproduce."
           fi
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | /tmp/sanitize-payload.sh)
           PAYLOAD=$(jq -n --arg job "build-backend" --arg step "cargo-build" --arg error_log "$ERROR_LOG" \
             --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
@@ -1911,6 +1963,10 @@ jobs:
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
 
+      - name: Clean up sanitizer script
+        if: always()
+        run: rm -f /tmp/sanitize-payload.sh
+
       - name: Write failure summary
         if: always()
         run: |
@@ -1955,7 +2011,7 @@ jobs:
       contents: read
     env:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
-    needs: [secret-scan, commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend, container-image-backend, container-image-frontend, deploy, notify-failure]
+    needs: [secret-scan, commit-lint, dependency-review, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend, container-image-backend, container-image-frontend, deploy, notify-failure]
     if: always() && github.ref == 'refs/heads/main'
     steps:
       - name: Clean workspace

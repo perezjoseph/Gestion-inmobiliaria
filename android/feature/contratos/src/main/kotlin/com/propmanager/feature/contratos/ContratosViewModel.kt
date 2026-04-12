@@ -207,7 +207,7 @@ class ContratosViewModel @Inject constructor(
         viewModelScope.launch {
             _formState.update { it.copy(isSubmitting = true) }
             val result = if (editingId != null) {
-                contratosRepository.delete(editingId!!).flatMap {
+                contratosRepository.delete(editingId!!).flatMapSuspend {
                     contratosRepository.create(CreateContratoRequest(
                         propiedadId = form.propiedadId, inquilinoId = form.inquilinoId,
                         fechaInicio = fechaInicioStr, fechaFin = fechaFinStr,
@@ -270,6 +270,6 @@ class ContratosViewModel @Inject constructor(
     }
     fun clearSuccessMessage() { _successMessage.value = null }
 
-    private fun <T> Result<Unit>.flatMap(block: suspend () -> Result<T>): Result<T> =
-        if (isSuccess) runCatching { kotlinx.coroutines.runBlocking { block().getOrThrow() } } else Result.failure(exceptionOrNull()!!)
+    private suspend fun <T> Result<Unit>.flatMapSuspend(block: suspend () -> Result<T>): Result<T> =
+        if (isSuccess) block() else Result.failure(exceptionOrNull()!!)
 }

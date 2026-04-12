@@ -52,8 +52,12 @@ dependencies {
     implementation(project(":feature:importacion"))
     implementation(project(":feature:scanner"))
 
-    // Core UI
+    // Core modules
     implementation(project(":core:ui"))
+    implementation(project(":core:data"))
+    implementation(project(":core:network"))
+    implementation(project(":core:common"))
+    implementation(project(":core:model"))
 
     // Compose
     val composeBom = platform(libs.androidx.compose.bom)
@@ -65,6 +69,13 @@ dependencies {
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    implementation(libs.hilt.navigation.compose)
+
+    // Serialization (for error parsing)
+    implementation(libs.kotlinx.serialization)
+
+    // WorkManager
+    implementation(libs.androidx.work.runtime.ktx)
 
     // Core library desugaring
     coreLibraryDesugaring(libs.androidx.core.desugaring)
@@ -72,6 +83,7 @@ dependencies {
     // Lifecycle
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
 
     // Testing
     testImplementation(libs.bundles.unit.test)

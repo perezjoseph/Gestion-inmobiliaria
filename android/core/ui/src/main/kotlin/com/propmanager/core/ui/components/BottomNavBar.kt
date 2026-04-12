@@ -4,6 +4,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -31,15 +33,29 @@ fun PropManagerBottomNavBar(
     currentRoute: String?,
     onNavigate: (BottomNavItem) -> Unit,
     modifier: Modifier = Modifier,
+    notificationBadgeCount: Int = 0,
 ) {
     NavigationBar(modifier = modifier) {
         BottomNavItem.entries.forEach { item ->
             NavigationBarItem(
                 icon = {
-                    Icon(
-                        imageVector = item.icon,
-                        contentDescription = stringResource(item.labelResId),
-                    )
+                    if (item == BottomNavItem.Mas && notificationBadgeCount > 0) {
+                        BadgedBox(
+                            badge = {
+                                Badge { Text(notificationBadgeCount.toString()) }
+                            },
+                        ) {
+                            Icon(
+                                imageVector = item.icon,
+                                contentDescription = stringResource(item.labelResId),
+                            )
+                        }
+                    } else {
+                        Icon(
+                            imageVector = item.icon,
+                            contentDescription = stringResource(item.labelResId),
+                        )
+                    }
                 },
                 label = { Text(text = stringResource(item.labelResId)) },
                 selected = currentRoute == item.route,

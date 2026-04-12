@@ -173,11 +173,7 @@ fun InquilinoFormScreen(
             PropManagerTopAppBar(
                 title = title,
                 scrollBehavior = scrollBehavior,
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.navigate_back))
-                    }
-                },
+                onNavigateBack = onNavigateBack,
             )
         },
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),

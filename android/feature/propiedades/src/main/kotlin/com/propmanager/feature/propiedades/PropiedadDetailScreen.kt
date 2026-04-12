@@ -73,11 +73,7 @@ fun PropiedadDetailScreen(
             PropManagerTopAppBar(
                 title = stringResource(R.string.propiedad_detail),
                 scrollBehavior = scrollBehavior,
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.navigate_back))
-                    }
-                },
+                onNavigateBack = onNavigateBack,
                 actions = {
                     if (detailState is PropiedadDetailUiState.Success) {
                         val propiedad = (detailState as PropiedadDetailUiState.Success).propiedad

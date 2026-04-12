@@ -105,7 +105,7 @@ fun ContratoDetailScreen(
             PropManagerTopAppBar(
                 title = stringResource(R.string.contrato_detail),
                 scrollBehavior = scrollBehavior,
-                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.navigate_back)) } },
+                onNavigateBack = onNavigateBack,
                 actions = {
                     if (detailState is ContratoDetailUiState.Success) {
                         val c = (detailState as ContratoDetailUiState.Success).contrato.contrato
