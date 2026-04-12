@@ -20,6 +20,7 @@ import hmac
 import json
 import logging
 import os
+import pathlib
 import re
 import socket
 import subprocess
@@ -30,6 +31,15 @@ from collections import defaultdict
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 
+_env_path = pathlib.Path(__file__).resolve().parent.parent / ".env"
+if _env_path.is_file():
+    with open(_env_path) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _k, _, _v = _line.partition("=")
+                os.environ.setdefault(_k.strip(), _v.strip())
+
 PORT = 9090
 BIND_ADDRESS = os.environ.get("BIND_ADDRESS", "127.0.0.1")
 _ALLOWED_BIND = {"127.0.0.1", "::1", "localhost"}
@@ -38,7 +48,7 @@ if BIND_ADDRESS not in _ALLOWED_BIND:
         f"BIND_ADDRESS={BIND_ADDRESS!r} is not allowed. "
         f"Must be one of {_ALLOWED_BIND} to prevent network exposure."
     )
-PROJECT_DIR = "/mnt/d/realestate"
+PROJECT_DIR = str(pathlib.Path(__file__).resolve().parent.parent)
 WSL_DISTRO = "Ubuntu-22.04"
 WSL_USER = "jperez"
 MAX_RETRIES = 3
@@ -209,10 +219,6 @@ def run_kiro(prompt, label):
 
 
 def fix_with_retry(job, step, error_log, context=None):
-    if job == "commit-lint":
-        log.info("Skipping commit-lint -- cannot auto-fix commit messages")
-        return False
-
     if not _fix_lock.acquire(blocking=False):
         log.warning(f"Another fix is already running -- skipping {job}/{step}")
         return False

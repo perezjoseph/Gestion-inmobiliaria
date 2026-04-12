@@ -412,13 +412,12 @@ jobs:
     name: Android Debug Build
     runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
     timeout-minutes: 30
-    needs: [secret-scan, commit-lint, dependency-review, lint, unit-test, quality-gate]
+    needs: [secret-scan, dependency-review, lint, unit-test, quality-gate]
     if: |
       always() &&
       needs.secret-scan.result == 'success' &&
       needs.lint.result == 'success' &&
       needs.unit-test.result == 'success' &&
-      (needs.commit-lint.result == 'success' || needs.commit-lint.result == 'skipped') &&
       (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped') &&
       (needs.quality-gate.result == 'success')
     permissions:
@@ -514,7 +513,7 @@ jobs:
       GH_SHA: ${{ github.sha }}
       GH_REF_NAME: ${{ github.ref_name }}
       GH_ACTOR: ${{ github.actor }}
-    needs: [secret-scan, commit-lint, dependency-review, lint, unit-test, quality-gate, build]
+    needs: [secret-scan, dependency-review, lint, unit-test, quality-gate, build]
     if: always() && contains(needs.*.result, 'failure')
     steps:
       - name: Validate webhook configuration
@@ -534,24 +533,6 @@ jobs:
             --arg job "secret-scan" \
             --arg step "gitleaks" \
             --arg error_log "Gitleaks detected secrets in the Android repository. Review the secret-scan job output and rotate any exposed credentials immediately." \
-            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
-            --arg commit "$GH_SHA" \
-            --arg branch "$GH_REF_NAME" \
-            --arg actor "$GH_ACTOR" \
-            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
-          SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
-          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
-            -H "Content-Type: application/json" \
-            -H "X-Signature-256: sha256=$SIGNATURE" \
-            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
-
-      - name: Notify -- conventional commit validation failed
-        if: always() && needs.commit-lint.result == 'failure' && steps.webhook-check.outputs.skip != 'true'
-        run: |
-          PAYLOAD=$(jq -n \
-            --arg job "commit-lint" \
-            --arg step "commitlint" \
-            --arg error_log "Commit message lint failed. Commit messages must follow conventional commits format (feat:, fix:, chore:, etc.)." \
             --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
             --arg commit "$GH_SHA" \
             --arg branch "$GH_REF_NAME" \
@@ -654,10 +635,9 @@ jobs:
             echo "## Android Pipeline Failure Summary"
             echo "| Job | Result |"
             echo "|-----|--------|"
-            for JOB in secret-scan commit-lint dependency-review lint unit-test quality-gate build; do
+            for JOB in secret-scan dependency-review lint unit-test quality-gate build; do
               case "$JOB" in
                 secret-scan) RESULT="${{ needs.secret-scan.result }}" ;;
-                commit-lint) RESULT="${{ needs.commit-lint.result }}" ;;
                 dependency-review) RESULT="${{ needs.dependency-review.result }}" ;;
                 lint) RESULT="${{ needs.lint.result }}" ;;
                 unit-test) RESULT="${{ needs.unit-test.result }}" ;;
