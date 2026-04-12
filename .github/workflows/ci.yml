@@ -143,6 +143,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-lint-
             ${{ runner.os }}-cargo-
+          save-always: true
 
       - name: Verify rustfmt formatting across all crates
         id: fmt
@@ -274,6 +275,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-test-
             ${{ runner.os }}-cargo-
+          save-always: true
 
       - name: Run backend tests
         id: backend-tests
@@ -386,6 +388,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-frontend-test-v2-
             ${{ runner.os }}-cargo-
+          save-always: true
 
       - name: Run frontend tests (native target)
         id: frontend-tests
@@ -692,8 +695,11 @@ jobs:
     permissions:
       contents: read
     continue-on-error: true
-    needs: [test-backend]
-    if: ${{ !(inputs.skip_sonarqube || false) }}
+    needs: [test-backend, test-frontend]
+    if: |
+      always() &&
+      !(inputs.skip_sonarqube || false) &&
+      (needs.test-backend.result == 'success' || needs.test-frontend.result == 'success')
     outputs:
       duration: ${{ steps.timing.outputs.duration }}
     steps:
@@ -742,7 +748,9 @@ jobs:
           if [ -n "$TOKEN" ]; then
             echo "Using existing SONAR_TOKEN secret."
             echo "::add-mask::$TOKEN"
-            echo "token=$TOKEN" >> $GITHUB_OUTPUT
+            {
+              echo "SONAR_ANALYSIS_TOKEN=$TOKEN"
+            } >> "$GITHUB_ENV"
             exit 0
           fi
 
@@ -770,8 +778,15 @@ jobs:
             "$SONAR_URL/api/user_tokens/generate?name=ci-token" \
             | jq -r '.token')
 
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "::error::Failed to generate SonarQube token"
+            exit 1
+          fi
+
           echo "::add-mask::$TOKEN"
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          {
+            echo "SONAR_ANALYSIS_TOKEN=$TOKEN"
+          } >> "$GITHUB_ENV"
 
       - name: Run SonarQube static analysis scan
         id: sonar-scan
@@ -790,7 +805,7 @@ jobs:
             --read-only \
             --memory 1g \
             --tmpfs /tmp:rw,noexec,nosuid,nodev \
-            -e SONAR_TOKEN="${{ steps.sonar-bootstrap.outputs.token }}" \
+            -e SONAR_TOKEN="${SONAR_ANALYSIS_TOKEN}" \
             -e SONAR_HOST_URL="http://192.168.88.25:9000" \
             -v "${{ github.workspace }}:/usr/src" \
             sonarsource/sonar-scanner-cli:11.3@sha256:7462f132388135e32b948f8f18ff0db9ae28a87c6777f1df5b2207e04a6d7c5c \
@@ -802,7 +817,7 @@ jobs:
       - name: Fetch SonarQube results and notify
         if: always()
         env:
-          SONAR_TOKEN: ${{ steps.sonar-bootstrap.outputs.token }}
+          SONAR_TOKEN: ${{ env.SONAR_ANALYSIS_TOKEN }}
           SCAN_OUTCOME: ${{ steps.sonar-scan.outcome }}
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
         run: |
@@ -877,6 +892,7 @@ jobs:
             echo "## SonarQube Results"
             echo "- Quality Gate: **$GATE_STATUS**"
             echo "- Open Issues: **$TOTAL** ($SUMMARY)"
+            echo "- [View Dashboard](http://192.168.88.25:9000/dashboard?id=gestion-inmobiliaria)"
             if [ "$GATE_STATUS" = "ERROR" ]; then
               echo ""
               echo "### Top Issues"
@@ -940,7 +956,8 @@ jobs:
       needs.test-backend.result == 'success' &&
       needs.test-frontend.result == 'success' &&
       needs.quality-gate.result == 'success' &&
-      (needs.commit-lint.result == 'success' || needs.commit-lint.result == 'skipped')
+      (needs.commit-lint.result == 'success' || needs.commit-lint.result == 'skipped') &&
+      (needs.sonarqube.result == 'success' || needs.sonarqube.result == 'skipped' || needs.sonarqube.result == 'cancelled')
     steps:
       - name: Record start time
         id: start
@@ -974,6 +991,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-wasm-
             ${{ runner.os }}-cargo-
+          save-always: true
 
       - name: Build optimized WASM frontend bundle
         run: trunk build --release 2>&1 | tee /tmp/build-frontend-output.txt
@@ -1046,7 +1064,8 @@ jobs:
       needs.test-backend.result == 'success' &&
       needs.test-frontend.result == 'success' &&
       needs.quality-gate.result == 'success' &&
-      (needs.commit-lint.result == 'success' || needs.commit-lint.result == 'skipped')
+      (needs.commit-lint.result == 'success' || needs.commit-lint.result == 'skipped') &&
+      (needs.sonarqube.result == 'success' || needs.sonarqube.result == 'skipped' || needs.sonarqube.result == 'cancelled')
     steps:
       - name: Record start time
         id: start
@@ -1075,6 +1094,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-backend-build-
             ${{ runner.os }}-cargo-
+          save-always: true
 
       - name: Build optimized backend binary
         run: cargo build --locked -p realestate-backend --release 2>&1 | tee /tmp/build-backend-output.txt
