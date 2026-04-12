@@ -61,7 +61,7 @@ jobs:
           rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           fetch-depth: 0
@@ -95,7 +95,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
@@ -132,7 +132,7 @@ jobs:
           rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
@@ -144,7 +144,7 @@ jobs:
 
       - name: Restore cargo cache
         id: cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: |
             ~/.cargo/registry
@@ -176,6 +176,18 @@ jobs:
             echo "::error::Backend clippy found warnings/errors."
             exit 1
           fi
+
+      - name: Generate clippy JSON report for SonarQube
+        id: clippy_json
+        if: always()
+        timeout-minutes: 15
+        run: |
+          umask 077
+          cargo clippy --locked -p realestate-backend --message-format=json -- -D warnings \
+            > "${RUNNER_TEMP}/clippy-report.json" 2>/dev/null || true
+          cargo clippy --locked -p realestate-frontend --target wasm32-unknown-unknown --message-format=json -- -D warnings \
+            >> "${RUNNER_TEMP}/clippy-report.json" 2>/dev/null || true
+          cp "${RUNNER_TEMP}/clippy-report.json" clippy-report.json
 
       - name: Run clippy lints on frontend WASM target
         id: clippy_frontend
@@ -233,9 +245,19 @@ jobs:
         if: always() && (steps.fmt.outcome == 'failure' || steps.clippy_backend.outcome == 'failure' || steps.clippy_frontend.outcome == 'failure')
         run: exit 1
 
+      - name: Upload clippy report for SonarQube
+        if: always() && steps.clippy_json.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: clippy-report
+          path: clippy-report.json
+          retention-days: 1
+          overwrite: false
+          if-no-files-found: warn
+
       - name: Clean up sensitive temp files
         if: always()
-        run: rm -f "${RUNNER_TEMP}/fmt-output.txt" "${RUNNER_TEMP}/clippy-backend-output.txt" "${RUNNER_TEMP}/clippy-frontend-output.txt"
+        run: rm -f "${RUNNER_TEMP}/fmt-output.txt" "${RUNNER_TEMP}/clippy-backend-output.txt" "${RUNNER_TEMP}/clippy-frontend-output.txt" "${RUNNER_TEMP}/clippy-report.json"
 
   test-backend:
     name: Backend Unit & Integration Tests
@@ -291,7 +313,7 @@ jobs:
           rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
@@ -300,7 +322,7 @@ jobs:
 
       - name: Restore cargo cache
         id: cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: |
             ~/.cargo/registry
@@ -338,7 +360,7 @@ jobs:
 
       - name: Generate test coverage report (LCOV)
         id: coverage
-        if: success() && github.ref == 'refs/heads/main'
+        if: success()
         run: |
           umask 077
           export PATH="$HOME/.cargo/bin:$PATH"
@@ -391,7 +413,7 @@ jobs:
 
       - name: Upload coverage artifact
         if: always() && steps.coverage.outputs.generated == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: backend-coverage
           path: coverage/lcov.info
@@ -464,7 +486,7 @@ jobs:
           rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
@@ -475,7 +497,7 @@ jobs:
 
       - name: Restore cargo cache
         id: cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: |
             ~/.cargo/registry
@@ -546,6 +568,7 @@ jobs:
     timeout-minutes: 30
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
+      actions: read
       contents: read
       security-events: write
     outputs:
@@ -569,7 +592,7 @@ jobs:
         run: rm -rf reports/
 
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           clean: false
@@ -686,7 +709,7 @@ jobs:
 
       - name: Upload OWASP vulnerability report
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: owasp-dependency-check-report
           path: reports/
@@ -735,8 +758,8 @@ jobs:
             Dockerfile.backend Dockerfile.frontend docker-compose.prod.yml docker-compose.dev.yml || true
 
       - name: Upload Trivy IaC SARIF to GitHub Security
-        if: always() && steps.install_trivy.outputs.installed == 'true'
-        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3.28.18
+        if: always() && steps.install_trivy.outputs.installed == 'true' && hashFiles('trivy-iac.sarif') != ''
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
         with:
           sarif_file: trivy-iac.sarif
           category: trivy-iac
@@ -791,8 +814,8 @@ jobs:
           " > cargo-audit.sarif 2>/dev/null || echo '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"cargo-audit","rules":[]}},"results":[]}]}' > cargo-audit.sarif
 
       - name: Upload cargo-audit SARIF to GitHub Security
-        if: always() && steps.install_audit.outputs.installed == 'true'
-        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3.28.18
+        if: always() && steps.install_audit.outputs.installed == 'true' && hashFiles('cargo-audit.sarif') != ''
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
         with:
           sarif_file: cargo-audit.sarif
           category: cargo-audit
@@ -830,8 +853,8 @@ jobs:
           " > cargo-deny.sarif 2>/dev/null || echo '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"cargo-deny","rules":[]}},"results":[]}]}' > cargo-deny.sarif
 
       - name: Upload cargo-deny SARIF to GitHub Security
-        if: always() && steps.install_deny.outputs.installed == 'true'
-        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3.28.18
+        if: always() && steps.install_deny.outputs.installed == 'true' && hashFiles('cargo-deny.sarif') != ''
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
         with:
           sarif_file: cargo-deny.sarif
           category: cargo-deny
@@ -909,12 +932,11 @@ jobs:
       contents: read
     env:
       DOCKER_CONTENT_TRUST: "1"
-    continue-on-error: true
-    needs: [test-backend, test-frontend]
+    needs: [lint, test-backend, test-frontend]
     if: |
       always() &&
       !(inputs.skip_sonarqube || false) &&
-      (needs.test-backend.result == 'success' || needs.test-frontend.result == 'success')
+      (needs.test-backend.result == 'success' || needs.test-frontend.result == 'success' || needs.lint.result == 'success')
     outputs:
       duration: ${{ steps.timing.outputs.duration }}
     steps:
@@ -931,31 +953,72 @@ jobs:
           rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository with full history for blame analysis
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           fetch-depth: 0
 
       - name: Download backend coverage report
         id: download-coverage
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: backend-coverage
           path: coverage/
         continue-on-error: true
 
+      - name: Download clippy report
+        id: download-clippy
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: clippy-report
+          path: .
+        continue-on-error: true
+
+      - name: Set up JDK 17 for Android analysis
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
+        with:
+          cache-read-only: true
+
+      - name: Generate Android Lint XML report
+        id: android-lint-xml
+        timeout-minutes: 15
+        working-directory: android
+        run: |
+          umask 077
+          ./gradlew :app:lintDebug --no-daemon --stacktrace 2>/dev/null || true
+        continue-on-error: true
+
+      - name: Generate detekt XML report
+        id: detekt-xml
+        timeout-minutes: 10
+        working-directory: android
+        run: |
+          umask 077
+          ./gradlew detekt --no-daemon --stacktrace 2>/dev/null || true
+        continue-on-error: true
+
       - name: Validate SONAR_HOST_URL format
+        id: sonar-url-check
         run: |
           if [ -z "$SONAR_HOST_URL" ]; then
-            echo "::error::SONAR_HOST_URL is not set"
-            exit 1
+            echo "::warning::SONAR_HOST_URL is not set -- skipping SonarQube scan"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
           fi
           if ! echo "$SONAR_HOST_URL" | grep -qE '^https?://[a-zA-Z0-9._\-]+(:[0-9]{1,5})?(/[a-zA-Z0-9._\-/]*)?$'; then
             echo "::error::SONAR_HOST_URL has invalid format -- possible SSRF vector"
             exit 1
           fi
+          echo "skip=false" >> $GITHUB_OUTPUT
 
       - name: Verify SonarQube server is reachable
+        if: steps.sonar-url-check.outputs.skip != 'true'
         timeout-minutes: 2
         run: |
           SONAR_URL="${SONAR_HOST_URL}"
@@ -1024,6 +1087,7 @@ jobs:
 
       - name: Run SonarQube static analysis scan
         id: sonar-scan
+        if: steps.sonar-url-check.outputs.skip != 'true'
         env:
           HAS_COVERAGE: ${{ steps.download-coverage.outcome == 'success' }}
           IS_PR: ${{ github.event_name == 'pull_request' }}
@@ -1039,6 +1103,18 @@ jobs:
           if [ "$HAS_COVERAGE" = "true" ] && [ -f coverage/lcov.info ]; then
             echo "Coverage report found -- including in SonarQube analysis"
             SCAN_ARGS+=("-Dsonar.rust.lcov.reportPaths=/usr/src/coverage/lcov.info")
+          fi
+          if [ -f clippy-report.json ]; then
+            echo "Clippy report found -- including in SonarQube analysis"
+            SCAN_ARGS+=("-Dsonar.rust.clippy.reportPaths=/usr/src/clippy-report.json")
+          fi
+          if [ -f android/app/build/reports/lint-results-debug.xml ]; then
+            echo "Android Lint XML report found -- including in SonarQube analysis"
+            SCAN_ARGS+=("-Dsonar.androidLint.reportPaths=/usr/src/android/app/build/reports/lint-results-debug.xml")
+          fi
+          if [ -f android/build/reports/detekt/detekt.xml ]; then
+            echo "Detekt report found -- including in SonarQube analysis"
+            SCAN_ARGS+=("-Dsonar.kotlin.detekt.reportPaths=/usr/src/android/build/reports/detekt/detekt.xml")
           fi
           if [ "$IS_PR" = "true" ] && [ -n "$PR_KEY" ]; then
             echo "PR detected (#${PR_KEY}) -- enabling PR decoration"
@@ -1070,7 +1146,7 @@ jobs:
             "${SCAN_ARGS[@]}"
 
       - name: Fetch SonarQube results and notify
-        if: always()
+        if: always() && steps.sonar-url-check.outputs.skip != 'true'
         timeout-minutes: 8
         env:
           SONAR_TOKEN: ${{ env.SONAR_ANALYSIS_TOKEN }}
@@ -1209,7 +1285,7 @@ jobs:
           fi
 
       - name: Revoke bootstrap SonarQube token
-        if: always() && env.SONAR_ANALYSIS_TOKEN != ''
+        if: always() && steps.sonar-url-check.outputs.skip != 'true' && env.SONAR_ANALYSIS_TOKEN != ''
         run: |
           TOKEN="${{ secrets.SONAR_TOKEN }}"
           if [ -n "$TOKEN" ]; then
@@ -1267,7 +1343,7 @@ jobs:
           rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
@@ -1281,7 +1357,7 @@ jobs:
 
       - name: Restore cargo cache
         id: cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: |
             ~/.cargo/registry
@@ -1360,7 +1436,7 @@ jobs:
           fi
 
       - name: Upload frontend dist artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: frontend-dist
           path: |
@@ -1371,7 +1447,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload frontend build SBOM
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: frontend-build-sbom
           path: frontend-build-sbom.spdx.json
@@ -1380,7 +1456,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Attest frontend build provenance
-        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
           subject-path: frontend/dist/
 
@@ -1439,7 +1515,7 @@ jobs:
           rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
@@ -1448,7 +1524,7 @@ jobs:
 
       - name: Restore cargo cache
         id: cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: |
             ~/.cargo/registry
@@ -1524,7 +1600,7 @@ jobs:
           fi
 
       - name: Upload backend binary artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: backend-binary
           path: |
@@ -1535,7 +1611,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload backend build SBOM
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: backend-build-sbom
           path: backend-build-sbom.spdx.json
@@ -1544,7 +1620,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Attest backend build provenance
-        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
           subject-path: target/release/realestate-backend
 
@@ -1597,12 +1673,12 @@ jobs:
           rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -1612,7 +1688,7 @@ jobs:
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
       - name: Build backend image (local)
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198e19c3bc4c94 # v6.18.0
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
           context: .
           file: Dockerfile.backend
@@ -1661,7 +1737,7 @@ jobs:
 
       - name: Upload backend SBOM artifact
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: backend-sbom
           path: backend-sbom.spdx.json
@@ -1670,8 +1746,8 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload Trivy SARIF to GitHub Security
-        if: always()
-        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3.28.18
+        if: always() && hashFiles('trivy-backend.sarif') != ''
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
         with:
           sarif_file: trivy-backend.sarif
           category: trivy-backend
@@ -1688,7 +1764,7 @@ jobs:
 
       - name: Attest backend container image provenance
         if: steps.push-backend.outputs.digest != ''
-        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
           subject-name: ghcr.io/${IMAGE_OWNER}/realestate-backend
           subject-digest: ${{ steps.push-backend.outputs.digest }}
@@ -1732,12 +1808,12 @@ jobs:
           rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -1747,7 +1823,7 @@ jobs:
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
       - name: Build frontend image (local)
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198e19c3bc4c94 # v6.18.0
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
           context: .
           file: Dockerfile.frontend
@@ -1796,7 +1872,7 @@ jobs:
 
       - name: Upload frontend SBOM artifact
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: frontend-sbom
           path: frontend-sbom.spdx.json
@@ -1805,8 +1881,8 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload Trivy SARIF to GitHub Security
-        if: always()
-        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3.28.18
+        if: always() && hashFiles('trivy-frontend.sarif') != ''
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
         with:
           sarif_file: trivy-frontend.sarif
           category: trivy-frontend
@@ -1823,7 +1899,7 @@ jobs:
 
       - name: Attest frontend container image provenance
         if: steps.push-frontend.outputs.digest != ''
-        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
           subject-name: ghcr.io/${IMAGE_OWNER}/realestate-frontend
           subject-digest: ${{ steps.push-frontend.outputs.digest }}
@@ -1867,12 +1943,12 @@ jobs:
           rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
       - name: Log in to GHCR
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -2325,7 +2401,7 @@ jobs:
           rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
