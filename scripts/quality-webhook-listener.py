@@ -30,6 +30,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 
 PORT = 9090
+BIND_ADDRESS = os.environ.get("BIND_ADDRESS", "0.0.0.0")
 PROJECT_DIR = "/mnt/d/realestate"
 WSL_DISTRO = "Ubuntu-22.04"
 WSL_USER = "jperez"
@@ -463,7 +464,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
         fix_with_retry(job, step, error_log, context)
 
     def _handle_ci_improve(self, payload):
-        focus = _validate_name(payload.get("focus", "general").split(",")[0]) if "," not in payload.get("focus", "") else _sanitize_text(payload.get("focus", "general"), 128)
+        raw_focus = _sanitize_text(payload.get("focus", "general"), 128)
+        focus = ",".join(_validate_name(f.strip()) for f in raw_focus.split(",") if f.strip())
+        if not focus:
+            focus = "general"
         pipeline_report = _sanitize_text(payload.get("pipeline_report", ""))
         sonar_report = _sanitize_text(payload.get("sonar_report", ""))
         run_url = _sanitize_text(payload.get("run_url", ""), 256)
@@ -484,8 +488,8 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
 def main():
     local_ip = get_local_ip()
-    server = HTTPServer(("0.0.0.0", PORT), WebhookHandler)
-    log.info(f"Quality webhook listener running on port {PORT}")
+    server = HTTPServer((BIND_ADDRESS, PORT), WebhookHandler)
+    log.info(f"Quality webhook listener running on {BIND_ADDRESS}:{PORT}")
     log.info(f"Max retries: {MAX_RETRIES} | Timeout: {KIRO_TIMEOUT // 60}min | Max payload: {MAX_PAYLOAD_BYTES // 1024}KB")
     log.info("Endpoints:")
     log.info(f"  Health:     http://{local_ip}:{PORT}/health")

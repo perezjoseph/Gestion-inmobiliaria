@@ -256,7 +256,6 @@ jobs:
       contents: read
     env:
       DATABASE_URL: postgresql://realestate:realestate_dev_password@localhost:5432/realestate
-      JWT_SECRET: ${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
       SERVER_PORT: 8080
       CORS_ORIGIN: http://localhost:8080
     outputs:
@@ -307,6 +306,9 @@ jobs:
             ${{ runner.os }}-cargo-test-
             ${{ runner.os }}-cargo-
           save-always: true
+
+      - name: Generate random JWT secret for test isolation
+        run: echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       - name: Run backend tests
         id: backend-tests
@@ -940,14 +942,14 @@ jobs:
           fi
           if [ "$IS_PR" = "true" ] && [ -n "$PR_KEY" ]; then
             echo "PR detected (#${PR_KEY}) -- enabling PR decoration"
-            EXTRA_ARGS="$EXTRA_ARGS -Dsonar.pullrequest.key=$PR_KEY"
-            EXTRA_ARGS="$EXTRA_ARGS -Dsonar.pullrequest.branch=$PR_BRANCH"
-            EXTRA_ARGS="$EXTRA_ARGS -Dsonar.pullrequest.base=$PR_BASE"
+            EXTRA_ARGS="$EXTRA_ARGS -Dsonar.pullrequest.key=${PR_KEY}"
+            EXTRA_ARGS="$EXTRA_ARGS -Dsonar.pullrequest.branch=${PR_BRANCH}"
+            EXTRA_ARGS="$EXTRA_ARGS -Dsonar.pullrequest.base=${PR_BASE}"
           else
             BRANCH_NAME="${{ github.ref_name }}"
             if [ -n "$BRANCH_NAME" ]; then
               echo "Branch push detected -- setting sonar.branch.name=$BRANCH_NAME"
-              EXTRA_ARGS="$EXTRA_ARGS -Dsonar.branch.name=$BRANCH_NAME"
+              EXTRA_ARGS="$EXTRA_ARGS -Dsonar.branch.name=${BRANCH_NAME}"
             fi
           fi
           docker run --rm \
@@ -1725,21 +1727,20 @@ jobs:
       - name: Define payload sanitizer
         id: sanitizer
         run: |
-          # Create a reusable sanitizer script that strips potential secrets from error payloads
-          cat > /tmp/sanitize-payload.sh << 'SANITIZE_EOF'
-          #!/usr/bin/env bash
-          # Strip common secret patterns from webhook payloads
-          sed -E \
-            -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' \
-            -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' \
-            -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' \
-            -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' \
-            -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'
-          SANITIZE_EOF
-          chmod +x /tmp/sanitize-payload.sh
+          # Define sanitizer as a shell function (avoids TOCTOU race with /tmp file on shared runners)
+          # Each subsequent step sources this function inline via heredoc
+          echo "Sanitizer defined as inline function in each notification step"
       - name: Notify -- secret scanning detected leaked secrets
         if: always() && needs.secret-scan.result == 'failure'
         run: |
+          sanitize_payload() {
+            sed -E \
+              -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' \
+              -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' \
+              -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' \
+              -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' \
+              -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'
+          }
           PAYLOAD=$(jq -n \
             --arg job "secret-scan" \
             --arg step "gitleaks" \
@@ -1779,10 +1780,11 @@ jobs:
           ERROR_LOG: ${{ needs.lint.outputs.error_log }}
           FAILED_STEPS: ${{ needs.lint.outputs.failed_steps }}
         run: |
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Lint job failed but no captured output. Run cargo fmt --all -- --check and cargo clippy --workspace -- -D warnings to reproduce."
           fi
-          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | /tmp/sanitize-payload.sh)
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
           STEP="${FAILED_STEPS:-clippy-or-fmt}"
           PAYLOAD=$(jq -n --arg job "lint" --arg step "$STEP" --arg error_log "$ERROR_LOG" \
             --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
@@ -1799,10 +1801,11 @@ jobs:
         env:
           ERROR_LOG: ${{ needs.test-backend.outputs.error_log }}
         run: |
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Backend tests failed but no captured output. Run cargo test -p realestate-backend --all-targets to reproduce."
           fi
-          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | /tmp/sanitize-payload.sh)
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
           PAYLOAD=$(jq -n --arg job "test-backend" --arg step "cargo-test" --arg error_log "$ERROR_LOG" \
             --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
@@ -1818,10 +1821,11 @@ jobs:
         env:
           ERROR_LOG: ${{ needs.test-frontend.outputs.error_log }}
         run: |
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Frontend tests failed but no captured output. Run cargo test -p realestate-frontend --all-targets to reproduce."
           fi
-          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | /tmp/sanitize-payload.sh)
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
           PAYLOAD=$(jq -n --arg job "test-frontend" --arg step "cargo-test" --arg error_log "$ERROR_LOG" \
             --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
@@ -1838,10 +1842,11 @@ jobs:
           ERROR_LOG: ${{ needs.quality-gate.outputs.error_log }}
           FAILED_STEPS: ${{ needs.quality-gate.outputs.failed_steps }}
         run: |
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Quality gate failed but no captured output. Run cargo audit and check OWASP scan to reproduce."
           fi
-          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | /tmp/sanitize-payload.sh)
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
           STEP="${FAILED_STEPS:-audit-or-owasp}"
           PAYLOAD=$(jq -n --arg job "quality-gate" --arg step "$STEP" --arg error_log "$ERROR_LOG" \
             --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
@@ -1858,10 +1863,11 @@ jobs:
         env:
           ERROR_LOG: ${{ needs.build-frontend.outputs.error_log }}
         run: |
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Frontend WASM build failed but no captured output. Run trunk build --release in frontend/ to reproduce."
           fi
-          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | /tmp/sanitize-payload.sh)
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
           PAYLOAD=$(jq -n --arg job "build-frontend" --arg step "trunk-build" --arg error_log "$ERROR_LOG" \
             --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
@@ -1877,10 +1883,11 @@ jobs:
         env:
           ERROR_LOG: ${{ needs.build-backend.outputs.error_log }}
         run: |
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Backend release build failed but no captured output. Run cargo build -p realestate-backend --release to reproduce."
           fi
-          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | /tmp/sanitize-payload.sh)
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
           PAYLOAD=$(jq -n --arg job "build-backend" --arg step "cargo-build" --arg error_log "$ERROR_LOG" \
             --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
@@ -1963,10 +1970,6 @@ jobs:
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
 
-      - name: Clean up sanitizer script
-        if: always()
-        run: rm -f /tmp/sanitize-payload.sh
-
       - name: Write failure summary
         if: always()
         run: |
@@ -2042,6 +2045,7 @@ jobs:
               echo "sonar_report=SonarQube token unavailable -- skipping issue collection." >> $GITHUB_OUTPUT
               exit 0
             fi
+            echo "::add-mask::$TOKEN"
             echo "temp_token=true" >> $GITHUB_OUTPUT
           fi
 
