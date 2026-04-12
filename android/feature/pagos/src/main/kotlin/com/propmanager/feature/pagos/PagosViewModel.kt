@@ -11,7 +11,7 @@ import com.propmanager.core.model.Pago
 import com.propmanager.core.model.ValidationResult
 import com.propmanager.core.model.dto.CreatePagoRequest
 import com.propmanager.core.model.dto.UpdatePagoRequest
-import com.propmanager.core.network.NetworkMonitor
+import com.propmanager.core.network.ConnectivityObserver
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,7 +59,7 @@ class PagosViewModel
     constructor(
         private val pagosRepository: PagosRepository,
         private val contratosRepository: ContratosRepository,
-        private val networkMonitor: NetworkMonitor,
+        private val networkMonitor: ConnectivityObserver,
     ) : ViewModel() {
         private val _filters = MutableStateFlow(PagosFilterState())
         val filters: StateFlow<PagosFilterState> = _filters.asStateFlow()
