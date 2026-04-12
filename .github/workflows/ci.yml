@@ -33,6 +33,7 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
   RUSTFLAGS: "-D warnings"
   SONAR_HOST_URL: "http://192.168.88.25:9000"
 
@@ -218,6 +219,10 @@ jobs:
         if: always() && (steps.fmt.outcome == 'failure' || steps.clippy_backend.outcome == 'failure' || steps.clippy_frontend.outcome == 'failure')
         run: exit 1
 
+      - name: Clean up sensitive temp files
+        if: always()
+        run: rm -f /tmp/fmt-output.txt /tmp/clippy-backend-output.txt /tmp/clippy-frontend-output.txt
+
   test-backend:
     name: Backend Unit & Integration Tests
     runs-on: [self-hosted, linux, docker]
@@ -236,7 +241,7 @@ jobs:
       cache_hit: ${{ steps.cache.outputs.cache-hit }}
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16@sha256:5a65324fe84dc41709ff914e90b07f3e2f577073ed27bf917d4873aca0c9ec51
         env:
           POSTGRES_DB: realestate
           POSTGRES_USER: realestate
@@ -248,6 +253,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+          --security-opt no-new-privileges
     steps:
       - name: Record start time
         id: start
@@ -348,6 +354,10 @@ jobs:
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
 
+      - name: Clean up sensitive temp files
+        if: always()
+        run: rm -f /tmp/test-backend-output.txt /tmp/tarpaulin-output.txt
+
   test-frontend:
     name: Frontend WASM Compilation & Tests
     runs-on: [self-hosted, linux]
@@ -431,6 +441,10 @@ jobs:
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
 
+      - name: Clean up sensitive temp files
+        if: always()
+        run: rm -f /tmp/test-frontend-output.txt
+
   quality-gate:
     name: Dependency Security & Health Check
     runs-on: [self-hosted, linux, docker]
@@ -475,10 +489,18 @@ jobs:
           rm -f "$HOME/.cargo/bin/cargo-audit"
           mkdir -p "$HOME/.cargo/bin"
           AUDIT_VERSION="0.22.1"
+          AUDIT_SHA256_musl="c32506f338bdcdaef5a17fb9f33abb6ecf9561324cfd34237fd335f9283a1eab"
+          AUDIT_SHA256_gnu="1890badd5f15831a9af4b074399fcd21e6f7c0fe42c84e9254cdffc9f813765c"
           INSTALLED=false
           for VARIANT in musl gnu; do
             URL="https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-${VARIANT}-v${AUDIT_VERSION}.tgz"
+            EXPECTED_SHA=$(eval echo "\$AUDIT_SHA256_${VARIANT}")
             if curl -sSfL --retry 3 --retry-delay 10 --connect-timeout 30 -o /tmp/cargo-audit.tgz "$URL" 2>/tmp/install-audit-output.txt; then
+              if ! echo "${EXPECTED_SHA}  /tmp/cargo-audit.tgz" | sha256sum -c -; then
+                echo "::warning::Checksum mismatch for cargo-audit ${VARIANT} binary -- skipping"
+                rm -f /tmp/cargo-audit.tgz
+                continue
+              fi
               if tar xzf /tmp/cargo-audit.tgz --strip-components=1 -C "$HOME/.cargo/bin/" 2>>/tmp/install-audit-output.txt; then
                 chmod +x "$HOME/.cargo/bin/cargo-audit"
                 if cargo audit --version &>/dev/null; then
@@ -520,8 +542,10 @@ jobs:
             exit 0
           fi
           DENY_VERSION="0.16.4"
+          DENY_SHA256="28b7f8e12df46a9ce186547e38278c851905fc4bda59a0cc57d2aade9fdf6962"
           URL="https://github.com/EmbarkStudios/cargo-deny/releases/download/${DENY_VERSION}/cargo-deny-${DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz"
           if curl -sSfL --retry 3 -o /tmp/cargo-deny.tar.gz "$URL"; then
+            echo "${DENY_SHA256}  /tmp/cargo-deny.tar.gz" | sha256sum -c -
             tar xzf /tmp/cargo-deny.tar.gz --strip-components=1 -C "$HOME/.cargo/bin/" 2>/dev/null
             chmod +x "$HOME/.cargo/bin/cargo-deny"
             rm -f /tmp/cargo-deny.tar.gz
@@ -754,6 +778,10 @@ jobs:
       - name: Fail job if any quality step failed
         if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.owasp.outcome == 'failure' || steps.trivy_iac.outcome == 'failure' || steps.trivy_secret.outcome == 'failure')
         run: exit 1
+
+      - name: Clean up sensitive temp files
+        if: always()
+        run: rm -f /tmp/audit-output.txt /tmp/deny-output.txt /tmp/trivy-iac-output.txt /tmp/trivy-secret-output.txt /tmp/install-audit-output.txt /tmp/cargo-audit.tgz /tmp/cargo-deny.tar.gz
 
   sonarqube:
     name: SonarQube Code Quality & Coverage Analysis
