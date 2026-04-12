@@ -172,22 +172,18 @@ jobs:
         timeout-minutes: 15
         run: |
           umask 077
-          if ! cargo clippy --locked -p realestate-backend -- -D warnings 2>&1 | tee "${RUNNER_TEMP}/clippy-backend-output.txt"; then
+          set +e
+          cargo clippy --locked -p realestate-backend --message-format=json -- -D warnings \
+            > "${RUNNER_TEMP}/clippy-backend.json" 2>"${RUNNER_TEMP}/clippy-backend-stderr.txt"
+          RESULT=$?
+          set -e
+          jq -r 'select(.reason == "compiler-message") | .message.rendered // empty' \
+            "${RUNNER_TEMP}/clippy-backend.json" > "${RUNNER_TEMP}/clippy-backend-output.txt" 2>/dev/null || true
+          if [ $RESULT -ne 0 ]; then
+            cat "${RUNNER_TEMP}/clippy-backend-output.txt"
             echo "::error::Backend clippy found warnings/errors."
             exit 1
           fi
-
-      - name: Generate clippy JSON report for SonarQube
-        id: clippy_json
-        if: always()
-        timeout-minutes: 15
-        run: |
-          umask 077
-          cargo clippy --locked -p realestate-backend --message-format=json -- -D warnings \
-            > "${RUNNER_TEMP}/clippy-report.json" 2>/dev/null || true
-          cargo clippy --locked -p realestate-frontend --target wasm32-unknown-unknown --message-format=json -- -D warnings \
-            >> "${RUNNER_TEMP}/clippy-report.json" 2>/dev/null || true
-          cp "${RUNNER_TEMP}/clippy-report.json" clippy-report.json
 
       - name: Run clippy lints on frontend WASM target
         id: clippy_frontend
@@ -195,10 +191,23 @@ jobs:
         timeout-minutes: 15
         run: |
           umask 077
-          if ! cargo clippy --locked -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings 2>&1 | tee "${RUNNER_TEMP}/clippy-frontend-output.txt"; then
+          set +e
+          cargo clippy --locked -p realestate-frontend --target wasm32-unknown-unknown --message-format=json -- -D warnings \
+            > "${RUNNER_TEMP}/clippy-frontend.json" 2>"${RUNNER_TEMP}/clippy-frontend-stderr.txt"
+          RESULT=$?
+          set -e
+          jq -r 'select(.reason == "compiler-message") | .message.rendered // empty' \
+            "${RUNNER_TEMP}/clippy-frontend.json" > "${RUNNER_TEMP}/clippy-frontend-output.txt" 2>/dev/null || true
+          if [ $RESULT -ne 0 ]; then
+            cat "${RUNNER_TEMP}/clippy-frontend-output.txt"
             echo "::error::Frontend clippy found warnings/errors."
             exit 1
           fi
+
+      - name: Assemble clippy JSON report for SonarQube
+        if: always()
+        run: |
+          cat "${RUNNER_TEMP}/clippy-backend.json" "${RUNNER_TEMP}/clippy-frontend.json" > clippy-report.json 2>/dev/null || true
 
       - name: Write lint summary
         if: always()
@@ -246,7 +255,7 @@ jobs:
         run: exit 1
 
       - name: Upload clippy report for SonarQube
-        if: always() && steps.clippy_json.outcome == 'success'
+        if: always() && hashFiles('clippy-report.json') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: clippy-report
@@ -257,7 +266,7 @@ jobs:
 
       - name: Clean up sensitive temp files
         if: always()
-        run: rm -f "${RUNNER_TEMP}/fmt-output.txt" "${RUNNER_TEMP}/clippy-backend-output.txt" "${RUNNER_TEMP}/clippy-frontend-output.txt" "${RUNNER_TEMP}/clippy-report.json"
+        run: rm -f "${RUNNER_TEMP}/fmt-output.txt" "${RUNNER_TEMP}/clippy-backend-output.txt" "${RUNNER_TEMP}/clippy-frontend-output.txt" "${RUNNER_TEMP}/clippy-backend.json" "${RUNNER_TEMP}/clippy-frontend.json" "${RUNNER_TEMP}/clippy-backend-stderr.txt" "${RUNNER_TEMP}/clippy-frontend-stderr.txt"
 
   test-backend:
     name: Backend Unit & Integration Tests
