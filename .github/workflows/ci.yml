@@ -218,10 +218,12 @@ jobs:
       failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
     steps:
       - name: Clean up OWASP reports from previous runs
-        run: rm -rf reports/
+        run: sudo rm -rf reports/
 
       - name: Checkout repository for dependency scanning
         uses: actions/checkout@v4
+        with:
+          clean: false
 
       - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable
