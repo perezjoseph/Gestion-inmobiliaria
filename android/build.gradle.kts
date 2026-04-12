@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.androidx.room) apply false
     alias(libs.plugins.detekt)
+    alias(libs.plugins.spotless)
 }
 
 detekt {
@@ -32,5 +33,18 @@ tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
         html.required.set(true)
         html.outputLocation.set(file("$rootDir/build/reports/detekt/detekt.html"))
         sarif.required.set(false)
+    }
+}
+
+spotless {
+    kotlin {
+        target("**/*.kt")
+        targetExclude("**/build/**")
+        ktfmt().kotlinlangStyle()
+    }
+    kotlinGradle {
+        target("**/*.kts")
+        targetExclude("**/build/**")
+        ktfmt().kotlinlangStyle()
     }
 }
