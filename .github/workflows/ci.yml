@@ -23,8 +23,7 @@ on:
         type: boolean
         default: false
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -1119,6 +1118,46 @@ jobs:
             -v "${GITHUB_WORKSPACE}:/usr/src" \
             sonarsource/sonar-scanner-cli:11.3@sha256:7462f132388135e32b948f8f18ff0db9ae28a87c6777f1df5b2207e04a6d7c5c \
             "${SCAN_ARGS[@]}"
+
+      - name: Report SonarQube analysis completeness
+        if: always() && steps.sonar-url-check.outputs.skip != 'true'
+        env:
+          COVERAGE_OK: ${{ steps.download-coverage.outcome == 'success' }}
+          CLIPPY_OK: ${{ steps.download-clippy.outcome == 'success' }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          TEST_BACKEND_RESULT: ${{ needs.test-backend.result }}
+        run: |
+          MISSING=0
+          {
+            echo "## SonarQube Analysis Completeness"
+            echo "| Report | Status | Source Job |"
+            echo "|--------|--------|------------|"
+            if [ "$COVERAGE_OK" = "true" ] && [ -f coverage/lcov.info ]; then
+              echo "| Coverage (lcov) | ✅ Imported | test-backend |"
+            else
+              echo "| Coverage (lcov) | ⚠️ Missing | test-backend ($TEST_BACKEND_RESULT) |"
+              MISSING=$((MISSING + 1))
+            fi
+            if [ "$CLIPPY_OK" = "true" ] && [ -f clippy-report.json ]; then
+              echo "| Clippy report | ✅ Imported | lint |"
+            else
+              echo "| Clippy report | ⚠️ Missing | lint ($LINT_RESULT) |"
+              MISSING=$((MISSING + 1))
+            fi
+            if [ -f android/app/build/reports/lint-results-debug.xml ]; then
+              echo "| Android Lint | ✅ Imported | sonarqube (local) |"
+            else
+              echo "| Android Lint | ⏭️ Not generated | sonarqube (local) |"
+            fi
+            if [ -f android/build/reports/detekt/detekt.xml ]; then
+              echo "| Detekt | ✅ Imported | sonarqube (local) |"
+            else
+              echo "| Detekt | ⏭️ Not generated | sonarqube (local) |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$MISSING" -gt 0 ]; then
+            echo "::warning::SonarQube analysis is incomplete -- $MISSING Rust report(s) missing due to cancelled/failed upstream jobs"
+          fi
 
       - name: Fetch SonarQube results and notify
         if: always() && steps.sonar-url-check.outputs.skip != 'true'
@@ -2547,6 +2586,28 @@ jobs:
           echo "report<<$EOF" >> $GITHUB_OUTPUT
           echo -e "$REPORT" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Write pipeline summary
+        if: always()
+        run: |
+          {
+            echo "## CI Pipeline Summary"
+            echo "| Job | Result | Duration | Cache |"
+            echo "|-----|--------|----------|-------|"
+            echo "| secret-scan | ${{ needs.secret-scan.result }} | -- | -- |"
+            echo "| lint | ${{ needs.lint.result }} | ${{ needs.lint.outputs.duration || 'n/a' }} | ${{ needs.lint.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }} |"
+            echo "| test-backend | ${{ needs.test-backend.result }} | ${{ needs.test-backend.outputs.duration || 'n/a' }} | ${{ needs.test-backend.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }} |"
+            echo "| test-frontend | ${{ needs.test-frontend.result }} | ${{ needs.test-frontend.outputs.duration || 'n/a' }} | ${{ needs.test-frontend.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }} |"
+            echo "| quality-gate | ${{ needs.quality-gate.result }} | ${{ needs.quality-gate.outputs.duration || 'n/a' }} | -- |"
+            echo "| sonarqube | ${{ needs.sonarqube.result }} | ${{ needs.sonarqube.outputs.duration || 'n/a' }} | -- |"
+            echo "| build-frontend | ${{ needs.build-frontend.result }} | ${{ needs.build-frontend.outputs.duration || 'n/a' }} | ${{ needs.build-frontend.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }} |"
+            echo "| build-backend | ${{ needs.build-backend.result }} | ${{ needs.build-backend.outputs.duration || 'n/a' }} | ${{ needs.build-backend.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }} |"
+            echo "| container-backend | ${{ needs.container-image-backend.result }} | -- | -- |"
+            echo "| container-frontend | ${{ needs.container-image-frontend.result }} | -- | -- |"
+            echo "| deploy | ${{ needs.deploy.result }} | -- | -- |"
+            echo ""
+            echo "Commit: \`${GH_SHA}\` by @${GH_ACTOR} on \`${GH_REF_NAME}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Send pipeline improvement request to webhook
         if: steps.webhook-check.outputs.skip != 'true'
