@@ -46,6 +46,7 @@ _SAFE_URL_RE = re.compile(r"^https://github\.com/[a-zA-Z0-9._\-]+/[a-zA-Z0-9._\-
 _fix_lock = threading.Lock()
 _sonar_fix_lock = threading.Lock()
 _improve_lock = threading.Lock()
+_thread_semaphore = threading.Semaphore(4)
 
 
 class RateLimiter:
@@ -327,6 +328,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Cache-Control", "no-store")
+        self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(body)
 
@@ -355,7 +357,12 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         client_ip = self.client_address[0]
-        content_length = int(self.headers.get("Content-Length", 0))
+        content_length_raw = self.headers.get("Content-Length", "")
+        if not content_length_raw.isdigit() or int(content_length_raw) < 1:
+            log.warning(f"Invalid Content-Length from {client_ip}: {content_length_raw!r}")
+            self._send(400, b"Invalid Content-Length")
+            return
+        content_length = int(content_length_raw)
         log.info(f"POST {self.path} from {client_ip} ({content_length} bytes)")
 
         if not _rate_limiter.allow(client_ip):
@@ -409,7 +416,17 @@ class WebhookHandler(BaseHTTPRequestHandler):
         handler = handlers.get(self.path)
         if handler:
             self._send(200, b"OK")
-            threading.Thread(target=handler, args=(payload,), daemon=True).start()
+
+            def _guarded(fn, p):
+                if not _thread_semaphore.acquire(blocking=False):
+                    log.warning(f"Thread pool exhausted -- dropping {self.path}")
+                    return
+                try:
+                    fn(p)
+                finally:
+                    _thread_semaphore.release()
+
+            threading.Thread(target=_guarded, args=(handler, payload), daemon=True).start()
         else:
             log.warning(f"Unknown endpoint: {self.path}")
             self._send(404, b"Not found")
@@ -494,6 +511,7 @@ def main():
     local_ip = get_local_ip()
     server = HTTPServer((BIND_ADDRESS, PORT), WebhookHandler)
     server.timeout = 30
+    server.request_queue_size = 8
     log.info(f"Quality webhook listener running on {BIND_ADDRESS}:{PORT}")
     log.info(f"Max retries: {MAX_RETRIES} | Timeout: {KIRO_TIMEOUT // 60}min | Max payload: {MAX_PAYLOAD_BYTES // 1024}KB")
     log.info("Endpoints:")

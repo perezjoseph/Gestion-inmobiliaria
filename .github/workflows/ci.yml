@@ -342,6 +342,11 @@ jobs:
             ${{ runner.os }}-cargo-test-
             ${{ runner.os }}-cargo-
 
+      - name: Mask test database credentials
+        run: |
+          echo "::add-mask::realestate_dev_password"
+          echo "::add-mask::postgresql://realestate:realestate_dev_password@localhost:5432/realestate"
+
       - name: Generate random JWT secret for test isolation
         run: echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
@@ -393,6 +398,7 @@ jobs:
           name: backend-coverage
           path: coverage/lcov.info
           retention-days: 1
+          overwrite: false
 
       - name: Write test summary
         if: always()
@@ -676,6 +682,7 @@ jobs:
           name: owasp-dependency-check-report
           path: reports/
           retention-days: 7
+          overwrite: false
 
       - name: Install Trivy for IaC scanning
         id: install_trivy
@@ -1249,6 +1256,8 @@ jobs:
       - name: Build optimized WASM frontend bundle
         run: trunk build --release 2>&1 | tee /tmp/build-frontend-output.txt
         working-directory: frontend
+        env:
+          CARGO_FROZEN: "true"
 
       - name: Scan frontend dist for leaked secrets
         run: |
@@ -1272,6 +1281,7 @@ jobs:
           name: frontend-dist
           path: frontend/dist/
           retention-days: 3
+          overwrite: false
 
       - name: Attest frontend build provenance
         uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
@@ -1355,7 +1365,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Build optimized backend binary
-        run: cargo build --locked -p realestate-backend --release 2>&1 | tee /tmp/build-backend-output.txt
+        run: cargo build --frozen -p realestate-backend --release 2>&1 | tee /tmp/build-backend-output.txt
 
       - name: Scan backend build output for leaked secrets
         run: |
@@ -1379,6 +1389,7 @@ jobs:
           name: backend-binary
           path: target/release/realestate-backend
           retention-days: 3
+          overwrite: false
 
       - name: Attest backend build provenance
         uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
@@ -1500,6 +1511,7 @@ jobs:
           name: backend-sbom
           path: backend-sbom.spdx.json
           retention-days: 30
+          overwrite: false
 
       - name: Upload Trivy SARIF to GitHub Security
         if: always()
@@ -1626,6 +1638,7 @@ jobs:
           name: frontend-sbom
           path: frontend-sbom.spdx.json
           retention-days: 30
+          overwrite: false
 
       - name: Upload Trivy SARIF to GitHub Security
         if: always()
