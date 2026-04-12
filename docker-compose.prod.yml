@@ -15,7 +15,7 @@ services:
       retries: 5
 
   backend:
-    image: ghcr.io/perezjoseph/realestate-backend:latest
+    image: ghcr.io/perezjoseph/realestate-backend:${IMAGE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       db:
@@ -29,7 +29,7 @@ services:
       - uploads:/app/uploads
 
   frontend:
-    image: ghcr.io/perezjoseph/realestate-frontend:latest
+    image: ghcr.io/perezjoseph/realestate-frontend:${IMAGE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       - backend
