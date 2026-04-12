@@ -44,6 +44,263 @@ impl FormErrors {
     }
 }
 
+#[derive(Properties, PartialEq)]
+struct PropiedadFormProps {
+    is_editing: bool,
+    titulo: UseStateHandle<String>,
+    descripcion: UseStateHandle<String>,
+    direccion: UseStateHandle<String>,
+    ciudad: UseStateHandle<String>,
+    provincia: UseStateHandle<String>,
+    tipo_propiedad: UseStateHandle<String>,
+    habitaciones: UseStateHandle<String>,
+    banos: UseStateHandle<String>,
+    area_m2: UseStateHandle<String>,
+    precio: UseStateHandle<String>,
+    moneda: UseStateHandle<String>,
+    estado: UseStateHandle<String>,
+    form_errors: FormErrors,
+    submitting: bool,
+    on_submit: Callback<SubmitEvent>,
+    on_cancel: Callback<MouseEvent>,
+    #[prop_or_default]
+    editing_id: Option<String>,
+    #[prop_or_default]
+    token: String,
+}
+
+#[function_component]
+fn PropiedadForm(props: &PropiedadFormProps) -> Html {
+    let show_optional = use_state(|| false);
+    let fe = props.form_errors.clone();
+
+    macro_rules! input_cb {
+        ($state:expr) => {{
+            let s = $state.clone();
+            Callback::from(move |e: InputEvent| {
+                let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+                s.set(input.value());
+            })
+        }};
+    }
+    macro_rules! select_cb {
+        ($state:expr) => {{
+            let s = $state.clone();
+            Callback::from(move |e: Event| {
+                let el: web_sys::HtmlSelectElement = e.target_unchecked_into();
+                s.set(el.value());
+            })
+        }};
+    }
+
+    let toggle_optional = {
+        let show_optional = show_optional.clone();
+        Callback::from(move |_: MouseEvent| {
+            show_optional.set(!*show_optional);
+        })
+    };
+    let opt_open = *show_optional;
+
+    html! {
+        <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
+            <h2 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
+                {if props.is_editing { "Editar Propiedad" } else { "Nueva Propiedad" }}</h2>
+            <form onsubmit={props.on_submit.clone()} style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
+                <div>
+                    <label class="gi-label">{"Título *"}</label>
+                    <input type="text" value={(*props.titulo).clone()} oninput={input_cb!(props.titulo)}
+                        class={if fe.titulo.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
+                    if let Some(ref msg) = fe.titulo { <p class="gi-field-error">{msg}</p> }
+                </div>
+                <div>
+                    <label class="gi-label">{"Dirección *"}</label>
+                    <input type="text" value={(*props.direccion).clone()} oninput={input_cb!(props.direccion)}
+                        class={if fe.direccion.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
+                    if let Some(ref msg) = fe.direccion { <p class="gi-field-error">{msg}</p> }
+                </div>
+                <div>
+                    <label class="gi-label">{"Ciudad *"}</label>
+                    <input type="text" value={(*props.ciudad).clone()} oninput={input_cb!(props.ciudad)}
+                        class={if fe.ciudad.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
+                    if let Some(ref msg) = fe.ciudad { <p class="gi-field-error">{msg}</p> }
+                </div>
+                <div>
+                    <label class="gi-label">{"Provincia *"}</label>
+                    <input type="text" value={(*props.provincia).clone()} oninput={input_cb!(props.provincia)}
+                        class={if fe.provincia.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
+                    if let Some(ref msg) = fe.provincia { <p class="gi-field-error">{msg}</p> }
+                </div>
+                <div>
+                    <label class="gi-label">{"Precio *"}</label>
+                    <input type="number" step="0.01" min="0" value={(*props.precio).clone()} oninput={input_cb!(props.precio)}
+                        class={if fe.precio.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
+                    if let Some(ref msg) = fe.precio { <p class="gi-field-error">{msg}</p> }
+                </div>
+                <div>
+                    <label class="gi-label">{"Moneda"}</label>
+                    <select onchange={select_cb!(props.moneda)} class="gi-input">
+                        <option value="DOP" selected={*props.moneda == "DOP"}>{"DOP"}</option>
+                        <option value="USD" selected={*props.moneda == "USD"}>{"USD"}</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="gi-label">{"Tipo"}</label>
+                    <select onchange={select_cb!(props.tipo_propiedad)} class="gi-input">
+                        <option value="casa" selected={*props.tipo_propiedad == "casa"}>{"Casa"}</option>
+                        <option value="apartamento" selected={*props.tipo_propiedad == "apartamento"}>{"Apartamento"}</option>
+                        <option value="local" selected={*props.tipo_propiedad == "local"}>{"Local"}</option>
+                        <option value="terreno" selected={*props.tipo_propiedad == "terreno"}>{"Terreno"}</option>
+                        <option value="oficina" selected={*props.tipo_propiedad == "oficina"}>{"Oficina"}</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="gi-label">{"Estado"}</label>
+                    <select onchange={select_cb!(props.estado)} class="gi-input">
+                        <option value="disponible" selected={*props.estado == "disponible"}>{"Disponible"}</option>
+                        <option value="ocupada" selected={*props.estado == "ocupada"}>{"Ocupada"}</option>
+                        <option value="mantenimiento" selected={*props.estado == "mantenimiento"}>{"Mantenimiento"}</option>
+                    </select>
+                </div>
+                <div style="grid-column: 1 / -1;">
+                    <button type="button" class="gi-collapsible-trigger" onclick={toggle_optional}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            style={if opt_open { "transform: rotate(90deg); transition: transform 0.2s;" } else { "transition: transform 0.2s;" }}>
+                            <path d="M9 18l6-6-6-6"/>
+                        </svg>
+                        {" Campos opcionales"}
+                    </button>
+                    <div class={if opt_open { "gi-collapsible-content open" } else { "gi-collapsible-content" }}>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4); padding-top: var(--space-3);">
+                            <div style="grid-column: 1 / -1;">
+                                <label class="gi-label">{"Descripción"}</label>
+                                <input type="text" value={(*props.descripcion).clone()} oninput={input_cb!(props.descripcion)} class="gi-input" />
+                            </div>
+                            <div>
+                                <label class="gi-label">{"Habitaciones"}</label>
+                                <input type="number" min="0" value={(*props.habitaciones).clone()} oninput={input_cb!(props.habitaciones)} class="gi-input" />
+                            </div>
+                            <div>
+                                <label class="gi-label">{"Baños"}</label>
+                                <input type="number" min="0" value={(*props.banos).clone()} oninput={input_cb!(props.banos)} class="gi-input" />
+                            </div>
+                            <div>
+                                <label class="gi-label">{"Área (m²)"}</label>
+                                <input type="number" step="0.01" min="0" value={(*props.area_m2).clone()} oninput={input_cb!(props.area_m2)} class="gi-input" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div style="grid-column: 1 / -1; display: flex; gap: var(--space-2); justify-content: flex-end;">
+                    <button type="button" onclick={props.on_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
+                    <button type="submit" disabled={props.submitting} class="gi-btn gi-btn-primary">
+                        {if props.submitting { "Guardando..." } else { "Guardar" }}
+                    </button>
+                </div>
+            </form>
+            if let Some(ref id) = props.editing_id {
+                <div style="margin-top: var(--space-5); border-top: 1px solid var(--border-subtle); padding-top: var(--space-5);">
+                    <DocumentGallery
+                        entity_type={"propiedad".to_string()}
+                        entity_id={id.clone()}
+                        token={props.token.clone()}
+                    />
+                </div>
+            }
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct PropiedadListProps {
+    items: Vec<Propiedad>,
+    user_rol: String,
+    headers: Vec<String>,
+    sortable_fields: Vec<String>,
+    current_sort: Option<String>,
+    current_order: Option<String>,
+    total: u64,
+    page: u64,
+    per_page: u64,
+    on_sort: Callback<(String, String)>,
+    on_edit: Callback<Propiedad>,
+    on_delete: Callback<Propiedad>,
+    on_new: Callback<MouseEvent>,
+    on_page_change: Callback<u64>,
+    on_per_page_change: Callback<u64>,
+}
+
+#[function_component]
+fn PropiedadList(props: &PropiedadListProps) -> Html {
+    if props.items.is_empty() {
+        return html! {
+            <div class="gi-empty-state">
+                <div class="gi-empty-state-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
+                        <path d="M3 21V9l9-6 9 6v12"/><path d="M9 21V12h6v9"/>
+                    </svg>
+                </div>
+                <div class="gi-empty-state-title">{"Sin propiedades registradas"}</div>
+                <p class="gi-empty-state-text">{"Las propiedades son la base de su portafolio. Agregue la primera para luego asignar inquilinos y contratos."}</p>
+                if can_write(&props.user_rol) {
+                    <button onclick={props.on_new.clone()} class="gi-btn gi-btn-primary" style="margin-top: var(--space-4);">
+                        {"+ Nueva Propiedad"}
+                    </button>
+                }
+            </div>
+        };
+    }
+
+    html! {
+        <>
+            <DataTable headers={props.headers.clone()} sortable_fields={props.sortable_fields.clone()} current_sort={props.current_sort.clone()} current_order={props.current_order.clone()} on_sort={props.on_sort.clone()}>
+                { for props.items.iter().map(|p| {
+                    let on_edit = props.on_edit.clone();
+                    let on_delete_click = props.on_delete.clone();
+                    let pc = p.clone();
+                    let pd = p.clone();
+                    let user_rol = props.user_rol.clone();
+                    let (badge_cls, badge_label) = estado_badge(&p.estado);
+                    let tipo_label = match p.tipo_propiedad.as_str() {
+                        "casa" => "Casa",
+                        "apartamento" => "Apartamento",
+                        "local" => "Local",
+                        "terreno" => "Terreno",
+                        "oficina" => "Oficina",
+                        other => other,
+                    };
+                    html! {
+                        <tr>
+                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{&p.titulo}</td>
+                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&p.direccion}</td>
+                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{&p.ciudad}</td>
+                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{tipo_label}</td>
+                            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={p.precio} moneda={p.moneda.clone()} /></td>
+                            <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
+                            if can_write(&user_rol) {
+                                <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2);">
+                                    <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(pc.clone()))}
+                                        class="gi-btn-text">{"Editar"}</button>
+                                    if can_delete(&user_rol) {
+                                        <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(pd.clone()))}
+                                            class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                })}
+            </DataTable>
+            <Pagination
+                total={props.total}
+                page={props.page}
+                per_page={props.per_page}
+                on_page_change={props.on_page_change.clone()}
+                on_per_page_change={props.on_per_page_change.clone()}
+            />
+        </>
+    }
+}
+
 #[function_component]
 pub fn Propiedades() -> Html {
     let auth = use_context::<AuthContext>();
@@ -65,7 +322,6 @@ pub fn Propiedades() -> Html {
     let delete_target = use_state(|| Option::<Propiedad>::None);
     let form_errors = use_state(FormErrors::default);
     let reload = use_state(|| 0u32);
-    let show_optional = use_state(|| false);
     let submitting = use_state(|| false);
 
     let titulo = use_state(String::new);
@@ -159,7 +415,6 @@ pub fn Propiedades() -> Html {
         let editing = editing.clone();
         let show_form = show_form.clone();
         let form_errors = form_errors.clone();
-        let show_optional = show_optional.clone();
         move || {
             titulo.set(String::new());
             descripcion.set(String::new());
@@ -176,7 +431,6 @@ pub fn Propiedades() -> Html {
             editing.set(None);
             show_form.set(false);
             form_errors.set(FormErrors::default());
-            show_optional.set(false);
         }
     };
 
@@ -468,13 +722,6 @@ pub fn Propiedades() -> Html {
         Callback::from(move |_: MouseEvent| reset_form())
     };
 
-    let toggle_optional = {
-        let show_optional = show_optional.clone();
-        Callback::from(move |_: MouseEvent| {
-            show_optional.set(!*show_optional);
-        })
-    };
-
     macro_rules! input_cb {
         ($state:expr) => {{
             let s = $state.clone();
@@ -536,6 +783,19 @@ pub fn Propiedades() -> Html {
         })
     };
 
+    let on_sort = {
+        let sort_field = sort_field.clone();
+        let sort_order = sort_order.clone();
+        let reload = reload.clone();
+        let page = page.clone();
+        Callback::from(move |(field, order): (String, String)| {
+            sort_field.set(Some(field));
+            sort_order.set(Some(order));
+            page.set(1);
+            reload.set(*reload + 1);
+        })
+    };
+
     if *loading {
         return html! { <Loading /> };
     }
@@ -564,21 +824,11 @@ pub fn Propiedades() -> Html {
         "".into(),
     ];
 
-    let on_sort = {
-        let sort_field = sort_field.clone();
-        let sort_order = sort_order.clone();
-        let reload = reload.clone();
-        let page = page.clone();
-        Callback::from(move |(field, order): (String, String)| {
-            sort_field.set(Some(field));
-            sort_order.set(Some(order));
-            page.set(1);
-            reload.set(*reload + 1);
-        })
-    };
-
-    let fe = (*form_errors).clone();
-    let opt_open = *show_optional;
+    let editing_id = editing.as_ref().map(|e| e.id.clone());
+    let token = auth
+        .as_ref()
+        .and_then(|a| a.token.clone())
+        .unwrap_or_default();
 
     html! {
         <div>
@@ -646,175 +896,46 @@ pub fn Propiedades() -> Html {
             </div>
 
             if *show_form {
-                <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
-                    <h2 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
-                        {if editing.is_some() { "Editar Propiedad" } else { "Nueva Propiedad" }}</h2>
-                    <form onsubmit={on_submit} style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
-                        <div>
-                            <label class="gi-label">{"Título *"}</label>
-                            <input type="text" value={(*titulo).clone()} oninput={input_cb!(titulo)}
-                                class={if fe.titulo.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                            if let Some(ref msg) = fe.titulo { <p class="gi-field-error">{msg}</p> }
-                        </div>
-                        <div>
-                            <label class="gi-label">{"Dirección *"}</label>
-                            <input type="text" value={(*direccion).clone()} oninput={input_cb!(direccion)}
-                                class={if fe.direccion.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                            if let Some(ref msg) = fe.direccion { <p class="gi-field-error">{msg}</p> }
-                        </div>
-                        <div>
-                            <label class="gi-label">{"Ciudad *"}</label>
-                            <input type="text" value={(*ciudad).clone()} oninput={input_cb!(ciudad)}
-                                class={if fe.ciudad.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                            if let Some(ref msg) = fe.ciudad { <p class="gi-field-error">{msg}</p> }
-                        </div>
-                        <div>
-                            <label class="gi-label">{"Provincia *"}</label>
-                            <input type="text" value={(*provincia).clone()} oninput={input_cb!(provincia)}
-                                class={if fe.provincia.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                            if let Some(ref msg) = fe.provincia { <p class="gi-field-error">{msg}</p> }
-                        </div>
-                        <div>
-                            <label class="gi-label">{"Precio *"}</label>
-                            <input type="number" step="0.01" min="0" value={(*precio).clone()} oninput={input_cb!(precio)}
-                                class={if fe.precio.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                            if let Some(ref msg) = fe.precio { <p class="gi-field-error">{msg}</p> }
-                        </div>
-                        <div>
-                            <label class="gi-label">{"Moneda"}</label>
-                            <select onchange={select_cb!(moneda)} class="gi-input">
-                                <option value="DOP" selected={*moneda == "DOP"}>{"DOP"}</option>
-                                <option value="USD" selected={*moneda == "USD"}>{"USD"}</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="gi-label">{"Tipo"}</label>
-                            <select onchange={select_cb!(tipo_propiedad)} class="gi-input">
-                                <option value="casa" selected={*tipo_propiedad == "casa"}>{"Casa"}</option>
-                                <option value="apartamento" selected={*tipo_propiedad == "apartamento"}>{"Apartamento"}</option>
-                                <option value="local" selected={*tipo_propiedad == "local"}>{"Local"}</option>
-                                <option value="terreno" selected={*tipo_propiedad == "terreno"}>{"Terreno"}</option>
-                                <option value="oficina" selected={*tipo_propiedad == "oficina"}>{"Oficina"}</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="gi-label">{"Estado"}</label>
-                            <select onchange={select_cb!(estado)} class="gi-input">
-                                <option value="disponible" selected={*estado == "disponible"}>{"Disponible"}</option>
-                                <option value="ocupada" selected={*estado == "ocupada"}>{"Ocupada"}</option>
-                                <option value="mantenimiento" selected={*estado == "mantenimiento"}>{"Mantenimiento"}</option>
-                            </select>
-                        </div>
-                        <div style="grid-column: 1 / -1;">
-                            <button type="button" class="gi-collapsible-trigger" onclick={toggle_optional.clone()}>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                    style={if opt_open { "transform: rotate(90deg); transition: transform 0.2s;" } else { "transition: transform 0.2s;" }}>
-                                    <path d="M9 18l6-6-6-6"/>
-                                </svg>
-                                {" Campos opcionales"}
-                            </button>
-                            <div class={if opt_open { "gi-collapsible-content open" } else { "gi-collapsible-content" }}>
-                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4); padding-top: var(--space-3);">
-                                    <div style="grid-column: 1 / -1;">
-                                        <label class="gi-label">{"Descripción"}</label>
-                                        <input type="text" value={(*descripcion).clone()} oninput={input_cb!(descripcion)} class="gi-input" />
-                                    </div>
-                                    <div>
-                                        <label class="gi-label">{"Habitaciones"}</label>
-                                        <input type="number" min="0" value={(*habitaciones).clone()} oninput={input_cb!(habitaciones)} class="gi-input" />
-                                    </div>
-                                    <div>
-                                        <label class="gi-label">{"Baños"}</label>
-                                        <input type="number" min="0" value={(*banos).clone()} oninput={input_cb!(banos)} class="gi-input" />
-                                    </div>
-                                    <div>
-                                        <label class="gi-label">{"Área (m²)"}</label>
-                                        <input type="number" step="0.01" min="0" value={(*area_m2).clone()} oninput={input_cb!(area_m2)} class="gi-input" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div style="grid-column: 1 / -1; display: flex; gap: var(--space-2); justify-content: flex-end;">
-                            <button type="button" onclick={on_cancel} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                            <button type="submit" disabled={*submitting} class="gi-btn gi-btn-primary">
-                                {if *submitting { "Guardando..." } else { "Guardar" }}
-                            </button>
-                        </div>
-                    </form>
-                    if let Some(ref ed) = *editing {
-                        <div style="margin-top: var(--space-5); border-top: 1px solid var(--border-subtle); padding-top: var(--space-5);">
-                            <DocumentGallery
-                                entity_type={"propiedad".to_string()}
-                                entity_id={ed.id.clone()}
-                                token={auth.as_ref().and_then(|a| a.token.clone()).unwrap_or_default()}
-                            />
-                        </div>
-                    }
-                </div>
-            }
-
-            if (*items).is_empty() {
-                <div class="gi-empty-state">
-                    <div class="gi-empty-state-icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
-                            <path d="M3 21V9l9-6 9 6v12"/><path d="M9 21V12h6v9"/>
-                        </svg>
-                    </div>
-                    <div class="gi-empty-state-title">{"Sin propiedades registradas"}</div>
-                    <p class="gi-empty-state-text">{"Las propiedades son la base de su portafolio. Agregue la primera para luego asignar inquilinos y contratos."}</p>
-                    if can_write(&user_rol) {
-                        <button onclick={on_new.clone()} class="gi-btn gi-btn-primary" style="margin-top: var(--space-4);">
-                            {"+ Nueva Propiedad"}
-                        </button>
-                    }
-                </div>
-            } else {
-                <DataTable headers={headers} sortable_fields={sortable_fields} current_sort={(*sort_field).clone()} current_order={(*sort_order).clone()} on_sort={on_sort}>
-                    { for (*items).iter().map(|p| {
-                        let on_edit = on_edit.clone();
-                        let on_delete_click = on_delete_click.clone();
-                        let pc = p.clone();
-                        let pd = p.clone();
-                        let user_rol = user_rol.clone();
-                        let (badge_cls, badge_label) = estado_badge(&p.estado);
-                        let tipo_label = match p.tipo_propiedad.as_str() {
-                            "casa" => "Casa",
-                            "apartamento" => "Apartamento",
-                            "local" => "Local",
-                            "terreno" => "Terreno",
-                            "oficina" => "Oficina",
-                            other => other,
-                        };
-                        html! {
-                            <tr>
-                                <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{&p.titulo}</td>
-                                <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&p.direccion}</td>
-                                <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{&p.ciudad}</td>
-                                <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{tipo_label}</td>
-                                <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={p.precio} moneda={p.moneda.clone()} /></td>
-                                <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
-                                if can_write(&user_rol) {
-                                    <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2);">
-                                        <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(pc.clone()))}
-                                            class="gi-btn-text">{"Editar"}</button>
-                                        if can_delete(&user_rol) {
-                                            <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(pd.clone()))}
-                                                class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button>
-                                        }
-                                    </td>
-                                }
-                            </tr>
-                        }
-                    })}
-                </DataTable>
-                <Pagination
-                    total={*total}
-                    page={*page}
-                    per_page={*per_page}
-                    on_page_change={on_page_change}
-                    on_per_page_change={on_per_page_change}
+                <PropiedadForm
+                    is_editing={editing.is_some()}
+                    titulo={titulo.clone()}
+                    descripcion={descripcion.clone()}
+                    direccion={direccion.clone()}
+                    ciudad={ciudad.clone()}
+                    provincia={provincia.clone()}
+                    tipo_propiedad={tipo_propiedad.clone()}
+                    habitaciones={habitaciones.clone()}
+                    banos={banos.clone()}
+                    area_m2={area_m2.clone()}
+                    precio={precio.clone()}
+                    moneda={moneda.clone()}
+                    estado={estado.clone()}
+                    form_errors={(*form_errors).clone()}
+                    submitting={*submitting}
+                    on_submit={on_submit}
+                    on_cancel={on_cancel}
+                    editing_id={editing_id}
+                    token={token}
                 />
             }
+
+            <PropiedadList
+                items={(*items).clone()}
+                user_rol={user_rol.clone()}
+                headers={headers}
+                sortable_fields={sortable_fields}
+                current_sort={(*sort_field).clone()}
+                current_order={(*sort_order).clone()}
+                total={*total}
+                page={*page}
+                per_page={*per_page}
+                on_sort={on_sort}
+                on_edit={on_edit}
+                on_delete={on_delete_click}
+                on_new={on_new}
+                on_page_change={on_page_change}
+                on_per_page_change={on_per_page_change}
+            />
         </div>
     }
 }

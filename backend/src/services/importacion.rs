@@ -434,16 +434,18 @@ pub async fn importar_gastos(
     }
 
     let headers = &rows[0];
-    let idx_propiedad_id = find_column_index(headers, "propiedad_id");
-    let idx_categoria = find_column_index(headers, "categoria");
-    let idx_descripcion = find_column_index(headers, "descripcion");
-    let idx_monto = find_column_index(headers, "monto");
-    let idx_moneda = find_column_index(headers, "moneda");
-    let idx_fecha_gasto = find_column_index(headers, "fecha_gasto");
-    let idx_unidad_id = find_column_index(headers, "unidad_id");
-    let idx_proveedor = find_column_index(headers, "proveedor");
-    let idx_numero_factura = find_column_index(headers, "numero_factura");
-    let idx_notas = find_column_index(headers, "notas");
+    let idx = GastoIndices {
+        propiedad_id: find_column_index(headers, "propiedad_id"),
+        categoria: find_column_index(headers, "categoria"),
+        descripcion: find_column_index(headers, "descripcion"),
+        monto: find_column_index(headers, "monto"),
+        moneda: find_column_index(headers, "moneda"),
+        fecha_gasto: find_column_index(headers, "fecha_gasto"),
+        unidad_id: find_column_index(headers, "unidad_id"),
+        proveedor: find_column_index(headers, "proveedor"),
+        numero_factura: find_column_index(headers, "numero_factura"),
+        notas: find_column_index(headers, "notas"),
+    };
 
     let data_rows = &rows[1..];
     let total_filas = data_rows.len();
@@ -452,19 +454,7 @@ pub async fn importar_gastos(
 
     for (i, row) in data_rows.iter().enumerate() {
         let fila = i + 2;
-        let request = match process_gasto_row(
-            row,
-            idx_propiedad_id,
-            idx_categoria,
-            idx_descripcion,
-            idx_monto,
-            idx_moneda,
-            idx_fecha_gasto,
-            idx_unidad_id,
-            idx_proveedor,
-            idx_numero_factura,
-            idx_notas,
-        ) {
+        let request = match process_gasto_row(row, &idx) {
             Ok(r) => r,
             Err(error) => {
                 fallidos.push(ImportError { fila, error });

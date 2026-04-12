@@ -45,6 +45,306 @@ impl FormErrors {
     }
 }
 
+#[derive(Properties, PartialEq)]
+struct ContratoFormProps {
+    is_editing: bool,
+    propiedad_id: UseStateHandle<String>,
+    inquilino_id: UseStateHandle<String>,
+    fecha_inicio: UseStateHandle<String>,
+    fecha_fin: UseStateHandle<String>,
+    monto_mensual: UseStateHandle<String>,
+    deposito: UseStateHandle<String>,
+    moneda: UseStateHandle<String>,
+    estado: UseStateHandle<String>,
+    propiedades: Vec<Propiedad>,
+    inquilinos: Vec<Inquilino>,
+    form_errors: FormErrors,
+    submitting: bool,
+    on_submit: Callback<SubmitEvent>,
+    on_cancel: Callback<MouseEvent>,
+}
+
+#[function_component]
+fn ContratoForm(props: &ContratoFormProps) -> Html {
+    let fe = props.form_errors.clone();
+
+    macro_rules! input_cb {
+        ($state:expr) => {{
+            let s = $state.clone();
+            Callback::from(move |e: InputEvent| {
+                let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+                s.set(input.value());
+            })
+        }};
+    }
+    macro_rules! select_cb {
+        ($state:expr) => {{
+            let s = $state.clone();
+            Callback::from(move |e: Event| {
+                let el: web_sys::HtmlSelectElement = e.target_unchecked_into();
+                s.set(el.value());
+            })
+        }};
+    }
+
+    html! {
+        <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
+            <h2 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
+                {if props.is_editing { "Editar Contrato" } else { "Nuevo Contrato" }}</h2>
+            <form onsubmit={props.on_submit.clone()} style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
+                <div>
+                    <label class="gi-label">{"Propiedad *"}</label>
+                    <select onchange={select_cb!(props.propiedad_id)} disabled={props.is_editing}
+                        class={if fe.propiedad_id.is_some() { "gi-input gi-input-error" } else { "gi-input" }}>
+                        <option value="" selected={props.propiedad_id.is_empty()}>{"— Seleccionar propiedad —"}</option>
+                        { for props.propiedades.iter().map(|p| {
+                            let sel = *props.propiedad_id == p.id;
+                            html! { <option value={p.id.clone()} selected={sel}>{format!("{} — {}", p.titulo, p.direccion)}</option> }
+                        })}
+                    </select>
+                    if let Some(ref msg) = fe.propiedad_id { <p class="gi-field-error">{msg}</p> }
+                </div>
+                <div>
+                    <label class="gi-label">{"Inquilino *"}</label>
+                    <select onchange={select_cb!(props.inquilino_id)} disabled={props.is_editing}
+                        class={if fe.inquilino_id.is_some() { "gi-input gi-input-error" } else { "gi-input" }}>
+                        <option value="" selected={props.inquilino_id.is_empty()}>{"— Seleccionar inquilino —"}</option>
+                        { for props.inquilinos.iter().map(|i| {
+                            let sel = *props.inquilino_id == i.id;
+                            html! { <option value={i.id.clone()} selected={sel}>{format!("{} {} ({})", i.nombre, i.apellido, i.cedula)}</option> }
+                        })}
+                    </select>
+                    if let Some(ref msg) = fe.inquilino_id { <p class="gi-field-error">{msg}</p> }
+                </div>
+                <div>
+                    <label class="gi-label" title="No puede solaparse con otro contrato activo de la misma propiedad">{"Fecha Inicio *"}</label>
+                    <input type="date" value={(*props.fecha_inicio).clone()} oninput={input_cb!(props.fecha_inicio)} disabled={props.is_editing}
+                        class={if fe.fecha_inicio.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
+                    if let Some(ref msg) = fe.fecha_inicio { <p class="gi-field-error">{msg}</p> }
+                </div>
+                <div>
+                    <label class="gi-label" title="Debe ser posterior a la fecha de inicio. No puede solaparse con otro contrato activo">{"Fecha Fin *"}</label>
+                    <input type="date" value={(*props.fecha_fin).clone()} oninput={input_cb!(props.fecha_fin)}
+                        class={if fe.fecha_fin.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
+                    if let Some(ref msg) = fe.fecha_fin { <p class="gi-field-error">{msg}</p> }
+                </div>
+                <div>
+                    <label class="gi-label">{"Monto Mensual *"}</label>
+                    <input type="number" step="0.01" min="0" value={(*props.monto_mensual).clone()} oninput={input_cb!(props.monto_mensual)}
+                        class={if fe.monto_mensual.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
+                    if let Some(ref msg) = fe.monto_mensual { <p class="gi-field-error">{msg}</p> }
+                </div>
+                <div>
+                    <label class="gi-label">{"Depósito"}</label>
+                    <input type="number" step="0.01" min="0" value={(*props.deposito).clone()} oninput={input_cb!(props.deposito)} class="gi-input" />
+                </div>
+                <div>
+                    <label class="gi-label">{"Moneda"}</label>
+                    <select onchange={select_cb!(props.moneda)} disabled={props.is_editing} class="gi-input">
+                        <option value="DOP" selected={*props.moneda == "DOP"}>{"DOP"}</option>
+                        <option value="USD" selected={*props.moneda == "USD"}>{"USD"}</option>
+                    </select>
+                </div>
+                if props.is_editing {
+                    <div>
+                        <label class="gi-label">{"Estado"}</label>
+                        <select onchange={select_cb!(props.estado)} class="gi-input">
+                            <option value="activo" selected={*props.estado == "activo"}>{"Activo"}</option>
+                            <option value="vencido" selected={*props.estado == "vencido"}>{"Vencido"}</option>
+                            <option value="terminado" selected={*props.estado == "terminado"}>{"Terminado"}</option>
+                        </select>
+                    </div>
+                }
+                <div style="grid-column: 1 / -1; display: flex; gap: var(--space-2); justify-content: flex-end;">
+                    <button type="button" onclick={props.on_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
+                    <button type="submit" disabled={props.submitting} class="gi-btn gi-btn-primary">
+                        {if props.submitting { "Guardando..." } else { "Guardar" }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct RenewModalProps {
+    renew_fecha_fin: UseStateHandle<String>,
+    renew_monto: UseStateHandle<String>,
+    on_confirm: Callback<MouseEvent>,
+    on_cancel: Callback<MouseEvent>,
+}
+
+#[function_component]
+fn RenewModal(props: &RenewModalProps) -> Html {
+    html! {
+        <div class="gi-modal-overlay">
+            <div class="gi-modal">
+                <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">{"Renovar Contrato"}</h3>
+                <div style="display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-4);">
+                    <div>
+                        <label class="gi-label">{"Nueva Fecha de Fin *"}</label>
+                        <input type="date" value={(*props.renew_fecha_fin).clone()}
+                            oninput={Callback::from({
+                                let renew_fecha_fin = props.renew_fecha_fin.clone();
+                                move |e: InputEvent| {
+                                    let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+                                    renew_fecha_fin.set(input.value());
+                                }
+                            })}
+                            class="gi-input" />
+                    </div>
+                    <div>
+                        <label class="gi-label">{"Nuevo Monto Mensual *"}</label>
+                        <input type="number" step="0.01" min="0" value={(*props.renew_monto).clone()}
+                            oninput={Callback::from({
+                                let renew_monto = props.renew_monto.clone();
+                                move |e: InputEvent| {
+                                    let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+                                    renew_monto.set(input.value());
+                                }
+                            })}
+                            class="gi-input" />
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
+                    <button onclick={props.on_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
+                    <button onclick={props.on_confirm.clone()} class="gi-btn gi-btn-primary">{"Renovar"}</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct TerminateModalProps {
+    terminate_fecha: UseStateHandle<String>,
+    on_confirm: Callback<MouseEvent>,
+    on_cancel: Callback<MouseEvent>,
+}
+
+#[function_component]
+fn TerminateModal(props: &TerminateModalProps) -> Html {
+    html! {
+        <div class="gi-modal-overlay">
+            <div class="gi-modal">
+                <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">{"Terminar Contrato Anticipadamente"}</h3>
+                <div style="margin-bottom: var(--space-4);">
+                    <label class="gi-label">{"Fecha de Terminación *"}</label>
+                    <input type="date" value={(*props.terminate_fecha).clone()}
+                        oninput={Callback::from({
+                            let terminate_fecha = props.terminate_fecha.clone();
+                            move |e: InputEvent| {
+                                let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+                                terminate_fecha.set(input.value());
+                            }
+                        })}
+                        class="gi-input" />
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
+                    <button onclick={props.on_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
+                    <button onclick={props.on_confirm.clone()} class="gi-btn gi-btn-danger">{"Terminar"}</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct ContratoListProps {
+    items: Vec<Contrato>,
+    user_rol: String,
+    headers: Vec<String>,
+    total: u64,
+    page: u64,
+    per_page: u64,
+    prop_label: Callback<String, String>,
+    inq_label: Callback<String, String>,
+    on_edit: Callback<Contrato>,
+    on_delete: Callback<Contrato>,
+    on_renew: Callback<Contrato>,
+    on_terminate: Callback<Contrato>,
+    on_page_change: Callback<u64>,
+    on_per_page_change: Callback<u64>,
+}
+
+#[function_component]
+fn ContratoList(props: &ContratoListProps) -> Html {
+    if props.items.is_empty() {
+        return html! {
+            <div class="gi-empty-state">
+                <div class="gi-empty-state-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                </div>
+                <div class="gi-empty-state-title">{"Sin contratos registrados"}</div>
+                <p class="gi-empty-state-text">{"Un contrato vincula una propiedad con un inquilino. Necesita tener al menos una propiedad y un inquilino registrados antes de crear un contrato."}</p>
+                <div class="gi-empty-state-hint">
+                    <Link<Route> to={Route::Propiedades} classes="gi-btn-text">
+                        {"Propiedades"}
+                    </Link<Route>>
+                    {" · "}
+                    <Link<Route> to={Route::Inquilinos} classes="gi-btn-text">
+                        {"Inquilinos"}
+                    </Link<Route>>
+                </div>
+            </div>
+        };
+    }
+
+    html! {
+        <>
+            <DataTable headers={props.headers.clone()}>
+                { for props.items.iter().map(|c| {
+                    let on_edit = props.on_edit.clone();
+                    let on_delete_click = props.on_delete.clone();
+                    let on_renew_click = props.on_renew.clone();
+                    let on_terminate_click = props.on_terminate.clone();
+                    let cc = c.clone(); let cd = c.clone(); let cr = c.clone(); let ct = c.clone();
+                    let user_rol = props.user_rol.clone();
+                    let p_label = props.prop_label.emit(c.propiedad_id.clone());
+                    let i_label = props.inq_label.emit(c.inquilino_id.clone());
+                    let (badge_cls, badge_label) = estado_badge(&c.estado);
+                    let is_active = c.estado == "activo";
+                    html! {
+                        <tr>
+                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{p_label}</td>
+                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{i_label}</td>
+                            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&c.fecha_inicio)}</td>
+                            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&c.fecha_fin)}</td>
+                            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={c.monto_mensual} moneda={c.moneda.clone()} /></td>
+                            <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
+                            if can_write(&user_rol) {
+                                <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2); flex-wrap: wrap;">
+                                    <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(cc.clone()))} class="gi-btn-text">{"Editar"}</button>
+                                    if is_active {
+                                        <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-success">{"Registrar Pago"}</Link<Route>>
+                                        <button onclick={Callback::from(move |_: MouseEvent| on_renew_click.emit(cr.clone()))} class="gi-btn-text" style="color: var(--color-primary-500);">{"Renovar"}</button>
+                                        <button onclick={Callback::from(move |_: MouseEvent| on_terminate_click.emit(ct.clone()))} class="gi-btn-text" style="color: var(--color-warning);">{"Terminar"}</button>
+                                    }
+                                    if can_delete(&user_rol) {
+                                        <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(cd.clone()))} class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                })}
+            </DataTable>
+            <Pagination
+                total={props.total}
+                page={props.page}
+                per_page={props.per_page}
+                on_page_change={props.on_page_change.clone()}
+                on_per_page_change={props.on_per_page_change.clone()}
+            />
+        </>
+    }
+}
+
 #[function_component]
 pub fn Contratos() -> Html {
     let auth = use_context::<AuthContext>();
@@ -130,24 +430,24 @@ pub fn Contratos() -> Html {
 
     let prop_label = {
         let propiedades = propiedades.clone();
-        move |id: &str| -> String {
+        Callback::from(move |id: String| -> String {
             propiedades
                 .iter()
                 .find(|p| p.id == id)
                 .map(|p| format!("{} — {}", p.titulo, p.direccion))
                 .unwrap_or_else(|| id.to_string())
-        }
+        })
     };
 
     let inq_label = {
         let inquilinos = inquilinos.clone();
-        move |id: &str| -> String {
+        Callback::from(move |id: String| -> String {
             inquilinos
                 .iter()
                 .find(|i| i.id == id)
                 .map(|i| format!("{} {} ({})", i.nombre, i.apellido, i.cedula))
                 .unwrap_or_else(|| id.to_string())
-        }
+        })
     };
 
     let reset_form = {
@@ -435,25 +735,6 @@ pub fn Contratos() -> Html {
         Callback::from(move |_: MouseEvent| reset_form())
     };
 
-    macro_rules! input_cb {
-        ($state:expr) => {{
-            let s = $state.clone();
-            Callback::from(move |e: InputEvent| {
-                let input: web_sys::HtmlInputElement = e.target_unchecked_into();
-                s.set(input.value());
-            })
-        }};
-    }
-    macro_rules! select_cb {
-        ($state:expr) => {{
-            let s = $state.clone();
-            Callback::from(move |e: Event| {
-                let el: web_sys::HtmlSelectElement = e.target_unchecked_into();
-                s.set(el.value());
-            })
-        }};
-    }
-
     let on_renew_click = {
         let renew_target = renew_target.clone();
         let renew_monto = renew_monto.clone();
@@ -592,8 +873,6 @@ pub fn Contratos() -> Html {
             String::new()
         },
     ];
-    let fe = (*form_errors).clone();
-    let is_editing = editing.is_some();
 
     html! {
         <div>
@@ -615,7 +894,7 @@ pub fn Contratos() -> Html {
                     <div class="gi-modal">
                         <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-2); color: var(--text-primary);">{"Confirmar eliminación"}</h3>
                         <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-5);">
-                            {format!("¿Está seguro de que desea eliminar el contrato de la propiedad \"{}\"? Esta acción no se puede deshacer.", prop_label(&target.propiedad_id))}</p>
+                            {format!("¿Está seguro de que desea eliminar el contrato de la propiedad \"{}\"? Esta acción no se puede deshacer.", prop_label.emit(target.propiedad_id.clone()))}</p>
                         <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
                             <button onclick={on_delete_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
                             <button onclick={on_delete_confirm.clone()} class="gi-btn gi-btn-danger">{"Eliminar"}</button>
@@ -624,218 +903,59 @@ pub fn Contratos() -> Html {
                 </div>
             }
 
-            if let Some(ref _target) = *renew_target {
-                <div class="gi-modal-overlay">
-                    <div class="gi-modal">
-                        <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">{"Renovar Contrato"}</h3>
-                        <div style="display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-4);">
-                            <div>
-                                <label class="gi-label">{"Nueva Fecha de Fin *"}</label>
-                                <input type="date" value={(*renew_fecha_fin).clone()}
-                                    oninput={Callback::from({
-                                        let renew_fecha_fin = renew_fecha_fin.clone();
-                                        move |e: InputEvent| {
-                                            let input: web_sys::HtmlInputElement = e.target_unchecked_into();
-                                            renew_fecha_fin.set(input.value());
-                                        }
-                                    })}
-                                    class="gi-input" />
-                            </div>
-                            <div>
-                                <label class="gi-label">{"Nuevo Monto Mensual *"}</label>
-                                <input type="number" step="0.01" min="0" value={(*renew_monto).clone()}
-                                    oninput={Callback::from({
-                                        let renew_monto = renew_monto.clone();
-                                        move |e: InputEvent| {
-                                            let input: web_sys::HtmlInputElement = e.target_unchecked_into();
-                                            renew_monto.set(input.value());
-                                        }
-                                    })}
-                                    class="gi-input" />
-                            </div>
-                        </div>
-                        <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
-                            <button onclick={on_renew_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                            <button onclick={on_renew_confirm.clone()} class="gi-btn gi-btn-primary">{"Renovar"}</button>
-                        </div>
-                    </div>
-                </div>
+            if renew_target.is_some() {
+                <RenewModal
+                    renew_fecha_fin={renew_fecha_fin.clone()}
+                    renew_monto={renew_monto.clone()}
+                    on_confirm={on_renew_confirm}
+                    on_cancel={on_renew_cancel}
+                />
             }
 
-            if let Some(ref _target) = *terminate_target {
-                <div class="gi-modal-overlay">
-                    <div class="gi-modal">
-                        <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">{"Terminar Contrato Anticipadamente"}</h3>
-                        <div style="margin-bottom: var(--space-4);">
-                            <label class="gi-label">{"Fecha de Terminación *"}</label>
-                            <input type="date" value={(*terminate_fecha).clone()}
-                                oninput={Callback::from({
-                                    let terminate_fecha = terminate_fecha.clone();
-                                    move |e: InputEvent| {
-                                        let input: web_sys::HtmlInputElement = e.target_unchecked_into();
-                                        terminate_fecha.set(input.value());
-                                    }
-                                })}
-                                class="gi-input" />
-                        </div>
-                        <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
-                            <button onclick={on_terminate_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                            <button onclick={on_terminate_confirm.clone()} class="gi-btn gi-btn-danger">{"Terminar"}</button>
-                        </div>
-                    </div>
-                </div>
+            if terminate_target.is_some() {
+                <TerminateModal
+                    terminate_fecha={terminate_fecha.clone()}
+                    on_confirm={on_terminate_confirm}
+                    on_cancel={on_terminate_cancel}
+                />
             }
 
             if *show_form {
-                <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
-                    <h2 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
-                        {if is_editing { "Editar Contrato" } else { "Nuevo Contrato" }}</h2>
-                    <form onsubmit={on_submit} style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
-                        <div>
-                            <label class="gi-label">{"Propiedad *"}</label>
-                            <select onchange={select_cb!(propiedad_id)} disabled={is_editing}
-                                class={if fe.propiedad_id.is_some() { "gi-input gi-input-error" } else { "gi-input" }}>
-                                <option value="" selected={propiedad_id.is_empty()}>{"— Seleccionar propiedad —"}</option>
-                                { for (*propiedades).iter().map(|p| {
-                                    let sel = *propiedad_id == p.id;
-                                    html! { <option value={p.id.clone()} selected={sel}>{format!("{} — {}", p.titulo, p.direccion)}</option> }
-                                })}
-                            </select>
-                            if let Some(ref msg) = fe.propiedad_id { <p class="gi-field-error">{msg}</p> }
-                        </div>
-                        <div>
-                            <label class="gi-label">{"Inquilino *"}</label>
-                            <select onchange={select_cb!(inquilino_id)} disabled={is_editing}
-                                class={if fe.inquilino_id.is_some() { "gi-input gi-input-error" } else { "gi-input" }}>
-                                <option value="" selected={inquilino_id.is_empty()}>{"— Seleccionar inquilino —"}</option>
-                                { for (*inquilinos).iter().map(|i| {
-                                    let sel = *inquilino_id == i.id;
-                                    html! { <option value={i.id.clone()} selected={sel}>{format!("{} {} ({})", i.nombre, i.apellido, i.cedula)}</option> }
-                                })}
-                            </select>
-                            if let Some(ref msg) = fe.inquilino_id { <p class="gi-field-error">{msg}</p> }
-                        </div>
-                        <div>
-                            <label class="gi-label" title="No puede solaparse con otro contrato activo de la misma propiedad">{"Fecha Inicio *"}</label>
-                            <input type="date" value={(*fecha_inicio).clone()} oninput={input_cb!(fecha_inicio)} disabled={is_editing}
-                                class={if fe.fecha_inicio.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                            if let Some(ref msg) = fe.fecha_inicio { <p class="gi-field-error">{msg}</p> }
-                        </div>
-                        <div>
-                            <label class="gi-label" title="Debe ser posterior a la fecha de inicio. No puede solaparse con otro contrato activo">{"Fecha Fin *"}</label>
-                            <input type="date" value={(*fecha_fin).clone()} oninput={input_cb!(fecha_fin)}
-                                class={if fe.fecha_fin.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                            if let Some(ref msg) = fe.fecha_fin { <p class="gi-field-error">{msg}</p> }
-                        </div>
-                        <div>
-                            <label class="gi-label">{"Monto Mensual *"}</label>
-                            <input type="number" step="0.01" min="0" value={(*monto_mensual).clone()} oninput={input_cb!(monto_mensual)}
-                                class={if fe.monto_mensual.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                            if let Some(ref msg) = fe.monto_mensual { <p class="gi-field-error">{msg}</p> }
-                        </div>
-                        <div>
-                            <label class="gi-label">{"Depósito"}</label>
-                            <input type="number" step="0.01" min="0" value={(*deposito).clone()} oninput={input_cb!(deposito)} class="gi-input" />
-                        </div>
-                        <div>
-                            <label class="gi-label">{"Moneda"}</label>
-                            <select onchange={select_cb!(moneda)} disabled={is_editing} class="gi-input">
-                                <option value="DOP" selected={*moneda == "DOP"}>{"DOP"}</option>
-                                <option value="USD" selected={*moneda == "USD"}>{"USD"}</option>
-                            </select>
-                        </div>
-                        if is_editing {
-                            <div>
-                                <label class="gi-label">{"Estado"}</label>
-                                <select onchange={select_cb!(estado)} class="gi-input">
-                                    <option value="activo" selected={*estado == "activo"}>{"Activo"}</option>
-                                    <option value="vencido" selected={*estado == "vencido"}>{"Vencido"}</option>
-                                    <option value="terminado" selected={*estado == "terminado"}>{"Terminado"}</option>
-                                </select>
-                            </div>
-                        }
-                        <div style="grid-column: 1 / -1; display: flex; gap: var(--space-2); justify-content: flex-end;">
-                            <button type="button" onclick={on_cancel} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                            <button type="submit" disabled={*submitting} class="gi-btn gi-btn-primary">
-                                {if *submitting { "Guardando..." } else { "Guardar" }}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            }
-
-            if (*items).is_empty() {
-                <div class="gi-empty-state">
-                    <div class="gi-empty-state-icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                            <polyline points="14 2 14 8 20 8"/>
-                            <line x1="16" y1="13" x2="8" y2="13"/>
-                            <line x1="16" y1="17" x2="8" y2="17"/>
-                        </svg>
-                    </div>
-                    <div class="gi-empty-state-title">{"Sin contratos registrados"}</div>
-                    <p class="gi-empty-state-text">{"Un contrato vincula una propiedad con un inquilino. Necesita tener al menos una propiedad y un inquilino registrados antes de crear un contrato."}</p>
-                    if can_write(&user_rol) {
-                        <button onclick={Callback::from({
-                            let show_form = show_form.clone();
-                            move |_: MouseEvent| show_form.set(true)
-                        })} class="gi-btn gi-btn-primary" style="margin-top: var(--space-3);">{"+ Nuevo Contrato"}</button>
-                    }
-                    <div class="gi-empty-state-hint">
-                        <Link<Route> to={Route::Propiedades} classes="gi-btn-text">
-                            {"Propiedades"}
-                        </Link<Route>>
-                        {" · "}
-                        <Link<Route> to={Route::Inquilinos} classes="gi-btn-text">
-                            {"Inquilinos"}
-                        </Link<Route>>
-                    </div>
-                </div>
-            } else {
-                <DataTable headers={headers}>
-                    { for (*items).iter().map(|c| {
-                        let on_edit = on_edit.clone(); let on_delete_click = on_delete_click.clone();
-                        let on_renew_click = on_renew_click.clone(); let on_terminate_click = on_terminate_click.clone();
-                        let cc = c.clone(); let cd = c.clone(); let cr = c.clone(); let ct = c.clone();
-                        let user_rol = user_rol.clone();
-                        let p_label = prop_label(&c.propiedad_id);
-                        let i_label = inq_label(&c.inquilino_id);
-                        let (badge_cls, badge_label) = estado_badge(&c.estado);
-                        let is_active = c.estado == "activo";
-                        html! {
-                            <tr>
-                                <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{p_label}</td>
-                                <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{i_label}</td>
-                                <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&c.fecha_inicio)}</td>
-                                <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&c.fecha_fin)}</td>
-                                <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={c.monto_mensual} moneda={c.moneda.clone()} /></td>
-                                <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
-                                if can_write(&user_rol) {
-                                    <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2); flex-wrap: wrap;">
-                                        <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(cc.clone()))} class="gi-btn-text">{"Editar"}</button>
-                                        if is_active {
-                                            <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-success">{"Registrar Pago"}</Link<Route>>
-                                            <button onclick={Callback::from(move |_: MouseEvent| on_renew_click.emit(cr.clone()))} class="gi-btn-text" style="color: var(--color-primary-500);">{"Renovar"}</button>
-                                            <button onclick={Callback::from(move |_: MouseEvent| on_terminate_click.emit(ct.clone()))} class="gi-btn-text" style="color: var(--color-warning);">{"Terminar"}</button>
-                                        }
-                                        if can_delete(&user_rol) {
-                                            <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(cd.clone()))} class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button>
-                                        }
-                                    </td>
-                                }
-                            </tr>
-                        }
-                    })}
-                </DataTable>
-                <Pagination
-                    total={*total}
-                    page={*page}
-                    per_page={*per_page}
-                    on_page_change={on_page_change}
-                    on_per_page_change={on_per_page_change}
+                <ContratoForm
+                    is_editing={editing.is_some()}
+                    propiedad_id={propiedad_id.clone()}
+                    inquilino_id={inquilino_id.clone()}
+                    fecha_inicio={fecha_inicio.clone()}
+                    fecha_fin={fecha_fin.clone()}
+                    monto_mensual={monto_mensual.clone()}
+                    deposito={deposito.clone()}
+                    moneda={moneda.clone()}
+                    estado={estado.clone()}
+                    propiedades={(*propiedades).clone()}
+                    inquilinos={(*inquilinos).clone()}
+                    form_errors={(*form_errors).clone()}
+                    submitting={*submitting}
+                    on_submit={on_submit}
+                    on_cancel={on_cancel}
                 />
             }
+
+            <ContratoList
+                items={(*items).clone()}
+                user_rol={user_rol.clone()}
+                headers={headers}
+                total={*total}
+                page={*page}
+                per_page={*per_page}
+                prop_label={prop_label.clone()}
+                inq_label={inq_label.clone()}
+                on_edit={on_edit}
+                on_delete={on_delete_click}
+                on_renew={on_renew_click}
+                on_terminate={on_terminate_click}
+                on_page_change={on_page_change}
+                on_per_page_change={on_per_page_change}
+            />
         </div>
     }
 }
