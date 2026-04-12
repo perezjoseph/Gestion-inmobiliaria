@@ -17,6 +17,7 @@ Usage:
 
 import hashlib
 import hmac
+import ipaddress
 import json
 import logging
 import os
@@ -41,13 +42,39 @@ if _env_path.is_file():
                 os.environ.setdefault(_k.strip(), _v.strip())
 
 PORT = 9090
-BIND_ADDRESS = os.environ.get("BIND_ADDRESS", "127.0.0.1")
-_ALLOWED_BIND = {"127.0.0.1", "::1", "localhost"}
-if BIND_ADDRESS not in _ALLOWED_BIND:
+BIND_ADDRESS = os.environ.get("BIND_ADDRESS", "0.0.0.0")
+
+_ALLOWED_NETWORKS = [
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("192.168.88.0/24"),
+]
+
+def _is_bind_allowed(addr: str) -> bool:
+    """Allow loopback, 'localhost', '0.0.0.0' (all interfaces), and the local LAN."""
+    if addr in ("localhost", "0.0.0.0", "::"):
+        return True
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        return False
+    return any(ip in net for net in _ALLOWED_NETWORKS)
+
+if not _is_bind_allowed(BIND_ADDRESS):
     raise SystemExit(
         f"BIND_ADDRESS={BIND_ADDRESS!r} is not allowed. "
-        f"Must be one of {_ALLOWED_BIND} to prevent network exposure."
+        f"Must be loopback, 0.0.0.0, or within {_ALLOWED_NETWORKS}."
     )
+
+_ALLOWED_CLIENTS = _ALLOWED_NETWORKS  # same subnets used for source IP filtering
+
+def _is_client_allowed(addr: str) -> bool:
+    """Reject requests from outside loopback and the local LAN."""
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        return False
+    return any(ip in net for net in _ALLOWED_CLIENTS)
 _win_project_dir = pathlib.Path(__file__).resolve().parent.parent
 
 
@@ -460,6 +487,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         client_ip = self.client_address[0]
+        if not _is_client_allowed(client_ip):
+            log.warning(f"Rejected GET from untrusted IP {client_ip}")
+            self._send(403, b"Forbidden")
+            return
         log.info(f"GET {self.path} from {client_ip}")
 
         if not _rate_limiter.allow(client_ip):
@@ -488,6 +519,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         client_ip = self.client_address[0]
         request_id = uuid.uuid4().hex[:12]
+        if not _is_client_allowed(client_ip):
+            log.warning(f"[{request_id}] Rejected POST from untrusted IP {client_ip}")
+            self._send(403, b"Forbidden", request_id=request_id)
+            return
         content_length_raw = self.headers.get("Content-Length", "")
         if not content_length_raw.isdigit() or int(content_length_raw) < 1:
             log.warning(f"[{request_id}] Invalid Content-Length from {client_ip}: {content_length_raw!r}")
