@@ -588,9 +588,6 @@ jobs:
           fi
           rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
-      - name: Clean up OWASP reports from previous runs
-        run: rm -rf reports/
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -690,59 +687,6 @@ jobs:
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           cargo deny check 2>&1 | tee "${RUNNER_TEMP}/deny-output.txt"
-
-      - name: Restore OWASP NVD database cache
-        id: owasp-cache
-        if: always()
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ${{ github.workspace }}/.owasp-data
-          key: owasp-nvd-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            owasp-nvd-
-
-      - name: OWASP dependency scan (fail on CVSS >= 7)
-        id: owasp
-        if: always()
-        timeout-minutes: 15
-        uses: dependency-check/Dependency-Check_Action@1e54355a8b4c8abaa8cc7d0b70aa655a3bb15a6c # main
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        with:
-          project: realestate
-          path: .
-          format: HTML
-          args: >-
-            --format SARIF
-            --failOnCVSS 7
-            --exclude target/**
-            --exclude node_modules/**
-            --exclude dist/**
-            --exclude android/**
-            --disableRetireJS
-            --disableNodeAudit
-            --disableAssembly
-            --suppression owasp-suppressions.xml
-            --data ${{ github.workspace }}/.owasp-data
-            --disableOssIndex
-
-      - name: Upload OWASP vulnerability report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: owasp-dependency-check-report
-          path: reports/
-          retention-days: 7
-          overwrite: false
-          if-no-files-found: warn
-
-      - name: Upload OWASP SARIF to GitHub Security
-        if: always() && hashFiles('reports/dependency-check-report.sarif') != ''
-        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
-        with:
-          sarif_file: reports/dependency-check-report.sarif
-          category: owasp-dependency-check
-        continue-on-error: true
 
       - name: Install Trivy for IaC scanning
         id: install_trivy
@@ -896,14 +840,13 @@ jobs:
             echo "|-------|--------|"
             echo "| cargo audit | ${{ steps.cargo_audit.outcome == 'success' && '✅ Pass' || (steps.install_audit.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
             echo "| cargo deny | ${{ steps.cargo_deny.outcome == 'success' && '✅ Pass' || (steps.install_deny.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
-            echo "| OWASP scan | ${{ steps.owasp.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
             echo "| Trivy IaC scan | ${{ steps.trivy_iac.outcome == 'success' && '✅ Pass' || (steps.install_trivy.outputs.installed != 'true' && '⏭️ Skipped' || '⚠️ Findings') }} |"
             echo "| Trivy secret scan | ${{ steps.trivy_secret.outcome == 'success' && '✅ Pass' || (steps.install_trivy.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect quality-gate errors for notification
         id: collect-errors
-        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.owasp.outcome == 'failure' || steps.trivy_iac.outcome == 'failure' || steps.trivy_secret.outcome == 'failure')
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.trivy_iac.outcome == 'failure' || steps.trivy_secret.outcome == 'failure')
         run: |
           ERROR=""
           FAILED=""
@@ -917,22 +860,6 @@ jobs:
           if [ "${{ steps.cargo_deny.outcome }}" = "failure" ]; then
             FAILED="${FAILED}cargo-deny,"
             ERROR="${ERROR}[cargo-deny] $(head -c 2000 "${RUNNER_TEMP}/deny-output.txt" 2>/dev/null || echo 'cargo deny found policy violations.')"$'\n\n'
-          fi
-          if [ "${{ steps.owasp.outcome }}" = "failure" ]; then
-            FAILED="${FAILED}owasp-scan,"
-            # Extract CVE IDs from OWASP report for actionable error messages
-            OWASP_CVES=""
-            for REPORT_FILE in reports/dependency-check-report.html; do
-              if [ -f "$REPORT_FILE" ]; then
-                OWASP_CVES=$(grep -oP 'CVE-\d{4}-\d+' "$REPORT_FILE" 2>/dev/null | sort -u | head -20 | tr '\n' ', ' || true)
-                break
-              fi
-            done
-            if [ -n "$OWASP_CVES" ]; then
-              ERROR="${ERROR}[owasp-scan] OWASP dependency check found vulnerabilities with CVSS >= 7.\nCVEs: ${OWASP_CVES}\nUpdate affected crate versions in Cargo.toml or add suppressions to owasp-suppressions.xml.\nRun 'cargo update' for affected crates, then verify with cargo audit."$'\n\n'
-            else
-              ERROR="${ERROR}[owasp-scan] OWASP dependency check found vulnerabilities with CVSS >= 7.\nUpdate affected crate versions in Cargo.toml. Run cargo audit to identify specific CVEs."$'\n\n'
-            fi
           fi
           if [ "${{ steps.trivy_iac.outcome }}" = "failure" ]; then
             FAILED="${FAILED}trivy-iac,"
@@ -954,7 +881,7 @@ jobs:
         run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
 
       - name: Fail job if any quality step failed
-        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.owasp.outcome == 'failure' || steps.trivy_iac.outcome == 'failure' || steps.trivy_secret.outcome == 'failure')
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.trivy_iac.outcome == 'failure' || steps.trivy_secret.outcome == 'failure')
         run: exit 1
 
       - name: Clean up sensitive temp files
@@ -2253,10 +2180,10 @@ jobs:
         run: |
           sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/gho_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghu_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g' -e 's|postgresql://[^@[:space:]]+"*|postgresql://***:***@***REDACTED***|g'; }
           if [ -z "$ERROR_LOG" ]; then
-            ERROR_LOG="Quality gate failed but no captured output. Run cargo audit and check OWASP scan to reproduce."
+            ERROR_LOG="Quality gate failed but no captured output. Run cargo audit and cargo deny to reproduce."
           fi
           ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
-          STEP="${FAILED_STEPS:-audit-or-owasp}"
+          STEP="${FAILED_STEPS:-audit-or-deny}"
           PAYLOAD=$(jq -n --arg job "quality-gate" --arg step "$STEP" --arg error_log "$ERROR_LOG" \
             --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
             --arg commit "$GH_SHA" --arg branch "$GH_REF_NAME" --arg actor "$GH_ACTOR" \

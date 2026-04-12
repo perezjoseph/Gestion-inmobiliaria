@@ -15,6 +15,7 @@ kiro-debug.log
 kiro-debug.log
 .kiro-prompt-*
 .fix-history.json
+.simplemem-data/
 escalations/
 
 # Android build artifacts

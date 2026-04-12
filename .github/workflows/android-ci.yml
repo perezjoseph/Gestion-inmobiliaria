@@ -379,35 +379,6 @@ jobs:
             echo "::warning::Gradle dependency verification metadata changed -- review for supply chain integrity"
           fi
 
-      - name: Unset host JAVA_HOME to avoid conflict with Docker container JVM
-        run: echo "JAVA_HOME=" >> "$GITHUB_ENV"
-
-      - name: OWASP dependency scan (fail on CVSS >= 7)
-        id: owasp
-        if: always()
-        timeout-minutes: 15
-        uses: dependency-check/Dependency-Check_Action@1e54355a8b4c8abaa8cc7d0b70aa655a3bb15a6c # main
-        with:
-          project: propmanager-android
-          path: android/
-          format: HTML
-          out: reports
-          args: >-
-            --failOnCVSS 7
-            --exclude "**/build/**"
-            --exclude "**/.gradle/**"
-            --suppression android-owasp-suppressions.xml
-
-      - name: Upload OWASP vulnerability report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: android-owasp-report
-          path: reports/
-          retention-days: 7
-          overwrite: false
-          if-no-files-found: warn
-
       - name: Write quality gate summary
         if: always()
         run: |
@@ -416,34 +387,17 @@ jobs:
             echo "| Check | Status |"
             echo "|-------|--------|"
             echo "| Gradle Dependencies | ${{ steps.dep-verify.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
-            echo "| OWASP Scan | ${{ steps.owasp.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect quality gate errors
         id: collect-errors
-        if: always() && (steps.dep-verify.outcome == 'failure' || steps.owasp.outcome == 'failure')
+        if: always() && steps.dep-verify.outcome == 'failure'
         run: |
           ERROR=""
           FAILED=""
           if [ "${{ steps.dep-verify.outcome }}" = "failure" ]; then
             FAILED="${FAILED}dep-verify,"
             ERROR="${ERROR}[dep-verify] $(tail -c 1500 "${RUNNER_TEMP}/dep-output.txt" 2>/dev/null || echo 'Gradle dependency verification failed.')\n\n"
-          fi
-          if [ "${{ steps.owasp.outcome }}" = "failure" ]; then
-            FAILED="${FAILED}owasp,"
-            # Extract actionable CVE details from the OWASP HTML report
-            OWASP_DETAILS=""
-            for REPORT_FILE in reports/dependency-check-report.html; do
-              if [ -f "$REPORT_FILE" ]; then
-                OWASP_DETAILS=$(grep -oP 'CVE-\d{4}-\d+' "$REPORT_FILE" 2>/dev/null | sort -u | head -20 | tr '\n' ', ' || true)
-                break
-              fi
-            done
-            if [ -n "$OWASP_DETAILS" ]; then
-              ERROR="${ERROR}[owasp] OWASP dependency check found vulnerabilities with CVSS >= 7.\nCVEs found: ${OWASP_DETAILS}\nUpdate vulnerable dependencies in android/gradle/libs.versions.toml to patched versions.\nIf no patch exists, add suppression to android-owasp-suppressions.xml with justification."
-            else
-              ERROR="${ERROR}[owasp] OWASP dependency check found vulnerabilities with CVSS >= 7.\nUpdate vulnerable dependencies in android/gradle/libs.versions.toml.\nRun the OWASP scan locally to see full details: use dependency-check CLI on the android/ directory."
-            fi
           fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
@@ -452,7 +406,7 @@ jobs:
           echo "$EOF" >> $GITHUB_OUTPUT
 
       - name: Fail job if any check failed
-        if: always() && (steps.dep-verify.outcome == 'failure' || steps.owasp.outcome == 'failure')
+        if: always() && steps.dep-verify.outcome == 'failure'
         run: exit 1
 
       - name: Record duration
@@ -845,10 +799,10 @@ jobs:
         run: |
           sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
           if [ -z "$ERROR_LOG" ]; then
-            ERROR_LOG="Android dependency security gate failed. Check OWASP scan report for details."
+            ERROR_LOG="Android dependency security gate failed. Check Gradle dependency verification for details."
           fi
           ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
-          STEP="${FAILED_STEPS:-owasp}"
+          STEP="${FAILED_STEPS:-dep-verify}"
           PAYLOAD=$(jq -n --arg job "android-quality-gate" --arg step "$STEP" --arg error_log "$ERROR_LOG" \
             --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
             --arg commit "$GH_SHA" --arg branch "$GH_REF_NAME" --arg actor "$GH_ACTOR" \

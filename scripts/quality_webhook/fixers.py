@@ -6,6 +6,7 @@ from .config import WIN_PROJECT_DIR, MAX_RETRIES, SCOPE_CONSTRAINTS, log
 from .runner import wsl_bash, run_kiro
 from .classifier import classify_error
 from .history import record_fix_attempt, get_past_attempts
+from .memory import store_fix_attempt, store_fix_outcome, search_relevant_context
 
 _fix_lock = threading.Lock()
 _sonar_fix_lock = threading.Lock()
@@ -156,6 +157,7 @@ def fix_with_retry(job, step, error_log, context=None):
         log.info(f"Error classified as: {error_class} for {job}/{step}")
 
         past_attempts_section = get_past_attempts(job, error_log)
+        semantic_context = search_relevant_context(job, error_log)
         previous_attempt_result = ""
 
         for attempt in range(1, MAX_RETRIES + 1):
@@ -165,6 +167,7 @@ def fix_with_retry(job, step, error_log, context=None):
             error_note = _build_error_notes(error_class)
 
             history_section = f"\n\n{past_attempts_section}" if past_attempts_section else ""
+            semantic_section = f"\n\n{semantic_context}" if semantic_context else ""
             retry_section = ""
             if previous_attempt_result:
                 retry_section = (
@@ -181,6 +184,7 @@ def fix_with_retry(job, step, error_log, context=None):
                 f"TASK: {instruction}"
                 f"{error_note}"
                 f"{history_section}"
+                f"{semantic_section}"
                 f"{retry_section}"
                 f"{SCOPE_CONSTRAINTS}\n\n"
                 "After fixing, run only the targeted verification command for this job. "
@@ -192,8 +196,10 @@ def fix_with_retry(job, step, error_log, context=None):
             success = run_kiro(prompt, f"CI fix ({job}/{step}) attempt {attempt}")
             record_fix_attempt(job, error_log, attempt, success,
                                f"class={error_class}, job={job}, step={step}")
+            store_fix_attempt(job, step, error_class, error_log, attempt, success)
 
             if success:
+                store_fix_outcome(job, error_class, strategy=f"Fixed via attempt {attempt}")
                 log.info(f"Attempt {attempt} completed for {job}/{step}")
                 return True
 

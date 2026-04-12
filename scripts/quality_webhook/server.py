@@ -19,6 +19,7 @@ from .fixers import (
     fix_with_retry, fix_sonar_issues, improve_pipeline,
     _fix_lock, _sonar_fix_lock, _improve_lock,
 )
+from .memory import get_memory_stats
 
 _thread_semaphore = threading.Semaphore(4)
 
@@ -74,6 +75,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     "sonar_fix": _sonar_fix_lock.locked(),
                     "improve": _improve_lock.locked(),
                 },
+                "memory": get_memory_stats(),
             }).encode(), "application/json")
             return
         self._send(404, b"Not found")
