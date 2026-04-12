@@ -34,6 +34,8 @@ env:
   CARGO_INCREMENTAL: "0"
   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
   CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+  CARGO_HTTP_TIMEOUT: "30"
+  CARGO_NET_RETRY: "3"
   RUSTFLAGS: "-D warnings"
   SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
 
@@ -62,7 +64,7 @@ jobs:
           GITLEAKS_VERSION="8.24.3"
           GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
           ARCHIVE="/tmp/gitleaks.tar.gz"
-          curl -sSfL -o "$ARCHIVE" \
+          curl -sSfL --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
           sudo tar xzf "$ARCHIVE" -C /usr/local/bin gitleaks
@@ -277,6 +279,15 @@ jobs:
           --health-retries 5
           --security-opt no-new-privileges
           --pids-limit 256
+          --memory 512m
+          --memory-swap 512m
+          --shm-size 128m
+          --cap-drop ALL
+          --cap-add CHOWN
+          --cap-add DAC_OVERRIDE
+          --cap-add FOWNER
+          --cap-add SETGID
+          --cap-add SETUID
     steps:
       - name: Record start time
         id: start
@@ -325,7 +336,7 @@ jobs:
             TARPAULIN_SHA256="67a61b2b271488e2d0cb718ccec384d0f296703f3c810f80ea5d46484c5d463b"
             ARCHIVE="/tmp/cargo-tarpaulin.tar.gz"
             mkdir -p "$HOME/.cargo/bin"
-            if curl -sSfL --retry 3 -o "$ARCHIVE" \
+            if curl -sSfL --retry 3 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
               "https://github.com/xd009642/tarpaulin/releases/download/${TARPAULIN_VERSION}/cargo-tarpaulin-x86_64-unknown-linux-musl.tar.gz"; then
               if echo "${TARPAULIN_SHA256}  ${ARCHIVE}" | sha256sum -c -; then
                 tar xzf "$ARCHIVE" -C "$HOME/.cargo/bin" 2>/dev/null
@@ -585,7 +596,7 @@ jobs:
           DENY_VERSION="0.16.4"
           DENY_SHA256="28b7f8e12df46a9ce186547e38278c851905fc4bda59a0cc57d2aade9fdf6962"
           URL="https://github.com/EmbarkStudios/cargo-deny/releases/download/${DENY_VERSION}/cargo-deny-${DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz"
-          if curl -sSfL --retry 3 -o /tmp/cargo-deny.tar.gz "$URL"; then
+          if curl -sSfL --retry 3 --connect-timeout 15 --max-time 120 -o /tmp/cargo-deny.tar.gz "$URL"; then
             echo "${DENY_SHA256}  /tmp/cargo-deny.tar.gz" | sha256sum -c -
             tar xzf /tmp/cargo-deny.tar.gz --strip-components=1 -C "$HOME/.cargo/bin/" 2>/dev/null
             chmod +x "$HOME/.cargo/bin/cargo-deny"
@@ -608,6 +619,7 @@ jobs:
       - name: OWASP dependency scan (fail on CVSS >= 7)
         id: owasp
         if: always()
+        timeout-minutes: 15
         uses: dependency-check/Dependency-Check_Action@1e54355a8b4c8abaa8cc7d0b70aa655a3bb15a6c # main
         with:
           project: realestate
@@ -639,7 +651,7 @@ jobs:
             exit 0
           fi
           ARCHIVE="/tmp/trivy.tar.gz"
-          curl -sSfL -o "$ARCHIVE" \
+          curl -sSfL --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
             "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
           echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
           sudo tar xzf "$ARCHIVE" -C /usr/local/bin trivy
@@ -896,21 +908,21 @@ jobs:
             exit 1
           fi
 
-          curl -sf -u "admin:${ADMIN_PASS}" -X POST \
+          curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
             "$SONAR_URL/api/projects/create?name=Gestion+Inmobiliaria&project=gestion-inmobiliaria" \
             2>/dev/null || echo "Project already exists."
 
-          DEFAULT_QG=$(curl -sf -u "admin:${ADMIN_PASS}" \
+          DEFAULT_QG=$(curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" \
             "$SONAR_URL/api/qualitygates/list" | jq -r '.qualitygates[] | select(.isDefault==true) | .name' 2>/dev/null || echo "Sonar way")
           if [ -n "$DEFAULT_QG" ]; then
-            curl -sf -u "admin:${ADMIN_PASS}" -X POST \
+            curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
               "$SONAR_URL/api/qualitygates/select?projectKey=gestion-inmobiliaria&gateName=$(echo "$DEFAULT_QG" | jq -sRr @uri)" \
               2>/dev/null || echo "Quality gate already assigned."
           fi
 
-          curl -sf -u "admin:${ADMIN_PASS}" -X POST \
+          curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
             "$SONAR_URL/api/user_tokens/revoke?name=ci-token" 2>/dev/null || true
-          TOKEN=$(curl -sf -u "admin:${ADMIN_PASS}" -X POST \
+          TOKEN=$(curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
             "$SONAR_URL/api/user_tokens/generate?name=ci-token" \
             | jq -r '.token')
 
@@ -988,13 +1000,13 @@ jobs:
               CE_TASK_ID=$(grep '^ceTaskId=' "$REPORT_FILE" | cut -d= -f2)
               if [ -n "$CE_TASK_ID" ]; then
                 for i in $(seq 1 60); do
-                  CE_RESPONSE=$(curl -sf -u "$SONAR_TOKEN:" \
+                  CE_RESPONSE=$(curl -sf --connect-timeout 10 --max-time 30 -u "$SONAR_TOKEN:" \
                     "$SONAR_URL/api/ce/task?id=$CE_TASK_ID" 2>/dev/null || echo '{}')
                   CE_STATUS=$(echo "$CE_RESPONSE" | jq -r '.task.status // "UNKNOWN"')
                   if [ "$CE_STATUS" = "SUCCESS" ]; then
                     ANALYSIS_ID=$(echo "$CE_RESPONSE" | jq -r '.task.analysisId // empty')
                     if [ -n "$ANALYSIS_ID" ]; then
-                      GATE=$(curl -sf -u "$SONAR_TOKEN:" \
+                      GATE=$(curl -sf --connect-timeout 10 --max-time 30 -u "$SONAR_TOKEN:" \
                         "$SONAR_URL/api/qualitygates/project_status?analysisId=$ANALYSIS_ID" 2>/dev/null || echo '{}')
                       GATE_STATUS=$(echo "$GATE" | jq -r '.projectStatus.status // "UNKNOWN"')
                     fi
@@ -1012,7 +1024,7 @@ jobs:
 
           if [ "$GATE_STATUS" = "UNKNOWN" ]; then
             for i in $(seq 1 30); do
-              GATE=$(curl -sf -u "$SONAR_TOKEN:" \
+              GATE=$(curl -sf --connect-timeout 10 --max-time 30 -u "$SONAR_TOKEN:" \
                 "$SONAR_URL/api/qualitygates/project_status?projectKey=gestion-inmobiliaria" 2>/dev/null || echo '{}')
               GATE_STATUS=$(echo "$GATE" | jq -r '.projectStatus.status // "UNKNOWN"')
               if [ "$GATE_STATUS" != "UNKNOWN" ] && [ "$GATE_STATUS" != "NONE" ]; then
@@ -1033,7 +1045,7 @@ jobs:
 
           echo "Final quality gate status: $GATE_STATUS"
 
-          ISSUES=$(curl -sf -u "$SONAR_TOKEN:" \
+          ISSUES=$(curl -sf --connect-timeout 10 --max-time 30 -u "$SONAR_TOKEN:" \
             "$SONAR_URL/api/issues/search?projectKeys=gestion-inmobiliaria&resolved=false&ps=50&s=SEVERITY&asc=false" 2>/dev/null || echo '{}')
           TOTAL=$(echo "$ISSUES" | jq -r '.total // 0')
           SUMMARY=$(echo "$ISSUES" | jq -r '
@@ -1042,7 +1054,7 @@ jobs:
             map("\(.count) \(.severity)") | join(", ")' 2>/dev/null || echo "Could not parse issues")
 
           # Fetch coverage metrics
-          MEASURES=$(curl -sf -u "$SONAR_TOKEN:" \
+          MEASURES=$(curl -sf --connect-timeout 10 --max-time 30 -u "$SONAR_TOKEN:" \
             "$SONAR_URL/api/measures/component?component=gestion-inmobiliaria&metricKeys=coverage,lines_to_cover,uncovered_lines,duplicated_lines_density,ncloc" 2>/dev/null || echo '{}')
           COVERAGE=$(echo "$MEASURES" | jq -r '.component.measures[]? | select(.metric=="coverage") | .value // "N/A"' 2>/dev/null || echo "N/A")
           NCLOC=$(echo "$MEASURES" | jq -r '.component.measures[]? | select(.metric=="ncloc") | .value // "N/A"' 2>/dev/null || echo "N/A")
@@ -1109,7 +1121,7 @@ jobs:
           fi
           ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD }}"
           if [ -n "$ADMIN_PASS" ]; then
-            curl -sf -u "admin:${ADMIN_PASS}" -X POST \
+            curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
               "${SONAR_HOST_URL}/api/user_tokens/revoke?name=ci-token" 2>/dev/null || true
             echo "Bootstrap token revoked."
           fi
@@ -1190,7 +1202,7 @@ jobs:
             GITLEAKS_VERSION="8.24.3"
             GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
             ARCHIVE="/tmp/gitleaks.tar.gz"
-            curl -sSfL -o "$ARCHIVE" \
+            curl -sSfL --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
               "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
             echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
             sudo tar xzf "$ARCHIVE" -C /usr/local/bin gitleaks
@@ -1292,7 +1304,7 @@ jobs:
             GITLEAKS_VERSION="8.24.3"
             GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
             ARCHIVE="/tmp/gitleaks.tar.gz"
-            curl -sSfL -o "$ARCHIVE" \
+            curl -sSfL --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
               "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
             echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
             sudo tar xzf "$ARCHIVE" -C /usr/local/bin gitleaks
@@ -1384,7 +1396,7 @@ jobs:
           TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
           if ! command -v trivy &>/dev/null || [ "$(trivy --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" != "$TRIVY_VERSION" ]; then
             ARCHIVE="/tmp/trivy.tar.gz"
-            curl -sSfL -o "$ARCHIVE" \
+            curl -sSfL --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
               "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
             echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
             sudo tar xzf "$ARCHIVE" -C /usr/local/bin trivy
@@ -1502,7 +1514,7 @@ jobs:
           TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
           if ! command -v trivy &>/dev/null || [ "$(trivy --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" != "$TRIVY_VERSION" ]; then
             ARCHIVE="/tmp/trivy.tar.gz"
-            curl -sSfL -o "$ARCHIVE" \
+            curl -sSfL --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
               "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
             echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
             sudo tar xzf "$ARCHIVE" -C /usr/local/bin trivy
@@ -2040,9 +2052,9 @@ jobs:
               exit 0
             fi
             TOKEN_NAME="ci-improve-${{ github.run_id }}"
-            curl -sf -u "admin:${ADMIN_PASS}" -X POST \
+            curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
               "$SONAR_URL/api/user_tokens/revoke?name=${TOKEN_NAME}" 2>/dev/null || true
-            TOKEN=$(curl -sf -u "admin:${ADMIN_PASS}" -X POST \
+            TOKEN=$(curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
               "$SONAR_URL/api/user_tokens/generate?name=${TOKEN_NAME}" 2>/dev/null \
               | jq -r '.token // empty' || true)
             if [ -z "$TOKEN" ]; then
@@ -2054,7 +2066,7 @@ jobs:
             echo "token_name=${TOKEN_NAME}" >> $GITHUB_OUTPUT
           fi
 
-          ISSUES_JSON=$(curl -sf -u "$TOKEN:" \
+          ISSUES_JSON=$(curl -sf --connect-timeout 10 --max-time 30 -u "$TOKEN:" \
             "$SONAR_URL/api/issues/search?projectKeys=${PROJECT_KEY}&resolved=false&ps=100&s=SEVERITY&asc=false&statuses=OPEN,CONFIRMED,REOPENED" \
             2>/dev/null || echo '{}')
 
@@ -2069,7 +2081,7 @@ jobs:
               "\(.severity) | \(.component | split(":") | last):\(.line // "?") | \(.rule) | \(.message)"] |
             join("\n")' 2>/dev/null || echo "")
 
-          HOTSPOTS_JSON=$(curl -sf -u "$TOKEN:" \
+          HOTSPOTS_JSON=$(curl -sf --connect-timeout 10 --max-time 30 -u "$TOKEN:" \
             "$SONAR_URL/api/hotspots/search?projectKey=${PROJECT_KEY}&status=TO_REVIEW&ps=50" \
             2>/dev/null || echo '{}')
 
@@ -2227,6 +2239,6 @@ jobs:
           ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD }}"
           TOKEN_NAME="${{ steps.sonar-issues.outputs.token_name }}"
           if [ -n "$ADMIN_PASS" ] && [ -n "$TOKEN_NAME" ]; then
-            curl -sf -u "admin:${ADMIN_PASS}" -X POST \
+            curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
               "${SONAR_HOST_URL}/api/user_tokens/revoke?name=${TOKEN_NAME}" 2>/dev/null || true
           fi
