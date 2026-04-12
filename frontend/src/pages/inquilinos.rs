@@ -459,6 +459,42 @@ fn handle_escape_inquilinos(
     }
 }
 
+fn make_inquilino_edit_cb(
+    nombre: &UseStateHandle<String>,
+    apellido: &UseStateHandle<String>,
+    email: &UseStateHandle<String>,
+    telefono: &UseStateHandle<String>,
+    cedula: &UseStateHandle<String>,
+    contacto_emergencia: &UseStateHandle<String>,
+    notas: &UseStateHandle<String>,
+    editing: &UseStateHandle<Option<Inquilino>>,
+    show_form: &UseStateHandle<bool>,
+    form_errors: &UseStateHandle<FormErrors>,
+) -> Callback<Inquilino> {
+    let (nombre, apellido, email, telefono, cedula) = (
+        nombre.clone(),
+        apellido.clone(),
+        email.clone(),
+        telefono.clone(),
+        cedula.clone(),
+    );
+    let (contacto_emergencia, notas) = (contacto_emergencia.clone(), notas.clone());
+    let (editing, show_form, form_errors) =
+        (editing.clone(), show_form.clone(), form_errors.clone());
+    Callback::from(move |i: Inquilino| {
+        nombre.set(i.nombre.clone());
+        apellido.set(i.apellido.clone());
+        email.set(i.email.clone().unwrap_or_default());
+        telefono.set(i.telefono.clone().unwrap_or_default());
+        cedula.set(i.cedula.clone());
+        contacto_emergencia.set(i.contacto_emergencia.clone().unwrap_or_default());
+        notas.set(i.notas.clone().unwrap_or_default());
+        editing.set(Some(i));
+        show_form.set(true);
+        form_errors.set(FormErrors::default());
+    })
+}
+
 fn render_inquilinos_view(
     loading: &UseStateHandle<bool>,
     user_rol: &str,
@@ -661,46 +697,22 @@ pub fn Inquilinos() -> Html {
         });
     }
 
-    let on_new = {
-        let reset_form = reset_form.clone();
-        let show_form = show_form.clone();
-        Callback::from(move |_: MouseEvent| {
-            reset_form();
-            show_form.set(true);
-        })
-    };
+    let on_new = super::page_helpers::new_cb(reset_form.clone(), &show_form, true);
 
-    let on_edit = {
-        let nombre = nombre.clone();
-        let apellido = apellido.clone();
-        let email = email.clone();
-        let telefono = telefono.clone();
-        let cedula = cedula.clone();
-        let contacto_emergencia = contacto_emergencia.clone();
-        let notas = notas.clone();
-        let editing = editing.clone();
-        let show_form = show_form.clone();
-        let form_errors = form_errors.clone();
-        Callback::from(move |i: Inquilino| {
-            nombre.set(i.nombre.clone());
-            apellido.set(i.apellido.clone());
-            email.set(i.email.clone().unwrap_or_default());
-            telefono.set(i.telefono.clone().unwrap_or_default());
-            cedula.set(i.cedula.clone());
-            contacto_emergencia.set(i.contacto_emergencia.clone().unwrap_or_default());
-            notas.set(i.notas.clone().unwrap_or_default());
-            editing.set(Some(i));
-            show_form.set(true);
-            form_errors.set(FormErrors::default());
-        })
-    };
+    let on_edit = make_inquilino_edit_cb(
+        &nombre,
+        &apellido,
+        &email,
+        &telefono,
+        &cedula,
+        &contacto_emergencia,
+        &notas,
+        &editing,
+        &show_form,
+        &form_errors,
+    );
 
-    let on_delete_click = {
-        let delete_target = delete_target.clone();
-        Callback::from(move |i: Inquilino| {
-            delete_target.set(Some(i));
-        })
-    };
+    let on_delete_click = super::page_helpers::delete_click_cb(&delete_target);
 
     let on_delete_confirm = {
         let error = error.clone();
@@ -717,12 +729,7 @@ pub fn Inquilinos() -> Html {
         })
     };
 
-    let on_delete_cancel = {
-        let delete_target = delete_target.clone();
-        Callback::from(move |_: MouseEvent| {
-            delete_target.set(None);
-        })
-    };
+    let on_delete_cancel = super::page_helpers::delete_cancel_cb(&delete_target);
 
     let validate_form = {
         let nombre = nombre.clone();
@@ -773,10 +780,7 @@ pub fn Inquilinos() -> Html {
         })
     };
 
-    let on_cancel = {
-        let reset_form = reset_form.clone();
-        Callback::from(move |_: MouseEvent| reset_form())
-    };
+    let on_cancel = super::page_helpers::cancel_cb(reset_form.clone());
 
     let on_search_apply = {
         let search = search.clone();
@@ -801,24 +805,8 @@ pub fn Inquilinos() -> Html {
             reload.set(*reload + 1);
         })
     };
-    let on_page_change = {
-        let page = page.clone();
-        let reload = reload.clone();
-        Callback::from(move |p: u64| {
-            page.set(p);
-            reload.set(*reload + 1);
-        })
-    };
-    let on_per_page_change = {
-        let per_page = per_page.clone();
-        let page = page.clone();
-        let reload = reload.clone();
-        Callback::from(move |pp: u64| {
-            per_page.set(pp);
-            page.set(1);
-            reload.set(*reload + 1);
-        })
-    };
+    let (on_page_change, on_per_page_change) =
+        super::page_helpers::pagination_cbs(&page, &per_page, &reload);
 
     render_inquilinos_view(
         &loading,

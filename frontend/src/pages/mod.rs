@@ -5,6 +5,7 @@ pub mod importar;
 pub mod inquilinos;
 pub mod login;
 pub mod mantenimiento;
+mod page_helpers;
 pub mod pagos;
 pub mod perfil;
 pub mod propiedades;
