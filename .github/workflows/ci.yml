@@ -143,7 +143,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-lint-
             ${{ runner.os }}-cargo-
-          save-always: true
 
       - name: Verify rustfmt formatting across all crates
         id: fmt
@@ -275,7 +274,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-test-
             ${{ runner.os }}-cargo-
-          save-always: true
 
       - name: Run backend tests
         id: backend-tests
@@ -388,7 +386,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-frontend-test-v2-
             ${{ runner.os }}-cargo-
-          save-always: true
 
       - name: Run frontend tests (native target)
         id: frontend-tests
@@ -589,6 +586,14 @@ jobs:
             --include-non-failures \
             Dockerfile.backend Dockerfile.frontend docker-compose.prod.yml docker-compose.dev.yml 2>&1 | tee /tmp/trivy-iac-output.txt
 
+      - name: Scan source code for embedded secrets (Trivy)
+        id: trivy_secret
+        if: always() && steps.install_trivy.outputs.installed == 'true'
+        run: |
+          trivy fs --scanners secret --exit-code 1 --no-progress --format table \
+            --skip-dirs target --skip-dirs node_modules --skip-dirs dist --skip-dirs .git \
+            . 2>&1 | tee /tmp/trivy-secret-output.txt
+
       - name: Generate cargo-audit SARIF report
         id: cargo_audit_sarif
         if: always() && steps.install_audit.outputs.installed == 'true'
@@ -646,11 +651,12 @@ jobs:
             echo "| cargo deny | ${{ steps.cargo_deny.outcome == 'success' && '✅ Pass' || (steps.install_deny.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
             echo "| OWASP scan | ${{ steps.owasp.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
             echo "| Trivy IaC scan | ${{ steps.trivy_iac.outcome == 'success' && '✅ Pass' || (steps.install_trivy.outputs.installed != 'true' && '⏭️ Skipped' || '⚠️ Findings') }} |"
+            echo "| Trivy secret scan | ${{ steps.trivy_secret.outcome == 'success' && '✅ Pass' || (steps.install_trivy.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect quality-gate errors for notification
         id: collect-errors
-        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.owasp.outcome == 'failure' || steps.trivy_iac.outcome == 'failure')
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.owasp.outcome == 'failure' || steps.trivy_iac.outcome == 'failure' || steps.trivy_secret.outcome == 'failure')
         run: |
           ERROR=""
           FAILED=""
@@ -673,6 +679,10 @@ jobs:
             FAILED="${FAILED}trivy-iac,"
             ERROR="${ERROR}[trivy-iac] $(head -c 2000 /tmp/trivy-iac-output.txt 2>/dev/null || echo 'Trivy found Dockerfile/compose misconfigurations.')"$'\n\n'
           fi
+          if [ "${{ steps.trivy_secret.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}trivy-secret,"
+            ERROR="${ERROR}[trivy-secret] $(head -c 2000 /tmp/trivy-secret-output.txt 2>/dev/null || echo 'Trivy found embedded secrets in source code.')"$'\n\n'
+          fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT
@@ -685,7 +695,7 @@ jobs:
         run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
 
       - name: Fail job if any quality step failed
-        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.owasp.outcome == 'failure' || steps.trivy_iac.outcome == 'failure')
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.owasp.outcome == 'failure' || steps.trivy_iac.outcome == 'failure' || steps.trivy_secret.outcome == 'failure')
         run: exit 1
 
   sonarqube:
@@ -804,6 +814,8 @@ jobs:
             --cap-drop ALL \
             --read-only \
             --memory 1g \
+            --memory-swap 1g \
+            --pids-limit 256 \
             --tmpfs /tmp:rw,noexec,nosuid,nodev \
             -e SONAR_TOKEN="${SONAR_ANALYSIS_TOKEN}" \
             -e SONAR_HOST_URL="http://192.168.88.25:9000" \
@@ -991,7 +1003,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-wasm-
             ${{ runner.os }}-cargo-
-          save-always: true
 
       - name: Build optimized WASM frontend bundle
         run: trunk build --release 2>&1 | tee /tmp/build-frontend-output.txt
@@ -1094,7 +1105,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-backend-build-
             ${{ runner.os }}-cargo-
-          save-always: true
 
       - name: Build optimized backend binary
         run: cargo build --locked -p realestate-backend --release 2>&1 | tee /tmp/build-backend-output.txt
@@ -1391,6 +1401,37 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Verify build provenance attestations
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BACKEND_DIGEST: ${{ needs.container-image-backend.outputs.digest }}
+          FRONTEND_DIGEST: ${{ needs.container-image-frontend.outputs.digest }}
+        run: |
+          VERIFIED=true
+          if [ -n "$BACKEND_DIGEST" ]; then
+            echo "Verifying backend attestation..."
+            if ! gh attestation verify "oci://ghcr.io/${{ github.repository_owner }}/realestate-backend${BACKEND_DIGEST}" \
+              --owner "${{ github.repository_owner }}" 2>&1; then
+              echo "::error::Backend attestation verification failed"
+              VERIFIED=false
+            fi
+          else
+            echo "::warning::Backend digest unavailable -- skipping attestation verification"
+          fi
+          if [ -n "$FRONTEND_DIGEST" ]; then
+            echo "Verifying frontend attestation..."
+            if ! gh attestation verify "oci://ghcr.io/${{ github.repository_owner }}/realestate-frontend${FRONTEND_DIGEST}" \
+              --owner "${{ github.repository_owner }}" 2>&1; then
+              echo "::error::Frontend attestation verification failed"
+              VERIFIED=false
+            fi
+          else
+            echo "::warning::Frontend digest unavailable -- skipping attestation verification"
+          fi
+          if [ "$VERIFIED" = "false" ]; then
+            exit 1
+          fi
+
       - name: Pull latest images and deploy
         env:
           POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
@@ -1425,7 +1466,7 @@ jobs:
             docker compose -f docker-compose.prod.yml pull
           fi
 
-          docker compose -f docker-compose.prod.yml up -d --no-build --remove-orphans
+          docker compose -f docker-compose.prod.yml up -d --no-build --pull never --remove-orphans
           docker compose -f docker-compose.prod.yml ps
 
       - name: Verify deployment health

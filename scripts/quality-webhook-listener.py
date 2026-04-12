@@ -94,8 +94,7 @@ def wsl_cmd(command):
 def run_kiro(prompt, label):
     log.info(f"Triggering kiro-cli for: {label}")
 
-    escaped = prompt.replace('"', '\\"').replace("'", "'\\''")
-    cmd = f'kiro-cli chat --trust-all-tools --agent sisyphus-kiro --no-interactive "{escaped}"'
+    cmd = "kiro-cli chat --trust-all-tools --agent sisyphus-kiro --no-interactive -"
 
     log_file = os.path.join(os.path.dirname(__file__), "..", "kiro-debug.log")
 
@@ -107,12 +106,38 @@ def run_kiro(prompt, label):
 
         proc = subprocess.Popen(
             wsl_cmd(cmd),
+            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             encoding="utf-8",
             errors="replace",
         )
+
+        try:
+            proc.stdin.write(prompt)
+            proc.stdin.close()
+        except BrokenPipeError:
+            log.warning("Broken pipe writing prompt to kiro-cli stdin")
+
+        output_lines = []
+        try:
+            for line in proc.stdout:
+                f.write(line)
+                f.flush()
+                output_lines.append(line)
+            proc.wait(timeout=KIRO_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            f.write("\n[TIMEOUT] Process killed\n")
+            log.warning(f"kiro-cli timed out after {KIRO_TIMEOUT // 60} minutes")
+            return False
+        except Exception as e:
+            proc.kill()
+            f.write(f"\n[ERROR] {e}\n")
+            log.error(f"kiro-cli process error: {e}", exc_info=True)
+            return False
 
         output_lines = []
         try:
