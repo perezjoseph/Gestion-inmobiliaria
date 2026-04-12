@@ -32,6 +32,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
   RUSTFLAGS: "-D warnings"
 
 jobs:
@@ -41,6 +42,7 @@ jobs:
     name: Secret Scanning (Gitleaks)
     runs-on: [self-hosted, linux]
     timeout-minutes: 10
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
     steps:
@@ -72,7 +74,7 @@ jobs:
     name: Conventional Commits Check
     runs-on: [self-hosted, linux]
     timeout-minutes: 5
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
     steps:
@@ -92,7 +94,7 @@ jobs:
 
       - name: Install commitlint CLI and conventional config
         run: |
-          npm install --ignore-scripts --save-dev @commitlint/{cli,config-conventional}
+          npm install --ignore-scripts --save-dev @commitlint/cli@20.5.0 @commitlint/config-conventional@20.5.0
           echo "module.exports = { extends: ['@commitlint/config-conventional'] };" > commitlint.config.js
 
       - name: Validate PR commit messages against conventional format
@@ -102,6 +104,7 @@ jobs:
     name: Code Formatting & Static Analysis
     runs-on: [self-hosted, linux]
     timeout-minutes: 20
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
     outputs:
@@ -217,6 +220,7 @@ jobs:
     name: Backend Unit & Integration Tests
     runs-on: [self-hosted, linux, docker]
     timeout-minutes: 30
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
     env:
@@ -345,6 +349,7 @@ jobs:
     name: Frontend WASM Compilation & Tests
     runs-on: [self-hosted, linux]
     timeout-minutes: 20
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
     outputs:
@@ -426,6 +431,7 @@ jobs:
     name: Dependency Security & Health Check
     runs-on: [self-hosted, linux, docker]
     timeout-minutes: 30
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
       security-events: write

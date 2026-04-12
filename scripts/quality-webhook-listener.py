@@ -23,6 +23,8 @@ import os
 import socket
 import subprocess
 import threading
+import time
+from collections import defaultdict
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 
@@ -38,6 +40,29 @@ WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 _fix_lock = threading.Lock()
 _sonar_fix_lock = threading.Lock()
 _improve_lock = threading.Lock()
+
+
+class RateLimiter:
+    """Sliding window rate limiter per IP address."""
+
+    def __init__(self, max_requests=30, window_seconds=60):
+        self.max_requests = max_requests
+        self.window = window_seconds
+        self._requests = defaultdict(list)
+        self._lock = threading.Lock()
+
+    def allow(self, ip):
+        now = time.monotonic()
+        with self._lock:
+            timestamps = self._requests[ip]
+            self._requests[ip] = [t for t in timestamps if now - t < self.window]
+            if len(self._requests[ip]) >= self.max_requests:
+                return False
+            self._requests[ip].append(now)
+            return True
+
+
+_rate_limiter = RateLimiter(max_requests=30, window_seconds=60)
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -262,6 +287,17 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
 
 class WebhookHandler(BaseHTTPRequestHandler):
     def do_GET(self):
+        client_ip = self.client_address[0]
+        log.info(f"GET {self.path} from {client_ip}")
+
+        if not _rate_limiter.allow(client_ip):
+            log.warning(f"Rate limit exceeded for {client_ip}")
+            self.send_response(429)
+            self.send_header("Retry-After", "60")
+            self.end_headers()
+            self.wfile.write(b"Too many requests")
+            return
+
         if self.path == "/health":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -280,7 +316,17 @@ class WebhookHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
+        client_ip = self.client_address[0]
         content_length = int(self.headers.get("Content-Length", 0))
+        log.info(f"POST {self.path} from {client_ip} ({content_length} bytes)")
+
+        if not _rate_limiter.allow(client_ip):
+            log.warning(f"Rate limit exceeded for {client_ip}")
+            self.send_response(429)
+            self.send_header("Retry-After", "60")
+            self.end_headers()
+            self.wfile.write(b"Too many requests")
+            return
 
         if content_length > MAX_PAYLOAD_BYTES:
             log.warning(f"Payload too large: {content_length} bytes (max {MAX_PAYLOAD_BYTES})")
