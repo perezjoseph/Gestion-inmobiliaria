@@ -166,7 +166,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-lint-
             ${{ runner.os }}-cargo-
-          save-always: true
 
       - name: Verify rustfmt formatting across all crates
         id: fmt
@@ -277,6 +276,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
           --security-opt no-new-privileges
+          --pids-limit 256
     steps:
       - name: Record start time
         id: start
@@ -305,7 +305,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-test-
             ${{ runner.os }}-cargo-
-          save-always: true
 
       - name: Generate random JWT secret for test isolation
         run: echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
@@ -440,7 +439,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-frontend-test-v2-
             ${{ runner.os }}-cargo-
-          save-always: true
 
       - name: Run frontend tests (native target)
         id: frontend-tests
@@ -1179,7 +1177,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-wasm-
             ${{ runner.os }}-cargo-
-          save-always: true
 
       - name: Build optimized WASM frontend bundle
         run: trunk build --release 2>&1 | tee /tmp/build-frontend-output.txt
@@ -1283,7 +1280,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-backend-build-
             ${{ runner.os }}-cargo-
-          save-always: true
 
       - name: Build optimized backend binary
         run: cargo build --locked -p realestate-backend --release 2>&1 | tee /tmp/build-backend-output.txt
@@ -1583,6 +1579,8 @@ jobs:
     permissions:
       contents: read
       packages: read
+    env:
+      DOCKER_CONTENT_TRUST: "1"
     needs: [container-image-backend, container-image-frontend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
@@ -1640,6 +1638,7 @@ jobs:
           BACKEND_DIGEST: ${{ needs.container-image-backend.outputs.digest }}
           FRONTEND_DIGEST: ${{ needs.container-image-frontend.outputs.digest }}
         run: |
+          umask 077
           # Capture current image digests for rollback
           PREV_BACKEND=$(docker compose -f docker-compose.prod.yml images backend --format json 2>/dev/null | jq -r '.[0].ID // empty' || true)
           PREV_FRONTEND=$(docker compose -f docker-compose.prod.yml images frontend --format json 2>/dev/null | jq -r '.[0].ID // empty' || true)
@@ -1676,6 +1675,7 @@ jobs:
           JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
+          umask 077
           echo "Waiting for services to initialize..."
           sleep 10
           BACKEND_OK=false
@@ -1704,6 +1704,7 @@ jobs:
           JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
+          umask 077
           echo "::warning::Health check failed -- rolling back to previous images"
           if [ -n "$PREV_BACKEND" ] || [ -n "$PREV_FRONTEND" ]; then
             docker compose -f docker-compose.prod.yml down
@@ -2038,8 +2039,11 @@ jobs:
               echo "sonar_report=SonarQube credentials unavailable -- skipping issue collection." >> $GITHUB_OUTPUT
               exit 0
             fi
+            TOKEN_NAME="ci-improve-${{ github.run_id }}"
+            curl -sf -u "admin:${ADMIN_PASS}" -X POST \
+              "$SONAR_URL/api/user_tokens/revoke?name=${TOKEN_NAME}" 2>/dev/null || true
             TOKEN=$(curl -sf -u "admin:${ADMIN_PASS}" -X POST \
-              "$SONAR_URL/api/user_tokens/generate?name=ci-improve-token" 2>/dev/null \
+              "$SONAR_URL/api/user_tokens/generate?name=${TOKEN_NAME}" 2>/dev/null \
               | jq -r '.token // empty' || true)
             if [ -z "$TOKEN" ]; then
               echo "sonar_report=SonarQube token unavailable -- skipping issue collection." >> $GITHUB_OUTPUT
@@ -2047,6 +2051,7 @@ jobs:
             fi
             echo "::add-mask::$TOKEN"
             echo "temp_token=true" >> $GITHUB_OUTPUT
+            echo "token_name=${TOKEN_NAME}" >> $GITHUB_OUTPUT
           fi
 
           ISSUES_JSON=$(curl -sf -u "$TOKEN:" \
@@ -2096,6 +2101,17 @@ jobs:
           BUILD_FE_ERRORS: ${{ needs.build-frontend.outputs.error_log }}
           BUILD_BE_ERRORS: ${{ needs.build-backend.outputs.error_log }}
         run: |
+          # Sanitize secrets from error logs before sending to webhook
+          sanitize_log() {
+            sed -E \
+              -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' \
+              -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' \
+              -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' \
+              -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' \
+              -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g' \
+              -e 's/postgresql:\/\/[^@]+@/postgresql:\/\/***:***@/g'
+          }
+
           FOCUS="general"
           REPORT=""
 
@@ -2110,25 +2126,31 @@ jobs:
           REPORT="${REPORT}  build-frontend     | ${{ needs.build-frontend.result }} | ${{ needs.build-frontend.outputs.duration || 'n/a' }} | ${{ needs.build-frontend.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }}\n"
           REPORT="${REPORT}  build-backend      | ${{ needs.build-backend.result }} | ${{ needs.build-backend.outputs.duration || 'n/a' }} | ${{ needs.build-backend.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }}\n"
 
-          # Collect error logs from all failed jobs
+          # Collect error logs from all failed jobs (sanitized)
           ERRORS=""
           if [ "${{ needs.lint.result }}" = "failure" ] && [ -n "$LINT_ERRORS" ]; then
-            ERRORS="${ERRORS}\n--- LINT ERRORS ---\n${LINT_ERRORS}\n"
+            SANITIZED=$(printf '%s' "$LINT_ERRORS" | sanitize_log)
+            ERRORS="${ERRORS}\n--- LINT ERRORS ---\n${SANITIZED}\n"
           fi
           if [ "${{ needs.test-backend.result }}" = "failure" ] && [ -n "$BACKEND_TEST_ERRORS" ]; then
-            ERRORS="${ERRORS}\n--- BACKEND TEST ERRORS ---\n${BACKEND_TEST_ERRORS}\n"
+            SANITIZED=$(printf '%s' "$BACKEND_TEST_ERRORS" | sanitize_log)
+            ERRORS="${ERRORS}\n--- BACKEND TEST ERRORS ---\n${SANITIZED}\n"
           fi
           if [ "${{ needs.test-frontend.result }}" = "failure" ] && [ -n "$FRONTEND_TEST_ERRORS" ]; then
-            ERRORS="${ERRORS}\n--- FRONTEND TEST ERRORS ---\n${FRONTEND_TEST_ERRORS}\n"
+            SANITIZED=$(printf '%s' "$FRONTEND_TEST_ERRORS" | sanitize_log)
+            ERRORS="${ERRORS}\n--- FRONTEND TEST ERRORS ---\n${SANITIZED}\n"
           fi
           if [ "${{ needs.quality-gate.result }}" = "failure" ] && [ -n "$QUALITY_ERRORS" ]; then
-            ERRORS="${ERRORS}\n--- QUALITY GATE ERRORS ---\n${QUALITY_ERRORS}\n"
+            SANITIZED=$(printf '%s' "$QUALITY_ERRORS" | sanitize_log)
+            ERRORS="${ERRORS}\n--- QUALITY GATE ERRORS ---\n${SANITIZED}\n"
           fi
           if [ "${{ needs.build-frontend.result }}" = "failure" ] && [ -n "$BUILD_FE_ERRORS" ]; then
-            ERRORS="${ERRORS}\n--- BUILD FRONTEND ERRORS ---\n${BUILD_FE_ERRORS}\n"
+            SANITIZED=$(printf '%s' "$BUILD_FE_ERRORS" | sanitize_log)
+            ERRORS="${ERRORS}\n--- BUILD FRONTEND ERRORS ---\n${SANITIZED}\n"
           fi
           if [ "${{ needs.build-backend.result }}" = "failure" ] && [ -n "$BUILD_BE_ERRORS" ]; then
-            ERRORS="${ERRORS}\n--- BUILD BACKEND ERRORS ---\n${BUILD_BE_ERRORS}\n"
+            SANITIZED=$(printf '%s' "$BUILD_BE_ERRORS" | sanitize_log)
+            ERRORS="${ERRORS}\n--- BUILD BACKEND ERRORS ---\n${SANITIZED}\n"
           fi
 
           if [ -n "$ERRORS" ]; then
@@ -2203,7 +2225,8 @@ jobs:
         if: always() && steps.sonar-issues.outputs.temp_token == 'true'
         run: |
           ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD }}"
-          if [ -n "$ADMIN_PASS" ]; then
+          TOKEN_NAME="${{ steps.sonar-issues.outputs.token_name }}"
+          if [ -n "$ADMIN_PASS" ] && [ -n "$TOKEN_NAME" ]; then
             curl -sf -u "admin:${ADMIN_PASS}" -X POST \
-              "${SONAR_HOST_URL}/api/user_tokens/revoke?name=ci-improve-token" 2>/dev/null || true
+              "${SONAR_HOST_URL}/api/user_tokens/revoke?name=${TOKEN_NAME}" 2>/dev/null || true
           fi

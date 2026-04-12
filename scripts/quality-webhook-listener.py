@@ -41,6 +41,7 @@ MAX_FIELD_LENGTH = 50_000
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
 _SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9_\-]{1,64}$")
+_SAFE_URL_RE = re.compile(r"^https://github\.com/[a-zA-Z0-9._\-]+/[a-zA-Z0-9._\-]+/actions/runs/\d+$")
 
 _fix_lock = threading.Lock()
 _sonar_fix_lock = threading.Lock()
@@ -84,6 +85,13 @@ def _validate_name(value):
     if isinstance(value, str) and _SAFE_NAME_RE.match(value):
         return value
     return "unknown"
+
+
+def _validate_url(value):
+    """Return value if it matches expected GitHub Actions run URL, else empty string."""
+    if isinstance(value, str) and _SAFE_URL_RE.match(value):
+        return value[:256]
+    return ""
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -470,14 +478,14 @@ class WebhookHandler(BaseHTTPRequestHandler):
             focus = "general"
         pipeline_report = _sanitize_text(payload.get("pipeline_report", ""))
         sonar_report = _sanitize_text(payload.get("sonar_report", ""))
-        run_url = _sanitize_text(payload.get("run_url", ""), 256)
+        run_url = _validate_url(payload.get("run_url", ""))
 
         log.info(f"CI improve webhook: focus={focus}")
         improve_pipeline(focus, pipeline_report, run_url, sonar_report)
 
     def _handle_sonar_fix(self, payload):
         sonar_report = _sanitize_text(payload.get("sonar_report", ""))
-        run_url = _sanitize_text(payload.get("run_url", ""), 256)
+        run_url = _validate_url(payload.get("run_url", ""))
 
         log.info("SonarQube fix webhook received")
         fix_sonar_issues(sonar_report, run_url)
@@ -489,6 +497,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
 def main():
     local_ip = get_local_ip()
     server = HTTPServer((BIND_ADDRESS, PORT), WebhookHandler)
+    server.timeout = 30
     log.info(f"Quality webhook listener running on {BIND_ADDRESS}:{PORT}")
     log.info(f"Max retries: {MAX_RETRIES} | Timeout: {KIRO_TIMEOUT // 60}min | Max payload: {MAX_PAYLOAD_BYTES // 1024}KB")
     log.info("Endpoints:")
