@@ -112,7 +112,7 @@ jobs:
       - name: Install commitlint CLI and conventional config
         run: |
           umask 077
-          npm install --ignore-scripts --no-fund --no-audit --save-dev @commitlint/cli@20.5.0 @commitlint/config-conventional@20.5.0
+          npm install --ignore-scripts --no-fund --no-audit --no-optional --save-dev @commitlint/cli@20.5.0 @commitlint/config-conventional@20.5.0
           echo "module.exports = { extends: ['@commitlint/config-conventional'] };" > commitlint.config.js
 
       - name: Validate PR commit messages against conventional format
@@ -358,6 +358,13 @@ jobs:
           umask 077
           cargo test --locked -p realestate-backend --all-targets 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
 
+      - name: Verify Cargo.lock was not modified during tests
+        run: |
+          if ! git diff --exit-code Cargo.lock; then
+            echo "::error::Cargo.lock was modified during tests -- lockfile integrity violation"
+            exit 1
+          fi
+
       - name: Generate test coverage report (LCOV)
         id: coverage
         if: success() && github.ref == 'refs/heads/main'
@@ -495,6 +502,13 @@ jobs:
         run: |
           umask 077
           cargo test --locked -p realestate-frontend --all-targets 2>&1 | tee "${RUNNER_TEMP}/test-frontend-output.txt"
+
+      - name: Verify Cargo.lock was not modified during tests
+        run: |
+          if ! git diff --exit-code Cargo.lock; then
+            echo "::error::Cargo.lock was modified during tests -- lockfile integrity violation"
+            exit 1
+          fi
 
       - name: Write test summary
         if: always()
@@ -1487,7 +1501,7 @@ jobs:
           context: .
           file: Dockerfile.backend
           load: true
-          tags: ghcr.io/${IMAGE_OWNER}/realestate-backend:${{ github.sha }}
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ github.sha }}
           provenance: mode=max
           sbom: true
 
@@ -1567,6 +1581,10 @@ jobs:
           docker rmi "ghcr.io/${IMAGE_OWNER}/realestate-backend:${IMAGE_TAG}" 2>/dev/null || true
           docker builder prune -f --filter "until=24h" 2>/dev/null || true
 
+      - name: Clean up docker credentials
+        if: always()
+        run: docker logout ghcr.io 2>/dev/null || true
+
   container-image-frontend:
     name: Build & Push Frontend Image to GHCR
     runs-on: [self-hosted, linux, docker]
@@ -1615,7 +1633,7 @@ jobs:
           context: .
           file: Dockerfile.frontend
           load: true
-          tags: ghcr.io/${IMAGE_OWNER}/realestate-frontend:${{ github.sha }}
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ github.sha }}
           provenance: mode=max
           sbom: true
 
@@ -1695,6 +1713,10 @@ jobs:
           docker rmi "ghcr.io/${IMAGE_OWNER}/realestate-frontend:${IMAGE_TAG}" 2>/dev/null || true
           docker builder prune -f --filter "until=24h" 2>/dev/null || true
 
+      - name: Clean up docker credentials
+        if: always()
+        run: docker logout ghcr.io 2>/dev/null || true
+
   # ── Stage 4: Deploy (runs after both images are pushed) ──
 
   deploy:
@@ -1702,6 +1724,9 @@ jobs:
     runs-on: [self-hosted, linux, sonarqube]
     timeout-minutes: 10
     environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
     permissions:
       contents: read
       packages: read
@@ -1855,6 +1880,10 @@ jobs:
             echo "No previous images recorded -- stopping failed deployment"
             docker compose -f docker-compose.prod.yml down
           fi
+
+      - name: Clean up docker credentials
+        if: always()
+        run: docker logout ghcr.io 2>/dev/null || true
 
   notify-failure:
     name: Failure Notification Webhook

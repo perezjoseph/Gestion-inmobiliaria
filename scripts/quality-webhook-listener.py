@@ -329,6 +329,15 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
         _improve_lock.release()
 
 
+class TimeoutHTTPServer(HTTPServer):
+    """HTTPServer with per-connection socket timeout (slow-loris protection)."""
+
+    def get_request(self):
+        conn, addr = super().get_request()
+        conn.settimeout(30)
+        return conn, addr
+
+
 class WebhookHandler(BaseHTTPRequestHandler):
     def _send(self, code, body=b"", content_type="text/plain"):
         self.send_response(code)
@@ -512,7 +521,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
     def _reject_method(self):
         self._send(405, b"Method not allowed")
 
-    do_PUT = do_DELETE = do_PATCH = do_HEAD = do_OPTIONS = _reject_method
+    do_PUT = do_DELETE = do_PATCH = do_HEAD = do_OPTIONS = do_TRACE = do_CONNECT = _reject_method
 
     def log_message(self, format, *args):
         pass
@@ -528,7 +537,7 @@ def main():
         raise SystemExit(1)
 
     local_ip = get_local_ip()
-    server = HTTPServer((BIND_ADDRESS, PORT), WebhookHandler)
+    server = TimeoutHTTPServer((BIND_ADDRESS, PORT), WebhookHandler)
     server.timeout = 30
     server.request_queue_size = 8
     log.info(f"Quality webhook listener running on {BIND_ADDRESS}:{PORT}")
