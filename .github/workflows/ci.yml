@@ -399,6 +399,7 @@ jobs:
           path: coverage/lcov.info
           retention-days: 1
           overwrite: false
+          if-no-files-found: warn
 
       - name: Write test summary
         if: always()
@@ -683,6 +684,7 @@ jobs:
           path: reports/
           retention-days: 7
           overwrite: false
+          if-no-files-found: warn
 
       - name: Install Trivy for IaC scanning
         id: install_trivy
@@ -1171,7 +1173,7 @@ jobs:
           fi
 
       - name: Revoke bootstrap SonarQube token
-        if: always() && steps.sonar-bootstrap.outputs.SONAR_ANALYSIS_TOKEN != '' && env.SONAR_ANALYSIS_TOKEN != ''
+        if: always() && env.SONAR_ANALYSIS_TOKEN != ''
         run: |
           TOKEN="${{ secrets.SONAR_TOKEN }}"
           if [ -n "$TOKEN" ]; then
@@ -1258,8 +1260,13 @@ jobs:
       - name: Build optimized WASM frontend bundle
         run: trunk build --release 2>&1 | tee /tmp/build-frontend-output.txt
         working-directory: frontend
-        env:
-          CARGO_FROZEN: "true"
+
+      - name: Verify Cargo.lock was not modified during build
+        run: |
+          if ! git diff --exit-code Cargo.lock; then
+            echo "::error::Cargo.lock was modified during build -- lockfile integrity violation"
+            exit 1
+          fi
 
       - name: Scan frontend dist for leaked secrets
         run: |
@@ -1284,6 +1291,7 @@ jobs:
           path: frontend/dist/
           retention-days: 3
           overwrite: false
+          if-no-files-found: error
 
       - name: Attest frontend build provenance
         uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
@@ -1392,6 +1400,7 @@ jobs:
           path: target/release/realestate-backend
           retention-days: 3
           overwrite: false
+          if-no-files-found: error
 
       - name: Attest backend build provenance
         uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
@@ -1514,6 +1523,7 @@ jobs:
           path: backend-sbom.spdx.json
           retention-days: 30
           overwrite: false
+          if-no-files-found: warn
 
       - name: Upload Trivy SARIF to GitHub Security
         if: always()
@@ -1641,6 +1651,7 @@ jobs:
           path: frontend-sbom.spdx.json
           retention-days: 30
           overwrite: false
+          if-no-files-found: warn
 
       - name: Upload Trivy SARIF to GitHub Security
         if: always()
@@ -1742,6 +1753,11 @@ jobs:
             exit 1
           fi
 
+      - name: Mask production secrets
+        run: |
+          echo "::add-mask::${{ secrets.PROD_POSTGRES_PASSWORD }}"
+          echo "::add-mask::${{ secrets.PROD_JWT_SECRET }}"
+
       - name: Pull latest images and deploy
         env:
           POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
@@ -1782,6 +1798,7 @@ jobs:
 
       - name: Verify deployment health
         id: health-check
+        timeout-minutes: 4
         env:
           POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
           JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
@@ -1811,6 +1828,7 @@ jobs:
 
       - name: Rollback on health check failure
         if: failure() && steps.health-check.outcome == 'failure'
+        timeout-minutes: 3
         env:
           POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
           JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
