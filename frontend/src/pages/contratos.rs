@@ -693,12 +693,7 @@ pub fn Contratos() -> Html {
                         Ok(_) => {
                             reset_form();
                             reload.set(*reload + 1);
-                            if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::Push(
-                                    "Contrato actualizado".into(),
-                                    ToastKind::Success,
-                                ));
-                            }
+                            push_toast(&toasts, "Contrato actualizado", ToastKind::Success);
                         }
                         Err(err) => error.set(Some(err)),
                     }
@@ -720,12 +715,7 @@ pub fn Contratos() -> Html {
                         Ok(_) => {
                             reset_form();
                             reload.set(*reload + 1);
-                            if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::Push(
-                                    "Contrato creado".into(),
-                                    ToastKind::Success,
-                                ));
-                            }
+                            push_toast(&toasts, "Contrato creado", ToastKind::Success);
                         }
                         Err(err) => error.set(Some(err)),
                     }
@@ -775,12 +765,7 @@ pub fn Contratos() -> Html {
                             renew_target.set(None);
                             renew_fecha_fin.set(String::new());
                             reload.set(*reload + 1);
-                            if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::Push(
-                                    "Contrato renovado".into(),
-                                    ToastKind::Success,
-                                ));
-                            }
+                            push_toast(&toasts, "Contrato renovado", ToastKind::Success);
                         }
                         Err(err) => error.set(Some(err)),
                     }
@@ -823,12 +808,7 @@ pub fn Contratos() -> Html {
                             terminate_target.set(None);
                             terminate_fecha.set(String::new());
                             reload.set(*reload + 1);
-                            if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::Push(
-                                    "Contrato terminado".into(),
-                                    ToastKind::Success,
-                                ));
-                            }
+                            push_toast(&toasts, "Contrato terminado", ToastKind::Success);
                         }
                         Err(err) => error.set(Some(err)),
                     }
@@ -895,17 +875,11 @@ pub fn Contratos() -> Html {
             }
 
             if let Some(ref target) = *delete_target {
-                <div class="gi-modal-overlay">
-                    <div class="gi-modal">
-                        <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-2); color: var(--text-primary);">{"Confirmar eliminación"}</h3>
-                        <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-5);">
-                            {format!("¿Está seguro de que desea eliminar el contrato de la propiedad \"{}\"? Esta acción no se puede deshacer.", prop_label.emit(target.propiedad_id.clone()))}</p>
-                        <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
-                            <button onclick={on_delete_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                            <button onclick={on_delete_confirm.clone()} class="gi-btn gi-btn-danger">{"Eliminar"}</button>
-                        </div>
-                    </div>
-                </div>
+                <DeleteConfirmModal
+                    message={format!("¿Está seguro de que desea eliminar el contrato de la propiedad \"{}\"? Esta acción no se puede deshacer.", prop_label.emit(target.propiedad_id.clone()))}
+                    on_confirm={on_delete_confirm.clone()}
+                    on_cancel={on_delete_cancel.clone()}
+                />
             }
 
             if renew_target.is_some() {
