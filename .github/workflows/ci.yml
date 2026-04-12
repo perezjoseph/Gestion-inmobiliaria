@@ -46,7 +46,7 @@ jobs:
 
   secret-scan:
     name: Secret Scanning (Gitleaks)
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
     timeout-minutes: 10
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -84,7 +84,7 @@ jobs:
 
   commit-lint:
     name: Conventional Commits Check
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
     timeout-minutes: 5
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -124,7 +124,7 @@ jobs:
 
   dependency-review:
     name: Dependency Review (PR)
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
     timeout-minutes: 10
     if: github.event_name == 'pull_request'
     permissions:
@@ -145,7 +145,7 @@ jobs:
 
   lint:
     name: Code Formatting & Static Analysis
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
     timeout-minutes: 20
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -276,7 +276,7 @@ jobs:
 
   test-backend:
     name: Backend Unit & Integration Tests
-    runs-on: [self-hosted, linux, docker]
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","docker"]') }}
     timeout-minutes: 30
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -467,7 +467,7 @@ jobs:
 
   test-frontend:
     name: Frontend WASM Compilation & Tests
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
     timeout-minutes: 20
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -568,7 +568,7 @@ jobs:
 
   quality-gate:
     name: Dependency Security & Health Check
-    runs-on: [self-hosted, linux, docker]
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","docker"]') }}
     timeout-minutes: 30
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -926,7 +926,7 @@ jobs:
 
   sonarqube:
     name: SonarQube Code Quality & Coverage Analysis
-    runs-on: [self-hosted, linux, sonarqube]
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","sonarqube"]') }}
     timeout-minutes: 20
     permissions:
       contents: read
@@ -1245,7 +1245,7 @@ jobs:
 
   build-frontend:
     name: Frontend WASM Release Build
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
     timeout-minutes: 30
     permissions:
       contents: read
@@ -1412,7 +1412,7 @@ jobs:
 
   build-backend:
     name: Backend Release Build
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
     timeout-minutes: 30
     permissions:
       contents: read
@@ -1573,7 +1573,7 @@ jobs:
 
   container-image-backend:
     name: Build & Push Backend Image to GHCR
-    runs-on: [self-hosted, linux, docker]
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","docker"]') }}
     timeout-minutes: 45
     permissions:
       contents: read
@@ -1705,7 +1705,7 @@ jobs:
 
   container-image-frontend:
     name: Build & Push Frontend Image to GHCR
-    runs-on: [self-hosted, linux, docker]
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","docker"]') }}
     timeout-minutes: 45
     permissions:
       contents: read
@@ -1839,7 +1839,7 @@ jobs:
 
   deploy:
     name: Deploy to Production
-    runs-on: [self-hosted, linux, sonarqube]
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","sonarqube"]') }}
     timeout-minutes: 10
     environment: production
     concurrency:
@@ -2005,7 +2005,7 @@ jobs:
 
   notify-failure:
     name: Failure Notification Webhook
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
     timeout-minutes: 5
     permissions: {}
     env:
@@ -2313,7 +2313,7 @@ jobs:
 
   pipeline-improve:
     name: CI/CD Pipeline Self-Improvement
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
     timeout-minutes: 10
     permissions:
       contents: read
