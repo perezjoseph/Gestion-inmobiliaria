@@ -26,6 +26,8 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.serialization.json.Json
+import java.lang.reflect.Proxy
 import java.math.BigDecimal
 import java.time.Instant
 
@@ -508,15 +510,28 @@ private class FakeConnectivityObserver(
     override val isOnline: StateFlow<Boolean> = MutableStateFlow(online).asStateFlow()
 }
 
+@Suppress("UNCHECKED_CAST")
 private class FakePropiedadesRepository(
     private val initialData: List<Propiedad> = emptyList(),
     private val createError: Throwable? = null,
     private val updateError: Throwable? = null,
 ) : PropiedadesRepository(
-        dao = StubPropiedadDao,
-        syncQueueDao = StubSyncQueueDao,
-        apiService = StubPropiedadesApiService,
-        json = kotlinx.serialization.json.Json,
+        dao =
+            Proxy.newProxyInstance(
+                com.propmanager.core.database.dao.PropiedadDao::class.java.classLoader,
+                arrayOf(com.propmanager.core.database.dao.PropiedadDao::class.java),
+            ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.PropiedadDao,
+        syncQueueDao =
+            Proxy.newProxyInstance(
+                com.propmanager.core.database.dao.SyncQueueDao::class.java.classLoader,
+                arrayOf(com.propmanager.core.database.dao.SyncQueueDao::class.java),
+            ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.SyncQueueDao,
+        apiService =
+            Proxy.newProxyInstance(
+                com.propmanager.core.network.api.PropiedadesApiService::class.java.classLoader,
+                arrayOf(com.propmanager.core.network.api.PropiedadesApiService::class.java),
+            ) { _, _, _ -> error("stub") } as com.propmanager.core.network.api.PropiedadesApiService,
+        json = Json { ignoreUnknownKeys = true },
     ) {
     var createCallCount = 0
         private set
@@ -585,52 +600,4 @@ private class FakePropiedadesRepository(
         store.value = store.value.filter { it.id != id }
         return Result.success(Unit)
     }
-}
-
-private object StubPropiedadDao : com.propmanager.core.database.dao.PropiedadDao {
-    override fun observeAll() = MutableStateFlow(emptyList<com.propmanager.core.database.entity.PropiedadEntity>())
-
-    override fun observeById(id: String) = MutableStateFlow<com.propmanager.core.database.entity.PropiedadEntity?>(null)
-
-    override fun observeFiltered(
-        ciudad: String?,
-        estado: String?,
-        tipoPropiedad: String?,
-    ) = MutableStateFlow(emptyList<com.propmanager.core.database.entity.PropiedadEntity>())
-
-    override suspend fun upsert(entity: com.propmanager.core.database.entity.PropiedadEntity) {}
-
-    override suspend fun upsertAll(entities: List<com.propmanager.core.database.entity.PropiedadEntity>) {}
-
-    override suspend fun markDeleted(id: String) {}
-
-    override suspend fun deleteAll() {}
-}
-
-private object StubSyncQueueDao : com.propmanager.core.database.dao.SyncQueueDao {
-    override suspend fun getAllPending() = emptyList<com.propmanager.core.database.entity.SyncQueueEntry>()
-
-    override suspend fun enqueue(entry: com.propmanager.core.database.entity.SyncQueueEntry) {}
-
-    override suspend fun remove(entry: com.propmanager.core.database.entity.SyncQueueEntry) {}
-
-    override fun observePendingCount() = MutableStateFlow(0)
-}
-
-private object StubPropiedadesApiService : com.propmanager.core.network.api.PropiedadesApiService {
-    override suspend fun list(
-        filters: Map<String, String>,
-    ): retrofit2.Response<com.propmanager.core.model.dto.PaginatedResponse<com.propmanager.core.model.dto.PropiedadDto>> = error("stub")
-
-    override suspend fun getById(id: String): retrofit2.Response<com.propmanager.core.model.dto.PropiedadDto> = error("stub")
-
-    override suspend fun create(request: CreatePropiedadRequest): retrofit2.Response<com.propmanager.core.model.dto.PropiedadDto> =
-        error("stub")
-
-    override suspend fun update(
-        id: String,
-        request: UpdatePropiedadRequest,
-    ): retrofit2.Response<com.propmanager.core.model.dto.PropiedadDto> = error("stub")
-
-    override suspend fun delete(id: String): retrofit2.Response<Unit> = error("stub")
 }
