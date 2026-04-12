@@ -22,10 +22,11 @@ fun SyncStatusBadge(
 
     val description = "Pendiente de sincronización"
     Box(
-        modifier = modifier
-            .size(8.dp)
-            .clip(CircleShape)
-            .background(SyncPendingColor)
-            .semantics { contentDescription = description },
+        modifier =
+            modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(SyncPendingColor)
+                .semantics { contentDescription = description },
     )
 }

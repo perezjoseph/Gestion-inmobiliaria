@@ -22,7 +22,14 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
-buildFeatures {
+
+    testOptions {
+        unitTests.all {
+            it.useJUnitPlatform()
+        }
+    }
+
+    buildFeatures {
         compose = true
     }
 }
@@ -47,4 +54,5 @@ dependencies {
 
     testImplementation(libs.bundles.unit.test)
     testImplementation(libs.bundles.kotest)
+    testImplementation(project(":core:database"))
 }

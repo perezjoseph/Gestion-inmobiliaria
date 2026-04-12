@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PropiedadDao {
-
     @Query("SELECT * FROM propiedades WHERE is_deleted = 0 ORDER BY titulo ASC")
     fun observeAll(): Flow<List<PropiedadEntity>>
 
@@ -23,12 +22,12 @@ interface PropiedadDao {
           AND (:estado IS NULL OR estado = :estado)
           AND (:tipoPropiedad IS NULL OR tipo_propiedad = :tipoPropiedad)
         ORDER BY titulo ASC
-        """
+        """,
     )
     fun observeFiltered(
         ciudad: String?,
         estado: String?,
-        tipoPropiedad: String?
+        tipoPropiedad: String?,
     ): Flow<List<PropiedadEntity>>
 
     @Upsert

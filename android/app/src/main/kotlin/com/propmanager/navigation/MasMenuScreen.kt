@@ -21,20 +21,24 @@ import androidx.compose.ui.res.stringResource
 import com.propmanager.core.ui.R
 import com.propmanager.core.ui.components.PropManagerTopAppBar
 
-private data class MenuItem(val labelResId: Int, val route: String)
-
-private val menuItems = listOf(
-    MenuItem(R.string.nav_pagos, Routes.PAGOS),
-    MenuItem(R.string.nav_gastos, Routes.GASTOS),
-    MenuItem(R.string.nav_mantenimiento, Routes.MANTENIMIENTO),
-    MenuItem(R.string.nav_reportes, Routes.REPORTES),
-    MenuItem(R.string.nav_documentos, "documentos/propiedad/all"),
-    MenuItem(R.string.nav_notificaciones, Routes.NOTIFICACIONES),
-    MenuItem(R.string.nav_auditoria, Routes.AUDITORIA),
-    MenuItem(R.string.nav_perfil, Routes.PERFIL),
-    MenuItem(R.string.nav_configuracion, Routes.CONFIGURACION),
-    MenuItem(R.string.nav_importacion, Routes.IMPORTACION),
+private data class MenuItem(
+    val labelResId: Int,
+    val route: String,
 )
+
+private val menuItems =
+    listOf(
+        MenuItem(R.string.nav_pagos, Routes.PAGOS),
+        MenuItem(R.string.nav_gastos, Routes.GASTOS),
+        MenuItem(R.string.nav_mantenimiento, Routes.MANTENIMIENTO),
+        MenuItem(R.string.nav_reportes, Routes.REPORTES),
+        MenuItem(R.string.nav_documentos, "documentos/propiedad/all"),
+        MenuItem(R.string.nav_notificaciones, Routes.NOTIFICACIONES),
+        MenuItem(R.string.nav_auditoria, Routes.AUDITORIA),
+        MenuItem(R.string.nav_perfil, Routes.PERFIL),
+        MenuItem(R.string.nav_configuracion, Routes.CONFIGURACION),
+        MenuItem(R.string.nav_importacion, Routes.IMPORTACION),
+    )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,10 +60,11 @@ fun MasMenuScreen(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState()),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .verticalScroll(rememberScrollState()),
         ) {
             menuItems.forEach { item ->
                 ListItem(
@@ -69,9 +74,10 @@ fun MasMenuScreen(
                             style = MaterialTheme.typography.bodyLarge,
                         )
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onNavigate(item.route) },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigate(item.route) },
                 )
                 HorizontalDivider()
             }

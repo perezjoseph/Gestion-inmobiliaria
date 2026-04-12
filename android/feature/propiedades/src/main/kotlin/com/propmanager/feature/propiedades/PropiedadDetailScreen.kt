@@ -36,8 +36,8 @@ import com.propmanager.core.common.DateFormatter
 import com.propmanager.core.model.Propiedad
 import com.propmanager.core.ui.R
 import com.propmanager.core.ui.components.ConfirmDeleteDialog
-import com.propmanager.core.ui.components.LoadingScreen
 import com.propmanager.core.ui.components.ErrorScreen
+import com.propmanager.core.ui.components.LoadingScreen
 import com.propmanager.core.ui.components.PropManagerTopAppBar
 import com.propmanager.core.ui.components.SyncStatusBadge
 import java.time.ZoneId
@@ -95,10 +95,11 @@ fun PropiedadDetailScreen(
         when (val state = detailState) {
             is PropiedadDetailUiState.Loading -> LoadingScreen(modifier = Modifier.padding(paddingValues))
             is PropiedadDetailUiState.NotFound -> ErrorScreen(message = state.message, modifier = Modifier.padding(paddingValues))
-            is PropiedadDetailUiState.Success -> PropiedadDetailContent(
-                propiedad = state.propiedad,
-                modifier = Modifier.padding(paddingValues),
-            )
+            is PropiedadDetailUiState.Success ->
+                PropiedadDetailContent(
+                    propiedad = state.propiedad,
+                    modifier = Modifier.padding(paddingValues),
+                )
         }
     }
 }
@@ -109,10 +110,11 @@ private fun PropiedadDetailContent(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(propiedad.titulo, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -134,14 +136,21 @@ private fun PropiedadDetailContent(
         propiedad.areaM2?.let { DetailRow(stringResource(R.string.propiedad_area), it.toPlainString()) }
         propiedad.descripcion?.let {
             Spacer(Modifier.height(8.dp))
-            Text(stringResource(R.string.propiedad_descripcion), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                stringResource(R.string.propiedad_descripcion),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Text(it, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
 
 @Composable
-private fun DetailRow(label: String, value: String) {
+private fun DetailRow(
+    label: String,
+    value: String,
+) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)

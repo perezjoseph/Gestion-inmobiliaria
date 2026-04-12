@@ -7,11 +7,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class AuditoriaRepository @Inject constructor(
-    private val apiService: AuditoriaApiService
-) {
-
-    suspend fun fetchAuditLog(filters: Map<String, String> = emptyMap()): Result<PaginatedResponse<AuditoriaDto>> = runCatching {
-        apiService.list(filters).body() ?: throw Exception("Empty response")
+class AuditoriaRepository
+    @Inject
+    constructor(
+        private val apiService: AuditoriaApiService,
+    ) {
+        suspend fun fetchAuditLog(filters: Map<String, String> = emptyMap()): Result<PaginatedResponse<AuditoriaDto>> =
+            runCatching {
+                apiService.list(filters).body() ?: throw Exception("Empty response")
+            }
     }
-}

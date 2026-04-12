@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ContratoDao {
-
     @Query("SELECT * FROM contratos WHERE is_deleted = 0 ORDER BY fecha_inicio DESC")
     fun observeAll(): Flow<List<ContratoEntity>>
 
@@ -22,9 +21,12 @@ interface ContratoDao {
           AND fecha_fin >= :todayStr
           AND fecha_fin <= :thresholdStr
         ORDER BY fecha_fin ASC
-        """
+        """,
     )
-    fun observeExpiring(todayStr: String, thresholdStr: String): Flow<List<ContratoEntity>>
+    fun observeExpiring(
+        todayStr: String,
+        thresholdStr: String,
+    ): Flow<List<ContratoEntity>>
 
     @Upsert
     suspend fun upsert(entity: ContratoEntity)

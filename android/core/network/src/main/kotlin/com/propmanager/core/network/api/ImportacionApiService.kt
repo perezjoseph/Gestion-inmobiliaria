@@ -12,26 +12,31 @@ import retrofit2.http.Part
 data class ImportResultDto(
     @SerialName("totalFilas") val totalFilas: Int,
     val exitosos: Int,
-    val fallidos: List<ImportErrorDto>
+    val fallidos: List<ImportErrorDto>,
 )
 
 @Serializable
 data class ImportErrorDto(
     val fila: Int,
-    val error: String
+    val error: String,
 )
 
 interface ImportacionApiService {
-
     @Multipart
     @POST("api/importar/propiedades")
-    suspend fun importPropiedades(@Part file: MultipartBody.Part): Response<ImportResultDto>
+    suspend fun importPropiedades(
+        @Part file: MultipartBody.Part,
+    ): Response<ImportResultDto>
 
     @Multipart
     @POST("api/importar/inquilinos")
-    suspend fun importInquilinos(@Part file: MultipartBody.Part): Response<ImportResultDto>
+    suspend fun importInquilinos(
+        @Part file: MultipartBody.Part,
+    ): Response<ImportResultDto>
 
     @Multipart
     @POST("api/importar/gastos")
-    suspend fun importGastos(@Part file: MultipartBody.Part): Response<ImportResultDto>
+    suspend fun importGastos(
+        @Part file: MultipartBody.Part,
+    ): Response<ImportResultDto>
 }

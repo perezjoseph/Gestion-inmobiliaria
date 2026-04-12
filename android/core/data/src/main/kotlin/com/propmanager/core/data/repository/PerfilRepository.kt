@@ -9,19 +9,23 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class PerfilRepository @Inject constructor(
-    private val apiService: PerfilApiService
-) {
+class PerfilRepository
+    @Inject
+    constructor(
+        private val apiService: PerfilApiService,
+    ) {
+        suspend fun fetchPerfil(): Result<UserDto> =
+            runCatching {
+                apiService.getPerfil().body() ?: throw Exception("Empty response")
+            }
 
-    suspend fun fetchPerfil(): Result<UserDto> = runCatching {
-        apiService.getPerfil().body() ?: throw Exception("Empty response")
-    }
+        suspend fun updatePerfil(request: UpdatePerfilRequest): Result<UserDto> =
+            runCatching {
+                apiService.updatePerfil(request).body() ?: throw Exception("Empty response")
+            }
 
-    suspend fun updatePerfil(request: UpdatePerfilRequest): Result<UserDto> = runCatching {
-        apiService.updatePerfil(request).body() ?: throw Exception("Empty response")
+        suspend fun changePassword(request: ChangePasswordRequest): Result<MessageResponse> =
+            runCatching {
+                apiService.changePassword(request).body() ?: throw Exception("Empty response")
+            }
     }
-
-    suspend fun changePassword(request: ChangePasswordRequest): Result<MessageResponse> = runCatching {
-        apiService.changePassword(request).body() ?: throw Exception("Empty response")
-    }
-}

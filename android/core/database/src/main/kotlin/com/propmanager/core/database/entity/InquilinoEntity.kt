@@ -17,5 +17,5 @@ data class InquilinoEntity(
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
     @ColumnInfo(name = "is_deleted") val isDeleted: Boolean = false,
-    @ColumnInfo(name = "is_pending_sync") val isPendingSync: Boolean = false
+    @ColumnInfo(name = "is_pending_sync") val isPendingSync: Boolean = false,
 )

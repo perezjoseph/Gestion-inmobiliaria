@@ -77,12 +77,24 @@ fun PagosListScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
-    LaunchedEffect(successMessage) { successMessage?.let { snackbarHostState.showSnackbar(it); viewModel.clearSuccessMessage() } }
-    deleteTarget?.let { p -> ConfirmDeleteDialog(itemName = p.id.take(8), onConfirm = viewModel::confirmDelete, onDismiss = viewModel::dismissDelete) }
+    LaunchedEffect(successMessage) {
+        successMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearSuccessMessage()
+        }
+    }
+    deleteTarget?.let { p ->
+        ConfirmDeleteDialog(itemName = p.id.take(8), onConfirm = viewModel::confirmDelete, onDismiss = viewModel::dismissDelete)
+    }
 
     Scaffold(
         topBar = { PropManagerTopAppBar(title = stringResource(R.string.pagos_title), scrollBehavior = scrollBehavior) },
-        floatingActionButton = { FloatingActionButton(onClick = { viewModel.initCreateForm(); onNavigateToCreate() }) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.pago_create)) } },
+        floatingActionButton = {
+            FloatingActionButton(onClick = {
+                viewModel.initCreateForm()
+                onNavigateToCreate()
+            }) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.pago_create)) }
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
@@ -94,10 +106,16 @@ fun PagosListScreen(
                     if (state.pagos.isEmpty()) {
                         EmptyStateScreen(message = stringResource(R.string.pago_empty))
                     } else {
-                        LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
                             item { Spacer(Modifier.height(8.dp)) }
                             items(state.pagos, key = { it.id }) { pago ->
-                                PagoListItem(pago = pago, onClick = { viewModel.initEditForm(pago); onNavigateToEdit(pago.id) }, onDelete = { viewModel.requestDelete(pago) })
+                                PagoListItem(pago = pago, onClick = {
+                                    viewModel.initEditForm(pago)
+                                    onNavigateToEdit(pago.id)
+                                }, onDelete = { viewModel.requestDelete(pago) })
                             }
                             item { Spacer(Modifier.height(80.dp)) }
                         }
@@ -109,17 +127,36 @@ fun PagosListScreen(
 }
 
 @Composable
-private fun PagoListItem(pago: Pago, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
+private fun PagoListItem(
+    pago: Pago,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Card(modifier = modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(CurrencyFormatter.format(pago.monto, pago.moneda), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        CurrencyFormatter.format(pago.monto, pago.moneda),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                     Spacer(Modifier.width(4.dp))
                     SyncStatusBadge(isPendingSync = pago.isPendingSync)
                 }
-                Text("Vence: ${DateFormatter.toDisplay(pago.fechaVencimiento)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                pago.fechaPago?.let { Text("Pagado: ${DateFormatter.toDisplay(it)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Text(
+                    "Vence: ${DateFormatter.toDisplay(pago.fechaVencimiento)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                pago.fechaPago?.let {
+                    Text(
+                        "Pagado: ${DateFormatter.toDisplay(it)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                     pago.metodoPago?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                     Text(pago.estado, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
@@ -149,16 +186,27 @@ fun PagoFormScreen(
         },
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
-        Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(rememberScrollState()),
+        ) {
             Spacer(Modifier.height(8.dp))
-            formState.errors["general"]?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall); Spacer(Modifier.height(8.dp)) }
+            formState.errors["general"]?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(8.dp))
+            }
 
             var expanded by remember { mutableStateOf(false) }
             val selectedContrato = contratos.find { it.id == formState.contratoId }
             ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
                 OutlinedTextField(
                     value = selectedContrato?.let { "${it.propiedadId.take(8)}… — ${DateFormatter.toDisplay(it.fechaInicio)}" } ?: "",
-                    onValueChange = {}, readOnly = true,
+                    onValueChange = {},
+                    readOnly = true,
                     label = { Text(stringResource(R.string.pago_contrato)) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                     isError = formState.errors.containsKey("contratoId"),
@@ -166,26 +214,64 @@ fun PagoFormScreen(
                 )
                 ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     contratos.forEach { c ->
-                        DropdownMenuItem(text = { Text("${c.propiedadId.take(8)}… — ${DateFormatter.toDisplay(c.fechaInicio)}") }, onClick = { viewModel.onFieldChange("contratoId", c.id); expanded = false })
+                        DropdownMenuItem(text = {
+                            Text(
+                                "${c.propiedadId.take(8)}… — ${DateFormatter.toDisplay(c.fechaInicio)}",
+                            )
+                        }, onClick = {
+                            viewModel.onFieldChange("contratoId", c.id)
+                            expanded =
+                                false
+                        })
                     }
                 }
             }
-            formState.errors["contratoId"]?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 16.dp, top = 4.dp)) }
+            formState.errors["contratoId"]?.let {
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 16.dp, top = 4.dp),
+                )
+            }
 
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.monto, onValueChange = { viewModel.onFieldChange("monto", it) }, label = stringResource(R.string.pago_monto), error = formState.errors["monto"], modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(value = formState.monto, onValueChange = {
+                viewModel.onFieldChange("monto", it)
+            }, label = stringResource(R.string.pago_monto), error = formState.errors["monto"], modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.moneda, onValueChange = { viewModel.onFieldChange("moneda", it) }, label = stringResource(R.string.pago_moneda), modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(value = formState.moneda, onValueChange = {
+                viewModel.onFieldChange("moneda", it)
+            }, label = stringResource(R.string.pago_moneda), modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
-            DatePickerField(value = formState.fechaVencimiento, onValueChange = viewModel::onFechaVencimientoChange, label = stringResource(R.string.pago_fecha_vencimiento), error = formState.errors["fechaVencimiento"], modifier = Modifier.fillMaxWidth())
+            DatePickerField(
+                value = formState.fechaVencimiento,
+                onValueChange = viewModel::onFechaVencimientoChange,
+                label = stringResource(R.string.pago_fecha_vencimiento),
+                error = formState.errors["fechaVencimiento"],
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            DatePickerField(value = formState.fechaPago, onValueChange = viewModel::onFechaPagoChange, label = stringResource(R.string.pago_fecha_pago), modifier = Modifier.fillMaxWidth())
+            DatePickerField(
+                value = formState.fechaPago,
+                onValueChange = viewModel::onFechaPagoChange,
+                label = stringResource(R.string.pago_fecha_pago),
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.metodoPago, onValueChange = { viewModel.onFieldChange("metodoPago", it) }, label = stringResource(R.string.pago_metodo), modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(value = formState.metodoPago, onValueChange = {
+                viewModel.onFieldChange("metodoPago", it)
+            }, label = stringResource(R.string.pago_metodo), modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.notas, onValueChange = { viewModel.onFieldChange("notas", it) }, label = stringResource(R.string.pago_notas), singleLine = false, maxLines = 3, modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(value = formState.notas, onValueChange = {
+                viewModel.onFieldChange("notas", it)
+            }, label = stringResource(R.string.pago_notas), singleLine = false, maxLines = 3, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(16.dp))
-            Button(onClick = { viewModel.save(onSuccess = onNavigateBack) }, enabled = !formState.isSubmitting, modifier = Modifier.fillMaxWidth()) {
+            Button(
+                onClick = { viewModel.save(onSuccess = onNavigateBack) },
+                enabled = !formState.isSubmitting,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 if (formState.isSubmitting) CircularProgressIndicator() else Text(stringResource(R.string.save))
             }
             Spacer(Modifier.height(16.dp))

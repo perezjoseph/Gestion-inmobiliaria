@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SyncQueueDao {
-
     @Query("SELECT * FROM sync_queue ORDER BY created_at ASC")
     suspend fun getAllPending(): List<SyncQueueEntry>
 

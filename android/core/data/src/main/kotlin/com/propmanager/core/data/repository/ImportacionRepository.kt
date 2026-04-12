@@ -7,19 +7,23 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class ImportacionRepository @Inject constructor(
-    private val apiService: ImportacionApiService
-) {
+class ImportacionRepository
+    @Inject
+    constructor(
+        private val apiService: ImportacionApiService,
+    ) {
+        suspend fun importPropiedades(file: MultipartBody.Part): Result<ImportResultDto> =
+            runCatching {
+                apiService.importPropiedades(file).body() ?: throw Exception("Empty response")
+            }
 
-    suspend fun importPropiedades(file: MultipartBody.Part): Result<ImportResultDto> = runCatching {
-        apiService.importPropiedades(file).body() ?: throw Exception("Empty response")
-    }
+        suspend fun importInquilinos(file: MultipartBody.Part): Result<ImportResultDto> =
+            runCatching {
+                apiService.importInquilinos(file).body() ?: throw Exception("Empty response")
+            }
 
-    suspend fun importInquilinos(file: MultipartBody.Part): Result<ImportResultDto> = runCatching {
-        apiService.importInquilinos(file).body() ?: throw Exception("Empty response")
+        suspend fun importGastos(file: MultipartBody.Part): Result<ImportResultDto> =
+            runCatching {
+                apiService.importGastos(file).body() ?: throw Exception("Empty response")
+            }
     }
-
-    suspend fun importGastos(file: MultipartBody.Part): Result<ImportResultDto> = runCatching {
-        apiService.importGastos(file).body() ?: throw Exception("Empty response")
-    }
-}

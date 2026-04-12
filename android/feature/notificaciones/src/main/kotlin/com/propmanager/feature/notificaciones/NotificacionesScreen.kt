@@ -58,33 +58,38 @@ fun NotificacionesScreen(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
         ) {
             OfflineIndicator(isOffline = !isOnline)
 
             when {
                 uiState.isLoading -> LoadingScreen()
-                uiState.errorMessage != null -> ErrorScreen(
-                    message = uiState.errorMessage!!,
-                    onRetry = viewModel::loadPagosVencidos,
-                )
-                uiState.pagosVencidos.isEmpty() -> EmptyStateScreen(
-                    message = stringResource(R.string.notificaciones_empty),
-                )
-                else -> LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    item(key = "top_spacer") { Spacer(modifier = Modifier.height(8.dp)) }
-                    items(uiState.pagosVencidos, key = { it.pagoId }) { pago ->
-                        PagoVencidoItem(pago = pago)
+                uiState.errorMessage != null ->
+                    ErrorScreen(
+                        message = uiState.errorMessage!!,
+                        onRetry = viewModel::loadPagosVencidos,
+                    )
+                uiState.pagosVencidos.isEmpty() ->
+                    EmptyStateScreen(
+                        message = stringResource(R.string.notificaciones_empty),
+                    )
+                else ->
+                    LazyColumn(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        item(key = "top_spacer") { Spacer(modifier = Modifier.height(8.dp)) }
+                        items(uiState.pagosVencidos, key = { it.pagoId }) { pago ->
+                            PagoVencidoItem(pago = pago)
+                        }
+                        item(key = "bottom_spacer") { Spacer(modifier = Modifier.height(16.dp)) }
                     }
-                    item(key = "bottom_spacer") { Spacer(modifier = Modifier.height(16.dp)) }
-                }
             }
         }
     }
@@ -97,9 +102,10 @@ private fun PagoVencidoItem(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
-        ),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+            ),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(

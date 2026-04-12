@@ -56,9 +56,10 @@ fun ImportacionScreen(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
         ) {
             OfflineIndicator(isOffline = !isOnline)
 
@@ -75,40 +76,45 @@ fun ImportacionScreen(
             OutlinedButton(
                 onClick = onPickFile,
                 enabled = !uiState.isLoading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 Text(stringResource(R.string.importacion_seleccionar_archivo))
             }
 
             when {
                 uiState.isLoading -> LoadingScreen()
-                uiState.errorMessage != null -> ErrorScreen(
-                    message = uiState.errorMessage!!,
-                )
+                uiState.errorMessage != null ->
+                    ErrorScreen(
+                        message = uiState.errorMessage!!,
+                    )
                 uiState.result != null -> {
                     val result = uiState.result!!
                     LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         item(key = "summary") {
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                ),
+                                colors =
+                                    CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    ),
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     Text(
-                                        text = stringResource(
-                                            R.string.importacion_resultado,
-                                            result.exitosos,
-                                            result.totalFilas,
-                                        ),
+                                        text =
+                                            stringResource(
+                                                R.string.importacion_resultado,
+                                                result.exitosos,
+                                                result.totalFilas,
+                                            ),
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold,
                                     )
@@ -119,9 +125,10 @@ fun ImportacionScreen(
                             items(result.fallidos, key = { it.fila }) { error ->
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
-                                    ),
+                                    colors =
+                                        CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                                        ),
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
                                         Text(
@@ -153,9 +160,10 @@ private fun ImportTypeSelector(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ImportType.entries.forEach { type ->
@@ -164,11 +172,12 @@ private fun ImportTypeSelector(
                 onClick = { onSelect(type) },
                 label = {
                     Text(
-                        text = when (type) {
-                            ImportType.PROPIEDADES -> stringResource(R.string.importacion_propiedades)
-                            ImportType.INQUILINOS -> stringResource(R.string.importacion_inquilinos)
-                            ImportType.GASTOS -> stringResource(R.string.importacion_gastos)
-                        },
+                        text =
+                            when (type) {
+                                ImportType.PROPIEDADES -> stringResource(R.string.importacion_propiedades)
+                                ImportType.INQUILINOS -> stringResource(R.string.importacion_inquilinos)
+                                ImportType.GASTOS -> stringResource(R.string.importacion_gastos)
+                            },
                     )
                 },
             )

@@ -65,7 +65,12 @@ fun ContratoFormScreen(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState()),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(rememberScrollState()),
         ) {
             Spacer(Modifier.height(8.dp))
             formState.errors["general"]?.let {
@@ -87,11 +92,22 @@ fun ContratoFormScreen(
                 )
                 ExposedDropdownMenu(expanded = propExpanded, onDismissRequest = { propExpanded = false }) {
                     propiedades.forEach { p ->
-                        DropdownMenuItem(text = { Text(p.titulo) }, onClick = { viewModel.onFormFieldChange("propiedadId", p.id); propExpanded = false })
+                        DropdownMenuItem(text = { Text(p.titulo) }, onClick = {
+                            viewModel.onFormFieldChange("propiedadId", p.id)
+                            propExpanded =
+                                false
+                        })
                     }
                 }
             }
-            formState.errors["propiedadId"]?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 16.dp, top = 4.dp)) }
+            formState.errors["propiedadId"]?.let {
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 16.dp, top = 4.dp),
+                )
+            }
 
             Spacer(Modifier.height(8.dp))
 
@@ -109,24 +125,66 @@ fun ContratoFormScreen(
                 )
                 ExposedDropdownMenu(expanded = inqExpanded, onDismissRequest = { inqExpanded = false }) {
                     inquilinos.forEach { i ->
-                        DropdownMenuItem(text = { Text("${i.nombre} ${i.apellido}") }, onClick = { viewModel.onFormFieldChange("inquilinoId", i.id); inqExpanded = false })
+                        DropdownMenuItem(text = { Text("${i.nombre} ${i.apellido}") }, onClick = {
+                            viewModel.onFormFieldChange("inquilinoId", i.id)
+                            inqExpanded =
+                                false
+                        })
                     }
                 }
             }
-            formState.errors["inquilinoId"]?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 16.dp, top = 4.dp)) }
+            formState.errors["inquilinoId"]?.let {
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 16.dp, top = 4.dp),
+                )
+            }
 
             Spacer(Modifier.height(8.dp))
-            DatePickerField(value = formState.fechaInicio, onValueChange = viewModel::onFechaInicioChange, label = stringResource(R.string.contrato_fecha_inicio), error = formState.errors["fechaInicio"], modifier = Modifier.fillMaxWidth())
+            DatePickerField(
+                value = formState.fechaInicio,
+                onValueChange = viewModel::onFechaInicioChange,
+                label = stringResource(R.string.contrato_fecha_inicio),
+                error = formState.errors["fechaInicio"],
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            DatePickerField(value = formState.fechaFin, onValueChange = viewModel::onFechaFinChange, label = stringResource(R.string.contrato_fecha_fin), error = formState.errors["fechaFin"], modifier = Modifier.fillMaxWidth())
+            DatePickerField(
+                value = formState.fechaFin,
+                onValueChange = viewModel::onFechaFinChange,
+                label = stringResource(R.string.contrato_fecha_fin),
+                error = formState.errors["fechaFin"],
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.montoMensual, onValueChange = { viewModel.onFormFieldChange("montoMensual", it) }, label = stringResource(R.string.contrato_monto_mensual), error = formState.errors["montoMensual"], modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.montoMensual,
+                onValueChange = {
+                    viewModel.onFormFieldChange("montoMensual", it)
+                },
+                label =
+                    stringResource(
+                        R.string.contrato_monto_mensual,
+                    ),
+                error = formState.errors["montoMensual"],
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.deposito, onValueChange = { viewModel.onFormFieldChange("deposito", it) }, label = stringResource(R.string.contrato_deposito), modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(value = formState.deposito, onValueChange = {
+                viewModel.onFormFieldChange("deposito", it)
+            }, label = stringResource(R.string.contrato_deposito), modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.moneda, onValueChange = { viewModel.onFormFieldChange("moneda", it) }, label = stringResource(R.string.contrato_moneda), modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(value = formState.moneda, onValueChange = {
+                viewModel.onFormFieldChange("moneda", it)
+            }, label = stringResource(R.string.contrato_moneda), modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(16.dp))
-            Button(onClick = { viewModel.save(onSuccess = onNavigateBack) }, enabled = !formState.isSubmitting, modifier = Modifier.fillMaxWidth()) {
+            Button(
+                onClick = { viewModel.save(onSuccess = onNavigateBack) },
+                enabled = !formState.isSubmitting,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 if (formState.isSubmitting) CircularProgressIndicator() else Text(stringResource(R.string.save))
             }
             Spacer(Modifier.height(16.dp))

@@ -76,7 +76,10 @@ fun ContratosListScreen(
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     LaunchedEffect(successMessage) {
-        successMessage?.let { snackbarHostState.showSnackbar(it); viewModel.clearSuccessMessage() }
+        successMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearSuccessMessage()
+        }
     }
     deleteTarget?.let { c ->
         ConfirmDeleteDialog(itemName = c.id.take(8), onConfirm = viewModel::confirmDelete, onDismiss = viewModel::dismissDelete)
@@ -85,7 +88,10 @@ fun ContratosListScreen(
     Scaffold(
         topBar = { PropManagerTopAppBar(title = stringResource(R.string.contratos_title), scrollBehavior = scrollBehavior) },
         floatingActionButton = {
-            FloatingActionButton(onClick = { viewModel.initCreateForm(); onNavigateToCreate() }) {
+            FloatingActionButton(onClick = {
+                viewModel.initCreateForm()
+                onNavigateToCreate()
+            }) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.contrato_create))
             }
         },
@@ -106,7 +112,11 @@ fun ContratosListScreen(
                         ) {
                             item { Spacer(Modifier.height(8.dp)) }
                             items(state.contratos, key = { it.contrato.id }) { cwn ->
-                                ContratoListItem(cwn = cwn, onClick = { onNavigateToDetail(cwn.contrato.id) }, onDelete = { viewModel.requestDelete(cwn.contrato) })
+                                ContratoListItem(
+                                    cwn = cwn,
+                                    onClick = { onNavigateToDetail(cwn.contrato.id) },
+                                    onDelete = { viewModel.requestDelete(cwn.contrato) },
+                                )
                             }
                             item { Spacer(Modifier.height(80.dp)) }
                         }
@@ -118,7 +128,12 @@ fun ContratosListScreen(
 }
 
 @Composable
-private fun ContratoListItem(cwn: ContratoWithNames, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
+private fun ContratoListItem(
+    cwn: ContratoWithNames,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val c = cwn.contrato
     Card(modifier = modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -129,9 +144,17 @@ private fun ContratoListItem(cwn: ContratoWithNames, onClick: () -> Unit, onDele
                     SyncStatusBadge(isPendingSync = c.isPendingSync)
                 }
                 Text(cwn.inquilinoNombre, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("${DateFormatter.toDisplay(c.fechaInicio)} — ${DateFormatter.toDisplay(c.fechaFin)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "${DateFormatter.toDisplay(c.fechaInicio)} — ${DateFormatter.toDisplay(c.fechaFin)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text(CurrencyFormatter.format(c.montoMensual, c.moneda), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        CurrencyFormatter.format(c.montoMensual, c.moneda),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                     Text(c.estado, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 }
             }

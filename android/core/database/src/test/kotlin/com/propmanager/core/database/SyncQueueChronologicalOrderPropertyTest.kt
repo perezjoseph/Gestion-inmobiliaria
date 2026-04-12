@@ -21,64 +21,68 @@ import io.kotest.property.checkAll
  * This validates the ordering contract that SyncQueueDao.getAllPending() enforces
  * via its ORDER BY created_at ASC query.
  */
-class SyncQueueChronologicalOrderPropertyTest : FreeSpec({
+class SyncQueueChronologicalOrderPropertyTest :
+    FreeSpec({
 
-    val entityTypeArb = Arb.element("propiedad", "inquilino", "contrato", "pago", "gasto", "solicitud")
-    val operationArb = Arb.element("CREATE", "UPDATE", "DELETE")
+        val entityTypeArb = Arb.element("propiedad", "inquilino", "contrato", "pago", "gasto", "solicitud")
+        val operationArb = Arb.element("CREATE", "UPDATE", "DELETE")
 
-    val syncQueueEntryArb: Arb<SyncQueueEntry> = arbitrary {
-        SyncQueueEntry(
-            id = 0,
-            entityType = entityTypeArb.bind(),
-            entityId = Arb.string(8..36).bind(),
-            operation = operationArb.bind(),
-            payload = Arb.string(1..100).bind(),
-            createdAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
-            retryCount = Arb.int(0..5).bind()
-        )
-    }
-
-    val syncQueueListArb: Arb<List<SyncQueueEntry>> = arbitrary {
-        val size = Arb.int(2..30).bind()
-        val usedTimestamps = mutableSetOf<Long>()
-        (1..size).map {
-            var entry = syncQueueEntryArb.bind()
-            while (entry.createdAt in usedTimestamps) {
-                entry = entry.copy(createdAt = Arb.long(1_000_000L..9_999_999_999L).bind())
+        val syncQueueEntryArb: Arb<SyncQueueEntry> =
+            arbitrary {
+                SyncQueueEntry(
+                    id = 0,
+                    entityType = entityTypeArb.bind(),
+                    entityId = Arb.string(8..36).bind(),
+                    operation = operationArb.bind(),
+                    payload = Arb.string(1..100).bind(),
+                    createdAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
+                    retryCount = Arb.int(0..5).bind(),
+                )
             }
-            usedTimestamps.add(entry.createdAt)
-            entry
-        }
-    }
 
-    "Property 4: Sync queue chronological processing order" - {
-
-        "entries sorted by createdAt ASC are in chronological order" {
-            checkAll(100, syncQueueListArb) { entries ->
-                val sorted = entries.sortedBy { it.createdAt }
-
-                sorted.zipWithNext().forEach { (a, b) ->
-                    (a.createdAt < b.createdAt) shouldBe true
+        val syncQueueListArb: Arb<List<SyncQueueEntry>> =
+            arbitrary {
+                val size = Arb.int(2..30).bind()
+                val usedTimestamps = mutableSetOf<Long>()
+                (1..size).map {
+                    var entry = syncQueueEntryArb.bind()
+                    while (entry.createdAt in usedTimestamps) {
+                        entry = entry.copy(createdAt = Arb.long(1_000_000L..9_999_999_999L).bind())
+                    }
+                    usedTimestamps.add(entry.createdAt)
+                    entry
                 }
             }
-        }
 
-        "sorting by createdAt ASC preserves all original entries" {
-            checkAll(100, syncQueueListArb) { entries ->
-                val sorted = entries.sortedBy { it.createdAt }
+        "Property 4: Sync queue chronological processing order" -
+            {
 
-                sorted.size shouldBe entries.size
-                sorted.toSet() shouldBe entries.toSet()
+                "entries sorted by createdAt ASC are in chronological order" {
+                    checkAll(100, syncQueueListArb) { entries ->
+                        val sorted = entries.sortedBy { it.createdAt }
+
+                        sorted.zipWithNext().forEach { (a, b) ->
+                            (a.createdAt < b.createdAt) shouldBe true
+                        }
+                    }
+                }
+
+                "sorting by createdAt ASC preserves all original entries" {
+                    checkAll(100, syncQueueListArb) { entries ->
+                        val sorted = entries.sortedBy { it.createdAt }
+
+                        sorted.size shouldBe entries.size
+                        sorted.toSet() shouldBe entries.toSet()
+                    }
+                }
+
+                "sorting is idempotent — sorting twice yields the same result" {
+                    checkAll(100, syncQueueListArb) { entries ->
+                        val sortedOnce = entries.sortedBy { it.createdAt }
+                        val sortedTwice = sortedOnce.sortedBy { it.createdAt }
+
+                        sortedOnce shouldBe sortedTwice
+                    }
+                }
             }
-        }
-
-        "sorting is idempotent — sorting twice yields the same result" {
-            checkAll(100, syncQueueListArb) { entries ->
-                val sortedOnce = entries.sortedBy { it.createdAt }
-                val sortedTwice = sortedOnce.sortedBy { it.createdAt }
-
-                sortedOnce shouldBe sortedTwice
-            }
-        }
-    }
-})
+    })

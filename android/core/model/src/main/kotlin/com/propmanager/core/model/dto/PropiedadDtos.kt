@@ -21,7 +21,7 @@ data class PropiedadDto(
     val estado: String,
     val imagenes: JsonElement? = null,
     @SerialName("createdAt") val createdAt: String,
-    @SerialName("updatedAt") val updatedAt: String
+    @SerialName("updatedAt") val updatedAt: String,
 )
 
 @Serializable
@@ -38,7 +38,7 @@ data class CreatePropiedadRequest(
     val precio: String,
     val moneda: String? = null,
     val estado: String? = null,
-    val imagenes: JsonElement? = null
+    val imagenes: JsonElement? = null,
 )
 
 @Serializable
@@ -55,5 +55,5 @@ data class UpdatePropiedadRequest(
     val precio: String? = null,
     val moneda: String? = null,
     val estado: String? = null,
-    val imagenes: JsonElement? = null
+    val imagenes: JsonElement? = null,
 )

@@ -12,10 +12,10 @@ import androidx.room.PrimaryKey
         ForeignKey(
             entity = PropiedadEntity::class,
             parentColumns = ["id"],
-            childColumns = ["propiedad_id"]
-        )
+            childColumns = ["propiedad_id"],
+        ),
     ],
-    indices = [Index("propiedad_id")]
+    indices = [Index("propiedad_id")],
 )
 data class SolicitudMantenimientoEntity(
     @PrimaryKey val id: String,
@@ -36,5 +36,5 @@ data class SolicitudMantenimientoEntity(
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
     @ColumnInfo(name = "is_deleted") val isDeleted: Boolean = false,
-    @ColumnInfo(name = "is_pending_sync") val isPendingSync: Boolean = false
+    @ColumnInfo(name = "is_pending_sync") val isPendingSync: Boolean = false,
 )

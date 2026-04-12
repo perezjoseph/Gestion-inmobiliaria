@@ -32,106 +32,107 @@ data class PerfilUiState(
 )
 
 @HiltViewModel
-class PerfilViewModel @Inject constructor(
-    private val perfilRepository: PerfilRepository,
-    private val networkMonitor: NetworkMonitor,
-) : ViewModel() {
+class PerfilViewModel
+    @Inject
+    constructor(
+        private val perfilRepository: PerfilRepository,
+        private val networkMonitor: NetworkMonitor,
+    ) : ViewModel() {
+        private val _uiState = MutableStateFlow(PerfilUiState())
+        val uiState: StateFlow<PerfilUiState> = _uiState.asStateFlow()
 
-    private val _uiState = MutableStateFlow(PerfilUiState())
-    val uiState: StateFlow<PerfilUiState> = _uiState.asStateFlow()
+        val isOnline: StateFlow<Boolean> =
+            networkMonitor.isOnline
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
-    val isOnline: StateFlow<Boolean> = networkMonitor.isOnline
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+        init {
+            loadPerfil()
+        }
 
-    init {
-        loadPerfil()
-    }
-
-    fun loadPerfil() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            perfilRepository.fetchPerfil()
-                .onSuccess { user ->
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            nombre = user.nombre,
-                            email = user.email,
-                            rol = user.rol,
-                        )
+        fun loadPerfil() {
+            viewModelScope.launch {
+                _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+                perfilRepository
+                    .fetchPerfil()
+                    .onSuccess { user ->
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                nombre = user.nombre,
+                                email = user.email,
+                                rol = user.rol,
+                            )
+                        }
+                    }.onFailure { e ->
+                        _uiState.update { it.copy(isLoading = false, errorMessage = e.message) }
                     }
-                }
-                .onFailure { e ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = e.message) }
-                }
+            }
         }
-    }
 
-    fun onNombreChange(nombre: String) {
-        _uiState.update { it.copy(nombre = nombre, errorMessage = null, saveSuccess = false) }
-    }
-
-    fun savePerfil() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true, errorMessage = null, saveSuccess = false) }
-            perfilRepository.updatePerfil(UpdatePerfilRequest(nombre = _uiState.value.nombre))
-                .onSuccess { user ->
-                    _uiState.update { it.copy(isSaving = false, saveSuccess = true, nombre = user.nombre) }
-                }
-                .onFailure { e ->
-                    _uiState.update { it.copy(isSaving = false, errorMessage = e.message) }
-                }
+        fun onNombreChange(nombre: String) {
+            _uiState.update { it.copy(nombre = nombre, errorMessage = null, saveSuccess = false) }
         }
-    }
 
-    fun togglePasswordForm() {
-        _uiState.update {
-            it.copy(
-                showPasswordForm = !it.showPasswordForm,
-                passwordActual = "",
-                passwordNueva = "",
-                passwordChanged = false,
-                errorMessage = null,
-            )
+        fun savePerfil() {
+            viewModelScope.launch {
+                _uiState.update { it.copy(isSaving = true, errorMessage = null, saveSuccess = false) }
+                perfilRepository
+                    .updatePerfil(UpdatePerfilRequest(nombre = _uiState.value.nombre))
+                    .onSuccess { user ->
+                        _uiState.update { it.copy(isSaving = false, saveSuccess = true, nombre = user.nombre) }
+                    }.onFailure { e ->
+                        _uiState.update { it.copy(isSaving = false, errorMessage = e.message) }
+                    }
+            }
         }
-    }
 
-    fun onPasswordActualChange(value: String) {
-        _uiState.update { it.copy(passwordActual = value, errorMessage = null) }
-    }
-
-    fun onPasswordNuevaChange(value: String) {
-        _uiState.update { it.copy(passwordNueva = value, errorMessage = null) }
-    }
-
-    fun changePassword() {
-        val state = _uiState.value
-        if (state.passwordActual.isBlank() || state.passwordNueva.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "Ambos campos de contraseña son requeridos") }
-            return
-        }
-        viewModelScope.launch {
-            _uiState.update { it.copy(isChangingPassword = true, errorMessage = null) }
-            perfilRepository.changePassword(
-                ChangePasswordRequest(
-                    passwordActual = state.passwordActual,
-                    passwordNuevo = state.passwordNueva,
+        fun togglePasswordForm() {
+            _uiState.update {
+                it.copy(
+                    showPasswordForm = !it.showPasswordForm,
+                    passwordActual = "",
+                    passwordNueva = "",
+                    passwordChanged = false,
+                    errorMessage = null,
                 )
-            )
-                .onSuccess {
-                    _uiState.update {
-                        it.copy(
-                            isChangingPassword = false,
-                            passwordChanged = true,
-                            passwordActual = "",
-                            passwordNueva = "",
-                            showPasswordForm = false,
-                        )
+            }
+        }
+
+        fun onPasswordActualChange(value: String) {
+            _uiState.update { it.copy(passwordActual = value, errorMessage = null) }
+        }
+
+        fun onPasswordNuevaChange(value: String) {
+            _uiState.update { it.copy(passwordNueva = value, errorMessage = null) }
+        }
+
+        fun changePassword() {
+            val state = _uiState.value
+            if (state.passwordActual.isBlank() || state.passwordNueva.isBlank()) {
+                _uiState.update { it.copy(errorMessage = "Ambos campos de contraseña son requeridos") }
+                return
+            }
+            viewModelScope.launch {
+                _uiState.update { it.copy(isChangingPassword = true, errorMessage = null) }
+                perfilRepository
+                    .changePassword(
+                        ChangePasswordRequest(
+                            passwordActual = state.passwordActual,
+                            passwordNuevo = state.passwordNueva,
+                        ),
+                    ).onSuccess {
+                        _uiState.update {
+                            it.copy(
+                                isChangingPassword = false,
+                                passwordChanged = true,
+                                passwordActual = "",
+                                passwordNueva = "",
+                                showPasswordForm = false,
+                            )
+                        }
+                    }.onFailure { e ->
+                        _uiState.update { it.copy(isChangingPassword = false, errorMessage = e.message) }
                     }
-                }
-                .onFailure { e ->
-                    _uiState.update { it.copy(isChangingPassword = false, errorMessage = e.message) }
-                }
+            }
         }
     }
-}

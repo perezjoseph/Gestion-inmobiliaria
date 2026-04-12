@@ -22,7 +22,7 @@ data class SolicitudDto(
     @SerialName("fechaFin") val fechaFin: String? = null,
     val notas: List<NotaDto>? = null,
     @SerialName("createdAt") val createdAt: String,
-    @SerialName("updatedAt") val updatedAt: String
+    @SerialName("updatedAt") val updatedAt: String,
 )
 
 @Serializable
@@ -31,7 +31,7 @@ data class NotaDto(
     @SerialName("solicitudId") val solicitudId: String,
     @SerialName("autorId") val autorId: String,
     val contenido: String,
-    @SerialName("createdAt") val createdAt: String
+    @SerialName("createdAt") val createdAt: String,
 )
 
 @Serializable
@@ -46,9 +46,8 @@ data class CreateSolicitudRequest(
     @SerialName("telefonoProveedor") val telefonoProveedor: String? = null,
     @SerialName("emailProveedor") val emailProveedor: String? = null,
     @SerialName("costoMonto") val costoMonto: String? = null,
-    @SerialName("costoMoneda") val costoMoneda: String? = null
+    @SerialName("costoMoneda") val costoMoneda: String? = null,
 )
-
 
 @Serializable
 data class UpdateSolicitudRequest(
@@ -61,15 +60,15 @@ data class UpdateSolicitudRequest(
     @SerialName("costoMonto") val costoMonto: String? = null,
     @SerialName("costoMoneda") val costoMoneda: String? = null,
     @SerialName("unidadId") val unidadId: String? = null,
-    @SerialName("inquilinoId") val inquilinoId: String? = null
+    @SerialName("inquilinoId") val inquilinoId: String? = null,
 )
 
 @Serializable
 data class UpdateEstadoRequest(
-    val estado: String
+    val estado: String,
 )
 
 @Serializable
 data class CreateNotaRequest(
-    val contenido: String
+    val contenido: String,
 )

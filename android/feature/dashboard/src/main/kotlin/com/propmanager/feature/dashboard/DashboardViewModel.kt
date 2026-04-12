@@ -9,7 +9,7 @@ import com.propmanager.core.model.dto.GastosComparacion
 import com.propmanager.core.model.dto.IngresosComparacion
 import com.propmanager.core.model.dto.OcupacionTendencia
 import com.propmanager.core.model.dto.PagoProximo
-import com.propmanager.core.network.NetworkMonitor
+import com.propmanager.core.network.ConnectivityObserver
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -37,108 +37,113 @@ data class DashboardUiState(
 )
 
 @HiltViewModel
-class DashboardViewModel @Inject constructor(
-    private val dashboardRepository: DashboardRepository,
-    private val networkMonitor: NetworkMonitor,
-) : ViewModel() {
+class DashboardViewModel
+    @Inject
+    constructor(
+        private val dashboardRepository: DashboardRepository,
+        private val networkMonitor: ConnectivityObserver,
+    ) : ViewModel() {
+        private val _uiState = MutableStateFlow(DashboardUiState())
+        val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
-    private val _uiState = MutableStateFlow(DashboardUiState())
-    val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
+        val isOnline: StateFlow<Boolean> =
+            networkMonitor.isOnline
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
-    val isOnline: StateFlow<Boolean> = networkMonitor.isOnline
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+        init {
+            loadDashboard()
+        }
 
-    init {
-        loadDashboard()
-    }
+        fun loadDashboard() {
+            viewModelScope.launch {
+                _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
-    fun loadDashboard() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-
-            if (networkMonitor.isOnline.value) {
-                fetchFromNetwork()
-            } else {
-                loadFromCache()
+                if (networkMonitor.isOnline.value) {
+                    fetchFromNetwork()
+                } else {
+                    loadFromCache()
+                }
             }
         }
-    }
 
-    private suspend fun fetchFromNetwork() {
-        val statsResult = dashboardRepository.fetchStats()
-        val pagosResult = dashboardRepository.fetchPagosProximos()
-        val contratosResult = dashboardRepository.fetchContratosCalendario()
-        val ocupacionResult = dashboardRepository.fetchOcupacionTendencia()
-        val ingresosResult = dashboardRepository.fetchIngresosComparacion()
-        val gastosResult = dashboardRepository.fetchGastosComparacion()
+        private suspend fun fetchFromNetwork() {
+            val statsResult = dashboardRepository.fetchStats()
+            val pagosResult = dashboardRepository.fetchPagosProximos()
+            val contratosResult = dashboardRepository.fetchContratosCalendario()
+            val ocupacionResult = dashboardRepository.fetchOcupacionTendencia()
+            val ingresosResult = dashboardRepository.fetchIngresosComparacion()
+            val gastosResult = dashboardRepository.fetchGastosComparacion()
 
-        if (statsResult.isFailure &&
-            pagosResult.isFailure &&
-            contratosResult.isFailure
-        ) {
-            loadFromCache(fallbackError = statsResult.exceptionOrNull()?.message)
-            return
-        }
+            if (statsResult.isFailure &&
+                pagosResult.isFailure &&
+                contratosResult.isFailure
+            ) {
+                loadFromCache(fallbackError = statsResult.exceptionOrNull()?.message)
+                return
+            }
 
-        _uiState.update {
-            it.copy(
-                isLoading = false,
-                errorMessage = null,
-                stats = statsResult.getOrNull(),
-                pagosProximos = pagosResult.getOrDefault(emptyList()),
-                contratosCalendario = contratosResult.getOrDefault(emptyList()),
-                ocupacionTendencia = ocupacionResult.getOrDefault(emptyList()),
-                ingresosComparacion = ingresosResult.getOrNull(),
-                gastosComparacion = gastosResult.getOrNull(),
-                isFromCache = false,
-                lastUpdated = null,
-            )
-        }
-    }
-
-    private suspend fun loadFromCache(fallbackError: String? = null) {
-        val cachedStats = dashboardRepository.getCachedStats()
-        val cachedPagos = dashboardRepository.getCachedPagosProximos()
-        val cachedContratos = dashboardRepository.getCachedContratosCalendario()
-        val cachedOcupacion = dashboardRepository.getCachedOcupacionTendencia()
-        val cachedIngresos = dashboardRepository.getCachedIngresosComparacion()
-        val cachedGastos = dashboardRepository.getCachedGastosComparacion()
-
-        val hasCachedData = cachedStats != null || cachedPagos != null || cachedContratos != null
-
-        if (!hasCachedData) {
             _uiState.update {
                 it.copy(
                     isLoading = false,
-                    errorMessage = fallbackError
-                        ?: "Sin conexión a internet. No hay datos en caché disponibles.",
+                    errorMessage = null,
+                    stats = statsResult.getOrNull(),
+                    pagosProximos = pagosResult.getOrDefault(emptyList()),
+                    contratosCalendario = contratosResult.getOrDefault(emptyList()),
+                    ocupacionTendencia = ocupacionResult.getOrDefault(emptyList()),
+                    ingresosComparacion = ingresosResult.getOrNull(),
+                    gastosComparacion = gastosResult.getOrNull(),
+                    isFromCache = false,
+                    lastUpdated = null,
                 )
             }
-            return
         }
 
-        val cachedAt = dashboardRepository.getCachedAt("stats")
-        val lastUpdatedText = cachedAt?.let { formatTimestamp(it) }
+        private suspend fun loadFromCache(fallbackError: String? = null) {
+            val cachedStats = dashboardRepository.getCachedStats()
+            val cachedPagos = dashboardRepository.getCachedPagosProximos()
+            val cachedContratos = dashboardRepository.getCachedContratosCalendario()
+            val cachedOcupacion = dashboardRepository.getCachedOcupacionTendencia()
+            val cachedIngresos = dashboardRepository.getCachedIngresosComparacion()
+            val cachedGastos = dashboardRepository.getCachedGastosComparacion()
 
-        _uiState.update {
-            it.copy(
-                isLoading = false,
-                errorMessage = null,
-                stats = cachedStats,
-                pagosProximos = cachedPagos ?: emptyList(),
-                contratosCalendario = cachedContratos ?: emptyList(),
-                ocupacionTendencia = cachedOcupacion ?: emptyList(),
-                ingresosComparacion = cachedIngresos,
-                gastosComparacion = cachedGastos,
-                isFromCache = true,
-                lastUpdated = lastUpdatedText,
-            )
+            val hasCachedData = cachedStats != null || cachedPagos != null || cachedContratos != null
+
+            if (!hasCachedData) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage =
+                            fallbackError
+                                ?: "Sin conexión a internet. No hay datos en caché disponibles.",
+                    )
+                }
+                return
+            }
+
+            val cachedAt = dashboardRepository.getCachedAt("stats")
+            val lastUpdatedText = cachedAt?.let { formatTimestamp(it) }
+
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    errorMessage = null,
+                    stats = cachedStats,
+                    pagosProximos = cachedPagos ?: emptyList(),
+                    contratosCalendario = cachedContratos ?: emptyList(),
+                    ocupacionTendencia = cachedOcupacion ?: emptyList(),
+                    ingresosComparacion = cachedIngresos,
+                    gastosComparacion = cachedGastos,
+                    isFromCache = true,
+                    lastUpdated = lastUpdatedText,
+                )
+            }
+        }
+
+        private fun formatTimestamp(instant: Instant): String {
+            val formatter =
+                DateTimeFormatter
+                    .ofPattern("dd/MM/yyyy HH:mm")
+                    .withZone(ZoneId.systemDefault())
+            return formatter.format(instant)
         }
     }
-
-    private fun formatTimestamp(instant: Instant): String {
-        val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
-            .withZone(ZoneId.systemDefault())
-        return formatter.format(instant)
-    }
-}

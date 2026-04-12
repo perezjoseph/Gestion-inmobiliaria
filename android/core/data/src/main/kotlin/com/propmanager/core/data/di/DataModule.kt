@@ -2,15 +2,6 @@ package com.propmanager.core.data.di
 
 import android.content.Context
 import androidx.work.WorkManager
-import com.propmanager.core.database.dao.ContratoDao
-import com.propmanager.core.database.dao.DashboardCacheDao
-import com.propmanager.core.database.dao.GastoDao
-import com.propmanager.core.database.dao.InquilinoDao
-import com.propmanager.core.database.dao.NotaMantenimientoDao
-import com.propmanager.core.database.dao.PagoDao
-import com.propmanager.core.database.dao.PropiedadDao
-import com.propmanager.core.database.dao.SolicitudMantenimientoDao
-import com.propmanager.core.database.dao.SyncQueueDao
 import com.propmanager.core.data.repository.AuditoriaRepository
 import com.propmanager.core.data.repository.ConfiguracionRepository
 import com.propmanager.core.data.repository.ContratosRepository
@@ -26,6 +17,15 @@ import com.propmanager.core.data.repository.PerfilRepository
 import com.propmanager.core.data.repository.PropiedadesRepository
 import com.propmanager.core.data.repository.ReportesRepository
 import com.propmanager.core.data.sync.SyncManager
+import com.propmanager.core.database.dao.ContratoDao
+import com.propmanager.core.database.dao.DashboardCacheDao
+import com.propmanager.core.database.dao.GastoDao
+import com.propmanager.core.database.dao.InquilinoDao
+import com.propmanager.core.database.dao.NotaMantenimientoDao
+import com.propmanager.core.database.dao.PagoDao
+import com.propmanager.core.database.dao.PropiedadDao
+import com.propmanager.core.database.dao.SolicitudMantenimientoDao
+import com.propmanager.core.database.dao.SyncQueueDao
 import com.propmanager.core.network.api.AuditoriaApiService
 import com.propmanager.core.network.api.ConfiguracionApiService
 import com.propmanager.core.network.api.ContratosApiService
@@ -51,23 +51,23 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object DataModule {
+    @Provides
+    @Singleton
+    fun provideJson(): Json =
+        Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = true
+        }
 
     @Provides
     @Singleton
-    fun provideJson(): Json = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-    }
+    fun provideWorkManager(
+        @ApplicationContext context: Context,
+    ): WorkManager = WorkManager.getInstance(context)
 
     @Provides
     @Singleton
-    fun provideWorkManager(@ApplicationContext context: Context): WorkManager =
-        WorkManager.getInstance(context)
-
-    @Provides
-    @Singleton
-    fun provideSyncManager(workManager: WorkManager): SyncManager =
-        SyncManager(workManager)
+    fun provideSyncManager(workManager: WorkManager): SyncManager = SyncManager(workManager)
 
     @Provides
     @Singleton
@@ -75,7 +75,7 @@ object DataModule {
         dao: PropiedadDao,
         syncQueueDao: SyncQueueDao,
         apiService: PropiedadesApiService,
-        json: Json
+        json: Json,
     ): PropiedadesRepository = PropiedadesRepository(dao, syncQueueDao, apiService, json)
 
     @Provides
@@ -84,7 +84,7 @@ object DataModule {
         dao: InquilinoDao,
         syncQueueDao: SyncQueueDao,
         apiService: InquilinosApiService,
-        json: Json
+        json: Json,
     ): InquilinosRepository = InquilinosRepository(dao, syncQueueDao, apiService, json)
 
     @Provides
@@ -93,7 +93,7 @@ object DataModule {
         dao: ContratoDao,
         syncQueueDao: SyncQueueDao,
         apiService: ContratosApiService,
-        json: Json
+        json: Json,
     ): ContratosRepository = ContratosRepository(dao, syncQueueDao, apiService, json)
 
     @Provides
@@ -102,7 +102,7 @@ object DataModule {
         dao: PagoDao,
         syncQueueDao: SyncQueueDao,
         apiService: PagosApiService,
-        json: Json
+        json: Json,
     ): PagosRepository = PagosRepository(dao, syncQueueDao, apiService, json)
 
     @Provides
@@ -111,7 +111,7 @@ object DataModule {
         dao: GastoDao,
         syncQueueDao: SyncQueueDao,
         apiService: GastosApiService,
-        json: Json
+        json: Json,
     ): GastosRepository = GastosRepository(dao, syncQueueDao, apiService, json)
 
     @Provides
@@ -121,7 +121,7 @@ object DataModule {
         notaDao: NotaMantenimientoDao,
         syncQueueDao: SyncQueueDao,
         apiService: MantenimientoApiService,
-        json: Json
+        json: Json,
     ): MantenimientoRepository = MantenimientoRepository(solicitudDao, notaDao, syncQueueDao, apiService, json)
 
     @Provides
@@ -129,18 +129,16 @@ object DataModule {
     fun provideDashboardRepository(
         apiService: DashboardApiService,
         cacheDao: DashboardCacheDao,
-        json: Json
+        json: Json,
     ): DashboardRepository = DashboardRepository(apiService, cacheDao, json)
 
     @Provides
     @Singleton
-    fun provideReportesRepository(apiService: ReportesApiService): ReportesRepository =
-        ReportesRepository(apiService)
+    fun provideReportesRepository(apiService: ReportesApiService): ReportesRepository = ReportesRepository(apiService)
 
     @Provides
     @Singleton
-    fun provideDocumentosRepository(apiService: DocumentosApiService): DocumentosRepository =
-        DocumentosRepository(apiService)
+    fun provideDocumentosRepository(apiService: DocumentosApiService): DocumentosRepository = DocumentosRepository(apiService)
 
     @Provides
     @Singleton
@@ -149,21 +147,17 @@ object DataModule {
 
     @Provides
     @Singleton
-    fun provideAuditoriaRepository(apiService: AuditoriaApiService): AuditoriaRepository =
-        AuditoriaRepository(apiService)
+    fun provideAuditoriaRepository(apiService: AuditoriaApiService): AuditoriaRepository = AuditoriaRepository(apiService)
 
     @Provides
     @Singleton
-    fun providePerfilRepository(apiService: PerfilApiService): PerfilRepository =
-        PerfilRepository(apiService)
+    fun providePerfilRepository(apiService: PerfilApiService): PerfilRepository = PerfilRepository(apiService)
 
     @Provides
     @Singleton
-    fun provideConfiguracionRepository(apiService: ConfiguracionApiService): ConfiguracionRepository =
-        ConfiguracionRepository(apiService)
+    fun provideConfiguracionRepository(apiService: ConfiguracionApiService): ConfiguracionRepository = ConfiguracionRepository(apiService)
 
     @Provides
     @Singleton
-    fun provideImportacionRepository(apiService: ImportacionApiService): ImportacionRepository =
-        ImportacionRepository(apiService)
+    fun provideImportacionRepository(apiService: ImportacionApiService): ImportacionRepository = ImportacionRepository(apiService)
 }

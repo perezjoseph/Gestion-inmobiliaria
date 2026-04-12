@@ -1,13 +1,12 @@
 package com.propmanager.core.common
 
+import com.google.common.truth.Truth.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
-import com.google.common.truth.Truth.assertThat
 
 class DateFormatterTest {
-
     @Test
     fun `toDisplay formats date as DD-MM-YYYY`() {
         val date = LocalDate.of(2025, 1, 5)

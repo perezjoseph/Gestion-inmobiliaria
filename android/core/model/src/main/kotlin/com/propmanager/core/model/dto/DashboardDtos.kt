@@ -9,7 +9,7 @@ data class DashboardStats(
     @SerialName("tasaOcupacion") val tasaOcupacion: Double,
     @SerialName("ingresoMensual") val ingresoMensual: String,
     @SerialName("pagosAtrasados") val pagosAtrasados: Long,
-    @SerialName("totalGastosMes") val totalGastosMes: String
+    @SerialName("totalGastosMes") val totalGastosMes: String,
 )
 
 @Serializable
@@ -19,7 +19,7 @@ data class PagoProximo(
     @SerialName("inquilinoNombre") val inquilinoNombre: String,
     val monto: String,
     val moneda: String,
-    @SerialName("fechaVencimiento") val fechaVencimiento: String
+    @SerialName("fechaVencimiento") val fechaVencimiento: String,
 )
 
 @Serializable
@@ -29,26 +29,26 @@ data class ContratoCalendario(
     @SerialName("inquilinoNombre") val inquilinoNombre: String,
     @SerialName("fechaFin") val fechaFin: String,
     @SerialName("diasRestantes") val diasRestantes: Long,
-    val color: String
+    val color: String,
 )
 
 @Serializable
 data class OcupacionTendencia(
     val mes: Int,
     val anio: Int,
-    val tasa: Double
+    val tasa: Double,
 )
 
 @Serializable
 data class IngresosComparacion(
     val esperado: String,
     val cobrado: String,
-    val diferencia: String
+    val diferencia: String,
 )
 
 @Serializable
 data class GastosComparacion(
     @SerialName("mesActual") val mesActual: String,
     @SerialName("mesAnterior") val mesAnterior: String,
-    @SerialName("porcentajeCambio") val porcentajeCambio: Double
+    @SerialName("porcentajeCambio") val porcentajeCambio: Double,
 )

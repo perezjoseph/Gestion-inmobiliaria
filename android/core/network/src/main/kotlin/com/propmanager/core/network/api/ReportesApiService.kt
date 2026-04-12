@@ -10,28 +10,43 @@ import retrofit2.http.GET
 import retrofit2.http.QueryMap
 
 interface ReportesApiService {
-
     @GET("api/reportes/ingresos")
-    suspend fun ingresos(@QueryMap params: Map<String, String> = emptyMap()): Response<IngresoReporteSummary>
+    suspend fun ingresos(
+        @QueryMap params: Map<String, String> = emptyMap(),
+    ): Response<IngresoReporteSummary>
 
     @GET("api/reportes/rentabilidad")
-    suspend fun rentabilidad(@QueryMap params: Map<String, String> = emptyMap()): Response<RentabilidadReporteSummary>
+    suspend fun rentabilidad(
+        @QueryMap params: Map<String, String> = emptyMap(),
+    ): Response<RentabilidadReporteSummary>
 
     @GET("api/reportes/historial-pagos")
-    suspend fun historialPagos(@QueryMap params: Map<String, String> = emptyMap()): Response<List<HistorialPagoReporte>>
+    suspend fun historialPagos(
+        @QueryMap params: Map<String, String> = emptyMap(),
+    ): Response<List<HistorialPagoReporte>>
 
     @GET("api/reportes/ocupacion/tendencia")
-    suspend fun ocupacionTendencia(@QueryMap params: Map<String, String> = emptyMap()): Response<List<OcupacionTendencia>>
+    suspend fun ocupacionTendencia(
+        @QueryMap params: Map<String, String> = emptyMap(),
+    ): Response<List<OcupacionTendencia>>
 
     @GET("api/reportes/ingresos/pdf")
-    suspend fun ingresosPdf(@QueryMap params: Map<String, String> = emptyMap()): Response<ResponseBody>
+    suspend fun ingresosPdf(
+        @QueryMap params: Map<String, String> = emptyMap(),
+    ): Response<ResponseBody>
 
     @GET("api/reportes/ingresos/xlsx")
-    suspend fun ingresosXlsx(@QueryMap params: Map<String, String> = emptyMap()): Response<ResponseBody>
+    suspend fun ingresosXlsx(
+        @QueryMap params: Map<String, String> = emptyMap(),
+    ): Response<ResponseBody>
 
     @GET("api/reportes/rentabilidad/pdf")
-    suspend fun rentabilidadPdf(@QueryMap params: Map<String, String> = emptyMap()): Response<ResponseBody>
+    suspend fun rentabilidadPdf(
+        @QueryMap params: Map<String, String> = emptyMap(),
+    ): Response<ResponseBody>
 
     @GET("api/reportes/rentabilidad/xlsx")
-    suspend fun rentabilidadXlsx(@QueryMap params: Map<String, String> = emptyMap()): Response<ResponseBody>
+    suspend fun rentabilidadXlsx(
+        @QueryMap params: Map<String, String> = emptyMap(),
+    ): Response<ResponseBody>
 }

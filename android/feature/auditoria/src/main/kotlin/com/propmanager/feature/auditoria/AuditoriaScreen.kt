@@ -63,9 +63,10 @@ fun AuditoriaScreen(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
         ) {
             OfflineIndicator(isOffline = !isOnline)
 
@@ -81,18 +82,23 @@ fun AuditoriaScreen(
 
             when {
                 uiState.isLoading && uiState.entries.isEmpty() -> LoadingScreen()
-                uiState.errorMessage != null && uiState.entries.isEmpty() -> ErrorScreen(
-                    message = uiState.errorMessage!!,
-                    onRetry = { viewModel.loadAuditLog() },
-                )
-                uiState.entries.isEmpty() -> EmptyStateScreen(
-                    message = stringResource(R.string.auditoria_empty),
-                )
+                uiState.errorMessage != null && uiState.entries.isEmpty() ->
+                    ErrorScreen(
+                        message = uiState.errorMessage!!,
+                        onRetry = { viewModel.loadAuditLog() },
+                    )
+                uiState.entries.isEmpty() ->
+                    EmptyStateScreen(
+                        message = stringResource(R.string.auditoria_empty),
+                    )
                 else -> {
                     val listState = rememberLazyListState()
                     val shouldLoadMore by remember {
                         derivedStateOf {
-                            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                            val lastVisible =
+                                listState.layoutInfo.visibleItemsInfo
+                                    .lastOrNull()
+                                    ?.index ?: 0
                             lastVisible >= uiState.entries.size - 3
                         }
                     }
@@ -102,9 +108,10 @@ fun AuditoriaScreen(
 
                     LazyColumn(
                         state = listState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         item(key = "top_spacer") { Spacer(modifier = Modifier.height(4.dp)) }
@@ -115,9 +122,10 @@ fun AuditoriaScreen(
                             item(key = "loading_more") {
                                 Text(
                                     text = stringResource(R.string.loading),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                             }
@@ -137,9 +145,10 @@ private fun EntityTypeFilterRow(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         FilterChip(

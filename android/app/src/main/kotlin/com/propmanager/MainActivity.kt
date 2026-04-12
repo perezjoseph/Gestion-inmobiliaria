@@ -31,7 +31,6 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-
     @Inject
     lateinit var networkMonitor: NetworkMonitor
 
@@ -67,16 +66,22 @@ private fun PropManagerApp(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    val startDestination = when (authState) {
-        is AuthState.Authenticated -> Routes.MAIN_GRAPH
-        is AuthState.Unauthenticated -> Routes.AUTH_GRAPH
-        is AuthState.Loading -> Routes.AUTH_GRAPH
-    }
+    val startDestination =
+        when (authState) {
+            is AuthState.Authenticated -> Routes.MAIN_GRAPH
+            is AuthState.Unauthenticated -> Routes.AUTH_GRAPH
+            is AuthState.Loading -> Routes.AUTH_GRAPH
+        }
 
-    val showBottomBar = currentRoute in listOf(
-        Routes.DASHBOARD, Routes.PROPIEDADES, Routes.INQUILINOS,
-        Routes.CONTRATOS, Routes.MAS,
-    )
+    val showBottomBar =
+        currentRoute in
+            listOf(
+                Routes.DASHBOARD,
+                Routes.PROPIEDADES,
+                Routes.INQUILINOS,
+                Routes.CONTRATOS,
+                Routes.MAS,
+            )
 
     LaunchedEffect(authState) {
         if (authState is AuthState.Unauthenticated && currentRoute != Routes.LOGIN) {
@@ -88,7 +93,8 @@ private fun PropManagerApp(
 
     LaunchedEffect(authState, isOnline) {
         if (authState is AuthState.Authenticated && isOnline) {
-            notificacionesRepository.fetchPagosVencidos()
+            notificacionesRepository
+                .fetchPagosVencidos()
                 .onSuccess { badgeCount = it.size }
         }
     }

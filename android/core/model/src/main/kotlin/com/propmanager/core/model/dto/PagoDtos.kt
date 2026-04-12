@@ -15,7 +15,7 @@ data class PagoDto(
     val estado: String,
     val notas: String? = null,
     @SerialName("createdAt") val createdAt: String,
-    @SerialName("updatedAt") val updatedAt: String
+    @SerialName("updatedAt") val updatedAt: String,
 )
 
 @Serializable
@@ -26,7 +26,7 @@ data class CreatePagoRequest(
     @SerialName("fechaPago") val fechaPago: String? = null,
     @SerialName("fechaVencimiento") val fechaVencimiento: String,
     @SerialName("metodoPago") val metodoPago: String? = null,
-    val notas: String? = null
+    val notas: String? = null,
 )
 
 @Serializable
@@ -35,5 +35,5 @@ data class UpdatePagoRequest(
     @SerialName("fechaPago") val fechaPago: String? = null,
     @SerialName("metodoPago") val metodoPago: String? = null,
     val estado: String? = null,
-    val notas: String? = null
+    val notas: String? = null,
 )

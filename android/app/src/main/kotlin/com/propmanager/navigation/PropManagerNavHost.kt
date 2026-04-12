@@ -7,10 +7,10 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
-import com.propmanager.feature.auth.AuthViewModel
-import com.propmanager.feature.auth.LoginScreen
 import com.propmanager.feature.auditoria.AuditoriaScreen
 import com.propmanager.feature.auditoria.AuditoriaViewModel
+import com.propmanager.feature.auth.AuthViewModel
+import com.propmanager.feature.auth.LoginScreen
 import com.propmanager.feature.configuracion.ConfiguracionScreen
 import com.propmanager.feature.configuracion.ConfiguracionViewModel
 import com.propmanager.feature.dashboard.DashboardScreen

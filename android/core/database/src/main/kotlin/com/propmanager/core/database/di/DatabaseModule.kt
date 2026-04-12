@@ -22,15 +22,17 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
-
     @Provides
     @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): PropManagerDatabase =
-        Room.databaseBuilder(
-            context,
-            PropManagerDatabase::class.java,
-            "propmanager.db"
-        ).build()
+    fun provideDatabase(
+        @ApplicationContext context: Context,
+    ): PropManagerDatabase =
+        Room
+            .databaseBuilder(
+                context,
+                PropManagerDatabase::class.java,
+                "propmanager.db",
+            ).build()
 
     @Provides
     fun providePropiedadDao(db: PropManagerDatabase): PropiedadDao = db.propiedadDao()

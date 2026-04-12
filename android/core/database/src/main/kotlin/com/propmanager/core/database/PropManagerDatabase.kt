@@ -36,17 +36,25 @@ import com.propmanager.core.database.entity.SyncQueueEntry
         DashboardCache::class,
     ],
     version = 1,
-    exportSchema = true
+    exportSchema = true,
 )
 @TypeConverters(Converters::class)
 abstract class PropManagerDatabase : RoomDatabase() {
     abstract fun propiedadDao(): PropiedadDao
+
     abstract fun inquilinoDao(): InquilinoDao
+
     abstract fun contratoDao(): ContratoDao
+
     abstract fun pagoDao(): PagoDao
+
     abstract fun gastoDao(): GastoDao
+
     abstract fun solicitudDao(): SolicitudMantenimientoDao
+
     abstract fun notaDao(): NotaMantenimientoDao
+
     abstract fun syncQueueDao(): SyncQueueDao
+
     abstract fun dashboardCacheDao(): DashboardCacheDao
 }

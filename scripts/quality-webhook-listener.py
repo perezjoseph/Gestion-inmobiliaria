@@ -42,7 +42,7 @@ if _env_path.is_file():
 
 PORT = 9090
 BIND_ADDRESS = os.environ.get("BIND_ADDRESS", "127.0.0.1")
-_ALLOWED_BIND = {"127.0.0.1", "::1", "localhost"}
+_ALLOWED_BIND = {"127.0.0.1", "::1", "localhost", "0.0.0.0"}
 if BIND_ADDRESS not in _ALLOWED_BIND:
     raise SystemExit(
         f"BIND_ADDRESS={BIND_ADDRESS!r} is not allowed. "
@@ -159,7 +159,10 @@ def run_kiro(prompt, label):
     except OSError as e:
         log.warning(f"Log rotation failed: {e}")
 
-    fd = os.open(log_file, os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd = os.open(log_file, flags, 0o600)
     with os.fdopen(fd, "a", encoding="utf-8") as f:
         f.write(f"\n{'=' * 80}\n")
         f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {label}\n")

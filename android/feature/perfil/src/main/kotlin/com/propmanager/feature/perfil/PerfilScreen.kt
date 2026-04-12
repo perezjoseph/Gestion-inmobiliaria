@@ -12,6 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -24,7 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -66,27 +66,30 @@ fun PerfilScreen(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
         ) {
             OfflineIndicator(isOffline = !isOnline)
 
             when {
                 uiState.isLoading -> LoadingScreen()
-                uiState.errorMessage != null && uiState.nombre.isEmpty() -> ErrorScreen(
-                    message = uiState.errorMessage!!,
-                    onRetry = viewModel::loadPerfil,
-                )
-                else -> PerfilContent(
-                    uiState = uiState,
-                    onNombreChange = viewModel::onNombreChange,
-                    onSave = viewModel::savePerfil,
-                    onTogglePasswordForm = viewModel::togglePasswordForm,
-                    onPasswordActualChange = viewModel::onPasswordActualChange,
-                    onPasswordNuevaChange = viewModel::onPasswordNuevaChange,
-                    onChangePassword = viewModel::changePassword,
-                )
+                uiState.errorMessage != null && uiState.nombre.isEmpty() ->
+                    ErrorScreen(
+                        message = uiState.errorMessage!!,
+                        onRetry = viewModel::loadPerfil,
+                    )
+                else ->
+                    PerfilContent(
+                        uiState = uiState,
+                        onNombreChange = viewModel::onNombreChange,
+                        onSave = viewModel::savePerfil,
+                        onTogglePasswordForm = viewModel::togglePasswordForm,
+                        onPasswordActualChange = viewModel::onPasswordActualChange,
+                        onPasswordNuevaChange = viewModel::onPasswordNuevaChange,
+                        onChangePassword = viewModel::changePassword,
+                    )
             }
         }
     }
@@ -104,10 +107,11 @@ private fun PerfilContent(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
     ) {
         PropManagerTextField(
             value = uiState.nombre,

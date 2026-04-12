@@ -12,15 +12,15 @@ import androidx.room.PrimaryKey
         ForeignKey(
             entity = SolicitudMantenimientoEntity::class,
             parentColumns = ["id"],
-            childColumns = ["solicitud_id"]
-        )
+            childColumns = ["solicitud_id"],
+        ),
     ],
-    indices = [Index("solicitud_id")]
+    indices = [Index("solicitud_id")],
 )
 data class NotaMantenimientoEntity(
     @PrimaryKey val id: String,
     @ColumnInfo(name = "solicitud_id") val solicitudId: String,
     @ColumnInfo(name = "autor_id") val autorId: String,
     val contenido: String,
-    @ColumnInfo(name = "created_at") val createdAt: Long
+    @ColumnInfo(name = "created_at") val createdAt: Long,
 )

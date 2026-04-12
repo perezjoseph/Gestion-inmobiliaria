@@ -20,7 +20,7 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
-buildFeatures {
+    buildFeatures {
         compose = true
     }
 }
@@ -33,6 +33,7 @@ dependencies {
     implementation(composeBom)
     implementation(libs.bundles.compose)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
 
     testImplementation(libs.bundles.unit.test)

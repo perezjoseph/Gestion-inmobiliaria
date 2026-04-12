@@ -10,7 +10,6 @@ import retrofit2.Response
 import retrofit2.http.GET
 
 interface DashboardApiService {
-
     @GET("api/dashboard/stats")
     suspend fun stats(): Response<DashboardStats>
 

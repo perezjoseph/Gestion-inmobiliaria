@@ -20,15 +20,14 @@ data class DocumentoDto(
     @SerialName("mimeType") val mimeType: String,
     @SerialName("fileSize") val fileSize: Long,
     @SerialName("uploadedBy") val uploadedBy: String,
-    @SerialName("createdAt") val createdAt: String
+    @SerialName("createdAt") val createdAt: String,
 )
 
 interface DocumentosApiService {
-
     @GET("api/documentos/{entityType}/{entityId}")
     suspend fun list(
         @Path("entityType") entityType: String,
-        @Path("entityId") entityId: String
+        @Path("entityId") entityId: String,
     ): Response<List<DocumentoDto>>
 
     @Multipart
@@ -36,6 +35,6 @@ interface DocumentosApiService {
     suspend fun upload(
         @Path("entityType") entityType: String,
         @Path("entityId") entityId: String,
-        @Part file: MultipartBody.Part
+        @Part file: MultipartBody.Part,
     ): Response<DocumentoDto>
 }

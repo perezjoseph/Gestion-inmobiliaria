@@ -15,7 +15,7 @@ data class ContratoDto(
     val moneda: String,
     val estado: String,
     @SerialName("createdAt") val createdAt: String,
-    @SerialName("updatedAt") val updatedAt: String
+    @SerialName("updatedAt") val updatedAt: String,
 )
 
 @Serializable
@@ -26,16 +26,16 @@ data class CreateContratoRequest(
     @SerialName("fechaFin") val fechaFin: String,
     @SerialName("montoMensual") val montoMensual: String,
     val deposito: String? = null,
-    val moneda: String? = null
+    val moneda: String? = null,
 )
 
 @Serializable
 data class RenovarContratoRequest(
     @SerialName("fechaFin") val fechaFin: String,
-    @SerialName("montoMensual") val montoMensual: String
+    @SerialName("montoMensual") val montoMensual: String,
 )
 
 @Serializable
 data class TerminarContratoRequest(
-    @SerialName("fechaTerminacion") val fechaTerminacion: String
+    @SerialName("fechaTerminacion") val fechaTerminacion: String,
 )

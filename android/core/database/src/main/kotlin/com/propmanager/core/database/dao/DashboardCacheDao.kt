@@ -7,7 +7,6 @@ import com.propmanager.core.database.entity.DashboardCache
 
 @Dao
 interface DashboardCacheDao {
-
     @Query("SELECT * FROM dashboard_cache WHERE `key` = :key")
     suspend fun getByKey(key: String): DashboardCache?
 

@@ -20,47 +20,52 @@ import retrofit2.Response
  * the error parser extracts the message field value exactly as provided, regardless of the error type
  * or message content. For malformed/non-JSON input, the parser returns a fallback message without crashing.
  */
-class ApiErrorParserPropertyTest : FreeSpec({
+class ApiErrorParserPropertyTest :
+    FreeSpec({
 
-    "Property 16: API error message extraction" - {
+        "Property 16: API error message extraction" -
+            {
 
-        "valid JSON error body extracts message exactly" {
-            checkAll(
-                100,
-                Arb.string(1..100).filter { !it.contains('"') && !it.contains('\\') },
-                Arb.string(1..200).filter { !it.contains('"') && !it.contains('\\') }
-            ) { errorType, message ->
-                val jsonBody = """{"error": "$errorType", "message": "$message"}"""
-                val errorResponse = Response.error<Unit>(
-                    400,
-                    jsonBody.toResponseBody("application/json".toMediaType())
-                )
+                "valid JSON error body extracts message exactly" {
+                    checkAll(
+                        100,
+                        Arb.string(1..100).filter { !it.contains('"') && !it.contains('\\') },
+                        Arb.string(1..200).filter { !it.contains('"') && !it.contains('\\') },
+                    ) { errorType, message ->
+                        val jsonBody = """{"error": "$errorType", "message": "$message"}"""
+                        val errorResponse =
+                            Response.error<Unit>(
+                                400,
+                                jsonBody.toResponseBody("application/json".toMediaType()),
+                            )
 
-                val extracted = ApiErrorParser.extractMessage(errorResponse)
+                        val extracted = ApiErrorParser.extractMessage(errorResponse)
 
-                extracted shouldBe message
-            }
-        }
-
-        "malformed JSON returns fallback message without crashing" {
-            checkAll(
-                100,
-                Arb.string(1..200).filter { input ->
-                    runCatching {
-                        kotlinx.serialization.json.Json.decodeFromString<ApiErrorBody>(input)
-                    }.isFailure
+                        extracted shouldBe message
+                    }
                 }
-            ) { malformedInput ->
-                val errorResponse = Response.error<Unit>(
-                    400,
-                    malformedInput.toResponseBody("application/json".toMediaType())
-                )
 
-                val extracted = ApiErrorParser.extractMessage(errorResponse)
+                "malformed JSON returns fallback message without crashing" {
+                    checkAll(
+                        100,
+                        Arb.string(1..200).filter { input ->
+                            runCatching {
+                                kotlinx.serialization.json.Json
+                                    .decodeFromString<ApiErrorBody>(input)
+                            }.isFailure
+                        },
+                    ) { malformedInput ->
+                        val errorResponse =
+                            Response.error<Unit>(
+                                400,
+                                malformedInput.toResponseBody("application/json".toMediaType()),
+                            )
 
-                extracted shouldNotBe null
-                extracted.isNotBlank() shouldBe true
+                        val extracted = ApiErrorParser.extractMessage(errorResponse)
+
+                        extracted shouldNotBe null
+                        extracted.isNotBlank() shouldBe true
+                    }
+                }
             }
-        }
-    }
-})
+    })

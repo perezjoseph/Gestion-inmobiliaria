@@ -7,15 +7,18 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class ConfiguracionRepository @Inject constructor(
-    private val apiService: ConfiguracionApiService
-) {
+class ConfiguracionRepository
+    @Inject
+    constructor(
+        private val apiService: ConfiguracionApiService,
+    ) {
+        suspend fun fetchMoneda(): Result<MonedaConfigDto> =
+            runCatching {
+                apiService.getMoneda().body() ?: throw Exception("Empty response")
+            }
 
-    suspend fun fetchMoneda(): Result<MonedaConfigDto> = runCatching {
-        apiService.getMoneda().body() ?: throw Exception("Empty response")
+        suspend fun updateMoneda(request: UpdateMonedaRequest): Result<MonedaConfigDto> =
+            runCatching {
+                apiService.updateMoneda(request).body() ?: throw Exception("Empty response")
+            }
     }
-
-    suspend fun updateMoneda(request: UpdateMonedaRequest): Result<MonedaConfigDto> = runCatching {
-        apiService.updateMoneda(request).body() ?: throw Exception("Empty response")
-    }
-}

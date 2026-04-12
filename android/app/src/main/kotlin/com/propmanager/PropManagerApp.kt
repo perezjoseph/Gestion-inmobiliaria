@@ -7,7 +7,6 @@ import javax.inject.Inject
 
 @HiltAndroidApp
 class PropManagerApp : Application() {
-
     @Inject
     lateinit var syncManager: SyncManager
 

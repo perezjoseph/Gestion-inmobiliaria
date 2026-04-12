@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SolicitudMantenimientoDao {
-
     @Query("SELECT * FROM solicitudes_mantenimiento WHERE is_deleted = 0 ORDER BY created_at DESC")
     fun observeAll(): Flow<List<SolicitudMantenimientoEntity>>
 
@@ -20,12 +19,12 @@ interface SolicitudMantenimientoDao {
           AND (:prioridad IS NULL OR prioridad = :prioridad)
           AND (:propiedadId IS NULL OR propiedad_id = :propiedadId)
         ORDER BY created_at DESC
-        """
+        """,
     )
     fun observeFiltered(
         estado: String?,
         prioridad: String?,
-        propiedadId: String?
+        propiedadId: String?,
     ): Flow<List<SolicitudMantenimientoEntity>>
 
     @Query("SELECT * FROM solicitudes_mantenimiento WHERE id = :id")

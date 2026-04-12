@@ -9,7 +9,7 @@ data class IngresoReporte(
     @SerialName("inquilinoNombre") val inquilinoNombre: String,
     val monto: String,
     val moneda: String,
-    val estado: String
+    val estado: String,
 )
 
 @Serializable
@@ -20,7 +20,7 @@ data class IngresoReporteSummary(
     @SerialName("totalAtrasado") val totalAtrasado: String,
     @SerialName("tasaOcupacion") val tasaOcupacion: Double,
     @SerialName("generatedAt") val generatedAt: String,
-    @SerialName("generatedBy") val generatedBy: String
+    @SerialName("generatedBy") val generatedBy: String,
 )
 
 @Serializable
@@ -30,7 +30,7 @@ data class RentabilidadReporte(
     @SerialName("totalIngresos") val totalIngresos: String,
     @SerialName("totalGastos") val totalGastos: String,
     @SerialName("ingresoNeto") val ingresoNeto: String,
-    val moneda: String
+    val moneda: String,
 )
 
 @Serializable
@@ -42,7 +42,7 @@ data class RentabilidadReporteSummary(
     val mes: Int,
     val anio: Int,
     @SerialName("generatedAt") val generatedAt: String,
-    @SerialName("generatedBy") val generatedBy: String
+    @SerialName("generatedBy") val generatedBy: String,
 )
 
 @Serializable
@@ -52,5 +52,5 @@ data class HistorialPagoReporte(
     val moneda: String,
     @SerialName("fechaVencimiento") val fechaVencimiento: String,
     @SerialName("fechaPago") val fechaPago: String? = null,
-    val estado: String
+    val estado: String,
 )

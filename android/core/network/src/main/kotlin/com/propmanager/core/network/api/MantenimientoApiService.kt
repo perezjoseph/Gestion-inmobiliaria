@@ -17,25 +17,41 @@ import retrofit2.http.Path
 import retrofit2.http.QueryMap
 
 interface MantenimientoApiService {
-
     @GET("api/mantenimiento")
-    suspend fun list(@QueryMap filters: Map<String, String> = emptyMap()): Response<PaginatedResponse<SolicitudDto>>
+    suspend fun list(
+        @QueryMap filters: Map<String, String> = emptyMap(),
+    ): Response<PaginatedResponse<SolicitudDto>>
 
     @GET("api/mantenimiento/{id}")
-    suspend fun getById(@Path("id") id: String): Response<SolicitudDto>
+    suspend fun getById(
+        @Path("id") id: String,
+    ): Response<SolicitudDto>
 
     @POST("api/mantenimiento")
-    suspend fun create(@Body request: CreateSolicitudRequest): Response<SolicitudDto>
+    suspend fun create(
+        @Body request: CreateSolicitudRequest,
+    ): Response<SolicitudDto>
 
     @PUT("api/mantenimiento/{id}")
-    suspend fun update(@Path("id") id: String, @Body request: UpdateSolicitudRequest): Response<SolicitudDto>
+    suspend fun update(
+        @Path("id") id: String,
+        @Body request: UpdateSolicitudRequest,
+    ): Response<SolicitudDto>
 
     @DELETE("api/mantenimiento/{id}")
-    suspend fun delete(@Path("id") id: String): Response<Unit>
+    suspend fun delete(
+        @Path("id") id: String,
+    ): Response<Unit>
 
     @PUT("api/mantenimiento/{id}/estado")
-    suspend fun updateEstado(@Path("id") id: String, @Body request: UpdateEstadoRequest): Response<SolicitudDto>
+    suspend fun updateEstado(
+        @Path("id") id: String,
+        @Body request: UpdateEstadoRequest,
+    ): Response<SolicitudDto>
 
     @POST("api/mantenimiento/{id}/notas")
-    suspend fun addNota(@Path("id") id: String, @Body request: CreateNotaRequest): Response<NotaDto>
+    suspend fun addNota(
+        @Path("id") id: String,
+        @Body request: CreateNotaRequest,
+    ): Response<NotaDto>
 }

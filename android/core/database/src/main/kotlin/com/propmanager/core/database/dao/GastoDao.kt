@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface GastoDao {
-
     @Query("SELECT * FROM gastos WHERE is_deleted = 0 ORDER BY fecha_gasto DESC")
     fun observeAll(): Flow<List<GastoEntity>>
 
@@ -22,14 +21,14 @@ interface GastoDao {
           AND (:fechaDesde IS NULL OR fecha_gasto >= :fechaDesde)
           AND (:fechaHasta IS NULL OR fecha_gasto <= :fechaHasta)
         ORDER BY fecha_gasto DESC
-        """
+        """,
     )
     fun observeFiltered(
         propiedadId: String?,
         categoria: String?,
         estado: String?,
         fechaDesde: String?,
-        fechaHasta: String?
+        fechaHasta: String?,
     ): Flow<List<GastoEntity>>
 
     @Upsert

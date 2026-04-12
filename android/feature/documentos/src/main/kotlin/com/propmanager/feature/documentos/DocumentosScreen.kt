@@ -55,9 +55,10 @@ fun DocumentosScreen(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
         ) {
             OfflineIndicator(isOffline = !isOnline)
 
@@ -69,70 +70,74 @@ fun DocumentosScreen(
             OutlinedButton(
                 onClick = onPickFile,
                 enabled = !uiState.isUploading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 Text(stringResource(R.string.documento_subir))
             }
 
             when {
                 uiState.isLoading -> LoadingScreen()
-                uiState.errorMessage != null -> ErrorScreen(
-                    message = uiState.errorMessage!!,
-                    onRetry = { },
-                )
-                uiState.documents.isEmpty() -> EmptyStateScreen(
-                    message = stringResource(R.string.documentos_empty),
-                )
-                else -> LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(uiState.documents, key = { it.id }) { doc ->
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    text = doc.filename,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Medium,
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                ) {
+                uiState.errorMessage != null ->
+                    ErrorScreen(
+                        message = uiState.errorMessage!!,
+                        onRetry = { },
+                    )
+                uiState.documents.isEmpty() ->
+                    EmptyStateScreen(
+                        message = stringResource(R.string.documentos_empty),
+                    )
+                else ->
+                    LazyColumn(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(uiState.documents, key = { it.id }) { doc ->
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.padding(12.dp)) {
                                     Text(
-                                        text = doc.mimeType,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        text = doc.filename,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium,
                                     )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                    ) {
+                                        Text(
+                                            text = doc.mimeType,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        Text(
+                                            text = formatFileSize(doc.fileSize),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                     Text(
-                                        text = formatFileSize(doc.fileSize),
+                                        text = doc.createdAt,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                Text(
-                                    text = doc.createdAt,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
                             }
                         }
+                        item(key = "bottom_spacer") { Spacer(modifier = Modifier.height(16.dp)) }
                     }
-                    item(key = "bottom_spacer") { Spacer(modifier = Modifier.height(16.dp)) }
-                }
             }
         }
     }
 }
 
-private fun formatFileSize(bytes: Long): String {
-    return when {
+private fun formatFileSize(bytes: Long): String =
+    when {
         bytes < 1024 -> "$bytes B"
         bytes < 1024 * 1024 -> "${bytes / 1024} KB"
         else -> String.format("%.1f MB", bytes / (1024.0 * 1024.0))
     }
-}

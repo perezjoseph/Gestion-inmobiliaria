@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface InquilinoDao {
-
     @Query("SELECT * FROM inquilinos WHERE is_deleted = 0 ORDER BY apellido ASC, nombre ASC")
     fun observeAll(): Flow<List<InquilinoEntity>>
 
@@ -23,7 +22,7 @@ interface InquilinoDao {
                OR apellido LIKE '%' || :query || '%'
                OR cedula LIKE '%' || :query || '%')
         ORDER BY apellido ASC, nombre ASC
-        """
+        """,
     )
     fun search(query: String): Flow<List<InquilinoEntity>>
 

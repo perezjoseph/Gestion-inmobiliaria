@@ -79,9 +79,10 @@ fun DashboardScreen(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
         ) {
             OfflineIndicator(isOffline = !isOnline)
 
@@ -105,9 +106,10 @@ private fun DashboardContent(
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         if (uiState.isFromCache && uiState.lastUpdated != null) {
@@ -188,9 +190,10 @@ private fun StalenessIndicator(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-        ),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            ),
     ) {
         Text(
             text = stringResource(R.string.last_updated, lastUpdated),
@@ -233,10 +236,11 @@ private fun StatsGrid(
             )
             StatCard(
                 label = stringResource(R.string.dashboard_total_inquilinos),
-                value = CurrencyFormatter.format(
-                    BigDecimal(stats.ingresoMensual),
-                    "DOP",
-                ),
+                value =
+                    CurrencyFormatter.format(
+                        BigDecimal(stats.ingresoMensual),
+                        "DOP",
+                    ),
                 modifier = Modifier.weight(1f),
             )
         }
@@ -251,14 +255,16 @@ private fun StatCard(
 ) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-        ),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+            ),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
@@ -342,10 +348,11 @@ private fun ContratoCalendarioItem(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Spacer(
-                modifier = Modifier
-                    .size(12.dp)
-                    .clip(CircleShape)
-                    .background(indicatorColor),
+                modifier =
+                    Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(indicatorColor),
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -360,10 +367,11 @@ private fun ContratoCalendarioItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = stringResource(
-                        R.string.contrato_dias_restantes,
-                        contrato.diasRestantes.toInt(),
-                    ),
+                    text =
+                        stringResource(
+                            R.string.contrato_dias_restantes,
+                            contrato.diasRestantes.toInt(),
+                        ),
                     style = MaterialTheme.typography.bodySmall,
                     color = indicatorColor,
                 )
@@ -377,8 +385,8 @@ private fun ContratoCalendarioItem(
     }
 }
 
-private fun parseColorIndicator(color: String): Color {
-    return when (color.lowercase()) {
+private fun parseColorIndicator(color: String): Color =
+    when (color.lowercase()) {
         "red", "rojo" -> Color(0xFFD32F2F)
         "yellow", "amarillo" -> Color(0xFFF9A825)
         "green", "verde" -> Color(0xFF388E3C)
@@ -387,7 +395,6 @@ private fun parseColorIndicator(color: String): Color {
                 .getOrDefault(Color(0xFF757575))
         }
     }
-}
 
 @Composable
 private fun OcupacionTendenciaItem(
@@ -397,9 +404,10 @@ private fun OcupacionTendenciaItem(
     val monthName = getMonthName(tendencia.mes)
 
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -416,8 +424,8 @@ private fun OcupacionTendenciaItem(
     HorizontalDivider()
 }
 
-private fun getMonthName(mes: Int): String {
-    return when (mes) {
+private fun getMonthName(mes: Int): String =
+    when (mes) {
         1 -> "Enero"
         2 -> "Febrero"
         3 -> "Marzo"
@@ -432,7 +440,6 @@ private fun getMonthName(mes: Int): String {
         12 -> "Diciembre"
         else -> "Mes $mes"
     }
-}
 
 @Composable
 private fun IngresosComparacionCard(
@@ -454,11 +461,12 @@ private fun IngresosComparacionCard(
             ComparisonRow(
                 label = stringResource(R.string.dashboard_diferencia),
                 value = CurrencyFormatter.format(BigDecimal(ingresos.diferencia), "DOP"),
-                valueColor = if (BigDecimal(ingresos.diferencia) >= BigDecimal.ZERO) {
-                    Color(0xFF388E3C)
-                } else {
-                    Color(0xFFD32F2F)
-                },
+                valueColor =
+                    if (BigDecimal(ingresos.diferencia) >= BigDecimal.ZERO) {
+                        Color(0xFF388E3C)
+                    } else {
+                        Color(0xFFD32F2F)
+                    },
             )
         }
     }
@@ -481,11 +489,12 @@ private fun GastosComparacionCard(
                 value = CurrencyFormatter.format(BigDecimal(gastos.mesAnterior), "DOP"),
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            val changeColor = if (gastos.porcentajeCambio <= 0) {
-                Color(0xFF388E3C)
-            } else {
-                Color(0xFFD32F2F)
-            }
+            val changeColor =
+                if (gastos.porcentajeCambio <= 0) {
+                    Color(0xFF388E3C)
+                } else {
+                    Color(0xFFD32F2F)
+                }
             ComparisonRow(
                 label = "% Cambio",
                 value = String.format("%+.1f%%", gastos.porcentajeCambio),

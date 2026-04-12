@@ -8,5 +8,5 @@ import androidx.room.PrimaryKey
 data class DashboardCache(
     @PrimaryKey val key: String,
     val data: String,
-    @ColumnInfo(name = "cached_at") val cachedAt: Long
+    @ColumnInfo(name = "cached_at") val cachedAt: Long,
 )

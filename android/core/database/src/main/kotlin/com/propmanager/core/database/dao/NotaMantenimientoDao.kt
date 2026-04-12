@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface NotaMantenimientoDao {
-
     @Query("SELECT * FROM notas_mantenimiento WHERE solicitud_id = :solicitudId ORDER BY created_at ASC")
     fun observeBySolicitudId(solicitudId: String): Flow<List<NotaMantenimientoEntity>>
 

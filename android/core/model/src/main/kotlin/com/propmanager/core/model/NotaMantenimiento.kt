@@ -7,5 +7,5 @@ data class NotaMantenimiento(
     val solicitudId: String,
     val autorId: String,
     val contenido: String,
-    val createdAt: Instant
+    val createdAt: Instant,
 )

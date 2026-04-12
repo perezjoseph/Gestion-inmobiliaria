@@ -22,7 +22,14 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
-buildFeatures {
+
+    testOptions {
+        unitTests.all {
+            it.useJUnitPlatform()
+        }
+    }
+
+    buildFeatures {
         compose = true
     }
 }

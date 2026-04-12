@@ -14,19 +14,29 @@ import retrofit2.http.Path
 import retrofit2.http.QueryMap
 
 interface InquilinosApiService {
-
     @GET("api/inquilinos")
-    suspend fun list(@QueryMap filters: Map<String, String> = emptyMap()): Response<PaginatedResponse<InquilinoDto>>
+    suspend fun list(
+        @QueryMap filters: Map<String, String> = emptyMap(),
+    ): Response<PaginatedResponse<InquilinoDto>>
 
     @GET("api/inquilinos/{id}")
-    suspend fun getById(@Path("id") id: String): Response<InquilinoDto>
+    suspend fun getById(
+        @Path("id") id: String,
+    ): Response<InquilinoDto>
 
     @POST("api/inquilinos")
-    suspend fun create(@Body request: CreateInquilinoRequest): Response<InquilinoDto>
+    suspend fun create(
+        @Body request: CreateInquilinoRequest,
+    ): Response<InquilinoDto>
 
     @PUT("api/inquilinos/{id}")
-    suspend fun update(@Path("id") id: String, @Body request: UpdateInquilinoRequest): Response<InquilinoDto>
+    suspend fun update(
+        @Path("id") id: String,
+        @Body request: UpdateInquilinoRequest,
+    ): Response<InquilinoDto>
 
     @DELETE("api/inquilinos/{id}")
-    suspend fun delete(@Path("id") id: String): Response<Unit>
+    suspend fun delete(
+        @Path("id") id: String,
+    ): Response<Unit>
 }

@@ -68,10 +68,18 @@ fun ContratoDetailScreen(
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     LaunchedEffect(contratoId) { viewModel.loadDetail(contratoId) }
-    LaunchedEffect(successMessage) { successMessage?.let { snackbarHostState.showSnackbar(it); viewModel.clearSuccessMessage() } }
+    LaunchedEffect(successMessage) {
+        successMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearSuccessMessage()
+        }
+    }
 
     deleteTarget?.let { c ->
-        ConfirmDeleteDialog(itemName = c.id.take(8), onConfirm = { viewModel.confirmDelete(); onNavigateBack() }, onDismiss = viewModel::dismissDelete)
+        ConfirmDeleteDialog(itemName = c.id.take(8), onConfirm = {
+            viewModel.confirmDelete()
+            onNavigateBack()
+        }, onDismiss = viewModel::dismissDelete)
     }
 
     if (showRenew) {
@@ -80,9 +88,19 @@ fun ContratoDetailScreen(
             title = { Text(stringResource(R.string.contrato_renovar)) },
             text = {
                 Column {
-                    DatePickerField(value = renewForm.fechaFin, onValueChange = viewModel::onRenewFechaFinChange, label = stringResource(R.string.contrato_fecha_fin), error = renewForm.errors["fechaFin"])
+                    DatePickerField(
+                        value = renewForm.fechaFin,
+                        onValueChange = viewModel::onRenewFechaFinChange,
+                        label = stringResource(R.string.contrato_fecha_fin),
+                        error = renewForm.errors["fechaFin"],
+                    )
                     Spacer(Modifier.height(8.dp))
-                    PropManagerTextField(value = renewForm.montoMensual, onValueChange = viewModel::onRenewMontoChange, label = stringResource(R.string.contrato_monto_mensual), error = renewForm.errors["montoMensual"])
+                    PropManagerTextField(
+                        value = renewForm.montoMensual,
+                        onValueChange = viewModel::onRenewMontoChange,
+                        label = stringResource(R.string.contrato_monto_mensual),
+                        error = renewForm.errors["montoMensual"],
+                    )
                 }
             },
             confirmButton = { TextButton(onClick = viewModel::confirmRenew) { Text(stringResource(R.string.confirm)) } },
@@ -94,7 +112,11 @@ fun ContratoDetailScreen(
         AlertDialog(
             onDismissRequest = viewModel::dismissTerminate,
             title = { Text(stringResource(R.string.contrato_terminar)) },
-            text = { Text(stringResource(R.string.contrato_fecha_terminacion) + ": " + DateFormatter.toDisplay(java.time.LocalDate.now())) },
+            text = {
+                Text(
+                    stringResource(R.string.contrato_fecha_terminacion) + ": " + DateFormatter.toDisplay(java.time.LocalDate.now()),
+                )
+            },
             confirmButton = { TextButton(onClick = viewModel::confirmTerminate) { Text(stringResource(R.string.confirm)) } },
             dismissButton = { TextButton(onClick = viewModel::dismissTerminate) { Text(stringResource(R.string.cancel)) } },
         )
@@ -109,8 +131,13 @@ fun ContratoDetailScreen(
                 actions = {
                     if (detailState is ContratoDetailUiState.Success) {
                         val c = (detailState as ContratoDetailUiState.Success).contrato.contrato
-                        IconButton(onClick = { viewModel.initEditForm(c); onNavigateToEdit() }) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.edit)) }
-                        IconButton(onClick = { viewModel.requestDelete(c) }) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete)) }
+                        IconButton(onClick = {
+                            viewModel.initEditForm(c)
+                            onNavigateToEdit()
+                        }) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.edit)) }
+                        IconButton(
+                            onClick = { viewModel.requestDelete(c) },
+                        ) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete)) }
                     }
                 },
             )
@@ -121,18 +148,24 @@ fun ContratoDetailScreen(
         when (val state = detailState) {
             is ContratoDetailUiState.Loading -> LoadingScreen(modifier = Modifier.padding(paddingValues))
             is ContratoDetailUiState.NotFound -> ErrorScreen(message = state.message, modifier = Modifier.padding(paddingValues))
-            is ContratoDetailUiState.Success -> ContratoDetailContent(
-                cwn = state.contrato,
-                onRenew = viewModel::showRenew,
-                onTerminate = viewModel::showTerminate,
-                modifier = Modifier.padding(paddingValues),
-            )
+            is ContratoDetailUiState.Success ->
+                ContratoDetailContent(
+                    cwn = state.contrato,
+                    onRenew = viewModel::showRenew,
+                    onTerminate = viewModel::showTerminate,
+                    modifier = Modifier.padding(paddingValues),
+                )
         }
     }
 }
 
 @Composable
-private fun ContratoDetailContent(cwn: ContratoWithNames, onRenew: () -> Unit, onTerminate: () -> Unit, modifier: Modifier = Modifier) {
+private fun ContratoDetailContent(
+    cwn: ContratoWithNames,
+    onRenew: () -> Unit,
+    onTerminate: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val c = cwn.contrato
     Column(modifier = modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -160,7 +193,10 @@ private fun ContratoDetailContent(cwn: ContratoWithNames, onRenew: () -> Unit, o
 }
 
 @Composable
-private fun DetailRow(label: String, value: String) {
+private fun DetailRow(
+    label: String,
+    value: String,
+) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)

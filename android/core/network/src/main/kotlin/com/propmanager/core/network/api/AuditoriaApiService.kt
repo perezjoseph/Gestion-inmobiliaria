@@ -16,11 +16,12 @@ data class AuditoriaDto(
     @SerialName("entityId") val entityId: String,
     val accion: String,
     val cambios: JsonElement,
-    @SerialName("createdAt") val createdAt: String
+    @SerialName("createdAt") val createdAt: String,
 )
 
 interface AuditoriaApiService {
-
     @GET("api/auditoria")
-    suspend fun list(@QueryMap filters: Map<String, String> = emptyMap()): Response<PaginatedResponse<AuditoriaDto>>
+    suspend fun list(
+        @QueryMap filters: Map<String, String> = emptyMap(),
+    ): Response<PaginatedResponse<AuditoriaDto>>
 }

@@ -18,7 +18,7 @@ data class GastoDto(
     @SerialName("numeroFactura") val numeroFactura: String? = null,
     val notas: String? = null,
     @SerialName("createdAt") val createdAt: String,
-    @SerialName("updatedAt") val updatedAt: String
+    @SerialName("updatedAt") val updatedAt: String,
 )
 
 @Serializable
@@ -32,7 +32,7 @@ data class CreateGastoRequest(
     @SerialName("fechaGasto") val fechaGasto: String,
     val proveedor: String? = null,
     @SerialName("numeroFactura") val numeroFactura: String? = null,
-    val notas: String? = null
+    val notas: String? = null,
 )
 
 @Serializable
@@ -46,5 +46,5 @@ data class UpdateGastoRequest(
     val proveedor: String? = null,
     @SerialName("numeroFactura") val numeroFactura: String? = null,
     val estado: String? = null,
-    val notas: String? = null
+    val notas: String? = null,
 )

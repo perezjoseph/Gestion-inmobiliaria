@@ -25,66 +25,68 @@ data class ConfiguracionUiState(
 )
 
 @HiltViewModel
-class ConfiguracionViewModel @Inject constructor(
-    private val configuracionRepository: ConfiguracionRepository,
-    private val networkMonitor: NetworkMonitor,
-) : ViewModel() {
+class ConfiguracionViewModel
+    @Inject
+    constructor(
+        private val configuracionRepository: ConfiguracionRepository,
+        private val networkMonitor: NetworkMonitor,
+    ) : ViewModel() {
+        private val _uiState = MutableStateFlow(ConfiguracionUiState())
+        val uiState: StateFlow<ConfiguracionUiState> = _uiState.asStateFlow()
 
-    private val _uiState = MutableStateFlow(ConfiguracionUiState())
-    val uiState: StateFlow<ConfiguracionUiState> = _uiState.asStateFlow()
+        val isOnline: StateFlow<Boolean> =
+            networkMonitor.isOnline
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
-    val isOnline: StateFlow<Boolean> = networkMonitor.isOnline
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+        init {
+            loadMoneda()
+        }
 
-    init {
-        loadMoneda()
-    }
-
-    fun loadMoneda() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            configuracionRepository.fetchMoneda()
-                .onSuccess { config ->
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            tasa = config.tasa.toString(),
-                            actualizado = config.actualizado,
-                        )
+        fun loadMoneda() {
+            viewModelScope.launch {
+                _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+                configuracionRepository
+                    .fetchMoneda()
+                    .onSuccess { config ->
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                tasa = config.tasa.toString(),
+                                actualizado = config.actualizado,
+                            )
+                        }
+                    }.onFailure { e ->
+                        _uiState.update { it.copy(isLoading = false, errorMessage = e.message) }
                     }
-                }
-                .onFailure { e ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = e.message) }
-                }
+            }
         }
-    }
 
-    fun onTasaChange(tasa: String) {
-        _uiState.update { it.copy(tasa = tasa, errorMessage = null, saveSuccess = false) }
-    }
-
-    fun saveMoneda() {
-        val tasaValue = _uiState.value.tasa.toDoubleOrNull()
-        if (tasaValue == null) {
-            _uiState.update { it.copy(errorMessage = "El valor debe ser un número válido") }
-            return
+        fun onTasaChange(tasa: String) {
+            _uiState.update { it.copy(tasa = tasa, errorMessage = null, saveSuccess = false) }
         }
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true, errorMessage = null, saveSuccess = false) }
-            configuracionRepository.updateMoneda(UpdateMonedaRequest(tasa = tasaValue))
-                .onSuccess { config ->
-                    _uiState.update {
-                        it.copy(
-                            isSaving = false,
-                            saveSuccess = true,
-                            tasa = config.tasa.toString(),
-                            actualizado = config.actualizado,
-                        )
+
+        fun saveMoneda() {
+            val tasaValue = _uiState.value.tasa.toDoubleOrNull()
+            if (tasaValue == null) {
+                _uiState.update { it.copy(errorMessage = "El valor debe ser un número válido") }
+                return
+            }
+            viewModelScope.launch {
+                _uiState.update { it.copy(isSaving = true, errorMessage = null, saveSuccess = false) }
+                configuracionRepository
+                    .updateMoneda(UpdateMonedaRequest(tasa = tasaValue))
+                    .onSuccess { config ->
+                        _uiState.update {
+                            it.copy(
+                                isSaving = false,
+                                saveSuccess = true,
+                                tasa = config.tasa.toString(),
+                                actualizado = config.actualizado,
+                            )
+                        }
+                    }.onFailure { e ->
+                        _uiState.update { it.copy(isSaving = false, errorMessage = e.message) }
                     }
-                }
-                .onFailure { e ->
-                    _uiState.update { it.copy(isSaving = false, errorMessage = e.message) }
-                }
+            }
         }
     }
-}

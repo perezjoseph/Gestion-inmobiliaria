@@ -16,62 +16,66 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class DashboardRepository @Inject constructor(
-    private val apiService: DashboardApiService,
-    private val cacheDao: DashboardCacheDao,
-    private val json: Json
-) {
+open class DashboardRepository
+    @Inject
+    constructor(
+        private val apiService: DashboardApiService,
+        private val cacheDao: DashboardCacheDao,
+        private val json: Json,
+    ) {
+        open suspend fun fetchStats(): Result<DashboardStats> = fetchAndCache("stats") { apiService.stats() }
 
-    suspend fun fetchStats(): Result<DashboardStats> =
-        fetchAndCache("stats") { apiService.stats() }
+        open suspend fun fetchPagosProximos(): Result<List<PagoProximo>> = fetchAndCache("pagos_proximos") { apiService.pagosProximos() }
 
-    suspend fun fetchPagosProximos(): Result<List<PagoProximo>> =
-        fetchAndCache("pagos_proximos") { apiService.pagosProximos() }
+        open suspend fun fetchContratosCalendario(): Result<List<ContratoCalendario>> =
+            fetchAndCache("contratos_calendario") { apiService.contratosCalendario() }
 
-    suspend fun fetchContratosCalendario(): Result<List<ContratoCalendario>> =
-        fetchAndCache("contratos_calendario") { apiService.contratosCalendario() }
+        open suspend fun fetchOcupacionTendencia(): Result<List<OcupacionTendencia>> =
+            fetchAndCache("ocupacion_tendencia") { apiService.ocupacionTendencia() }
 
-    suspend fun fetchOcupacionTendencia(): Result<List<OcupacionTendencia>> =
-        fetchAndCache("ocupacion_tendencia") { apiService.ocupacionTendencia() }
+        open suspend fun fetchIngresosComparacion(): Result<IngresosComparacion> =
+            fetchAndCache("ingresos_comparacion") { apiService.ingresosComparacion() }
 
-    suspend fun fetchIngresosComparacion(): Result<IngresosComparacion> =
-        fetchAndCache("ingresos_comparacion") { apiService.ingresosComparacion() }
+        open suspend fun fetchGastosComparacion(): Result<GastosComparacion> =
+            fetchAndCache("gastos_comparacion") { apiService.gastosComparacion() }
 
-    suspend fun fetchGastosComparacion(): Result<GastosComparacion> =
-        fetchAndCache("gastos_comparacion") { apiService.gastosComparacion() }
+        open suspend fun getCachedStats(): DashboardStats? = getCached("stats")
 
-    suspend fun getCachedStats(): DashboardStats? = getCached("stats")
-    suspend fun getCachedPagosProximos(): List<PagoProximo>? = getCached("pagos_proximos")
-    suspend fun getCachedContratosCalendario(): List<ContratoCalendario>? = getCached("contratos_calendario")
-    suspend fun getCachedOcupacionTendencia(): List<OcupacionTendencia>? = getCached("ocupacion_tendencia")
-    suspend fun getCachedIngresosComparacion(): IngresosComparacion? = getCached("ingresos_comparacion")
-    suspend fun getCachedGastosComparacion(): GastosComparacion? = getCached("gastos_comparacion")
+        open suspend fun getCachedPagosProximos(): List<PagoProximo>? = getCached("pagos_proximos")
 
-    suspend fun getCachedAt(key: String): Instant? =
-        cacheDao.getByKey(key)?.cachedAt?.let { Instant.ofEpochMilli(it) }
+        open suspend fun getCachedContratosCalendario(): List<ContratoCalendario>? = getCached("contratos_calendario")
 
-    private suspend inline fun <reified T> fetchAndCache(
-        key: String,
-        crossinline apiCall: suspend () -> retrofit2.Response<T>
-    ): Result<T> = runCatching {
-        val response = apiCall()
-        val body = response.body() ?: throw Exception("Empty response for $key")
-        cacheDao.upsert(
-            DashboardCache(
-                key = key,
-                data = json.encodeToString(body),
-                cachedAt = Instant.now().toEpochMilli()
-            )
-        )
-        body
-    }
+        open suspend fun getCachedOcupacionTendencia(): List<OcupacionTendencia>? = getCached("ocupacion_tendencia")
 
-    private suspend inline fun <reified T> getCached(key: String): T? {
-        val cache = cacheDao.getByKey(key) ?: return null
-        return try {
-            json.decodeFromString<T>(cache.data)
-        } catch (_: Exception) {
-            null
+        open suspend fun getCachedIngresosComparacion(): IngresosComparacion? = getCached("ingresos_comparacion")
+
+        open suspend fun getCachedGastosComparacion(): GastosComparacion? = getCached("gastos_comparacion")
+
+        open suspend fun getCachedAt(key: String): Instant? = cacheDao.getByKey(key)?.cachedAt?.let { Instant.ofEpochMilli(it) }
+
+        private suspend inline fun <reified T> fetchAndCache(
+            key: String,
+            crossinline apiCall: suspend () -> retrofit2.Response<T>,
+        ): Result<T> =
+            runCatching {
+                val response = apiCall()
+                val body = response.body() ?: throw Exception("Empty response for $key")
+                cacheDao.upsert(
+                    DashboardCache(
+                        key = key,
+                        data = json.encodeToString(body),
+                        cachedAt = Instant.now().toEpochMilli(),
+                    ),
+                )
+                body
+            }
+
+        private suspend inline fun <reified T> getCached(key: String): T? {
+            val cache = cacheDao.getByKey(key) ?: return null
+            return try {
+                json.decodeFromString<T>(cache.data)
+            } catch (_: Exception) {
+                null
+            }
         }
     }
-}

@@ -14,7 +14,7 @@ data class InquilinoDto(
     @SerialName("contactoEmergencia") val contactoEmergencia: String? = null,
     val notas: String? = null,
     @SerialName("createdAt") val createdAt: String,
-    @SerialName("updatedAt") val updatedAt: String
+    @SerialName("updatedAt") val updatedAt: String,
 )
 
 @Serializable
@@ -25,7 +25,7 @@ data class CreateInquilinoRequest(
     val telefono: String? = null,
     val cedula: String,
     @SerialName("contactoEmergencia") val contactoEmergencia: String? = null,
-    val notas: String? = null
+    val notas: String? = null,
 )
 
 @Serializable
@@ -36,5 +36,5 @@ data class UpdateInquilinoRequest(
     val telefono: String? = null,
     val cedula: String? = null,
     @SerialName("contactoEmergencia") val contactoEmergencia: String? = null,
-    val notas: String? = null
+    val notas: String? = null,
 )

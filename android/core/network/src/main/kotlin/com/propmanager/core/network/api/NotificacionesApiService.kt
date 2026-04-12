@@ -13,11 +13,10 @@ data class PagoVencidoDto(
     @SerialName("inquilinoApellido") val inquilinoApellido: String,
     val monto: String,
     val moneda: String,
-    @SerialName("diasVencido") val diasVencido: Long
+    @SerialName("diasVencido") val diasVencido: Long,
 )
 
 interface NotificacionesApiService {
-
     @GET("api/notificaciones/pagos-vencidos")
     suspend fun pagosVencidos(): Response<List<PagoVencidoDto>>
 }

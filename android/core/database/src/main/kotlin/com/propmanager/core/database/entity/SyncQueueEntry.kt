@@ -12,5 +12,5 @@ data class SyncQueueEntry(
     val operation: String,
     val payload: String,
     @ColumnInfo(name = "created_at") val createdAt: Long,
-    @ColumnInfo(name = "retry_count") val retryCount: Int = 0
+    @ColumnInfo(name = "retry_count") val retryCount: Int = 0,
 )

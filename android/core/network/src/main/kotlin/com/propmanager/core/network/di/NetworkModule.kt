@@ -1,8 +1,9 @@
 package com.propmanager.core.network.di
 
-import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.propmanager.core.network.AuthInterceptor
+import com.propmanager.core.network.ConnectivityObserver
 import com.propmanager.core.network.EncryptedTokenProvider
+import com.propmanager.core.network.NetworkMonitor
 import com.propmanager.core.network.TokenProvider
 import com.propmanager.core.network.api.AuditoriaApiService
 import com.propmanager.core.network.api.AuthApiService
@@ -29,22 +30,25 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class TokenProviderModule {
-
     @Binds
     @Singleton
     abstract fun bindTokenProvider(impl: EncryptedTokenProvider): TokenProvider
+
+    @Binds
+    @Singleton
+    abstract fun bindConnectivityObserver(impl: NetworkMonitor): ConnectivityObserver
 }
 
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
-
     private const val BASE_URL = "http://10.0.2.2:8080/"
     private const val CONNECT_TIMEOUT_SECONDS = 30L
     private const val READ_TIMEOUT_SECONDS = 30L
@@ -52,19 +56,22 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideJson(): Json = Json {
-        ignoreUnknownKeys = true
-        coerceInputValues = true
-        encodeDefaults = true
-    }
+    fun provideJson(): Json =
+        Json {
+            ignoreUnknownKeys = true
+            coerceInputValues = true
+            encodeDefaults = true
+        }
 
     @Provides
     @Singleton
     fun provideOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient {
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
-        }
-        return OkHttpClient.Builder()
+        val loggingInterceptor =
+            HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BODY
+            }
+        return OkHttpClient
+            .Builder()
             .addInterceptor(authInterceptor)
             .addInterceptor(loggingInterceptor)
             .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -75,9 +82,13 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideRetrofit(okHttpClient: OkHttpClient, json: Json): Retrofit {
+    fun provideRetrofit(
+        okHttpClient: OkHttpClient,
+        json: Json,
+    ): Retrofit {
         val contentType = "application/json".toMediaType()
-        return Retrofit.Builder()
+        return Retrofit
+            .Builder()
             .baseUrl(BASE_URL)
             .client(okHttpClient)
             .addConverterFactory(json.asConverterFactory(contentType))
@@ -86,53 +97,43 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideAuthApiService(retrofit: Retrofit): AuthApiService =
-        retrofit.create(AuthApiService::class.java)
+    fun provideAuthApiService(retrofit: Retrofit): AuthApiService = retrofit.create(AuthApiService::class.java)
 
     @Provides
     @Singleton
-    fun providePropiedadesApiService(retrofit: Retrofit): PropiedadesApiService =
-        retrofit.create(PropiedadesApiService::class.java)
+    fun providePropiedadesApiService(retrofit: Retrofit): PropiedadesApiService = retrofit.create(PropiedadesApiService::class.java)
 
     @Provides
     @Singleton
-    fun provideInquilinosApiService(retrofit: Retrofit): InquilinosApiService =
-        retrofit.create(InquilinosApiService::class.java)
+    fun provideInquilinosApiService(retrofit: Retrofit): InquilinosApiService = retrofit.create(InquilinosApiService::class.java)
 
     @Provides
     @Singleton
-    fun provideContratosApiService(retrofit: Retrofit): ContratosApiService =
-        retrofit.create(ContratosApiService::class.java)
+    fun provideContratosApiService(retrofit: Retrofit): ContratosApiService = retrofit.create(ContratosApiService::class.java)
 
     @Provides
     @Singleton
-    fun providePagosApiService(retrofit: Retrofit): PagosApiService =
-        retrofit.create(PagosApiService::class.java)
+    fun providePagosApiService(retrofit: Retrofit): PagosApiService = retrofit.create(PagosApiService::class.java)
 
     @Provides
     @Singleton
-    fun provideGastosApiService(retrofit: Retrofit): GastosApiService =
-        retrofit.create(GastosApiService::class.java)
+    fun provideGastosApiService(retrofit: Retrofit): GastosApiService = retrofit.create(GastosApiService::class.java)
 
     @Provides
     @Singleton
-    fun provideMantenimientoApiService(retrofit: Retrofit): MantenimientoApiService =
-        retrofit.create(MantenimientoApiService::class.java)
+    fun provideMantenimientoApiService(retrofit: Retrofit): MantenimientoApiService = retrofit.create(MantenimientoApiService::class.java)
 
     @Provides
     @Singleton
-    fun provideDashboardApiService(retrofit: Retrofit): DashboardApiService =
-        retrofit.create(DashboardApiService::class.java)
+    fun provideDashboardApiService(retrofit: Retrofit): DashboardApiService = retrofit.create(DashboardApiService::class.java)
 
     @Provides
     @Singleton
-    fun provideReportesApiService(retrofit: Retrofit): ReportesApiService =
-        retrofit.create(ReportesApiService::class.java)
+    fun provideReportesApiService(retrofit: Retrofit): ReportesApiService = retrofit.create(ReportesApiService::class.java)
 
     @Provides
     @Singleton
-    fun provideDocumentosApiService(retrofit: Retrofit): DocumentosApiService =
-        retrofit.create(DocumentosApiService::class.java)
+    fun provideDocumentosApiService(retrofit: Retrofit): DocumentosApiService = retrofit.create(DocumentosApiService::class.java)
 
     @Provides
     @Singleton
@@ -141,21 +142,17 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideAuditoriaApiService(retrofit: Retrofit): AuditoriaApiService =
-        retrofit.create(AuditoriaApiService::class.java)
+    fun provideAuditoriaApiService(retrofit: Retrofit): AuditoriaApiService = retrofit.create(AuditoriaApiService::class.java)
 
     @Provides
     @Singleton
-    fun provideConfiguracionApiService(retrofit: Retrofit): ConfiguracionApiService =
-        retrofit.create(ConfiguracionApiService::class.java)
+    fun provideConfiguracionApiService(retrofit: Retrofit): ConfiguracionApiService = retrofit.create(ConfiguracionApiService::class.java)
 
     @Provides
     @Singleton
-    fun provideImportacionApiService(retrofit: Retrofit): ImportacionApiService =
-        retrofit.create(ImportacionApiService::class.java)
+    fun provideImportacionApiService(retrofit: Retrofit): ImportacionApiService = retrofit.create(ImportacionApiService::class.java)
 
     @Provides
     @Singleton
-    fun providePerfilApiService(retrofit: Retrofit): PerfilApiService =
-        retrofit.create(PerfilApiService::class.java)
+    fun providePerfilApiService(retrofit: Retrofit): PerfilApiService = retrofit.create(PerfilApiService::class.java)
 }

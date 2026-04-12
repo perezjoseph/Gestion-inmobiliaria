@@ -19,5 +19,5 @@ data class Gasto(
     val notas: String?,
     val createdAt: Instant,
     val updatedAt: Instant,
-    val isPendingSync: Boolean = false
+    val isPendingSync: Boolean = false,
 )

@@ -25,51 +25,54 @@ data class AuditoriaUiState(
 )
 
 @HiltViewModel
-class AuditoriaViewModel @Inject constructor(
-    private val auditoriaRepository: AuditoriaRepository,
-    private val networkMonitor: NetworkMonitor,
-) : ViewModel() {
+class AuditoriaViewModel
+    @Inject
+    constructor(
+        private val auditoriaRepository: AuditoriaRepository,
+        private val networkMonitor: NetworkMonitor,
+    ) : ViewModel() {
+        private val _uiState = MutableStateFlow(AuditoriaUiState())
+        val uiState: StateFlow<AuditoriaUiState> = _uiState.asStateFlow()
 
-    private val _uiState = MutableStateFlow(AuditoriaUiState())
-    val uiState: StateFlow<AuditoriaUiState> = _uiState.asStateFlow()
+        val isOnline: StateFlow<Boolean> =
+            networkMonitor.isOnline
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
-    val isOnline: StateFlow<Boolean> = networkMonitor.isOnline
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
-
-    fun loadAuditLog(page: Int = 1) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            val filters = buildMap {
-                put("page", page.toString())
-                put("per_page", "20")
-                _uiState.value.entityTypeFilter?.let { put("entity_type", it) }
-            }
-            auditoriaRepository.fetchAuditLog(filters)
-                .onSuccess { response ->
-                    val newEntries = if (page == 1) response.data else _uiState.value.entries + response.data
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            entries = newEntries,
-                            currentPage = page,
-                            hasMore = newEntries.size < response.total,
-                        )
+        fun loadAuditLog(page: Int = 1) {
+            viewModelScope.launch {
+                _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+                val filters =
+                    buildMap {
+                        put("page", page.toString())
+                        put("per_page", "20")
+                        _uiState.value.entityTypeFilter?.let { put("entity_type", it) }
                     }
-                }
-                .onFailure { e ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = e.message) }
-                }
+                auditoriaRepository
+                    .fetchAuditLog(filters)
+                    .onSuccess { response ->
+                        val newEntries = if (page == 1) response.data else _uiState.value.entries + response.data
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                entries = newEntries,
+                                currentPage = page,
+                                hasMore = newEntries.size < response.total,
+                            )
+                        }
+                    }.onFailure { e ->
+                        _uiState.update { it.copy(isLoading = false, errorMessage = e.message) }
+                    }
+            }
+        }
+
+        fun setEntityTypeFilter(entityType: String?) {
+            _uiState.update { it.copy(entityTypeFilter = entityType) }
+            loadAuditLog(page = 1)
+        }
+
+        fun loadNextPage() {
+            if (!_uiState.value.isLoading && _uiState.value.hasMore) {
+                loadAuditLog(page = _uiState.value.currentPage + 1)
+            }
         }
     }
-
-    fun setEntityTypeFilter(entityType: String?) {
-        _uiState.update { it.copy(entityTypeFilter = entityType) }
-        loadAuditLog(page = 1)
-    }
-
-    fun loadNextPage() {
-        if (!_uiState.value.isLoading && _uiState.value.hasMore) {
-            loadAuditLog(page = _uiState.value.currentPage + 1)
-        }
-    }
-}

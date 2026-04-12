@@ -85,12 +85,24 @@ fun MantenimientoListScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
-    LaunchedEffect(successMessage) { successMessage?.let { snackbarHostState.showSnackbar(it); viewModel.clearSuccessMessage() } }
-    deleteTarget?.let { s -> ConfirmDeleteDialog(itemName = s.titulo, onConfirm = viewModel::confirmDelete, onDismiss = viewModel::dismissDelete) }
+    LaunchedEffect(successMessage) {
+        successMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearSuccessMessage()
+        }
+    }
+    deleteTarget?.let { s ->
+        ConfirmDeleteDialog(itemName = s.titulo, onConfirm = viewModel::confirmDelete, onDismiss = viewModel::dismissDelete)
+    }
 
     Scaffold(
         topBar = { PropManagerTopAppBar(title = stringResource(R.string.mantenimiento_title), scrollBehavior = scrollBehavior) },
-        floatingActionButton = { FloatingActionButton(onClick = { viewModel.initCreateForm(); onNavigateToCreate() }) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.solicitud_create)) } },
+        floatingActionButton = {
+            FloatingActionButton(onClick = {
+                viewModel.initCreateForm()
+                onNavigateToCreate()
+            }) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.solicitud_create)) }
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
@@ -102,10 +114,17 @@ fun MantenimientoListScreen(
                     if (state.solicitudes.isEmpty()) {
                         EmptyStateScreen(message = stringResource(R.string.solicitud_empty))
                     } else {
-                        LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
                             item { Spacer(Modifier.height(8.dp)) }
                             items(state.solicitudes, key = { it.id }) { solicitud ->
-                                SolicitudListItem(solicitud = solicitud, onClick = { onNavigateToDetail(solicitud.id) }, onDelete = { viewModel.requestDelete(solicitud) })
+                                SolicitudListItem(
+                                    solicitud = solicitud,
+                                    onClick = { onNavigateToDetail(solicitud.id) },
+                                    onDelete = { viewModel.requestDelete(solicitud) },
+                                )
                             }
                             item { Spacer(Modifier.height(80.dp)) }
                         }
@@ -117,7 +136,12 @@ fun MantenimientoListScreen(
 }
 
 @Composable
-private fun SolicitudListItem(solicitud: SolicitudMantenimiento, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
+private fun SolicitudListItem(
+    solicitud: SolicitudMantenimiento,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Card(modifier = modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
@@ -128,10 +152,18 @@ private fun SolicitudListItem(solicitud: SolicitudMantenimiento, onClick: () -> 
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(solicitud.estado, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                    Text(solicitud.prioridad, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        solicitud.prioridad,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 solicitud.costoMonto?.let { costo ->
-                    Text(CurrencyFormatter.format(costo, solicitud.costoMoneda ?: "DOP"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        CurrencyFormatter.format(costo, solicitud.costoMoneda ?: "DOP"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                 }
             }
             IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete)) }

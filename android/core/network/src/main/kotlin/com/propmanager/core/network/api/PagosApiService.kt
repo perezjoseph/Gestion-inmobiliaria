@@ -15,19 +15,29 @@ import retrofit2.http.Path
 import retrofit2.http.QueryMap
 
 interface PagosApiService {
-
     @GET("api/pagos")
-    suspend fun list(@QueryMap filters: Map<String, String> = emptyMap()): Response<PaginatedResponse<PagoDto>>
+    suspend fun list(
+        @QueryMap filters: Map<String, String> = emptyMap(),
+    ): Response<PaginatedResponse<PagoDto>>
 
     @POST("api/pagos")
-    suspend fun create(@Body request: CreatePagoRequest): Response<PagoDto>
+    suspend fun create(
+        @Body request: CreatePagoRequest,
+    ): Response<PagoDto>
 
     @PUT("api/pagos/{id}")
-    suspend fun update(@Path("id") id: String, @Body request: UpdatePagoRequest): Response<PagoDto>
+    suspend fun update(
+        @Path("id") id: String,
+        @Body request: UpdatePagoRequest,
+    ): Response<PagoDto>
 
     @DELETE("api/pagos/{id}")
-    suspend fun delete(@Path("id") id: String): Response<Unit>
+    suspend fun delete(
+        @Path("id") id: String,
+    ): Response<Unit>
 
     @GET("api/pagos/{id}/recibo")
-    suspend fun getRecibo(@Path("id") id: String): Response<ResponseBody>
+    suspend fun getRecibo(
+        @Path("id") id: String,
+    ): Response<ResponseBody>
 }

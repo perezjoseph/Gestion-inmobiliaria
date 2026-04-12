@@ -22,36 +22,38 @@ data class NotificacionesUiState(
 )
 
 @HiltViewModel
-class NotificacionesViewModel @Inject constructor(
-    private val notificacionesRepository: NotificacionesRepository,
-    private val networkMonitor: NetworkMonitor,
-) : ViewModel() {
+class NotificacionesViewModel
+    @Inject
+    constructor(
+        private val notificacionesRepository: NotificacionesRepository,
+        private val networkMonitor: NetworkMonitor,
+    ) : ViewModel() {
+        private val _uiState = MutableStateFlow(NotificacionesUiState())
+        val uiState: StateFlow<NotificacionesUiState> = _uiState.asStateFlow()
 
-    private val _uiState = MutableStateFlow(NotificacionesUiState())
-    val uiState: StateFlow<NotificacionesUiState> = _uiState.asStateFlow()
+        val isOnline: StateFlow<Boolean> =
+            networkMonitor.isOnline
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
-    val isOnline: StateFlow<Boolean> = networkMonitor.isOnline
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+        val badgeCount: StateFlow<Int>
+            get() = _badgeCount.asStateFlow()
+        private val _badgeCount = MutableStateFlow(0)
 
-    val badgeCount: StateFlow<Int>
-        get() = _badgeCount.asStateFlow()
-    private val _badgeCount = MutableStateFlow(0)
+        init {
+            loadPagosVencidos()
+        }
 
-    init {
-        loadPagosVencidos()
-    }
-
-    fun loadPagosVencidos() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            notificacionesRepository.fetchPagosVencidos()
-                .onSuccess { pagos ->
-                    _uiState.update { it.copy(isLoading = false, pagosVencidos = pagos) }
-                    _badgeCount.value = pagos.size
-                }
-                .onFailure { e ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = e.message) }
-                }
+        fun loadPagosVencidos() {
+            viewModelScope.launch {
+                _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+                notificacionesRepository
+                    .fetchPagosVencidos()
+                    .onSuccess { pagos ->
+                        _uiState.update { it.copy(isLoading = false, pagosVencidos = pagos) }
+                        _badgeCount.value = pagos.size
+                    }.onFailure { e ->
+                        _uiState.update { it.copy(isLoading = false, errorMessage = e.message) }
+                    }
+            }
         }
     }
-}

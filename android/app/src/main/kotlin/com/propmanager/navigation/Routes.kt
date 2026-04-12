@@ -33,13 +33,25 @@ object Routes {
     const val MAS = "mas"
 
     fun propiedadDetail(id: String) = "propiedades/$id"
+
     fun propiedadForm(id: String? = null) = "propiedades/form?id=${id ?: ""}"
+
     fun inquilinoForm(id: String? = null) = "inquilinos/form?id=${id ?: ""}"
+
     fun contratoDetail(id: String) = "contratos/$id"
+
     fun contratoForm(id: String? = null) = "contratos/form?id=${id ?: ""}"
+
     fun pagoForm(id: String? = null) = "pagos/form?id=${id ?: ""}"
+
     fun gastoForm(id: String? = null) = "gastos/form?id=${id ?: ""}"
+
     fun solicitudDetail(id: String) = "mantenimiento/$id"
+
     fun solicitudForm(id: String? = null) = "mantenimiento/form?id=${id ?: ""}"
-    fun documentos(entityType: String, entityId: String) = "documentos/$entityType/$entityId"
+
+    fun documentos(
+        entityType: String,
+        entityId: String,
+    ) = "documentos/$entityType/$entityId"
 }

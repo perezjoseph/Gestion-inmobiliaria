@@ -12,15 +12,15 @@ import androidx.room.PrimaryKey
         ForeignKey(
             entity = PropiedadEntity::class,
             parentColumns = ["id"],
-            childColumns = ["propiedad_id"]
+            childColumns = ["propiedad_id"],
         ),
         ForeignKey(
             entity = InquilinoEntity::class,
             parentColumns = ["id"],
-            childColumns = ["inquilino_id"]
-        )
+            childColumns = ["inquilino_id"],
+        ),
     ],
-    indices = [Index("propiedad_id"), Index("inquilino_id")]
+    indices = [Index("propiedad_id"), Index("inquilino_id")],
 )
 data class ContratoEntity(
     @PrimaryKey val id: String,
@@ -35,5 +35,5 @@ data class ContratoEntity(
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
     @ColumnInfo(name = "is_deleted") val isDeleted: Boolean = false,
-    @ColumnInfo(name = "is_pending_sync") val isPendingSync: Boolean = false
+    @ColumnInfo(name = "is_pending_sync") val isPendingSync: Boolean = false,
 )

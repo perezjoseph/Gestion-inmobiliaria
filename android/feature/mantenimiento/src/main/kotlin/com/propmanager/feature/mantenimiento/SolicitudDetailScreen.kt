@@ -75,9 +75,19 @@ fun SolicitudDetailScreen(
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     LaunchedEffect(solicitudId) { viewModel.loadDetail(solicitudId) }
-    LaunchedEffect(successMessage) { successMessage?.let { snackbarHostState.showSnackbar(it); viewModel.clearSuccessMessage() } }
+    LaunchedEffect(successMessage) {
+        successMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearSuccessMessage()
+        }
+    }
 
-    deleteTarget?.let { s -> ConfirmDeleteDialog(itemName = s.titulo, onConfirm = { viewModel.confirmDelete(); onNavigateBack() }, onDismiss = viewModel::dismissDelete) }
+    deleteTarget?.let { s ->
+        ConfirmDeleteDialog(itemName = s.titulo, onConfirm = {
+            viewModel.confirmDelete()
+            onNavigateBack()
+        }, onDismiss = viewModel::dismissDelete)
+    }
 
     if (showEstado) {
         val estados = listOf("pendiente", "en_progreso", "completada", "cancelada")
@@ -107,8 +117,13 @@ fun SolicitudDetailScreen(
                 actions = {
                     if (detailState is SolicitudDetailUiState.Success) {
                         val s = (detailState as SolicitudDetailUiState.Success).solicitud
-                        IconButton(onClick = { viewModel.initEditForm(s); onNavigateToEdit() }) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.edit)) }
-                        IconButton(onClick = { viewModel.requestDelete(s) }) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete)) }
+                        IconButton(onClick = {
+                            viewModel.initEditForm(s)
+                            onNavigateToEdit()
+                        }) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.edit)) }
+                        IconButton(
+                            onClick = { viewModel.requestDelete(s) },
+                        ) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete)) }
                     }
                 },
             )
@@ -128,13 +143,20 @@ fun SolicitudDetailScreen(
                     item { SolicitudFields(state.solicitud) }
                     item {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                            Button(onClick = viewModel::showEstadoChange, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.solicitud_cambiar_estado)) }
+                            Button(
+                                onClick = viewModel::showEstadoChange,
+                                modifier = Modifier.weight(1f),
+                            ) { Text(stringResource(R.string.solicitud_cambiar_estado)) }
                         }
                     }
                     item {
                         HorizontalDivider()
                         Spacer(Modifier.height(8.dp))
-                        Text(stringResource(R.string.solicitud_notas), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            stringResource(R.string.solicitud_notas),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
                     }
                     items(state.notas, key = { it.id }) { nota -> NotaItem(nota) }
                     item {
@@ -188,13 +210,20 @@ private fun NotaItem(nota: NotaMantenimiento) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(nota.contenido, style = MaterialTheme.typography.bodyMedium)
-            Text(displayFormatter.format(nota.createdAt), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                displayFormatter.format(nota.createdAt),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
 
 @Composable
-private fun DetailRow(label: String, value: String) {
+private fun DetailRow(
+    label: String,
+    value: String,
+) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)

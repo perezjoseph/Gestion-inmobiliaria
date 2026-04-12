@@ -58,59 +58,63 @@ fun ConfiguracionScreen(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
         ) {
             OfflineIndicator(isOffline = !isOnline)
 
             when {
                 uiState.isLoading -> LoadingScreen()
-                uiState.errorMessage != null && uiState.tasa.isEmpty() -> ErrorScreen(
-                    message = uiState.errorMessage!!,
-                    onRetry = viewModel::loadMoneda,
-                )
-                else -> Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                ) {
-                    Text(
-                        text = stringResource(R.string.configuracion_moneda),
-                        style = MaterialTheme.typography.titleMedium,
+                uiState.errorMessage != null && uiState.tasa.isEmpty() ->
+                    ErrorScreen(
+                        message = uiState.errorMessage!!,
+                        onRetry = viewModel::loadMoneda,
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    PropManagerTextField(
-                        value = uiState.tasa,
-                        onValueChange = viewModel::onTasaChange,
-                        label = "Tasa de cambio (USD → DOP)",
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    if (uiState.actualizado.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Última actualización: ${uiState.actualizado}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (uiState.errorMessage != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = uiState.errorMessage!!,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = viewModel::saveMoneda,
-                        enabled = !uiState.isSaving,
-                        modifier = Modifier.fillMaxWidth(),
+                else ->
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
                     ) {
-                        Text(stringResource(R.string.save))
+                        Text(
+                            text = stringResource(R.string.configuracion_moneda),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        PropManagerTextField(
+                            value = uiState.tasa,
+                            onValueChange = viewModel::onTasaChange,
+                            label = "Tasa de cambio (USD → DOP)",
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        if (uiState.actualizado.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Última actualización: ${uiState.actualizado}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (uiState.errorMessage != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = uiState.errorMessage!!,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = viewModel::saveMoneda,
+                            enabled = !uiState.isSaving,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(stringResource(R.string.save))
+                        }
                     }
-                }
             }
         }
     }
