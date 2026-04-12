@@ -787,3 +787,145 @@ jobs:
               "error_log": "SonarQube analysis failed. Check SonarQube server status and scan configuration.",
               "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }' || echo "Webhook unreachable — skipping notification"
+
+  # ── Stage 3: Pipeline Self-Improvement (runs after everything else) ──
+
+  pipeline-improve:
+    name: CI/CD Pipeline Self-Improvement
+    runs-on: [self-hosted, linux]
+    needs: [commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend, notify-failure]
+    if: always() && github.ref == 'refs/heads/main'
+    steps:
+      - name: Clean workspace
+        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Collect SonarQube open issues
+        id: sonar-issues
+        run: |
+          SONAR_URL="http://192.168.88.25:9000"
+          TOKEN="${{ secrets.SONAR_TOKEN }}"
+          PROJECT_KEY="gestion-inmobiliaria"
+
+          if [ -z "$TOKEN" ]; then
+            ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD || 'SonarAdmin2025!' }}"
+            TOKEN=$(curl -sf -u "admin:${ADMIN_PASS}" -X POST \
+              "$SONAR_URL/api/user_tokens/generate?name=ci-improve-token" 2>/dev/null \
+              | jq -r '.token // empty' || true)
+            if [ -z "$TOKEN" ]; then
+              echo "sonar_report=SonarQube token unavailable — skipping issue collection." >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+
+          # Fetch open issues sorted by severity (worst first), up to 100
+          ISSUES_JSON=$(curl -sf -u "$TOKEN:" \
+            "$SONAR_URL/api/issues/search?projectKeys=${PROJECT_KEY}&resolved=false&ps=100&s=SEVERITY&asc=false&statuses=OPEN,CONFIRMED,REOPENED" \
+            2>/dev/null || echo '{}')
+
+          TOTAL=$(echo "$ISSUES_JSON" | jq -r '.total // 0')
+
+          BREAKDOWN=$(echo "$ISSUES_JSON" | jq -r '
+            [.issues // [] | group_by(.severity) | .[] |
+              {severity: .[0].severity, count: length}] |
+            map("\(.count) \(.severity)") | join(", ")' 2>/dev/null || echo "unknown")
+
+          # Build detailed issue list: severity | file:line | rule | message
+          ISSUE_LIST=$(echo "$ISSUES_JSON" | jq -r '
+            [.issues[:80] | .[] |
+              "\(.severity) | \(.component | split(":") | last):\(.line // "?") | \(.rule) | \(.message)"] |
+            join("\n")' 2>/dev/null || echo "")
+
+          # Fetch security hotspots
+          HOTSPOTS_JSON=$(curl -sf -u "$TOKEN:" \
+            "$SONAR_URL/api/hotspots/search?projectKey=${PROJECT_KEY}&status=TO_REVIEW&ps=50" \
+            2>/dev/null || echo '{}')
+
+          HOTSPOT_TOTAL=$(echo "$HOTSPOTS_JSON" | jq -r '.paging.total // 0')
+
+          HOTSPOT_LIST=$(echo "$HOTSPOTS_JSON" | jq -r '
+            [.hotspots[:30] | .[] |
+              "\(.vulnerabilityProbability) | \(.component | split(":") | last):\(.line // "?") | \(.securityCategory) | \(.message)"] |
+            join("\n")' 2>/dev/null || echo "")
+
+          SONAR_REPORT="SonarQube Open Issues Report (project: ${PROJECT_KEY}):\n"
+          SONAR_REPORT="${SONAR_REPORT}Total open issues: ${TOTAL}\n"
+          SONAR_REPORT="${SONAR_REPORT}Breakdown: ${BREAKDOWN}\n\n"
+          SONAR_REPORT="${SONAR_REPORT}Issues (severity | file:line | rule | message):\n${ISSUE_LIST}\n\n"
+          SONAR_REPORT="${SONAR_REPORT}Security Hotspots to review: ${HOTSPOT_TOTAL}\n"
+          SONAR_REPORT="${SONAR_REPORT}Hotspots (risk | file:line | category | message):\n${HOTSPOT_LIST}"
+
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "sonar_report<<$EOF" >> $GITHUB_OUTPUT
+          echo -e "$SONAR_REPORT" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Determine improvement focus from pipeline results
+        id: analyze
+        run: |
+          FOCUS="general"
+          REPORT=""
+
+          # Collect job outcomes
+          REPORT="${REPORT}Pipeline Run Summary:\n"
+          REPORT="${REPORT}  commit-lint:    ${{ needs.commit-lint.result }}\n"
+          REPORT="${REPORT}  lint:           ${{ needs.lint.result }}\n"
+          REPORT="${REPORT}  test-backend:   ${{ needs.test-backend.result }}\n"
+          REPORT="${REPORT}  test-frontend:  ${{ needs.test-frontend.result }}\n"
+          REPORT="${REPORT}  quality-gate:   ${{ needs.quality-gate.result }}\n"
+          REPORT="${REPORT}  sonarqube:      ${{ needs.sonarqube.result }}\n"
+          REPORT="${REPORT}  build-frontend: ${{ needs.build-frontend.result }}\n"
+          REPORT="${REPORT}  build-backend:  ${{ needs.build-backend.result }}\n"
+
+          # Determine focus based on what failed
+          if [ "${{ needs.quality-gate.result }}" = "failure" ]; then
+            FOCUS="security"
+            REPORT="${REPORT}\nSecurity-related job failed. Focus on dependency vulnerabilities, audit findings, and OWASP results.\n"
+            if [ -n "${{ needs.quality-gate.outputs.error_log }}" ]; then
+              REPORT="${REPORT}Quality gate errors: ${{ needs.quality-gate.outputs.error_log }}\n"
+            fi
+          elif [ "${{ needs.lint.result }}" = "failure" ] || [ "${{ needs.test-backend.result }}" = "failure" ] || [ "${{ needs.test-frontend.result }}" = "failure" ]; then
+            FOCUS="bugs"
+            REPORT="${REPORT}\nCode quality jobs failed. Focus on improving error detection, test reliability, and lint coverage.\n"
+          elif [ "${{ needs.build-frontend.result }}" = "failure" ] || [ "${{ needs.build-backend.result }}" = "failure" ]; then
+            FOCUS="pipeline"
+            REPORT="${REPORT}\nBuild jobs failed. Focus on build reliability, caching, and error reporting.\n"
+          else
+            FOCUS="security,pipeline,reporting,sonarqube"
+            REPORT="${REPORT}\nAll jobs passed. Focus on proactive security hardening, pipeline optimization, reporting improvements, and resolving SonarQube issues.\n"
+          fi
+
+          # Always append SonarQube issues regardless of focus
+          SONAR_DATA="${{ steps.sonar-issues.outputs.sonar_report }}"
+          if [ -n "$SONAR_DATA" ]; then
+            REPORT="${REPORT}\n--- SONARQUBE ISSUES ---\n${SONAR_DATA}\n--- END SONARQUBE ISSUES ---\n"
+          fi
+
+          # Add workflow file metadata
+          REPORT="${REPORT}\nWorkflow file: .github/workflows/ci.yml\n"
+          REPORT="${REPORT}Webhook listener: scripts/quality-webhook-listener.py\n"
+          REPORT="${REPORT}Trigger: ${{ github.event_name }} on ${{ github.ref }}\n"
+          REPORT="${REPORT}Commit: ${{ github.sha }}\n"
+
+          echo "focus=$FOCUS" >> $GITHUB_OUTPUT
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "report<<$EOF" >> $GITHUB_OUTPUT
+          echo -e "$REPORT" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Send pipeline improvement request to webhook
+        env:
+          FOCUS: ${{ steps.analyze.outputs.focus }}
+          REPORT: ${{ steps.analyze.outputs.report }}
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg focus "$FOCUS" \
+            --arg pipeline_report "$REPORT" \
+            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{focus: $focus, pipeline_report: $pipeline_report, run_url: $run_url}')
+
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-improve \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" || echo "Webhook unreachable — skipping pipeline improvement"

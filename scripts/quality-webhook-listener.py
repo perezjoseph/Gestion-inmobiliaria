@@ -7,6 +7,7 @@ then triggers kiro-cli to auto-fix issues.
 Endpoints:
     POST /sonarqube    — SonarQube quality gate webhook
     POST /ci-failure   — GitHub Actions pipeline failure webhook
+    POST /ci-improve   — CI/CD pipeline self-improvement webhook
 
 Usage:
     python scripts/quality-webhook-listener.py
@@ -182,6 +183,67 @@ def fix_with_retry(job, step, error_log):
         log.debug("Lock released")
 
 
+_improve_lock = threading.Lock()
+
+
+def improve_pipeline(focus, pipeline_report, run_url):
+    acquired = _improve_lock.acquire(blocking=False)
+    log.debug(f"Improve lock acquired: {acquired}")
+    if not acquired:
+        log.warning("Another pipeline improvement is already running — skipping")
+        return False
+
+    try:
+        for attempt in range(1, MAX_RETRIES + 1):
+            log.info(f"=== Pipeline improvement attempt {attempt}/{MAX_RETRIES} (focus: {focus}) ===")
+
+            prompt = (
+                "You are a CI/CD pipeline engineer and code quality specialist. Your job is to improve the GitHub Actions pipeline "
+                "at .github/workflows/ci.yml for this Rust/WASM project AND resolve open SonarQube issues. "
+                f"Focus area: {focus}. "
+                f"Pipeline analysis report:\n{pipeline_report}\n\n"
+                "INSTRUCTIONS — work autonomously through this self-improvement loop:\n"
+                "1. Read .github/workflows/ci.yml and scripts/quality-webhook-listener.py fully.\n"
+                "2. Based on the focus area and report, identify concrete improvements:\n"
+                "   - SECURITY: Add secret scanning (gitleaks/trufflehog), pin action versions to SHA, "
+                "add permissions least-privilege per job, add SAST scanning, harden artifact handling, "
+                "add supply chain security (SLSA provenance, Sigstore signing), check for hardcoded secrets in env blocks.\n"
+                "   - BUGS: Fix race conditions, missing error handling, fragile grep/sed parsing, "
+                "missing 'if: always()' guards, output truncation issues, cache key collisions, "
+                "missing timeout-minutes on jobs.\n"
+                "   - PIPELINE: Optimize cache strategy, reduce redundant checkouts, add job-level timeout-minutes, "
+                "add retry logic for flaky network steps, improve artifact retention policies, "
+                "add workflow_dispatch for manual runs, add path filters to skip irrelevant jobs.\n"
+                "   - REPORTING: Improve error collection fidelity, add structured annotations, "
+                "add job summary markdown output, improve webhook payloads with richer context.\n"
+                "   - SONARQUBE ISSUES: The report above contains open SonarQube issues with severity, file, line, rule, and message. "
+                "For each issue, open the file at the specified line, understand the rule violation, and fix it in the source code. "
+                "Prioritize BLOCKER and CRITICAL severity first, then MAJOR. "
+                "Also review and fix any security hotspots listed — check the file and line, understand the risk, and apply the fix. "
+                "After fixing issues, run cargo fmt, cargo clippy, and cargo test to verify nothing is broken.\n"
+                "3. Make ALL the improvements you identify. Do not stop at one.\n"
+                "4. After making changes, verify the YAML is valid and all Rust code compiles.\n"
+                "5. Stage, commit, and push:\n"
+                "   git add -A && git commit -m 'ci: improve pipeline and resolve sonar issues ({focus})' && git push origin main\n"
+                "   If push fails due to remote changes: git pull --rebase origin main && git push origin main\n"
+                "6. Review your own changes. If you spot more improvements or missed sonar issues, repeat from step 2.\n"
+                "7. Do NOT stop until you are confident the pipeline is meaningfully better and sonar issues are resolved.\n\n"
+                f"Run URL for context: {run_url}"
+            )
+
+            if run_kiro(prompt, f"Pipeline improve ({focus}) attempt {attempt}"):
+                log.info(f"✓ Pipeline improvement attempt {attempt} completed")
+                return True
+
+            log.warning(f"✗ Pipeline improvement attempt {attempt} failed")
+
+        log.error(f"Pipeline improvement failed after {MAX_RETRIES} attempts.")
+        return False
+    finally:
+        _improve_lock.release()
+        log.debug("Improve lock released")
+
+
 class WebhookHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         content_length = int(self.headers.get("Content-Length", 0))
@@ -207,6 +269,9 @@ class WebhookHandler(BaseHTTPRequestHandler):
         elif self.path == "/ci-failure":
             log.debug("Dispatching to CI failure handler")
             threading.Thread(target=self._handle_ci_failure, args=(payload,), daemon=True).start()
+        elif self.path == "/ci-improve":
+            log.debug("Dispatching to CI pipeline improvement handler")
+            threading.Thread(target=self._handle_ci_improve, args=(payload,), daemon=True).start()
         else:
             log.warning(f"Unknown endpoint: {self.path}")
 
@@ -258,6 +323,15 @@ class WebhookHandler(BaseHTTPRequestHandler):
         log.info(f"Error: {error_log[:200]}")
         fix_with_retry(job, step, error_log)
 
+    def _handle_ci_improve(self, payload):
+        focus = payload.get("focus", "general")
+        pipeline_report = payload.get("pipeline_report", "")
+        run_url = payload.get("run_url", "")
+
+        log.info(f"CI improve webhook: focus={focus}")
+        log.debug(f"Full CI improve payload: {json.dumps(payload, indent=2)[:1000]}")
+        improve_pipeline(focus, pipeline_report, run_url)
+
     def log_message(self, format, *args):
         pass
 
@@ -271,6 +345,7 @@ def main():
     log.info(f"Endpoints:")
     log.info(f"  SonarQube:  http://{local_ip}:{PORT}/sonarqube")
     log.info(f"  CI failure: http://{local_ip}:{PORT}/ci-failure")
+    log.info(f"  CI improve: http://{local_ip}:{PORT}/ci-improve")
     log.info(f"Project dir: {PROJECT_DIR}")
     log.info(f"WSL: {WSL_DISTRO} (user: {WSL_USER})")
     log.info("Waiting for webhooks...")
