@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.androidx.room3)
+    alias(libs.plugins.androidx.room)
 }
 
 android {
@@ -30,11 +30,11 @@ room {
 dependencies {
     implementation(project(":core:model"))
 
-    implementation(libs.room3.runtime)
-    ksp(libs.room3.compiler)
-    implementation(libs.androidx.sqlite.bundled)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
 
     testImplementation(libs.bundles.unit.test)
     testImplementation(libs.bundles.kotest)
-    testImplementation(libs.room3.testing)
+    testImplementation(libs.room.testing)
 }

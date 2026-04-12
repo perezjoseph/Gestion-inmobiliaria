@@ -34,6 +34,7 @@ env:
   CARGO_INCREMENTAL: "0"
   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
   RUSTFLAGS: "-D warnings"
+  SONAR_HOST_URL: "http://192.168.88.25:9000"
 
 jobs:
   # ── Stage 1: Quality Checks (all run in parallel) ──
@@ -143,6 +144,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-lint-
             ${{ runner.os }}-cargo-
+          save-always: true
 
       - name: Verify rustfmt formatting across all crates
         id: fmt
@@ -274,6 +276,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-test-
             ${{ runner.os }}-cargo-
+          save-always: true
 
       - name: Run backend tests
         id: backend-tests
@@ -386,6 +389,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-frontend-test-v2-
             ${{ runner.os }}-cargo-
+          save-always: true
 
       - name: Run frontend tests (native target)
         id: frontend-tests
@@ -586,6 +590,21 @@ jobs:
             --include-non-failures \
             Dockerfile.backend Dockerfile.frontend docker-compose.prod.yml docker-compose.dev.yml 2>&1 | tee /tmp/trivy-iac-output.txt
 
+      - name: Generate Trivy IaC SARIF report
+        if: always() && steps.install_trivy.outputs.installed == 'true'
+        run: |
+          trivy fs --scanners misconfig --severity CRITICAL,HIGH,MEDIUM \
+            --no-progress --format sarif --output trivy-iac.sarif \
+            Dockerfile.backend Dockerfile.frontend docker-compose.prod.yml docker-compose.dev.yml || true
+
+      - name: Upload Trivy IaC SARIF to GitHub Security
+        if: always() && steps.install_trivy.outputs.installed == 'true'
+        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3.28.18
+        with:
+          sarif_file: trivy-iac.sarif
+          category: trivy-iac
+        continue-on-error: true
+
       - name: Scan source code for embedded secrets (Trivy)
         id: trivy_secret
         if: always() && steps.install_trivy.outputs.installed == 'true'
@@ -638,6 +657,44 @@ jobs:
         with:
           sarif_file: cargo-audit.sarif
           category: cargo-audit
+        continue-on-error: true
+
+      - name: Generate cargo-deny SARIF report
+        id: cargo_deny_sarif
+        if: always() && steps.install_deny.outputs.installed == 'true'
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo deny check 2>&1 | python3 -c "
+          import sys, json, re
+          sarif = {
+            '\$schema': 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json',
+            'version': '2.1.0',
+            'runs': [{'tool': {'driver': {'name': 'cargo-deny', 'rules': []}}, 'results': []}]
+          }
+          for line in sys.stdin:
+            line = line.strip()
+            if not line or line.startswith('advisories') or line.startswith('licenses') or line.startswith('bans') or line.startswith('sources'):
+              continue
+            m = re.match(r'^(warning|error)\[([^\]]+)\]:\s*(.+)', line)
+            if m:
+              level = 'error' if m.group(1) == 'error' else 'warning'
+              rule_id = m.group(2)
+              msg = m.group(3)
+              sarif['runs'][0]['results'].append({
+                'ruleId': rule_id,
+                'level': level,
+                'message': {'text': msg},
+                'locations': [{'physicalLocation': {'artifactLocation': {'uri': 'Cargo.lock'}, 'region': {'startLine': 1}}}]
+              })
+          json.dump(sarif, sys.stdout, indent=2)
+          " > cargo-deny.sarif 2>/dev/null || echo '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"cargo-deny","rules":[]}},"results":[]}]}' > cargo-deny.sarif
+
+      - name: Upload cargo-deny SARIF to GitHub Security
+        if: always() && steps.install_deny.outputs.installed == 'true'
+        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3.28.18
+        with:
+          sarif_file: cargo-deny.sarif
+          category: cargo-deny
         continue-on-error: true
 
       - name: Write quality gate summary
@@ -736,7 +793,7 @@ jobs:
 
       - name: Verify SonarQube server is reachable
         run: |
-          SONAR_URL="http://192.168.88.25:9000"
+          SONAR_URL="${SONAR_HOST_URL}"
           for i in $(seq 1 12); do
             STATUS=$(curl -sf --connect-timeout 5 --max-time 10 "$SONAR_URL/api/system/status" 2>/dev/null | jq -r '.status // "UNREACHABLE"')
             if [ "$STATUS" = "UP" ]; then
@@ -752,7 +809,7 @@ jobs:
       - name: Bootstrap SonarQube project and token
         id: sonar-bootstrap
         run: |
-          SONAR_URL="http://192.168.88.25:9000"
+          SONAR_URL="${SONAR_HOST_URL}"
           TOKEN="${{ secrets.SONAR_TOKEN }}"
 
           if [ -n "$TOKEN" ]; then
@@ -817,6 +874,12 @@ jobs:
             EXTRA_ARGS="$EXTRA_ARGS -Dsonar.pullrequest.key=$PR_KEY"
             EXTRA_ARGS="$EXTRA_ARGS -Dsonar.pullrequest.branch=$PR_BRANCH"
             EXTRA_ARGS="$EXTRA_ARGS -Dsonar.pullrequest.base=$PR_BASE"
+          else
+            BRANCH_NAME="${{ github.ref_name }}"
+            if [ -n "$BRANCH_NAME" ]; then
+              echo "Branch push detected -- setting sonar.branch.name=$BRANCH_NAME"
+              EXTRA_ARGS="$EXTRA_ARGS -Dsonar.branch.name=$BRANCH_NAME"
+            fi
           fi
           docker run --rm \
             --network host \
@@ -828,7 +891,7 @@ jobs:
             --pids-limit 256 \
             --tmpfs /tmp:rw,noexec,nosuid,nodev \
             -e SONAR_TOKEN="${SONAR_ANALYSIS_TOKEN}" \
-            -e SONAR_HOST_URL="http://192.168.88.25:9000" \
+            -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
             -v "${{ github.workspace }}:/usr/src" \
             sonarsource/sonar-scanner-cli:11.3@sha256:7462f132388135e32b948f8f18ff0db9ae28a87c6777f1df5b2207e04a6d7c5c \
             -Dsonar.projectBaseDir=/usr/src \
@@ -843,7 +906,7 @@ jobs:
           SCAN_OUTCOME: ${{ steps.sonar-scan.outcome }}
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
         run: |
-          SONAR_URL="http://192.168.88.25:9000"
+          SONAR_URL="${SONAR_HOST_URL}"
           GATE_STATUS="UNKNOWN"
 
           if [ "$SCAN_OUTCOME" = "success" ]; then
@@ -930,7 +993,7 @@ jobs:
             if [ "$DUPLICATION" != "N/A" ]; then
               echo "- Duplication: **${DUPLICATION}%**"
             fi
-            echo "- [View Dashboard](http://192.168.88.25:9000/dashboard?id=gestion-inmobiliaria)"
+            echo "- [View Dashboard](${SONAR_HOST_URL}/dashboard?id=gestion-inmobiliaria)"
             if [ "$GATE_STATUS" = "ERROR" ]; then
               echo ""
               echo "### Top Issues"
@@ -1029,6 +1092,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-wasm-
             ${{ runner.os }}-cargo-
+          save-always: true
 
       - name: Build optimized WASM frontend bundle
         run: trunk build --release 2>&1 | tee /tmp/build-frontend-output.txt
@@ -1131,6 +1195,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-backend-build-
             ${{ runner.os }}-cargo-
+          save-always: true
 
       - name: Build optimized backend binary
         run: cargo build --locked -p realestate-backend --release 2>&1 | tee /tmp/build-backend-output.txt
@@ -1829,7 +1894,7 @@ jobs:
       - name: Collect SonarQube open issues
         id: sonar-issues
         run: |
-          SONAR_URL="http://192.168.88.25:9000"
+          SONAR_URL="${SONAR_HOST_URL}"
           TOKEN="${{ secrets.SONAR_TOKEN }}"
           PROJECT_KEY="gestion-inmobiliaria"
 
@@ -2005,5 +2070,5 @@ jobs:
           ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD }}"
           if [ -n "$ADMIN_PASS" ]; then
             curl -sf -u "admin:${ADMIN_PASS}" -X POST \
-              "http://192.168.88.25:9000/api/user_tokens/revoke?name=ci-improve-token" 2>/dev/null || true
+              "${SONAR_HOST_URL}/api/user_tokens/revoke?name=ci-improve-token" 2>/dev/null || true
           fi

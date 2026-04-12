@@ -22,8 +22,7 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
-
-    buildFeatures {
+buildFeatures {
         compose = true
     }
 }
