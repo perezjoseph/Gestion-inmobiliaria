@@ -312,7 +312,6 @@ jobs:
           args: >-
             --enableExperimental
             --failOnCVSS 7
-            --suppression owasp-suppressions.xml
             --exclude target/**
             --exclude node_modules/**
             --exclude dist/**
