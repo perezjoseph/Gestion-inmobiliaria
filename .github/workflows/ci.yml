@@ -370,6 +370,7 @@ jobs:
         id: coverage
         if: success() && github.ref == 'refs/heads/main'
         run: |
+          umask 077
           export PATH="$HOME/.cargo/bin:$PATH"
           if ! command -v cargo-tarpaulin &>/dev/null; then
             TARPAULIN_VERSION="0.32.7"
@@ -737,6 +738,7 @@ jobs:
       - name: Generate Trivy IaC SARIF report
         if: always() && steps.install_trivy.outputs.installed == 'true'
         run: |
+          umask 077
           trivy fs --scanners misconfig --severity CRITICAL,HIGH,MEDIUM \
             --no-progress --format sarif --output trivy-iac.sarif \
             Dockerfile.backend Dockerfile.frontend docker-compose.prod.yml docker-compose.dev.yml || true
@@ -762,6 +764,7 @@ jobs:
         id: cargo_audit_sarif
         if: always() && steps.install_audit.outputs.installed == 'true'
         run: |
+          umask 077
           export PATH="$HOME/.cargo/bin:$PATH"
           cargo audit --json 2>/dev/null | python3 -c "
           import json, sys
@@ -808,6 +811,7 @@ jobs:
         id: cargo_deny_sarif
         if: always() && steps.install_deny.outputs.installed == 'true'
         run: |
+          umask 077
           export PATH="$HOME/.cargo/bin:$PATH"
           cargo deny check 2>&1 | python3 -c "
           import sys, json, re
@@ -1312,14 +1316,49 @@ jobs:
             gitleaks detect --source frontend/dist --no-git --verbose --redact --exit-code 1
           fi
 
+      - name: Generate SHA256 checksums for frontend dist
+        run: |
+          umask 077
+          cd frontend/dist
+          find . -type f -exec sha256sum {} \; > ../frontend-dist.sha256
+          echo "Frontend dist checksums ($(wc -l < ../frontend-dist.sha256) files):"
+          head -20 ../frontend-dist.sha256
+
+      - name: Generate SBOM for frontend dist (SPDX)
+        run: |
+          umask 077
+          TRIVY_VERSION="0.69.3"
+          TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
+          if ! command -v trivy &>/dev/null; then
+            ARCHIVE="${RUNNER_TEMP}/trivy.tar.gz"
+            curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+              "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+            echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
+            sudo tar xzf "$ARCHIVE" --no-same-owner -C /usr/local/bin trivy
+            rm -f "$ARCHIVE"
+          fi
+          trivy rootfs --format spdx-json --output frontend-build-sbom.spdx.json \
+            --no-progress frontend/dist/ || true
+
       - name: Upload frontend dist artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: frontend-dist
-          path: frontend/dist/
+          path: |
+            frontend/dist/
+            frontend/frontend-dist.sha256
           retention-days: 3
           overwrite: false
           if-no-files-found: error
+
+      - name: Upload frontend build SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: frontend-build-sbom
+          path: frontend-build-sbom.spdx.json
+          retention-days: 30
+          overwrite: false
+          if-no-files-found: warn
 
       - name: Attest frontend build provenance
         uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
@@ -1421,14 +1460,54 @@ jobs:
             gitleaks detect --source target/release --no-git --verbose --redact --exit-code 1
           fi
 
+      - name: Generate SHA256 checksum for backend binary
+        run: |
+          umask 077
+          sha256sum target/release/realestate-backend > target/release/realestate-backend.sha256
+          echo "Backend binary checksum:"
+          cat target/release/realestate-backend.sha256
+
+      - name: Generate SBOM for backend binary (SPDX)
+        run: |
+          umask 077
+          TRIVY_VERSION="0.69.3"
+          TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
+          if ! command -v trivy &>/dev/null; then
+            ARCHIVE="${RUNNER_TEMP}/trivy.tar.gz"
+            curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+              "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+            echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
+            sudo tar xzf "$ARCHIVE" --no-same-owner -C /usr/local/bin trivy
+            rm -f "$ARCHIVE"
+          fi
+          trivy rootfs --format spdx-json --output backend-build-sbom.spdx.json \
+            --no-progress target/release/realestate-backend || true
+
+      - name: Scan backend binary for vulnerabilities (Trivy)
+        run: |
+          trivy rootfs --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed \
+            --no-progress --format table \
+            target/release/realestate-backend || true
+
       - name: Upload backend binary artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: backend-binary
-          path: target/release/realestate-backend
+          path: |
+            target/release/realestate-backend
+            target/release/realestate-backend.sha256
           retention-days: 3
           overwrite: false
           if-no-files-found: error
+
+      - name: Upload backend build SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: backend-build-sbom
+          path: backend-build-sbom.spdx.json
+          retention-days: 30
+          overwrite: false
+          if-no-files-found: warn
 
       - name: Attest backend build provenance
         uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3

@@ -136,7 +136,7 @@ def run_kiro(prompt, label):
 
     log_file = os.path.join(os.path.dirname(__file__), "..", "kiro-debug.log")
 
-    fd = os.open(log_file, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    fd = os.open(log_file, os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, "a", encoding="utf-8") as f:
         f.write(f"\n{'=' * 80}\n")
         f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {label}\n")
