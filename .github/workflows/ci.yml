@@ -929,3 +929,27 @@ jobs:
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-improve \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD" || echo "Webhook unreachable — skipping pipeline improvement"
+
+      - name: Send SonarQube issues to dedicated fix webhook
+        env:
+          SONAR_REPORT: ${{ steps.sonar-issues.outputs.sonar_report }}
+        run: |
+          if [ -z "$SONAR_REPORT" ] || echo "$SONAR_REPORT" | grep -q "token unavailable"; then
+            echo "No SonarQube data available — skipping sonar-fix webhook"
+            exit 0
+          fi
+
+          # Only send if there are actual open issues
+          if echo "$SONAR_REPORT" | grep -q "Total open issues: 0"; then
+            echo "No open SonarQube issues — skipping sonar-fix webhook"
+            exit 0
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg sonar_report "$SONAR_REPORT" \
+            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{sonar_report: $sonar_report, run_url: $run_url}')
+
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/sonar-fix \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" || echo "Webhook unreachable — skipping SonarQube fix"

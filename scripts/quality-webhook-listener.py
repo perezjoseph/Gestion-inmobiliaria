@@ -8,6 +8,7 @@ Endpoints:
     POST /sonarqube    — SonarQube quality gate webhook
     POST /ci-failure   — GitHub Actions pipeline failure webhook
     POST /ci-improve   — CI/CD pipeline self-improvement webhook
+    POST /sonar-fix    — SonarQube open issue resolution webhook
 
 Usage:
     python scripts/quality-webhook-listener.py
@@ -183,6 +184,53 @@ def fix_with_retry(job, step, error_log):
         log.debug("Lock released")
 
 
+_sonar_fix_lock = threading.Lock()
+
+
+def fix_sonar_issues(sonar_report, run_url):
+    acquired = _sonar_fix_lock.acquire(blocking=False)
+    log.debug(f"Sonar fix lock acquired: {acquired}")
+    if not acquired:
+        log.warning("Another SonarQube fix is already running — skipping")
+        return False
+
+    try:
+        for attempt in range(1, MAX_RETRIES + 1):
+            log.info(f"=== SonarQube issue fix attempt {attempt}/{MAX_RETRIES} ===")
+
+            prompt = (
+                "You are a code quality specialist. Your job is to resolve open SonarQube issues "
+                "in this Rust/WASM real estate management project.\n\n"
+                f"SonarQube issue report:\n{sonar_report}\n\n"
+                "INSTRUCTIONS — work autonomously through this self-improvement loop:\n"
+                "1. The report above contains open SonarQube issues with severity, file, line, rule, and message. "
+                "For each issue, open the file at the specified line, understand the rule violation, and fix it.\n"
+                "2. Prioritize BLOCKER and HIGH severity first, then MEDIUM.\n"
+                "3. Also review and fix any security hotspots listed — check the file and line, "
+                "understand the risk, and apply the appropriate fix.\n"
+                "4. After fixing issues, run cargo fmt, cargo clippy, and cargo test to verify nothing is broken.\n"
+                "5. If tests fail after your changes, fix the test failures before proceeding.\n"
+                "6. Stage, commit, and push:\n"
+                "   git add -A && git commit -m 'fix: resolve SonarQube issues (auto-fix)' && git push origin main\n"
+                "   If push fails due to remote changes: git pull --rebase origin main && git push origin main\n"
+                "7. Review your changes. If you missed issues or introduced new ones, repeat from step 1.\n"
+                "8. Do NOT stop until all reported issues are addressed.\n\n"
+                f"Run URL for context: {run_url}"
+            )
+
+            if run_kiro(prompt, f"SonarQube issue fix attempt {attempt}"):
+                log.info(f"✓ SonarQube fix attempt {attempt} completed")
+                return True
+
+            log.warning(f"✗ SonarQube fix attempt {attempt} failed")
+
+        log.error(f"SonarQube fix failed after {MAX_RETRIES} attempts.")
+        return False
+    finally:
+        _sonar_fix_lock.release()
+        log.debug("Sonar fix lock released")
+
+
 _improve_lock = threading.Lock()
 
 
@@ -198,8 +246,8 @@ def improve_pipeline(focus, pipeline_report, run_url):
             log.info(f"=== Pipeline improvement attempt {attempt}/{MAX_RETRIES} (focus: {focus}) ===")
 
             prompt = (
-                "You are a CI/CD pipeline engineer and code quality specialist. Your job is to improve the GitHub Actions pipeline "
-                "at .github/workflows/ci.yml for this Rust/WASM project AND resolve open SonarQube issues. "
+                "You are a CI/CD pipeline engineer. Your job is to improve the GitHub Actions pipeline "
+                "at .github/workflows/ci.yml for this Rust/WASM project. "
                 f"Focus area: {focus}. "
                 f"Pipeline analysis report:\n{pipeline_report}\n\n"
                 "INSTRUCTIONS — work autonomously through this self-improvement loop:\n"
@@ -216,18 +264,13 @@ def improve_pipeline(focus, pipeline_report, run_url):
                 "add workflow_dispatch for manual runs, add path filters to skip irrelevant jobs.\n"
                 "   - REPORTING: Improve error collection fidelity, add structured annotations, "
                 "add job summary markdown output, improve webhook payloads with richer context.\n"
-                "   - SONARQUBE ISSUES: The report above contains open SonarQube issues with severity, file, line, rule, and message. "
-                "For each issue, open the file at the specified line, understand the rule violation, and fix it in the source code. "
-                "Prioritize BLOCKER and CRITICAL severity first, then MAJOR. "
-                "Also review and fix any security hotspots listed — check the file and line, understand the risk, and apply the fix. "
-                "After fixing issues, run cargo fmt, cargo clippy, and cargo test to verify nothing is broken.\n"
                 "3. Make ALL the improvements you identify. Do not stop at one.\n"
-                "4. After making changes, verify the YAML is valid and all Rust code compiles.\n"
+                "4. After making changes, verify the YAML is valid (check indentation, syntax).\n"
                 "5. Stage, commit, and push:\n"
-                "   git add -A && git commit -m 'ci: improve pipeline and resolve sonar issues ({focus})' && git push origin main\n"
+                "   git add -A && git commit -m 'ci: improve pipeline ({focus})' && git push origin main\n"
                 "   If push fails due to remote changes: git pull --rebase origin main && git push origin main\n"
-                "6. Review your own changes. If you spot more improvements or missed sonar issues, repeat from step 2.\n"
-                "7. Do NOT stop until you are confident the pipeline is meaningfully better and sonar issues are resolved.\n\n"
+                "6. Review your own changes. If you spot more improvements, repeat from step 2.\n"
+                "7. Do NOT stop until you are confident the pipeline is meaningfully better.\n\n"
                 f"Run URL for context: {run_url}"
             )
 
@@ -272,6 +315,9 @@ class WebhookHandler(BaseHTTPRequestHandler):
         elif self.path == "/ci-improve":
             log.debug("Dispatching to CI pipeline improvement handler")
             threading.Thread(target=self._handle_ci_improve, args=(payload,), daemon=True).start()
+        elif self.path == "/sonar-fix":
+            log.debug("Dispatching to SonarQube issue fix handler")
+            threading.Thread(target=self._handle_sonar_fix, args=(payload,), daemon=True).start()
         else:
             log.warning(f"Unknown endpoint: {self.path}")
 
@@ -332,6 +378,14 @@ class WebhookHandler(BaseHTTPRequestHandler):
         log.debug(f"Full CI improve payload: {json.dumps(payload, indent=2)[:1000]}")
         improve_pipeline(focus, pipeline_report, run_url)
 
+    def _handle_sonar_fix(self, payload):
+        sonar_report = payload.get("sonar_report", "")
+        run_url = payload.get("run_url", "")
+
+        log.info("SonarQube fix webhook received")
+        log.debug(f"Sonar fix payload: {json.dumps(payload, indent=2)[:1000]}")
+        fix_sonar_issues(sonar_report, run_url)
+
     def log_message(self, format, *args):
         pass
 
@@ -346,6 +400,7 @@ def main():
     log.info(f"  SonarQube:  http://{local_ip}:{PORT}/sonarqube")
     log.info(f"  CI failure: http://{local_ip}:{PORT}/ci-failure")
     log.info(f"  CI improve: http://{local_ip}:{PORT}/ci-improve")
+    log.info(f"  Sonar fix:  http://{local_ip}:{PORT}/sonar-fix")
     log.info(f"Project dir: {PROJECT_DIR}")
     log.info(f"WSL: {WSL_DISTRO} (user: {WSL_USER})")
     log.info("Waiting for webhooks...")
