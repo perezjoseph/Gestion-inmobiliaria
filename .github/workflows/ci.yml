@@ -571,8 +571,6 @@ jobs:
       actions: read
       contents: read
       security-events: write
-    env:
-      DOCKER_CONTENT_TRUST: "1"
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
@@ -933,7 +931,7 @@ jobs:
               ERROR="${ERROR}[owasp-scan] OWASP dependency check found vulnerabilities with CVSS >= 7.\nCVEs: ${OWASP_CVES}\nUpdate affected crate versions in Cargo.toml or add suppressions to owasp-suppressions.xml.\nRun 'cargo update' for affected crates, then verify with cargo audit."$'\n\n'
             else
               ERROR="${ERROR}[owasp-scan] OWASP dependency check found vulnerabilities with CVSS >= 7.\nUpdate affected crate versions in Cargo.toml. Run cargo audit to identify specific CVEs."$'\n\n'
-            fi$'\n\n'
+            fi
           fi
           if [ "${{ steps.trivy_iac.outcome }}" = "failure" ]; then
             FAILED="${FAILED}trivy-iac,"
