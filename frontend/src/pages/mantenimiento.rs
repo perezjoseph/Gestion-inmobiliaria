@@ -469,3 +469,688 @@ fn MantenimientoList(props: &MantenimientoListProps) -> Html {
         </>
     }
 }
+
+#[function_component]
+pub fn Mantenimiento() -> Html {
+    let auth = use_context::<AuthContext>();
+    let toasts = use_context::<ToastContext>();
+    let user_rol = auth
+        .as_ref()
+        .and_then(|a| a.user.as_ref())
+        .map(|u| u.rol.clone())
+        .unwrap_or_default();
+
+    let items = use_state(Vec::<Solicitud>::new);
+    let total = use_state(|| 0u64);
+    let page = use_state(|| 1u64);
+    let per_page = use_state(|| 20u64);
+    let propiedades = use_state(Vec::<Propiedad>::new);
+    let unidades = use_state(Vec::<Unidad>::new);
+    let inquilinos_list = use_state(Vec::<Inquilino>::new);
+    let error = use_state(|| Option::<String>::None);
+    let loading = use_state(|| true);
+    let view = use_state(|| View::List);
+    let editing = use_state(|| Option::<Solicitud>::None);
+    let detail_item = use_state(|| Option::<Solicitud>::None);
+    let delete_target = use_state(|| Option::<Solicitud>::None);
+    let submitting = use_state(|| false);
+    let form_errors = use_state(FormErrors::default);
+    let reload = use_state(|| 0u32);
+
+    let f_propiedad_id = use_state(String::new);
+    let f_unidad_id = use_state(String::new);
+    let f_inquilino_id = use_state(String::new);
+    let f_titulo = use_state(String::new);
+    let f_descripcion = use_state(String::new);
+    let f_prioridad = use_state(|| "media".to_string());
+    let f_nombre_proveedor = use_state(String::new);
+    let f_telefono_proveedor = use_state(String::new);
+    let f_email_proveedor = use_state(String::new);
+    let f_costo_monto = use_state(String::new);
+    let f_costo_moneda = use_state(|| "DOP".to_string());
+
+    let filter_estado = use_state(String::new);
+    let filter_prioridad = use_state(String::new);
+
+    let nota_contenido = use_state(String::new);
+    let nota_submitting = use_state(|| false);
+
+    {
+        let items = items.clone();
+        let total = total.clone();
+        let error = error.clone();
+        let loading = loading.clone();
+        let reload_val = *reload;
+        let pg = *page;
+        let pp = *per_page;
+        let fe = (*filter_estado).clone();
+        let fp = (*filter_prioridad).clone();
+        use_effect_with((reload_val, pg, fe.clone(), fp.clone()), move |_| {
+            spawn_local(async move {
+                loading.set(true);
+                let mut params = vec![format!("page={pg}"), format!("perPage={pp}")];
+                if !fe.is_empty() {
+                    params.push(format!("estado={fe}"));
+                }
+                if !fp.is_empty() {
+                    params.push(format!("prioridad={fp}"));
+                }
+                let url = format!("/mantenimiento?{}", params.join("&"));
+                match api_get::<PaginatedResponse<Solicitud>>(&url).await {
+                    Ok(resp) => {
+                        items.set(resp.data);
+                        total.set(resp.total);
+                    }
+                    Err(err) => error.set(Some(err)),
+                }
+                loading.set(false);
+            });
+        });
+    }
+
+    {
+        let propiedades = propiedades.clone();
+        let inquilinos_list = inquilinos_list.clone();
+        use_effect_with((), move |_| {
+            spawn_local(async move {
+                if let Ok(resp) =
+                    api_get::<PaginatedResponse<Propiedad>>("/propiedades?perPage=1000").await
+                {
+                    propiedades.set(resp.data);
+                }
+                if let Ok(resp) =
+                    api_get::<PaginatedResponse<Inquilino>>("/inquilinos?perPage=1000").await
+                {
+                    inquilinos_list.set(resp.data);
+                }
+            });
+        });
+    }
+
+    let reset_form = {
+        let f_propiedad_id = f_propiedad_id.clone();
+        let f_unidad_id = f_unidad_id.clone();
+        let f_inquilino_id = f_inquilino_id.clone();
+        let f_titulo = f_titulo.clone();
+        let f_descripcion = f_descripcion.clone();
+        let f_prioridad = f_prioridad.clone();
+        let f_nombre_proveedor = f_nombre_proveedor.clone();
+        let f_telefono_proveedor = f_telefono_proveedor.clone();
+        let f_email_proveedor = f_email_proveedor.clone();
+        let f_costo_monto = f_costo_monto.clone();
+        let f_costo_moneda = f_costo_moneda.clone();
+        let editing = editing.clone();
+        let view = view.clone();
+        let form_errors = form_errors.clone();
+        move || {
+            f_propiedad_id.set(String::new());
+            f_unidad_id.set(String::new());
+            f_inquilino_id.set(String::new());
+            f_titulo.set(String::new());
+            f_descripcion.set(String::new());
+            f_prioridad.set("media".into());
+            f_nombre_proveedor.set(String::new());
+            f_telefono_proveedor.set(String::new());
+            f_email_proveedor.set(String::new());
+            f_costo_monto.set(String::new());
+            f_costo_moneda.set("DOP".into());
+            editing.set(None);
+            view.set(View::List);
+            form_errors.set(FormErrors::default());
+        }
+    };
+
+    let escape_handler = use_mut_ref(|| Option::<Box<dyn Fn()>>::None);
+    {
+        let delete_target = delete_target.clone();
+        let view_state = view.clone();
+        let reset_form = reset_form.clone();
+        let handler = escape_handler.clone();
+        *handler.borrow_mut() = Some(Box::new(move || {
+            if delete_target.is_some() {
+                delete_target.set(None);
+            } else if matches!(*view_state, View::Form) {
+                reset_form();
+            }
+        }) as Box<dyn Fn()>);
+    }
+    {
+        let escape_handler = escape_handler.clone();
+        use_effect_with((), move |_| {
+            let listener = web_sys::window().and_then(|w| w.document()).map(|doc| {
+                EventListener::new(&doc, "keydown", move |event| {
+                    let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
+                    if event.key() == "Escape"
+                        && let Some(ref cb) = *escape_handler.borrow()
+                    {
+                        cb();
+                    }
+                })
+            });
+            move || drop(listener)
+        });
+    }
+
+    let on_new = {
+        let reset_form = reset_form.clone();
+        let view = view.clone();
+        Callback::from(move |_: MouseEvent| {
+            reset_form();
+            view.set(View::Form);
+        })
+    };
+
+    let on_edit = {
+        let f_propiedad_id = f_propiedad_id.clone();
+        let f_unidad_id = f_unidad_id.clone();
+        let f_inquilino_id = f_inquilino_id.clone();
+        let f_titulo = f_titulo.clone();
+        let f_descripcion = f_descripcion.clone();
+        let f_prioridad = f_prioridad.clone();
+        let f_nombre_proveedor = f_nombre_proveedor.clone();
+        let f_telefono_proveedor = f_telefono_proveedor.clone();
+        let f_email_proveedor = f_email_proveedor.clone();
+        let f_costo_monto = f_costo_monto.clone();
+        let f_costo_moneda = f_costo_moneda.clone();
+        let editing = editing.clone();
+        let view = view.clone();
+        let form_errors = form_errors.clone();
+        Callback::from(move |s: Solicitud| {
+            f_propiedad_id.set(s.propiedad_id.clone());
+            f_unidad_id.set(s.unidad_id.clone().unwrap_or_default());
+            f_inquilino_id.set(s.inquilino_id.clone().unwrap_or_default());
+            f_titulo.set(s.titulo.clone());
+            f_descripcion.set(s.descripcion.clone().unwrap_or_default());
+            f_prioridad.set(s.prioridad.clone());
+            f_nombre_proveedor.set(s.nombre_proveedor.clone().unwrap_or_default());
+            f_telefono_proveedor.set(s.telefono_proveedor.clone().unwrap_or_default());
+            f_email_proveedor.set(s.email_proveedor.clone().unwrap_or_default());
+            f_costo_monto.set(s.costo_monto.map(|v| v.to_string()).unwrap_or_default());
+            f_costo_moneda.set(s.costo_moneda.clone().unwrap_or_else(|| "DOP".into()));
+            editing.set(Some(s));
+            view.set(View::Form);
+            form_errors.set(FormErrors::default());
+        })
+    };
+
+    let on_view_detail = {
+        let view = view.clone();
+        let detail_item = detail_item.clone();
+        let error = error.clone();
+        let nota_contenido = nota_contenido.clone();
+        Callback::from(move |id: String| {
+            let view = view.clone();
+            let detail_item = detail_item.clone();
+            let error = error.clone();
+            let nota_contenido = nota_contenido.clone();
+            spawn_local(async move {
+                match api_get::<Solicitud>(&format!("/mantenimiento/{id}")).await {
+                    Ok(sol) => {
+                        detail_item.set(Some(sol));
+                        nota_contenido.set(String::new());
+                        view.set(View::Detail(id));
+                    }
+                    Err(err) => error.set(Some(err)),
+                }
+            });
+        })
+    };
+
+    let on_back_to_list = {
+        let view = view.clone();
+        let detail_item = detail_item.clone();
+        Callback::from(move |_: MouseEvent| {
+            detail_item.set(None);
+            view.set(View::List);
+        })
+    };
+
+    let on_delete_click = {
+        let delete_target = delete_target.clone();
+        Callback::from(move |s: Solicitud| {
+            delete_target.set(Some(s));
+        })
+    };
+
+    let on_delete_confirm = {
+        let error = error.clone();
+        let reload = reload.clone();
+        let delete_target = delete_target.clone();
+        let toasts = toasts.clone();
+        Callback::from(move |_: MouseEvent| {
+            if let Some(ref s) = *delete_target {
+                let id = s.id.clone();
+                let sol_titulo = s.titulo.clone();
+                let error = error.clone();
+                let reload = reload.clone();
+                let delete_target = delete_target.clone();
+                let toasts = toasts.clone();
+                spawn_local(async move {
+                    match api_delete(&format!("/mantenimiento/{id}")).await {
+                        Ok(()) => {
+                            delete_target.set(None);
+                            reload.set(*reload + 1);
+                            if let Some(t) = &toasts {
+                                t.dispatch(ToastAction::Push(
+                                    format!("\"{}\" eliminada", sol_titulo),
+                                    ToastKind::Info,
+                                ));
+                            }
+                        }
+                        Err(err) => {
+                            delete_target.set(None);
+                            error.set(Some(err));
+                        }
+                    }
+                });
+            }
+        })
+    };
+
+    let on_delete_cancel = {
+        let delete_target = delete_target.clone();
+        Callback::from(move |_: MouseEvent| {
+            delete_target.set(None);
+        })
+    };
+
+    let validate_form = {
+        let f_titulo = f_titulo.clone();
+        let f_propiedad_id = f_propiedad_id.clone();
+        let form_errors = form_errors.clone();
+        move || -> bool {
+            let mut errs = FormErrors::default();
+            if f_titulo.trim().is_empty() {
+                errs.titulo = Some("El título es obligatorio".into());
+            }
+            if f_propiedad_id.is_empty() {
+                errs.propiedad_id = Some("Debe seleccionar una propiedad".into());
+            }
+            let valid = !errs.has_errors();
+            form_errors.set(errs);
+            valid
+        }
+    };
+
+    let on_submit = {
+        let f_propiedad_id = f_propiedad_id.clone();
+        let f_unidad_id = f_unidad_id.clone();
+        let f_inquilino_id = f_inquilino_id.clone();
+        let f_titulo = f_titulo.clone();
+        let f_descripcion = f_descripcion.clone();
+        let f_prioridad = f_prioridad.clone();
+        let f_nombre_proveedor = f_nombre_proveedor.clone();
+        let f_telefono_proveedor = f_telefono_proveedor.clone();
+        let f_email_proveedor = f_email_proveedor.clone();
+        let f_costo_monto = f_costo_monto.clone();
+        let f_costo_moneda = f_costo_moneda.clone();
+        let editing = editing.clone();
+        let error = error.clone();
+        let reload = reload.clone();
+        let reset_form = reset_form.clone();
+        let validate_form = validate_form.clone();
+        let toasts = toasts.clone();
+        let submitting = submitting.clone();
+        Callback::from(move |e: SubmitEvent| {
+            e.prevent_default();
+            if *submitting {
+                return;
+            }
+            if !validate_form() {
+                return;
+            }
+            submitting.set(true);
+            let opt_str = |s: &UseStateHandle<String>| -> Option<String> {
+                let v = (**s).clone();
+                if v.is_empty() { None } else { Some(v) }
+            };
+            let costo = f_costo_monto.parse::<f64>().ok();
+            let error = error.clone();
+            let reload = reload.clone();
+            let reset_form = reset_form.clone();
+            let toasts = toasts.clone();
+            let submitting_handle = submitting.clone();
+            if let Some(ref ed) = *editing {
+                let update = UpdateSolicitud {
+                    titulo: Some((*f_titulo).clone()),
+                    descripcion: opt_str(&f_descripcion),
+                    prioridad: Some((*f_prioridad).clone()),
+                    nombre_proveedor: opt_str(&f_nombre_proveedor),
+                    telefono_proveedor: opt_str(&f_telefono_proveedor),
+                    email_proveedor: opt_str(&f_email_proveedor),
+                    costo_monto: costo,
+                    costo_moneda: opt_str(&f_costo_moneda),
+                    unidad_id: opt_str(&f_unidad_id),
+                    inquilino_id: opt_str(&f_inquilino_id),
+                };
+                let id = ed.id.clone();
+                let submitting = submitting_handle;
+                spawn_local(async move {
+                    match api_put::<Solicitud, _>(&format!("/mantenimiento/{id}"), &update).await {
+                        Ok(_) => {
+                            reset_form();
+                            reload.set(*reload + 1);
+                            if let Some(t) = &toasts {
+                                t.dispatch(ToastAction::Push(
+                                    "Solicitud actualizada".into(),
+                                    ToastKind::Success,
+                                ));
+                            }
+                        }
+                        Err(err) => error.set(Some(err)),
+                    }
+                    submitting.set(false);
+                });
+            } else {
+                let create = CreateSolicitud {
+                    propiedad_id: (*f_propiedad_id).clone(),
+                    unidad_id: opt_str(&f_unidad_id),
+                    inquilino_id: opt_str(&f_inquilino_id),
+                    titulo: (*f_titulo).clone(),
+                    descripcion: opt_str(&f_descripcion),
+                    prioridad: Some((*f_prioridad).clone()),
+                    nombre_proveedor: opt_str(&f_nombre_proveedor),
+                    telefono_proveedor: opt_str(&f_telefono_proveedor),
+                    email_proveedor: opt_str(&f_email_proveedor),
+                    costo_monto: costo,
+                    costo_moneda: opt_str(&f_costo_moneda),
+                };
+                let submitting = submitting_handle;
+                spawn_local(async move {
+                    match api_post::<Solicitud, _>("/mantenimiento", &create).await {
+                        Ok(_) => {
+                            reset_form();
+                            reload.set(*reload + 1);
+                            if let Some(t) = &toasts {
+                                t.dispatch(ToastAction::Push(
+                                    "Solicitud creada".into(),
+                                    ToastKind::Success,
+                                ));
+                            }
+                        }
+                        Err(err) => error.set(Some(err)),
+                    }
+                    submitting.set(false);
+                });
+            }
+        })
+    };
+
+    let on_cancel = {
+        let reset_form = reset_form.clone();
+        Callback::from(move |_: MouseEvent| reset_form())
+    };
+
+    let on_cambiar_estado = {
+        let error = error.clone();
+        let detail_item = detail_item.clone();
+        let reload = reload.clone();
+        let toasts = toasts.clone();
+        Callback::from(move |(id, nuevo_estado): (String, String)| {
+            let error = error.clone();
+            let detail_item = detail_item.clone();
+            let reload = reload.clone();
+            let toasts = toasts.clone();
+            let estado_label = nuevo_estado.clone();
+            spawn_local(async move {
+                let body = CambiarEstado {
+                    estado: nuevo_estado,
+                };
+                match api_put::<Solicitud, _>(&format!("/mantenimiento/{id}/estado"), &body).await {
+                    Ok(updated) => {
+                        detail_item.set(Some(updated));
+                        reload.set(*reload + 1);
+                        if let Some(t) = &toasts {
+                            t.dispatch(ToastAction::Push(
+                                format!("Estado cambiado a {estado_label}"),
+                                ToastKind::Success,
+                            ));
+                        }
+                    }
+                    Err(err) => error.set(Some(err)),
+                }
+            });
+        })
+    };
+
+    let on_add_nota = {
+        let nota_contenido = nota_contenido.clone();
+        let nota_submitting = nota_submitting.clone();
+        let detail_item = detail_item.clone();
+        let error = error.clone();
+        Callback::from(move |e: SubmitEvent| {
+            e.prevent_default();
+            let contenido = (*nota_contenido).clone();
+            if contenido.trim().is_empty() || *nota_submitting {
+                return;
+            }
+            nota_submitting.set(true);
+            let nota_contenido = nota_contenido.clone();
+            let nota_submitting = nota_submitting.clone();
+            let detail_item = detail_item.clone();
+            let error = error.clone();
+            if let Some(ref sol) = *detail_item {
+                let id = sol.id.clone();
+                spawn_local(async move {
+                    let body = CreateNota { contenido };
+                    match api_post::<Solicitud, _>(&format!("/mantenimiento/{id}/notas"), &body)
+                        .await
+                    {
+                        Ok(updated) => {
+                            detail_item.set(Some(updated));
+                            nota_contenido.set(String::new());
+                        }
+                        Err(err) => error.set(Some(err)),
+                    }
+                    nota_submitting.set(false);
+                });
+            }
+        })
+    };
+
+    macro_rules! select_cb {
+        ($state:expr) => {{
+            let s = $state.clone();
+            Callback::from(move |e: Event| {
+                let el: web_sys::HtmlSelectElement = e.target_unchecked_into();
+                s.set(el.value());
+            })
+        }};
+    }
+
+    let on_filter_apply = {
+        let reload = reload.clone();
+        let page = page.clone();
+        Callback::from(move |_: MouseEvent| {
+            page.set(1);
+            reload.set(*reload + 1);
+        })
+    };
+    let on_filter_clear = {
+        let filter_estado = filter_estado.clone();
+        let filter_prioridad = filter_prioridad.clone();
+        let reload = reload.clone();
+        let page = page.clone();
+        Callback::from(move |_: MouseEvent| {
+            filter_estado.set(String::new());
+            filter_prioridad.set(String::new());
+            page.set(1);
+            reload.set(*reload + 1);
+        })
+    };
+
+    let on_page_change = {
+        let page = page.clone();
+        let reload = reload.clone();
+        Callback::from(move |p: u64| {
+            page.set(p);
+            reload.set(*reload + 1);
+        })
+    };
+    let on_per_page_change = {
+        let per_page = per_page.clone();
+        let page = page.clone();
+        let reload = reload.clone();
+        Callback::from(move |pp: u64| {
+            per_page.set(pp);
+            page.set(1);
+            reload.set(*reload + 1);
+        })
+    };
+
+    let on_error_close = {
+        let error = error.clone();
+        Callback::from(move |_: MouseEvent| error.set(None))
+    };
+
+    if *loading {
+        return html! { <Loading /> };
+    }
+
+    let prop_label_cb = {
+        let propiedades = (*propiedades).clone();
+        Callback::from(move |id: String| -> String {
+            propiedades
+                .iter()
+                .find(|p| p.id == id)
+                .map(|p| p.titulo.clone())
+                .unwrap_or_else(|| "—".into())
+        })
+    };
+
+    if let View::Detail(ref _id) = *view {
+        if let Some(ref sol) = *detail_item {
+            return html! {
+                <MantenimientoDetail
+                    sol={sol.clone()}
+                    user_rol={user_rol.clone()}
+                    error={(*error).clone()}
+                    on_error_close={on_error_close.clone()}
+                    on_back={on_back_to_list}
+                    on_cambiar_estado={on_cambiar_estado}
+                    on_add_nota={on_add_nota}
+                    nota_contenido={nota_contenido.clone()}
+                    nota_submitting={*nota_submitting}
+                    prop_label={prop_label_cb}
+                />
+            };
+        }
+    }
+
+    if matches!(*view, View::Form) {
+        return html! {
+            <MantenimientoForm
+                is_editing={editing.is_some()}
+                f_propiedad_id={f_propiedad_id.clone()}
+                f_unidad_id={f_unidad_id.clone()}
+                f_inquilino_id={f_inquilino_id.clone()}
+                f_titulo={f_titulo.clone()}
+                f_descripcion={f_descripcion.clone()}
+                f_prioridad={f_prioridad.clone()}
+                f_nombre_proveedor={f_nombre_proveedor.clone()}
+                f_telefono_proveedor={f_telefono_proveedor.clone()}
+                f_email_proveedor={f_email_proveedor.clone()}
+                f_costo_monto={f_costo_monto.clone()}
+                f_costo_moneda={f_costo_moneda.clone()}
+                propiedades={(*propiedades).clone()}
+                unidades={(*unidades).clone()}
+                inquilinos_list={(*inquilinos_list).clone()}
+                form_errors={(*form_errors).clone()}
+                submitting={*submitting}
+                on_submit={on_submit}
+                on_cancel={on_cancel}
+                error={(*error).clone()}
+                on_error_close={on_error_close}
+            />
+        };
+    }
+
+    let headers = vec![
+        "Propiedad".into(),
+        "Título".into(),
+        "Prioridad".into(),
+        "Estado".into(),
+        "Proveedor".into(),
+        "Costo".into(),
+        if can_write(&user_rol) {
+            "Acciones".into()
+        } else {
+            String::new()
+        },
+    ];
+
+    html! {
+        <div>
+            <div class="gi-page-header">
+                <h1 class="gi-page-title">{"Mantenimiento"}</h1>
+                if can_write(&user_rol) {
+                    <button onclick={on_new.clone()} class="gi-btn gi-btn-primary">{"+ Nueva Solicitud"}</button>
+                }
+            </div>
+
+            if let Some(err) = (*error).as_ref() {
+                <ErrorBanner message={err.clone()} onclose={on_error_close} />
+            }
+
+            if let Some(ref target) = *delete_target {
+                <div class="gi-modal-overlay">
+                    <div class="gi-modal">
+                        <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-2); color: var(--text-primary);">
+                            {"Confirmar eliminación"}</h3>
+                        <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-5);">
+                            {format!("¿Está seguro de que desea eliminar la solicitud \"{}\"? Esta acción no se puede deshacer.", target.titulo)}</p>
+                        <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
+                            <button onclick={on_delete_cancel} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
+                            <button onclick={on_delete_confirm} class="gi-btn gi-btn-danger">{"Eliminar"}</button>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <div class="gi-filter-bar">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); align-items: end;">
+                    <div>
+                        <label class="gi-label">{"Estado"}</label>
+                        <select onchange={select_cb!(filter_estado)} class="gi-input">
+                            <option value="" selected={filter_estado.is_empty()}>{"Todos"}</option>
+                            <option value="pendiente" selected={*filter_estado == "pendiente"}>{"Pendiente"}</option>
+                            <option value="en_progreso" selected={*filter_estado == "en_progreso"}>{"En Progreso"}</option>
+                            <option value="completado" selected={*filter_estado == "completado"}>{"Completado"}</option>
+                            <option value="cancelado" selected={*filter_estado == "cancelado"}>{"Cancelado"}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="gi-label">{"Prioridad"}</label>
+                        <select onchange={select_cb!(filter_prioridad)} class="gi-input">
+                            <option value="" selected={filter_prioridad.is_empty()}>{"Todas"}</option>
+                            <option value="baja" selected={*filter_prioridad == "baja"}>{"Baja"}</option>
+                            <option value="media" selected={*filter_prioridad == "media"}>{"Media"}</option>
+                            <option value="alta" selected={*filter_prioridad == "alta"}>{"Alta"}</option>
+                            <option value="urgente" selected={*filter_prioridad == "urgente"}>{"Urgente"}</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: var(--space-2);">
+                        <button onclick={on_filter_apply} class="gi-btn gi-btn-primary">{"Filtrar"}</button>
+                        <button onclick={on_filter_clear} class="gi-btn gi-btn-ghost">{"Limpiar"}</button>
+                    </div>
+                </div>
+            </div>
+
+            <MantenimientoList
+                items={(*items).clone()}
+                user_rol={user_rol.clone()}
+                headers={headers}
+                total={*total}
+                page={*page}
+                per_page={*per_page}
+                prop_label={prop_label_cb}
+                on_edit={on_edit}
+                on_delete={on_delete_click}
+                on_view_detail={on_view_detail}
+                on_new={on_new}
+                on_page_change={on_page_change}
+                on_per_page_change={on_per_page_change}
+            />
+        </div>
+    }
+}

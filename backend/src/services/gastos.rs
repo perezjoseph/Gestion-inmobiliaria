@@ -179,12 +179,12 @@ fn validate_gasto_update(input: &UpdateGastoRequest) -> Result<(), AppError> {
     if let Some(ref estado) = input.estado {
         validate_enum("estado", estado, ESTADOS_GASTO)?;
     }
-    if let Some(ref monto) = input.monto {
-        if *monto <= Decimal::ZERO {
-            return Err(AppError::Validation(
-                "El monto debe ser mayor que cero".to_string(),
-            ));
-        }
+    if let Some(ref monto) = input.monto
+        && *monto <= Decimal::ZERO
+    {
+        return Err(AppError::Validation(
+            "El monto debe ser mayor que cero".to_string(),
+        ));
     }
     Ok(())
 }
