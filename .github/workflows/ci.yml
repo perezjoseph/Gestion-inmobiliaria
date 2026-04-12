@@ -151,6 +151,7 @@ jobs:
         id: fmt
         if: always()
         run: |
+          umask 077
           if ! cargo fmt --all -- --check 2>&1 | tee /tmp/fmt-output.txt; then
             echo "::error::Code formatting check failed. Run 'cargo fmt --all' to fix."
             exit 1
@@ -160,6 +161,7 @@ jobs:
         id: clippy_backend
         if: always()
         run: |
+          umask 077
           if ! cargo clippy --locked -p realestate-backend -- -D warnings 2>&1 | tee /tmp/clippy-backend-output.txt; then
             echo "::error::Backend clippy found warnings/errors."
             exit 1
@@ -169,6 +171,7 @@ jobs:
         id: clippy_frontend
         if: always()
         run: |
+          umask 077
           if ! cargo clippy --locked -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings 2>&1 | tee /tmp/clippy-frontend-output.txt; then
             echo "::error::Frontend clippy found warnings/errors."
             exit 1
@@ -286,7 +289,9 @@ jobs:
 
       - name: Run backend tests
         id: backend-tests
-        run: cargo test --locked -p realestate-backend --all-targets 2>&1 | tee /tmp/test-backend-output.txt
+        run: |
+          umask 077
+          cargo test --locked -p realestate-backend --all-targets 2>&1 | tee /tmp/test-backend-output.txt
 
       - name: Generate test coverage report (LCOV)
         id: coverage
@@ -295,9 +300,22 @@ jobs:
           export PATH="$HOME/.cargo/bin:$PATH"
           if ! command -v cargo-tarpaulin &>/dev/null; then
             TARPAULIN_VERSION="0.32.7"
-            curl -sSfL "https://github.com/xd009642/tarpaulin/releases/download/${TARPAULIN_VERSION}/cargo-tarpaulin-x86_64-unknown-linux-musl.tar.gz" \
-              | tar xz -C "$HOME/.cargo/bin" 2>/dev/null \
-              || cargo install cargo-tarpaulin --locked
+            TARPAULIN_SHA256="67a61b2b271488e2d0cb718ccec384d0f296703f3c810f80ea5d46484c5d463b"
+            ARCHIVE="/tmp/cargo-tarpaulin.tar.gz"
+            mkdir -p "$HOME/.cargo/bin"
+            if curl -sSfL --retry 3 -o "$ARCHIVE" \
+              "https://github.com/xd009642/tarpaulin/releases/download/${TARPAULIN_VERSION}/cargo-tarpaulin-x86_64-unknown-linux-musl.tar.gz"; then
+              if echo "${TARPAULIN_SHA256}  ${ARCHIVE}" | sha256sum -c -; then
+                tar xzf "$ARCHIVE" -C "$HOME/.cargo/bin" 2>/dev/null
+              else
+                echo "::warning::Tarpaulin checksum mismatch -- falling back to cargo install"
+                rm -f "$ARCHIVE"
+                cargo install cargo-tarpaulin --locked
+              fi
+              rm -f "$ARCHIVE"
+            else
+              cargo install cargo-tarpaulin --locked
+            fi
           fi
           mkdir -p coverage
           cargo tarpaulin -p realestate-backend --out lcov --output-dir coverage/ --skip-clean 2>&1 | tee /tmp/tarpaulin-output.txt || true
@@ -403,7 +421,9 @@ jobs:
 
       - name: Run frontend tests (native target)
         id: frontend-tests
-        run: cargo test --locked -p realestate-frontend --all-targets 2>&1 | tee /tmp/test-frontend-output.txt
+        run: |
+          umask 077
+          cargo test --locked -p realestate-frontend --all-targets 2>&1 | tee /tmp/test-frontend-output.txt
 
       - name: Write test summary
         if: always()
@@ -1385,6 +1405,12 @@ jobs:
           subject-digest: ${{ steps.push-backend.outputs.digest }}
           push-to-registry: true
 
+      - name: Clean up docker images on self-hosted runner
+        if: always()
+        run: |
+          docker rmi "ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }}" 2>/dev/null || true
+          docker builder prune -f --filter "until=24h" 2>/dev/null || true
+
   container-image-frontend:
     name: Build & Push Frontend Image to GHCR
     runs-on: [self-hosted, linux, docker]
@@ -1493,12 +1519,19 @@ jobs:
           subject-digest: ${{ steps.push-frontend.outputs.digest }}
           push-to-registry: true
 
+      - name: Clean up docker images on self-hosted runner
+        if: always()
+        run: |
+          docker rmi "ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }}" 2>/dev/null || true
+          docker builder prune -f --filter "until=24h" 2>/dev/null || true
+
   # ── Stage 4: Deploy (runs after both images are pushed) ──
 
   deploy:
     name: Deploy to Production
     runs-on: [self-hosted, linux, sonarqube]
     timeout-minutes: 10
+    environment: production
     permissions:
       contents: read
       packages: read
