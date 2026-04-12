@@ -893,14 +893,8 @@ jobs:
             FOCUS="pipeline"
             REPORT="${REPORT}\nBuild jobs failed. Focus on build reliability, caching, and error reporting.\n"
           else
-            FOCUS="security,pipeline,reporting,sonarqube"
-            REPORT="${REPORT}\nAll jobs passed. Focus on proactive security hardening, pipeline optimization, reporting improvements, and resolving SonarQube issues.\n"
-          fi
-
-          # Always append SonarQube issues regardless of focus
-          SONAR_DATA="${{ steps.sonar-issues.outputs.sonar_report }}"
-          if [ -n "$SONAR_DATA" ]; then
-            REPORT="${REPORT}\n--- SONARQUBE ISSUES ---\n${SONAR_DATA}\n--- END SONARQUBE ISSUES ---\n"
+            FOCUS="security,pipeline,reporting"
+            REPORT="${REPORT}\nAll jobs passed. Focus on proactive security hardening, pipeline optimization, and reporting improvements.\n"
           fi
 
           # Add workflow file metadata
