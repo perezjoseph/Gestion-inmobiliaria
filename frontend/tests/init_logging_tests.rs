@@ -14,12 +14,13 @@ fn route_variant_name(index: usize) -> &'static str {
         9 => "Perfil",
         10 => "AuditoriaPage",
         11 => "Importar",
-        12 => "NotFound",
+        12 => "Mantenimiento",
+        13 => "NotFound",
         _ => unreachable!(),
     }
 }
 
-const ROUTE_COUNT: usize = 13;
+const ROUTE_COUNT: usize = 14;
 
 const SWITCH_FN_SOURCE: &str = include_str!("../src/app.rs");
 
@@ -122,7 +123,7 @@ fn extract_protected_route_fn(source: &str) -> &str {
 
 const PUBLIC_ROUTES: [&str; 2] = ["Login", "Registro"];
 
-const PROTECTED_ROUTES: [&str; 10] = [
+const PROTECTED_ROUTES: [&str; 11] = [
     "Dashboard",
     "Propiedades",
     "Inquilinos",
@@ -133,6 +134,7 @@ const PROTECTED_ROUTES: [&str; 10] = [
     "Perfil",
     "AuditoriaPage",
     "Importar",
+    "Mantenimiento",
 ];
 
 // **Validates: Requirements 3.1**
@@ -141,7 +143,7 @@ const PROTECTED_ROUTES: [&str; 10] = [
 // and wraps protected routes in ProtectedRoute while rendering public
 // routes directly.
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(13))]
+    #![proptest_config(ProptestConfig::with_cases(14))]
     #[test]
     fn preservation_routing_all_variants_handled(route_idx in 0..ROUTE_COUNT) {
         let variant = route_variant_name(route_idx);
