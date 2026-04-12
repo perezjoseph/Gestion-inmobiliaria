@@ -14,7 +14,7 @@ import com.propmanager.core.model.ValidationResult
 import com.propmanager.core.model.dto.CreateContratoRequest
 import com.propmanager.core.model.dto.RenovarContratoRequest
 import com.propmanager.core.model.dto.TerminarContratoRequest
-import com.propmanager.core.network.NetworkMonitor
+import com.propmanager.core.network.ConnectivityObserver
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -78,7 +78,7 @@ class ContratosViewModel
         private val contratosRepository: ContratosRepository,
         private val propiedadesRepository: PropiedadesRepository,
         private val inquilinosRepository: InquilinosRepository,
-        private val networkMonitor: NetworkMonitor,
+        private val networkMonitor: ConnectivityObserver,
     ) : ViewModel() {
         val contratos: StateFlow<ContratosUiState> =
             MutableStateFlow<ContratosUiState>(ContratosUiState.Loading).also { state ->
