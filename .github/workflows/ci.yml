@@ -402,6 +402,15 @@ jobs:
             echo "::warning::Coverage report was not generated"
           fi
 
+      - name: Scan coverage artifact for leaked secrets
+        if: always() && steps.coverage.outputs.generated == 'true'
+        run: |
+          if command -v gitleaks &>/dev/null; then
+            gitleaks detect --source coverage/ --no-git --verbose --redact --exit-code 1
+          else
+            echo "::warning::gitleaks not available -- skipping coverage secret scan"
+          fi
+
       - name: Upload coverage artifact
         if: always() && steps.coverage.outputs.generated == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -1340,6 +1349,15 @@ jobs:
           trivy rootfs --format spdx-json --output frontend-build-sbom.spdx.json \
             --no-progress frontend/dist/ || true
 
+      - name: Check for sensitive files in frontend dist
+        run: |
+          FOUND=$(find frontend/dist/ -type f \( -name '.env*' -o -name '*.key' -o -name '*.pem' -o -name '*.p12' -o -name '*.pfx' -o -name 'id_rsa*' -o -name '*.secret' \) 2>/dev/null || true)
+          if [ -n "$FOUND" ]; then
+            echo "::error::Sensitive files found in frontend dist:"
+            echo "$FOUND"
+            exit 1
+          fi
+
       - name: Upload frontend dist artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -1488,6 +1506,15 @@ jobs:
           trivy rootfs --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed \
             --no-progress --format table \
             target/release/realestate-backend || true
+
+      - name: Check for sensitive files in backend release
+        run: |
+          FOUND=$(find target/release/ -maxdepth 1 -type f \( -name '.env*' -o -name '*.key' -o -name '*.pem' -o -name '*.p12' -o -name '*.pfx' -o -name 'id_rsa*' -o -name '*.secret' \) 2>/dev/null || true)
+          if [ -n "$FOUND" ]; then
+            echo "::error::Sensitive files found in backend release:"
+            echo "$FOUND"
+            exit 1
+          fi
 
       - name: Upload backend binary artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
