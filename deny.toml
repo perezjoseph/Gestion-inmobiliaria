@@ -5,7 +5,21 @@ targets = [
 ]
 
 [advisories]
-ignore = []
+ignore = [
+    # rsa Marvin Attack (RUSTSEC-2023-0071): no patch available.
+    # We use HMAC (HS256) for JWT, not RSA. The rsa crate is a transitive dep
+    # of jsonwebtoken but never exercised in our code path.
+    "RUSTSEC-2023-0071",
+    # proc-macro-error unmaintained: transitive dep from yew-macro/yew 0.21.
+    # No safe upgrade until yew drops this dependency.
+    "RUSTSEC-2024-0370",
+    # bincode unmaintained: transitive dep from gloo-worker/yew 0.21.
+    # No safe upgrade until yew drops this dependency.
+    "RUSTSEC-2025-0141",
+    # rusttype unmaintained: transitive dep from numaelis-rckive-genpdf.
+    # No safe upgrade available.
+    "RUSTSEC-2021-0140",
+]
 
 [licenses]
 allow = [
@@ -24,6 +38,24 @@ allow = [
     "MPL-2.0",
 ]
 confidence-threshold = 0.8
+
+# Our own workspace crates are private and unlicensed
+[licenses.private]
+ignore = true
+registries = []
+
+# Crate-specific license exceptions for copyleft/uncommon licenses
+[[licenses.exceptions]]
+name = "actix-governor"
+allow = ["GPL-3.0-or-later"]
+
+[[licenses.exceptions]]
+name = "numaelis-rckive-genpdf"
+allow = ["EUPL-1.2"]
+
+[[licenses.exceptions]]
+name = "webpki-roots"
+allow = ["CDLA-Permissive-2.0"]
 
 [bans]
 multiple-versions = "warn"
