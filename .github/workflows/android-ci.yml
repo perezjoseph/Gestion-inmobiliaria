@@ -384,16 +384,15 @@ jobs:
         if: always()
         timeout-minutes: 15
         uses: dependency-check/Dependency-Check_Action@1e54355a8b4c8abaa8cc7d0b70aa655a3bb15a6c # main
-        env:
-          JAVA_HOME: ""
         with:
           project: propmanager-android
           path: android/
           format: HTML
+          out: reports
           args: >-
             --failOnCVSS 7
-            --exclude **/build/**
-            --exclude **/.gradle/**
+            --exclude "**/build/**"
+            --exclude "**/.gradle/**"
             --suppression android-owasp-suppressions.xml
 
       - name: Upload OWASP vulnerability report
@@ -429,7 +428,19 @@ jobs:
           fi
           if [ "${{ steps.owasp.outcome }}" = "failure" ]; then
             FAILED="${FAILED}owasp,"
-            ERROR="${ERROR}[owasp] OWASP dependency check found vulnerabilities with CVSS >= 7. Check the uploaded report for details."
+            # Extract actionable CVE details from the OWASP HTML report
+            OWASP_DETAILS=""
+            for REPORT_FILE in reports/dependency-check-report.html; do
+              if [ -f "$REPORT_FILE" ]; then
+                OWASP_DETAILS=$(grep -oP 'CVE-\d{4}-\d+' "$REPORT_FILE" 2>/dev/null | sort -u | head -20 | tr '\n' ', ' || true)
+                break
+              fi
+            done
+            if [ -n "$OWASP_DETAILS" ]; then
+              ERROR="${ERROR}[owasp] OWASP dependency check found vulnerabilities with CVSS >= 7.\nCVEs found: ${OWASP_DETAILS}\nUpdate vulnerable dependencies in android/gradle/libs.versions.toml to patched versions.\nIf no patch exists, add suppression to android-owasp-suppressions.xml with justification."
+            else
+              ERROR="${ERROR}[owasp] OWASP dependency check found vulnerabilities with CVSS >= 7.\nUpdate vulnerable dependencies in android/gradle/libs.versions.toml.\nRun the OWASP scan locally to see full details: use dependency-check CLI on the android/ directory."
+            fi
           fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT

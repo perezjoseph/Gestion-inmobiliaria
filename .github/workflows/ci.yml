@@ -571,6 +571,8 @@ jobs:
       actions: read
       contents: read
       security-events: write
+    env:
+      DOCKER_CONTENT_TRUST: "1"
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
@@ -654,7 +656,7 @@ jobs:
         timeout-minutes: 5
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          cargo audit --deny yanked --deny unmaintained 2>&1 | tee "${RUNNER_TEMP}/audit-output.txt"
+          cargo audit --deny yanked --deny unmaintained --deny unsound 2>&1 | tee "${RUNNER_TEMP}/audit-output.txt"
 
       - name: Install cargo-deny for supply chain policy checks
         id: install_deny
@@ -691,15 +693,27 @@ jobs:
           export PATH="$HOME/.cargo/bin:$PATH"
           cargo deny check 2>&1 | tee "${RUNNER_TEMP}/deny-output.txt"
 
+      - name: Restore OWASP NVD database cache
+        id: owasp-cache
+        if: always()
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ${{ github.workspace }}/.owasp-data
+          key: owasp-nvd-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            owasp-nvd-
+
       - name: OWASP dependency scan (fail on CVSS >= 7)
         id: owasp
         if: always()
         timeout-minutes: 15
         uses: dependency-check/Dependency-Check_Action@1e54355a8b4c8abaa8cc7d0b70aa655a3bb15a6c # main
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         with:
           project: realestate
           path: .
-          format: HTML
+          format: 'HTML,SARIF'
           args: >-
             --failOnCVSS 7
             --exclude target/**
@@ -710,6 +724,8 @@ jobs:
             --disableNodeAudit
             --disableAssembly
             --suppression owasp-suppressions.xml
+            --data ${{ github.workspace }}/.owasp-data
+            --disableOssIndex
 
       - name: Upload OWASP vulnerability report
         if: always()
@@ -720,6 +736,14 @@ jobs:
           retention-days: 7
           overwrite: false
           if-no-files-found: warn
+
+      - name: Upload OWASP SARIF to GitHub Security
+        if: always() && hashFiles('reports/dependency-check-report.sarif') != ''
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+        with:
+          sarif_file: reports/dependency-check-report.sarif
+          category: owasp-dependency-check
+        continue-on-error: true
 
       - name: Install Trivy for IaC scanning
         id: install_trivy
@@ -897,7 +921,19 @@ jobs:
           fi
           if [ "${{ steps.owasp.outcome }}" = "failure" ]; then
             FAILED="${FAILED}owasp-scan,"
-            ERROR="${ERROR}[owasp-scan] OWASP dependency check failed with CVSS >= 7. See uploaded report artifact for details."$'\n\n'
+            # Extract CVE IDs from OWASP report for actionable error messages
+            OWASP_CVES=""
+            for REPORT_FILE in reports/dependency-check-report.html; do
+              if [ -f "$REPORT_FILE" ]; then
+                OWASP_CVES=$(grep -oP 'CVE-\d{4}-\d+' "$REPORT_FILE" 2>/dev/null | sort -u | head -20 | tr '\n' ', ' || true)
+                break
+              fi
+            done
+            if [ -n "$OWASP_CVES" ]; then
+              ERROR="${ERROR}[owasp-scan] OWASP dependency check found vulnerabilities with CVSS >= 7.\nCVEs: ${OWASP_CVES}\nUpdate affected crate versions in Cargo.toml or add suppressions to owasp-suppressions.xml.\nRun 'cargo update' for affected crates, then verify with cargo audit."$'\n\n'
+            else
+              ERROR="${ERROR}[owasp-scan] OWASP dependency check found vulnerabilities with CVSS >= 7.\nUpdate affected crate versions in Cargo.toml. Run cargo audit to identify specific CVEs."$'\n\n'
+            fi$'\n\n'
           fi
           if [ "${{ steps.trivy_iac.outcome }}" = "failure" ]; then
             FAILED="${FAILED}trivy-iac,"
@@ -2127,8 +2163,11 @@ jobs:
               -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' \
               -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' \
               -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' \
+              -e 's/gho_[A-Za-z0-9_]+/***REDACTED***/g' \
+              -e 's/ghu_[A-Za-z0-9_]+/***REDACTED***/g' \
               -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' \
-              -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'
+              -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g' \
+              -e 's|postgresql://[^@[:space:]]+"*|postgresql://***:***@***REDACTED***|g'
           }
           PAYLOAD=$(jq -n \
             --arg job "secret-scan" \
@@ -2151,7 +2190,7 @@ jobs:
           ERROR_LOG: ${{ needs.lint.outputs.error_log }}
           FAILED_STEPS: ${{ needs.lint.outputs.failed_steps }}
         run: |
-          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/gho_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghu_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g' -e 's|postgresql://[^@[:space:]]+"*|postgresql://***:***@***REDACTED***|g'; }
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Lint job failed but no captured output. Run cargo fmt --all -- --check and cargo clippy --workspace -- -D warnings to reproduce."
           fi
@@ -2172,7 +2211,7 @@ jobs:
         env:
           ERROR_LOG: ${{ needs.test-backend.outputs.error_log }}
         run: |
-          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/gho_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghu_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g' -e 's|postgresql://[^@[:space:]]+"*|postgresql://***:***@***REDACTED***|g'; }
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Backend tests failed but no captured output. Run cargo test -p realestate-backend --all-targets to reproduce."
           fi
@@ -2192,7 +2231,7 @@ jobs:
         env:
           ERROR_LOG: ${{ needs.test-frontend.outputs.error_log }}
         run: |
-          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/gho_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghu_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g' -e 's|postgresql://[^@[:space:]]+"*|postgresql://***:***@***REDACTED***|g'; }
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Frontend tests failed but no captured output. Run cargo test -p realestate-frontend --all-targets to reproduce."
           fi
@@ -2213,7 +2252,7 @@ jobs:
           ERROR_LOG: ${{ needs.quality-gate.outputs.error_log }}
           FAILED_STEPS: ${{ needs.quality-gate.outputs.failed_steps }}
         run: |
-          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/gho_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghu_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g' -e 's|postgresql://[^@[:space:]]+"*|postgresql://***:***@***REDACTED***|g'; }
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Quality gate failed but no captured output. Run cargo audit and check OWASP scan to reproduce."
           fi
@@ -2234,7 +2273,7 @@ jobs:
         env:
           ERROR_LOG: ${{ needs.build-frontend.outputs.error_log }}
         run: |
-          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/gho_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghu_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g' -e 's|postgresql://[^@[:space:]]+"*|postgresql://***:***@***REDACTED***|g'; }
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Frontend WASM build failed but no captured output. Run trunk build --release in frontend/ to reproduce."
           fi
@@ -2254,7 +2293,7 @@ jobs:
         env:
           ERROR_LOG: ${{ needs.build-backend.outputs.error_log }}
         run: |
-          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/gho_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghu_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g' -e 's|postgresql://[^@[:space:]]+"*|postgresql://***:***@***REDACTED***|g'; }
           if [ -z "$ERROR_LOG" ]; then
             ERROR_LOG="Backend release build failed but no captured output. Run cargo build -p realestate-backend --release to reproduce."
           fi
@@ -2502,6 +2541,8 @@ jobs:
               -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' \
               -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' \
               -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' \
+              -e 's/gho_[A-Za-z0-9_]+/***REDACTED***/g' \
+              -e 's/ghu_[A-Za-z0-9_]+/***REDACTED***/g' \
               -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' \
               -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g' \
               -e 's/postgresql:\/\/[^@]+@/postgresql:\/\/***:***@/g'

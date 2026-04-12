@@ -41,6 +41,22 @@ if _env_path.is_file():
                 _k, _, _v = _line.partition("=")
                 os.environ.setdefault(_k.strip(), _v.strip())
 
+# =============================================================================
+# NETWORK BINDING — DO NOT CHANGE
+# =============================================================================
+# This listener MUST bind to 0.0.0.0 to accept webhooks from GitHub Actions
+# runners on the local network 192.168.88.0/24.
+#
+# Security is enforced by THREE layers — all required:
+#   1. _ALLOWED_NETWORKS — restricts bind address to loopback or LAN
+#   2. _is_client_allowed() — rejects requests from IPs outside the LAN
+#   3. HMAC signature verification — validates every POST payload
+#
+# DO NOT revert BIND_ADDRESS to 127.0.0.1 or localhost.
+# DO NOT remove 192.168.88.0/24 from _ALLOWED_NETWORKS.
+# DO NOT restrict the default to localhost-only.
+# If you have a security concern, raise it — do not silently change this.
+# =============================================================================
 PORT = 9090
 BIND_ADDRESS = os.environ.get("BIND_ADDRESS", "0.0.0.0")
 
@@ -66,7 +82,7 @@ if not _is_bind_allowed(BIND_ADDRESS):
         f"Must be loopback, 0.0.0.0, or within {_ALLOWED_NETWORKS}."
     )
 
-_ALLOWED_CLIENTS = _ALLOWED_NETWORKS  # same subnets used for source IP filtering
+_ALLOWED_CLIENTS = _ALLOWED_NETWORKS
 
 def _is_client_allowed(addr: str) -> bool:
     """Reject requests from outside loopback and the local LAN."""
@@ -106,6 +122,127 @@ _fix_lock = threading.Lock()
 _sonar_fix_lock = threading.Lock()
 _improve_lock = threading.Lock()
 _thread_semaphore = threading.Semaphore(4)
+
+_FIX_HISTORY_FILE = _win_project_dir / ".fix-history.json"
+_FIX_HISTORY_MAX_ENTRIES = 200
+_fix_history_lock = threading.Lock()
+
+
+def _error_hash(job, error_log):
+    """Stable hash for deduplicating similar errors."""
+    normalized = re.sub(r"\d+", "N", error_log[:2000]).strip().lower()
+    return hashlib.sha256(f"{job}:{normalized}".encode()).hexdigest()[:16]
+
+
+def _load_fix_history():
+    """Load fix history from disk. Returns dict keyed by error hash."""
+    try:
+        if _FIX_HISTORY_FILE.is_file():
+            data = json.loads(_FIX_HISTORY_FILE.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+    except (json.JSONDecodeError, OSError) as e:
+        log.warning(f"Fix history load failed: {e}")
+    return {}
+
+
+def _save_fix_history(history):
+    """Persist fix history to disk, pruning old entries."""
+    if len(history) > _FIX_HISTORY_MAX_ENTRIES:
+        sorted_keys = sorted(
+            history.keys(),
+            key=lambda k: history[k].get("last_seen", ""),
+        )
+        for k in sorted_keys[: len(history) - _FIX_HISTORY_MAX_ENTRIES]:
+            del history[k]
+    try:
+        _FIX_HISTORY_FILE.write_text(
+            json.dumps(history, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+            newline="\n",
+        )
+    except OSError as e:
+        log.warning(f"Fix history save failed: {e}")
+
+
+def _record_fix_attempt(job, error_log, attempt, success, strategy_notes=""):
+    """Record a fix attempt in the history for future reference."""
+    h = _error_hash(job, error_log)
+    now = datetime.now().isoformat()
+    with _fix_history_lock:
+        history = _load_fix_history()
+        entry = history.get(h, {
+            "job": job,
+            "first_seen": now,
+            "attempts": [],
+            "total_attempts": 0,
+            "successes": 0,
+        })
+        entry["last_seen"] = now
+        entry["total_attempts"] = entry.get("total_attempts", 0) + 1
+        if success:
+            entry["successes"] = entry.get("successes", 0) + 1
+        entry["attempts"] = entry.get("attempts", [])[-9:] + [{
+            "ts": now,
+            "attempt": attempt,
+            "success": success,
+            "notes": strategy_notes[:500],
+        }]
+        history[h] = entry
+        _save_fix_history(history)
+
+
+def _get_past_attempts(job, error_log):
+    """Retrieve past fix attempts for a similar error."""
+    h = _error_hash(job, error_log)
+    with _fix_history_lock:
+        history = _load_fix_history()
+        entry = history.get(h)
+    if not entry:
+        return ""
+    total = entry.get("total_attempts", 0)
+    successes = entry.get("successes", 0)
+    if total == 0:
+        return ""
+    recent = entry.get("attempts", [])[-3:]
+    lines = [f"FIX HISTORY: {total} previous attempts for this error pattern, {successes} succeeded."]
+    for a in recent:
+        status = "succeeded" if a.get("success") else "failed"
+        lines.append(f"  - {a.get('ts', '?')}: attempt {a.get('attempt', '?')} {status}")
+        if a.get("notes"):
+            lines.append(f"    Notes: {a['notes']}")
+    if total > 0 and successes == 0:
+        lines.append("  WARNING: No previous attempt has succeeded. Try a fundamentally different approach.")
+    return "\n".join(lines)
+
+
+def _is_autofix_commit():
+    """Check if the most recent commit on main is an auto-fix to prevent loops."""
+    try:
+        result = _wsl_bash(
+            "git log -1 --format='%s' HEAD 2>/dev/null",
+            timeout=15,
+        )
+        if result.returncode == 0:
+            msg = result.stdout.strip()
+            autofix_markers = ["(auto-fix)", "resolve CI failures (auto-fix)",
+                               "resolve SonarQube issues (auto-fix)",
+                               "improve pipeline"]
+            return any(marker in msg for marker in autofix_markers)
+    except Exception as e:
+        log.warning(f"Auto-fix commit check failed: {e}")
+    return False
+
+
+_SCOPE_CONSTRAINTS = (
+    "\n\nSCOPE CONSTRAINTS (mandatory):\n"
+    "- Modify at most 10 files and 300 lines total.\n"
+    "- Do NOT refactor unrelated code. Fix only what the error requires.\n"
+    "- Do NOT add new crate dependencies unless absolutely necessary for the fix.\n"
+    "- Do NOT modify CI pipeline YAML files (.github/workflows/) unless the job is specifically about pipeline config.\n"
+    "- Do NOT modify scripts/quality-webhook-listener.py.\n"
+    "- Prefer minimal, targeted edits over broad changes.\n"
+)
 
 
 class RateLimiter:
@@ -324,6 +461,55 @@ def run_kiro(prompt, label):
     return True
 
 
+_RUNNER_ENV_PATTERNS = [
+    "command not found",
+    "No such file or directory",
+    "Permission denied",
+    "disk space",
+    "No space left on device",
+    "unable to access",
+    "Could not resolve host",
+    "Connection refused",
+    "timeout",
+    "ENOSPC",
+    "cannot allocate memory",
+    "docker daemon is not running",
+    "Cannot connect to the Docker daemon",
+]
+
+_DEPENDENCY_PATTERNS = [
+    "failed to download",
+    "failed to fetch",
+    "could not compile",
+    "unresolved import",
+    "no matching package",
+    "version solving failed",
+    "incompatible",
+    "RUSTSEC-",
+    "GHSA-",
+    "CVE-",
+    "CVSS",
+    "vulnerability",
+    "yanked",
+]
+
+
+def _classify_error(error_log):
+    """Classify an error log into a category to guide the fix prompt."""
+    lower = error_log.lower()
+    for pattern in _RUNNER_ENV_PATTERNS:
+        if pattern.lower() in lower:
+            return "runner_environment"
+    for pattern in _DEPENDENCY_PATTERNS:
+        if pattern.lower() in lower:
+            return "dependency"
+    if "test" in lower and ("failed" in lower or "FAILED" in lower):
+        return "test_failure"
+    if "error[E" in error_log or "clippy" in lower or "fmt" in lower:
+        return "code_quality"
+    return "unknown"
+
+
 def fix_with_retry(job, step, error_log, context=None):
     if not _fix_lock.acquire(blocking=False):
         log.warning(f"Another fix is already running -- skipping {job}/{step}")
@@ -334,29 +520,127 @@ def fix_with_retry(job, step, error_log, context=None):
         if context:
             ctx = f" (commit: {context.get('commit', '?')[:8]}, branch: {context.get('branch', '?')}, actor: {context.get('actor', '?')})"
 
+        error_class = _classify_error(error_log)
+        log.info(f"Error classified as: {error_class} for {job}/{step}")
+
         for attempt in range(1, MAX_RETRIES + 1):
-            log.info(f"=== Attempt {attempt}/{MAX_RETRIES} for {job}/{step}{ctx} ===")
+            log.info(f"=== Attempt {attempt}/{MAX_RETRIES} for {job}/{step}{ctx} (class: {error_class}) ===")
 
             job_instructions = {
-                "lint": "Fix the formatting and clippy warnings.",
-                "test-backend": "Fix the failing backend tests.",
-                "test-frontend": "Fix the failing frontend tests.",
-                "quality-gate": "Fix the quality gate failures (dependency audit or OWASP issues).",
-                "sonarqube": "Fix the SonarQube analysis failures.",
-                "android-lint": "Fix the Android lint warnings in the android/ directory. Run ./gradlew lint in android/ to verify.",
-                "android-unit-test": "Fix the failing Android unit tests in the android/ directory. Run ./gradlew testDebugUnitTest in android/ to verify.",
-                "android-build": "Fix the Android build errors in the android/ directory. Run ./gradlew assembleDebug in android/ to verify.",
-                "android-quality-gate": "Fix the Android dependency security issues. Check the OWASP report and update vulnerable dependencies in android/gradle/libs.versions.toml.",
+                "lint": (
+                    "Fix the formatting and clippy warnings. "
+                    "Run 'cargo fmt --all' for formatting, then 'cargo clippy --locked -p realestate-backend -- -D warnings' "
+                    "and 'cargo clippy --locked -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings' to verify."
+                ),
+                "test-backend": (
+                    "Fix the failing backend tests. Read the test output carefully to identify which tests failed and why. "
+                    "Run 'cargo test --locked -p realestate-backend --all-targets' to verify."
+                ),
+                "test-frontend": (
+                    "Fix the failing frontend tests. "
+                    "Run 'cargo test --locked -p realestate-frontend --all-targets' to verify."
+                ),
+                "quality-gate": (
+                    "Fix the quality gate failures. The error log contains details from cargo-audit, cargo-deny, or OWASP scans. "
+                    "For RUSTSEC/CVE advisories: update the affected crate version in Cargo.toml, run 'cargo update' for the specific crate, then verify with 'cargo audit'. "
+                    "For OWASP findings: check the vulnerability details and update or suppress as appropriate. "
+                    "For license violations: check deny.toml and adjust exceptions if the license is acceptable. "
+                    "Do NOT modify the CI pipeline YAML -- fix the dependency versions in Cargo.toml or deny.toml."
+                ),
+                "sonarqube": "Fix the SonarQube analysis failures. Check the SonarQube server configuration and scan settings.",
+                "android-lint": (
+                    "Fix the Android lint warnings in the android/ directory. "
+                    "Read the specific lint errors in the output. "
+                    "Run './gradlew lint' in android/ to verify. "
+                    "For detekt issues, run './gradlew detekt' in android/. "
+                    "For ktfmt issues, run './gradlew spotlessApply' in android/ to auto-fix formatting."
+                ),
+                "android-unit-test": (
+                    "Fix the failing Android unit tests in the android/ directory. "
+                    "Read the test output to identify which tests failed. "
+                    "Run './gradlew testDebugUnitTest' in android/ to verify."
+                ),
+                "android-build": (
+                    "Fix the Android build errors in the android/ directory. "
+                    "Read the Gradle build output for compilation errors. "
+                    "Run './gradlew assembleDebug' in android/ to verify."
+                ),
+                "android-quality-gate": (
+                    "Fix the Android dependency security issues. "
+                    "The OWASP report found vulnerabilities with CVSS >= 7. "
+                    "Update vulnerable dependencies in android/gradle/libs.versions.toml to patched versions. "
+                    "If no patch exists, add a suppression to android-owasp-suppressions.xml with justification. "
+                    "Run './gradlew dependencies' in android/ to verify resolution."
+                ),
+                "android-sonarqube": "Fix the Android SonarQube analysis failures. Check scan configuration and server connectivity.",
+                "build-frontend": (
+                    "Fix the frontend WASM build errors. "
+                    "Run 'trunk build --release' in frontend/ to reproduce. "
+                    "Check for compilation errors targeting wasm32-unknown-unknown."
+                ),
+                "build-backend": (
+                    "Fix the backend release build errors. "
+                    "Run 'cargo build -p realestate-backend --release' to reproduce."
+                ),
+                "container-image-backend": (
+                    "Fix the backend container image build or Trivy scan failure. "
+                    "Check Dockerfile.backend for build errors. "
+                    "For Trivy vulnerabilities, update base image or fix vulnerable packages."
+                ),
+                "container-image-frontend": (
+                    "Fix the frontend container image build or Trivy scan failure. "
+                    "Check Dockerfile.frontend for build errors."
+                ),
+                "deploy": (
+                    "Fix the production deployment failure. "
+                    "Check docker-compose.prod.yml and service health. "
+                    "This may require infrastructure changes that cannot be auto-fixed."
+                ),
+                "secret-scan": (
+                    "WARNING: Gitleaks detected secrets in the repository. "
+                    "Do NOT commit the secret again. Remove the leaked credential from the codebase, "
+                    "add it to .gitleaksignore if it's a false positive, and rotate any exposed credentials."
+                ),
             }
             instruction = job_instructions.get(job, "Analyze the error and fix the issue.")
 
+            runner_env_note = ""
+            if error_class == "runner_environment":
+                runner_env_note = (
+                    "\n\nIMPORTANT: This error appears to be a RUNNER ENVIRONMENT issue "
+                    "(missing tool, network problem, disk space, or Docker issue). "
+                    "These cannot be fixed by changing application code. "
+                    "If you confirm this is a runner/infra issue, do NOT make code changes. "
+                    "Instead, document the issue and suggest what the runner admin should fix. "
+                    "Only make code changes if the error is actually caused by the code."
+                )
+
+            dependency_note = ""
+            if error_class == "dependency":
+                dependency_note = (
+                    "\n\nDEPENDENCY ISSUE METHODOLOGY:\n"
+                    "1. Parse the CVE/RUSTSEC/GHSA IDs from the error log.\n"
+                    "2. For each advisory, identify the affected crate and its current version.\n"
+                    "3. Check if a patched version exists (use 'cargo audit' output or search crates.io).\n"
+                    "4. If a patch exists: update the version constraint in Cargo.toml, run 'cargo update -p <crate>'.\n"
+                    "5. If no patch exists: evaluate if the vulnerability applies to our usage. "
+                    "If not applicable, add to .cargo/audit.toml [advisories.ignore]. "
+                    "If applicable, find an alternative crate or implement a workaround.\n"
+                    "6. Verify: run 'cargo audit' and 'cargo deny check' to confirm resolution.\n"
+                    "7. Run 'cargo test --locked -p realestate-backend --all-targets' to ensure nothing broke."
+                )
+
             prompt = (
-                f"The CI pipeline FAILED in job '{job}', step '{step}'.{ctx} "
-                f"Error output:\n{error_log}\n\n"
-                f"{instruction} "
-                "Fix the specific issues reported. After fixing, only run targeted verification. "
-                "Then commit and push: git add -A && git commit -m 'fix: resolve CI failures (auto-fix)' && git push origin main. "
-                "If push fails: git pull --rebase origin main && git push origin main."
+                f"The CI pipeline FAILED in job '{job}', step '{step}'.{ctx}\n"
+                f"Error classification: {error_class}\n\n"
+                f"Error output:\n```\n{error_log}\n```\n\n"
+                f"TASK: {instruction}"
+                f"{runner_env_note}"
+                f"{dependency_note}\n\n"
+                "After fixing, run only the targeted verification command for this job. "
+                "Then commit and push:\n"
+                "  git add -A && git commit -m 'fix: resolve CI failures (auto-fix)' && git push origin main\n"
+                "  If push fails: git pull --rebase origin main && git push origin main"
             )
 
             if run_kiro(prompt, f"CI fix ({job}/{step}) attempt {attempt}"):
@@ -381,20 +665,29 @@ def fix_sonar_issues(sonar_report, run_url):
             log.info(f"=== SonarQube issue fix attempt {attempt}/{MAX_RETRIES} ===")
 
             prompt = (
-                "You are a code quality specialist. Your job is to resolve open SonarQube issues "
-                "in this Rust/WASM real estate management project.\n\n"
-                f"SonarQube issue report:\n{sonar_report}\n\n"
-                "INSTRUCTIONS -- work autonomously through this self-improvement loop:\n"
-                "1. The report above contains open SonarQube issues with severity, file, line, rule, and message. "
-                "For each issue, open the file at the specified line, understand the rule violation, and fix it.\n"
-                "2. Prioritize BLOCKER and HIGH severity first, then MEDIUM.\n"
-                "3. Also review and fix any security hotspots listed.\n"
-                "4. After fixing issues, run cargo fmt, cargo clippy, and cargo test to verify nothing is broken.\n"
-                "5. If tests fail after your changes, fix the test failures before proceeding.\n"
-                "6. Stage, commit, and push:\n"
+                "You are a code quality specialist working on a Rust/WASM real estate management project "
+                "with a Kotlin Android module.\n\n"
+                f"SonarQube issue report:\n```\n{sonar_report}\n```\n\n"
+                "METHODOLOGY:\n"
+                "1. Parse the report: each line has severity | file:line | rule | message.\n"
+                "2. Group issues by file to minimize context switches.\n"
+                "3. Fix BLOCKER and HIGH severity first, then MEDIUM.\n"
+                "4. For each issue:\n"
+                "   a. Open the file at the specified line.\n"
+                "   b. Read the surrounding context (10 lines above and below).\n"
+                "   c. Understand the rule violation (the rule ID tells you what's wrong).\n"
+                "   d. Apply the minimal fix that resolves the violation.\n"
+                "5. For security hotspots: evaluate if the code is actually vulnerable. "
+                "If safe, note it. If vulnerable, fix it.\n"
+                "6. After all fixes:\n"
+                "   - For Rust files: run 'cargo fmt', 'cargo clippy --locked -- -D warnings', "
+                "and 'cargo test --locked' to verify.\n"
+                "   - For Kotlin files: run './gradlew spotlessApply detekt testDebugUnitTest' in android/.\n"
+                "7. If tests fail after your changes, fix the test failures before proceeding.\n"
+                "8. Stage, commit, and push:\n"
                 "   git add -A && git commit -m 'fix: resolve SonarQube issues (auto-fix)' && git push origin main\n"
                 "   If push fails: git pull --rebase origin main && git push origin main\n"
-                "7. Do NOT stop until all reported issues are addressed.\n\n"
+                "9. Do NOT stop until all reported issues are addressed.\n\n"
                 f"Run URL for context: {run_url}"
             )
 
@@ -423,27 +716,63 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
             if sonar_report and "unavailable" not in sonar_report:
                 sonar_section = f"\n\n--- SONARQUBE ISSUES ---\n{sonar_report}\n--- END SONARQUBE ISSUES ---\n"
 
+            focus_guidance = {
+                "security": (
+                    "SECURITY FOCUS:\n"
+                    "- If the error is from OWASP/cargo-audit/cargo-deny, the fix belongs in Cargo.toml, "
+                    "deny.toml, or android/gradle/libs.versions.toml -- NOT in the pipeline YAML.\n"
+                    "- Only modify the pipeline YAML if the security tool itself is misconfigured.\n"
+                    "- For dependency vulnerabilities: update crate versions, add suppressions for false positives.\n"
+                ),
+                "bugs": (
+                    "BUG FIX FOCUS:\n"
+                    "- The /ci-failure webhook handles application code fixes.\n"
+                    "- Only improve the pipeline if the failure is caused by pipeline misconfiguration "
+                    "(wrong environment, missing tools, bad caching).\n"
+                    "- If error logs show code compilation or test failures, do NOT change the pipeline.\n"
+                ),
+                "pipeline": (
+                    "PIPELINE FOCUS:\n"
+                    "- Fix build/deploy pipeline configuration issues.\n"
+                    "- Check Dockerfile syntax, docker-compose config, deployment scripts.\n"
+                ),
+            }
+
+            focus_specific = ""
+            for f in focus.split(","):
+                f = f.strip()
+                if f in focus_guidance:
+                    focus_specific += focus_guidance[f] + "\n"
+
             prompt = (
-                "You are a CI/CD pipeline engineer. Your job is to improve the GitHub Actions pipeline "
-                "at .github/workflows/ci.yml for this Rust/WASM project.\n\n"
+                "You are a CI/CD pipeline engineer for a Rust/WASM real estate management project "
+                "with an Android module.\n\n"
                 f"Focus area: {focus}\n\n"
                 f"--- PIPELINE REPORT ---\n{pipeline_report}\n--- END PIPELINE REPORT ---\n"
                 f"{sonar_section}\n"
-                "INSTRUCTIONS:\n"
-                "1. Read .github/workflows/ci.yml and scripts/quality-webhook-listener.py fully.\n"
-                "2. The report above contains job results, durations, cache hit/miss stats, and error logs "
-                "from any failed jobs. Use this data to identify concrete, targeted improvements:\n"
-                "   - Jobs with cache MISS: investigate cache key strategy, consider broader restore-keys.\n"
-                "   - Slow jobs (high duration): look for parallelization, unnecessary steps, or missing caching.\n"
-                "   - Failed jobs: read the error logs in the report and fix the root cause in the pipeline config "
-                "     (not the application code -- that's handled by /ci-failure).\n"
-                "   - All jobs passed: look for security hardening, redundant steps, or reporting gaps.\n"
-                "3. Make ALL improvements you identify. Do not stop at one.\n"
-                "4. After making changes, verify the YAML is valid.\n"
-                "5. Stage, commit, and push:\n"
+                "DECISION FRAMEWORK -- read the error logs and classify each failure:\n"
+                "  A) RUNNER ENVIRONMENT (missing tool, network, disk, Docker): "
+                "Document the issue but do NOT change code. These need admin intervention.\n"
+                "  B) PIPELINE CONFIG (wrong step order, bad caching, missing env var): "
+                "Fix in .github/workflows/ci.yml or android-ci.yml.\n"
+                "  C) DEPENDENCY VULNERABILITY (CVE, RUSTSEC, OWASP): "
+                "Fix in Cargo.toml, deny.toml, or android/gradle/libs.versions.toml. NOT the pipeline YAML.\n"
+                "  D) APPLICATION CODE (compilation, test failure): "
+                "Skip -- the /ci-failure webhook handles these.\n\n"
+                f"{focus_specific}"
+                "IMPROVEMENTS TO LOOK FOR:\n"
+                "- Jobs with cache MISS: investigate cache key strategy, consider broader restore-keys.\n"
+                "- Slow jobs (high duration): look for parallelization, unnecessary steps, or missing caching.\n"
+                "- Failed jobs: read the error logs and apply the decision framework above.\n"
+                "- All jobs passed: look for security hardening, redundant steps, or reporting gaps.\n\n"
+                "RULES:\n"
+                "1. Read the relevant workflow YAML files fully before making changes.\n"
+                "2. Make ALL improvements you identify. Do not stop at one.\n"
+                "3. After making changes, verify the YAML is valid.\n"
+                "4. Stage, commit, and push:\n"
                 f"   git add -A && git commit -m 'ci: improve pipeline ({focus})' && git push origin main\n"
                 "   If push fails: git pull --rebase origin main && git push origin main\n"
-                "6. Do NOT stop until you are confident the pipeline is meaningfully better.\n\n"
+                "5. Do NOT stop until you are confident the pipeline is meaningfully better.\n\n"
                 f"Run URL: {run_url}"
             )
 
