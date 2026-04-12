@@ -118,7 +118,7 @@ jobs:
 
   test-backend:
     name: Backend Unit & Integration Tests
-    runs-on: [self-hosted, linux, docker, sonarqube]
+    runs-on: [self-hosted, linux, docker]
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
     services:
@@ -212,7 +212,7 @@ jobs:
 
   quality-gate:
     name: Dependency Security & Health Check
-    runs-on: [self-hosted, linux, docker, sonarqube]
+    runs-on: [self-hosted, linux, docker]
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
@@ -343,7 +343,7 @@ jobs:
 
   sonarqube:
     name: SonarQube Code Quality & Coverage Analysis
-    runs-on: [self-hosted, linux, docker, sonarqube]
+    runs-on: [self-hosted, linux, sonarqube]
     continue-on-error: true
     steps:
       - name: Checkout repository with full history for blame analysis
