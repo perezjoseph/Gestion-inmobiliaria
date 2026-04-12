@@ -127,7 +127,8 @@ def run_kiro(prompt, label):
 
     log_file = os.path.join(os.path.dirname(__file__), "..", "kiro-debug.log")
 
-    with open(log_file, "a", encoding="utf-8") as f:
+    fd = os.open(log_file, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    with os.fdopen(fd, "a", encoding="utf-8") as f:
         f.write(f"\n{'=' * 80}\n")
         f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {label}\n")
         f.write(f"{'=' * 80}\n\n")
@@ -321,23 +322,26 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
 
 
 class WebhookHandler(BaseHTTPRequestHandler):
+    def _send(self, code, body=b"", content_type="text/plain"):
+        self.send_response(code)
+        self.send_header("Content-Type", content_type)
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         client_ip = self.client_address[0]
         log.info(f"GET {self.path} from {client_ip}")
 
         if not _rate_limiter.allow(client_ip):
             log.warning(f"Rate limit exceeded for {client_ip}")
-            self.send_response(429)
+            self._send(429, b"Too many requests")
             self.send_header("Retry-After", "60")
-            self.end_headers()
-            self.wfile.write(b"Too many requests")
             return
 
         if self.path == "/health":
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps({
+            self._send(200, json.dumps({
                 "status": "ok",
                 "timestamp": datetime.now().isoformat(),
                 "locks": {
@@ -345,10 +349,9 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     "sonar_fix": _sonar_fix_lock.locked(),
                     "improve": _improve_lock.locked(),
                 },
-            }).encode())
+            }).encode(), "application/json")
             return
-        self.send_response(404)
-        self.end_headers()
+        self._send(404, b"Not found")
 
     def do_POST(self):
         client_ip = self.client_address[0]
@@ -357,22 +360,19 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
         if not _rate_limiter.allow(client_ip):
             log.warning(f"Rate limit exceeded for {client_ip}")
-            self.send_response(429)
-            self.send_header("Retry-After", "60")
-            self.end_headers()
-            self.wfile.write(b"Too many requests")
+            self._send(429, b"Too many requests")
             return
 
         if content_length > MAX_PAYLOAD_BYTES:
             log.warning(f"Payload too large: {content_length} bytes (max {MAX_PAYLOAD_BYTES})")
-            self.send_response(413)
-            self.end_headers()
-            self.wfile.write(b"Payload too large")
+            self._send(413, b"Payload too large")
             return
 
         content_type = self.headers.get("Content-Type", "")
-        if "json" not in content_type and self.path != "/sonarqube":
-            log.warning(f"Unexpected Content-Type: {content_type}")
+        if "json" not in content_type:
+            log.warning(f"Rejected non-JSON Content-Type: {content_type}")
+            self._send(400, b"Content-Type must be application/json")
+            return
 
         body = self.rfile.read(content_length)
 
@@ -389,18 +389,14 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 ).hexdigest()
             if not hmac.compare_digest(expected, sig_header):
                 log.warning(f"Invalid HMAC signature on {self.path} from {self.client_address[0]}")
-                self.send_response(401)
-                self.end_headers()
-                self.wfile.write(b"Invalid signature")
+                self._send(401, b"Invalid signature")
                 return
 
         try:
             payload = json.loads(body)
         except json.JSONDecodeError as e:
             log.error(f"Invalid JSON: {e}")
-            self.send_response(400)
-            self.end_headers()
-            self.wfile.write(b"Invalid JSON")
+            self._send(400, b"Invalid JSON")
             return
 
         handlers = {
@@ -412,15 +408,11 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
         handler = handlers.get(self.path)
         if handler:
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b"OK")
+            self._send(200, b"OK")
             threading.Thread(target=handler, args=(payload,), daemon=True).start()
         else:
             log.warning(f"Unknown endpoint: {self.path}")
-            self.send_response(404)
-            self.end_headers()
-            self.wfile.write(b"Not found")
+            self._send(404, b"Not found")
 
     def _handle_sonarqube(self, payload):
         project = _sanitize_text(payload.get("project", {}).get("key", "unknown"), 128)

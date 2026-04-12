@@ -34,6 +34,7 @@ env:
   CARGO_INCREMENTAL: "0"
   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
   CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+  CARGO_HTTP_CHECK_REVOKE: "true"
   CARGO_HTTP_TIMEOUT: "30"
   CARGO_NET_RETRY: "3"
   RUSTFLAGS: "-D warnings"
@@ -51,7 +52,12 @@ jobs:
       contents: read
     steps:
       - name: Clean workspace
-        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -60,6 +66,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install Gitleaks (with checksum verification)
+        timeout-minutes: 3
         run: |
           GITLEAKS_VERSION="8.24.3"
           GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
@@ -83,7 +90,12 @@ jobs:
       contents: read
     steps:
       - name: Clean workspace
-        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository with full history
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -98,7 +110,7 @@ jobs:
 
       - name: Install commitlint CLI and conventional config
         run: |
-          npm install --ignore-scripts --save-dev @commitlint/cli@20.5.0 @commitlint/config-conventional@20.5.0
+          npm install --ignore-scripts --no-fund --no-audit --save-dev @commitlint/cli@20.5.0 @commitlint/config-conventional@20.5.0
           echo "module.exports = { extends: ['@commitlint/config-conventional'] };" > commitlint.config.js
 
       - name: Validate PR commit messages against conventional format
@@ -146,7 +158,12 @@ jobs:
         run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
 
       - name: Clean workspace
-        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -297,7 +314,12 @@ jobs:
         run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
 
       - name: Clean workspace
-        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -429,7 +451,12 @@ jobs:
         run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
 
       - name: Clean workspace
-        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -518,7 +545,12 @@ jobs:
         run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
 
       - name: Clean workspace
-        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Clean up OWASP reports from previous runs
         run: sudo rm -rf reports/
@@ -534,6 +566,7 @@ jobs:
 
       - name: Install cargo-audit for CVE scanning
         id: install_audit
+        timeout-minutes: 5
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           if command -v cargo-audit &>/dev/null && cargo audit --version &>/dev/null; then
@@ -589,6 +622,7 @@ jobs:
       - name: Install cargo-deny for supply chain policy checks
         id: install_deny
         if: always()
+        timeout-minutes: 5
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           if command -v cargo-deny &>/dev/null; then
@@ -646,6 +680,7 @@ jobs:
       - name: Install Trivy for IaC scanning
         id: install_trivy
         if: always()
+        timeout-minutes: 3
         run: |
           TRIVY_VERSION="0.69.3"
           TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
@@ -859,7 +894,12 @@ jobs:
         run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
 
       - name: Clean workspace
-        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository with full history for blame analysis
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -974,7 +1014,7 @@ jobs:
             --memory 1g \
             --memory-swap 1g \
             --pids-limit 256 \
-            --tmpfs /tmp:rw,noexec,nosuid,nodev \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=256m \
             -e SONAR_TOKEN="${SONAR_ANALYSIS_TOKEN}" \
             -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
             -v "${GITHUB_WORKSPACE}:/usr/src" \
@@ -1173,7 +1213,12 @@ jobs:
         run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
 
       - name: Clean workspace
-        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -1281,7 +1326,12 @@ jobs:
         run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
 
       - name: Clean workspace
-        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -1376,7 +1426,12 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Clean workspace
-        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -1404,6 +1459,7 @@ jobs:
           sbom: true
 
       - name: Install Trivy (with checksum verification)
+        timeout-minutes: 3
         run: |
           TRIVY_VERSION="0.69.3"
           TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
@@ -1496,7 +1552,12 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Clean workspace
-        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -1524,6 +1585,7 @@ jobs:
           sbom: true
 
       - name: Install Trivy (with checksum verification)
+        timeout-minutes: 3
         run: |
           TRIVY_VERSION="0.69.3"
           TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
@@ -1613,7 +1675,12 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Clean workspace
-        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -2063,7 +2130,12 @@ jobs:
     if: always() && github.ref == 'refs/heads/main'
     steps:
       - name: Clean workspace
-        run: sudo rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.* 2>/dev/null || true
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
