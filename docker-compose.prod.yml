@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-realestate}
+      POSTGRES_USER: ${POSTGRES_USER:-realestate}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-realestate}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: ghcr.io/perezjoseph/realestate-backend:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-realestate}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-realestate}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      SERVER_PORT: "8080"
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+    volumes:
+      - uploads:/app/uploads
+
+  frontend:
+    image: ghcr.io/perezjoseph/realestate-frontend:latest
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8443:8443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  postgres_data:
+  uploads:
+  caddy_data:
+  caddy_config:

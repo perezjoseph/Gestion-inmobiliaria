@@ -15,6 +15,8 @@ Usage:
     python scripts/quality-webhook-listener.py
 """
 
+import hashlib
+import hmac
 import json
 import logging
 import os
@@ -31,6 +33,7 @@ WSL_USER = "jperez"
 MAX_RETRIES = 3
 KIRO_TIMEOUT = 3600
 MAX_PAYLOAD_BYTES = 512 * 1024  # 512 KB
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
 _fix_lock = threading.Lock()
 _sonar_fix_lock = threading.Lock()
@@ -291,6 +294,18 @@ class WebhookHandler(BaseHTTPRequestHandler):
             log.warning(f"Unexpected Content-Type: {content_type}")
 
         body = self.rfile.read(content_length)
+
+        if WEBHOOK_SECRET:
+            sig_header = self.headers.get("X-Signature-256", "")
+            expected = "sha256=" + hmac.new(
+                WEBHOOK_SECRET.encode(), body, hashlib.sha256
+            ).hexdigest()
+            if not hmac.compare_digest(expected, sig_header):
+                log.warning(f"Invalid HMAC signature on {self.path} from {self.client_address[0]}")
+                self.send_response(401)
+                self.end_headers()
+                self.wfile.write(b"Invalid signature")
+                return
 
         try:
             payload = json.loads(body)

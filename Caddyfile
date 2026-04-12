@@ -1,0 +1,20 @@
+# To switch to Let's Encrypt: replace ":8443" with your domain
+# and replace "tls internal" with "tls your@email.com"
+
+:8443 {
+	tls internal
+
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+
+	handle /uploads/* {
+		reverse_proxy backend:8080
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

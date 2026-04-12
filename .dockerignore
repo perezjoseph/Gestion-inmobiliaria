@@ -1,0 +1,12 @@
+target/
+node_modules/
+dist/
+.git/
+.github/
+.kiro/
+.env
+.env.*
+*.md
+reports/
+kiro-debug.log
+scripts/__pycache__/
