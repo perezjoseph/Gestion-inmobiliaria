@@ -970,10 +970,11 @@ jobs:
               2>/dev/null || echo "Quality gate already assigned."
           fi
 
+          TOKEN_NAME="ci-token-${{ github.run_id }}"
           curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
-            "$SONAR_URL/api/user_tokens/revoke?name=ci-token" 2>/dev/null || true
+            "$SONAR_URL/api/user_tokens/revoke?name=${TOKEN_NAME}" 2>/dev/null || true
           TOKEN=$(curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
-            "$SONAR_URL/api/user_tokens/generate?name=ci-token" \
+            "$SONAR_URL/api/user_tokens/generate?name=${TOKEN_NAME}" \
             | jq -r '.token')
 
           if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
@@ -1178,9 +1179,10 @@ jobs:
             exit 0
           fi
           ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD }}"
+          TOKEN_NAME="ci-token-${{ github.run_id }}"
           if [ -n "$ADMIN_PASS" ]; then
             curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
-              "${SONAR_HOST_URL}/api/user_tokens/revoke?name=ci-token" 2>/dev/null || true
+              "${SONAR_HOST_URL}/api/user_tokens/revoke?name=${TOKEN_NAME}" 2>/dev/null || true
             echo "Bootstrap token revoked."
           fi
 
@@ -1716,23 +1718,25 @@ jobs:
           VERIFIED=true
           if [ -n "$BACKEND_DIGEST" ]; then
             echo "Verifying backend attestation..."
-            if ! gh attestation verify "oci://ghcr.io/${IMAGE_OWNER}/realestate-backend${BACKEND_DIGEST}" \
+            if ! gh attestation verify "oci://ghcr.io/${IMAGE_OWNER}/realestate-backend@${BACKEND_DIGEST}" \
               --owner "${IMAGE_OWNER}" 2>&1; then
               echo "::error::Backend attestation verification failed"
               VERIFIED=false
             fi
           else
-            echo "::warning::Backend digest unavailable -- skipping attestation verification"
+            echo "::error::Backend digest unavailable -- cannot verify provenance"
+            VERIFIED=false
           fi
           if [ -n "$FRONTEND_DIGEST" ]; then
             echo "Verifying frontend attestation..."
-            if ! gh attestation verify "oci://ghcr.io/${IMAGE_OWNER}/realestate-frontend${FRONTEND_DIGEST}" \
+            if ! gh attestation verify "oci://ghcr.io/${IMAGE_OWNER}/realestate-frontend@${FRONTEND_DIGEST}" \
               --owner "${IMAGE_OWNER}" 2>&1; then
               echo "::error::Frontend attestation verification failed"
               VERIFIED=false
             fi
           else
-            echo "::warning::Frontend digest unavailable -- skipping attestation verification"
+            echo "::error::Frontend digest unavailable -- cannot verify provenance"
+            VERIFIED=false
           fi
           if [ "$VERIFIED" = "false" ]; then
             exit 1
@@ -1756,14 +1760,14 @@ jobs:
           # Pull by digest when available to prevent TOCTOU between scan and deploy
           if [ -n "$BACKEND_DIGEST" ]; then
             echo "Pulling backend by digest: $BACKEND_DIGEST"
-            docker pull "ghcr.io/${IMAGE_OWNER}/realestate-backend${BACKEND_DIGEST}"
-            docker tag "ghcr.io/${IMAGE_OWNER}/realestate-backend${BACKEND_DIGEST}" \
+            docker pull "ghcr.io/${IMAGE_OWNER}/realestate-backend@${BACKEND_DIGEST}"
+            docker tag "ghcr.io/${IMAGE_OWNER}/realestate-backend@${BACKEND_DIGEST}" \
               "ghcr.io/${IMAGE_OWNER}/realestate-backend:${IMAGE_TAG}"
           fi
           if [ -n "$FRONTEND_DIGEST" ]; then
             echo "Pulling frontend by digest: $FRONTEND_DIGEST"
-            docker pull "ghcr.io/${IMAGE_OWNER}/realestate-frontend${FRONTEND_DIGEST}"
-            docker tag "ghcr.io/${IMAGE_OWNER}/realestate-frontend${FRONTEND_DIGEST}" \
+            docker pull "ghcr.io/${IMAGE_OWNER}/realestate-frontend@${FRONTEND_DIGEST}"
+            docker tag "ghcr.io/${IMAGE_OWNER}/realestate-frontend@${FRONTEND_DIGEST}" \
               "ghcr.io/${IMAGE_OWNER}/realestate-frontend:${IMAGE_TAG}"
           fi
 

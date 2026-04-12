@@ -31,6 +31,12 @@ from datetime import datetime
 
 PORT = 9090
 BIND_ADDRESS = os.environ.get("BIND_ADDRESS", "127.0.0.1")
+_ALLOWED_BIND = {"127.0.0.1", "::1", "localhost"}
+if BIND_ADDRESS not in _ALLOWED_BIND:
+    raise SystemExit(
+        f"BIND_ADDRESS={BIND_ADDRESS!r} is not allowed. "
+        f"Must be one of {_ALLOWED_BIND} to prevent network exposure."
+    )
 PROJECT_DIR = "/mnt/d/realestate"
 WSL_DISTRO = "Ubuntu-22.04"
 WSL_USER = "jperez"
@@ -105,7 +111,8 @@ log = logging.getLogger("webhook")
 def get_local_ip():
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.connect(("192.168.88.25", 80))
+        sock.settimeout(2)
+        sock.connect(("8.8.8.8", 80))
         ip = sock.getsockname()[0]
         sock.close()
         return ip
@@ -327,6 +334,9 @@ class WebhookHandler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", content_type)
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Content-Security-Policy", "default-src 'none'")
+        self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Connection", "close")
         self.end_headers()
@@ -499,6 +509,11 @@ class WebhookHandler(BaseHTTPRequestHandler):
         log.info("SonarQube fix webhook received")
         fix_sonar_issues(sonar_report, run_url)
 
+    def _reject_method(self):
+        self._send(405, b"Method not allowed")
+
+    do_PUT = do_DELETE = do_PATCH = do_HEAD = do_OPTIONS = _reject_method
+
     def log_message(self, format, *args):
         pass
 
@@ -506,6 +521,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
 def main():
     if not WEBHOOK_SECRET:
         log.error("WEBHOOK_SECRET environment variable is required. Set it before starting the listener.")
+        raise SystemExit(1)
+
+    if not os.path.isdir(PROJECT_DIR):
+        log.error(f"PROJECT_DIR does not exist or is not a directory: {PROJECT_DIR}")
         raise SystemExit(1)
 
     local_ip = get_local_ip()
