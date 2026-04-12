@@ -516,12 +516,19 @@ def fix_with_retry(job, step, error_log, context=None):
         return False
 
     try:
+        if _is_autofix_commit():
+            log.warning(f"Last commit is an auto-fix -- skipping {job}/{step} to prevent loop")
+            return False
+
         ctx = ""
         if context:
             ctx = f" (commit: {context.get('commit', '?')[:8]}, branch: {context.get('branch', '?')}, actor: {context.get('actor', '?')})"
 
         error_class = _classify_error(error_log)
         log.info(f"Error classified as: {error_class} for {job}/{step}")
+
+        past_attempts_section = _get_past_attempts(job, error_log)
+        previous_attempt_result = ""
 
         for attempt in range(1, MAX_RETRIES + 1):
             log.info(f"=== Attempt {attempt}/{MAX_RETRIES} for {job}/{step}{ctx} (class: {error_class}) ===")
@@ -630,30 +637,115 @@ def fix_with_retry(job, step, error_log, context=None):
                     "7. Run 'cargo test --locked -p realestate-backend --all-targets' to ensure nothing broke."
                 )
 
+            flaky_note = ""
+            if error_class == "test_failure":
+                flaky_note = (
+                    "\n\nFLAKY TEST CHECK (do this FIRST):\n"
+                    "Before making any code changes, re-run the failing test 2 times. "
+                    "If it passes on re-run, the test is flaky -- do NOT change application code. "
+                    "Instead, note which test is flaky and move on. "
+                    "Only fix the code if the test fails consistently on every re-run."
+                )
+
+            history_section = ""
+            if past_attempts_section:
+                history_section = f"\n\n{past_attempts_section}"
+
+            retry_section = ""
+            if previous_attempt_result:
+                retry_section = (
+                    f"\n\nPREVIOUS ATTEMPT FAILED (attempt {attempt - 1}):\n"
+                    f"{previous_attempt_result}\n"
+                    "You MUST try a DIFFERENT approach this time. Do not repeat the same fix."
+                )
+
             prompt = (
                 f"The CI pipeline FAILED in job '{job}', step '{step}'.{ctx}\n"
-                f"Error classification: {error_class}\n\n"
+                f"Error classification: {error_class}\n"
+                f"Fix attempt: {attempt} of {MAX_RETRIES}\n\n"
                 f"Error output:\n```\n{error_log}\n```\n\n"
                 f"TASK: {instruction}"
                 f"{runner_env_note}"
-                f"{dependency_note}\n\n"
+                f"{dependency_note}"
+                f"{flaky_note}"
+                f"{history_section}"
+                f"{retry_section}"
+                f"{_SCOPE_CONSTRAINTS}\n\n"
                 "After fixing, run only the targeted verification command for this job. "
                 "Then commit and push:\n"
                 "  git add -A && git commit -m 'fix: resolve CI failures (auto-fix)' && git push origin main\n"
                 "  If push fails: git pull --rebase origin main && git push origin main"
             )
 
-            if run_kiro(prompt, f"CI fix ({job}/{step}) attempt {attempt}"):
+            success = run_kiro(prompt, f"CI fix ({job}/{step}) attempt {attempt}")
+            _record_fix_attempt(job, error_log, attempt, success,
+                                f"class={error_class}, job={job}, step={step}")
+
+            if success:
                 log.info(f"Attempt {attempt} completed for {job}/{step}")
                 return True
 
+            previous_attempt_result = (
+                f"kiro-cli returned failure for attempt {attempt}. "
+                f"The fix either did not compile, tests still failed, or the push was rejected. "
+                f"Error class: {error_class}. Job: {job}, Step: {step}."
+            )
             log.warning(f"Attempt {attempt} failed for {job}/{step}")
 
-        log.error(f"Failed after {MAX_RETRIES} attempts for {job}/{step}. Manual intervention needed.")
+        _write_escalation(job, step, error_log, error_class, context)
+        log.error(f"Failed after {MAX_RETRIES} attempts for {job}/{step}. Escalation written.")
         return False
     finally:
         _fix_lock.release()
 
+
+def _write_escalation(job, step, error_log, error_class, context):
+    """Write a structured escalation report when all retries are exhausted."""
+    escalation_dir = _win_project_dir / "escalations"
+    try:
+        escalation_dir.mkdir(exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report = {
+            "timestamp": datetime.now().isoformat(),
+            "job": job,
+            "step": step,
+            "error_class": error_class,
+            "context": context or {},
+            "max_retries_exhausted": MAX_RETRIES,
+            "error_log_preview": error_log[:3000],
+            "recommendation": _escalation_recommendation(error_class, job),
+        }
+        path = escalation_dir / f"{ts}_{job}.json"
+        path.write_text(json.dumps(report, indent=2, ensure_ascii=False),
+                        encoding="utf-8", newline="\n")
+        log.info(f"Escalation report written to {path}")
+    except OSError as e:
+        log.warning(f"Failed to write escalation report: {e}")
+
+
+def _escalation_recommendation(error_class, job):
+    """Generate a human-readable recommendation for the escalation."""
+    recs = {
+        "runner_environment": (
+            "This is a runner/infrastructure issue. Check: disk space, Docker daemon, "
+            "network connectivity, installed tools on the self-hosted runner."
+        ),
+        "dependency": (
+            f"Dependency vulnerability in {job}. Manual review needed: "
+            "check if a patched version exists, evaluate if suppression is appropriate, "
+            "or find an alternative library."
+        ),
+        "test_failure": (
+            f"Persistent test failure in {job} that auto-fix could not resolve. "
+            "The test may require understanding of business logic changes. "
+            "Check if the test expectations need updating or if there's a real regression."
+        ),
+        "code_quality": (
+            f"Code quality issue in {job} that auto-fix could not resolve. "
+            "May require architectural changes or understanding of the broader context."
+        ),
+    }
+    return recs.get(error_class, f"Auto-fix exhausted {MAX_RETRIES} attempts for {job}. Manual investigation required.")
 
 def fix_sonar_issues(sonar_report, run_url):
     if not _sonar_fix_lock.acquire(blocking=False):
@@ -661,8 +753,22 @@ def fix_sonar_issues(sonar_report, run_url):
         return False
 
     try:
+        if _is_autofix_commit():
+            log.warning("Last commit is an auto-fix -- skipping SonarQube fix to prevent loop")
+            return False
+
+        previous_attempt_result = ""
+
         for attempt in range(1, MAX_RETRIES + 1):
             log.info(f"=== SonarQube issue fix attempt {attempt}/{MAX_RETRIES} ===")
+
+            retry_section = ""
+            if previous_attempt_result:
+                retry_section = (
+                    f"\n\nPREVIOUS ATTEMPT FAILED (attempt {attempt - 1}):\n"
+                    f"{previous_attempt_result}\n"
+                    "Try a different approach. Focus on the issues that were NOT fixed in the previous attempt."
+                )
 
             prompt = (
                 "You are a code quality specialist working on a Rust/WASM real estate management project "
@@ -687,14 +793,22 @@ def fix_sonar_issues(sonar_report, run_url):
                 "8. Stage, commit, and push:\n"
                 "   git add -A && git commit -m 'fix: resolve SonarQube issues (auto-fix)' && git push origin main\n"
                 "   If push fails: git pull --rebase origin main && git push origin main\n"
-                "9. Do NOT stop until all reported issues are addressed.\n\n"
+                "9. Do NOT stop until all reported issues are addressed.\n"
+                f"{retry_section}"
+                f"{_SCOPE_CONSTRAINTS}\n\n"
                 f"Run URL for context: {run_url}"
             )
 
-            if run_kiro(prompt, f"SonarQube issue fix attempt {attempt}"):
+            success = run_kiro(prompt, f"SonarQube issue fix attempt {attempt}")
+
+            if success:
                 log.info(f"SonarQube fix attempt {attempt} completed")
                 return True
 
+            previous_attempt_result = (
+                f"kiro-cli returned failure for SonarQube fix attempt {attempt}. "
+                "Some issues may remain unfixed or the verification step failed."
+            )
             log.warning(f"SonarQube fix attempt {attempt} failed")
 
         log.error(f"SonarQube fix failed after {MAX_RETRIES} attempts.")

@@ -1,5 +1,6 @@
 use crate::app::AuthContext;
 use crate::components::common::data_table::DataTable;
+use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::loading::Loading;
 use crate::components::common::pagination::Pagination;
@@ -80,6 +81,29 @@ fn MantenimientoForm(props: &MantenimientoFormProps) -> Html {
         .filter(|u| u.propiedad_id == selected_prop)
         .collect();
     let fe = props.form_errors.clone();
+    let title = if props.is_editing {
+        "Editar Solicitud"
+    } else {
+        "Nueva Solicitud"
+    };
+    let prop_class = if fe.propiedad_id.is_some() {
+        "gi-input gi-input-error"
+    } else {
+        "gi-input"
+    };
+    let titulo_class = if fe.titulo.is_some() {
+        "gi-input gi-input-error"
+    } else {
+        "gi-input"
+    };
+    let submit_text = if props.submitting {
+        "Guardando..."
+    } else {
+        "Guardar"
+    };
+    let error_html = render_form_error(&props.error, &props.on_error_close);
+    let prop_error_html = render_field_error(&fe.propiedad_id);
+    let titulo_error_html = render_field_error(&fe.titulo);
 
     macro_rules! input_cb {
         ($state:expr) => {{
@@ -112,26 +136,21 @@ fn MantenimientoForm(props: &MantenimientoFormProps) -> Html {
     html! {
         <div>
             <div class="gi-page-header">
-                <h1 class="gi-page-title">{if props.is_editing { "Editar Solicitud" } else { "Nueva Solicitud" }}</h1>
+                <h1 class="gi-page-title">{title}</h1>
             </div>
-
-            if let Some(ref err) = props.error {
-                <ErrorBanner message={err.clone()} onclose={props.on_error_close.clone()} />
-            }
-
+            {error_html}
             <div class="gi-card" style="padding: var(--space-6);">
                 <form onsubmit={props.on_submit.clone()} style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
                     <div>
                         <label class="gi-label">{"Propiedad *"}</label>
-                        <select onchange={select_cb!(props.f_propiedad_id)} disabled={props.is_editing}
-                            class={if fe.propiedad_id.is_some() { "gi-input gi-input-error" } else { "gi-input" }}>
+                        <select onchange={select_cb!(props.f_propiedad_id)} disabled={props.is_editing} class={prop_class}>
                             <option value="" selected={props.f_propiedad_id.is_empty()}>{"— Seleccionar propiedad —"}</option>
                             { for props.propiedades.iter().map(|p| {
                                 let sel = *props.f_propiedad_id == p.id;
                                 html! { <option value={p.id.clone()} selected={sel}>{&p.titulo}</option> }
                             })}
                         </select>
-                        if let Some(ref msg) = fe.propiedad_id { <p class="gi-field-error">{msg}</p> }
+                        {prop_error_html}
                     </div>
                     <div>
                         <label class="gi-label">{"Unidad"}</label>
@@ -157,9 +176,8 @@ fn MantenimientoForm(props: &MantenimientoFormProps) -> Html {
                     <div>
                         <label class="gi-label">{"Título *"}</label>
                         <input type="text" value={(*props.f_titulo).clone()} oninput={input_cb!(props.f_titulo)}
-                            class={if fe.titulo.is_some() { "gi-input gi-input-error" } else { "gi-input" }}
-                            placeholder="Descripción breve del problema" />
-                        if let Some(ref msg) = fe.titulo { <p class="gi-field-error">{msg}</p> }
+                            class={titulo_class} placeholder="Descripción breve del problema" />
+                        {titulo_error_html}
                     </div>
                     <div style="grid-column: 1 / -1;">
                         <label class="gi-label">{"Descripción"}</label>
@@ -204,13 +222,25 @@ fn MantenimientoForm(props: &MantenimientoFormProps) -> Html {
                     </div>
                     <div style="grid-column: 1 / -1; display: flex; gap: var(--space-2); justify-content: flex-end;">
                         <button type="button" onclick={props.on_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                        <button type="submit" disabled={props.submitting} class="gi-btn gi-btn-primary">
-                            {if props.submitting { "Guardando..." } else { "Guardar" }}
-                        </button>
+                        <button type="submit" disabled={props.submitting} class="gi-btn gi-btn-primary">{submit_text}</button>
                     </div>
                 </form>
             </div>
         </div>
+    }
+}
+
+fn render_form_error(error: &Option<String>, on_close: &Callback<MouseEvent>) -> Html {
+    match error {
+        Some(err) => html! { <ErrorBanner message={err.clone()} onclose={on_close.clone()} /> },
+        None => html! {},
+    }
+}
+
+fn render_field_error(error: &Option<String>) -> Html {
+    match error {
+        Some(msg) => html! { <p class="gi-field-error">{msg}</p> },
+        None => html! {},
     }
 }
 
@@ -228,21 +258,157 @@ struct MantenimientoDetailProps {
     prop_label: Callback<String, String>,
 }
 
+fn render_detail_actions(
+    sol_id: &str,
+    sol_estado: &str,
+    user_rol: &str,
+    on_cambiar_estado: &Callback<(String, String)>,
+) -> Html {
+    if !can_write(user_rol) {
+        return html! {};
+    }
+    let action = match sol_estado {
+        "pendiente" => Some(("en_progreso", "Iniciar Trabajo")),
+        "en_progreso" => Some(("completado", "Completar")),
+        _ => None,
+    };
+    let Some((next_estado, label)) = action else {
+        return html! {};
+    };
+    let id = sol_id.to_string();
+    let next = next_estado.to_string();
+    let on_cambiar = on_cambiar_estado.clone();
+    html! {
+        <div style="display: flex; gap: var(--space-2);">
+            <button onclick={Callback::from(move |_: MouseEvent| on_cambiar.emit((id.clone(), next.clone())))}
+                class="gi-btn gi-btn-primary">{label}</button>
+        </div>
+    }
+}
+
+fn render_detail_field(label: &str, value: &str, style: &str) -> Html {
+    html! {
+        <div style={style.to_string()}>
+            <span class="gi-label">{label}</span>
+            <p style="font-size: var(--text-sm); color: var(--text-primary);">{value.to_string()}</p>
+        </div>
+    }
+}
+
+fn render_optional_field(label: &str, value: &Option<String>, style: &str) -> Html {
+    match value {
+        Some(v) => render_detail_field(label, v, style),
+        None => html! {},
+    }
+}
+
+fn render_detail_fields(sol: &Solicitud, prop_label: &Callback<String, String>) -> Html {
+    let costo_html = match (&sol.costo_monto, &sol.costo_moneda) {
+        (Some(monto), Some(moneda)) => {
+            render_detail_field("Costo", &format_currency(moneda, *monto), "")
+        }
+        _ => html! {},
+    };
+    let fecha_inicio_html = render_optional_field(
+        "Fecha Inicio",
+        &sol.fecha_inicio.as_ref().map(|f| format_date_display(f)),
+        "",
+    );
+    let fecha_fin_html = render_optional_field(
+        "Fecha Fin",
+        &sol.fecha_fin.as_ref().map(|f| format_date_display(f)),
+        "",
+    );
+
+    html! {
+        <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
+                {render_detail_field("Propiedad", &prop_label.emit(sol.propiedad_id.clone()), "")}
+                <div>
+                    <span class="gi-label">{"Estado"}</span>
+                    <div>{estado_badge(&sol.estado)}</div>
+                </div>
+                <div>
+                    <span class="gi-label">{"Prioridad"}</span>
+                    <div>{prioridad_badge(&sol.prioridad)}</div>
+                </div>
+                {render_optional_field("Descripción", &sol.descripcion, "grid-column: 1 / -1;")}
+                {render_optional_field("Proveedor", &sol.nombre_proveedor, "")}
+                {render_optional_field("Teléfono Proveedor", &sol.telefono_proveedor, "")}
+                {render_optional_field("Email Proveedor", &sol.email_proveedor, "")}
+                {costo_html}
+                {fecha_inicio_html}
+                {fecha_fin_html}
+                <div>
+                    <span class="gi-label">{"Creado"}</span>
+                    <p style="font-size: var(--text-sm); color: var(--text-secondary);">{format_date_display(&sol.created_at)}</p>
+                </div>
+                <div>
+                    <span class="gi-label">{"Actualizado"}</span>
+                    <p style="font-size: var(--text-sm); color: var(--text-secondary);">{format_date_display(&sol.updated_at)}</p>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+fn render_detail_notas(
+    sol: &Solicitud,
+    user_rol: &str,
+    on_add_nota: &Callback<SubmitEvent>,
+    nota_contenido: &UseStateHandle<String>,
+    nota_submitting: bool,
+) -> Html {
+    let nota_form = if can_write(user_rol) {
+        let s = nota_contenido.clone();
+        let textarea_cb = Callback::from(move |e: InputEvent| {
+            let el: web_sys::HtmlTextAreaElement = e.target_unchecked_into();
+            s.set(el.value());
+        });
+        let btn_text = if nota_submitting {
+            "Enviando..."
+        } else {
+            "Agregar"
+        };
+        html! {
+            <form onsubmit={on_add_nota.clone()} style="display: flex; gap: var(--space-3); margin-bottom: var(--space-4);">
+                <textarea value={(*nota_contenido).clone()} oninput={textarea_cb}
+                    class="gi-input" style="flex: 1; min-height: 60px;" placeholder="Agregar una nota..." />
+                <button type="submit" disabled={nota_submitting} class="gi-btn gi-btn-primary" style="align-self: flex-end;">{btn_text}</button>
+            </form>
+        }
+    } else {
+        html! {}
+    };
+
+    let notas_list = sol.notas.as_deref().unwrap_or_default();
+    let notas_html = if notas_list.is_empty() {
+        html! { <p style="font-size: var(--text-sm); color: var(--text-tertiary);">{"Sin notas aún."}</p> }
+    } else {
+        html! {
+            <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                { for notas_list.iter().map(|n| html! {
+                    <div style="padding: var(--space-3); border: 1px solid var(--border-subtle); border-radius: 8px;">
+                        <p style="font-size: var(--text-sm); color: var(--text-primary); margin-bottom: var(--space-1);">{&n.contenido}</p>
+                        <p style="font-size: var(--text-xs); color: var(--text-tertiary);">{format_date_display(&n.created_at)}</p>
+                    </div>
+                })}
+            </div>
+        }
+    };
+
+    html! {
+        <div class="gi-card" style="padding: var(--space-6);">
+            <h2 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">{"Notas"}</h2>
+            {nota_form}
+            {notas_html}
+        </div>
+    }
+}
+
 #[function_component]
 fn MantenimientoDetail(props: &MantenimientoDetailProps) -> Html {
     let sol = &props.sol;
-    let sol_id = sol.id.clone();
-    let sol_estado = sol.estado.clone();
-
-    macro_rules! textarea_cb {
-        ($state:expr) => {{
-            let s = $state.clone();
-            Callback::from(move |e: InputEvent| {
-                let el: web_sys::HtmlTextAreaElement = e.target_unchecked_into();
-                s.set(el.value());
-            })
-        }};
-    }
 
     html! {
         <div>
@@ -251,134 +417,15 @@ fn MantenimientoDetail(props: &MantenimientoDetailProps) -> Html {
                     <button onclick={props.on_back.clone()} class="gi-btn gi-btn-ghost">{"← Volver"}</button>
                     <h1 class="gi-page-title">{&sol.titulo}</h1>
                 </div>
-                if can_write(&props.user_rol) {
-                    <div style="display: flex; gap: var(--space-2);">
-                        if sol_estado == "pendiente" {
-                            <button onclick={Callback::from({
-                                let id = sol_id.clone(); let on_cambiar = props.on_cambiar_estado.clone();
-                                move |_: MouseEvent| on_cambiar.emit((id.clone(), "en_progreso".into()))
-                            })} class="gi-btn gi-btn-primary">{"Iniciar Trabajo"}</button>
-                        }
-                        if sol_estado == "en_progreso" {
-                            <button onclick={Callback::from({
-                                let id = sol_id.clone(); let on_cambiar = props.on_cambiar_estado.clone();
-                                move |_: MouseEvent| on_cambiar.emit((id.clone(), "completado".into()))
-                            })} class="gi-btn gi-btn-primary">{"Completar"}</button>
-                        }
-                    </div>
-                }
+                {render_detail_actions(&sol.id, &sol.estado, &props.user_rol, &props.on_cambiar_estado)}
             </div>
 
             if let Some(ref err) = props.error {
                 <ErrorBanner message={err.clone()} onclose={props.on_error_close.clone()} />
             }
 
-            <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
-                    <div>
-                        <span class="gi-label">{"Propiedad"}</span>
-                        <p style="font-size: var(--text-sm); color: var(--text-primary);">{props.prop_label.emit(sol.propiedad_id.clone())}</p>
-                    </div>
-                    <div>
-                        <span class="gi-label">{"Estado"}</span>
-                        <div>{estado_badge(&sol.estado)}</div>
-                    </div>
-                    <div>
-                        <span class="gi-label">{"Prioridad"}</span>
-                        <div>{prioridad_badge(&sol.prioridad)}</div>
-                    </div>
-                    if let Some(ref desc) = sol.descripcion {
-                        <div style="grid-column: 1 / -1;">
-                            <span class="gi-label">{"Descripción"}</span>
-                            <p style="font-size: var(--text-sm); color: var(--text-primary);">{desc}</p>
-                        </div>
-                    }
-                    if let Some(ref nombre) = sol.nombre_proveedor {
-                        <div>
-                            <span class="gi-label">{"Proveedor"}</span>
-                            <p style="font-size: var(--text-sm); color: var(--text-primary);">{nombre}</p>
-                        </div>
-                    }
-                    if let Some(ref tel) = sol.telefono_proveedor {
-                        <div>
-                            <span class="gi-label">{"Teléfono Proveedor"}</span>
-                            <p style="font-size: var(--text-sm); color: var(--text-primary);">{tel}</p>
-                        </div>
-                    }
-                    if let Some(ref email) = sol.email_proveedor {
-                        <div>
-                            <span class="gi-label">{"Email Proveedor"}</span>
-                            <p style="font-size: var(--text-sm); color: var(--text-primary);">{email}</p>
-                        </div>
-                    }
-                    if sol.costo_monto.is_some() && sol.costo_moneda.is_some() {
-                        <div>
-                            <span class="gi-label">{"Costo"}</span>
-                            <p style="font-size: var(--text-sm); color: var(--text-primary);">
-                                {format_currency(sol.costo_moneda.as_deref().unwrap_or("DOP"), sol.costo_monto.unwrap_or(0.0))}
-                            </p>
-                        </div>
-                    }
-                    if let Some(ref fi) = sol.fecha_inicio {
-                        <div>
-                            <span class="gi-label">{"Fecha Inicio"}</span>
-                            <p style="font-size: var(--text-sm); color: var(--text-primary);">{format_date_display(fi)}</p>
-                        </div>
-                    }
-                    if let Some(ref ff) = sol.fecha_fin {
-                        <div>
-                            <span class="gi-label">{"Fecha Fin"}</span>
-                            <p style="font-size: var(--text-sm); color: var(--text-primary);">{format_date_display(ff)}</p>
-                        </div>
-                    }
-                    <div>
-                        <span class="gi-label">{"Creado"}</span>
-                        <p style="font-size: var(--text-sm); color: var(--text-secondary);">{format_date_display(&sol.created_at)}</p>
-                    </div>
-                    <div>
-                        <span class="gi-label">{"Actualizado"}</span>
-                        <p style="font-size: var(--text-sm); color: var(--text-secondary);">{format_date_display(&sol.updated_at)}</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="gi-card" style="padding: var(--space-6);">
-                <h2 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">{"Notas"}</h2>
-                if can_write(&props.user_rol) {
-                    <form onsubmit={props.on_add_nota.clone()} style="display: flex; gap: var(--space-3); margin-bottom: var(--space-4);">
-                        <textarea
-                            value={(*props.nota_contenido).clone()}
-                            oninput={textarea_cb!(props.nota_contenido)}
-                            class="gi-input"
-                            style="flex: 1; min-height: 60px;"
-                            placeholder="Agregar una nota..."
-                        />
-                        <button type="submit" disabled={props.nota_submitting} class="gi-btn gi-btn-primary" style="align-self: flex-end;">
-                            {if props.nota_submitting { "Enviando..." } else { "Agregar" }}
-                        </button>
-                    </form>
-                }
-                {
-                    if sol.notas.as_deref().unwrap_or_default().is_empty() {
-                        html! {
-                            <p style="font-size: var(--text-sm); color: var(--text-tertiary);">{"Sin notas aún."}</p>
-                        }
-                    } else {
-                        html! {
-                            <div style="display: flex; flex-direction: column; gap: var(--space-3);">
-                                { for sol.notas.as_deref().unwrap_or_default().iter().map(|n| {
-                                    html! {
-                                        <div style="padding: var(--space-3); border: 1px solid var(--border-subtle); border-radius: 8px;">
-                                            <p style="font-size: var(--text-sm); color: var(--text-primary); margin-bottom: var(--space-1);">{&n.contenido}</p>
-                                            <p style="font-size: var(--text-xs); color: var(--text-tertiary);">{format_date_display(&n.created_at)}</p>
-                                        </div>
-                                    }
-                                })}
-                            </div>
-                        }
-                    }
-                }
-            </div>
+            {render_detail_fields(sol, &props.prop_label)}
+            {render_detail_notas(sol, &props.user_rol, &props.on_add_nota, &props.nota_contenido, props.nota_submitting)}
         </div>
     }
 }
