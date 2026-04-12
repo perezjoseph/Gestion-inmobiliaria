@@ -30,14 +30,16 @@ class PeriodicRefreshWorker
         override suspend fun doWork(): Result {
             var hasError = false
 
-            listOf(
-                "propiedades" to { propiedadesRepository.refreshFromServer() },
-                "inquilinos" to { inquilinosRepository.refreshFromServer() },
-                "contratos" to { contratosRepository.refreshFromServer() },
-                "pagos" to { pagosRepository.refreshFromServer() },
-                "gastos" to { gastosRepository.refreshFromServer() },
-                "mantenimiento" to { mantenimientoRepository.refreshFromServer() },
-            ).forEach { (name, refresh) ->
+            val refreshTasks: List<Pair<String, suspend () -> kotlin.Result<Unit>>> =
+                listOf(
+                    "propiedades" to { propiedadesRepository.refreshFromServer() },
+                    "inquilinos" to { inquilinosRepository.refreshFromServer() },
+                    "contratos" to { contratosRepository.refreshFromServer() },
+                    "pagos" to { pagosRepository.refreshFromServer() },
+                    "gastos" to { gastosRepository.refreshFromServer() },
+                    "mantenimiento" to { mantenimientoRepository.refreshFromServer() },
+                )
+            refreshTasks.forEach { (name, refresh) ->
                 refresh().onFailure { e ->
                     Log.e(TAG, "Failed to refresh $name", e)
                     hasError = true

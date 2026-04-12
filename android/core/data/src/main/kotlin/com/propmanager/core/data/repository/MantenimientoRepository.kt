@@ -25,7 +25,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class MantenimientoRepository
+open class MantenimientoRepository
     @Inject
     constructor(
         private val solicitudDao: SolicitudMantenimientoDao,
@@ -34,9 +34,9 @@ class MantenimientoRepository
         private val apiService: MantenimientoApiService,
         private val json: Json,
     ) {
-        fun observeAll(): Flow<List<SolicitudMantenimiento>> = solicitudDao.observeAll().map { entities -> entities.map { it.toDomain() } }
+        open fun observeAll(): Flow<List<SolicitudMantenimiento>> = solicitudDao.observeAll().map { entities -> entities.map { it.toDomain() } }
 
-        fun observeFiltered(
+        open fun observeFiltered(
             estado: String? = null,
             prioridad: String? = null,
             propiedadId: String? = null,
@@ -45,12 +45,12 @@ class MantenimientoRepository
                 .observeFiltered(estado, prioridad, propiedadId)
                 .map { entities -> entities.map { it.toDomain() } }
 
-        fun observeById(id: String): Flow<SolicitudMantenimiento?> = solicitudDao.observeById(id).map { it?.toDomain() }
+        open fun observeById(id: String): Flow<SolicitudMantenimiento?> = solicitudDao.observeById(id).map { it?.toDomain() }
 
-        fun observeNotas(solicitudId: String): Flow<List<NotaMantenimiento>> =
+        open fun observeNotas(solicitudId: String): Flow<List<NotaMantenimiento>> =
             notaDao.observeBySolicitudId(solicitudId).map { entities -> entities.map { it.toDomain() } }
 
-        suspend fun create(request: CreateSolicitudRequest): Result<SolicitudMantenimiento> =
+        open suspend fun create(request: CreateSolicitudRequest): Result<SolicitudMantenimiento> =
             runCatching {
                 val id = UUID.randomUUID().toString()
                 val now = Instant.now().toEpochMilli()
@@ -88,7 +88,7 @@ class MantenimientoRepository
                 entity.toDomain()
             }
 
-        suspend fun update(
+        open suspend fun update(
             id: String,
             request: UpdateSolicitudRequest,
         ): Result<Unit> =
@@ -104,7 +104,7 @@ class MantenimientoRepository
                 )
             }
 
-        suspend fun updateEstado(
+        open suspend fun updateEstado(
             id: String,
             request: UpdateEstadoRequest,
         ): Result<Unit> =
@@ -120,7 +120,7 @@ class MantenimientoRepository
                 )
             }
 
-        suspend fun addNota(
+        open suspend fun addNota(
             solicitudId: String,
             request: CreateNotaRequest,
         ): Result<NotaMantenimiento> =
@@ -148,7 +148,7 @@ class MantenimientoRepository
                 entity.toDomain()
             }
 
-        suspend fun delete(id: String): Result<Unit> =
+        open suspend fun delete(id: String): Result<Unit> =
             runCatching {
                 solicitudDao.markDeleted(id)
                 syncQueueDao.enqueue(
@@ -162,7 +162,7 @@ class MantenimientoRepository
                 )
             }
 
-        suspend fun refreshFromServer(): Result<Unit> =
+        open suspend fun refreshFromServer(): Result<Unit> =
             runCatching {
                 var page = 1L
                 do {

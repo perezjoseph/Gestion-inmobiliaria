@@ -38,6 +38,8 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization)
+    implementation(libs.retrofit2)
+    implementation(libs.okhttp3.logging.interceptor)
 
     implementation(libs.hilt.android)
     implementation(libs.hilt.work)

@@ -22,7 +22,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class ContratosRepository
+open class ContratosRepository
     @Inject
     constructor(
         private val dao: ContratoDao,
@@ -30,11 +30,11 @@ class ContratosRepository
         private val apiService: ContratosApiService,
         private val json: Json,
     ) {
-        fun observeAll(): Flow<List<Contrato>> = dao.observeAll().map { entities -> entities.map { it.toDomain() } }
+        open fun observeAll(): Flow<List<Contrato>> = dao.observeAll().map { entities -> entities.map { it.toDomain() } }
 
-        fun observeById(id: String): Flow<Contrato?> = dao.observeById(id).map { it?.toDomain() }
+        open fun observeById(id: String): Flow<Contrato?> = dao.observeById(id).map { it?.toDomain() }
 
-        fun observeExpiring(daysThreshold: Int = 30): Flow<List<Contrato>> {
+        open fun observeExpiring(daysThreshold: Int = 30): Flow<List<Contrato>> {
             val today = LocalDate.now().toString()
             val threshold = LocalDate.now().plusDays(daysThreshold.toLong()).toString()
             return dao
@@ -42,7 +42,7 @@ class ContratosRepository
                 .map { entities -> entities.map { it.toDomain() } }
         }
 
-        suspend fun create(request: CreateContratoRequest): Result<Contrato> =
+        open suspend fun create(request: CreateContratoRequest): Result<Contrato> =
             runCatching {
                 val id = UUID.randomUUID().toString()
                 val now = Instant.now().toEpochMilli()
@@ -74,7 +74,7 @@ class ContratosRepository
                 entity.toDomain()
             }
 
-        suspend fun renew(
+        open suspend fun renew(
             id: String,
             request: RenovarContratoRequest,
         ): Result<Unit> =
@@ -90,7 +90,7 @@ class ContratosRepository
                 )
             }
 
-        suspend fun terminate(
+        open suspend fun terminate(
             id: String,
             request: TerminarContratoRequest,
         ): Result<Unit> =
@@ -106,7 +106,7 @@ class ContratosRepository
                 )
             }
 
-        suspend fun delete(id: String): Result<Unit> =
+        open suspend fun delete(id: String): Result<Unit> =
             runCatching {
                 dao.markDeleted(id)
                 syncQueueDao.enqueue(
@@ -120,7 +120,7 @@ class ContratosRepository
                 )
             }
 
-        suspend fun refreshFromServer(): Result<Unit> =
+        open suspend fun refreshFromServer(): Result<Unit> =
             runCatching {
                 var page = 1L
                 do {

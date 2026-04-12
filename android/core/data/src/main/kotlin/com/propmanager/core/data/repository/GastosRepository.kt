@@ -20,7 +20,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class GastosRepository
+open class GastosRepository
     @Inject
     constructor(
         private val dao: GastoDao,
@@ -28,9 +28,9 @@ class GastosRepository
         private val apiService: GastosApiService,
         private val json: Json,
     ) {
-        fun observeAll(): Flow<List<Gasto>> = dao.observeAll().map { entities -> entities.map { it.toDomain() } }
+        open fun observeAll(): Flow<List<Gasto>> = dao.observeAll().map { entities -> entities.map { it.toDomain() } }
 
-        fun observeFiltered(
+        open fun observeFiltered(
             propiedadId: String? = null,
             categoria: String? = null,
             estado: String? = null,
@@ -41,7 +41,7 @@ class GastosRepository
                 .observeFiltered(propiedadId, categoria, estado, fechaDesde, fechaHasta)
                 .map { entities -> entities.map { it.toDomain() } }
 
-        suspend fun create(request: CreateGastoRequest): Result<Gasto> =
+        open suspend fun create(request: CreateGastoRequest): Result<Gasto> =
             runCatching {
                 val id = UUID.randomUUID().toString()
                 val now = Instant.now().toEpochMilli()
@@ -76,7 +76,7 @@ class GastosRepository
                 entity.toDomain()
             }
 
-        suspend fun update(
+        open suspend fun update(
             id: String,
             request: UpdateGastoRequest,
         ): Result<Unit> =
@@ -92,7 +92,7 @@ class GastosRepository
                 )
             }
 
-        suspend fun delete(id: String): Result<Unit> =
+        open suspend fun delete(id: String): Result<Unit> =
             runCatching {
                 dao.markDeleted(id)
                 syncQueueDao.enqueue(
@@ -106,7 +106,7 @@ class GastosRepository
                 )
             }
 
-        suspend fun refreshFromServer(): Result<Unit> =
+        open suspend fun refreshFromServer(): Result<Unit> =
             runCatching {
                 var page = 1L
                 do {

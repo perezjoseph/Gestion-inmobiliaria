@@ -20,7 +20,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class InquilinosRepository
+open class InquilinosRepository
     @Inject
     constructor(
         private val dao: InquilinoDao,
@@ -28,13 +28,13 @@ class InquilinosRepository
         private val apiService: InquilinosApiService,
         private val json: Json,
     ) {
-        fun observeAll(): Flow<List<Inquilino>> = dao.observeAll().map { entities -> entities.map { it.toDomain() } }
+        open fun observeAll(): Flow<List<Inquilino>> = dao.observeAll().map { entities -> entities.map { it.toDomain() } }
 
-        fun search(query: String): Flow<List<Inquilino>> = dao.search(query).map { entities -> entities.map { it.toDomain() } }
+        open fun search(query: String): Flow<List<Inquilino>> = dao.search(query).map { entities -> entities.map { it.toDomain() } }
 
-        fun observeById(id: String): Flow<Inquilino?> = dao.observeById(id).map { it?.toDomain() }
+        open fun observeById(id: String): Flow<Inquilino?> = dao.observeById(id).map { it?.toDomain() }
 
-        suspend fun create(request: CreateInquilinoRequest): Result<Inquilino> =
+        open suspend fun create(request: CreateInquilinoRequest): Result<Inquilino> =
             runCatching {
                 val id = UUID.randomUUID().toString()
                 val now = Instant.now().toEpochMilli()
@@ -65,7 +65,7 @@ class InquilinosRepository
                 entity.toDomain()
             }
 
-        suspend fun update(
+        open suspend fun update(
             id: String,
             request: UpdateInquilinoRequest,
         ): Result<Unit> =
@@ -81,7 +81,7 @@ class InquilinosRepository
                 )
             }
 
-        suspend fun delete(id: String): Result<Unit> =
+        open suspend fun delete(id: String): Result<Unit> =
             runCatching {
                 dao.markDeleted(id)
                 syncQueueDao.enqueue(
@@ -95,7 +95,7 @@ class InquilinosRepository
                 )
             }
 
-        suspend fun refreshFromServer(): Result<Unit> =
+        open suspend fun refreshFromServer(): Result<Unit> =
             runCatching {
                 var page = 1L
                 do {

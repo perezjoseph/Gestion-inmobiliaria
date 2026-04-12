@@ -20,7 +20,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class PagosRepository
+open class PagosRepository
     @Inject
     constructor(
         private val dao: PagoDao,
@@ -28,9 +28,9 @@ class PagosRepository
         private val apiService: PagosApiService,
         private val json: Json,
     ) {
-        fun observeAll(): Flow<List<Pago>> = dao.observeAll().map { entities -> entities.map { it.toDomain() } }
+        open fun observeAll(): Flow<List<Pago>> = dao.observeAll().map { entities -> entities.map { it.toDomain() } }
 
-        fun observeFiltered(
+        open fun observeFiltered(
             contratoId: String? = null,
             estado: String? = null,
             fechaDesde: String? = null,
@@ -40,7 +40,7 @@ class PagosRepository
                 .observeFiltered(contratoId, estado, fechaDesde, fechaHasta)
                 .map { entities -> entities.map { it.toDomain() } }
 
-        suspend fun create(request: CreatePagoRequest): Result<Pago> =
+        open suspend fun create(request: CreatePagoRequest): Result<Pago> =
             runCatching {
                 val id = UUID.randomUUID().toString()
                 val now = Instant.now().toEpochMilli()
@@ -72,7 +72,7 @@ class PagosRepository
                 entity.toDomain()
             }
 
-        suspend fun update(
+        open suspend fun update(
             id: String,
             request: UpdatePagoRequest,
         ): Result<Unit> =
@@ -88,7 +88,7 @@ class PagosRepository
                 )
             }
 
-        suspend fun delete(id: String): Result<Unit> =
+        open suspend fun delete(id: String): Result<Unit> =
             runCatching {
                 dao.markDeleted(id)
                 syncQueueDao.enqueue(
@@ -102,7 +102,7 @@ class PagosRepository
                 )
             }
 
-        suspend fun refreshFromServer(): Result<Unit> =
+        open suspend fun refreshFromServer(): Result<Unit> =
             runCatching {
                 var page = 1L
                 do {
