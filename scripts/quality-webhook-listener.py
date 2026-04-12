@@ -25,6 +25,7 @@ import socket
 import subprocess
 import threading
 import time
+import uuid
 from collections import defaultdict
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
@@ -339,7 +340,7 @@ class TimeoutHTTPServer(HTTPServer):
 
 
 class WebhookHandler(BaseHTTPRequestHandler):
-    def _send(self, code, body=b"", content_type="text/plain"):
+    def _send(self, code, body=b"", content_type="text/plain", request_id=None):
         self.send_response(code)
         self.send_header("Content-Type", content_type)
         self.send_header("X-Content-Type-Options", "nosniff")
@@ -348,6 +349,8 @@ class WebhookHandler(BaseHTTPRequestHandler):
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Connection", "close")
+        if request_id:
+            self.send_header("X-Request-Id", request_id)
         self.end_headers()
         self.wfile.write(body)
 
@@ -376,28 +379,29 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         client_ip = self.client_address[0]
+        request_id = uuid.uuid4().hex[:12]
         content_length_raw = self.headers.get("Content-Length", "")
         if not content_length_raw.isdigit() or int(content_length_raw) < 1:
-            log.warning(f"Invalid Content-Length from {client_ip}: {content_length_raw!r}")
-            self._send(400, b"Invalid Content-Length")
+            log.warning(f"[{request_id}] Invalid Content-Length from {client_ip}: {content_length_raw!r}")
+            self._send(400, b"Invalid Content-Length", request_id=request_id)
             return
         content_length = int(content_length_raw)
-        log.info(f"POST {self.path} from {client_ip} ({content_length} bytes)")
+        log.info(f"[{request_id}] POST {self.path} from {client_ip} ({content_length} bytes)")
 
         if not _rate_limiter.allow(client_ip):
-            log.warning(f"Rate limit exceeded for {client_ip}")
-            self._send(429, b"Too many requests")
+            log.warning(f"[{request_id}] Rate limit exceeded for {client_ip}")
+            self._send(429, b"Too many requests", request_id=request_id)
             return
 
         if content_length > MAX_PAYLOAD_BYTES:
-            log.warning(f"Payload too large: {content_length} bytes (max {MAX_PAYLOAD_BYTES})")
-            self._send(413, b"Payload too large")
+            log.warning(f"[{request_id}] Payload too large: {content_length} bytes (max {MAX_PAYLOAD_BYTES})")
+            self._send(413, b"Payload too large", request_id=request_id)
             return
 
         content_type = self.headers.get("Content-Type", "")
         if "json" not in content_type:
-            log.warning(f"Rejected non-JSON Content-Type: {content_type}")
-            self._send(400, b"Content-Type must be application/json")
+            log.warning(f"[{request_id}] Rejected non-JSON Content-Type: {content_type}")
+            self._send(400, b"Content-Type must be application/json", request_id=request_id)
             return
 
         body = self.rfile.read(content_length)
@@ -414,15 +418,15 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     WEBHOOK_SECRET.encode(), body, hashlib.sha256
                 ).hexdigest()
             if not hmac.compare_digest(expected, sig_header):
-                log.warning(f"Invalid HMAC signature on {self.path} from {self.client_address[0]}")
-                self._send(401, b"Invalid signature")
+                log.warning(f"[{request_id}] Invalid HMAC signature on {self.path} from {client_ip}")
+                self._send(401, b"Invalid signature", request_id=request_id)
                 return
 
         try:
             payload = json.loads(body)
         except json.JSONDecodeError as e:
-            log.error(f"Invalid JSON: {e}")
-            self._send(400, b"Invalid JSON")
+            log.error(f"[{request_id}] Invalid JSON: {e}")
+            self._send(400, b"Invalid JSON", request_id=request_id)
             return
 
         handlers = {
@@ -434,21 +438,23 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
         handler = handlers.get(self.path)
         if handler:
-            self._send(200, b"OK")
+            self._send(200, b"OK", request_id=request_id)
 
-            def _guarded(fn, p):
+            def _guarded(fn, p, rid):
                 if not _thread_semaphore.acquire(blocking=False):
-                    log.warning(f"Thread pool exhausted -- dropping {self.path}")
+                    log.warning(f"[{rid}] Thread pool exhausted -- dropping {self.path}")
                     return
                 try:
                     fn(p)
+                except Exception:
+                    log.exception(f"[{rid}] Handler error for {self.path}")
                 finally:
                     _thread_semaphore.release()
 
-            threading.Thread(target=_guarded, args=(handler, payload), daemon=True).start()
+            threading.Thread(target=_guarded, args=(handler, payload, request_id), daemon=True).start()
         else:
-            log.warning(f"Unknown endpoint: {self.path}")
-            self._send(404, b"Not found")
+            log.warning(f"[{request_id}] Unknown endpoint: {self.path}")
+            self._send(404, b"Not found", request_id=request_id)
 
     def _handle_sonarqube(self, payload):
         project = _sanitize_text(payload.get("project", {}).get("key", "unknown"), 128)
@@ -467,7 +473,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
             return
 
         failures_summary = ", ".join(
-            f"{c.get('metric', '?')}={c.get('value', '?')} (threshold: {c.get('errorThreshold', '?')})"
+            f"{_sanitize_text(c.get('metric', '?'), 64)}={_sanitize_text(str(c.get('value', '?')), 32)} (threshold: {_sanitize_text(str(c.get('errorThreshold', '?')), 32)})"
             for c in failed
         )
         log.info(f"Failed conditions: {failures_summary}")
