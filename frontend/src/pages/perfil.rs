@@ -9,6 +9,102 @@ use crate::services::api::{api_get, api_put};
 use crate::types::usuario::User;
 
 #[function_component]
+fn PasswordChangeForm() -> Html {
+    let toasts = use_context::<ToastContext>();
+    let password_actual = use_state(String::new);
+    let password_nuevo = use_state(String::new);
+    let password_confirmar = use_state(String::new);
+    let pwd_error = use_state(|| Option::<String>::None);
+
+    let on_change_password = {
+        let password_actual = password_actual.clone();
+        let password_nuevo = password_nuevo.clone();
+        let password_confirmar = password_confirmar.clone();
+        let pwd_error = pwd_error.clone();
+        let toasts = toasts.clone();
+        Callback::from(move |e: SubmitEvent| {
+            e.prevent_default();
+            if *password_nuevo != *password_confirmar {
+                pwd_error.set(Some("Las contraseñas no coinciden".into()));
+                return;
+            }
+            if password_nuevo.len() < 6 {
+                pwd_error.set(Some(
+                    "La contraseña debe tener al menos 6 caracteres".into(),
+                ));
+                return;
+            }
+            let body = serde_json::json!({
+                "passwordActual": *password_actual,
+                "passwordNuevo": *password_nuevo,
+            });
+            let pwd_error = pwd_error.clone();
+            let password_actual = password_actual.clone();
+            let password_nuevo = password_nuevo.clone();
+            let password_confirmar = password_confirmar.clone();
+            let toasts = toasts.clone();
+            spawn_local(async move {
+                match api_put::<serde_json::Value, _>("/perfil/password", &body).await {
+                    Ok(_) => {
+                        password_actual.set(String::new());
+                        password_nuevo.set(String::new());
+                        password_confirmar.set(String::new());
+                        pwd_error.set(None);
+                        if let Some(t) = &toasts {
+                            t.dispatch(ToastAction::Push(
+                                "Contraseña actualizada".into(),
+                                ToastKind::Success,
+                            ));
+                        }
+                    }
+                    Err(err) => pwd_error.set(Some(err)),
+                }
+            });
+        })
+    };
+
+    macro_rules! input_cb {
+        ($state:expr) => {{
+            let s = $state.clone();
+            Callback::from(move |e: InputEvent| {
+                let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+                s.set(input.value());
+            })
+        }};
+    }
+
+    html! {
+        <div class="gi-card" style="padding: var(--space-5);">
+            <h2 style="font-size: var(--text-base); font-weight: 600; color: var(--text-primary); margin-bottom: var(--space-4);">
+                {"Cambiar Contraseña"}
+            </h2>
+            if let Some(err) = (*pwd_error).as_ref() {
+                <div class="gi-error-banner" role="alert" style="margin-bottom: var(--space-3);">
+                    <span style="font-size: var(--text-sm);">{err}</span>
+                </div>
+            }
+            <form onsubmit={on_change_password} style="display: flex; flex-direction: column; gap: var(--space-3);">
+                <div>
+                    <label class="gi-label">{"Contraseña Actual"}</label>
+                    <input type="password" value={(*password_actual).clone()} oninput={input_cb!(password_actual)} class="gi-input" />
+                </div>
+                <div>
+                    <label class="gi-label">{"Nueva Contraseña"}</label>
+                    <input type="password" value={(*password_nuevo).clone()} oninput={input_cb!(password_nuevo)} class="gi-input" />
+                </div>
+                <div>
+                    <label class="gi-label">{"Confirmar Nueva Contraseña"}</label>
+                    <input type="password" value={(*password_confirmar).clone()} oninput={input_cb!(password_confirmar)} class="gi-input" />
+                </div>
+                <div style="display: flex; justify-content: flex-end;">
+                    <button type="submit" class="gi-btn gi-btn-primary">{"Cambiar Contraseña"}</button>
+                </div>
+            </form>
+        </div>
+    }
+}
+
+#[function_component]
 pub fn Perfil() -> Html {
     let auth = use_context::<AuthContext>();
     let toasts = use_context::<ToastContext>();
@@ -18,10 +114,6 @@ pub fn Perfil() -> Html {
 
     let nombre = use_state(String::new);
     let email = use_state(String::new);
-    let password_actual = use_state(String::new);
-    let password_nuevo = use_state(String::new);
-    let password_confirmar = use_state(String::new);
-    let pwd_error = use_state(|| Option::<String>::None);
 
     {
         let user = user.clone();
@@ -71,53 +163,6 @@ pub fn Perfil() -> Html {
                         }
                     }
                     Err(err) => error.set(Some(err)),
-                }
-            });
-        })
-    };
-
-    let on_change_password = {
-        let password_actual = password_actual.clone();
-        let password_nuevo = password_nuevo.clone();
-        let password_confirmar = password_confirmar.clone();
-        let pwd_error = pwd_error.clone();
-        let toasts = toasts.clone();
-        Callback::from(move |e: SubmitEvent| {
-            e.prevent_default();
-            if *password_nuevo != *password_confirmar {
-                pwd_error.set(Some("Las contraseñas no coinciden".into()));
-                return;
-            }
-            if password_nuevo.len() < 6 {
-                pwd_error.set(Some(
-                    "La contraseña debe tener al menos 6 caracteres".into(),
-                ));
-                return;
-            }
-            let body = serde_json::json!({
-                "passwordActual": *password_actual,
-                "passwordNuevo": *password_nuevo,
-            });
-            let pwd_error = pwd_error.clone();
-            let password_actual = password_actual.clone();
-            let password_nuevo = password_nuevo.clone();
-            let password_confirmar = password_confirmar.clone();
-            let toasts = toasts.clone();
-            spawn_local(async move {
-                match api_put::<serde_json::Value, _>("/perfil/password", &body).await {
-                    Ok(_) => {
-                        password_actual.set(String::new());
-                        password_nuevo.set(String::new());
-                        password_confirmar.set(String::new());
-                        pwd_error.set(None);
-                        if let Some(t) = &toasts {
-                            t.dispatch(ToastAction::Push(
-                                "Contraseña actualizada".into(),
-                                ToastKind::Success,
-                            ));
-                        }
-                    }
-                    Err(err) => pwd_error.set(Some(err)),
                 }
             });
         })
@@ -179,33 +224,7 @@ pub fn Perfil() -> Html {
                     </form>
                 </div>
 
-                <div class="gi-card" style="padding: var(--space-5);">
-                    <h2 style="font-size: var(--text-base); font-weight: 600; color: var(--text-primary); margin-bottom: var(--space-4);">
-                        {"Cambiar Contraseña"}
-                    </h2>
-                    if let Some(err) = (*pwd_error).as_ref() {
-                        <div class="gi-error-banner" role="alert" style="margin-bottom: var(--space-3);">
-                            <span style="font-size: var(--text-sm);">{err}</span>
-                        </div>
-                    }
-                    <form onsubmit={on_change_password} style="display: flex; flex-direction: column; gap: var(--space-3);">
-                        <div>
-                            <label class="gi-label">{"Contraseña Actual"}</label>
-                            <input type="password" value={(*password_actual).clone()} oninput={input_cb!(password_actual)} class="gi-input" />
-                        </div>
-                        <div>
-                            <label class="gi-label">{"Nueva Contraseña"}</label>
-                            <input type="password" value={(*password_nuevo).clone()} oninput={input_cb!(password_nuevo)} class="gi-input" />
-                        </div>
-                        <div>
-                            <label class="gi-label">{"Confirmar Nueva Contraseña"}</label>
-                            <input type="password" value={(*password_confirmar).clone()} oninput={input_cb!(password_confirmar)} class="gi-input" />
-                        </div>
-                        <div style="display: flex; justify-content: flex-end;">
-                            <button type="submit" class="gi-btn gi-btn-primary">{"Cambiar Contraseña"}</button>
-                        </div>
-                    </form>
-                </div>
+                <PasswordChangeForm />
             </div>
         </div>
     }

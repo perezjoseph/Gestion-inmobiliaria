@@ -28,6 +28,194 @@ impl FormErrors {
     }
 }
 
+#[derive(Properties, PartialEq)]
+struct InquilinoFormProps {
+    is_editing: bool,
+    nombre: UseStateHandle<String>,
+    apellido: UseStateHandle<String>,
+    email: UseStateHandle<String>,
+    telefono: UseStateHandle<String>,
+    cedula: UseStateHandle<String>,
+    contacto_emergencia: UseStateHandle<String>,
+    notas: UseStateHandle<String>,
+    form_errors: FormErrors,
+    submitting: bool,
+    on_submit: Callback<SubmitEvent>,
+    on_cancel: Callback<MouseEvent>,
+}
+
+#[function_component]
+fn InquilinoForm(props: &InquilinoFormProps) -> Html {
+    let show_optional = use_state(|| false);
+    let fe = props.form_errors.clone();
+
+    macro_rules! input_cb {
+        ($state:expr) => {{
+            let s = $state.clone();
+            Callback::from(move |e: InputEvent| {
+                let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+                s.set(input.value());
+            })
+        }};
+    }
+
+    let toggle_optional = {
+        let show_optional = show_optional.clone();
+        Callback::from(move |_: MouseEvent| {
+            show_optional.set(!*show_optional);
+        })
+    };
+    let opt_open = *show_optional;
+
+    html! {
+        <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
+            <h2 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
+                {if props.is_editing { "Editar Inquilino" } else { "Nuevo Inquilino" }}</h2>
+            <form onsubmit={props.on_submit.clone()} style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
+                <div>
+                    <label class="gi-label">{"Nombre *"}</label>
+                    <input type="text" value={(*props.nombre).clone()} oninput={input_cb!(props.nombre)}
+                        class={if fe.nombre.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
+                    if let Some(ref msg) = fe.nombre { <p class="gi-field-error">{msg}</p> }
+                </div>
+                <div>
+                    <label class="gi-label">{"Apellido *"}</label>
+                    <input type="text" value={(*props.apellido).clone()} oninput={input_cb!(props.apellido)}
+                        class={if fe.apellido.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
+                    if let Some(ref msg) = fe.apellido { <p class="gi-field-error">{msg}</p> }
+                </div>
+                <div>
+                    <label class="gi-label" title="Documento de identidad dominicano. Formato: XXX-XXXXXXX-X">{"Cédula *"}</label>
+                    <input type="text" value={(*props.cedula).clone()} oninput={input_cb!(props.cedula)}
+                        class={if fe.cedula.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
+                    if let Some(ref msg) = fe.cedula { <p class="gi-field-error">{msg}</p> }
+                </div>
+                <div style="grid-column: 1 / -1;">
+                    <button type="button" class="gi-collapsible-trigger" onclick={toggle_optional}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            style={if opt_open { "transform: rotate(90deg); transition: transform 0.2s;" } else { "transition: transform 0.2s;" }}>
+                            <path d="M9 18l6-6-6-6"/>
+                        </svg>
+                        {" Campos opcionales"}
+                    </button>
+                    <div class={if opt_open { "gi-collapsible-content open" } else { "gi-collapsible-content" }}>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4); padding-top: var(--space-3);">
+                            <div>
+                                <label class="gi-label">{"Email"}</label>
+                                <input type="email" value={(*props.email).clone()} oninput={input_cb!(props.email)} class="gi-input" />
+                            </div>
+                            <div>
+                                <label class="gi-label">{"Teléfono"}</label>
+                                <input type="text" value={(*props.telefono).clone()} oninput={input_cb!(props.telefono)} class="gi-input" />
+                            </div>
+                            <div>
+                                <label class="gi-label">{"Contacto de emergencia"}</label>
+                                <input type="text" value={(*props.contacto_emergencia).clone()} oninput={input_cb!(props.contacto_emergencia)} class="gi-input" />
+                            </div>
+                            <div style="grid-column: 1 / -1;">
+                                <label class="gi-label">{"Notas"}</label>
+                                <input type="text" value={(*props.notas).clone()} oninput={input_cb!(props.notas)} class="gi-input" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div style="grid-column: 1 / -1; display: flex; gap: var(--space-2); justify-content: flex-end;">
+                    <button type="button" onclick={props.on_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
+                    <button type="submit" disabled={props.submitting} class="gi-btn gi-btn-primary">
+                        {if props.submitting { "Guardando..." } else { "Guardar" }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct InquilinoListProps {
+    items: Vec<Inquilino>,
+    user_rol: String,
+    headers: Vec<String>,
+    total: u64,
+    page: u64,
+    per_page: u64,
+    on_edit: Callback<Inquilino>,
+    on_delete: Callback<Inquilino>,
+    on_new: Callback<MouseEvent>,
+    on_page_change: Callback<u64>,
+    on_per_page_change: Callback<u64>,
+}
+
+#[function_component]
+fn InquilinoList(props: &InquilinoListProps) -> Html {
+    if props.items.is_empty() {
+        return html! {
+            <div class="gi-empty-state">
+                <div class="gi-empty-state-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                </div>
+                <div class="gi-empty-state-title">{"Sin inquilinos registrados"}</div>
+                <p class="gi-empty-state-text">{"Registre sus inquilinos con nombre y cédula. Luego podrá vincularlos a propiedades mediante contratos."}</p>
+                if can_write(&props.user_rol) {
+                    <button onclick={props.on_new.clone()} class="gi-btn gi-btn-primary" style="margin-top: var(--space-4);">
+                        {"+ Nuevo Inquilino"}
+                    </button>
+                }
+                <div class="gi-empty-state-hint">
+                    {"¿Aún no tiene propiedades? "}
+                    <Link<Route> to={Route::Propiedades} classes="gi-btn-text">
+                        {"Agregar propiedad primero"}
+                    </Link<Route>>
+                </div>
+            </div>
+        };
+    }
+
+    html! {
+        <>
+            <DataTable headers={props.headers.clone()}>
+                { for props.items.iter().map(|i| {
+                    let on_edit = props.on_edit.clone();
+                    let on_delete_click = props.on_delete.clone();
+                    let ic = i.clone();
+                    let id = i.clone();
+                    let user_rol = props.user_rol.clone();
+                    html! {
+                        <tr>
+                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{&i.nombre}</td>
+                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&i.apellido}</td>
+                            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&i.cedula}</td>
+                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{i.email.as_deref().unwrap_or("—")}</td>
+                            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{i.telefono.as_deref().unwrap_or("—")}</td>
+                            if can_write(&user_rol) {
+                                <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2);">
+                                    <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(ic.clone()))}
+                                        class="gi-btn-text">{"Editar"}</button>
+                                    if can_delete(&user_rol) {
+                                        <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(id.clone()))}
+                                            class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                })}
+            </DataTable>
+            <Pagination
+                total={props.total}
+                page={props.page}
+                per_page={props.per_page}
+                on_page_change={props.on_page_change.clone()}
+                on_per_page_change={props.on_per_page_change.clone()}
+            />
+        </>
+    }
+}
+
 #[function_component]
 pub fn Inquilinos() -> Html {
     let auth = use_context::<AuthContext>();
@@ -49,7 +237,6 @@ pub fn Inquilinos() -> Html {
     let submitting = use_state(|| false);
     let form_errors = use_state(FormErrors::default);
     let reload = use_state(|| 0u32);
-    let show_optional = use_state(|| false);
     let nombre = use_state(String::new);
     let apellido = use_state(String::new);
     let email = use_state(String::new);
@@ -59,6 +246,7 @@ pub fn Inquilinos() -> Html {
     let notas = use_state(String::new);
     let search = use_state(String::new);
     let applied_search = use_state(String::new);
+
     {
         let items = items.clone();
         let total = total.clone();
@@ -87,6 +275,7 @@ pub fn Inquilinos() -> Html {
             });
         });
     }
+
     let reset_form = {
         let nombre = nombre.clone();
         let apellido = apellido.clone();
@@ -98,7 +287,6 @@ pub fn Inquilinos() -> Html {
         let editing = editing.clone();
         let show_form = show_form.clone();
         let form_errors = form_errors.clone();
-        let show_optional = show_optional.clone();
         move || {
             nombre.set(String::new());
             apellido.set(String::new());
@@ -110,9 +298,9 @@ pub fn Inquilinos() -> Html {
             editing.set(None);
             show_form.set(false);
             form_errors.set(FormErrors::default());
-            show_optional.set(false);
         }
     };
+
     let escape_handler = use_mut_ref(|| Option::<Box<dyn Fn()>>::None);
     {
         let delete_target = delete_target.clone();
@@ -143,6 +331,7 @@ pub fn Inquilinos() -> Html {
             move || drop(listener)
         });
     }
+
     let on_new = {
         let reset_form = reset_form.clone();
         let show_form = show_form.clone();
@@ -151,6 +340,7 @@ pub fn Inquilinos() -> Html {
             show_form.set(true);
         })
     };
+
     let on_edit = {
         let nombre = nombre.clone();
         let apellido = apellido.clone();
@@ -175,12 +365,14 @@ pub fn Inquilinos() -> Html {
             form_errors.set(FormErrors::default());
         })
     };
+
     let on_delete_click = {
         let delete_target = delete_target.clone();
         Callback::from(move |i: Inquilino| {
             delete_target.set(Some(i));
         })
     };
+
     let on_delete_confirm = {
         let error = error.clone();
         let reload = reload.clone();
@@ -221,12 +413,14 @@ pub fn Inquilinos() -> Html {
             }
         })
     };
+
     let on_delete_cancel = {
         let delete_target = delete_target.clone();
         Callback::from(move |_: MouseEvent| {
             delete_target.set(None);
         })
     };
+
     let validate_form = {
         let nombre = nombre.clone();
         let apellido = apellido.clone();
@@ -248,6 +442,7 @@ pub fn Inquilinos() -> Html {
             valid
         }
     };
+
     let on_submit = {
         let nombre = nombre.clone();
         let apellido = apellido.clone();
@@ -355,16 +550,12 @@ pub fn Inquilinos() -> Html {
             }
         })
     };
+
     let on_cancel = {
         let reset_form = reset_form.clone();
         Callback::from(move |_: MouseEvent| reset_form())
     };
-    let toggle_optional = {
-        let show_optional = show_optional.clone();
-        Callback::from(move |_: MouseEvent| {
-            show_optional.set(!*show_optional);
-        })
-    };
+
     macro_rules! input_cb {
         ($state:expr) => {{
             let s = $state.clone();
@@ -374,6 +565,7 @@ pub fn Inquilinos() -> Html {
             })
         }};
     }
+
     let on_search_apply = {
         let search = search.clone();
         let applied_search = applied_search.clone();
@@ -415,9 +607,11 @@ pub fn Inquilinos() -> Html {
             reload.set(*reload + 1);
         })
     };
+
     if *loading {
         return html! { <Loading /> };
     }
+
     let headers = vec![
         "Nombre".into(),
         "Apellido".into(),
@@ -430,8 +624,7 @@ pub fn Inquilinos() -> Html {
             String::new()
         },
     ];
-    let fe = (*form_errors).clone();
-    let opt_open = *show_optional;
+
     html! {
         <div>
             <div class="gi-page-header">
@@ -478,128 +671,35 @@ pub fn Inquilinos() -> Html {
             </div>
 
             if *show_form {
-                <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
-                    <h2 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
-                        {if editing.is_some() { "Editar Inquilino" } else { "Nuevo Inquilino" }}</h2>
-                    <form onsubmit={on_submit} style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
-                        <div>
-                            <label class="gi-label">{"Nombre *"}</label>
-                            <input type="text" value={(*nombre).clone()} oninput={input_cb!(nombre)}
-                                class={if fe.nombre.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                            if let Some(ref msg) = fe.nombre { <p class="gi-field-error">{msg}</p> }
-                        </div>
-                        <div>
-                            <label class="gi-label">{"Apellido *"}</label>
-                            <input type="text" value={(*apellido).clone()} oninput={input_cb!(apellido)}
-                                class={if fe.apellido.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                            if let Some(ref msg) = fe.apellido { <p class="gi-field-error">{msg}</p> }
-                        </div>
-                        <div>
-                            <label class="gi-label" title="Documento de identidad dominicano. Formato: XXX-XXXXXXX-X">{"Cédula *"}</label>
-                            <input type="text" value={(*cedula).clone()} oninput={input_cb!(cedula)}
-                                class={if fe.cedula.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                            if let Some(ref msg) = fe.cedula { <p class="gi-field-error">{msg}</p> }
-                        </div>
-                        <div style="grid-column: 1 / -1;">
-                            <button type="button" class="gi-collapsible-trigger" onclick={toggle_optional.clone()}>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                    style={if opt_open { "transform: rotate(90deg); transition: transform 0.2s;" } else { "transition: transform 0.2s;" }}>
-                                    <path d="M9 18l6-6-6-6"/>
-                                </svg>
-                                {" Campos opcionales"}
-                            </button>
-                            <div class={if opt_open { "gi-collapsible-content open" } else { "gi-collapsible-content" }}>
-                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4); padding-top: var(--space-3);">
-                                    <div>
-                                        <label class="gi-label">{"Email"}</label>
-                                        <input type="email" value={(*email).clone()} oninput={input_cb!(email)} class="gi-input" />
-                                    </div>
-                                    <div>
-                                        <label class="gi-label">{"Teléfono"}</label>
-                                        <input type="text" value={(*telefono).clone()} oninput={input_cb!(telefono)} class="gi-input" />
-                                    </div>
-                                    <div>
-                                        <label class="gi-label">{"Contacto de emergencia"}</label>
-                                        <input type="text" value={(*contacto_emergencia).clone()} oninput={input_cb!(contacto_emergencia)} class="gi-input" />
-                                    </div>
-                                    <div style="grid-column: 1 / -1;">
-                                        <label class="gi-label">{"Notas"}</label>
-                                        <input type="text" value={(*notas).clone()} oninput={input_cb!(notas)} class="gi-input" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div style="grid-column: 1 / -1; display: flex; gap: var(--space-2); justify-content: flex-end;">
-                            <button type="button" onclick={on_cancel} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                            <button type="submit" disabled={*submitting} class="gi-btn gi-btn-primary">
-                                {if *submitting { "Guardando..." } else { "Guardar" }}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            }
-
-            if (*items).is_empty() {
-                <div class="gi-empty-state">
-                    <div class="gi-empty-state-icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
-                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-                            <circle cx="9" cy="7" r="4"/>
-                            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                        </svg>
-                    </div>
-                    <div class="gi-empty-state-title">{"Sin inquilinos registrados"}</div>
-                    <p class="gi-empty-state-text">{"Registre sus inquilinos con nombre y cédula. Luego podrá vincularlos a propiedades mediante contratos."}</p>
-                    if can_write(&user_rol) {
-                        <button onclick={on_new.clone()} class="gi-btn gi-btn-primary" style="margin-top: var(--space-4);">
-                            {"+ Nuevo Inquilino"}
-                        </button>
-                    }
-                    <div class="gi-empty-state-hint">
-                        {"¿Aún no tiene propiedades? "}
-                        <Link<Route> to={Route::Propiedades} classes="gi-btn-text">
-                            {"Agregar propiedad primero"}
-                        </Link<Route>>
-                    </div>
-                </div>
-            } else {
-                <DataTable headers={headers}>
-                    { for (*items).iter().map(|i| {
-                        let on_edit = on_edit.clone();
-                        let on_delete_click = on_delete_click.clone();
-                        let ic = i.clone();
-                        let id = i.clone();
-                        let user_rol = user_rol.clone();
-                        html! {
-                            <tr>
-                                <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{&i.nombre}</td>
-                                <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&i.apellido}</td>
-                                <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&i.cedula}</td>
-                                <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{i.email.as_deref().unwrap_or("—")}</td>
-                                <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{i.telefono.as_deref().unwrap_or("—")}</td>
-                                if can_write(&user_rol) {
-                                    <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2);">
-                                        <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(ic.clone()))}
-                                            class="gi-btn-text">{"Editar"}</button>
-                                        if can_delete(&user_rol) {
-                                            <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(id.clone()))}
-                                                class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button>
-                                        }
-                                    </td>
-                                }
-                            </tr>
-                        }
-                    })}
-                </DataTable>
-                <Pagination
-                    total={*total}
-                    page={*page}
-                    per_page={*per_page}
-                    on_page_change={on_page_change}
-                    on_per_page_change={on_per_page_change}
+                <InquilinoForm
+                    is_editing={editing.is_some()}
+                    nombre={nombre.clone()}
+                    apellido={apellido.clone()}
+                    email={email.clone()}
+                    telefono={telefono.clone()}
+                    cedula={cedula.clone()}
+                    contacto_emergencia={contacto_emergencia.clone()}
+                    notas={notas.clone()}
+                    form_errors={(*form_errors).clone()}
+                    submitting={*submitting}
+                    on_submit={on_submit}
+                    on_cancel={on_cancel}
                 />
             }
+
+            <InquilinoList
+                items={(*items).clone()}
+                user_rol={user_rol.clone()}
+                headers={headers}
+                total={*total}
+                page={*page}
+                per_page={*per_page}
+                on_edit={on_edit}
+                on_delete={on_delete_click}
+                on_new={on_new}
+                on_page_change={on_page_change}
+                on_per_page_change={on_per_page_change}
+            />
         </div>
     }
 }

@@ -169,12 +169,7 @@ pub async fn list(
     })
 }
 
-pub async fn update<C: ConnectionTrait>(
-    db: &C,
-    id: Uuid,
-    input: UpdateGastoRequest,
-    usuario_id: Uuid,
-) -> Result<GastoResponse, AppError> {
+fn validate_gasto_update(input: &UpdateGastoRequest) -> Result<(), AppError> {
     if let Some(ref categoria) = input.categoria {
         validate_enum("categoria", categoria, CATEGORIAS_GASTO)?;
     }
@@ -184,13 +179,23 @@ pub async fn update<C: ConnectionTrait>(
     if let Some(ref estado) = input.estado {
         validate_enum("estado", estado, ESTADOS_GASTO)?;
     }
-    if let Some(ref monto) = input.monto
-        && *monto <= Decimal::ZERO
-    {
-        return Err(AppError::Validation(
-            "El monto debe ser mayor que cero".to_string(),
-        ));
+    if let Some(ref monto) = input.monto {
+        if *monto <= Decimal::ZERO {
+            return Err(AppError::Validation(
+                "El monto debe ser mayor que cero".to_string(),
+            ));
+        }
     }
+    Ok(())
+}
+
+pub async fn update<C: ConnectionTrait>(
+    db: &C,
+    id: Uuid,
+    input: UpdateGastoRequest,
+    usuario_id: Uuid,
+) -> Result<GastoResponse, AppError> {
+    validate_gasto_update(&input)?;
 
     let existing = gasto::Entity::find_by_id(id)
         .one(db)

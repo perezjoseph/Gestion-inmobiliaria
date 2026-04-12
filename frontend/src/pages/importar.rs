@@ -16,6 +16,40 @@ fn get_token() -> Option<String> {
         .flatten()
 }
 
+async fn handle_upload_response(resp: gloo_net::http::Response) -> Result<ImportResult, String> {
+    if resp.ok() {
+        resp.json::<ImportResult>()
+            .await
+            .map_err(|err| format!("Error al procesar respuesta: {err}"))
+    } else {
+        let text = resp
+            .text()
+            .await
+            .unwrap_or_else(|_| "Error desconocido".into());
+        Err(text)
+    }
+}
+
+async fn perform_upload(file: web_sys::File, entity_type: String) -> Result<ImportResult, String> {
+    let form_data =
+        web_sys::FormData::new().map_err(|_| "Error al crear formulario".to_string())?;
+    let _ = form_data.append_with_blob("file", &file);
+
+    let url = format!("{BASE_URL}/importar/{entity_type}");
+    let mut builder = Request::post(&url);
+    if let Some(token) = get_token() {
+        builder = builder.header("Authorization", &format!("Bearer {token}"));
+    }
+    let req = builder
+        .body(form_data)
+        .map_err(|err| format!("Error al preparar solicitud: {err}"))?;
+    let resp = req
+        .send()
+        .await
+        .map_err(|err| format!("Error de red: {err}"))?;
+    handle_upload_response(resp).await
+}
+
 #[function_component]
 pub fn Importar() -> Html {
     let entity_type = use_state(|| "propiedades".to_string());
@@ -51,41 +85,9 @@ pub fn Importar() -> Html {
             result.set(None);
 
             spawn_local(async move {
-                let form_data = match web_sys::FormData::new() {
-                    Ok(fd) => fd,
-                    Err(_) => {
-                        error.set(Some("Error al crear formulario".into()));
-                        uploading.set(false);
-                        return;
-                    }
-                };
-                let _ = form_data.append_with_blob("file", &file);
-
-                let url = format!("{BASE_URL}/importar/{entity_type}");
-                let mut builder = Request::post(&url);
-                if let Some(token) = get_token() {
-                    builder = builder.header("Authorization", &format!("Bearer {token}"));
-                }
-                match builder.body(form_data) {
-                    Ok(req) => match req.send().await {
-                        Ok(resp) => {
-                            if resp.ok() {
-                                match resp.json::<ImportResult>().await {
-                                    Ok(r) => result.set(Some(r)),
-                                    Err(err) => error
-                                        .set(Some(format!("Error al procesar respuesta: {err}"))),
-                                }
-                            } else {
-                                let text = resp
-                                    .text()
-                                    .await
-                                    .unwrap_or_else(|_| "Error desconocido".into());
-                                error.set(Some(text));
-                            }
-                        }
-                        Err(err) => error.set(Some(format!("Error de red: {err}"))),
-                    },
-                    Err(err) => error.set(Some(format!("Error al preparar solicitud: {err}"))),
+                match perform_upload(file, entity_type).await {
+                    Ok(r) => result.set(Some(r)),
+                    Err(err) => error.set(Some(err)),
                 }
                 uploading.set(false);
             });

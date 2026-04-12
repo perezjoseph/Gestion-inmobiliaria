@@ -10,6 +10,56 @@ use crate::services::api::{api_get, api_put};
 use crate::types::PaginatedResponse;
 use crate::types::usuario::User;
 
+#[derive(Properties, PartialEq)]
+struct UsuarioRowProps {
+    user: User,
+    on_role_change: Callback<(String, String)>,
+    on_toggle_active: Callback<(String, bool)>,
+}
+
+#[function_component]
+fn UsuarioRow(props: &UsuarioRowProps) -> Html {
+    let u = &props.user;
+    let uid = u.id.clone();
+    let uid2 = u.id.clone();
+    let activo = u.activo;
+    let on_role_change = props.on_role_change.clone();
+    let on_toggle_active = props.on_toggle_active.clone();
+
+    html! {
+        <tr>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{&u.nombre}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&u.email}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">
+                <select
+                    onchange={Callback::from(move |e: Event| {
+                        let el: web_sys::HtmlSelectElement = e.target_unchecked_into();
+                        on_role_change.emit((uid.clone(), el.value()));
+                    })}
+                    class="gi-input" style="width: auto; padding: var(--space-1) var(--space-2);"
+                >
+                    <option value="admin" selected={u.rol == "admin"}>{"Admin"}</option>
+                    <option value="gerente" selected={u.rol == "gerente"}>{"Gerente"}</option>
+                    <option value="visualizador" selected={u.rol == "visualizador"}>{"Visualizador"}</option>
+                </select>
+            </td>
+            <td style="padding: var(--space-3) var(--space-5);">
+                <span class={if u.activo { "gi-badge gi-badge-success" } else { "gi-badge gi-badge-error" }}>
+                    { if u.activo { "Activo" } else { "Inactivo" } }
+                </span>
+            </td>
+            <td style="padding: var(--space-3) var(--space-5);">
+                <button
+                    onclick={Callback::from(move |_: MouseEvent| on_toggle_active.emit((uid2.clone(), activo)))}
+                    class="gi-btn-text"
+                >
+                    { if activo { "Desactivar" } else { "Activar" } }
+                </button>
+            </td>
+        </tr>
+    }
+}
+
 #[function_component]
 pub fn Usuarios() -> Html {
     let toasts = use_context::<ToastContext>();
@@ -151,42 +201,12 @@ pub fn Usuarios() -> Html {
             } else {
                 <DataTable headers={headers}>
                     { for (*items).iter().map(|u| {
-                        let on_role_change = on_role_change.clone();
-                        let on_toggle_active = on_toggle_active.clone();
-                        let uid = u.id.clone();
-                        let uid2 = u.id.clone();
-                        let activo = u.activo;
                         html! {
-                            <tr>
-                                <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{&u.nombre}</td>
-                                <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&u.email}</td>
-                                <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">
-                                    <select
-                                        onchange={Callback::from(move |e: Event| {
-                                            let el: web_sys::HtmlSelectElement = e.target_unchecked_into();
-                                            on_role_change.emit((uid.clone(), el.value()));
-                                        })}
-                                        class="gi-input" style="width: auto; padding: var(--space-1) var(--space-2);"
-                                    >
-                                        <option value="admin" selected={u.rol == "admin"}>{"Admin"}</option>
-                                        <option value="gerente" selected={u.rol == "gerente"}>{"Gerente"}</option>
-                                        <option value="visualizador" selected={u.rol == "visualizador"}>{"Visualizador"}</option>
-                                    </select>
-                                </td>
-                                <td style="padding: var(--space-3) var(--space-5);">
-                                    <span class={if u.activo { "gi-badge gi-badge-success" } else { "gi-badge gi-badge-error" }}>
-                                        { if u.activo { "Activo" } else { "Inactivo" } }
-                                    </span>
-                                </td>
-                                <td style="padding: var(--space-3) var(--space-5);">
-                                    <button
-                                        onclick={Callback::from(move |_: MouseEvent| on_toggle_active.emit((uid2.clone(), activo)))}
-                                        class="gi-btn-text"
-                                    >
-                                        { if activo { "Desactivar" } else { "Activar" } }
-                                    </button>
-                                </td>
-                            </tr>
+                            <UsuarioRow
+                                user={u.clone()}
+                                on_role_change={on_role_change.clone()}
+                                on_toggle_active={on_toggle_active.clone()}
+                            />
                         }
                     })}
                 </DataTable>

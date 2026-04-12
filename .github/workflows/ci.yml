@@ -674,7 +674,7 @@ jobs:
     name: Failure Notification Webhook
     runs-on: [self-hosted, linux]
     needs: [commit-lint, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend]
-    if: always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
+    if: always() && contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     steps:
       - name: Notify — conventional commit validation failed
         if: always() && needs.commit-lint.result == 'failure'

@@ -151,12 +151,7 @@ pub async fn list(
     })
 }
 
-pub async fn update<C: ConnectionTrait>(
-    db: &C,
-    id: Uuid,
-    input: UpdatePropiedadRequest,
-    usuario_id: Uuid,
-) -> Result<PropiedadResponse, AppError> {
+fn validate_propiedad_update(input: &UpdatePropiedadRequest) -> Result<(), AppError> {
     if let Some(ref tipo_propiedad) = input.tipo_propiedad {
         validate_enum("tipo_propiedad", tipo_propiedad, TIPOS_PROPIEDAD)?;
     }
@@ -166,6 +161,16 @@ pub async fn update<C: ConnectionTrait>(
     if let Some(ref moneda) = input.moneda {
         validate_enum("moneda", moneda, MONEDAS)?;
     }
+    Ok(())
+}
+
+pub async fn update<C: ConnectionTrait>(
+    db: &C,
+    id: Uuid,
+    input: UpdatePropiedadRequest,
+    usuario_id: Uuid,
+) -> Result<PropiedadResponse, AppError> {
+    validate_propiedad_update(&input)?;
 
     let existing = propiedad::Entity::find_by_id(id)
         .one(db)

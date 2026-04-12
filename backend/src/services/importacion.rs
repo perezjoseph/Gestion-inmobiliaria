@@ -89,6 +89,91 @@ fn get_field(row: &[String], idx: Option<usize>) -> &str {
         .unwrap_or("")
 }
 
+fn validate_required_fields<'a>(fields: &[(&str, &'a str)]) -> Vec<&'a str> {
+    fields
+        .iter()
+        .filter_map(|(value, msg)| if value.is_empty() { Some(*msg) } else { None })
+        .collect()
+}
+
+fn non_empty_to_option(value: &str) -> Option<String> {
+    if value.is_empty() {
+        None
+    } else {
+        Some(value.to_string())
+    }
+}
+
+struct PropiedadIndices {
+    titulo: Option<usize>,
+    direccion: Option<usize>,
+    ciudad: Option<usize>,
+    provincia: Option<usize>,
+    tipo_propiedad: Option<usize>,
+    precio: Option<usize>,
+    moneda: Option<usize>,
+    descripcion: Option<usize>,
+    estado: Option<usize>,
+}
+
+fn process_propiedad_row(
+    row: &[String],
+    idx: &PropiedadIndices,
+) -> Result<propiedad::ActiveModel, String> {
+    let titulo = get_field(row, idx.titulo);
+    let direccion = get_field(row, idx.direccion);
+    let ciudad = get_field(row, idx.ciudad);
+    let provincia = get_field(row, idx.provincia);
+    let tipo_propiedad = get_field(row, idx.tipo_propiedad);
+    let precio_str = get_field(row, idx.precio);
+
+    let errores = validate_required_fields(&[
+        (titulo, "titulo es requerido"),
+        (direccion, "direccion es requerida"),
+        (ciudad, "ciudad es requerida"),
+        (provincia, "provincia es requerida"),
+        (tipo_propiedad, "tipo_propiedad es requerido"),
+        (precio_str, "precio es requerido"),
+    ]);
+
+    if !errores.is_empty() {
+        return Err(errores.join(", "));
+    }
+
+    let precio =
+        Decimal::from_str(precio_str).map_err(|_| format!("precio inválido: {precio_str}"))?;
+
+    let moneda = get_field(row, idx.moneda);
+    let moneda = if moneda.is_empty() { "DOP" } else { moneda };
+    let descripcion = get_field(row, idx.descripcion);
+    let estado = get_field(row, idx.estado);
+    let estado = if estado.is_empty() {
+        "disponible"
+    } else {
+        estado
+    };
+
+    let now = Utc::now().into();
+    Ok(propiedad::ActiveModel {
+        id: Set(Uuid::new_v4()),
+        titulo: Set(titulo.to_string()),
+        descripcion: Set(non_empty_to_option(descripcion)),
+        direccion: Set(direccion.to_string()),
+        ciudad: Set(ciudad.to_string()),
+        provincia: Set(provincia.to_string()),
+        tipo_propiedad: Set(tipo_propiedad.to_string()),
+        habitaciones: Set(None),
+        banos: Set(None),
+        area_m2: Set(None),
+        precio: Set(precio),
+        moneda: Set(moneda.to_string()),
+        estado: Set(estado.to_string()),
+        imagenes: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+    })
+}
+
 pub async fn importar_propiedades(
     db: &DatabaseConnection,
     data: &[u8],
@@ -104,15 +189,17 @@ pub async fn importar_propiedades(
     }
 
     let headers = &rows[0];
-    let idx_titulo = find_column_index(headers, "titulo");
-    let idx_direccion = find_column_index(headers, "direccion");
-    let idx_ciudad = find_column_index(headers, "ciudad");
-    let idx_provincia = find_column_index(headers, "provincia");
-    let idx_tipo = find_column_index(headers, "tipo_propiedad");
-    let idx_precio = find_column_index(headers, "precio");
-    let idx_moneda = find_column_index(headers, "moneda");
-    let idx_descripcion = find_column_index(headers, "descripcion");
-    let idx_estado = find_column_index(headers, "estado");
+    let idx = PropiedadIndices {
+        titulo: find_column_index(headers, "titulo"),
+        direccion: find_column_index(headers, "direccion"),
+        ciudad: find_column_index(headers, "ciudad"),
+        provincia: find_column_index(headers, "provincia"),
+        tipo_propiedad: find_column_index(headers, "tipo_propiedad"),
+        precio: find_column_index(headers, "precio"),
+        moneda: find_column_index(headers, "moneda"),
+        descripcion: find_column_index(headers, "descripcion"),
+        estado: find_column_index(headers, "estado"),
+    };
 
     let data_rows = &rows[1..];
     let total_filas = data_rows.len();
@@ -121,84 +208,12 @@ pub async fn importar_propiedades(
 
     for (i, row) in data_rows.iter().enumerate() {
         let fila = i + 2;
-        let titulo = get_field(row, idx_titulo);
-        let direccion = get_field(row, idx_direccion);
-        let ciudad = get_field(row, idx_ciudad);
-        let provincia = get_field(row, idx_provincia);
-        let tipo_propiedad = get_field(row, idx_tipo);
-        let precio_str = get_field(row, idx_precio);
-
-        let mut errores = Vec::new();
-        if titulo.is_empty() {
-            errores.push("titulo es requerido");
-        }
-        if direccion.is_empty() {
-            errores.push("direccion es requerida");
-        }
-        if ciudad.is_empty() {
-            errores.push("ciudad es requerida");
-        }
-        if provincia.is_empty() {
-            errores.push("provincia es requerida");
-        }
-        if tipo_propiedad.is_empty() {
-            errores.push("tipo_propiedad es requerido");
-        }
-        if precio_str.is_empty() {
-            errores.push("precio es requerido");
-        }
-
-        if !errores.is_empty() {
-            fallidos.push(ImportError {
-                fila,
-                error: errores.join(", "),
-            });
-            continue;
-        }
-
-        let precio = match Decimal::from_str(precio_str) {
-            Ok(p) => p,
-            Err(_) => {
-                fallidos.push(ImportError {
-                    fila,
-                    error: format!("precio inválido: {precio_str}"),
-                });
+        let model = match process_propiedad_row(row, &idx) {
+            Ok(m) => m,
+            Err(error) => {
+                fallidos.push(ImportError { fila, error });
                 continue;
             }
-        };
-
-        let moneda = {
-            let m = get_field(row, idx_moneda);
-            if m.is_empty() { "DOP" } else { m }
-        };
-        let descripcion = get_field(row, idx_descripcion);
-        let estado = {
-            let e = get_field(row, idx_estado);
-            if e.is_empty() { "disponible" } else { e }
-        };
-
-        let now = Utc::now().into();
-        let model = propiedad::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            titulo: Set(titulo.to_string()),
-            descripcion: Set(if descripcion.is_empty() {
-                None
-            } else {
-                Some(descripcion.to_string())
-            }),
-            direccion: Set(direccion.to_string()),
-            ciudad: Set(ciudad.to_string()),
-            provincia: Set(provincia.to_string()),
-            tipo_propiedad: Set(tipo_propiedad.to_string()),
-            habitaciones: Set(None),
-            banos: Set(None),
-            area_m2: Set(None),
-            precio: Set(precio),
-            moneda: Set(moneda.to_string()),
-            estado: Set(estado.to_string()),
-            imagenes: Set(None),
-            created_at: Set(now),
-            updated_at: Set(now),
         };
 
         match model.insert(db).await {
@@ -217,6 +232,49 @@ pub async fn importar_propiedades(
         exitosos,
         fallidos,
     })
+}
+
+fn process_inquilino_row(
+    row: &[String],
+    idx_nombre: Option<usize>,
+    idx_apellido: Option<usize>,
+    idx_cedula: Option<usize>,
+    idx_email: Option<usize>,
+    idx_telefono: Option<usize>,
+) -> Result<(&str, inquilino::ActiveModel), String> {
+    let nombre = get_field(row, idx_nombre);
+    let apellido = get_field(row, idx_apellido);
+    let cedula = get_field(row, idx_cedula);
+
+    let errores = validate_required_fields(&[
+        (nombre, "nombre es requerido"),
+        (apellido, "apellido es requerido"),
+        (cedula, "cedula es requerida"),
+    ]);
+
+    if !errores.is_empty() {
+        return Err(errores.join(", "));
+    }
+
+    let email = get_field(row, idx_email);
+    let telefono = get_field(row, idx_telefono);
+
+    let now = Utc::now().into();
+    let model = inquilino::ActiveModel {
+        id: Set(Uuid::new_v4()),
+        nombre: Set(nombre.to_string()),
+        apellido: Set(apellido.to_string()),
+        email: Set(non_empty_to_option(email)),
+        telefono: Set(non_empty_to_option(telefono)),
+        cedula: Set(cedula.to_string()),
+        contacto_emergencia: Set(None),
+        notas: Set(None),
+        documentos: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+
+    Ok((cedula, model))
 }
 
 pub async fn importar_inquilinos(
@@ -247,28 +305,20 @@ pub async fn importar_inquilinos(
 
     for (i, row) in data_rows.iter().enumerate() {
         let fila = i + 2;
-        let nombre = get_field(row, idx_nombre);
-        let apellido = get_field(row, idx_apellido);
-        let cedula = get_field(row, idx_cedula);
-
-        let mut errores = Vec::new();
-        if nombre.is_empty() {
-            errores.push("nombre es requerido");
-        }
-        if apellido.is_empty() {
-            errores.push("apellido es requerido");
-        }
-        if cedula.is_empty() {
-            errores.push("cedula es requerida");
-        }
-
-        if !errores.is_empty() {
-            fallidos.push(ImportError {
-                fila,
-                error: errores.join(", "),
-            });
-            continue;
-        }
+        let (cedula, model) = match process_inquilino_row(
+            row,
+            idx_nombre,
+            idx_apellido,
+            idx_cedula,
+            idx_email,
+            idx_telefono,
+        ) {
+            Ok(result) => result,
+            Err(error) => {
+                fallidos.push(ImportError { fila, error });
+                continue;
+            }
+        };
 
         let existing = inquilino::Entity::find()
             .filter(inquilino::Column::Cedula.eq(cedula))
@@ -282,32 +332,6 @@ pub async fn importar_inquilinos(
             });
             continue;
         }
-
-        let email = get_field(row, idx_email);
-        let telefono = get_field(row, idx_telefono);
-
-        let now = Utc::now().into();
-        let model = inquilino::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            nombre: Set(nombre.to_string()),
-            apellido: Set(apellido.to_string()),
-            email: Set(if email.is_empty() {
-                None
-            } else {
-                Some(email.to_string())
-            }),
-            telefono: Set(if telefono.is_empty() {
-                None
-            } else {
-                Some(telefono.to_string())
-            }),
-            cedula: Set(cedula.to_string()),
-            contacto_emergencia: Set(None),
-            notas: Set(None),
-            documentos: Set(None),
-            created_at: Set(now),
-            updated_at: Set(now),
-        };
 
         match model.insert(db).await {
             Ok(_) => exitosos += 1,
@@ -325,6 +349,73 @@ pub async fn importar_inquilinos(
         exitosos,
         fallidos,
     })
+}
+
+struct GastoIndices {
+    propiedad_id: Option<usize>,
+    categoria: Option<usize>,
+    descripcion: Option<usize>,
+    monto: Option<usize>,
+    moneda: Option<usize>,
+    fecha_gasto: Option<usize>,
+    unidad_id: Option<usize>,
+    proveedor: Option<usize>,
+    numero_factura: Option<usize>,
+    notas: Option<usize>,
+}
+
+fn process_gasto_row(row: &[String], idx: &GastoIndices) -> Result<CreateGastoRequest, String> {
+    let propiedad_id_str = get_field(row, idx.propiedad_id);
+    let categoria = get_field(row, idx.categoria);
+    let descripcion = get_field(row, idx.descripcion);
+    let monto_str = get_field(row, idx.monto);
+    let moneda = get_field(row, idx.moneda);
+    let fecha_gasto_str = get_field(row, idx.fecha_gasto);
+
+    let errores = validate_required_fields(&[
+        (propiedad_id_str, "propiedad_id es requerido"),
+        (categoria, "categoria es requerida"),
+        (descripcion, "descripcion es requerida"),
+        (monto_str, "monto es requerido"),
+        (moneda, "moneda es requerida"),
+        (fecha_gasto_str, "fecha_gasto es requerida"),
+    ]);
+
+    if !errores.is_empty() {
+        return Err(errores.join(", "));
+    }
+
+    let propiedad_id = Uuid::from_str(propiedad_id_str)
+        .map_err(|_| format!("propiedad_id inválido: {propiedad_id_str}"))?;
+
+    let monto = Decimal::from_str(monto_str).map_err(|_| format!("monto inválido: {monto_str}"))?;
+
+    let fecha_gasto = NaiveDate::parse_from_str(fecha_gasto_str, "%Y-%m-%d")
+        .map_err(|_| format!("fecha_gasto inválida: {fecha_gasto_str}"))?;
+
+    let unidad_id = parse_optional_uuid(get_field(row, idx.unidad_id))?;
+
+    Ok(CreateGastoRequest {
+        propiedad_id,
+        unidad_id,
+        categoria: categoria.to_string(),
+        descripcion: descripcion.to_string(),
+        monto,
+        moneda: moneda.to_string(),
+        fecha_gasto,
+        proveedor: non_empty_to_option(get_field(row, idx.proveedor)),
+        numero_factura: non_empty_to_option(get_field(row, idx.numero_factura)),
+        notas: non_empty_to_option(get_field(row, idx.notas)),
+    })
+}
+
+fn parse_optional_uuid(value: &str) -> Result<Option<Uuid>, String> {
+    if value.is_empty() {
+        return Ok(None);
+    }
+    Uuid::from_str(value)
+        .map(Some)
+        .map_err(|_| format!("unidad_id inválido: {value}"))
 }
 
 pub async fn importar_gastos(
@@ -361,117 +452,24 @@ pub async fn importar_gastos(
 
     for (i, row) in data_rows.iter().enumerate() {
         let fila = i + 2;
-        let propiedad_id_str = get_field(row, idx_propiedad_id);
-        let categoria = get_field(row, idx_categoria);
-        let descripcion = get_field(row, idx_descripcion);
-        let monto_str = get_field(row, idx_monto);
-        let moneda = get_field(row, idx_moneda);
-        let fecha_gasto_str = get_field(row, idx_fecha_gasto);
-
-        let mut errores = Vec::new();
-        if propiedad_id_str.is_empty() {
-            errores.push("propiedad_id es requerido");
-        }
-        if categoria.is_empty() {
-            errores.push("categoria es requerida");
-        }
-        if descripcion.is_empty() {
-            errores.push("descripcion es requerida");
-        }
-        if monto_str.is_empty() {
-            errores.push("monto es requerido");
-        }
-        if moneda.is_empty() {
-            errores.push("moneda es requerida");
-        }
-        if fecha_gasto_str.is_empty() {
-            errores.push("fecha_gasto es requerida");
-        }
-
-        if !errores.is_empty() {
-            fallidos.push(ImportError {
-                fila,
-                error: errores.join(", "),
-            });
-            continue;
-        }
-
-        let propiedad_id = match Uuid::from_str(propiedad_id_str) {
-            Ok(id) => id,
-            Err(_) => {
-                fallidos.push(ImportError {
-                    fila,
-                    error: format!("propiedad_id inválido: {propiedad_id_str}"),
-                });
+        let request = match process_gasto_row(
+            row,
+            idx_propiedad_id,
+            idx_categoria,
+            idx_descripcion,
+            idx_monto,
+            idx_moneda,
+            idx_fecha_gasto,
+            idx_unidad_id,
+            idx_proveedor,
+            idx_numero_factura,
+            idx_notas,
+        ) {
+            Ok(r) => r,
+            Err(error) => {
+                fallidos.push(ImportError { fila, error });
                 continue;
             }
-        };
-
-        let monto = match Decimal::from_str(monto_str) {
-            Ok(m) => m,
-            Err(_) => {
-                fallidos.push(ImportError {
-                    fila,
-                    error: format!("monto inválido: {monto_str}"),
-                });
-                continue;
-            }
-        };
-
-        let fecha_gasto = match NaiveDate::parse_from_str(fecha_gasto_str, "%Y-%m-%d") {
-            Ok(d) => d,
-            Err(_) => {
-                fallidos.push(ImportError {
-                    fila,
-                    error: format!("fecha_gasto inválida: {fecha_gasto_str}"),
-                });
-                continue;
-            }
-        };
-
-        let unidad_id_str = get_field(row, idx_unidad_id);
-        let unidad_id = if unidad_id_str.is_empty() {
-            None
-        } else {
-            match Uuid::from_str(unidad_id_str) {
-                Ok(id) => Some(id),
-                Err(_) => {
-                    fallidos.push(ImportError {
-                        fila,
-                        error: format!("unidad_id inválido: {unidad_id_str}"),
-                    });
-                    continue;
-                }
-            }
-        };
-
-        let proveedor_str = get_field(row, idx_proveedor);
-        let numero_factura_str = get_field(row, idx_numero_factura);
-        let notas_str = get_field(row, idx_notas);
-
-        let request = CreateGastoRequest {
-            propiedad_id,
-            unidad_id,
-            categoria: categoria.to_string(),
-            descripcion: descripcion.to_string(),
-            monto,
-            moneda: moneda.to_string(),
-            fecha_gasto,
-            proveedor: if proveedor_str.is_empty() {
-                None
-            } else {
-                Some(proveedor_str.to_string())
-            },
-            numero_factura: if numero_factura_str.is_empty() {
-                None
-            } else {
-                Some(numero_factura_str.to_string())
-            },
-            notas: if notas_str.is_empty() {
-                None
-            } else {
-                Some(notas_str.to_string())
-            },
         };
 
         match gastos::create(db, request, usuario_id).await {

@@ -32,41 +32,53 @@ fn apply_auth(builder: RequestBuilder) -> RequestBuilder {
     }
 }
 
-fn humanize_error(status: u16, raw: &str) -> String {
-    #[derive(serde::Deserialize)]
-    struct ApiErr {
-        #[serde(default)]
-        error: String,
-        #[serde(default)]
-        message: String,
-    }
+#[derive(serde::Deserialize)]
+struct ApiErr {
+    #[serde(default)]
+    error: String,
+    #[serde(default)]
+    message: String,
+}
 
+fn humanize_duplicate_error(msg: &str) -> Option<String> {
+    if msg.contains("cedula") {
+        return Some("Esta cédula ya está registrada en el sistema.".into());
+    }
+    if msg.contains("email") || msg.contains("correo") {
+        return Some("Este correo electrónico ya está en uso.".into());
+    }
+    Some("Este registro ya existe. Verifique los datos e intente de nuevo.".into())
+}
+
+fn humanize_parsed_error(parsed: &ApiErr) -> Option<String> {
+    let msg = &parsed.message;
+    if msg.contains("duplicate key") || parsed.error == "conflict" {
+        return humanize_duplicate_error(msg);
+    }
+    if msg.contains("superpone") || msg.contains("overlap") || msg.contains("solapamiento") {
+        return Some(
+            "El contrato se superpone con otro contrato activo para esta propiedad.".into(),
+        );
+    }
+    if parsed.error == "validation" {
+        return Some(parsed.message.clone());
+    }
+    if parsed.error == "not_found" {
+        return Some("El registro solicitado no fue encontrado.".into());
+    }
+    if parsed.error == "forbidden" {
+        return Some("No tiene permisos para realizar esta acción.".into());
+    }
+    Some(parsed.message.clone())
+}
+
+fn humanize_error(status: u16, raw: &str) -> String {
     if let Ok(parsed) = serde_json::from_str::<ApiErr>(raw)
         && !parsed.message.is_empty()
     {
-        let msg = &parsed.message;
-        if msg.contains("duplicate key") || parsed.error == "conflict" {
-            if msg.contains("cedula") {
-                return "Esta cédula ya está registrada en el sistema.".into();
-            }
-            if msg.contains("email") || msg.contains("correo") {
-                return "Este correo electrónico ya está en uso.".into();
-            }
-            return "Este registro ya existe. Verifique los datos e intente de nuevo.".into();
+        if let Some(msg) = humanize_parsed_error(&parsed) {
+            return msg;
         }
-        if msg.contains("superpone") || msg.contains("overlap") || msg.contains("solapamiento") {
-            return "El contrato se superpone con otro contrato activo para esta propiedad.".into();
-        }
-        if parsed.error == "validation" {
-            return parsed.message;
-        }
-        if parsed.error == "not_found" {
-            return "El registro solicitado no fue encontrado.".into();
-        }
-        if parsed.error == "forbidden" {
-            return "No tiene permisos para realizar esta acción.".into();
-        }
-        return parsed.message;
     }
 
     match status {

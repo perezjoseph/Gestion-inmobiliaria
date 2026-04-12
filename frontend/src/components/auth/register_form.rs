@@ -63,6 +63,39 @@ pub fn validate_form(
     })
 }
 
+fn input_class(has_error: bool) -> &'static str {
+    if has_error {
+        "gi-input gi-input-error"
+    } else {
+        "gi-input"
+    }
+}
+
+fn humanize_register_error(err: String) -> String {
+    if err.contains("ya está registrado") || err.contains("409") {
+        "Este correo electrónico ya está registrado".to_string()
+    } else if err.contains("Error de red") {
+        "Error de conexión. Intente nuevamente.".to_string()
+    } else {
+        err
+    }
+}
+
+async fn do_register_and_login(
+    request: RegisterRequest,
+    login_email: String,
+    login_password: String,
+) -> Result<LoginResponse, String> {
+    auth::register(request)
+        .await
+        .map_err(humanize_register_error)?;
+    let login_req = LoginRequest {
+        email: login_email,
+        password: login_password,
+    };
+    auth::login(login_req).await
+}
+
 #[derive(Properties, PartialEq)]
 pub struct RegisterFormProps {
     pub on_success: Callback<LoginResponse>,
@@ -164,31 +197,10 @@ pub fn RegisterForm(props: &RegisterFormProps) -> Html {
 
             loading.set(true);
             spawn_local(async move {
-                match auth::register(request).await {
-                    Ok(_) => {
-                        let login_req = LoginRequest {
-                            email: login_email,
-                            password: login_password,
-                        };
-                        match auth::login(login_req).await {
-                            Ok(response) => {
-                                on_success.emit(response);
-                            }
-                            Err(err) => {
-                                server_error.set(Some(err));
-                                loading.set(false);
-                            }
-                        }
-                    }
+                match do_register_and_login(request, login_email, login_password).await {
+                    Ok(response) => on_success.emit(response),
                     Err(err) => {
-                        let msg = if err.contains("ya está registrado") || err.contains("409") {
-                            "Este correo electrónico ya está registrado".to_string()
-                        } else if err.contains("Error de red") {
-                            "Error de conexión. Intente nuevamente.".to_string()
-                        } else {
-                            err
-                        };
-                        server_error.set(Some(msg));
+                        server_error.set(Some(err));
                         loading.set(false);
                     }
                 }
@@ -196,26 +208,10 @@ pub fn RegisterForm(props: &RegisterFormProps) -> Html {
         })
     };
 
-    let nombre_cls = if nombre_error.is_some() {
-        "gi-input gi-input-error"
-    } else {
-        "gi-input"
-    };
-    let email_cls = if email_error.is_some() {
-        "gi-input gi-input-error"
-    } else {
-        "gi-input"
-    };
-    let pass_cls = if password_error.is_some() {
-        "gi-input gi-input-error"
-    } else {
-        "gi-input"
-    };
-    let confirm_cls = if confirm_error.is_some() {
-        "gi-input gi-input-error"
-    } else {
-        "gi-input"
-    };
+    let nombre_cls = input_class(nombre_error.is_some());
+    let email_cls = input_class(email_error.is_some());
+    let pass_cls = input_class(password_error.is_some());
+    let confirm_cls = input_class(confirm_error.is_some());
 
     html! {
         <form onsubmit={on_submit} style="display: flex; flex-direction: column; gap: var(--space-4);">

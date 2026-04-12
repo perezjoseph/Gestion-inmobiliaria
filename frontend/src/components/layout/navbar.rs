@@ -3,47 +3,11 @@ use yew_router::prelude::*;
 
 use crate::app::{AuthAction, AuthContext, Route, ThemeContext};
 
-#[derive(Properties, PartialEq)]
-pub struct NavbarProps {
-    pub user_name: String,
-    pub user_role: String,
-    pub on_toggle_sidebar: Callback<MouseEvent>,
-}
-
 #[function_component]
-pub fn Navbar(props: &NavbarProps) -> Html {
-    let auth = use_context::<AuthContext>().unwrap();
+fn NavbarSearch() -> Html {
     let navigator = use_navigator().unwrap();
-    let theme = use_context::<ThemeContext>().unwrap();
     let search_query = use_state(String::new);
     let search_open = use_state(|| false);
-
-    let on_logout = {
-        let auth = auth.clone();
-        let navigator = navigator.clone();
-        Callback::from(move |_: MouseEvent| {
-            auth.dispatch(AuthAction::Logout);
-            navigator.push(&Route::Login);
-        })
-    };
-
-    let on_toggle_theme = {
-        let theme = theme.clone();
-        Callback::from(move |_: MouseEvent| {
-            let new_dark = !*theme;
-            theme.set(new_dark);
-            if let Some(window) = web_sys::window() {
-                if let Some(doc) = window.document()
-                    && let Some(el) = doc.document_element()
-                {
-                    let _ = el.set_attribute("data-theme", if new_dark { "dark" } else { "light" });
-                }
-                if let Ok(Some(storage)) = window.local_storage() {
-                    let _ = storage.set_item("theme", if new_dark { "dark" } else { "light" });
-                }
-            }
-        })
-    };
 
     let on_toggle_search = {
         let search_open = search_open.clone();
@@ -73,15 +37,8 @@ pub fn Navbar(props: &NavbarProps) -> Html {
             if e.key() == "Enter" {
                 let q = (*search_query).trim().to_lowercase();
                 if !q.is_empty() {
-                    if q.contains("pago") || q.contains("cobr") {
-                        navigator.push(&Route::Pagos);
-                    } else if q.contains("contrat") {
-                        navigator.push(&Route::Contratos);
-                    } else if q.contains("inquilin") || q.contains("arrendat") {
-                        navigator.push(&Route::Inquilinos);
-                    } else {
-                        navigator.push(&Route::Propiedades);
-                    }
+                    let route = resolve_search_route(&q);
+                    navigator.push(&route);
                     search_query.set(String::new());
                     search_open.set(false);
                 }
@@ -92,6 +49,92 @@ pub fn Navbar(props: &NavbarProps) -> Html {
         })
     };
 
+    html! {
+        <>
+            if *search_open {
+                <input type="text"
+                    class="gi-input gi-navbar-search"
+                    placeholder="Ir a sección... (propiedades, pagos, contratos)"
+                    value={(*search_query).clone()}
+                    oninput={on_search_input}
+                    onkeydown={on_search_keydown}
+                    style="width: 260px; font-size: var(--text-sm);"
+                />
+            }
+            <button class="gi-btn gi-btn-ghost gi-navbar-search-btn" onclick={on_toggle_search}
+                aria-label="Ir a sección" title="Ir a sección"
+                style="padding: var(--space-2); border: none; display: flex; align-items: center; gap: var(--space-1);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <polyline points="9 18 15 12 9 6"/>
+                </svg>
+                <span style="font-size: var(--text-xs); font-weight: 500;">{"Ir a…"}</span>
+            </button>
+        </>
+    }
+}
+
+fn resolve_search_route(q: &str) -> Route {
+    if q.contains("pago") || q.contains("cobr") {
+        Route::Pagos
+    } else if q.contains("contrat") {
+        Route::Contratos
+    } else if q.contains("inquilin") || q.contains("arrendat") {
+        Route::Inquilinos
+    } else {
+        Route::Propiedades
+    }
+}
+
+#[function_component]
+fn ThemeToggle() -> Html {
+    let theme = use_context::<ThemeContext>().unwrap();
+
+    let on_toggle_theme = {
+        let theme = theme.clone();
+        Callback::from(move |_: MouseEvent| {
+            let new_dark = !*theme;
+            theme.set(new_dark);
+            if let Some(window) = web_sys::window() {
+                if let Some(doc) = window.document()
+                    && let Some(el) = doc.document_element()
+                {
+                    let _ = el.set_attribute("data-theme", if new_dark { "dark" } else { "light" });
+                }
+                if let Ok(Some(storage)) = window.local_storage() {
+                    let _ = storage.set_item("theme", if new_dark { "dark" } else { "light" });
+                }
+            }
+        })
+    };
+
+    html! {
+        <button class="gi-theme-toggle" onclick={on_toggle_theme}
+            aria-label={if *theme { "Cambiar a modo claro" } else { "Cambiar a modo oscuro" }}
+            title={if *theme { "Modo claro" } else { "Modo oscuro" }}>
+        </button>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct UserMenuProps {
+    user_name: String,
+    user_role: String,
+}
+
+#[function_component]
+fn UserMenu(props: &UserMenuProps) -> Html {
+    let auth = use_context::<AuthContext>().unwrap();
+    let navigator = use_navigator().unwrap();
+
+    let on_logout = {
+        let auth = auth.clone();
+        let navigator = navigator.clone();
+        Callback::from(move |_: MouseEvent| {
+            auth.dispatch(AuthAction::Logout);
+            navigator.push(&Route::Login);
+        })
+    };
+
     let role_label = match props.user_role.as_str() {
         "admin" => "Administrador",
         "gerente" => "Gerente",
@@ -99,6 +142,33 @@ pub fn Navbar(props: &NavbarProps) -> Html {
         _ => &props.user_role,
     };
 
+    html! {
+        <div class="gi-navbar-user" style="display: flex; align-items: center; gap: var(--space-3);">
+            <div class="gi-navbar-user-info" style="text-align: right;">
+                <div class="gi-navbar-user-name gi-text-sm" style="font-weight: 600; color: var(--text-primary);">
+                    {&props.user_name}
+                </div>
+                <div class="gi-badge gi-badge-info" style="font-size: 0.65rem;">
+                    {role_label}
+                </div>
+            </div>
+            <button onclick={on_logout} class="gi-btn gi-btn-ghost gi-navbar-logout"
+                style="font-size: var(--text-xs);">
+                {"Cerrar sesión"}
+            </button>
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+pub struct NavbarProps {
+    pub user_name: String,
+    pub user_role: String,
+    pub on_toggle_sidebar: Callback<MouseEvent>,
+}
+
+#[function_component]
+pub fn Navbar(props: &NavbarProps) -> Html {
     html! {
         <nav class="gi-navbar" style="padding: var(--space-3) var(--space-5); display: flex; justify-content: space-between; align-items: center; gap: var(--space-2);">
             <div style="display: flex; align-items: center; gap: var(--space-3); min-width: 0;">
@@ -115,43 +185,9 @@ pub fn Navbar(props: &NavbarProps) -> Html {
                 </span>
             </div>
             <div style="display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0;">
-                // Quick search
-                if *search_open {
-                    <input type="text"
-                        class="gi-input gi-navbar-search"
-                        placeholder="Ir a sección... (propiedades, pagos, contratos)"
-                        value={(*search_query).clone()}
-                        oninput={on_search_input}
-                        onkeydown={on_search_keydown}
-                        style="width: 260px; font-size: var(--text-sm);"
-                    />
-                }
-                <button class="gi-btn gi-btn-ghost gi-navbar-search-btn" onclick={on_toggle_search}
-                    aria-label="Ir a sección" title="Ir a sección"
-                    style="padding: var(--space-2); border: none; display: flex; align-items: center; gap: var(--space-1);">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                        <polyline points="9 18 15 12 9 6"/>
-                    </svg>
-                    <span style="font-size: var(--text-xs); font-weight: 500;">{"Ir a…"}</span>
-                </button>
-                <button class="gi-theme-toggle" onclick={on_toggle_theme}
-                    aria-label={if *theme { "Cambiar a modo claro" } else { "Cambiar a modo oscuro" }}
-                    title={if *theme { "Modo claro" } else { "Modo oscuro" }}>
-                </button>
-                <div class="gi-navbar-user" style="display: flex; align-items: center; gap: var(--space-3);">
-                    <div class="gi-navbar-user-info" style="text-align: right;">
-                        <div class="gi-navbar-user-name gi-text-sm" style="font-weight: 600; color: var(--text-primary);">
-                            {&props.user_name}
-                        </div>
-                        <div class="gi-badge gi-badge-info" style="font-size: 0.65rem;">
-                            {role_label}
-                        </div>
-                    </div>
-                    <button onclick={on_logout} class="gi-btn gi-btn-ghost gi-navbar-logout"
-                        style="font-size: var(--text-xs);">
-                        {"Cerrar sesión"}
-                    </button>
-                </div>
+                <NavbarSearch />
+                <ThemeToggle />
+                <UserMenu user_name={props.user_name.clone()} user_role={props.user_role.clone()} />
             </div>
         </nav>
     }
