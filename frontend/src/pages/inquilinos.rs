@@ -254,6 +254,83 @@ fn InquilinoList(props: &InquilinoListProps) -> Html {
     }
 }
 
+fn validate_inquilino_fields(nombre: &str, apellido: &str, cedula: &str) -> FormErrors {
+    let mut errs = FormErrors::default();
+    if nombre.trim().is_empty() {
+        errs.nombre = Some("El nombre es obligatorio".into());
+    }
+    if apellido.trim().is_empty() {
+        errs.apellido = Some("El apellido es obligatorio".into());
+    }
+    if cedula.trim().is_empty() {
+        errs.cedula = Some("La cédula es obligatoria".into());
+    }
+    errs
+}
+
+fn non_empty_inq(s: &str) -> Option<String> {
+    if s.trim().is_empty() { None } else { Some(s.to_string()) }
+}
+
+fn do_save_inquilino(
+    editing_id: Option<String>,
+    update: UpdateInquilino,
+    create: CreateInquilino,
+    reset_form: impl Fn() + 'static,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+    submitting: UseStateHandle<bool>,
+) {
+    spawn_local(async move {
+        let res = match editing_id {
+            Some(id) => api_put::<Inquilino, _>(&format!("/inquilinos/{id}"), &update).await.map(|_| ()),
+            None => api_post::<Inquilino, _>("/inquilinos", &create).await.map(|_| ()),
+        };
+        match res {
+            Ok(()) => {
+                reset_form();
+                reload.set(*reload + 1);
+                push_toast(&toasts, "Inquilino guardado", ToastKind::Success);
+            }
+            Err(err) => error.set(Some(err)),
+        }
+        submitting.set(false);
+    });
+}
+
+fn do_delete_inquilino(
+    id: String,
+    label: String,
+    delete_target: UseStateHandle<Option<Inquilino>>,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+    reload_for_undo: UseStateHandle<u32>,
+) {
+    spawn_local(async move {
+        match api_delete(&format!("/inquilinos/{id}")).await {
+            Ok(()) => {
+                delete_target.set(None);
+                reload.set(*reload + 1);
+                let undo_reload = reload_for_undo;
+                if let Some(t) = &toasts {
+                    t.dispatch(ToastAction::PushWithUndo(
+                        format!("\"{label}\" eliminado"),
+                        ToastKind::Info,
+                        "Deshacer".into(),
+                        std::rc::Rc::new(move || { undo_reload.set(*undo_reload + 1); }),
+                    ));
+                }
+            }
+            Err(err) => {
+                delete_target.set(None);
+                error.set(Some(err));
+            }
+        }
+    });
+}
+
 #[function_component]
 pub fn Inquilinos() -> Html {
     let auth = use_context::<AuthContext>();
@@ -418,34 +495,8 @@ pub fn Inquilinos() -> Html {
         let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
             if let Some(ref i) = *delete_target {
-                let id = i.id.clone();
-                let inq_name = format!("{} {}", i.nombre, i.apellido);
-                let error = error.clone();
-                let reload = reload.clone();
-                let delete_target = delete_target.clone();
-                let toasts = toasts.clone();
-                let reload_for_undo = reload.clone();
-                spawn_local(async move {
-                    let result = api_delete(&format!("/inquilinos/{id}")).await;
-                    delete_target.set(None);
-                    match result {
-                        Ok(()) => {
-                            reload.set(*reload + 1);
-                            let undo_reload = reload_for_undo;
-                            if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::PushWithUndo(
-                                    format!("\"{inq_name}\" eliminado"),
-                                    ToastKind::Info,
-                                    "Deshacer".into(),
-                                    std::rc::Rc::new(move || {
-                                        undo_reload.set(*undo_reload + 1);
-                                    }),
-                                ));
-                            }
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                });
+                let label = format!("{} {}", i.nombre, i.apellido);
+                do_delete_inquilino(i.id.clone(), label, delete_target.clone(), reload.clone(), error.clone(), toasts.clone(), reload.clone());
             }
         })
     };
@@ -463,16 +514,7 @@ pub fn Inquilinos() -> Html {
         let cedula = cedula.clone();
         let form_errors = form_errors.clone();
         move || -> bool {
-            let mut errs = FormErrors::default();
-            if nombre.trim().is_empty() {
-                errs.nombre = Some("El nombre es obligatorio".into());
-            }
-            if apellido.trim().is_empty() {
-                errs.apellido = Some("El apellido es obligatorio".into());
-            }
-            if cedula.trim().is_empty() {
-                errs.cedula = Some("La cédula es obligatoria".into());
-            }
+            let errs = validate_inquilino_fields(&nombre, &apellido, &cedula);
             let valid = !errs.has_errors();
             form_errors.set(errs);
             valid
@@ -496,84 +538,30 @@ pub fn Inquilinos() -> Html {
         let submitting = submitting.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
-            if *submitting {
-                return;
-            }
-            if !validate_form() {
+            if *submitting || !validate_form() {
                 return;
             }
             submitting.set(true);
-            let email_val = if email.trim().is_empty() {
-                None
-            } else {
-                Some((*email).clone())
+            let editing_id = editing.as_ref().map(|e| e.id.clone());
+            let update = UpdateInquilino {
+                nombre: Some((*nombre).clone()),
+                apellido: Some((*apellido).clone()),
+                email: non_empty_inq(&email),
+                telefono: non_empty_inq(&telefono),
+                cedula: Some((*cedula).clone()),
+                contacto_emergencia: non_empty_inq(&contacto_emergencia),
+                notas: non_empty_inq(&notas),
             };
-            let tel_val = if telefono.trim().is_empty() {
-                None
-            } else {
-                Some((*telefono).clone())
+            let create = CreateInquilino {
+                nombre: (*nombre).clone(),
+                apellido: (*apellido).clone(),
+                email: non_empty_inq(&email),
+                telefono: non_empty_inq(&telefono),
+                cedula: (*cedula).clone(),
+                contacto_emergencia: non_empty_inq(&contacto_emergencia),
+                notas: non_empty_inq(&notas),
             };
-            let ce_val = if contacto_emergencia.trim().is_empty() {
-                None
-            } else {
-                Some((*contacto_emergencia).clone())
-            };
-            let notas_val = if notas.trim().is_empty() {
-                None
-            } else {
-                Some((*notas).clone())
-            };
-            let error = error.clone();
-            let reload = reload.clone();
-            let reset_form = reset_form.clone();
-            let toasts = toasts.clone();
-            let submitting_handle = submitting.clone();
-            if let Some(ref ed) = *editing {
-                let update = UpdateInquilino {
-                    nombre: Some((*nombre).clone()),
-                    apellido: Some((*apellido).clone()),
-                    email: email_val,
-                    telefono: tel_val,
-                    cedula: Some((*cedula).clone()),
-                    contacto_emergencia: ce_val,
-                    notas: notas_val,
-                };
-                let id = ed.id.clone();
-                let submitting = submitting_handle.clone();
-                spawn_local(async move {
-                    match api_put::<Inquilino, _>(&format!("/inquilinos/{id}"), &update).await {
-                        Ok(_) => {
-                            reset_form();
-                            reload.set(*reload + 1);
-                            push_toast(&toasts, "Inquilino actualizado", ToastKind::Success);
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                    submitting.set(false);
-                });
-            } else {
-                let create = CreateInquilino {
-                    nombre: (*nombre).clone(),
-                    apellido: (*apellido).clone(),
-                    email: email_val,
-                    telefono: tel_val,
-                    cedula: (*cedula).clone(),
-                    contacto_emergencia: ce_val,
-                    notas: notas_val,
-                };
-                let submitting = submitting_handle;
-                spawn_local(async move {
-                    match api_post::<Inquilino, _>("/inquilinos", &create).await {
-                        Ok(_) => {
-                            reset_form();
-                            reload.set(*reload + 1);
-                            push_toast(&toasts, "Inquilino registrado", ToastKind::Success);
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                    submitting.set(false);
-                });
-            }
+            do_save_inquilino(editing_id, update, create, reset_form.clone(), reload.clone(), error.clone(), toasts.clone(), submitting.clone());
         })
     };
 

@@ -352,6 +352,139 @@ fn ContratoList(props: &ContratoListProps) -> Html {
     }
 }
 
+fn validate_contrato_fields(
+    propiedad_id: &str, inquilino_id: &str, fecha_inicio: &str, fecha_fin: &str, monto_mensual: &str,
+) -> FormErrors {
+    let mut errs = FormErrors::default();
+    if propiedad_id.is_empty() {
+        errs.propiedad_id = Some("Debe seleccionar una propiedad".into());
+    }
+    if inquilino_id.is_empty() {
+        errs.inquilino_id = Some("Debe seleccionar un inquilino".into());
+    }
+    if fecha_inicio.is_empty() {
+        errs.fecha_inicio = Some("La fecha de inicio es obligatoria".into());
+    }
+    if fecha_fin.is_empty() {
+        errs.fecha_fin = Some("La fecha de fin es obligatoria".into());
+    }
+    if !fecha_inicio.is_empty() && !fecha_fin.is_empty() && fecha_fin <= fecha_inicio {
+        errs.fecha_fin = Some("La fecha de fin debe ser posterior a la fecha de inicio".into());
+    }
+    match monto_mensual.parse::<f64>() {
+        Ok(v) if v <= 0.0 => errs.monto_mensual = Some("El monto debe ser mayor a 0".into()),
+        Err(_) => errs.monto_mensual = Some("Monto inválido".into()),
+        _ => {}
+    }
+    errs
+}
+
+fn do_save_contrato(
+    editing_id: Option<String>,
+    update: UpdateContrato,
+    create: CreateContrato,
+    reset_form: impl Fn() + 'static,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+    submitting: UseStateHandle<bool>,
+) {
+    spawn_local(async move {
+        let res = match editing_id {
+            Some(id) => api_put::<Contrato, _>(&format!("/contratos/{id}"), &update).await.map(|_| ()),
+            None => api_post::<Contrato, _>("/contratos", &create).await.map(|_| ()),
+        };
+        match res {
+            Ok(()) => {
+                reset_form();
+                reload.set(*reload + 1);
+                push_toast(&toasts, "Contrato guardado", ToastKind::Success);
+            }
+            Err(err) => error.set(Some(err)),
+        }
+        submitting.set(false);
+    });
+}
+
+fn do_delete_contrato(
+    id: String,
+    label: String,
+    delete_target: UseStateHandle<Option<Contrato>>,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+    reload_for_undo: UseStateHandle<u32>,
+) {
+    spawn_local(async move {
+        match api_delete(&format!("/contratos/{id}")).await {
+            Ok(()) => {
+                delete_target.set(None);
+                reload.set(*reload + 1);
+                let undo_reload = reload_for_undo;
+                if let Some(t) = &toasts {
+                    t.dispatch(ToastAction::PushWithUndo(
+                        format!("\"{label}\" eliminado"),
+                        ToastKind::Info,
+                        "Deshacer".into(),
+                        std::rc::Rc::new(move || { undo_reload.set(*undo_reload + 1); }),
+                    ));
+                }
+            }
+            Err(err) => {
+                delete_target.set(None);
+                error.set(Some(err));
+            }
+        }
+    });
+}
+
+fn do_renew_contrato(
+    id: String,
+    fecha_fin: String,
+    monto: f64,
+    renew_target: UseStateHandle<Option<Contrato>>,
+    renew_fecha_fin: UseStateHandle<String>,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+) {
+    spawn_local(async move {
+        let body = serde_json::json!({ "fechaFin": fecha_fin, "montoMensual": monto });
+        match api_post::<Contrato, _>(&format!("/contratos/{id}/renovar"), &body).await {
+            Ok(_) => {
+                renew_target.set(None);
+                renew_fecha_fin.set(String::new());
+                reload.set(*reload + 1);
+                push_toast(&toasts, "Contrato renovado", ToastKind::Success);
+            }
+            Err(err) => error.set(Some(err)),
+        }
+    });
+}
+
+fn do_terminate_contrato(
+    id: String,
+    fecha: String,
+    terminate_target: UseStateHandle<Option<Contrato>>,
+    terminate_fecha: UseStateHandle<String>,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+) {
+    spawn_local(async move {
+        let body = serde_json::json!({ "fechaTerminacion": fecha });
+        match api_post::<Contrato, _>(&format!("/contratos/{id}/terminar"), &body).await {
+            Ok(_) => {
+                terminate_target.set(None);
+                terminate_fecha.set(String::new());
+                reload.set(*reload + 1);
+                push_toast(&toasts, "Contrato terminado", ToastKind::Success);
+            }
+            Err(err) => error.set(Some(err)),
+        }
+    });
+}
+
 #[function_component]
 pub fn Contratos() -> Html {
     let auth = use_context::<AuthContext>();
@@ -565,34 +698,8 @@ pub fn Contratos() -> Html {
         let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
             if let Some(ref c) = *delete_target {
-                let id = c.id.clone();
-                let contrato_short = format!("Contrato {}", &c.id[..8.min(c.id.len())]);
-                let error = error.clone();
-                let reload = reload.clone();
-                let delete_target = delete_target.clone();
-                let toasts = toasts.clone();
-                let reload_for_undo = reload.clone();
-                spawn_local(async move {
-                    let result = api_delete(&format!("/contratos/{id}")).await;
-                    delete_target.set(None);
-                    match result {
-                        Ok(()) => {
-                            reload.set(*reload + 1);
-                            let undo_reload = reload_for_undo;
-                            if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::PushWithUndo(
-                                    format!("\"{contrato_short}\" eliminado"),
-                                    ToastKind::Info,
-                                    "Deshacer".into(),
-                                    std::rc::Rc::new(move || {
-                                        undo_reload.set(*undo_reload + 1);
-                                    }),
-                                ));
-                            }
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                });
+                let label = format!("Contrato {}", &c.id[..8.min(c.id.len())]);
+                do_delete_contrato(c.id.clone(), label, delete_target.clone(), reload.clone(), error.clone(), toasts.clone(), reload.clone());
             }
         })
     };
@@ -612,32 +719,7 @@ pub fn Contratos() -> Html {
         let monto_mensual = monto_mensual.clone();
         let form_errors = form_errors.clone();
         move || -> bool {
-            let mut errs = FormErrors::default();
-            if propiedad_id.is_empty() {
-                errs.propiedad_id = Some("Debe seleccionar una propiedad".into());
-            }
-            if inquilino_id.is_empty() {
-                errs.inquilino_id = Some("Debe seleccionar un inquilino".into());
-            }
-            if fecha_inicio.is_empty() {
-                errs.fecha_inicio = Some("La fecha de inicio es obligatoria".into());
-            }
-            if fecha_fin.is_empty() {
-                errs.fecha_fin = Some("La fecha de fin es obligatoria".into());
-            }
-            if !fecha_inicio.is_empty() && !fecha_fin.is_empty() && *fecha_fin <= *fecha_inicio {
-                errs.fecha_fin =
-                    Some("La fecha de fin debe ser posterior a la fecha de inicio".into());
-            }
-            match monto_mensual.parse::<f64>() {
-                Ok(v) if v <= 0.0 => {
-                    errs.monto_mensual = Some("El monto debe ser mayor a 0".into());
-                }
-                Err(_) => {
-                    errs.monto_mensual = Some("Monto inválido".into());
-                }
-                _ => {}
-            }
+            let errs = validate_contrato_fields(&propiedad_id, &inquilino_id, &fecha_inicio, &fecha_fin, &monto_mensual);
             let valid = !errs.has_errors();
             form_errors.set(errs);
             valid
@@ -662,66 +744,29 @@ pub fn Contratos() -> Html {
         let submitting = submitting.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
-            if *submitting {
+            if *submitting || !validate_form() {
                 return;
             }
-            if !validate_form() {
-                return;
-            }
+            let Ok(monto_val) = monto_mensual.parse::<f64>() else { return };
             submitting.set(true);
-            let monto_val: f64 = match monto_mensual.parse() {
-                Ok(v) => v,
-                Err(_) => return,
-            };
             let dep = deposito.parse::<f64>().ok();
-            let error = error.clone();
-            let reload = reload.clone();
-            let reset_form = reset_form.clone();
-            let toasts = toasts.clone();
-            let submitting_handle = submitting.clone();
-            if let Some(ref ed) = *editing {
-                let update = UpdateContrato {
-                    fecha_fin: Some((*fecha_fin).clone()),
-                    monto_mensual: Some(monto_val),
-                    deposito: dep,
-                    estado: Some((*estado).clone()),
-                };
-                let id = ed.id.clone();
-                let submitting = submitting_handle.clone();
-                spawn_local(async move {
-                    match api_put::<Contrato, _>(&format!("/contratos/{id}"), &update).await {
-                        Ok(_) => {
-                            reset_form();
-                            reload.set(*reload + 1);
-                            push_toast(&toasts, "Contrato actualizado", ToastKind::Success);
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                    submitting.set(false);
-                });
-            } else {
-                let create = CreateContrato {
-                    propiedad_id: (*propiedad_id).clone(),
-                    inquilino_id: (*inquilino_id).clone(),
-                    fecha_inicio: (*fecha_inicio).clone(),
-                    fecha_fin: (*fecha_fin).clone(),
-                    monto_mensual: monto_val,
-                    deposito: dep,
-                    moneda: Some((*moneda).clone()),
-                };
-                let submitting = submitting_handle;
-                spawn_local(async move {
-                    match api_post::<Contrato, _>("/contratos", &create).await {
-                        Ok(_) => {
-                            reset_form();
-                            reload.set(*reload + 1);
-                            push_toast(&toasts, "Contrato creado", ToastKind::Success);
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                    submitting.set(false);
-                });
-            }
+            let editing_id = editing.as_ref().map(|e| e.id.clone());
+            let update = UpdateContrato {
+                fecha_fin: Some((*fecha_fin).clone()),
+                monto_mensual: Some(monto_val),
+                deposito: dep,
+                estado: Some((*estado).clone()),
+            };
+            let create = CreateContrato {
+                propiedad_id: (*propiedad_id).clone(),
+                inquilino_id: (*inquilino_id).clone(),
+                fecha_inicio: (*fecha_inicio).clone(),
+                fecha_fin: (*fecha_fin).clone(),
+                monto_mensual: monto_val,
+                deposito: dep,
+                moneda: Some((*moneda).clone()),
+            };
+            do_save_contrato(editing_id, update, create, reset_form.clone(), reload.clone(), error.clone(), toasts.clone(), submitting.clone());
         })
     };
 
@@ -748,28 +793,7 @@ pub fn Contratos() -> Html {
         let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
             if let Some(ref c) = *renew_target {
-                let id = c.id.clone();
-                let body = serde_json::json!({
-                    "fechaFin": *renew_fecha_fin,
-                    "montoMensual": renew_monto.parse::<f64>().unwrap_or(0.0),
-                });
-                let error = error.clone();
-                let reload = reload.clone();
-                let renew_target = renew_target.clone();
-                let renew_fecha_fin = renew_fecha_fin.clone();
-                let toasts = toasts.clone();
-                spawn_local(async move {
-                    match api_post::<Contrato, _>(&format!("/contratos/{id}/renovar"), &body).await
-                    {
-                        Ok(_) => {
-                            renew_target.set(None);
-                            renew_fecha_fin.set(String::new());
-                            reload.set(*reload + 1);
-                            push_toast(&toasts, "Contrato renovado", ToastKind::Success);
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                });
+                do_renew_contrato(c.id.clone(), (*renew_fecha_fin).clone(), renew_monto.parse::<f64>().unwrap_or(0.0), renew_target.clone(), renew_fecha_fin.clone(), reload.clone(), error.clone(), toasts.clone());
             }
         })
     };
@@ -794,25 +818,7 @@ pub fn Contratos() -> Html {
         let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
             if let Some(ref c) = *terminate_target {
-                let id = c.id.clone();
-                let body = serde_json::json!({ "fechaTerminacion": *terminate_fecha });
-                let error = error.clone();
-                let reload = reload.clone();
-                let terminate_target = terminate_target.clone();
-                let terminate_fecha = terminate_fecha.clone();
-                let toasts = toasts.clone();
-                spawn_local(async move {
-                    match api_post::<Contrato, _>(&format!("/contratos/{id}/terminar"), &body).await
-                    {
-                        Ok(_) => {
-                            terminate_target.set(None);
-                            terminate_fecha.set(String::new());
-                            reload.set(*reload + 1);
-                            push_toast(&toasts, "Contrato terminado", ToastKind::Success);
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                });
+                do_terminate_contrato(c.id.clone(), (*terminate_fecha).clone(), terminate_target.clone(), terminate_fecha.clone(), reload.clone(), error.clone(), toasts.clone());
             }
         })
     };

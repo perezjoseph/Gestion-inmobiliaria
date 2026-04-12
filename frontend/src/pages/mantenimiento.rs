@@ -470,6 +470,127 @@ fn MantenimientoList(props: &MantenimientoListProps) -> Html {
     }
 }
 
+fn validate_mantenimiento_fields(titulo: &str, propiedad_id: &str) -> FormErrors {
+    let mut errs = FormErrors::default();
+    if titulo.trim().is_empty() {
+        errs.titulo = Some("El título es obligatorio".into());
+    }
+    if propiedad_id.is_empty() {
+        errs.propiedad_id = Some("Debe seleccionar una propiedad".into());
+    }
+    errs
+}
+
+fn non_empty_mant(s: &str) -> Option<String> {
+    if s.trim().is_empty() { None } else { Some(s.to_string()) }
+}
+
+fn do_save_solicitud(
+    editing_id: Option<String>,
+    update: UpdateSolicitud,
+    create: CreateSolicitud,
+    reset_form: impl Fn() + 'static,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+    submitting: UseStateHandle<bool>,
+) {
+    spawn_local(async move {
+        let res = match editing_id {
+            Some(id) => api_put::<Solicitud, _>(&format!("/mantenimiento/{id}"), &update).await.map(|_| ()),
+            None => api_post::<Solicitud, _>("/mantenimiento", &create).await.map(|_| ()),
+        };
+        match res {
+            Ok(()) => {
+                reset_form();
+                reload.set(*reload + 1);
+                push_toast(&toasts, "Solicitud guardada", ToastKind::Success);
+            }
+            Err(err) => error.set(Some(err)),
+        }
+        submitting.set(false);
+    });
+}
+
+fn do_delete_solicitud(
+    id: String,
+    label: String,
+    delete_target: UseStateHandle<Option<Solicitud>>,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+) {
+    spawn_local(async move {
+        match api_delete(&format!("/mantenimiento/{id}")).await {
+            Ok(()) => {
+                delete_target.set(None);
+                reload.set(*reload + 1);
+                push_toast(&toasts, &format!("\"{}\" eliminada", label), ToastKind::Info);
+            }
+            Err(err) => {
+                delete_target.set(None);
+                error.set(Some(err));
+            }
+        }
+    });
+}
+
+fn do_cambiar_estado(
+    id: String,
+    nuevo_estado: String,
+    detail_item: UseStateHandle<Option<Solicitud>>,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+) {
+    let estado_label = nuevo_estado.clone();
+    spawn_local(async move {
+        let body = CambiarEstado { estado: nuevo_estado };
+        match api_put::<Solicitud, _>(&format!("/mantenimiento/{id}/estado"), &body).await {
+            Ok(updated) => {
+                detail_item.set(Some(updated));
+                reload.set(*reload + 1);
+                push_toast(&toasts, &format!("Estado cambiado a {estado_label}"), ToastKind::Success);
+            }
+            Err(err) => error.set(Some(err)),
+        }
+    });
+}
+
+fn do_add_nota(
+    sol_id: String,
+    contenido: String,
+    nota_contenido: UseStateHandle<String>,
+    nota_submitting: UseStateHandle<bool>,
+    detail_item: UseStateHandle<Option<Solicitud>>,
+    error: UseStateHandle<Option<String>>,
+) {
+    spawn_local(async move {
+        let body = CreateNota { contenido };
+        match api_post::<Solicitud, _>(&format!("/mantenimiento/{sol_id}/notas"), &body).await {
+            Ok(updated) => {
+                detail_item.set(Some(updated));
+                nota_contenido.set(String::new());
+            }
+            Err(err) => error.set(Some(err)),
+        }
+        nota_submitting.set(false);
+    });
+}
+
+fn build_mantenimiento_url(pg: u64, pp: u64, fe: &str, fp: &str) -> String {
+    let mut params = vec![format!("page={pg}"), format!("perPage={pp}")];
+    if !fe.is_empty() { params.push(format!("estado={fe}")); }
+    if !fp.is_empty() { params.push(format!("prioridad={fp}")); }
+    format!("/mantenimiento?{}", params.join("&"))
+}
+
+fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
+    if let Some(t) = toasts {
+        t.dispatch(ToastAction::Push(msg.into(), kind));
+    }
+}
+
 #[function_component]
 pub fn Mantenimiento() -> Html {
     let auth = use_context::<AuthContext>();
@@ -528,14 +649,7 @@ pub fn Mantenimiento() -> Html {
         use_effect_with((reload_val, pg, fe.clone(), fp.clone()), move |_| {
             spawn_local(async move {
                 loading.set(true);
-                let mut params = vec![format!("page={pg}"), format!("perPage={pp}")];
-                if !fe.is_empty() {
-                    params.push(format!("estado={fe}"));
-                }
-                if !fp.is_empty() {
-                    params.push(format!("prioridad={fp}"));
-                }
-                let url = format!("/mantenimiento?{}", params.join("&"));
+                let url = build_mantenimiento_url(pg, pp, &fe, &fp);
                 match api_get::<PaginatedResponse<Solicitud>>(&url).await {
                     Ok(resp) => {
                         items.set(resp.data);
@@ -719,30 +833,7 @@ pub fn Mantenimiento() -> Html {
         let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
             if let Some(ref s) = *delete_target {
-                let id = s.id.clone();
-                let sol_titulo = s.titulo.clone();
-                let error = error.clone();
-                let reload = reload.clone();
-                let delete_target = delete_target.clone();
-                let toasts = toasts.clone();
-                spawn_local(async move {
-                    match api_delete(&format!("/mantenimiento/{id}")).await {
-                        Ok(()) => {
-                            delete_target.set(None);
-                            reload.set(*reload + 1);
-                            if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::Push(
-                                    format!("\"{}\" eliminada", sol_titulo),
-                                    ToastKind::Info,
-                                ));
-                            }
-                        }
-                        Err(err) => {
-                            delete_target.set(None);
-                            error.set(Some(err));
-                        }
-                    }
-                });
+                do_delete_solicitud(s.id.clone(), s.titulo.clone(), delete_target.clone(), reload.clone(), error.clone(), toasts.clone());
             }
         })
     };
@@ -759,13 +850,7 @@ pub fn Mantenimiento() -> Html {
         let f_propiedad_id = f_propiedad_id.clone();
         let form_errors = form_errors.clone();
         move || -> bool {
-            let mut errs = FormErrors::default();
-            if f_titulo.trim().is_empty() {
-                errs.titulo = Some("El título es obligatorio".into());
-            }
-            if f_propiedad_id.is_empty() {
-                errs.propiedad_id = Some("Debe seleccionar una propiedad".into());
-            }
+            let errs = validate_mantenimiento_fields(&f_titulo, &f_propiedad_id);
             let valid = !errs.has_errors();
             form_errors.set(errs);
             valid
@@ -793,86 +878,38 @@ pub fn Mantenimiento() -> Html {
         let submitting = submitting.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
-            if *submitting {
-                return;
-            }
-            if !validate_form() {
+            if *submitting || !validate_form() {
                 return;
             }
             submitting.set(true);
-            let opt_str = |s: &UseStateHandle<String>| -> Option<String> {
-                let v = (**s).clone();
-                if v.is_empty() { None } else { Some(v) }
-            };
             let costo = f_costo_monto.parse::<f64>().ok();
-            let error = error.clone();
-            let reload = reload.clone();
-            let reset_form = reset_form.clone();
-            let toasts = toasts.clone();
-            let submitting_handle = submitting.clone();
-            if let Some(ref ed) = *editing {
-                let update = UpdateSolicitud {
-                    titulo: Some((*f_titulo).clone()),
-                    descripcion: opt_str(&f_descripcion),
-                    prioridad: Some((*f_prioridad).clone()),
-                    nombre_proveedor: opt_str(&f_nombre_proveedor),
-                    telefono_proveedor: opt_str(&f_telefono_proveedor),
-                    email_proveedor: opt_str(&f_email_proveedor),
-                    costo_monto: costo,
-                    costo_moneda: opt_str(&f_costo_moneda),
-                    unidad_id: opt_str(&f_unidad_id),
-                    inquilino_id: opt_str(&f_inquilino_id),
-                };
-                let id = ed.id.clone();
-                let submitting = submitting_handle;
-                spawn_local(async move {
-                    match api_put::<Solicitud, _>(&format!("/mantenimiento/{id}"), &update).await {
-                        Ok(_) => {
-                            reset_form();
-                            reload.set(*reload + 1);
-                            if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::Push(
-                                    "Solicitud actualizada".into(),
-                                    ToastKind::Success,
-                                ));
-                            }
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                    submitting.set(false);
-                });
-            } else {
-                let create = CreateSolicitud {
-                    propiedad_id: (*f_propiedad_id).clone(),
-                    unidad_id: opt_str(&f_unidad_id),
-                    inquilino_id: opt_str(&f_inquilino_id),
-                    titulo: (*f_titulo).clone(),
-                    descripcion: opt_str(&f_descripcion),
-                    prioridad: Some((*f_prioridad).clone()),
-                    nombre_proveedor: opt_str(&f_nombre_proveedor),
-                    telefono_proveedor: opt_str(&f_telefono_proveedor),
-                    email_proveedor: opt_str(&f_email_proveedor),
-                    costo_monto: costo,
-                    costo_moneda: opt_str(&f_costo_moneda),
-                };
-                let submitting = submitting_handle;
-                spawn_local(async move {
-                    match api_post::<Solicitud, _>("/mantenimiento", &create).await {
-                        Ok(_) => {
-                            reset_form();
-                            reload.set(*reload + 1);
-                            if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::Push(
-                                    "Solicitud creada".into(),
-                                    ToastKind::Success,
-                                ));
-                            }
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                    submitting.set(false);
-                });
-            }
+            let editing_id = editing.as_ref().map(|e| e.id.clone());
+            let update = UpdateSolicitud {
+                titulo: Some((*f_titulo).clone()),
+                descripcion: non_empty_mant(&f_descripcion),
+                prioridad: Some((*f_prioridad).clone()),
+                nombre_proveedor: non_empty_mant(&f_nombre_proveedor),
+                telefono_proveedor: non_empty_mant(&f_telefono_proveedor),
+                email_proveedor: non_empty_mant(&f_email_proveedor),
+                costo_monto: costo,
+                costo_moneda: non_empty_mant(&f_costo_moneda),
+                unidad_id: non_empty_mant(&f_unidad_id),
+                inquilino_id: non_empty_mant(&f_inquilino_id),
+            };
+            let create = CreateSolicitud {
+                propiedad_id: (*f_propiedad_id).clone(),
+                unidad_id: non_empty_mant(&f_unidad_id),
+                inquilino_id: non_empty_mant(&f_inquilino_id),
+                titulo: (*f_titulo).clone(),
+                descripcion: non_empty_mant(&f_descripcion),
+                prioridad: Some((*f_prioridad).clone()),
+                nombre_proveedor: non_empty_mant(&f_nombre_proveedor),
+                telefono_proveedor: non_empty_mant(&f_telefono_proveedor),
+                email_proveedor: non_empty_mant(&f_email_proveedor),
+                costo_monto: costo,
+                costo_moneda: non_empty_mant(&f_costo_moneda),
+            };
+            do_save_solicitud(editing_id, update, create, reset_form.clone(), reload.clone(), error.clone(), toasts.clone(), submitting.clone());
         })
     };
 
@@ -887,29 +924,7 @@ pub fn Mantenimiento() -> Html {
         let reload = reload.clone();
         let toasts = toasts.clone();
         Callback::from(move |(id, nuevo_estado): (String, String)| {
-            let error = error.clone();
-            let detail_item = detail_item.clone();
-            let reload = reload.clone();
-            let toasts = toasts.clone();
-            let estado_label = nuevo_estado.clone();
-            spawn_local(async move {
-                let body = CambiarEstado {
-                    estado: nuevo_estado,
-                };
-                match api_put::<Solicitud, _>(&format!("/mantenimiento/{id}/estado"), &body).await {
-                    Ok(updated) => {
-                        detail_item.set(Some(updated));
-                        reload.set(*reload + 1);
-                        if let Some(t) = &toasts {
-                            t.dispatch(ToastAction::Push(
-                                format!("Estado cambiado a {estado_label}"),
-                                ToastKind::Success,
-                            ));
-                        }
-                    }
-                    Err(err) => error.set(Some(err)),
-                }
-            });
+            do_cambiar_estado(id, nuevo_estado, detail_item.clone(), reload.clone(), error.clone(), toasts.clone());
         })
     };
 
@@ -925,25 +940,8 @@ pub fn Mantenimiento() -> Html {
                 return;
             }
             nota_submitting.set(true);
-            let nota_contenido = nota_contenido.clone();
-            let nota_submitting = nota_submitting.clone();
-            let detail_item = detail_item.clone();
-            let error = error.clone();
             if let Some(ref sol) = *detail_item {
-                let id = sol.id.clone();
-                spawn_local(async move {
-                    let body = CreateNota { contenido };
-                    match api_post::<Solicitud, _>(&format!("/mantenimiento/{id}/notas"), &body)
-                        .await
-                    {
-                        Ok(updated) => {
-                            detail_item.set(Some(updated));
-                            nota_contenido.set(String::new());
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                    nota_submitting.set(false);
-                });
+                do_add_nota(sol.id.clone(), contenido, nota_contenido.clone(), nota_submitting.clone(), detail_item.clone(), error.clone());
             }
         })
     };

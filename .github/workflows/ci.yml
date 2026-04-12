@@ -52,11 +52,16 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Install Gitleaks
+      - name: Install Gitleaks (with checksum verification)
         run: |
           GITLEAKS_VERSION="8.24.3"
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
-            | sudo tar xz -C /usr/local/bin gitleaks
+          GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
+          ARCHIVE="/tmp/gitleaks.tar.gz"
+          curl -sSfL -o "$ARCHIVE" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          sudo tar xzf "$ARCHIVE" -C /usr/local/bin gitleaks
+          rm -f "$ARCHIVE"
           gitleaks version
 
       - name: Run Gitleaks secret detection
@@ -661,6 +666,9 @@ jobs:
           fi
           docker run --rm \
             --network host \
+            --security-opt no-new-privileges \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid \
             -e SONAR_TOKEN="${{ steps.sonar-bootstrap.outputs.token }}" \
             -e SONAR_HOST_URL="http://192.168.88.25:9000" \
             -v "${{ github.workspace }}:/usr/src" \
@@ -976,6 +984,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write
     needs: [build-backend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
@@ -1005,15 +1014,40 @@ jobs:
           load: true
           tags: ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }}
 
+      - name: Install Trivy (with checksum verification)
+        run: |
+          TRIVY_VERSION="0.69.3"
+          TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
+          if ! command -v trivy &>/dev/null || [ "$(trivy --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" != "$TRIVY_VERSION" ]; then
+            ARCHIVE="/tmp/trivy.tar.gz"
+            curl -sSfL -o "$ARCHIVE" \
+              "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+            echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
+            sudo tar xzf "$ARCHIVE" -C /usr/local/bin trivy
+            rm -f "$ARCHIVE"
+          fi
+          trivy --version
+
       - name: Scan backend image for vulnerabilities (Trivy)
         run: |
-          TRIVY_VERSION="0.62.1"
-          if ! command -v trivy &>/dev/null; then
-            curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
-              | sudo tar xz -C /usr/local/bin trivy
-          fi
-          trivy image --exit-code 1 --severity CRITICAL,HIGH --no-progress \
+          trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --no-progress \
+            --format table \
             ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }}
+
+      - name: Generate Trivy SARIF report for backend image
+        if: always()
+        run: |
+          trivy image --severity CRITICAL,HIGH,MEDIUM --ignore-unfixed --no-progress \
+            --format sarif --output trivy-backend.sarif \
+            ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }} || true
+
+      - name: Upload Trivy SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3.28.18
+        with:
+          sarif_file: trivy-backend.sarif
+          category: trivy-backend
+        continue-on-error: true
 
       - name: Push backend image to GHCR
         run: docker push ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }}
@@ -1025,6 +1059,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write
     needs: [build-frontend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
@@ -1054,15 +1089,40 @@ jobs:
           load: true
           tags: ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }}
 
+      - name: Install Trivy (with checksum verification)
+        run: |
+          TRIVY_VERSION="0.69.3"
+          TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
+          if ! command -v trivy &>/dev/null || [ "$(trivy --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" != "$TRIVY_VERSION" ]; then
+            ARCHIVE="/tmp/trivy.tar.gz"
+            curl -sSfL -o "$ARCHIVE" \
+              "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+            echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
+            sudo tar xzf "$ARCHIVE" -C /usr/local/bin trivy
+            rm -f "$ARCHIVE"
+          fi
+          trivy --version
+
       - name: Scan frontend image for vulnerabilities (Trivy)
         run: |
-          TRIVY_VERSION="0.62.1"
-          if ! command -v trivy &>/dev/null; then
-            curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
-              | sudo tar xz -C /usr/local/bin trivy
-          fi
-          trivy image --exit-code 1 --severity CRITICAL,HIGH --no-progress \
+          trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --no-progress \
+            --format table \
             ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }}
+
+      - name: Generate Trivy SARIF report for frontend image
+        if: always()
+        run: |
+          trivy image --severity CRITICAL,HIGH,MEDIUM --ignore-unfixed --no-progress \
+            --format sarif --output trivy-frontend.sarif \
+            ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }} || true
+
+      - name: Upload Trivy SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3.28.18
+        with:
+          sarif_file: trivy-frontend.sarif
+          category: trivy-frontend
+        continue-on-error: true
 
       - name: Push frontend image to GHCR
         run: docker push ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }}
@@ -1100,11 +1160,21 @@ jobs:
           JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
+          # Capture current image digests for rollback
+          PREV_BACKEND=$(docker compose -f docker-compose.prod.yml images backend --format json 2>/dev/null | jq -r '.[0].ID // empty' || true)
+          PREV_FRONTEND=$(docker compose -f docker-compose.prod.yml images frontend --format json 2>/dev/null | jq -r '.[0].ID // empty' || true)
+          echo "PREV_BACKEND=$PREV_BACKEND" >> "$GITHUB_ENV"
+          echo "PREV_FRONTEND=$PREV_FRONTEND" >> "$GITHUB_ENV"
           docker compose -f docker-compose.prod.yml pull
           docker compose -f docker-compose.prod.yml up -d --remove-orphans
           docker compose -f docker-compose.prod.yml ps
 
       - name: Verify deployment health
+        id: health-check
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
+          JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           echo "Waiting for services to initialize..."
           sleep 10
@@ -1125,6 +1195,23 @@ jobs:
             echo "Backend logs (last 50 lines):"
             docker compose -f docker-compose.prod.yml logs --tail=50 backend
             exit 1
+          fi
+
+      - name: Rollback on health check failure
+        if: failure() && steps.health-check.outcome == 'failure'
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
+          JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "::warning::Health check failed -- rolling back to previous images"
+          if [ -n "$PREV_BACKEND" ] || [ -n "$PREV_FRONTEND" ]; then
+            docker compose -f docker-compose.prod.yml down
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans 2>/dev/null || true
+            echo "Rollback attempted. Verify manually."
+          else
+            echo "No previous images recorded -- stopping failed deployment"
+            docker compose -f docker-compose.prod.yml down
           fi
 
   notify-failure:

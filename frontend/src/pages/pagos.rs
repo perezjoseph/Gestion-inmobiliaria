@@ -322,6 +322,114 @@ fn PagoList(props: &PagoListProps) -> Html {
     }
 }
 
+fn build_pagos_url(pg: u64, pp: u64, f_contrato: &str, f_estado: &str) -> String {
+    let mut params = vec![format!("page={pg}"), format!("perPage={pp}")];
+    if !f_contrato.is_empty() {
+        params.push(format!("contratoId={f_contrato}"));
+    }
+    if !f_estado.is_empty() {
+        params.push(format!("estado={f_estado}"));
+    }
+    format!("/pagos?{}", params.join("&"))
+}
+
+fn validate_pago_fields(contrato_id: &str, monto: &str, fecha_vencimiento: &str) -> FormErrors {
+    let mut errs = FormErrors::default();
+    if contrato_id.is_empty() {
+        errs.contrato_id = Some("Debe seleccionar un contrato".into());
+    }
+    match monto.parse::<f64>() {
+        Ok(v) if v <= 0.0 => errs.monto = Some("El monto debe ser mayor a 0".into()),
+        Err(_) => errs.monto = Some("Monto inválido".into()),
+        _ => {}
+    }
+    if fecha_vencimiento.is_empty() {
+        errs.fecha_vencimiento = Some("La fecha de vencimiento es obligatoria".into());
+    }
+    errs
+}
+
+fn non_empty(s: &str) -> Option<String> {
+    if s.trim().is_empty() { None } else { Some(s.to_string()) }
+}
+
+fn format_contrato_label(id: &str, contratos: &[Contrato], propiedades: &[Propiedad], inquilinos: &[Inquilino]) -> String {
+    contratos
+        .iter()
+        .find(|c| c.id == id)
+        .map(|c| {
+            let prop_name = propiedades.iter().find(|p| p.id == c.propiedad_id).map(|p| p.titulo.as_str()).unwrap_or("—");
+            let tenant_name = inquilinos.iter().find(|i| i.id == c.inquilino_id).map(|i| format!("{} {}", i.nombre, i.apellido)).unwrap_or_default();
+            if tenant_name.is_empty() {
+                format!("{} — {} {}", prop_name, c.moneda, c.monto_mensual)
+            } else {
+                format!("{} ({}) — {} {}", prop_name, tenant_name, c.moneda, c.monto_mensual)
+            }
+        })
+        .unwrap_or_else(|| id.to_string())
+}
+
+fn do_save_pago(
+    editing_id: Option<String>,
+    update: UpdatePago,
+    create: CreatePago,
+    reset_form: impl Fn() + 'static,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+    submitting: UseStateHandle<bool>,
+) {
+    spawn_local(async move {
+        let res = match editing_id {
+            Some(id) => api_put::<Pago, _>(&format!("/pagos/{id}"), &update).await.map(|_| ()),
+            None => api_post::<Pago, _>("/pagos", &create).await.map(|_| ()),
+        };
+        match res {
+            Ok(()) => {
+                reset_form();
+                reload.set(*reload + 1);
+                push_toast(&toasts, "Pago guardado", ToastKind::Success);
+            }
+            Err(err) => error.set(Some(err)),
+        }
+        submitting.set(false);
+    });
+}
+
+fn do_delete_pago(
+    id: String,
+    label: String,
+    delete_target: UseStateHandle<Option<Pago>>,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+    reload_for_undo: UseStateHandle<u32>,
+) {
+    spawn_local(async move {
+        match api_delete(&format!("/pagos/{id}")).await {
+            Ok(()) => {
+                delete_target.set(None);
+                reload.set(*reload + 1);
+                let undo_reload = reload_for_undo;
+                if let Some(t) = &toasts {
+                    t.dispatch(ToastAction::PushWithUndo(
+                        format!("Pago de {label} eliminado"),
+                        ToastKind::Info,
+                        "Deshacer".into(),
+                        std::rc::Rc::new(move || {
+                            undo_reload.set(*undo_reload + 1);
+                        }),
+                    ));
+                }
+            }
+            Err(err) => {
+                delete_target.set(None);
+                error.set(Some(err));
+            }
+        }
+    });
+}
+
 #[function_component]
 pub fn Pagos() -> Html {
     let auth = use_context::<AuthContext>();
@@ -375,14 +483,7 @@ pub fn Pagos() -> Html {
             move |_| {
                 spawn_local(async move {
                     loading.set(true);
-                    let mut params = vec![format!("page={pg}"), format!("perPage={pp}")];
-                    if !f_contrato.is_empty() {
-                        params.push(format!("contratoId={f_contrato}"));
-                    }
-                    if !f_estado.is_empty() {
-                        params.push(format!("estado={f_estado}"));
-                    }
-                    let url = format!("/pagos?{}", params.join("&"));
+                    let url = build_pagos_url(pg, pp, &f_contrato, &f_estado);
                     match api_get::<PaginatedResponse<Pago>>(&url).await {
                         Ok(resp) => {
                             total.set(resp.total);
@@ -426,30 +527,7 @@ pub fn Pagos() -> Html {
         let propiedades = propiedades.clone();
         let inquilinos_list = inquilinos_list.clone();
         Callback::from(move |id: String| -> String {
-            contratos
-                .iter()
-                .find(|c| c.id == id)
-                .map(|c| {
-                    let prop_name = propiedades
-                        .iter()
-                        .find(|p| p.id == c.propiedad_id)
-                        .map(|p| p.titulo.as_str())
-                        .unwrap_or("—");
-                    let tenant_name = inquilinos_list
-                        .iter()
-                        .find(|i| i.id == c.inquilino_id)
-                        .map(|i| format!("{} {}", i.nombre, i.apellido))
-                        .unwrap_or_default();
-                    if tenant_name.is_empty() {
-                        format!("{} — {} {}", prop_name, c.moneda, c.monto_mensual)
-                    } else {
-                        format!(
-                            "{} ({}) — {} {}",
-                            prop_name, tenant_name, c.moneda, c.monto_mensual
-                        )
-                    }
-                })
-                .unwrap_or_else(|| id.to_string())
+            format_contrato_label(&id, &contratos, &propiedades, &inquilinos_list)
         })
     };
 
@@ -561,34 +639,8 @@ pub fn Pagos() -> Html {
         let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
             if let Some(ref p) = *delete_target {
-                let id = p.id.clone();
-                let pago_monto = format_currency(&p.moneda, p.monto);
-                let error = error.clone();
-                let reload = reload.clone();
-                let delete_target = delete_target.clone();
-                let toasts = toasts.clone();
-                let reload_for_undo = reload.clone();
-                spawn_local(async move {
-                    let result = api_delete(&format!("/pagos/{id}")).await;
-                    delete_target.set(None);
-                    match result {
-                        Ok(()) => {
-                            reload.set(*reload + 1);
-                            let undo_reload = reload_for_undo;
-                            if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::PushWithUndo(
-                                    format!("Pago de {pago_monto} eliminado"),
-                                    ToastKind::Info,
-                                    "Deshacer".into(),
-                                    std::rc::Rc::new(move || {
-                                        undo_reload.set(*undo_reload + 1);
-                                    }),
-                                ));
-                            }
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                });
+                let label = format_currency(&p.moneda, p.monto);
+                do_delete_pago(p.id.clone(), label, delete_target.clone(), reload.clone(), error.clone(), toasts.clone(), reload.clone());
             }
         })
     };
@@ -606,22 +658,7 @@ pub fn Pagos() -> Html {
         let fecha_vencimiento = fecha_vencimiento.clone();
         let form_errors = form_errors.clone();
         move || -> bool {
-            let mut errs = FormErrors::default();
-            if contrato_id.is_empty() {
-                errs.contrato_id = Some("Debe seleccionar un contrato".into());
-            }
-            match monto.parse::<f64>() {
-                Ok(v) if v <= 0.0 => {
-                    errs.monto = Some("El monto debe ser mayor a 0".into());
-                }
-                Err(_) => {
-                    errs.monto = Some("Monto inválido".into());
-                }
-                _ => {}
-            }
-            if fecha_vencimiento.is_empty() {
-                errs.fecha_vencimiento = Some("La fecha de vencimiento es obligatoria".into());
-            }
+            let errs = validate_pago_fields(&contrato_id, &monto, &fecha_vencimiento);
             let valid = !errs.has_errors();
             form_errors.set(errs);
             valid
@@ -646,81 +683,29 @@ pub fn Pagos() -> Html {
         let submitting = submitting.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
-            if *submitting {
+            if *submitting || !validate_form() {
                 return;
             }
-            if !validate_form() {
-                return;
-            }
+            let Ok(monto_val) = monto.parse::<f64>() else { return };
             submitting.set(true);
-            let monto_val: f64 = match monto.parse() {
-                Ok(v) => v,
-                Err(_) => return,
+            let editing_id = editing.as_ref().map(|e| e.id.clone());
+            let update = UpdatePago {
+                monto: Some(monto_val),
+                fecha_pago: non_empty(&fecha_pago),
+                metodo_pago: non_empty(&metodo_pago),
+                estado: Some((*estado_form).clone()),
+                notas: non_empty(&notas),
             };
-            let fp = if fecha_pago.trim().is_empty() {
-                None
-            } else {
-                Some((*fecha_pago).clone())
+            let create = CreatePago {
+                contrato_id: (*contrato_id).clone(),
+                monto: monto_val,
+                moneda: Some((*moneda).clone()),
+                fecha_pago: non_empty(&fecha_pago),
+                fecha_vencimiento: (*fecha_vencimiento).clone(),
+                metodo_pago: non_empty(&metodo_pago),
+                notas: non_empty(&notas),
             };
-            let mp = if metodo_pago.is_empty() {
-                None
-            } else {
-                Some((*metodo_pago).clone())
-            };
-            let n = if notas.trim().is_empty() {
-                None
-            } else {
-                Some((*notas).clone())
-            };
-            let error = error.clone();
-            let reload = reload.clone();
-            let reset_form = reset_form.clone();
-            let toasts = toasts.clone();
-            let submitting_handle = submitting.clone();
-            if let Some(ref ed) = *editing {
-                let update = UpdatePago {
-                    monto: Some(monto_val),
-                    fecha_pago: fp,
-                    metodo_pago: mp,
-                    estado: Some((*estado_form).clone()),
-                    notas: n,
-                };
-                let id = ed.id.clone();
-                let submitting = submitting_handle.clone();
-                spawn_local(async move {
-                    match api_put::<Pago, _>(&format!("/pagos/{id}"), &update).await {
-                        Ok(_) => {
-                            reset_form();
-                            reload.set(*reload + 1);
-                            push_toast(&toasts, "Pago actualizado", ToastKind::Success);
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                    submitting.set(false);
-                });
-            } else {
-                let create = CreatePago {
-                    contrato_id: (*contrato_id).clone(),
-                    monto: monto_val,
-                    moneda: Some((*moneda).clone()),
-                    fecha_pago: fp,
-                    fecha_vencimiento: (*fecha_vencimiento).clone(),
-                    metodo_pago: mp,
-                    notas: n,
-                };
-                let submitting = submitting_handle;
-                spawn_local(async move {
-                    match api_post::<Pago, _>("/pagos", &create).await {
-                        Ok(_) => {
-                            reset_form();
-                            reload.set(*reload + 1);
-                            push_toast(&toasts, "Pago registrado", ToastKind::Success);
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                    submitting.set(false);
-                });
-            }
+            do_save_pago(editing_id, update, create, reset_form.clone(), reload.clone(), error.clone(), toasts.clone(), submitting.clone());
         })
     };
 

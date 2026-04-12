@@ -371,6 +371,101 @@ fn PropiedadList(props: &PropiedadListProps) -> Html {
     }
 }
 
+fn validate_propiedad_fields(titulo: &str, direccion: &str, ciudad: &str, provincia: &str, precio: &str) -> FormErrors {
+    let mut errs = FormErrors::default();
+    if titulo.trim().is_empty() {
+        errs.titulo = Some("El título es obligatorio".into());
+    }
+    if direccion.trim().is_empty() {
+        errs.direccion = Some("La dirección es obligatoria".into());
+    }
+    if ciudad.trim().is_empty() {
+        errs.ciudad = Some("La ciudad es obligatoria".into());
+    }
+    if provincia.trim().is_empty() {
+        errs.provincia = Some("La provincia es obligatoria".into());
+    }
+    match precio.parse::<f64>() {
+        Ok(v) if v <= 0.0 => errs.precio = Some("El precio debe ser mayor a 0".into()),
+        Err(_) => errs.precio = Some("Precio inválido".into()),
+        _ => {}
+    }
+    errs
+}
+
+fn non_empty_prop(s: &str) -> Option<String> {
+    if s.trim().is_empty() { None } else { Some(s.to_string()) }
+}
+
+fn do_save_propiedad(
+    editing_id: Option<String>,
+    update: UpdatePropiedad,
+    create: CreatePropiedad,
+    reset_form: impl Fn() + 'static,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+    submitting: UseStateHandle<bool>,
+) {
+    spawn_local(async move {
+        let res = match editing_id {
+            Some(id) => api_put::<Propiedad, _>(&format!("/propiedades/{id}"), &update).await.map(|_| ()),
+            None => api_post::<Propiedad, _>("/propiedades", &create).await.map(|_| ()),
+        };
+        match res {
+            Ok(()) => {
+                reset_form();
+                reload.set(*reload + 1);
+                push_toast(&toasts, "Propiedad guardada", ToastKind::Success);
+            }
+            Err(err) => error.set(Some(err)),
+        }
+        submitting.set(false);
+    });
+}
+
+fn do_delete_propiedad(
+    id: String,
+    label: String,
+    delete_target: UseStateHandle<Option<Propiedad>>,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+    reload_for_undo: UseStateHandle<u32>,
+) {
+    spawn_local(async move {
+        match api_delete(&format!("/propiedades/{id}")).await {
+            Ok(()) => {
+                delete_target.set(None);
+                reload.set(*reload + 1);
+                let undo_reload = reload_for_undo;
+                if let Some(t) = &toasts {
+                    t.dispatch(ToastAction::PushWithUndo(
+                        format!("\"{label}\" eliminada"),
+                        ToastKind::Info,
+                        "Deshacer".into(),
+                        std::rc::Rc::new(move || { undo_reload.set(*undo_reload + 1); }),
+                    ));
+                }
+            }
+            Err(err) => {
+                delete_target.set(None);
+                error.set(Some(err));
+            }
+        }
+    });
+}
+
+fn build_propiedades_url(pg: u64, pp: u64, fc: &str, ft: &str, fe: &str, sf: &Option<String>, so: &Option<String>) -> String {
+    let mut params = vec![format!("page={pg}"), format!("perPage={pp}")];
+    if !fc.is_empty() { params.push(format!("ciudad={fc}")); }
+    if !ft.is_empty() { params.push(format!("tipoPropiedad={ft}")); }
+    if !fe.is_empty() { params.push(format!("estado={fe}")); }
+    if let Some(field) = sf { params.push(format!("sortBy={field}")); }
+    if let Some(order) = so { params.push(format!("sortOrder={order}")); }
+    format!("/propiedades?{}", params.join("&"))
+}
+
 #[function_component]
 pub fn Propiedades() -> Html {
     let auth = use_context::<AuthContext>();
@@ -439,23 +534,7 @@ pub fn Propiedades() -> Html {
             move |_| {
                 spawn_local(async move {
                     loading.set(true);
-                    let mut params = vec![format!("page={pg}"), format!("perPage={pp}")];
-                    if !fc.is_empty() {
-                        params.push(format!("ciudad={fc}"));
-                    }
-                    if !ft.is_empty() {
-                        params.push(format!("tipoPropiedad={ft}"));
-                    }
-                    if !fe.is_empty() {
-                        params.push(format!("estado={fe}"));
-                    }
-                    if let Some(ref field) = sf {
-                        params.push(format!("sortBy={field}"));
-                    }
-                    if let Some(ref order) = so {
-                        params.push(format!("sortOrder={order}"));
-                    }
-                    let url = format!("/propiedades?{}", params.join("&"));
+                    let url = build_propiedades_url(pg, pp, &fc, &ft, &fe, &sf, &so);
                     match api_get::<PaginatedResponse<Propiedad>>(&url).await {
                         Ok(resp) => {
                             items.set(resp.data);
@@ -593,34 +672,7 @@ pub fn Propiedades() -> Html {
         let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
             if let Some(ref p) = *delete_target {
-                let id = p.id.clone();
-                let prop_titulo = p.titulo.clone();
-                let error = error.clone();
-                let reload = reload.clone();
-                let delete_target = delete_target.clone();
-                let toasts = toasts.clone();
-                let reload_for_undo = reload.clone();
-                spawn_local(async move {
-                    let result = api_delete(&format!("/propiedades/{id}")).await;
-                    delete_target.set(None);
-                    match result {
-                        Ok(()) => {
-                            reload.set(*reload + 1);
-                            let undo_reload = reload_for_undo;
-                            if let Some(t) = &toasts {
-                                t.dispatch(ToastAction::PushWithUndo(
-                                    format!("\"{prop_titulo}\" eliminada"),
-                                    ToastKind::Info,
-                                    "Deshacer".into(),
-                                    std::rc::Rc::new(move || {
-                                        undo_reload.set(*undo_reload + 1);
-                                    }),
-                                ));
-                            }
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                });
+                do_delete_propiedad(p.id.clone(), p.titulo.clone(), delete_target.clone(), reload.clone(), error.clone(), toasts.clone(), reload.clone());
             }
         })
     };
@@ -640,28 +692,7 @@ pub fn Propiedades() -> Html {
         let precio = precio.clone();
         let form_errors = form_errors.clone();
         move || -> bool {
-            let mut errs = FormErrors::default();
-            if titulo.trim().is_empty() {
-                errs.titulo = Some("El título es obligatorio".into());
-            }
-            if direccion.trim().is_empty() {
-                errs.direccion = Some("La dirección es obligatoria".into());
-            }
-            if ciudad.trim().is_empty() {
-                errs.ciudad = Some("La ciudad es obligatoria".into());
-            }
-            if provincia.trim().is_empty() {
-                errs.provincia = Some("La provincia es obligatoria".into());
-            }
-            match precio.parse::<f64>() {
-                Ok(v) if v <= 0.0 => {
-                    errs.precio = Some("El precio debe ser mayor a 0".into());
-                }
-                Err(_) => {
-                    errs.precio = Some("Precio inválido".into());
-                }
-                _ => {}
-            }
+            let errs = validate_propiedad_fields(&titulo, &direccion, &ciudad, &provincia, &precio);
             let valid = !errs.has_errors();
             form_errors.set(errs);
             valid
@@ -690,88 +721,47 @@ pub fn Propiedades() -> Html {
         let submitting = submitting.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
-            if *submitting {
+            if *submitting || !validate_form() {
                 return;
             }
-            if !validate_form() {
-                return;
-            }
+            let Ok(precio_val) = precio.parse::<f64>() else { return };
             submitting.set(true);
-            let precio_val: f64 = match precio.parse() {
-                Ok(v) => v,
-                Err(_) => return,
-            };
-            let desc = if descripcion.trim().is_empty() {
-                None
-            } else {
-                Some((*descripcion).clone())
-            };
+            let desc = non_empty_prop(&descripcion);
             let hab = habitaciones.parse::<i32>().ok();
             let ban = banos.parse::<i32>().ok();
             let area = area_m2.parse::<f64>().ok();
-            let error = error.clone();
-            let reload = reload.clone();
-            let reset_form = reset_form.clone();
-            let toasts = toasts.clone();
-            let submitting_handle = submitting.clone();
-            if let Some(ref ed) = *editing {
-                let update = UpdatePropiedad {
-                    titulo: Some((*titulo).clone()),
-                    descripcion: desc,
-                    direccion: Some((*direccion).clone()),
-                    ciudad: Some((*ciudad).clone()),
-                    provincia: Some((*provincia).clone()),
-                    tipo_propiedad: Some((*tipo_propiedad).clone()),
-                    habitaciones: hab,
-                    banos: ban,
-                    area_m2: area,
-                    precio: Some(precio_val),
-                    moneda: Some((*moneda).clone()),
-                    estado: Some((*estado).clone()),
-                    imagenes: None,
-                };
-                let id = ed.id.clone();
-                let submitting = submitting_handle.clone();
-                spawn_local(async move {
-                    match api_put::<Propiedad, _>(&format!("/propiedades/{id}"), &update).await {
-                        Ok(_) => {
-                            reset_form();
-                            reload.set(*reload + 1);
-                            push_toast(&toasts, "Propiedad actualizada", ToastKind::Success);
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                    submitting.set(false);
-                });
-            } else {
-                let create = CreatePropiedad {
-                    titulo: (*titulo).clone(),
-                    descripcion: desc,
-                    direccion: (*direccion).clone(),
-                    ciudad: (*ciudad).clone(),
-                    provincia: (*provincia).clone(),
-                    tipo_propiedad: (*tipo_propiedad).clone(),
-                    habitaciones: hab,
-                    banos: ban,
-                    area_m2: area,
-                    precio: precio_val,
-                    moneda: Some((*moneda).clone()),
-                    estado: Some((*estado).clone()),
-                    imagenes: None,
-                };
-                let submitting = submitting_handle;
-                spawn_local(async move {
-                    match api_post::<Propiedad, _>("/propiedades", &create).await {
-                        Ok(_) => {
-                            reset_form();
-                            reload.set(*reload + 1);
-                            push_toast(&toasts, "Propiedad creada", ToastKind::Success);
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                    submitting.set(false);
-                });
-            }
+            let editing_id = editing.as_ref().map(|e| e.id.clone());
+            let update = UpdatePropiedad {
+                titulo: Some((*titulo).clone()),
+                descripcion: desc.clone(),
+                direccion: Some((*direccion).clone()),
+                ciudad: Some((*ciudad).clone()),
+                provincia: Some((*provincia).clone()),
+                tipo_propiedad: Some((*tipo_propiedad).clone()),
+                habitaciones: hab,
+                banos: ban,
+                area_m2: area,
+                precio: Some(precio_val),
+                moneda: Some((*moneda).clone()),
+                estado: Some((*estado).clone()),
+                imagenes: None,
+            };
+            let create = CreatePropiedad {
+                titulo: (*titulo).clone(),
+                descripcion: desc,
+                direccion: (*direccion).clone(),
+                ciudad: (*ciudad).clone(),
+                provincia: (*provincia).clone(),
+                tipo_propiedad: (*tipo_propiedad).clone(),
+                habitaciones: hab,
+                banos: ban,
+                area_m2: area,
+                precio: precio_val,
+                moneda: Some((*moneda).clone()),
+                estado: Some((*estado).clone()),
+                imagenes: None,
+            };
+            do_save_propiedad(editing_id, update, create, reset_form.clone(), reload.clone(), error.clone(), toasts.clone(), submitting.clone());
         })
     };
 
