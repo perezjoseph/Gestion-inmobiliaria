@@ -19,7 +19,6 @@ from .fixers import (
     fix_with_retry, fix_sonar_issues, improve_pipeline,
     _fix_lock, _sonar_fix_lock, _improve_lock,
 )
-from . import memory
 
 _thread_semaphore = threading.Semaphore(4)
 
@@ -75,7 +74,6 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     "sonar_fix": _sonar_fix_lock.locked(),
                     "improve": _improve_lock.locked(),
                 },
-                "agentmemory": memory.is_available(),
             }).encode(), "application/json")
             return
         self._send(404, b"Not found")
@@ -185,9 +183,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
         for attempt in range(1, MAX_RETRIES + 1):
             log.info(f"=== SonarQube fix attempt {attempt}/{MAX_RETRIES} ===")
             if run_kiro(prompt, f"SonarQube fix attempt {attempt}"):
-                memory.observe_sonar_fix(failures_summary[:300], attempt, True)
                 return
-            memory.observe_sonar_fix(failures_summary[:300], attempt, False)
 
         log.error(f"Failed after {MAX_RETRIES} attempts.")
 
@@ -313,10 +309,6 @@ def main():
     log.info(f"  Sonar fix:  http://{local_ip}:{PORT}/sonar-fix")
     log.info(f"Project dir: {PROJECT_DIR} (Windows: {WIN_PROJECT_DIR})")
     log.info(f"WSL: {WSL_DISTRO} (user: {WSL_USER})")
-    if memory.is_available():
-        log.info(f"agentmemory: connected at {memory.AGENTMEMORY_URL}")
-    else:
-        log.info("agentmemory: not available (running without semantic memory)")
     log.info("Waiting for webhooks...")
 
     try:

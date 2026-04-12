@@ -6,7 +6,6 @@ from .config import WIN_PROJECT_DIR, MAX_RETRIES, SCOPE_CONSTRAINTS, log
 from .runner import wsl_bash, run_kiro
 from .classifier import classify_error
 from .history import record_fix_attempt, get_past_attempts
-from . import memory
 
 _fix_lock = threading.Lock()
 _sonar_fix_lock = threading.Lock()
@@ -162,13 +161,10 @@ def fix_with_retry(job, step, error_log, context=None):
         for attempt in range(1, MAX_RETRIES + 1):
             log.info(f"=== Attempt {attempt}/{MAX_RETRIES} for {job}/{step}{ctx} (class: {error_class}) ===")
 
-            semantic_memory = memory.search_similar_fixes(job, error_log, error_class)
-
             instruction = _JOB_INSTRUCTIONS.get(job, "Analyze the error and fix the issue.")
             error_note = _build_error_notes(error_class)
 
             history_section = f"\n\n{past_attempts_section}" if past_attempts_section else ""
-            semantic_section = f"\n\n{semantic_memory}" if semantic_memory else ""
             retry_section = ""
             if previous_attempt_result:
                 retry_section = (
@@ -185,7 +181,6 @@ def fix_with_retry(job, step, error_log, context=None):
                 f"TASK: {instruction}"
                 f"{error_note}"
                 f"{history_section}"
-                f"{semantic_section}"
                 f"{retry_section}"
                 f"{SCOPE_CONSTRAINTS}\n\n"
                 "After fixing, run only the targeted verification command for this job. "
@@ -197,15 +192,8 @@ def fix_with_retry(job, step, error_log, context=None):
             success = run_kiro(prompt, f"CI fix ({job}/{step}) attempt {attempt}")
             record_fix_attempt(job, error_log, attempt, success,
                                f"class={error_class}, job={job}, step={step}")
-            memory.observe_fix_attempt(
-                job, step, error_class, error_log[:500], attempt, success,
-            )
 
             if success:
-                memory.remember_successful_fix(
-                    job, error_class, error_log[:200],
-                    f"Fixed {job}/{step} on attempt {attempt} (class: {error_class})",
-                )
                 log.info(f"Attempt {attempt} completed for {job}/{step}")
                 return True
 
@@ -323,7 +311,6 @@ def fix_sonar_issues(sonar_report, run_url):
             )
 
             success = run_kiro(prompt, f"SonarQube issue fix attempt {attempt}")
-            memory.observe_sonar_fix(sonar_report[:300], attempt, success)
 
             if success:
                 log.info(f"SonarQube fix attempt {attempt} completed")
@@ -415,11 +402,8 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
             )
 
             if run_kiro(prompt, f"Pipeline improve ({focus}) attempt {attempt}"):
-                memory.observe_pipeline_improve(focus, attempt, True)
                 log.info(f"Pipeline improvement attempt {attempt} completed")
                 return True
-
-            memory.observe_pipeline_improve(focus, attempt, False)
 
             log.warning(f"Pipeline improvement attempt {attempt} failed")
 

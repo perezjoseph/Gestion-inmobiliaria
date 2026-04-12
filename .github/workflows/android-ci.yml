@@ -379,6 +379,9 @@ jobs:
             echo "::warning::Gradle dependency verification metadata changed -- review for supply chain integrity"
           fi
 
+      - name: Unset host JAVA_HOME to avoid conflict with Docker container JVM
+        run: echo "JAVA_HOME=" >> "$GITHUB_ENV"
+
       - name: OWASP dependency scan (fail on CVSS >= 7)
         id: owasp
         if: always()

@@ -711,8 +711,9 @@ jobs:
         with:
           project: realestate
           path: .
-          format: 'HTML,SARIF'
+          format: HTML
           args: >-
+            --format SARIF
             --failOnCVSS 7
             --exclude target/**
             --exclude node_modules/**
