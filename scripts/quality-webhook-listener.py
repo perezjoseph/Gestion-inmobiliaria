@@ -42,7 +42,7 @@ if _env_path.is_file():
 
 PORT = 9090
 BIND_ADDRESS = os.environ.get("BIND_ADDRESS", "127.0.0.1")
-_ALLOWED_BIND = {"127.0.0.1", "::1", "localhost", "0.0.0.0"}
+_ALLOWED_BIND = {"127.0.0.1", "::1", "localhost"}
 if BIND_ADDRESS not in _ALLOWED_BIND:
     raise SystemExit(
         f"BIND_ADDRESS={BIND_ADDRESS!r} is not allowed. "

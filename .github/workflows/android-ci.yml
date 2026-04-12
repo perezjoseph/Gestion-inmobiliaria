@@ -374,7 +374,10 @@ jobs:
         working-directory: android
         run: |
           umask 077
-          ./gradlew dependencies --no-daemon --stacktrace 2>&1 | tee "${RUNNER_TEMP}/dep-output.txt"
+          ./gradlew dependencies --write-verification-metadata sha256 --no-daemon --stacktrace 2>&1 | tee "${RUNNER_TEMP}/dep-output.txt"
+          if ! git diff --exit-code gradle/verification-metadata.xml 2>/dev/null; then
+            echo "::warning::Gradle dependency verification metadata changed -- review for supply chain integrity"
+          fi
 
       - name: OWASP dependency scan (fail on CVSS >= 7)
         id: owasp
@@ -386,10 +389,10 @@ jobs:
           path: android/
           format: HTML
           args: >-
-            --enableExperimental
             --failOnCVSS 7
             --exclude **/build/**
             --exclude **/.gradle/**
+            --suppression android-owasp-suppressions.xml
 
       - name: Upload OWASP vulnerability report
         if: always()

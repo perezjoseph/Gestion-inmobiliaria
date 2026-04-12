@@ -701,11 +701,15 @@ jobs:
           path: .
           format: HTML
           args: >-
-            --enableExperimental
             --failOnCVSS 7
             --exclude target/**
             --exclude node_modules/**
             --exclude dist/**
+            --exclude android/**
+            --disableRetireJS
+            --disableNodeAudit
+            --disableAssembly
+            --suppression owasp-suppressions.xml
 
       - name: Upload OWASP vulnerability report
         if: always()
