@@ -125,10 +125,36 @@ def _validate_url(value):
         return value[:256]
     return ""
 
+_STRUCTURED_LOGGING = os.environ.get("LOG_FORMAT", "text").lower() == "json"
+
+
+class _JsonFormatter(logging.Formatter):
+    """Emit log records as single-line JSON for structured log ingestion."""
+
+    def format(self, record):
+        entry = {
+            "ts": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "msg": record.getMessage(),
+            "logger": record.name,
+        }
+        if record.exc_info and record.exc_info[0]:
+            entry["exception"] = self.formatException(record.exc_info)
+        return json.dumps(entry, ensure_ascii=False)
+
+
+_handler = logging.StreamHandler()
+if _STRUCTURED_LOGGING:
+    _handler.setFormatter(_JsonFormatter(datefmt="%Y-%m-%dT%H:%M:%S"))
+else:
+    _handler.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+
 logging.basicConfig(
     level=logging.DEBUG,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[_handler],
 )
 log = logging.getLogger("webhook")
 
@@ -156,8 +182,6 @@ def wsl_cmd(command):
 def run_kiro(prompt, label):
     log.info(f"Triggering kiro-cli for: {label}")
 
-    cmd = "kiro-cli chat --trust-all-tools --agent sisyphus-kiro --no-interactive -"
-
     log_file = os.path.join(os.path.dirname(__file__), "..", "kiro-debug.log")
 
     # Rotate log if it exceeds MAX_LOG_BYTES to prevent disk exhaustion
@@ -171,6 +195,27 @@ def run_kiro(prompt, label):
     except OSError as e:
         log.warning(f"Log rotation failed: {e}")
 
+    # Write prompt to a temp file in the project directory (guaranteed
+    # accessible from WSL via /mnt/d/...). Avoid Windows TEMP — it may
+    # point to C:\Windows\Temp (permission denied in WSL) or use 8.3
+    # short path names that WSL's drvfs cannot resolve.
+    prompt_file_win = _win_project_dir / f".kiro-prompt-{uuid.uuid4().hex[:8]}.txt"
+    prompt_file_wsl = _to_wsl_path(prompt_file_win)
+    try:
+        prompt_file_win.write_text(prompt, encoding="utf-8")
+    except OSError as e:
+        log.error(f"Failed to write prompt file {prompt_file_win}: {e}")
+        return False
+
+    # Read file via cat and verify it's non-empty before passing to kiro-cli.
+    # $(<file) silently returns empty on permission denied or missing files.
+    cmd = (
+        f"KIRO_INPUT=$(cat '{prompt_file_wsl}') && "
+        f"[ -n \"$KIRO_INPUT\" ] && "
+        f"kiro-cli chat --trust-all-tools --agent sisyphus-kiro --no-interactive \"$KIRO_INPUT\" || "
+        f"{{ echo 'ERROR: prompt file empty or unreadable: {prompt_file_wsl}' >&2; exit 1; }}"
+    )
+
     flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
@@ -181,43 +226,42 @@ def run_kiro(prompt, label):
         f.write(f"{'=' * 80}\n\n")
         f.flush()
 
-        proc = subprocess.Popen(
-            wsl_cmd(cmd),
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-
+        timed_out = False
         try:
-            proc.stdin.write(prompt)
-            proc.stdin.close()
-        except BrokenPipeError:
-            log.warning("Broken pipe writing prompt to kiro-cli stdin")
-
-        output_lines = []
-        try:
-            for line in proc.stdout:
-                f.write(line)
-                f.flush()
-                output_lines.append(line)
-            proc.wait(timeout=KIRO_TIMEOUT)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
+            result = subprocess.run(
+                wsl_cmd(cmd),
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=KIRO_TIMEOUT,
+            )
+            full_output = (result.stdout or "") + (result.stderr or "")
+            f.write(full_output)
+            f.flush()
+        except subprocess.TimeoutExpired as e:
+            timed_out = True
+            full_output = (e.stdout or "") + (e.stderr or "") if hasattr(e, "stdout") else ""
+            f.write(full_output)
             f.write("\n[TIMEOUT] Process killed\n")
+            f.flush()
             log.warning(f"kiro-cli timed out after {KIRO_TIMEOUT // 60} minutes")
-            return False
         except Exception as e:
-            proc.kill()
+            full_output = ""
             f.write(f"\n[ERROR] {e}\n")
+            f.flush()
             log.error(f"kiro-cli process error: {e}", exc_info=True)
-            return False
+        finally:
+            try:
+                prompt_file_win.unlink(missing_ok=True)
+            except OSError:
+                pass
 
-    full_output = "".join(output_lines)
-    log.info(f"kiro-cli exit code: {proc.returncode}")
+    if timed_out:
+        return False
+
+    log.info(f"kiro-cli exit code: {result.returncode}")
     if full_output:
         log.info(f"stdout (last 500 chars): ...{full_output[-500:]}")
 
@@ -225,8 +269,8 @@ def run_kiro(prompt, label):
         log.error("Tool approval/denied error detected")
         return False
 
-    if proc.returncode not in (0, 1):
-        log.error(f"kiro-cli exited with unexpected code {proc.returncode}")
+    if result.returncode not in (0, 1):
+        log.error(f"kiro-cli exited with unexpected code {result.returncode}")
         return False
 
     log.info(f"kiro-cli completed successfully for: {label}")
@@ -381,11 +425,13 @@ class WebhookHandler(BaseHTTPRequestHandler):
     def _send(self, code, body=b"", content_type="text/plain", request_id=None):
         self.send_response(code)
         self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Content-Security-Policy", "default-src 'none'")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("Cache-Control", "no-store")
+        self.send_header("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
         self.send_header("Connection", "close")
         if request_id:
             self.send_header("X-Request-Id", request_id)
@@ -398,8 +444,12 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
         if not _rate_limiter.allow(client_ip):
             log.warning(f"Rate limit exceeded for {client_ip}")
-            self._send(429, b"Too many requests")
+            self.send_response(429)
+            self.send_header("Content-Type", "text/plain")
             self.send_header("Retry-After", "60")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(b"Too many requests")
             return
 
         if self.path == "/health":

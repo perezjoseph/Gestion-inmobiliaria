@@ -100,7 +100,12 @@ jobs:
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
+      duration: ${{ steps.timing.outputs.duration }}
     steps:
+      - name: Record start time
+        id: start
+        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
+
       - name: Clean workspace
         run: |
           if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
@@ -201,6 +206,11 @@ jobs:
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
 
+      - name: Record duration
+        id: timing
+        if: always()
+        run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
+
       - name: Fail job if lint failed
         if: always() && (steps.android-lint.outcome == 'failure' || steps.detekt.outcome == 'failure')
         run: exit 1
@@ -218,7 +228,12 @@ jobs:
       contents: read
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
+      duration: ${{ steps.timing.outputs.duration }}
     steps:
+      - name: Record start time
+        id: start
+        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
+
       - name: Clean workspace
         run: |
           if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
@@ -289,6 +304,11 @@ jobs:
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
 
+      - name: Record duration
+        id: timing
+        if: always()
+        run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
+
       - name: Clean up temp files
         if: always()
         run: rm -f "${RUNNER_TEMP}/test-output.txt"
@@ -303,7 +323,12 @@ jobs:
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
+      duration: ${{ steps.timing.outputs.duration }}
     steps:
+      - name: Record start time
+        id: start
+        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
+
       - name: Clean workspace
         run: |
           if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
@@ -397,6 +422,11 @@ jobs:
         if: always() && (steps.dep-verify.outcome == 'failure' || steps.owasp.outcome == 'failure')
         run: exit 1
 
+      - name: Record duration
+        id: timing
+        if: always()
+        run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
+
       - name: Clean up temp files
         if: always()
         run: rm -f "${RUNNER_TEMP}/dep-output.txt"
@@ -419,7 +449,12 @@ jobs:
       contents: read
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
+      duration: ${{ steps.timing.outputs.duration }}
     steps:
+      - name: Record start time
+        id: start
+        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
+
       - name: Clean workspace
         run: |
           if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
@@ -487,6 +522,11 @@ jobs:
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Record duration
+        id: timing
+        if: always()
+        run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
 
       - name: Clean up temp files
         if: always()
@@ -976,14 +1016,14 @@ jobs:
           REPORT=""
 
           REPORT="${REPORT}Android Pipeline Run Summary:\n"
-          REPORT="${REPORT}  Job                | Result\n"
-          REPORT="${REPORT}  -------------------|--------\n"
-          REPORT="${REPORT}  secret-scan        | ${{ needs.secret-scan.result }}\n"
-          REPORT="${REPORT}  lint               | ${{ needs.lint.result }}\n"
-          REPORT="${REPORT}  unit-test          | ${{ needs.unit-test.result }}\n"
-          REPORT="${REPORT}  quality-gate       | ${{ needs.quality-gate.result }}\n"
-          REPORT="${REPORT}  sonarqube          | ${{ needs.sonarqube.result }}\n"
-          REPORT="${REPORT}  build              | ${{ needs.build.result }}\n"
+          REPORT="${REPORT}  Job                | Result   | Duration\n"
+          REPORT="${REPORT}  -------------------|----------|----------\n"
+          REPORT="${REPORT}  secret-scan        | ${{ needs.secret-scan.result }} | n/a\n"
+          REPORT="${REPORT}  lint               | ${{ needs.lint.result }} | ${{ needs.lint.outputs.duration || 'n/a' }}\n"
+          REPORT="${REPORT}  unit-test          | ${{ needs.unit-test.result }} | ${{ needs.unit-test.outputs.duration || 'n/a' }}\n"
+          REPORT="${REPORT}  quality-gate       | ${{ needs.quality-gate.result }} | ${{ needs.quality-gate.outputs.duration || 'n/a' }}\n"
+          REPORT="${REPORT}  sonarqube          | ${{ needs.sonarqube.result }} | n/a\n"
+          REPORT="${REPORT}  build              | ${{ needs.build.result }} | ${{ needs.build.outputs.duration || 'n/a' }}\n"
 
           ERRORS=""
           if [ "${{ needs.lint.result }}" = "failure" ] && [ -n "$LINT_ERRORS" ]; then

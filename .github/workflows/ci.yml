@@ -2405,8 +2405,19 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Validate webhook configuration
+        id: webhook-check
+        run: |
+          if [ -z "$WEBHOOK_SECRET" ] || [ -z "$WEBHOOK_HOST" ]; then
+            echo "::warning::WEBHOOK_SECRET or WEBHOOK_HOST not configured -- skipping improvement webhooks"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Collect SonarQube open issues
         id: sonar-issues
+        if: steps.webhook-check.outputs.skip != 'true'
         run: |
           SONAR_URL="${SONAR_HOST_URL}"
           TOKEN="${{ secrets.SONAR_TOKEN }}"
@@ -2472,6 +2483,7 @@ jobs:
 
       - name: Determine improvement focus from pipeline results
         id: analyze
+        if: steps.webhook-check.outputs.skip != 'true'
         env:
           LINT_ERRORS: ${{ needs.lint.outputs.error_log }}
           BACKEND_TEST_ERRORS: ${{ needs.test-backend.outputs.error_log }}
@@ -2557,6 +2569,7 @@ jobs:
           echo "$EOF" >> $GITHUB_OUTPUT
 
       - name: Send pipeline improvement request to webhook
+        if: steps.webhook-check.outputs.skip != 'true'
         env:
           FOCUS: ${{ steps.analyze.outputs.focus }}
           REPORT: ${{ steps.analyze.outputs.report }}
@@ -2576,6 +2589,7 @@ jobs:
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping pipeline improvement"
 
       - name: Send SonarQube issues to dedicated fix webhook
+        if: steps.webhook-check.outputs.skip != 'true'
         env:
           SONAR_REPORT: ${{ steps.sonar-issues.outputs.sonar_report }}
         run: |
