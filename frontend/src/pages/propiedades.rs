@@ -515,6 +515,280 @@ fn build_propiedades_url(
     format!("/propiedades?{}", params.join("&"))
 }
 
+fn load_propiedades_data(
+    items: UseStateHandle<Vec<Propiedad>>,
+    total: UseStateHandle<u64>,
+    error: UseStateHandle<Option<String>>,
+    loading: UseStateHandle<bool>,
+    url: String,
+) {
+    spawn_local(async move {
+        loading.set(true);
+        match api_get::<PaginatedResponse<Propiedad>>(&url).await {
+            Ok(resp) => {
+                items.set(resp.data);
+                total.set(resp.total);
+            }
+            Err(err) => error.set(Some(err)),
+        }
+        loading.set(false);
+    });
+}
+
+fn handle_propiedad_submit(
+    submitting: &UseStateHandle<bool>,
+    validate_form: &dyn Fn() -> bool,
+    precio: &UseStateHandle<String>,
+    descripcion: &UseStateHandle<String>,
+    habitaciones: &UseStateHandle<String>,
+    banos: &UseStateHandle<String>,
+    area_m2: &UseStateHandle<String>,
+    titulo: &UseStateHandle<String>,
+    direccion: &UseStateHandle<String>,
+    ciudad: &UseStateHandle<String>,
+    provincia: &UseStateHandle<String>,
+    tipo_propiedad: &UseStateHandle<String>,
+    moneda: &UseStateHandle<String>,
+    estado: &UseStateHandle<String>,
+    editing: &UseStateHandle<Option<Propiedad>>,
+    reset_form: impl Fn() + 'static,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+    submitting_clone: UseStateHandle<bool>,
+) {
+    if *(*submitting) || !validate_form() {
+        return;
+    }
+    let Ok(precio_val) = precio.parse::<f64>() else {
+        return;
+    };
+    submitting.set(true);
+    let desc = non_empty_prop(descripcion);
+    let hab = habitaciones.parse::<i32>().ok();
+    let ban = banos.parse::<i32>().ok();
+    let area = area_m2.parse::<f64>().ok();
+    let editing_id = editing.as_ref().map(|e| e.id.clone());
+    let update = UpdatePropiedad {
+        titulo: Some((**titulo).clone()),
+        descripcion: desc.clone(),
+        direccion: Some((**direccion).clone()),
+        ciudad: Some((**ciudad).clone()),
+        provincia: Some((**provincia).clone()),
+        tipo_propiedad: Some((**tipo_propiedad).clone()),
+        habitaciones: hab,
+        banos: ban,
+        area_m2: area,
+        precio: Some(precio_val),
+        moneda: Some((**moneda).clone()),
+        estado: Some((**estado).clone()),
+        imagenes: None,
+    };
+    let create = CreatePropiedad {
+        titulo: (**titulo).clone(),
+        descripcion: desc,
+        direccion: (**direccion).clone(),
+        ciudad: (**ciudad).clone(),
+        provincia: (**provincia).clone(),
+        tipo_propiedad: (**tipo_propiedad).clone(),
+        habitaciones: hab,
+        banos: ban,
+        area_m2: area,
+        precio: precio_val,
+        moneda: Some((**moneda).clone()),
+        estado: Some((**estado).clone()),
+        imagenes: None,
+    };
+    do_save_propiedad(
+        editing_id,
+        update,
+        create,
+        reset_form,
+        reload,
+        error,
+        toasts,
+        submitting_clone,
+    );
+}
+
+fn handle_propiedad_delete_confirm(
+    delete_target: &UseStateHandle<Option<Propiedad>>,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+) {
+    if let Some(ref p) = **delete_target {
+        do_delete_propiedad(
+            p.id.clone(),
+            p.titulo.clone(),
+            delete_target.clone(),
+            reload.clone(),
+            error,
+            toasts,
+            reload,
+        );
+    }
+}
+
+fn handle_escape_propiedades(
+    delete_target: &UseStateHandle<Option<Propiedad>>,
+    show_form: &UseStateHandle<bool>,
+    reset_form: &dyn Fn(),
+) {
+    if delete_target.is_some() {
+        delete_target.set(None);
+    } else if **show_form {
+        reset_form();
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_propiedades_view(
+    loading: &UseStateHandle<bool>,
+    user_rol: &str,
+    error: &UseStateHandle<Option<String>>,
+    delete_target: &UseStateHandle<Option<Propiedad>>,
+    on_delete_confirm: Callback<MouseEvent>,
+    on_delete_cancel: Callback<MouseEvent>,
+    filter_ciudad: UseStateHandle<String>,
+    filter_tipo: UseStateHandle<String>,
+    filter_estado: UseStateHandle<String>,
+    on_filter_apply: Callback<MouseEvent>,
+    on_filter_clear: Callback<MouseEvent>,
+    show_form: &UseStateHandle<bool>,
+    editing: &UseStateHandle<Option<Propiedad>>,
+    titulo: UseStateHandle<String>,
+    descripcion: UseStateHandle<String>,
+    direccion: UseStateHandle<String>,
+    ciudad: UseStateHandle<String>,
+    provincia: UseStateHandle<String>,
+    tipo_propiedad: UseStateHandle<String>,
+    habitaciones: UseStateHandle<String>,
+    banos: UseStateHandle<String>,
+    area_m2: UseStateHandle<String>,
+    precio: UseStateHandle<String>,
+    moneda: UseStateHandle<String>,
+    estado: UseStateHandle<String>,
+    form_errors: &UseStateHandle<FormErrors>,
+    submitting: &UseStateHandle<bool>,
+    on_submit: Callback<SubmitEvent>,
+    on_cancel: Callback<MouseEvent>,
+    editing_id: Option<String>,
+    token: String,
+    items: &UseStateHandle<Vec<Propiedad>>,
+    sort_field: &UseStateHandle<Option<String>>,
+    sort_order: &UseStateHandle<Option<String>>,
+    total: &UseStateHandle<u64>,
+    page: &UseStateHandle<u64>,
+    per_page: &UseStateHandle<u64>,
+    on_sort: Callback<(String, String)>,
+    on_edit: Callback<Propiedad>,
+    on_delete_click: Callback<Propiedad>,
+    on_new: Callback<MouseEvent>,
+    on_page_change: Callback<u64>,
+    on_per_page_change: Callback<u64>,
+) -> Html {
+    if **loading {
+        return html! { <Loading /> };
+    }
+
+    let last_header = if can_write(user_rol) { "Acciones" } else { "" };
+    let headers: Vec<String> = vec![
+        "Título".into(),
+        "Dirección".into(),
+        "Ciudad".into(),
+        "Tipo".into(),
+        "Precio".into(),
+        "Estado".into(),
+        last_header.into(),
+    ];
+    let sortable_fields: Vec<String> = vec![
+        "titulo".into(),
+        "direccion".into(),
+        "ciudad".into(),
+        "".into(),
+        "precio".into(),
+        "estado".into(),
+        "".into(),
+    ];
+
+    html! {
+        <div>
+            <div class="gi-page-header">
+                <h1 class="gi-page-title">{"Propiedades"}</h1>
+                if can_write(user_rol) {
+                    <button onclick={on_new.clone()} class="gi-btn gi-btn-primary">{"+ Nueva Propiedad"}</button>
+                }
+            </div>
+
+            if let Some(err) = (*(*error)).as_ref() {
+                <ErrorBanner message={err.clone()} onclose={Callback::from({
+                    let error = error.clone();
+                    move |_: MouseEvent| error.set(None)
+                })} />
+            }
+
+            if let Some(ref target) = **delete_target {
+                <DeleteConfirmModal
+                    message={format!("¿Está seguro de que desea eliminar la propiedad \"{}\"? Esta acción no se puede deshacer.", target.titulo)}
+                    on_confirm={on_delete_confirm}
+                    on_cancel={on_delete_cancel}
+                />
+            }
+
+            <PropiedadFilterBar
+                filter_ciudad={filter_ciudad}
+                filter_tipo={filter_tipo}
+                filter_estado={filter_estado}
+                on_apply={on_filter_apply}
+                on_clear={on_filter_clear}
+            />
+
+            if **show_form {
+                <PropiedadForm
+                    is_editing={editing.is_some()}
+                    titulo={titulo}
+                    descripcion={descripcion}
+                    direccion={direccion}
+                    ciudad={ciudad}
+                    provincia={provincia}
+                    tipo_propiedad={tipo_propiedad}
+                    habitaciones={habitaciones}
+                    banos={banos}
+                    area_m2={area_m2}
+                    precio={precio}
+                    moneda={moneda}
+                    estado={estado}
+                    form_errors={(*(*form_errors)).clone()}
+                    submitting={**submitting}
+                    on_submit={on_submit}
+                    on_cancel={on_cancel}
+                    editing_id={editing_id}
+                    token={token}
+                />
+            }
+
+            <PropiedadList
+                items={(*(*items)).clone()}
+                user_rol={user_rol.to_string()}
+                headers={headers}
+                sortable_fields={sortable_fields}
+                current_sort={(*(*sort_field)).clone()}
+                current_order={(*(*sort_order)).clone()}
+                total={**total}
+                page={**page}
+                per_page={**per_page}
+                on_sort={on_sort}
+                on_edit={on_edit}
+                on_delete={on_delete_click}
+                on_new={on_new}
+                on_page_change={on_page_change}
+                on_per_page_change={on_per_page_change}
+            />
+        </div>
+    }
+}
+
 #[function_component]
 pub fn Propiedades() -> Html {
     let auth = use_context::<AuthContext>();
@@ -581,18 +855,8 @@ pub fn Propiedades() -> Html {
                 so.clone(),
             ),
             move |_| {
-                spawn_local(async move {
-                    loading.set(true);
-                    let url = build_propiedades_url(pg, pp, &fc, &ft, &fe, &sf, &so);
-                    match api_get::<PaginatedResponse<Propiedad>>(&url).await {
-                        Ok(resp) => {
-                            items.set(resp.data);
-                            total.set(resp.total);
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                    loading.set(false);
-                });
+                let url = build_propiedades_url(pg, pp, &fc, &ft, &fe, &sf, &so);
+                load_propiedades_data(items, total, error, loading, url);
             },
         );
     }
@@ -639,11 +903,7 @@ pub fn Propiedades() -> Html {
         let reset_form = reset_form.clone();
         let handler = escape_handler.clone();
         *handler.borrow_mut() = Some(Box::new(move || {
-            if delete_target.is_some() {
-                delete_target.set(None);
-            } else if *show_form {
-                reset_form();
-            }
+            handle_escape_propiedades(&delete_target, &show_form, &reset_form);
         }) as Box<dyn Fn()>);
     }
     {
@@ -711,17 +971,12 @@ pub fn Propiedades() -> Html {
         let delete_target = delete_target.clone();
         let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
-            if let Some(ref p) = *delete_target {
-                do_delete_propiedad(
-                    p.id.clone(),
-                    p.titulo.clone(),
-                    delete_target.clone(),
-                    reload.clone(),
-                    error.clone(),
-                    toasts.clone(),
-                    reload.clone(),
-                );
-            }
+            handle_propiedad_delete_confirm(
+                &delete_target,
+                reload.clone(),
+                error.clone(),
+                toasts.clone(),
+            );
         })
     };
 
@@ -769,52 +1024,22 @@ pub fn Propiedades() -> Html {
         let submitting = submitting.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
-            if *submitting || !validate_form() {
-                return;
-            }
-            let Ok(precio_val) = precio.parse::<f64>() else {
-                return;
-            };
-            submitting.set(true);
-            let desc = non_empty_prop(&descripcion);
-            let hab = habitaciones.parse::<i32>().ok();
-            let ban = banos.parse::<i32>().ok();
-            let area = area_m2.parse::<f64>().ok();
-            let editing_id = editing.as_ref().map(|e| e.id.clone());
-            let update = UpdatePropiedad {
-                titulo: Some((*titulo).clone()),
-                descripcion: desc.clone(),
-                direccion: Some((*direccion).clone()),
-                ciudad: Some((*ciudad).clone()),
-                provincia: Some((*provincia).clone()),
-                tipo_propiedad: Some((*tipo_propiedad).clone()),
-                habitaciones: hab,
-                banos: ban,
-                area_m2: area,
-                precio: Some(precio_val),
-                moneda: Some((*moneda).clone()),
-                estado: Some((*estado).clone()),
-                imagenes: None,
-            };
-            let create = CreatePropiedad {
-                titulo: (*titulo).clone(),
-                descripcion: desc,
-                direccion: (*direccion).clone(),
-                ciudad: (*ciudad).clone(),
-                provincia: (*provincia).clone(),
-                tipo_propiedad: (*tipo_propiedad).clone(),
-                habitaciones: hab,
-                banos: ban,
-                area_m2: area,
-                precio: precio_val,
-                moneda: Some((*moneda).clone()),
-                estado: Some((*estado).clone()),
-                imagenes: None,
-            };
-            do_save_propiedad(
-                editing_id,
-                update,
-                create,
+            handle_propiedad_submit(
+                &submitting,
+                &validate_form,
+                &precio,
+                &descripcion,
+                &habitaciones,
+                &banos,
+                &area_m2,
+                &titulo,
+                &direccion,
+                &ciudad,
+                &provincia,
+                &tipo_propiedad,
+                &moneda,
+                &estado,
+                &editing,
                 reset_form.clone(),
                 reload.clone(),
                 error.clone(),
@@ -884,113 +1109,55 @@ pub fn Propiedades() -> Html {
         })
     };
 
-    if *loading {
-        return html! { <Loading /> };
-    }
-
-    let headers = vec![
-        "Título".into(),
-        "Dirección".into(),
-        "Ciudad".into(),
-        "Tipo".into(),
-        "Precio".into(),
-        "Estado".into(),
-        if can_write(&user_rol) {
-            "Acciones".into()
-        } else {
-            String::new()
-        },
-    ];
-
-    let sortable_fields: Vec<String> = vec![
-        "titulo".into(),
-        "direccion".into(),
-        "ciudad".into(),
-        "".into(),
-        "precio".into(),
-        "estado".into(),
-        "".into(),
-    ];
-
     let editing_id = editing.as_ref().map(|e| e.id.clone());
     let token = auth
         .as_ref()
         .and_then(|a| a.token.clone())
         .unwrap_or_default();
 
-    html! {
-        <div>
-            <div class="gi-page-header">
-                <h1 class="gi-page-title">{"Propiedades"}</h1>
-                if can_write(&user_rol) {
-                    <button onclick={on_new.clone()} class="gi-btn gi-btn-primary">{"+ Nueva Propiedad"}</button>
-                }
-            </div>
-
-            if let Some(err) = (*error).as_ref() {
-                <ErrorBanner message={err.clone()} onclose={Callback::from({
-                    let error = error.clone();
-                    move |_: MouseEvent| error.set(None)
-                })} />
-            }
-
-            if let Some(ref target) = *delete_target {
-                <DeleteConfirmModal
-                    message={format!("¿Está seguro de que desea eliminar la propiedad \"{}\"? Esta acción no se puede deshacer.", target.titulo)}
-                    on_confirm={on_delete_confirm.clone()}
-                    on_cancel={on_delete_cancel.clone()}
-                />
-            }
-
-            <PropiedadFilterBar
-                filter_ciudad={filter_ciudad.clone()}
-                filter_tipo={filter_tipo.clone()}
-                filter_estado={filter_estado.clone()}
-                on_apply={on_filter_apply}
-                on_clear={on_filter_clear}
-            />
-
-            if *show_form {
-                <PropiedadForm
-                    is_editing={editing.is_some()}
-                    titulo={titulo.clone()}
-                    descripcion={descripcion.clone()}
-                    direccion={direccion.clone()}
-                    ciudad={ciudad.clone()}
-                    provincia={provincia.clone()}
-                    tipo_propiedad={tipo_propiedad.clone()}
-                    habitaciones={habitaciones.clone()}
-                    banos={banos.clone()}
-                    area_m2={area_m2.clone()}
-                    precio={precio.clone()}
-                    moneda={moneda.clone()}
-                    estado={estado.clone()}
-                    form_errors={(*form_errors).clone()}
-                    submitting={*submitting}
-                    on_submit={on_submit}
-                    on_cancel={on_cancel}
-                    editing_id={editing_id}
-                    token={token}
-                />
-            }
-
-            <PropiedadList
-                items={(*items).clone()}
-                user_rol={user_rol.clone()}
-                headers={headers}
-                sortable_fields={sortable_fields}
-                current_sort={(*sort_field).clone()}
-                current_order={(*sort_order).clone()}
-                total={*total}
-                page={*page}
-                per_page={*per_page}
-                on_sort={on_sort}
-                on_edit={on_edit}
-                on_delete={on_delete_click}
-                on_new={on_new}
-                on_page_change={on_page_change}
-                on_per_page_change={on_per_page_change}
-            />
-        </div>
-    }
+    render_propiedades_view(
+        &loading,
+        &user_rol,
+        &error,
+        &delete_target,
+        on_delete_confirm,
+        on_delete_cancel,
+        filter_ciudad,
+        filter_tipo,
+        filter_estado,
+        on_filter_apply,
+        on_filter_clear,
+        &show_form,
+        &editing,
+        titulo,
+        descripcion,
+        direccion,
+        ciudad,
+        provincia,
+        tipo_propiedad,
+        habitaciones,
+        banos,
+        area_m2,
+        precio,
+        moneda,
+        estado,
+        &form_errors,
+        &submitting,
+        on_submit,
+        on_cancel,
+        editing_id,
+        token,
+        &items,
+        &sort_field,
+        &sort_order,
+        &total,
+        &page,
+        &per_page,
+        on_sort,
+        on_edit,
+        on_delete_click,
+        on_new,
+        on_page_change,
+        on_per_page_change,
+    )
 }

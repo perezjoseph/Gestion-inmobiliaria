@@ -486,6 +486,111 @@ fn do_delete_pago(
     });
 }
 
+fn load_pagos_data(
+    items: UseStateHandle<Vec<Pago>>,
+    total: UseStateHandle<u64>,
+    error: UseStateHandle<Option<String>>,
+    loading: UseStateHandle<bool>,
+    url: String,
+) {
+    spawn_local(async move {
+        loading.set(true);
+        match api_get::<PaginatedResponse<Pago>>(&url).await {
+            Ok(resp) => {
+                total.set(resp.total);
+                items.set(resp.data);
+            }
+            Err(err) => error.set(Some(err)),
+        }
+        loading.set(false);
+    });
+}
+
+fn handle_pago_submit(
+    submitting: &UseStateHandle<bool>,
+    validate_form: &dyn Fn() -> bool,
+    monto: &UseStateHandle<String>,
+    contrato_id: &UseStateHandle<String>,
+    moneda: &UseStateHandle<String>,
+    fecha_pago: &UseStateHandle<String>,
+    fecha_vencimiento: &UseStateHandle<String>,
+    metodo_pago: &UseStateHandle<String>,
+    estado_form: &UseStateHandle<String>,
+    notas: &UseStateHandle<String>,
+    editing: &UseStateHandle<Option<Pago>>,
+    reset_form: impl Fn() + 'static,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+) {
+    if **submitting || !validate_form() {
+        return;
+    }
+    let Ok(monto_val) = monto.parse::<f64>() else {
+        return;
+    };
+    submitting.set(true);
+    let editing_id = editing.as_ref().map(|e| e.id.clone());
+    let update = UpdatePago {
+        monto: Some(monto_val),
+        fecha_pago: non_empty(fecha_pago),
+        metodo_pago: non_empty(metodo_pago),
+        estado: Some((**estado_form).clone()),
+        notas: non_empty(notas),
+    };
+    let create = CreatePago {
+        contrato_id: (**contrato_id).clone(),
+        monto: monto_val,
+        moneda: Some((**moneda).clone()),
+        fecha_pago: non_empty(fecha_pago),
+        fecha_vencimiento: (**fecha_vencimiento).clone(),
+        metodo_pago: non_empty(metodo_pago),
+        notas: non_empty(notas),
+    };
+    do_save_pago(
+        editing_id,
+        update,
+        create,
+        reset_form,
+        reload,
+        error,
+        toasts,
+        submitting.clone(),
+    );
+}
+
+fn handle_pago_delete_confirm(
+    delete_target: &UseStateHandle<Option<Pago>>,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+) {
+    if let Some(ref p) = **delete_target {
+        let label = format_currency(&p.moneda, p.monto);
+        do_delete_pago(
+            p.id.clone(),
+            label,
+            delete_target.clone(),
+            reload.clone(),
+            error,
+            toasts,
+            reload,
+        );
+    }
+}
+
+fn handle_escape_pagos(
+    delete_target: &UseStateHandle<Option<Pago>>,
+    show_form: &UseStateHandle<bool>,
+    reset_form: &dyn Fn(),
+) {
+    if delete_target.is_some() {
+        delete_target.set(None);
+    } else if **show_form {
+        reset_form();
+    }
+}
+
 #[function_component]
 pub fn Pagos() -> Html {
     let auth = use_context::<AuthContext>();
@@ -537,18 +642,8 @@ pub fn Pagos() -> Html {
         use_effect_with(
             (reload_val, pg, f_contrato.clone(), f_estado.clone()),
             move |_| {
-                spawn_local(async move {
-                    loading.set(true);
-                    let url = build_pagos_url(pg, pp, &f_contrato, &f_estado);
-                    match api_get::<PaginatedResponse<Pago>>(&url).await {
-                        Ok(resp) => {
-                            total.set(resp.total);
-                            items.set(resp.data);
-                        }
-                        Err(err) => error.set(Some(err)),
-                    }
-                    loading.set(false);
-                });
+                let url = build_pagos_url(pg, pp, &f_contrato, &f_estado);
+                load_pagos_data(items, total, error, loading, url);
             },
         );
     }
@@ -605,11 +700,7 @@ pub fn Pagos() -> Html {
         let reset_form = reset_form.clone();
         let handler = escape_handler.clone();
         *handler.borrow_mut() = Some(Box::new(move || {
-            if delete_target.is_some() {
-                delete_target.set(None);
-            } else if *show_form {
-                reset_form();
-            }
+            handle_escape_pagos(&delete_target, &show_form, &reset_form);
         }) as Box<dyn Fn()>);
     }
     {
@@ -669,18 +760,12 @@ pub fn Pagos() -> Html {
         let delete_target = delete_target.clone();
         let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
-            if let Some(ref p) = *delete_target {
-                let label = format_currency(&p.moneda, p.monto);
-                do_delete_pago(
-                    p.id.clone(),
-                    label,
-                    delete_target.clone(),
-                    reload.clone(),
-                    error.clone(),
-                    toasts.clone(),
-                    reload.clone(),
-                );
-            }
+            handle_pago_delete_confirm(
+                &delete_target,
+                reload.clone(),
+                error.clone(),
+                toasts.clone(),
+            );
         })
     };
 
@@ -722,39 +807,22 @@ pub fn Pagos() -> Html {
         let submitting = submitting.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
-            if *submitting || !validate_form() {
-                return;
-            }
-            let Ok(monto_val) = monto.parse::<f64>() else {
-                return;
-            };
-            submitting.set(true);
-            let editing_id = editing.as_ref().map(|e| e.id.clone());
-            let update = UpdatePago {
-                monto: Some(monto_val),
-                fecha_pago: non_empty(&fecha_pago),
-                metodo_pago: non_empty(&metodo_pago),
-                estado: Some((*estado_form).clone()),
-                notas: non_empty(&notas),
-            };
-            let create = CreatePago {
-                contrato_id: (*contrato_id).clone(),
-                monto: monto_val,
-                moneda: Some((*moneda).clone()),
-                fecha_pago: non_empty(&fecha_pago),
-                fecha_vencimiento: (*fecha_vencimiento).clone(),
-                metodo_pago: non_empty(&metodo_pago),
-                notas: non_empty(&notas),
-            };
-            do_save_pago(
-                editing_id,
-                update,
-                create,
+            handle_pago_submit(
+                &submitting,
+                &validate_form,
+                &monto,
+                &contrato_id,
+                &moneda,
+                &fecha_pago,
+                &fecha_vencimiento,
+                &metodo_pago,
+                &estado_form,
+                &notas,
+                &editing,
                 reset_form.clone(),
                 reload.clone(),
                 error.clone(),
                 toasts.clone(),
-                submitting.clone(),
             );
         })
     };
@@ -804,40 +872,117 @@ pub fn Pagos() -> Html {
         })
     };
 
-    if *loading {
+    render_pagos_view(
+        &loading,
+        &user_rol,
+        &error,
+        &delete_target,
+        on_delete_confirm,
+        on_delete_cancel,
+        filter_contrato,
+        filter_estado,
+        &contratos,
+        &contrato_label,
+        on_filter_apply,
+        on_filter_clear,
+        &show_form,
+        &editing,
+        contrato_id,
+        monto,
+        moneda,
+        fecha_pago,
+        fecha_vencimiento,
+        metodo_pago,
+        estado_form,
+        notas,
+        &form_errors,
+        &submitting,
+        on_submit,
+        on_cancel,
+        &items,
+        &total,
+        &page,
+        &per_page,
+        on_edit,
+        on_delete_click,
+        on_new,
+        on_page_change,
+        on_per_page_change,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_pagos_view(
+    loading: &UseStateHandle<bool>,
+    user_rol: &str,
+    error: &UseStateHandle<Option<String>>,
+    delete_target: &UseStateHandle<Option<Pago>>,
+    on_delete_confirm: Callback<MouseEvent>,
+    on_delete_cancel: Callback<MouseEvent>,
+    filter_contrato: UseStateHandle<String>,
+    filter_estado: UseStateHandle<String>,
+    contratos: &UseStateHandle<Vec<Contrato>>,
+    contrato_label: &Callback<String, String>,
+    on_filter_apply: Callback<MouseEvent>,
+    on_filter_clear: Callback<MouseEvent>,
+    show_form: &UseStateHandle<bool>,
+    editing: &UseStateHandle<Option<Pago>>,
+    contrato_id: UseStateHandle<String>,
+    monto: UseStateHandle<String>,
+    moneda: UseStateHandle<String>,
+    fecha_pago: UseStateHandle<String>,
+    fecha_vencimiento: UseStateHandle<String>,
+    metodo_pago: UseStateHandle<String>,
+    estado_form: UseStateHandle<String>,
+    notas: UseStateHandle<String>,
+    form_errors: &UseStateHandle<FormErrors>,
+    submitting: &UseStateHandle<bool>,
+    on_submit: Callback<SubmitEvent>,
+    on_cancel: Callback<MouseEvent>,
+    items: &UseStateHandle<Vec<Pago>>,
+    total: &UseStateHandle<u64>,
+    page: &UseStateHandle<u64>,
+    per_page: &UseStateHandle<u64>,
+    on_edit: Callback<Pago>,
+    on_delete_click: Callback<Pago>,
+    on_new: Callback<MouseEvent>,
+    on_page_change: Callback<u64>,
+    on_per_page_change: Callback<u64>,
+) -> Html {
+    if **loading {
         return html! { <Loading /> };
     }
 
-    let headers = vec![
+    let mut headers: Vec<String> = vec![
         "Contrato".into(),
         "Monto".into(),
         "Fecha Pago".into(),
         "Vencimiento".into(),
         "Método".into(),
         "Estado".into(),
-        if can_write(&user_rol) {
-            "Acciones".into()
-        } else {
-            String::new()
-        },
     ];
+    if can_write(user_rol) {
+        headers.push("Acciones".into());
+    } else {
+        headers.push(String::new());
+    }
 
     html! {
         <div>
             <div class="gi-page-header">
                 <h1 class="gi-page-title">{"Pagos"}</h1>
-                if can_write(&user_rol) {
+                if can_write(user_rol) {
                     <button onclick={on_new.clone()} class="gi-btn gi-btn-primary">{"+ Nuevo Pago"}</button>
                 }
             </div>
 
-            if let Some(err) = (*error).as_ref() {
+            if let Some(err) = (**error).as_ref() {
                 <ErrorBanner message={err.clone()} onclose={Callback::from({
                     let error = error.clone(); move |_: MouseEvent| error.set(None)
                 })} />
             }
 
-            if let Some(ref target) = *delete_target {
+            if let Some(ref target) = **delete_target {
                 <DeleteConfirmModal
                     message={format!("¿Está seguro de que desea eliminar el pago de {}? Esta acción no se puede deshacer.", format_currency(&target.moneda, target.monto))}
                     on_confirm={on_delete_confirm.clone()}
@@ -846,41 +991,41 @@ pub fn Pagos() -> Html {
             }
 
             <PagoFilterBar
-                filter_contrato={filter_contrato.clone()}
-                filter_estado={filter_estado.clone()}
-                contratos={(*contratos).clone()}
+                filter_contrato={filter_contrato}
+                filter_estado={filter_estado}
+                contratos={(**contratos).clone()}
                 contrato_label={contrato_label.clone()}
                 on_apply={on_filter_apply}
                 on_clear={on_filter_clear}
             />
 
-            if *show_form {
+            if **show_form {
                 <PagoForm
                     is_editing={editing.is_some()}
-                    contrato_id={contrato_id.clone()}
-                    monto={monto.clone()}
-                    moneda={moneda.clone()}
-                    fecha_pago={fecha_pago.clone()}
-                    fecha_vencimiento={fecha_vencimiento.clone()}
-                    metodo_pago={metodo_pago.clone()}
-                    estado_form={estado_form.clone()}
-                    notas={notas.clone()}
-                    contratos={(*contratos).clone()}
+                    contrato_id={contrato_id}
+                    monto={monto}
+                    moneda={moneda}
+                    fecha_pago={fecha_pago}
+                    fecha_vencimiento={fecha_vencimiento}
+                    metodo_pago={metodo_pago}
+                    estado_form={estado_form}
+                    notas={notas}
+                    contratos={(**contratos).clone()}
                     contrato_label={contrato_label.clone()}
-                    form_errors={(*form_errors).clone()}
-                    submitting={*submitting}
+                    form_errors={(**form_errors).clone()}
+                    submitting={**submitting}
                     on_submit={on_submit}
                     on_cancel={on_cancel}
                 />
             }
 
             <PagoList
-                items={(*items).clone()}
-                user_rol={user_rol.clone()}
+                items={(**items).clone()}
+                user_rol={user_rol.to_string()}
                 headers={headers}
-                total={*total}
-                page={*page}
-                per_page={*per_page}
+                total={**total}
+                page={**page}
+                per_page={**per_page}
                 contrato_label={contrato_label.clone()}
                 on_edit={on_edit}
                 on_delete={on_delete_click}

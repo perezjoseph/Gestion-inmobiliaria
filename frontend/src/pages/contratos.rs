@@ -526,6 +526,291 @@ fn register_escape_listener(
     })
 }
 
+fn load_contratos_data(
+    items: UseStateHandle<Vec<Contrato>>,
+    total: UseStateHandle<u64>,
+    error: UseStateHandle<Option<String>>,
+    loading: UseStateHandle<bool>,
+    url: String,
+) {
+    spawn_local(async move {
+        loading.set(true);
+        match api_get::<PaginatedResponse<Contrato>>(&url).await {
+            Ok(resp) => {
+                total.set(resp.total);
+                items.set(resp.data);
+            }
+            Err(err) => error.set(Some(err)),
+        }
+        loading.set(false);
+    });
+}
+
+fn handle_contrato_submit(
+    submitting: UseStateHandle<bool>,
+    validate_form: impl Fn() -> bool,
+    monto_mensual: &UseStateHandle<String>,
+    deposito: &UseStateHandle<String>,
+    fecha_fin: &UseStateHandle<String>,
+    propiedad_id: &UseStateHandle<String>,
+    inquilino_id: &UseStateHandle<String>,
+    fecha_inicio: &UseStateHandle<String>,
+    moneda: &UseStateHandle<String>,
+    estado: &UseStateHandle<String>,
+    editing: &UseStateHandle<Option<Contrato>>,
+    reset_form: impl Fn() + 'static,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+) {
+    if *submitting || !validate_form() {
+        return;
+    }
+    let Ok(monto_val) = monto_mensual.parse::<f64>() else {
+        return;
+    };
+    submitting.set(true);
+    let dep = deposito.parse::<f64>().ok();
+    let editing_id = editing.as_ref().map(|e| e.id.clone());
+    let update = UpdateContrato {
+        fecha_fin: Some((**fecha_fin).clone()),
+        monto_mensual: Some(monto_val),
+        deposito: dep,
+        estado: Some((**estado).clone()),
+    };
+    let create = CreateContrato {
+        propiedad_id: (**propiedad_id).clone(),
+        inquilino_id: (**inquilino_id).clone(),
+        fecha_inicio: (**fecha_inicio).clone(),
+        fecha_fin: (**fecha_fin).clone(),
+        monto_mensual: monto_val,
+        deposito: dep,
+        moneda: Some((**moneda).clone()),
+    };
+    do_save_contrato(
+        editing_id, update, create, reset_form, reload, error, toasts, submitting,
+    );
+}
+
+fn handle_contrato_delete_confirm(
+    delete_target: &UseStateHandle<Option<Contrato>>,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+) {
+    if let Some(ref c) = **delete_target {
+        let label = format!("Contrato {}", &c.id[..8.min(c.id.len())]);
+        do_delete_contrato(
+            c.id.clone(),
+            label,
+            delete_target.clone(),
+            reload.clone(),
+            error,
+            toasts,
+            reload,
+        );
+    }
+}
+
+fn handle_contrato_renew_confirm(
+    renew_target: &UseStateHandle<Option<Contrato>>,
+    renew_fecha_fin: UseStateHandle<String>,
+    renew_monto: &UseStateHandle<String>,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+) {
+    if let Some(ref c) = **renew_target {
+        do_renew_contrato(
+            c.id.clone(),
+            (*renew_fecha_fin).clone(),
+            renew_monto.parse::<f64>().unwrap_or(0.0),
+            renew_target.clone(),
+            renew_fecha_fin,
+            reload,
+            error,
+            toasts,
+        );
+    }
+}
+
+fn handle_contrato_terminate_confirm(
+    terminate_target: &UseStateHandle<Option<Contrato>>,
+    terminate_fecha: UseStateHandle<String>,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+) {
+    if let Some(ref c) = **terminate_target {
+        do_terminate_contrato(
+            c.id.clone(),
+            (*terminate_fecha).clone(),
+            terminate_target.clone(),
+            terminate_fecha,
+            reload,
+            error,
+            toasts,
+        );
+    }
+}
+
+fn handle_escape_contratos(
+    delete_target: &UseStateHandle<Option<Contrato>>,
+    show_form: &UseStateHandle<bool>,
+    reset_form: impl Fn(),
+) {
+    if delete_target.is_some() {
+        delete_target.set(None);
+    } else if **show_form {
+        reset_form();
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_contratos_view(
+    loading: bool,
+    user_rol: &str,
+    error: &UseStateHandle<Option<String>>,
+    delete_target: &UseStateHandle<Option<Contrato>>,
+    renew_target: &UseStateHandle<Option<Contrato>>,
+    renew_fecha_fin: &UseStateHandle<String>,
+    renew_monto: &UseStateHandle<String>,
+    terminate_target: &UseStateHandle<Option<Contrato>>,
+    terminate_fecha: &UseStateHandle<String>,
+    show_form: bool,
+    editing: &UseStateHandle<Option<Contrato>>,
+    propiedad_id: &UseStateHandle<String>,
+    inquilino_id: &UseStateHandle<String>,
+    fecha_inicio: &UseStateHandle<String>,
+    fecha_fin: &UseStateHandle<String>,
+    monto_mensual: &UseStateHandle<String>,
+    deposito: &UseStateHandle<String>,
+    moneda: &UseStateHandle<String>,
+    estado: &UseStateHandle<String>,
+    propiedades: &UseStateHandle<Vec<Propiedad>>,
+    inquilinos: &UseStateHandle<Vec<Inquilino>>,
+    form_errors: &UseStateHandle<FormErrors>,
+    submitting: bool,
+    on_submit: Callback<SubmitEvent>,
+    on_cancel: Callback<MouseEvent>,
+    on_new: Callback<MouseEvent>,
+    on_delete_confirm: Callback<MouseEvent>,
+    on_delete_cancel: Callback<MouseEvent>,
+    on_renew_confirm: Callback<MouseEvent>,
+    on_renew_cancel: Callback<MouseEvent>,
+    on_terminate_confirm: Callback<MouseEvent>,
+    on_terminate_cancel: Callback<MouseEvent>,
+    items: &UseStateHandle<Vec<Contrato>>,
+    total: u64,
+    page: u64,
+    per_page: u64,
+    prop_label: Callback<String, String>,
+    inq_label: Callback<String, String>,
+    on_edit: Callback<Contrato>,
+    on_delete_click: Callback<Contrato>,
+    on_renew_click: Callback<Contrato>,
+    on_terminate_click: Callback<Contrato>,
+    on_page_change: Callback<u64>,
+    on_per_page_change: Callback<u64>,
+) -> Html {
+    if loading {
+        return html! { <Loading /> };
+    }
+
+    let headers = vec![
+        "Propiedad".into(),
+        "Inquilino".into(),
+        "Inicio".into(),
+        "Fin".into(),
+        "Monto".into(),
+        "Estado".into(),
+        if can_write(user_rol) {
+            "Acciones".into()
+        } else {
+            String::new()
+        },
+    ];
+
+    html! {
+        <div>
+            <div class="gi-page-header">
+                <h1 class="gi-page-title">{"Contratos"}</h1>
+                if can_write(user_rol) {
+                    <button onclick={on_new} class="gi-btn gi-btn-primary">{"+ Nuevo Contrato"}</button>
+                }
+            </div>
+
+            if let Some(err) = (*error).as_ref() {
+                <ErrorBanner message={err.clone()} onclose={Callback::from({
+                    let error = error.clone(); move |_: MouseEvent| error.set(None)
+                })} />
+            }
+
+            if let Some(ref target) = **delete_target {
+                <DeleteConfirmModal
+                    message={format!("¿Está seguro de que desea eliminar el contrato de la propiedad \"{}\"? Esta acción no se puede deshacer.", prop_label.emit(target.propiedad_id.clone()))}
+                    on_confirm={on_delete_confirm.clone()}
+                    on_cancel={on_delete_cancel.clone()}
+                />
+            }
+
+            if renew_target.is_some() {
+                <RenewModal
+                    renew_fecha_fin={renew_fecha_fin.clone()}
+                    renew_monto={renew_monto.clone()}
+                    on_confirm={on_renew_confirm}
+                    on_cancel={on_renew_cancel}
+                />
+            }
+
+            if terminate_target.is_some() {
+                <TerminateModal
+                    terminate_fecha={terminate_fecha.clone()}
+                    on_confirm={on_terminate_confirm}
+                    on_cancel={on_terminate_cancel}
+                />
+            }
+
+            if show_form {
+                <ContratoForm
+                    is_editing={editing.is_some()}
+                    propiedad_id={propiedad_id.clone()}
+                    inquilino_id={inquilino_id.clone()}
+                    fecha_inicio={fecha_inicio.clone()}
+                    fecha_fin={fecha_fin.clone()}
+                    monto_mensual={monto_mensual.clone()}
+                    deposito={deposito.clone()}
+                    moneda={moneda.clone()}
+                    estado={estado.clone()}
+                    propiedades={(**propiedades).clone()}
+                    inquilinos={(**inquilinos).clone()}
+                    form_errors={(**form_errors).clone()}
+                    submitting={submitting}
+                    on_submit={on_submit}
+                    on_cancel={on_cancel}
+                />
+            }
+
+            <ContratoList
+                items={(**items).clone()}
+                user_rol={user_rol.to_string()}
+                headers={headers}
+                total={total}
+                page={page}
+                per_page={per_page}
+                prop_label={prop_label.clone()}
+                inq_label={inq_label.clone()}
+                on_edit={on_edit}
+                on_delete={on_delete_click}
+                on_renew={on_renew_click}
+                on_terminate={on_terminate_click}
+                on_page_change={on_page_change}
+                on_per_page_change={on_per_page_change}
+            />
+        </div>
+    }
+}
+
 #[function_component]
 pub fn Contratos() -> Html {
     let auth = use_context::<AuthContext>();
@@ -575,18 +860,13 @@ pub fn Contratos() -> Html {
         let pg = *page;
         let pp = *per_page;
         use_effect_with((reload_val, pg), move |_| {
-            spawn_local(async move {
-                loading.set(true);
-                let url = format!("/contratos?page={pg}&perPage={pp}");
-                match api_get::<PaginatedResponse<Contrato>>(&url).await {
-                    Ok(resp) => {
-                        total.set(resp.total);
-                        items.set(resp.data);
-                    }
-                    Err(err) => error.set(Some(err)),
-                }
-                loading.set(false);
-            });
+            load_contratos_data(
+                items,
+                total,
+                error,
+                loading,
+                format!("/contratos?page={pg}&perPage={pp}"),
+            );
         });
     }
 
@@ -654,11 +934,7 @@ pub fn Contratos() -> Html {
         let reset_form = reset_form.clone();
         let handler = escape_handler.clone();
         *handler.borrow_mut() = Some(Box::new(move || {
-            if delete_target.is_some() {
-                delete_target.set(None);
-            } else if *show_form {
-                reset_form();
-            }
+            handle_escape_contratos(&delete_target, &show_form, || reset_form());
         }) as Box<dyn Fn()>);
     }
     {
@@ -718,18 +994,12 @@ pub fn Contratos() -> Html {
         let delete_target = delete_target.clone();
         let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
-            if let Some(ref c) = *delete_target {
-                let label = format!("Contrato {}", &c.id[..8.min(c.id.len())]);
-                do_delete_contrato(
-                    c.id.clone(),
-                    label,
-                    delete_target.clone(),
-                    reload.clone(),
-                    error.clone(),
-                    toasts.clone(),
-                    reload.clone(),
-                );
-            }
+            handle_contrato_delete_confirm(
+                &delete_target,
+                reload.clone(),
+                error.clone(),
+                toasts.clone(),
+            );
         })
     };
 
@@ -779,39 +1049,22 @@ pub fn Contratos() -> Html {
         let submitting = submitting.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
-            if *submitting || !validate_form() {
-                return;
-            }
-            let Ok(monto_val) = monto_mensual.parse::<f64>() else {
-                return;
-            };
-            submitting.set(true);
-            let dep = deposito.parse::<f64>().ok();
-            let editing_id = editing.as_ref().map(|e| e.id.clone());
-            let update = UpdateContrato {
-                fecha_fin: Some((*fecha_fin).clone()),
-                monto_mensual: Some(monto_val),
-                deposito: dep,
-                estado: Some((*estado).clone()),
-            };
-            let create = CreateContrato {
-                propiedad_id: (*propiedad_id).clone(),
-                inquilino_id: (*inquilino_id).clone(),
-                fecha_inicio: (*fecha_inicio).clone(),
-                fecha_fin: (*fecha_fin).clone(),
-                monto_mensual: monto_val,
-                deposito: dep,
-                moneda: Some((*moneda).clone()),
-            };
-            do_save_contrato(
-                editing_id,
-                update,
-                create,
+            handle_contrato_submit(
+                submitting.clone(),
+                || validate_form(),
+                &monto_mensual,
+                &deposito,
+                &fecha_fin,
+                &propiedad_id,
+                &inquilino_id,
+                &fecha_inicio,
+                &moneda,
+                &estado,
+                &editing,
                 reset_form.clone(),
                 reload.clone(),
                 error.clone(),
                 toasts.clone(),
-                submitting.clone(),
             );
         })
     };
@@ -838,18 +1091,14 @@ pub fn Contratos() -> Html {
         let reload = reload.clone();
         let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
-            if let Some(ref c) = *renew_target {
-                do_renew_contrato(
-                    c.id.clone(),
-                    (*renew_fecha_fin).clone(),
-                    renew_monto.parse::<f64>().unwrap_or(0.0),
-                    renew_target.clone(),
-                    renew_fecha_fin.clone(),
-                    reload.clone(),
-                    error.clone(),
-                    toasts.clone(),
-                );
-            }
+            handle_contrato_renew_confirm(
+                &renew_target,
+                renew_fecha_fin.clone(),
+                &renew_monto,
+                reload.clone(),
+                error.clone(),
+                toasts.clone(),
+            );
         })
     };
 
@@ -872,17 +1121,13 @@ pub fn Contratos() -> Html {
         let reload = reload.clone();
         let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
-            if let Some(ref c) = *terminate_target {
-                do_terminate_contrato(
-                    c.id.clone(),
-                    (*terminate_fecha).clone(),
-                    terminate_target.clone(),
-                    terminate_fecha.clone(),
-                    reload.clone(),
-                    error.clone(),
-                    toasts.clone(),
-                );
-            }
+            handle_contrato_terminate_confirm(
+                &terminate_target,
+                terminate_fecha.clone(),
+                reload.clone(),
+                error.clone(),
+                toasts.clone(),
+            );
         })
     };
 
@@ -910,100 +1155,50 @@ pub fn Contratos() -> Html {
         })
     };
 
-    if *loading {
-        return html! { <Loading /> };
-    }
-
-    let headers = vec![
-        "Propiedad".into(),
-        "Inquilino".into(),
-        "Inicio".into(),
-        "Fin".into(),
-        "Monto".into(),
-        "Estado".into(),
-        if can_write(&user_rol) {
-            "Acciones".into()
-        } else {
-            String::new()
-        },
-    ];
-
-    html! {
-        <div>
-            <div class="gi-page-header">
-                <h1 class="gi-page-title">{"Contratos"}</h1>
-                if can_write(&user_rol) {
-                    <button onclick={on_new} class="gi-btn gi-btn-primary">{"+ Nuevo Contrato"}</button>
-                }
-            </div>
-
-            if let Some(err) = (*error).as_ref() {
-                <ErrorBanner message={err.clone()} onclose={Callback::from({
-                    let error = error.clone(); move |_: MouseEvent| error.set(None)
-                })} />
-            }
-
-            if let Some(ref target) = *delete_target {
-                <DeleteConfirmModal
-                    message={format!("¿Está seguro de que desea eliminar el contrato de la propiedad \"{}\"? Esta acción no se puede deshacer.", prop_label.emit(target.propiedad_id.clone()))}
-                    on_confirm={on_delete_confirm.clone()}
-                    on_cancel={on_delete_cancel.clone()}
-                />
-            }
-
-            if renew_target.is_some() {
-                <RenewModal
-                    renew_fecha_fin={renew_fecha_fin.clone()}
-                    renew_monto={renew_monto.clone()}
-                    on_confirm={on_renew_confirm}
-                    on_cancel={on_renew_cancel}
-                />
-            }
-
-            if terminate_target.is_some() {
-                <TerminateModal
-                    terminate_fecha={terminate_fecha.clone()}
-                    on_confirm={on_terminate_confirm}
-                    on_cancel={on_terminate_cancel}
-                />
-            }
-
-            if *show_form {
-                <ContratoForm
-                    is_editing={editing.is_some()}
-                    propiedad_id={propiedad_id.clone()}
-                    inquilino_id={inquilino_id.clone()}
-                    fecha_inicio={fecha_inicio.clone()}
-                    fecha_fin={fecha_fin.clone()}
-                    monto_mensual={monto_mensual.clone()}
-                    deposito={deposito.clone()}
-                    moneda={moneda.clone()}
-                    estado={estado.clone()}
-                    propiedades={(*propiedades).clone()}
-                    inquilinos={(*inquilinos).clone()}
-                    form_errors={(*form_errors).clone()}
-                    submitting={*submitting}
-                    on_submit={on_submit}
-                    on_cancel={on_cancel}
-                />
-            }
-
-            <ContratoList
-                items={(*items).clone()}
-                user_rol={user_rol.clone()}
-                headers={headers}
-                total={*total}
-                page={*page}
-                per_page={*per_page}
-                prop_label={prop_label.clone()}
-                inq_label={inq_label.clone()}
-                on_edit={on_edit}
-                on_delete={on_delete_click}
-                on_renew={on_renew_click}
-                on_terminate={on_terminate_click}
-                on_page_change={on_page_change}
-                on_per_page_change={on_per_page_change}
-            />
-        </div>
-    }
+    render_contratos_view(
+        *loading,
+        &user_rol,
+        &error,
+        &delete_target,
+        &renew_target,
+        &renew_fecha_fin,
+        &renew_monto,
+        &terminate_target,
+        &terminate_fecha,
+        *show_form,
+        &editing,
+        &propiedad_id,
+        &inquilino_id,
+        &fecha_inicio,
+        &fecha_fin,
+        &monto_mensual,
+        &deposito,
+        &moneda,
+        &estado,
+        &propiedades,
+        &inquilinos,
+        &form_errors,
+        *submitting,
+        on_submit,
+        on_cancel,
+        on_new,
+        on_delete_confirm,
+        on_delete_cancel,
+        on_renew_confirm,
+        on_renew_cancel,
+        on_terminate_confirm,
+        on_terminate_cancel,
+        &items,
+        *total,
+        *page,
+        *per_page,
+        prop_label,
+        inq_label,
+        on_edit,
+        on_delete_click,
+        on_renew_click,
+        on_terminate_click,
+        on_page_change,
+        on_per_page_change,
+    )
 }

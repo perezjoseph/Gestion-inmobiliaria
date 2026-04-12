@@ -92,7 +92,7 @@ jobs:
 
       - name: Install commitlint CLI and conventional config
         run: |
-          npm install --save-dev @commitlint/{cli,config-conventional}
+          npm install --ignore-scripts --save-dev @commitlint/{cli,config-conventional}
           echo "module.exports = { extends: ['@commitlint/config-conventional'] };" > commitlint.config.js
 
       - name: Validate PR commit messages against conventional format
@@ -140,7 +140,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-lint-
             ${{ runner.os }}-cargo-
-          save-always: true
 
       - name: Verify rustfmt formatting across all crates
         id: fmt
@@ -155,7 +154,7 @@ jobs:
         id: clippy_backend
         if: always()
         run: |
-          if ! cargo clippy -p realestate-backend -- -D warnings 2>&1 | tee /tmp/clippy-backend-output.txt; then
+          if ! cargo clippy --locked -p realestate-backend -- -D warnings 2>&1 | tee /tmp/clippy-backend-output.txt; then
             echo "::error::Backend clippy found warnings/errors."
             exit 1
           fi
@@ -164,7 +163,7 @@ jobs:
         id: clippy_frontend
         if: always()
         run: |
-          if ! cargo clippy -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings 2>&1 | tee /tmp/clippy-frontend-output.txt; then
+          if ! cargo clippy --locked -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings 2>&1 | tee /tmp/clippy-frontend-output.txt; then
             echo "::error::Frontend clippy found warnings/errors."
             exit 1
           fi
@@ -271,11 +270,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-test-
             ${{ runner.os }}-cargo-
-          save-always: true
 
       - name: Run backend tests
         id: backend-tests
-        run: cargo test -p realestate-backend --all-targets 2>&1 | tee /tmp/test-backend-output.txt
+        run: cargo test --locked -p realestate-backend --all-targets 2>&1 | tee /tmp/test-backend-output.txt
 
       - name: Generate test coverage report (LCOV)
         id: coverage
@@ -383,11 +381,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-frontend-test-v2-
             ${{ runner.os }}-cargo-
-          save-always: true
 
       - name: Run frontend tests (native target)
         id: frontend-tests
-        run: cargo test -p realestate-frontend --all-targets 2>&1 | tee /tmp/test-frontend-output.txt
+        run: cargo test --locked -p realestate-frontend --all-targets 2>&1 | tee /tmp/test-frontend-output.txt
 
       - name: Write test summary
         if: always()
@@ -934,7 +931,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-wasm-
             ${{ runner.os }}-cargo-
-          save-always: true
 
       - name: Build optimized WASM frontend bundle
         run: trunk build --release 2>&1 | tee /tmp/build-frontend-output.txt
@@ -1020,10 +1016,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-backend-build-
             ${{ runner.os }}-cargo-
-          save-always: true
 
       - name: Build optimized backend binary
-        run: cargo build -p realestate-backend --release 2>&1 | tee /tmp/build-backend-output.txt
+        run: cargo build --locked -p realestate-backend --release 2>&1 | tee /tmp/build-backend-output.txt
 
       - name: Upload backend binary artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -1315,7 +1310,7 @@ jobs:
             docker compose -f docker-compose.prod.yml pull
           fi
 
-          docker compose -f docker-compose.prod.yml up -d --remove-orphans
+          docker compose -f docker-compose.prod.yml up -d --no-build --remove-orphans
           docker compose -f docker-compose.prod.yml ps
 
       - name: Verify deployment health
@@ -1356,7 +1351,7 @@ jobs:
           echo "::warning::Health check failed -- rolling back to previous images"
           if [ -n "$PREV_BACKEND" ] || [ -n "$PREV_FRONTEND" ]; then
             docker compose -f docker-compose.prod.yml down
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans 2>/dev/null || true
+            docker compose -f docker-compose.prod.yml up -d --no-build --remove-orphans 2>/dev/null || true
             echo "Rollback attempted. Verify manually."
           else
             echo "No previous images recorded -- stopping failed deployment"
@@ -1669,6 +1664,7 @@ jobs:
               echo "sonar_report=SonarQube token unavailable -- skipping issue collection." >> $GITHUB_OUTPUT
               exit 0
             fi
+            echo "temp_token=true" >> $GITHUB_OUTPUT
           fi
 
           ISSUES_JSON=$(curl -sf -u "$TOKEN:" \
@@ -1820,3 +1816,12 @@ jobs:
             -H "Content-Type: application/json" \
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping SonarQube fix"
+
+      - name: Revoke temporary SonarQube token
+        if: always() && steps.sonar-issues.outputs.temp_token == 'true'
+        run: |
+          ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD }}"
+          if [ -n "$ADMIN_PASS" ]; then
+            curl -sf -u "admin:${ADMIN_PASS}" -X POST \
+              "http://192.168.88.25:9000/api/user_tokens/revoke?name=ci-improve-token" 2>/dev/null || true
+          fi

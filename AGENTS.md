@@ -28,6 +28,10 @@ This project has frontend design skills installed in `.kiro/skills/`. Activate t
 - `critique` — Evaluate an existing design. Returns scored feedback on hierarchy, cognitive load, and anti-patterns.
 - `audit` — Technical quality check across accessibility, performance, theming, and responsive design.
 
+### Android development
+
+- `claude-android-ninja` — Android development with Kotlin and Jetpack Compose. Covers modular architecture, Navigation3, Gradle conventions, MVVM, Hilt DI, Room 3, Material 3 theming, testing, coroutines, accessibility, security, and performance. Activate when working on the Android module or any Android-related tasks.
+
 ### Specialized skills
 
 - `adapt` — Make a component responsive across breakpoints and devices.

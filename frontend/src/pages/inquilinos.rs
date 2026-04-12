@@ -356,6 +356,223 @@ fn register_escape_listener_i(
     })
 }
 
+fn load_inquilinos_data(
+    items: UseStateHandle<Vec<Inquilino>>,
+    total: UseStateHandle<u64>,
+    error: UseStateHandle<Option<String>>,
+    loading: UseStateHandle<bool>,
+    pg: u64,
+    pp: u64,
+    search_val: String,
+) {
+    spawn_local(async move {
+        loading.set(true);
+        let mut params = vec![format!("page={pg}"), format!("perPage={pp}")];
+        if !search_val.is_empty() {
+            params.push(format!("search={search_val}"));
+        }
+        let url = format!("/inquilinos?{}", params.join("&"));
+        match api_get::<PaginatedResponse<Inquilino>>(&url).await {
+            Ok(resp) => {
+                total.set(resp.total);
+                items.set(resp.data);
+            }
+            Err(err) => error.set(Some(err)),
+        }
+        loading.set(false);
+    });
+}
+
+fn handle_inquilino_submit(
+    submitting: UseStateHandle<bool>,
+    validate_form: impl Fn() -> bool,
+    nombre: &UseStateHandle<String>,
+    apellido: &UseStateHandle<String>,
+    email: &UseStateHandle<String>,
+    telefono: &UseStateHandle<String>,
+    cedula: &UseStateHandle<String>,
+    contacto_emergencia: &UseStateHandle<String>,
+    notas: &UseStateHandle<String>,
+    editing: &UseStateHandle<Option<Inquilino>>,
+    reset_form: impl Fn() + 'static,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+) {
+    if *submitting || !validate_form() {
+        return;
+    }
+    submitting.set(true);
+    let editing_id = editing.as_ref().map(|e| e.id.clone());
+    let update = UpdateInquilino {
+        nombre: Some((**nombre).clone()),
+        apellido: Some((**apellido).clone()),
+        email: non_empty_inq(email),
+        telefono: non_empty_inq(telefono),
+        cedula: Some((**cedula).clone()),
+        contacto_emergencia: non_empty_inq(contacto_emergencia),
+        notas: non_empty_inq(notas),
+    };
+    let create = CreateInquilino {
+        nombre: (**nombre).clone(),
+        apellido: (**apellido).clone(),
+        email: non_empty_inq(email),
+        telefono: non_empty_inq(telefono),
+        cedula: (**cedula).clone(),
+        contacto_emergencia: non_empty_inq(contacto_emergencia),
+        notas: non_empty_inq(notas),
+    };
+    do_save_inquilino(
+        editing_id, update, create, reset_form, reload, error, toasts, submitting,
+    );
+}
+
+fn handle_inquilino_delete_confirm(
+    delete_target: &UseStateHandle<Option<Inquilino>>,
+    reload: UseStateHandle<u32>,
+    error: UseStateHandle<Option<String>>,
+    toasts: Option<ToastContext>,
+) {
+    if let Some(ref i) = **delete_target {
+        let label = format!("{} {}", i.nombre, i.apellido);
+        do_delete_inquilino(
+            i.id.clone(),
+            label,
+            delete_target.clone(),
+            reload.clone(),
+            error,
+            toasts,
+            reload,
+        );
+    }
+}
+
+fn handle_escape_inquilinos(
+    delete_target: &UseStateHandle<Option<Inquilino>>,
+    show_form: &UseStateHandle<bool>,
+    reset_form: &dyn Fn(),
+) {
+    if delete_target.is_some() {
+        delete_target.set(None);
+    } else if **show_form {
+        reset_form();
+    }
+}
+
+fn render_inquilinos_view(
+    loading: &UseStateHandle<bool>,
+    user_rol: &str,
+    error: &UseStateHandle<Option<String>>,
+    delete_target: &UseStateHandle<Option<Inquilino>>,
+    on_delete_confirm: Callback<MouseEvent>,
+    on_delete_cancel: Callback<MouseEvent>,
+    search: UseStateHandle<String>,
+    on_search_apply: Callback<MouseEvent>,
+    on_search_clear: Callback<MouseEvent>,
+    show_form: &UseStateHandle<bool>,
+    editing: &UseStateHandle<Option<Inquilino>>,
+    nombre: UseStateHandle<String>,
+    apellido: UseStateHandle<String>,
+    email: UseStateHandle<String>,
+    telefono: UseStateHandle<String>,
+    cedula: UseStateHandle<String>,
+    contacto_emergencia: UseStateHandle<String>,
+    notas: UseStateHandle<String>,
+    form_errors: &UseStateHandle<FormErrors>,
+    submitting: &UseStateHandle<bool>,
+    on_submit: Callback<SubmitEvent>,
+    on_cancel: Callback<MouseEvent>,
+    items: &UseStateHandle<Vec<Inquilino>>,
+    total: u64,
+    page: u64,
+    per_page: u64,
+    on_edit: Callback<Inquilino>,
+    on_delete_click: Callback<Inquilino>,
+    on_new: Callback<MouseEvent>,
+    on_page_change: Callback<u64>,
+    on_per_page_change: Callback<u64>,
+) -> Html {
+    if **loading {
+        return html! { <Loading /> };
+    }
+
+    let headers = vec![
+        "Nombre".into(),
+        "Apellido".into(),
+        "Cédula".into(),
+        "Email".into(),
+        "Teléfono".into(),
+        if can_write(user_rol) {
+            "Acciones".into()
+        } else {
+            String::new()
+        },
+    ];
+
+    html! {
+        <div>
+            <div class="gi-page-header">
+                <h1 class="gi-page-title">{"Inquilinos"}</h1>
+                if can_write(user_rol) {
+                    <button onclick={on_new.clone()} class="gi-btn gi-btn-primary">{"+ Nuevo Inquilino"}</button>
+                }
+            </div>
+
+            if let Some(err) = (*error).as_ref() {
+                <ErrorBanner message={err.clone()} onclose={Callback::from({
+                    let error = error.clone();
+                    move |_: MouseEvent| error.set(None)
+                })} />
+            }
+
+            if let Some(ref target) = **delete_target {
+                <DeleteConfirmModal
+                    message={format!("¿Está seguro de que desea eliminar al inquilino \"{} {}\"? Esta acción no se puede deshacer.", target.nombre, target.apellido)}
+                    on_confirm={on_delete_confirm}
+                    on_cancel={on_delete_cancel}
+                />
+            }
+
+            <InquilinoSearchBar
+                search={search}
+                on_apply={on_search_apply}
+                on_clear={on_search_clear}
+            />
+
+            if **show_form {
+                <InquilinoForm
+                    is_editing={editing.is_some()}
+                    nombre={nombre}
+                    apellido={apellido}
+                    email={email}
+                    telefono={telefono}
+                    cedula={cedula}
+                    contacto_emergencia={contacto_emergencia}
+                    notas={notas}
+                    form_errors={(**form_errors).clone()}
+                    submitting={**submitting}
+                    on_submit={on_submit}
+                    on_cancel={on_cancel}
+                />
+            }
+
+            <InquilinoList
+                items={(**items).clone()}
+                user_rol={user_rol.to_string()}
+                headers={headers}
+                total={total}
+                page={page}
+                per_page={per_page}
+                on_edit={on_edit}
+                on_delete={on_delete_click}
+                on_new={on_new}
+                on_page_change={on_page_change}
+                on_per_page_change={on_per_page_change}
+            />
+        </div>
+    }
+}
+
 #[function_component]
 pub fn Inquilinos() -> Html {
     let auth = use_context::<AuthContext>();
@@ -397,22 +614,7 @@ pub fn Inquilinos() -> Html {
         let pg = *page;
         let pp = *per_page;
         use_effect_with((reload_val, search_val.clone(), pg), move |_| {
-            spawn_local(async move {
-                loading.set(true);
-                let mut params = vec![format!("page={pg}"), format!("perPage={pp}")];
-                if !search_val.is_empty() {
-                    params.push(format!("search={search_val}"));
-                }
-                let url = format!("/inquilinos?{}", params.join("&"));
-                match api_get::<PaginatedResponse<Inquilino>>(&url).await {
-                    Ok(resp) => {
-                        total.set(resp.total);
-                        items.set(resp.data);
-                    }
-                    Err(err) => error.set(Some(err)),
-                }
-                loading.set(false);
-            });
+            load_inquilinos_data(items, total, error, loading, pg, pp, search_val);
         });
     }
 
@@ -448,11 +650,7 @@ pub fn Inquilinos() -> Html {
         let reset_form = reset_form.clone();
         let handler = escape_handler.clone();
         *handler.borrow_mut() = Some(Box::new(move || {
-            if delete_target.is_some() {
-                delete_target.set(None);
-            } else if *show_form {
-                reset_form();
-            }
+            handle_escape_inquilinos(&delete_target, &show_form, &reset_form);
         }) as Box<dyn Fn()>);
     }
     {
@@ -510,18 +708,12 @@ pub fn Inquilinos() -> Html {
         let delete_target = delete_target.clone();
         let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
-            if let Some(ref i) = *delete_target {
-                let label = format!("{} {}", i.nombre, i.apellido);
-                do_delete_inquilino(
-                    i.id.clone(),
-                    label,
-                    delete_target.clone(),
-                    reload.clone(),
-                    error.clone(),
-                    toasts.clone(),
-                    reload.clone(),
-                );
-            }
+            handle_inquilino_delete_confirm(
+                &delete_target,
+                reload.clone(),
+                error.clone(),
+                toasts.clone(),
+            );
         })
     };
 
@@ -562,38 +754,21 @@ pub fn Inquilinos() -> Html {
         let submitting = submitting.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
-            if *submitting || !validate_form() {
-                return;
-            }
-            submitting.set(true);
-            let editing_id = editing.as_ref().map(|e| e.id.clone());
-            let update = UpdateInquilino {
-                nombre: Some((*nombre).clone()),
-                apellido: Some((*apellido).clone()),
-                email: non_empty_inq(&email),
-                telefono: non_empty_inq(&telefono),
-                cedula: Some((*cedula).clone()),
-                contacto_emergencia: non_empty_inq(&contacto_emergencia),
-                notas: non_empty_inq(&notas),
-            };
-            let create = CreateInquilino {
-                nombre: (*nombre).clone(),
-                apellido: (*apellido).clone(),
-                email: non_empty_inq(&email),
-                telefono: non_empty_inq(&telefono),
-                cedula: (*cedula).clone(),
-                contacto_emergencia: non_empty_inq(&contacto_emergencia),
-                notas: non_empty_inq(&notas),
-            };
-            do_save_inquilino(
-                editing_id,
-                update,
-                create,
+            handle_inquilino_submit(
+                submitting.clone(),
+                &validate_form,
+                &nombre,
+                &apellido,
+                &email,
+                &telefono,
+                &cedula,
+                &contacto_emergencia,
+                &notas,
+                &editing,
                 reset_form.clone(),
                 reload.clone(),
                 error.clone(),
                 toasts.clone(),
-                submitting.clone(),
             );
         })
     };
@@ -645,83 +820,37 @@ pub fn Inquilinos() -> Html {
         })
     };
 
-    if *loading {
-        return html! { <Loading /> };
-    }
-
-    let headers = vec![
-        "Nombre".into(),
-        "Apellido".into(),
-        "Cédula".into(),
-        "Email".into(),
-        "Teléfono".into(),
-        if can_write(&user_rol) {
-            "Acciones".into()
-        } else {
-            String::new()
-        },
-    ];
-
-    html! {
-        <div>
-            <div class="gi-page-header">
-                <h1 class="gi-page-title">{"Inquilinos"}</h1>
-                if can_write(&user_rol) {
-                    <button onclick={on_new.clone()} class="gi-btn gi-btn-primary">{"+ Nuevo Inquilino"}</button>
-                }
-            </div>
-
-            if let Some(err) = (*error).as_ref() {
-                <ErrorBanner message={err.clone()} onclose={Callback::from({
-                    let error = error.clone();
-                    move |_: MouseEvent| error.set(None)
-                })} />
-            }
-
-            if let Some(ref target) = *delete_target {
-                <DeleteConfirmModal
-                    message={format!("¿Está seguro de que desea eliminar al inquilino \"{} {}\"? Esta acción no se puede deshacer.", target.nombre, target.apellido)}
-                    on_confirm={on_delete_confirm.clone()}
-                    on_cancel={on_delete_cancel.clone()}
-                />
-            }
-
-            <InquilinoSearchBar
-                search={search.clone()}
-                on_apply={on_search_apply}
-                on_clear={on_search_clear}
-            />
-
-            if *show_form {
-                <InquilinoForm
-                    is_editing={editing.is_some()}
-                    nombre={nombre.clone()}
-                    apellido={apellido.clone()}
-                    email={email.clone()}
-                    telefono={telefono.clone()}
-                    cedula={cedula.clone()}
-                    contacto_emergencia={contacto_emergencia.clone()}
-                    notas={notas.clone()}
-                    form_errors={(*form_errors).clone()}
-                    submitting={*submitting}
-                    on_submit={on_submit}
-                    on_cancel={on_cancel}
-                />
-            }
-
-            <InquilinoList
-                items={(*items).clone()}
-                user_rol={user_rol.clone()}
-                headers={headers}
-                total={*total}
-                page={*page}
-                per_page={*per_page}
-                on_edit={on_edit}
-                on_delete={on_delete_click}
-                on_new={on_new}
-                on_page_change={on_page_change}
-                on_per_page_change={on_per_page_change}
-            />
-        </div>
-    }
+    render_inquilinos_view(
+        &loading,
+        &user_rol,
+        &error,
+        &delete_target,
+        on_delete_confirm,
+        on_delete_cancel,
+        search,
+        on_search_apply,
+        on_search_clear,
+        &show_form,
+        &editing,
+        nombre,
+        apellido,
+        email,
+        telefono,
+        cedula,
+        contacto_emergencia,
+        notas,
+        &form_errors,
+        &submitting,
+        on_submit,
+        on_cancel,
+        &items,
+        *total,
+        *page,
+        *per_page,
+        on_edit,
+        on_delete_click,
+        on_new,
+        on_page_change,
+        on_per_page_change,
+    )
 }
