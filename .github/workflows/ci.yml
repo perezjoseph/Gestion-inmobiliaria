@@ -217,6 +217,9 @@ jobs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
     steps:
+      - name: Clean up OWASP reports from previous runs
+        run: rm -rf reports/
+
       - name: Checkout repository for dependency scanning
         uses: actions/checkout@v4
 
@@ -346,41 +349,52 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set vm.max_map_count for Elasticsearch
-        run: |
-          CURRENT=$(cat /proc/sys/vm/max_map_count)
-          if [ "$CURRENT" -lt 524288 ]; then
-            echo "Setting vm.max_map_count=524288 (current: $CURRENT)"
-            sudo sysctl -w vm.max_map_count=524288 || echo "::warning::Could not set vm.max_map_count — SonarQube may fail to start"
-          fi
+      # ── Using external SonarQube at 192.168.88.25:9000 ──
+      # To switch to a local docker-compose instance, uncomment the two steps
+      # below and change SONAR_URL references from 192.168.88.25 to localhost.
 
-      - name: Deploy SonarQube via docker-compose
+      # - name: Set vm.max_map_count for Elasticsearch
+      #   run: |
+      #     CURRENT=$(cat /proc/sys/vm/max_map_count)
+      #     if [ "$CURRENT" -lt 524288 ]; then
+      #       echo "Setting vm.max_map_count=524288 (current: $CURRENT)"
+      #       sudo sysctl -w vm.max_map_count=524288 || echo "::warning::Could not set vm.max_map_count"
+      #     fi
+
+      # - name: Deploy SonarQube via docker-compose
+      #   run: |
+      #     docker compose -f .github/docker-compose.sonarqube.yml up -d
+      #     echo "Waiting for SonarQube to be ready..."
+      #     for i in $(seq 1 40); do
+      #       STATUS=$(curl -sf --connect-timeout 5 --max-time 10 http://localhost:9000/api/system/status 2>/dev/null | grep -o '"status":"[^"]*"' | cut -d'"' -f4 || true)
+      #       if [ "$STATUS" = "UP" ]; then echo "SonarQube is ready."; exit 0; fi
+      #       echo "Attempt $i/40 — status: ${STATUS:-unreachable}. Retrying in 10s..."
+      #       sleep 10
+      #     done
+      #     echo "::error::SonarQube did not become ready within ~7 minutes"
+      #     docker compose -f .github/docker-compose.sonarqube.yml logs sonarqube | tail -50
+      #     exit 1
+
+      - name: Verify SonarQube server is reachable
         run: |
-          docker compose -f .github/docker-compose.sonarqube.yml up -d
-          echo "Waiting for SonarQube to be ready..."
-          for i in $(seq 1 40); do
-            STATUS=$(curl -sf --connect-timeout 5 --max-time 10 http://localhost:9000/api/system/status 2>/dev/null | grep -o '"status":"[^"]*"' | cut -d'"' -f4 || true)
+          SONAR_URL="http://192.168.88.25:9000"
+          echo "Checking SonarQube at $SONAR_URL ..."
+          for i in $(seq 1 12); do
+            STATUS=$(curl -sf --connect-timeout 5 --max-time 10 "$SONAR_URL/api/system/status" 2>/dev/null | grep -o '"status":"[^"]*"' | cut -d'"' -f4 || true)
             if [ "$STATUS" = "UP" ]; then
               echo "SonarQube is ready."
               exit 0
             fi
-            echo "Attempt $i/40 — status: ${STATUS:-unreachable}. Retrying in 10s..."
-            sleep 10
+            echo "Attempt $i/12 — status: ${STATUS:-unreachable}. Retrying in 5s..."
+            sleep 5
           done
-          echo "::error::SonarQube did not become ready within ~7 minutes"
-          docker compose -f .github/docker-compose.sonarqube.yml logs sonarqube | tail -50
+          echo "::error::SonarQube at $SONAR_URL did not respond within ~60 seconds"
           exit 1
 
       - name: Bootstrap SonarQube project and token
         id: sonar-bootstrap
         run: |
-          SONAR_URL="http://localhost:9000"
-          
-          # Change default admin password on first boot (ignore if already changed)
-          curl -sf -u admin:admin -X POST \
-            "$SONAR_URL/api/users/change_password?login=admin&previousPassword=admin&password=${{ secrets.SONAR_ADMIN_PASSWORD || 'SonarAdmin2025!' }}" \
-            2>/dev/null || echo "Admin password already changed or custom password set."
-
+          SONAR_URL="http://192.168.88.25:9000"
           ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD || 'SonarAdmin2025!' }}"
 
           # Create project if it doesn't exist
@@ -397,10 +411,9 @@ jobs:
               2>/dev/null || echo "Quality gate already assigned."
           fi
 
-          # Generate or reuse a token
+          # Use existing token from secrets, or generate one via admin API
           TOKEN="${{ secrets.SONAR_TOKEN }}"
           if [ -z "$TOKEN" ]; then
-            # Revoke old CI token if it exists, then create a new one
             curl -sf -u "admin:${ADMIN_PASS}" -X POST \
               "$SONAR_URL/api/user_tokens/revoke?name=ci-token" 2>/dev/null || true
             TOKEN=$(curl -sf -u "admin:${ADMIN_PASS}" -X POST \
@@ -417,7 +430,7 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ steps.sonar-bootstrap.outputs.token }}
-          SONAR_HOST_URL: http://localhost:9000
+          SONAR_HOST_URL: http://192.168.88.25:9000
         with:
           args: >
             -Dsonar.qualitygate.wait=true
@@ -429,7 +442,7 @@ jobs:
           SONAR_TOKEN: ${{ steps.sonar-bootstrap.outputs.token }}
           SCAN_OUTCOME: ${{ steps.sonar-scan.outcome }}
         run: |
-          SONAR_URL="http://localhost:9000"
+          SONAR_URL="http://192.168.88.25:9000"
           GATE_STATUS="UNKNOWN"
 
           if [ "$SCAN_OUTCOME" = "success" ]; then
