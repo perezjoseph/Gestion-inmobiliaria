@@ -13,6 +13,7 @@ frontend/dist/
 
 kiro-debug.log
 kiro-debug.log
+.kiro-prompt-*
 
 # Android build artifacts
 android/.gradle/
