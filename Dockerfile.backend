@@ -1,4 +1,4 @@
-FROM rust:1.86-bookworm AS builder
+FROM rust:1.86-bookworm@sha256:878ca0e8df1305dcbbfffac5bb908cce6a4bc5f6b629c518e7112645ee8851d4 AS builder
 
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
@@ -7,7 +7,7 @@ COPY frontend/ frontend/
 
 RUN cargo build -p realestate-backend --release
 
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim@sha256:13cb01d584d2c23f475c088c168a48f9a08f033a10460572fbfd10912ec5ba7c
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates libssl3 libpq5 curl \

@@ -30,7 +30,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 
 PORT = 9090
-BIND_ADDRESS = os.environ.get("BIND_ADDRESS", "0.0.0.0")
+BIND_ADDRESS = os.environ.get("BIND_ADDRESS", "127.0.0.1")
 PROJECT_DIR = "/mnt/d/realestate"
 WSL_DISTRO = "Ubuntu-22.04"
 WSL_USER = "jperez"
@@ -495,6 +495,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
 
 def main():
+    if not WEBHOOK_SECRET:
+        log.error("WEBHOOK_SECRET environment variable is required. Set it before starting the listener.")
+        raise SystemExit(1)
+
     local_ip = get_local_ip()
     server = HTTPServer((BIND_ADDRESS, PORT), WebhookHandler)
     server.timeout = 30

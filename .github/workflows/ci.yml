@@ -102,7 +102,10 @@ jobs:
           echo "module.exports = { extends: ['@commitlint/config-conventional'] };" > commitlint.config.js
 
       - name: Validate PR commit messages against conventional format
-        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: npx commitlint --from "$PR_BASE_SHA" --to "$PR_HEAD_SHA" --verbose
 
   dependency-review:
     name: Dependency Review (PR)
@@ -944,6 +947,7 @@ jobs:
           PR_KEY: ${{ github.event.pull_request.number }}
           PR_BRANCH: ${{ github.head_ref }}
           PR_BASE: ${{ github.base_ref }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
           EXTRA_ARGS=""
           if [ "$HAS_COVERAGE" = "true" ] && [ -f coverage/lcov.info ]; then
@@ -956,7 +960,7 @@ jobs:
             EXTRA_ARGS="$EXTRA_ARGS -Dsonar.pullrequest.branch=${PR_BRANCH}"
             EXTRA_ARGS="$EXTRA_ARGS -Dsonar.pullrequest.base=${PR_BASE}"
           else
-            BRANCH_NAME="${{ github.ref_name }}"
+            BRANCH_NAME="${GITHUB_REF_NAME}"
             if [ -n "$BRANCH_NAME" ]; then
               echo "Branch push detected -- setting sonar.branch.name=$BRANCH_NAME"
               EXTRA_ARGS="$EXTRA_ARGS -Dsonar.branch.name=${BRANCH_NAME}"
@@ -973,7 +977,7 @@ jobs:
             --tmpfs /tmp:rw,noexec,nosuid,nodev \
             -e SONAR_TOKEN="${SONAR_ANALYSIS_TOKEN}" \
             -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
-            -v "${{ github.workspace }}:/usr/src" \
+            -v "${GITHUB_WORKSPACE}:/usr/src" \
             sonarsource/sonar-scanner-cli:11.3@sha256:7462f132388135e32b948f8f18ff0db9ae28a87c6777f1df5b2207e04a6d7c5c \
             -Dsonar.projectBaseDir=/usr/src \
             -Dsonar.qualitygate.wait=true \
@@ -986,6 +990,13 @@ jobs:
           SONAR_TOKEN: ${{ env.SONAR_ANALYSIS_TOKEN }}
           SCAN_OUTCOME: ${{ steps.sonar-scan.outcome }}
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
+          GH_SERVER_URL: ${{ github.server_url }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_SHA: ${{ github.sha }}
+          GH_REF_NAME: ${{ github.ref_name }}
+          GH_ACTOR: ${{ github.actor }}
         run: |
           SONAR_URL="${SONAR_HOST_URL}"
           GATE_STATUS="UNKNOWN"
@@ -1095,14 +1106,14 @@ jobs:
               --arg job "sonarqube" \
               --arg step "quality-gate-${GATE_STATUS}" \
               --arg error_log "$ERROR_LOG" \
-              --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-              --arg commit "${{ github.sha }}" \
-              --arg branch "${{ github.ref_name }}" \
-              --arg actor "${{ github.actor }}" \
+              --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+              --arg commit "$GH_SHA" \
+              --arg branch "$GH_REF_NAME" \
+              --arg actor "$GH_ACTOR" \
               '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
 
             SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
-            curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+            curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
               -H "Content-Type: application/json" \
               -H "X-Signature-256: sha256=$SIGNATURE" \
               -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
@@ -1357,6 +1368,8 @@ jobs:
       attestations: write
     env:
       DOCKER_CONTENT_TRUST: "1"
+      IMAGE_OWNER: ${{ github.repository_owner }}
+      IMAGE_TAG: ${{ github.sha }}
     outputs:
       digest: ${{ steps.push-backend.outputs.digest }}
     needs: [build-backend]
@@ -1386,7 +1399,7 @@ jobs:
           context: .
           file: Dockerfile.backend
           load: true
-          tags: ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }}
+          tags: ghcr.io/${IMAGE_OWNER}/realestate-backend:${{ github.sha }}
           provenance: mode=max
           sbom: true
 
@@ -1408,21 +1421,21 @@ jobs:
         run: |
           trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --no-progress \
             --format table \
-            ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }}
+            ghcr.io/${IMAGE_OWNER}/realestate-backend:${IMAGE_TAG}
 
       - name: Generate Trivy SARIF report for backend image
         if: always()
         run: |
           trivy image --severity CRITICAL,HIGH,MEDIUM --ignore-unfixed --no-progress \
             --format sarif --output trivy-backend.sarif \
-            ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }} || true
+            ghcr.io/${IMAGE_OWNER}/realestate-backend:${IMAGE_TAG} || true
 
       - name: Generate SBOM for backend image (SPDX)
         if: always()
         run: |
           trivy image --format spdx-json --output backend-sbom.spdx.json \
             --no-progress \
-            ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }} || true
+            ghcr.io/${IMAGE_OWNER}/realestate-backend:${IMAGE_TAG} || true
 
       - name: Upload backend SBOM artifact
         if: always()
@@ -1443,9 +1456,9 @@ jobs:
       - name: Push backend image to GHCR
         id: push-backend
         run: |
-          docker push ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }}
+          docker push ghcr.io/${IMAGE_OWNER}/realestate-backend:${IMAGE_TAG}
           DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' \
-            ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }} 2>/dev/null \
+            ghcr.io/${IMAGE_OWNER}/realestate-backend:${IMAGE_TAG} 2>/dev/null \
             | grep -oP 'sha256:[a-f0-9]+' || true)
           echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
 
@@ -1453,14 +1466,14 @@ jobs:
         if: steps.push-backend.outputs.digest != ''
         uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
         with:
-          subject-name: ghcr.io/${{ github.repository_owner }}/realestate-backend
+          subject-name: ghcr.io/${IMAGE_OWNER}/realestate-backend
           subject-digest: ${{ steps.push-backend.outputs.digest }}
           push-to-registry: true
 
       - name: Clean up docker images on self-hosted runner
         if: always()
         run: |
-          docker rmi "ghcr.io/${{ github.repository_owner }}/realestate-backend:${{ github.sha }}" 2>/dev/null || true
+          docker rmi "ghcr.io/${IMAGE_OWNER}/realestate-backend:${IMAGE_TAG}" 2>/dev/null || true
           docker builder prune -f --filter "until=24h" 2>/dev/null || true
 
   container-image-frontend:
@@ -1475,6 +1488,8 @@ jobs:
       attestations: write
     env:
       DOCKER_CONTENT_TRUST: "1"
+      IMAGE_OWNER: ${{ github.repository_owner }}
+      IMAGE_TAG: ${{ github.sha }}
     outputs:
       digest: ${{ steps.push-frontend.outputs.digest }}
     needs: [build-frontend]
@@ -1504,7 +1519,7 @@ jobs:
           context: .
           file: Dockerfile.frontend
           load: true
-          tags: ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }}
+          tags: ghcr.io/${IMAGE_OWNER}/realestate-frontend:${{ github.sha }}
           provenance: mode=max
           sbom: true
 
@@ -1526,21 +1541,21 @@ jobs:
         run: |
           trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --no-progress \
             --format table \
-            ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }}
+            ghcr.io/${IMAGE_OWNER}/realestate-frontend:${IMAGE_TAG}
 
       - name: Generate Trivy SARIF report for frontend image
         if: always()
         run: |
           trivy image --severity CRITICAL,HIGH,MEDIUM --ignore-unfixed --no-progress \
             --format sarif --output trivy-frontend.sarif \
-            ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }} || true
+            ghcr.io/${IMAGE_OWNER}/realestate-frontend:${IMAGE_TAG} || true
 
       - name: Generate SBOM for frontend image (SPDX)
         if: always()
         run: |
           trivy image --format spdx-json --output frontend-sbom.spdx.json \
             --no-progress \
-            ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }} || true
+            ghcr.io/${IMAGE_OWNER}/realestate-frontend:${IMAGE_TAG} || true
 
       - name: Upload frontend SBOM artifact
         if: always()
@@ -1561,9 +1576,9 @@ jobs:
       - name: Push frontend image to GHCR
         id: push-frontend
         run: |
-          docker push ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }}
+          docker push ghcr.io/${IMAGE_OWNER}/realestate-frontend:${IMAGE_TAG}
           DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' \
-            ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }} 2>/dev/null \
+            ghcr.io/${IMAGE_OWNER}/realestate-frontend:${IMAGE_TAG} 2>/dev/null \
             | grep -oP 'sha256:[a-f0-9]+' || true)
           echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
 
@@ -1571,14 +1586,14 @@ jobs:
         if: steps.push-frontend.outputs.digest != ''
         uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
         with:
-          subject-name: ghcr.io/${{ github.repository_owner }}/realestate-frontend
+          subject-name: ghcr.io/${IMAGE_OWNER}/realestate-frontend
           subject-digest: ${{ steps.push-frontend.outputs.digest }}
           push-to-registry: true
 
       - name: Clean up docker images on self-hosted runner
         if: always()
         run: |
-          docker rmi "ghcr.io/${{ github.repository_owner }}/realestate-frontend:${{ github.sha }}" 2>/dev/null || true
+          docker rmi "ghcr.io/${IMAGE_OWNER}/realestate-frontend:${IMAGE_TAG}" 2>/dev/null || true
           docker builder prune -f --filter "until=24h" 2>/dev/null || true
 
   # ── Stage 4: Deploy (runs after both images are pushed) ──
@@ -1593,6 +1608,7 @@ jobs:
       packages: read
     env:
       DOCKER_CONTENT_TRUST: "1"
+      IMAGE_OWNER: ${{ github.repository_owner }}
     needs: [container-image-backend, container-image-frontend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
@@ -1620,8 +1636,8 @@ jobs:
           VERIFIED=true
           if [ -n "$BACKEND_DIGEST" ]; then
             echo "Verifying backend attestation..."
-            if ! gh attestation verify "oci://ghcr.io/${{ github.repository_owner }}/realestate-backend${BACKEND_DIGEST}" \
-              --owner "${{ github.repository_owner }}" 2>&1; then
+            if ! gh attestation verify "oci://ghcr.io/${IMAGE_OWNER}/realestate-backend${BACKEND_DIGEST}" \
+              --owner "${IMAGE_OWNER}" 2>&1; then
               echo "::error::Backend attestation verification failed"
               VERIFIED=false
             fi
@@ -1630,8 +1646,8 @@ jobs:
           fi
           if [ -n "$FRONTEND_DIGEST" ]; then
             echo "Verifying frontend attestation..."
-            if ! gh attestation verify "oci://ghcr.io/${{ github.repository_owner }}/realestate-frontend${FRONTEND_DIGEST}" \
-              --owner "${{ github.repository_owner }}" 2>&1; then
+            if ! gh attestation verify "oci://ghcr.io/${IMAGE_OWNER}/realestate-frontend${FRONTEND_DIGEST}" \
+              --owner "${IMAGE_OWNER}" 2>&1; then
               echo "::error::Frontend attestation verification failed"
               VERIFIED=false
             fi
@@ -1660,15 +1676,15 @@ jobs:
           # Pull by digest when available to prevent TOCTOU between scan and deploy
           if [ -n "$BACKEND_DIGEST" ]; then
             echo "Pulling backend by digest: $BACKEND_DIGEST"
-            docker pull "ghcr.io/${{ github.repository_owner }}/realestate-backend${BACKEND_DIGEST}"
-            docker tag "ghcr.io/${{ github.repository_owner }}/realestate-backend${BACKEND_DIGEST}" \
-              "ghcr.io/${{ github.repository_owner }}/realestate-backend:${IMAGE_TAG}"
+            docker pull "ghcr.io/${IMAGE_OWNER}/realestate-backend${BACKEND_DIGEST}"
+            docker tag "ghcr.io/${IMAGE_OWNER}/realestate-backend${BACKEND_DIGEST}" \
+              "ghcr.io/${IMAGE_OWNER}/realestate-backend:${IMAGE_TAG}"
           fi
           if [ -n "$FRONTEND_DIGEST" ]; then
             echo "Pulling frontend by digest: $FRONTEND_DIGEST"
-            docker pull "ghcr.io/${{ github.repository_owner }}/realestate-frontend${FRONTEND_DIGEST}"
-            docker tag "ghcr.io/${{ github.repository_owner }}/realestate-frontend${FRONTEND_DIGEST}" \
-              "ghcr.io/${{ github.repository_owner }}/realestate-frontend:${IMAGE_TAG}"
+            docker pull "ghcr.io/${IMAGE_OWNER}/realestate-frontend${FRONTEND_DIGEST}"
+            docker tag "ghcr.io/${IMAGE_OWNER}/realestate-frontend${FRONTEND_DIGEST}" \
+              "ghcr.io/${IMAGE_OWNER}/realestate-frontend:${IMAGE_TAG}"
           fi
 
           # Fall back to tag-based pull if digests unavailable
@@ -1734,6 +1750,13 @@ jobs:
     permissions: {}
     env:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
+      GH_SERVER_URL: ${{ github.server_url }}
+      GH_REPOSITORY: ${{ github.repository }}
+      GH_RUN_ID: ${{ github.run_id }}
+      GH_SHA: ${{ github.sha }}
+      GH_REF_NAME: ${{ github.ref_name }}
+      GH_ACTOR: ${{ github.actor }}
     needs: [secret-scan, commit-lint, dependency-review, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend, container-image-backend, container-image-frontend, deploy]
     if: always() && contains(needs.*.result, 'failure')
     steps:
@@ -1758,13 +1781,13 @@ jobs:
             --arg job "secret-scan" \
             --arg step "gitleaks" \
             --arg error_log "Gitleaks detected secrets in the repository. Review the secret-scan job output and rotate any exposed credentials immediately." \
-            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --arg commit "${{ github.sha }}" \
-            --arg branch "${{ github.ref_name }}" \
-            --arg actor "${{ github.actor }}" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" \
+            --arg branch "$GH_REF_NAME" \
+            --arg actor "$GH_ACTOR" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
-          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
             -H "Content-Type: application/json" \
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
@@ -1776,13 +1799,13 @@ jobs:
             --arg job "commit-lint" \
             --arg step "commitlint" \
             --arg error_log "Commit message lint failed. Commit messages must follow conventional commits format (feat:, fix:, chore:, etc.)." \
-            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --arg commit "${{ github.sha }}" \
-            --arg branch "${{ github.ref_name }}" \
-            --arg actor "${{ github.actor }}" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" \
+            --arg branch "$GH_REF_NAME" \
+            --arg actor "$GH_ACTOR" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
-          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
             -H "Content-Type: application/json" \
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
@@ -1800,11 +1823,11 @@ jobs:
           ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
           STEP="${FAILED_STEPS:-clippy-or-fmt}"
           PAYLOAD=$(jq -n --arg job "lint" --arg step "$STEP" --arg error_log "$ERROR_LOG" \
-            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" --arg branch "$GH_REF_NAME" --arg actor "$GH_ACTOR" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
-          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
             -H "Content-Type: application/json" \
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
@@ -1820,11 +1843,11 @@ jobs:
           fi
           ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
           PAYLOAD=$(jq -n --arg job "test-backend" --arg step "cargo-test" --arg error_log "$ERROR_LOG" \
-            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" --arg branch "$GH_REF_NAME" --arg actor "$GH_ACTOR" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
-          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
             -H "Content-Type: application/json" \
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
@@ -1840,11 +1863,11 @@ jobs:
           fi
           ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
           PAYLOAD=$(jq -n --arg job "test-frontend" --arg step "cargo-test" --arg error_log "$ERROR_LOG" \
-            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" --arg branch "$GH_REF_NAME" --arg actor "$GH_ACTOR" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
-          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
             -H "Content-Type: application/json" \
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
@@ -1862,11 +1885,11 @@ jobs:
           ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
           STEP="${FAILED_STEPS:-audit-or-owasp}"
           PAYLOAD=$(jq -n --arg job "quality-gate" --arg step "$STEP" --arg error_log "$ERROR_LOG" \
-            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" --arg branch "$GH_REF_NAME" --arg actor "$GH_ACTOR" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
-          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
             -H "Content-Type: application/json" \
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
@@ -1882,11 +1905,11 @@ jobs:
           fi
           ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
           PAYLOAD=$(jq -n --arg job "build-frontend" --arg step "trunk-build" --arg error_log "$ERROR_LOG" \
-            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" --arg branch "$GH_REF_NAME" --arg actor "$GH_ACTOR" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
-          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
             -H "Content-Type: application/json" \
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
@@ -1902,11 +1925,11 @@ jobs:
           fi
           ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
           PAYLOAD=$(jq -n --arg job "build-backend" --arg step "cargo-build" --arg error_log "$ERROR_LOG" \
-            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" --arg branch "$GH_REF_NAME" --arg actor "$GH_ACTOR" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
-          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
             -H "Content-Type: application/json" \
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
@@ -1918,13 +1941,13 @@ jobs:
             --arg job "sonarqube" \
             --arg step "sonar-scan" \
             --arg error_log "SonarQube analysis failed. Check SonarQube server status and scan configuration." \
-            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --arg commit "${{ github.sha }}" \
-            --arg branch "${{ github.ref_name }}" \
-            --arg actor "${{ github.actor }}" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" \
+            --arg branch "$GH_REF_NAME" \
+            --arg actor "$GH_ACTOR" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
-          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
             -H "Content-Type: application/json" \
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
@@ -1936,13 +1959,13 @@ jobs:
             --arg job "container-image-backend" \
             --arg step "docker-build-scan" \
             --arg error_log "Backend container image build or Trivy vulnerability scan failed. Check the container-image-backend job output for details." \
-            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --arg commit "${{ github.sha }}" \
-            --arg branch "${{ github.ref_name }}" \
-            --arg actor "${{ github.actor }}" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" \
+            --arg branch "$GH_REF_NAME" \
+            --arg actor "$GH_ACTOR" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
-          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
             -H "Content-Type: application/json" \
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
@@ -1954,13 +1977,13 @@ jobs:
             --arg job "container-image-frontend" \
             --arg step "docker-build-scan" \
             --arg error_log "Frontend container image build or Trivy vulnerability scan failed. Check the container-image-frontend job output for details." \
-            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --arg commit "${{ github.sha }}" \
-            --arg branch "${{ github.ref_name }}" \
-            --arg actor "${{ github.actor }}" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" \
+            --arg branch "$GH_REF_NAME" \
+            --arg actor "$GH_ACTOR" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
-          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
             -H "Content-Type: application/json" \
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
@@ -1972,13 +1995,13 @@ jobs:
             --arg job "deploy" \
             --arg step "docker-compose-deploy" \
             --arg error_log "Production deployment failed. Check docker compose logs and service health on the deployment target." \
-            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --arg commit "${{ github.sha }}" \
-            --arg branch "${{ github.ref_name }}" \
-            --arg actor "${{ github.actor }}" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" \
+            --arg branch "$GH_REF_NAME" \
+            --arg actor "$GH_ACTOR" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
-          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-failure \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
             -H "Content-Type: application/json" \
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
@@ -2014,7 +2037,7 @@ jobs:
               echo "| $JOB | $ICON $RESULT |"
             done
             echo ""
-            echo "Commit: \`${{ github.sha }}\` by @${{ github.actor }}"
+            echo "Commit: \`${GH_SHA}\` by @${GH_ACTOR}"
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ── Stage 3: Pipeline Self-Improvement (runs after everything else) ──
@@ -2027,6 +2050,15 @@ jobs:
       contents: read
     env:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
+      GH_SERVER_URL: ${{ github.server_url }}
+      GH_REPOSITORY: ${{ github.repository }}
+      GH_RUN_ID: ${{ github.run_id }}
+      GH_SHA: ${{ github.sha }}
+      GH_REF_NAME: ${{ github.ref_name }}
+      GH_ACTOR: ${{ github.actor }}
+      GH_EVENT_NAME: ${{ github.event_name }}
+      GH_REF: ${{ github.ref }}
     needs: [secret-scan, commit-lint, dependency-review, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend, container-image-backend, container-image-frontend, deploy, notify-failure]
     if: always() && github.ref == 'refs/heads/main'
     steps:
@@ -2051,7 +2083,7 @@ jobs:
               echo "sonar_report=SonarQube credentials unavailable -- skipping issue collection." >> $GITHUB_OUTPUT
               exit 0
             fi
-            TOKEN_NAME="ci-improve-${{ github.run_id }}"
+            TOKEN_NAME="ci-improve-${GH_RUN_ID}"
             curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
               "$SONAR_URL/api/user_tokens/revoke?name=${TOKEN_NAME}" 2>/dev/null || true
             TOKEN=$(curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
@@ -2180,8 +2212,8 @@ jobs:
           fi
 
           REPORT="${REPORT}\nFocus: ${FOCUS}\n"
-          REPORT="${REPORT}Trigger: ${{ github.event_name }} on ${{ github.ref }}\n"
-          REPORT="${REPORT}Commit: ${{ github.sha }}\n"
+          REPORT="${REPORT}Trigger: ${GH_EVENT_NAME} on ${GH_REF}\n"
+          REPORT="${REPORT}Commit: ${GH_SHA}\n"
 
           echo "focus=$FOCUS" >> $GITHUB_OUTPUT
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
@@ -2199,11 +2231,11 @@ jobs:
             --arg focus "$FOCUS" \
             --arg pipeline_report "$REPORT" \
             --arg sonar_report "$SONAR_REPORT" \
-            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
             '{focus: $focus, pipeline_report: $pipeline_report, sonar_report: $sonar_report, run_url: $run_url}')
 
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
-          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/ci-improve \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-improve \
             -H "Content-Type: application/json" \
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping pipeline improvement"
@@ -2224,11 +2256,11 @@ jobs:
 
           PAYLOAD=$(jq -n \
             --arg sonar_report "$SONAR_REPORT" \
-            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
             '{sonar_report: $sonar_report, run_url: $run_url}')
 
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
-          curl -s --connect-timeout 5 --max-time 10 -X POST http://${{ secrets.WEBHOOK_HOST }}:9090/sonar-fix \
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/sonar-fix \
             -H "Content-Type: application/json" \
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping SonarQube fix"
