@@ -48,7 +48,19 @@ if BIND_ADDRESS not in _ALLOWED_BIND:
         f"BIND_ADDRESS={BIND_ADDRESS!r} is not allowed. "
         f"Must be one of {_ALLOWED_BIND} to prevent network exposure."
     )
-PROJECT_DIR = str(pathlib.Path(__file__).resolve().parent.parent)
+_win_project_dir = pathlib.Path(__file__).resolve().parent.parent
+
+
+def _to_wsl_path(win_path: pathlib.Path) -> str:
+    """Convert a Windows path to a WSL-compatible /mnt/ path."""
+    drive = win_path.drive  # e.g. "D:"
+    if drive and len(drive) == 2 and drive[1] == ":":
+        rest = win_path.as_posix()[2:]  # strip "D:" prefix, use forward slashes
+        return f"/mnt/{drive[0].lower()}{rest}"
+    return str(win_path)
+
+
+PROJECT_DIR = _to_wsl_path(_win_project_dir)
 WSL_DISTRO = "Ubuntu-22.04"
 WSL_USER = "jperez"
 MAX_RETRIES = 3
@@ -564,8 +576,8 @@ def main():
         log.error("WEBHOOK_SECRET environment variable is required. Set it before starting the listener.")
         raise SystemExit(1)
 
-    if not os.path.isdir(PROJECT_DIR):
-        log.error(f"PROJECT_DIR does not exist or is not a directory: {PROJECT_DIR}")
+    if not _win_project_dir.is_dir():
+        log.error(f"PROJECT_DIR does not exist or is not a directory: {_win_project_dir}")
         raise SystemExit(1)
 
     local_ip = get_local_ip()
@@ -580,7 +592,7 @@ def main():
     log.info(f"  CI failure: http://{local_ip}:{PORT}/ci-failure")
     log.info(f"  CI improve: http://{local_ip}:{PORT}/ci-improve")
     log.info(f"  Sonar fix:  http://{local_ip}:{PORT}/sonar-fix")
-    log.info(f"Project dir: {PROJECT_DIR}")
+    log.info(f"Project dir: {PROJECT_DIR} (Windows: {_win_project_dir})")
     log.info(f"WSL: {WSL_DISTRO} (user: {WSL_USER})")
     log.info("Waiting for webhooks...")
 
