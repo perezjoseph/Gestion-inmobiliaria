@@ -187,10 +187,10 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
+          key: v2-${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-lint-
-            ${{ runner.os }}-cargo-
+            v2-${{ runner.os }}-cargo-lint-
+            v2-${{ runner.os }}-cargo-
 
       - name: Verify rustfmt formatting across all crates
         id: fmt
@@ -343,10 +343,10 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          key: v2-${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-test-
-            ${{ runner.os }}-cargo-
+            v2-${{ runner.os }}-cargo-test-
+            v2-${{ runner.os }}-cargo-
 
       - name: Mask test database credentials
         run: |
@@ -354,7 +354,10 @@ jobs:
           echo "::add-mask::postgresql://realestate:realestate_dev_password@localhost:5432/realestate"
 
       - name: Generate random JWT secret for test isolation
-        run: echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+        run: |
+          JWT_SECRET=$(openssl rand -hex 32)
+          echo "::add-mask::$JWT_SECRET"
+          echo "JWT_SECRET=$JWT_SECRET" >> "$GITHUB_ENV"
 
       - name: Run backend tests
         id: backend-tests
@@ -396,7 +399,7 @@ jobs:
             fi
           fi
           mkdir -p coverage
-          cargo tarpaulin -p realestate-backend --out lcov --output-dir coverage/ --skip-clean 2>&1 | tee "${RUNNER_TEMP}/tarpaulin-output.txt" || true
+          cargo tarpaulin --locked -p realestate-backend --out lcov --output-dir coverage/ --skip-clean 2>&1 | tee "${RUNNER_TEMP}/tarpaulin-output.txt" || true
           if [ -f coverage/lcov.info ]; then
             echo "generated=true" >> $GITHUB_OUTPUT
             LINES=$(grep -c "^DA:" coverage/lcov.info 2>/dev/null || echo 0)
@@ -404,6 +407,14 @@ jobs:
           else
             echo "generated=false" >> $GITHUB_OUTPUT
             echo "::warning::Coverage report was not generated"
+          fi
+
+      - name: Verify Cargo.lock was not modified during coverage
+        if: always() && steps.coverage.outputs.generated == 'true'
+        run: |
+          if ! git diff --exit-code Cargo.lock; then
+            echo "::error::Cargo.lock was modified during coverage -- lockfile integrity violation"
+            exit 1
           fi
 
       - name: Scan coverage artifact for leaked secrets
@@ -507,10 +518,10 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-frontend-test-v2-${{ hashFiles('**/Cargo.lock') }}
+          key: v2-${{ runner.os }}-cargo-frontend-test-v2-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-frontend-test-v2-
-            ${{ runner.os }}-cargo-
+            v2-${{ runner.os }}-cargo-frontend-test-v2-
+            v2-${{ runner.os }}-cargo-
 
       - name: Run frontend tests (native target)
         id: frontend-tests
@@ -967,6 +978,17 @@ jobs:
           path: coverage/
         continue-on-error: true
 
+      - name: Validate SONAR_HOST_URL format
+        run: |
+          if [ -z "$SONAR_HOST_URL" ]; then
+            echo "::error::SONAR_HOST_URL is not set"
+            exit 1
+          fi
+          if ! echo "$SONAR_HOST_URL" | grep -qE '^https?://[a-zA-Z0-9._\-]+(:[0-9]{1,5})?(/[a-zA-Z0-9._\-/]*)?$'; then
+            echo "::error::SONAR_HOST_URL has invalid format -- possible SSRF vector"
+            exit 1
+          fi
+
       - name: Verify SonarQube server is reachable
         timeout-minutes: 2
         run: |
@@ -1300,10 +1322,10 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
+          key: v2-${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-wasm-
-            ${{ runner.os }}-cargo-
+            v2-${{ runner.os }}-cargo-wasm-
+            v2-${{ runner.os }}-cargo-
 
       - name: Build optimized WASM frontend bundle
         timeout-minutes: 25
@@ -1462,10 +1484,10 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-backend-build-${{ hashFiles('**/Cargo.lock') }}
+          key: v2-${{ runner.os }}-cargo-backend-build-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-backend-build-
-            ${{ runner.os }}-cargo-
+            v2-${{ runner.os }}-cargo-backend-build-
+            v2-${{ runner.os }}-cargo-
 
       - name: Build optimized backend binary
         timeout-minutes: 25

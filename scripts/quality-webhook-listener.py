@@ -231,6 +231,10 @@ def fix_with_retry(job, step, error_log, context=None):
                 "test-frontend": "Fix the failing frontend tests.",
                 "quality-gate": "Fix the quality gate failures (dependency audit or OWASP issues).",
                 "sonarqube": "Fix the SonarQube analysis failures.",
+                "android-lint": "Fix the Android lint warnings in the android/ directory. Run ./gradlew lint in android/ to verify.",
+                "android-unit-test": "Fix the failing Android unit tests in the android/ directory. Run ./gradlew testDebugUnitTest in android/ to verify.",
+                "android-build": "Fix the Android build errors in the android/ directory. Run ./gradlew assembleDebug in android/ to verify.",
+                "android-quality-gate": "Fix the Android dependency security issues. Check the OWASP report and update vulnerable dependencies in android/gradle/libs.versions.toml.",
             }
             instruction = job_instructions.get(job, "Analyze the error and fix the issue.")
 

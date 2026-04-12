@@ -12,3 +12,14 @@ b4e3e72a989478deae5be094fbf9aa3958d78b52:.github/workflows/ci.yml:curl-auth-user
 9c97c2f6ff473b2598a4cae0e7e0e95da001b9f0:.github/workflows/ci.yml:curl-auth-user:355
 9c97c2f6ff473b2598a4cae0e7e0e95da001b9f0:.github/workflows/ci.yml:curl-auth-user:360
 b893147752efd376b7f14206c6cd584fd7e1b37d:.github/workflows/ci.yml:curl-auth-user:417
+# Commit b1d2107 — SonarQube setup/token generation using "admin:${ADMIN_PASS}" from secrets
+b1d2107d44fa48c3f0faa025d6386249961b84d4:.github/workflows/ci.yml:curl-auth-user:1003
+b1d2107d44fa48c3f0faa025d6386249961b84d4:.github/workflows/ci.yml:curl-auth-user:1009
+b1d2107d44fa48c3f0faa025d6386249961b84d4:.github/workflows/ci.yml:curl-auth-user:1027
+b1d2107d44fa48c3f0faa025d6386249961b84d4:.github/workflows/ci.yml:curl-auth-user:1048
+b1d2107d44fa48c3f0faa025d6386249961b84d4:.github/workflows/ci.yml:curl-auth-user:1057
+# Commit b1d2107 — SonarQube quality gate/issue API calls using $SONAR_TOKEN
+b1d2107d44fa48c3f0faa025d6386249961b84d4:.github/workflows/ci.yml:curl-auth-user:2069
+b1d2107d44fa48c3f0faa025d6386249961b84d4:.github/workflows/ci.yml:curl-auth-user:2084
+# Commit 7f66b33 — earlier version of SonarQube measures API call
+7f66b33dd9f34456f21cb6b86fc78049cb65ff2c:.github/workflows/ci.yml:curl-auth-user:913

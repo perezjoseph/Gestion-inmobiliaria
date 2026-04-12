@@ -1,0 +1,678 @@
+name: Android CI
+run-name: "Android CI [${{ github.event_name }}] ${{ github.ref_name }} @ ${{ github.sha }}"
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "android/**"
+      - ".github/workflows/android-ci.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "android/**"
+      - ".github/workflows/android-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: "17"
+  JAVA_DISTRIBUTION: "temurin"
+
+jobs:
+  # ── Stage 1: Quality Checks (all run in parallel) ──
+
+  secret-scan:
+    name: Secret Scanning (Gitleaks)
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    timeout-minutes: 10
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+    steps:
+      - name: Clean workspace
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install Gitleaks (with checksum verification)
+        timeout-minutes: 3
+        run: |
+          GITLEAKS_VERSION="8.24.3"
+          GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
+          ARCHIVE="${RUNNER_TEMP}/gitleaks.tar.gz"
+          curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          sudo tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C /usr/local/bin gitleaks
+          rm -f "$ARCHIVE"
+          gitleaks version
+
+      - name: Run Gitleaks secret detection
+        run: gitleaks detect --source . --verbose --redact --exit-code 1
+
+  commit-lint:
+    name: Conventional Commits Check
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    timeout-minutes: 5
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+    steps:
+      - name: Clean workspace
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+
+      - name: Checkout repository with full history
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Setup Node.js 22 for commitlint
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Install commitlint CLI and conventional config
+        run: |
+          umask 077
+          npm install --ignore-scripts --no-fund --no-audit --no-optional --prefer-offline --save-dev @commitlint/cli@20.5.0 @commitlint/config-conventional@20.5.0
+          echo "module.exports = { extends: ['@commitlint/config-conventional'] };" > commitlint.config.js
+
+      - name: Validate PR commit messages against conventional format
+        env:
+          NODE_OPTIONS: "--disable-proto=delete"
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: npx commitlint --from "$PR_BASE_SHA" --to "$PR_HEAD_SHA" --verbose
+
+  dependency-review:
+    name: Dependency Review (PR)
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: Review dependency changes for vulnerabilities and license issues
+        uses: actions/dependency-review-action@da24556b548a50705dd671f47852072ea4c105d9 # v4.7.1
+        with:
+          fail-on-severity: high
+          deny-licenses: AGPL-3.0, GPL-3.0, GPL-2.0
+          comment-summary-in-pr: on-failure
+
+  lint:
+    name: Android Lint & Static Analysis
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    timeout-minutes: 20
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
+      failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
+    steps:
+      - name: Clean workspace
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Run Android Lint
+        id: android-lint
+        if: always()
+        timeout-minutes: 15
+        working-directory: android
+        run: |
+          umask 077
+          ./gradlew lint --no-daemon --stacktrace 2>&1 | tee "${RUNNER_TEMP}/lint-output.txt"
+
+      - name: Upload lint reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-lint-reports
+          path: android/**/build/reports/lint-results*.html
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Write lint summary
+        if: always()
+        run: |
+          {
+            echo "## Android Lint Results"
+            echo "| Check | Status |"
+            echo "|-------|--------|"
+            echo "| Android Lint | ${{ steps.android-lint.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect lint errors
+        id: collect-errors
+        if: always() && steps.android-lint.outcome == 'failure'
+        run: |
+          ERROR=""
+          FAILED=""
+          if [ "${{ steps.android-lint.outcome }}" = "failure" ]; then
+            FAILED="android-lint"
+            ERROR="[android-lint] $(tail -c 3000 "${RUNNER_TEMP}/lint-output.txt" 2>/dev/null || echo 'Android lint failed.')"
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "failed_steps=${FAILED}" >> $GITHUB_OUTPUT
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Fail job if lint failed
+        if: always() && steps.android-lint.outcome == 'failure'
+        run: exit 1
+
+      - name: Clean up temp files
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/lint-output.txt"
+
+  unit-test:
+    name: Android Unit Tests
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    timeout-minutes: 25
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
+    steps:
+      - name: Clean workspace
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Run unit tests
+        id: unit-tests
+        timeout-minutes: 20
+        working-directory: android
+        run: |
+          umask 077
+          ./gradlew testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee "${RUNNER_TEMP}/test-output.txt"
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-test-reports
+          path: android/**/build/reports/tests/
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Write test summary
+        if: always()
+        run: |
+          {
+            echo "## Android Unit Test Results"
+            if [ "${{ steps.unit-tests.outcome }}" = "success" ]; then
+              echo "✅ All unit tests passed"
+            else
+              echo "❌ Unit tests failed"
+              echo '```'
+              grep -E "(FAILED|FAILURE|> Task .* FAILED)" "${RUNNER_TEMP}/test-output.txt" 2>/dev/null | head -20 || true
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect test errors
+        id: collect-errors
+        if: failure()
+        run: |
+          ERROR=""
+          [ -f "${RUNNER_TEMP}/test-output.txt" ] && ERROR="$(tail -c 3000 "${RUNNER_TEMP}/test-output.txt")"
+          if [ -z "$ERROR" ]; then
+            ERROR="Android unit tests failed but no captured output. Run ./gradlew testDebugUnitTest in android/ to reproduce."
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Clean up temp files
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/test-output.txt"
+
+  quality-gate:
+    name: Dependency Security Scan
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    timeout-minutes: 20
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
+      failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
+    steps:
+      - name: Clean workspace
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Run Gradle dependency verification
+        id: dep-verify
+        if: always()
+        timeout-minutes: 10
+        working-directory: android
+        run: |
+          umask 077
+          ./gradlew dependencies --no-daemon --stacktrace 2>&1 | tee "${RUNNER_TEMP}/dep-output.txt"
+
+      - name: OWASP dependency scan (fail on CVSS >= 7)
+        id: owasp
+        if: always()
+        timeout-minutes: 15
+        uses: dependency-check/Dependency-Check_Action@1e54355a8b4c8abaa8cc7d0b70aa655a3bb15a6c # main
+        with:
+          project: propmanager-android
+          path: android/
+          format: HTML
+          args: >-
+            --enableExperimental
+            --failOnCVSS 7
+            --exclude **/build/**
+            --exclude **/.gradle/**
+
+      - name: Upload OWASP vulnerability report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-owasp-report
+          path: reports/
+          retention-days: 7
+          overwrite: false
+          if-no-files-found: warn
+
+      - name: Write quality gate summary
+        if: always()
+        run: |
+          {
+            echo "## Android Dependency Security Results"
+            echo "| Check | Status |"
+            echo "|-------|--------|"
+            echo "| Gradle Dependencies | ${{ steps.dep-verify.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| OWASP Scan | ${{ steps.owasp.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect quality gate errors
+        id: collect-errors
+        if: always() && (steps.dep-verify.outcome == 'failure' || steps.owasp.outcome == 'failure')
+        run: |
+          ERROR=""
+          FAILED=""
+          if [ "${{ steps.dep-verify.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}dep-verify,"
+            ERROR="${ERROR}[dep-verify] $(tail -c 1500 "${RUNNER_TEMP}/dep-output.txt" 2>/dev/null || echo 'Gradle dependency verification failed.')\n\n"
+          fi
+          if [ "${{ steps.owasp.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}owasp,"
+            ERROR="${ERROR}[owasp] OWASP dependency check found vulnerabilities with CVSS >= 7. Check the uploaded report for details."
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo -e "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Fail job if any check failed
+        if: always() && (steps.dep-verify.outcome == 'failure' || steps.owasp.outcome == 'failure')
+        run: exit 1
+
+      - name: Clean up temp files
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/dep-output.txt"
+
+  # ── Stage 2: Build (gated on all quality checks) ──
+
+  build:
+    name: Android Debug Build
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    timeout-minutes: 30
+    needs: [secret-scan, commit-lint, dependency-review, lint, unit-test, quality-gate]
+    if: |
+      always() &&
+      needs.secret-scan.result == 'success' &&
+      needs.lint.result == 'success' &&
+      needs.unit-test.result == 'success' &&
+      (needs.commit-lint.result == 'success' || needs.commit-lint.result == 'skipped') &&
+      (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped') &&
+      (needs.quality-gate.result == 'success')
+    permissions:
+      contents: read
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
+    steps:
+      - name: Clean workspace
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          sudo rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Build debug APK
+        id: build-debug
+        timeout-minutes: 25
+        working-directory: android
+        run: |
+          umask 077
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee "${RUNNER_TEMP}/build-output.txt"
+
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Write build summary
+        if: always()
+        run: |
+          {
+            echo "## Android Build Results"
+            if [ "${{ steps.build-debug.outcome }}" = "success" ]; then
+              APK_SIZE=$(du -sh android/app/build/outputs/apk/debug/*.apk 2>/dev/null | head -1 | awk '{print $1}')
+              echo "✅ Debug APK built successfully (${APK_SIZE:-unknown})"
+            else
+              echo "❌ Debug build failed"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect build errors
+        id: collect-errors
+        if: failure()
+        run: |
+          ERROR=""
+          [ -f "${RUNNER_TEMP}/build-output.txt" ] && ERROR="$(tail -c 3000 "${RUNNER_TEMP}/build-output.txt")"
+          if [ -z "$ERROR" ]; then
+            ERROR="Android debug build failed but no captured output. Run ./gradlew assembleDebug in android/ to reproduce."
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Clean up temp files
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/build-output.txt"
+
+  # ── Stage 3: Failure Notification ──
+
+  notify-failure:
+    name: Android Failure Notification
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    timeout-minutes: 5
+    permissions: {}
+    env:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
+      GH_SERVER_URL: ${{ github.server_url }}
+      GH_REPOSITORY: ${{ github.repository }}
+      GH_RUN_ID: ${{ github.run_id }}
+      GH_SHA: ${{ github.sha }}
+      GH_REF_NAME: ${{ github.ref_name }}
+      GH_ACTOR: ${{ github.actor }}
+    needs: [secret-scan, commit-lint, dependency-review, lint, unit-test, quality-gate, build]
+    if: always() && contains(needs.*.result, 'failure')
+    steps:
+      - name: Validate webhook configuration
+        id: webhook-check
+        run: |
+          if [ -z "$WEBHOOK_SECRET" ] || [ -z "$WEBHOOK_HOST" ]; then
+            echo "::warning::WEBHOOK_SECRET or WEBHOOK_HOST not configured -- skipping notifications"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Notify -- secret scanning detected leaked secrets
+        if: always() && needs.secret-scan.result == 'failure' && steps.webhook-check.outputs.skip != 'true'
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg job "secret-scan" \
+            --arg step "gitleaks" \
+            --arg error_log "Gitleaks detected secrets in the Android repository. Review the secret-scan job output and rotate any exposed credentials immediately." \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" \
+            --arg branch "$GH_REF_NAME" \
+            --arg actor "$GH_ACTOR" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
+          SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
+            -H "Content-Type: application/json" \
+            -H "X-Signature-256: sha256=$SIGNATURE" \
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
+
+      - name: Notify -- conventional commit validation failed
+        if: always() && needs.commit-lint.result == 'failure' && steps.webhook-check.outputs.skip != 'true'
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg job "commit-lint" \
+            --arg step "commitlint" \
+            --arg error_log "Commit message lint failed. Commit messages must follow conventional commits format (feat:, fix:, chore:, etc.)." \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" \
+            --arg branch "$GH_REF_NAME" \
+            --arg actor "$GH_ACTOR" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
+          SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
+            -H "Content-Type: application/json" \
+            -H "X-Signature-256: sha256=$SIGNATURE" \
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
+
+      - name: Notify -- Android lint failed
+        if: always() && needs.lint.result == 'failure' && steps.webhook-check.outputs.skip != 'true'
+        env:
+          ERROR_LOG: ${{ needs.lint.outputs.error_log }}
+          FAILED_STEPS: ${{ needs.lint.outputs.failed_steps }}
+        run: |
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
+          if [ -z "$ERROR_LOG" ]; then
+            ERROR_LOG="Android lint failed but no captured output. Run ./gradlew lint in android/ to reproduce."
+          fi
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
+          STEP="${FAILED_STEPS:-android-lint}"
+          PAYLOAD=$(jq -n --arg job "android-lint" --arg step "$STEP" --arg error_log "$ERROR_LOG" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" --arg branch "$GH_REF_NAME" --arg actor "$GH_ACTOR" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
+          SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
+            -H "Content-Type: application/json" \
+            -H "X-Signature-256: sha256=$SIGNATURE" \
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
+
+      - name: Notify -- Android unit tests failed
+        if: always() && needs.unit-test.result == 'failure' && steps.webhook-check.outputs.skip != 'true'
+        env:
+          ERROR_LOG: ${{ needs.unit-test.outputs.error_log }}
+        run: |
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
+          if [ -z "$ERROR_LOG" ]; then
+            ERROR_LOG="Android unit tests failed but no captured output. Run ./gradlew testDebugUnitTest in android/ to reproduce."
+          fi
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
+          PAYLOAD=$(jq -n --arg job "android-unit-test" --arg step "gradle-test" --arg error_log "$ERROR_LOG" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" --arg branch "$GH_REF_NAME" --arg actor "$GH_ACTOR" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
+          SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
+            -H "Content-Type: application/json" \
+            -H "X-Signature-256: sha256=$SIGNATURE" \
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
+
+      - name: Notify -- dependency security gate failed
+        if: always() && needs.quality-gate.result == 'failure' && steps.webhook-check.outputs.skip != 'true'
+        env:
+          ERROR_LOG: ${{ needs.quality-gate.outputs.error_log }}
+          FAILED_STEPS: ${{ needs.quality-gate.outputs.failed_steps }}
+        run: |
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
+          if [ -z "$ERROR_LOG" ]; then
+            ERROR_LOG="Android dependency security gate failed. Check OWASP scan report for details."
+          fi
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
+          STEP="${FAILED_STEPS:-owasp}"
+          PAYLOAD=$(jq -n --arg job "android-quality-gate" --arg step "$STEP" --arg error_log "$ERROR_LOG" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" --arg branch "$GH_REF_NAME" --arg actor "$GH_ACTOR" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
+          SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
+            -H "Content-Type: application/json" \
+            -H "X-Signature-256: sha256=$SIGNATURE" \
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
+
+      - name: Notify -- Android build failed
+        if: always() && needs.build.result == 'failure' && steps.webhook-check.outputs.skip != 'true'
+        env:
+          ERROR_LOG: ${{ needs.build.outputs.error_log }}
+        run: |
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
+          if [ -z "$ERROR_LOG" ]; then
+            ERROR_LOG="Android debug build failed but no captured output. Run ./gradlew assembleDebug in android/ to reproduce."
+          fi
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
+          PAYLOAD=$(jq -n --arg job "android-build" --arg step "gradle-assemble" --arg error_log "$ERROR_LOG" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" --arg branch "$GH_REF_NAME" --arg actor "$GH_ACTOR" \
+            '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
+          SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
+            -H "Content-Type: application/json" \
+            -H "X-Signature-256: sha256=$SIGNATURE" \
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
+
+      - name: Write failure summary
+        if: always()
+        run: |
+          {
+            echo "## Android Pipeline Failure Summary"
+            echo "| Job | Result |"
+            echo "|-----|--------|"
+            for JOB in secret-scan commit-lint dependency-review lint unit-test quality-gate build; do
+              case "$JOB" in
+                secret-scan) RESULT="${{ needs.secret-scan.result }}" ;;
+                commit-lint) RESULT="${{ needs.commit-lint.result }}" ;;
+                dependency-review) RESULT="${{ needs.dependency-review.result }}" ;;
+                lint) RESULT="${{ needs.lint.result }}" ;;
+                unit-test) RESULT="${{ needs.unit-test.result }}" ;;
+                quality-gate) RESULT="${{ needs.quality-gate.result }}" ;;
+                build) RESULT="${{ needs.build.result }}" ;;
+              esac
+              case "$RESULT" in
+                success) ICON="✅" ;;
+                failure) ICON="❌" ;;
+                cancelled) ICON="⏹️" ;;
+                skipped) ICON="⏭️" ;;
+                *) ICON="❓" ;;
+              esac
+              echo "| $JOB | $ICON $RESULT |"
+            done
+            echo ""
+            echo "Commit: \`${GH_SHA}\` by @${GH_ACTOR}"
+          } >> "$GITHUB_STEP_SUMMARY"
