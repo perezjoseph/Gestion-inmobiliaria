@@ -352,6 +352,48 @@ fn ContratoList(props: &ContratoListProps) -> Html {
     }
 }
 
+fn make_contrato_edit_cb(
+    propiedad_id: &UseStateHandle<String>,
+    inquilino_id: &UseStateHandle<String>,
+    fecha_inicio: &UseStateHandle<String>,
+    fecha_fin: &UseStateHandle<String>,
+    monto_mensual: &UseStateHandle<String>,
+    deposito: &UseStateHandle<String>,
+    moneda: &UseStateHandle<String>,
+    estado: &UseStateHandle<String>,
+    editing: &UseStateHandle<Option<Contrato>>,
+    show_form: &UseStateHandle<bool>,
+    form_errors: &UseStateHandle<FormErrors>,
+) -> Callback<Contrato> {
+    let (propiedad_id, inquilino_id, fecha_inicio, fecha_fin) = (
+        propiedad_id.clone(),
+        inquilino_id.clone(),
+        fecha_inicio.clone(),
+        fecha_fin.clone(),
+    );
+    let (monto_mensual, deposito, moneda, estado) = (
+        monto_mensual.clone(),
+        deposito.clone(),
+        moneda.clone(),
+        estado.clone(),
+    );
+    let (editing, show_form, form_errors) =
+        (editing.clone(), show_form.clone(), form_errors.clone());
+    Callback::from(move |c: Contrato| {
+        propiedad_id.set(c.propiedad_id.clone());
+        inquilino_id.set(c.inquilino_id.clone());
+        fecha_inicio.set(c.fecha_inicio.clone());
+        fecha_fin.set(c.fecha_fin.clone());
+        monto_mensual.set(c.monto_mensual.to_string());
+        deposito.set(c.deposito.map(|v| v.to_string()).unwrap_or_default());
+        moneda.set(c.moneda.clone());
+        estado.set(c.estado.clone());
+        editing.set(Some(c));
+        show_form.set(true);
+        form_errors.set(FormErrors::default());
+    })
+}
+
 fn validate_contrato_fields(
     propiedad_id: &str,
     inquilino_id: &str,
@@ -945,48 +987,23 @@ pub fn Contratos() -> Html {
         });
     }
 
-    let on_new = {
-        let reset_form = reset_form.clone();
-        let show_form = show_form.clone();
-        Callback::from(move |_: MouseEvent| {
-            reset_form();
-            show_form.set(true);
-        })
-    };
+    let on_new = super::page_helpers::new_cb(reset_form.clone(), &show_form, true);
 
-    let on_edit = {
-        let propiedad_id = propiedad_id.clone();
-        let inquilino_id = inquilino_id.clone();
-        let fecha_inicio = fecha_inicio.clone();
-        let fecha_fin = fecha_fin.clone();
-        let monto_mensual = monto_mensual.clone();
-        let deposito = deposito.clone();
-        let moneda = moneda.clone();
-        let estado = estado.clone();
-        let editing = editing.clone();
-        let show_form = show_form.clone();
-        let form_errors = form_errors.clone();
-        Callback::from(move |c: Contrato| {
-            propiedad_id.set(c.propiedad_id.clone());
-            inquilino_id.set(c.inquilino_id.clone());
-            fecha_inicio.set(c.fecha_inicio.clone());
-            fecha_fin.set(c.fecha_fin.clone());
-            monto_mensual.set(c.monto_mensual.to_string());
-            deposito.set(c.deposito.map(|v| v.to_string()).unwrap_or_default());
-            moneda.set(c.moneda.clone());
-            estado.set(c.estado.clone());
-            editing.set(Some(c));
-            show_form.set(true);
-            form_errors.set(FormErrors::default());
-        })
-    };
+    let on_edit = make_contrato_edit_cb(
+        &propiedad_id,
+        &inquilino_id,
+        &fecha_inicio,
+        &fecha_fin,
+        &monto_mensual,
+        &deposito,
+        &moneda,
+        &estado,
+        &editing,
+        &show_form,
+        &form_errors,
+    );
 
-    let on_delete_click = {
-        let delete_target = delete_target.clone();
-        Callback::from(move |c: Contrato| {
-            delete_target.set(Some(c));
-        })
-    };
+    let on_delete_click = super::page_helpers::delete_click_cb(&delete_target);
 
     let on_delete_confirm = {
         let error = error.clone();
@@ -1003,12 +1020,7 @@ pub fn Contratos() -> Html {
         })
     };
 
-    let on_delete_cancel = {
-        let delete_target = delete_target.clone();
-        Callback::from(move |_: MouseEvent| {
-            delete_target.set(None);
-        })
-    };
+    let on_delete_cancel = super::page_helpers::delete_cancel_cb(&delete_target);
 
     let validate_form = {
         let propiedad_id = propiedad_id.clone();
@@ -1069,10 +1081,7 @@ pub fn Contratos() -> Html {
         })
     };
 
-    let on_cancel = {
-        let reset_form = reset_form.clone();
-        Callback::from(move |_: MouseEvent| reset_form())
-    };
+    let on_cancel = super::page_helpers::cancel_cb(reset_form.clone());
 
     let on_renew_click = {
         let renew_target = renew_target.clone();
@@ -1136,24 +1145,8 @@ pub fn Contratos() -> Html {
         Callback::from(move |_: MouseEvent| terminate_target.set(None))
     };
 
-    let on_page_change = {
-        let page = page.clone();
-        let reload = reload.clone();
-        Callback::from(move |p: u64| {
-            page.set(p);
-            reload.set(*reload + 1);
-        })
-    };
-    let on_per_page_change = {
-        let per_page = per_page.clone();
-        let page = page.clone();
-        let reload = reload.clone();
-        Callback::from(move |pp: u64| {
-            per_page.set(pp);
-            page.set(1);
-            reload.set(*reload + 1);
-        })
-    };
+    let (on_page_change, on_per_page_change) =
+        super::page_helpers::pagination_cbs(&page, &per_page, &reload);
 
     render_contratos_view(
         *loading,

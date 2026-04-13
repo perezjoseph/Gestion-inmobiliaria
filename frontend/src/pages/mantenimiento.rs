@@ -517,6 +517,54 @@ fn MantenimientoList(props: &MantenimientoListProps) -> Html {
     }
 }
 
+fn make_mantenimiento_edit_cb(
+    f_propiedad_id: &UseStateHandle<String>,
+    f_unidad_id: &UseStateHandle<String>,
+    f_inquilino_id: &UseStateHandle<String>,
+    f_titulo: &UseStateHandle<String>,
+    f_descripcion: &UseStateHandle<String>,
+    f_prioridad: &UseStateHandle<String>,
+    f_nombre_proveedor: &UseStateHandle<String>,
+    f_telefono_proveedor: &UseStateHandle<String>,
+    f_email_proveedor: &UseStateHandle<String>,
+    f_costo_monto: &UseStateHandle<String>,
+    f_costo_moneda: &UseStateHandle<String>,
+    editing: &UseStateHandle<Option<Solicitud>>,
+    view: &UseStateHandle<View>,
+    form_errors: &UseStateHandle<FormErrors>,
+) -> Callback<Solicitud> {
+    let (f_propiedad_id, f_unidad_id, f_inquilino_id) = (
+        f_propiedad_id.clone(),
+        f_unidad_id.clone(),
+        f_inquilino_id.clone(),
+    );
+    let (f_titulo, f_descripcion, f_prioridad) =
+        (f_titulo.clone(), f_descripcion.clone(), f_prioridad.clone());
+    let (f_nombre_proveedor, f_telefono_proveedor, f_email_proveedor) = (
+        f_nombre_proveedor.clone(),
+        f_telefono_proveedor.clone(),
+        f_email_proveedor.clone(),
+    );
+    let (f_costo_monto, f_costo_moneda) = (f_costo_monto.clone(), f_costo_moneda.clone());
+    let (editing, view, form_errors) = (editing.clone(), view.clone(), form_errors.clone());
+    Callback::from(move |s: Solicitud| {
+        f_propiedad_id.set(s.propiedad_id.clone());
+        f_unidad_id.set(s.unidad_id.clone().unwrap_or_default());
+        f_inquilino_id.set(s.inquilino_id.clone().unwrap_or_default());
+        f_titulo.set(s.titulo.clone());
+        f_descripcion.set(s.descripcion.clone().unwrap_or_default());
+        f_prioridad.set(s.prioridad.clone());
+        f_nombre_proveedor.set(s.nombre_proveedor.clone().unwrap_or_default());
+        f_telefono_proveedor.set(s.telefono_proveedor.clone().unwrap_or_default());
+        f_email_proveedor.set(s.email_proveedor.clone().unwrap_or_default());
+        f_costo_monto.set(s.costo_monto.map(|v| v.to_string()).unwrap_or_default());
+        f_costo_moneda.set(s.costo_moneda.clone().unwrap_or_else(|| "DOP".into()));
+        editing.set(Some(s));
+        view.set(View::Form);
+        form_errors.set(FormErrors::default());
+    })
+}
+
 fn validate_mantenimiento_fields(titulo: &str, propiedad_id: &str) -> FormErrors {
     let mut errs = FormErrors::default();
     if titulo.trim().is_empty() {
@@ -1226,47 +1274,24 @@ pub fn Mantenimiento() -> Html {
         });
     }
 
-    let on_new = {
-        let reset_form = reset_form.clone();
-        let view = view.clone();
-        Callback::from(move |_: MouseEvent| {
-            reset_form();
-            view.set(View::Form);
-        })
-    };
+    let on_new = super::page_helpers::new_cb(reset_form.clone(), &view, View::Form);
 
-    let on_edit = {
-        let f_propiedad_id = f_propiedad_id.clone();
-        let f_unidad_id = f_unidad_id.clone();
-        let f_inquilino_id = f_inquilino_id.clone();
-        let f_titulo = f_titulo.clone();
-        let f_descripcion = f_descripcion.clone();
-        let f_prioridad = f_prioridad.clone();
-        let f_nombre_proveedor = f_nombre_proveedor.clone();
-        let f_telefono_proveedor = f_telefono_proveedor.clone();
-        let f_email_proveedor = f_email_proveedor.clone();
-        let f_costo_monto = f_costo_monto.clone();
-        let f_costo_moneda = f_costo_moneda.clone();
-        let editing = editing.clone();
-        let view = view.clone();
-        let form_errors = form_errors.clone();
-        Callback::from(move |s: Solicitud| {
-            f_propiedad_id.set(s.propiedad_id.clone());
-            f_unidad_id.set(s.unidad_id.clone().unwrap_or_default());
-            f_inquilino_id.set(s.inquilino_id.clone().unwrap_or_default());
-            f_titulo.set(s.titulo.clone());
-            f_descripcion.set(s.descripcion.clone().unwrap_or_default());
-            f_prioridad.set(s.prioridad.clone());
-            f_nombre_proveedor.set(s.nombre_proveedor.clone().unwrap_or_default());
-            f_telefono_proveedor.set(s.telefono_proveedor.clone().unwrap_or_default());
-            f_email_proveedor.set(s.email_proveedor.clone().unwrap_or_default());
-            f_costo_monto.set(s.costo_monto.map(|v| v.to_string()).unwrap_or_default());
-            f_costo_moneda.set(s.costo_moneda.clone().unwrap_or_else(|| "DOP".into()));
-            editing.set(Some(s));
-            view.set(View::Form);
-            form_errors.set(FormErrors::default());
-        })
-    };
+    let on_edit = make_mantenimiento_edit_cb(
+        &f_propiedad_id,
+        &f_unidad_id,
+        &f_inquilino_id,
+        &f_titulo,
+        &f_descripcion,
+        &f_prioridad,
+        &f_nombre_proveedor,
+        &f_telefono_proveedor,
+        &f_email_proveedor,
+        &f_costo_monto,
+        &f_costo_moneda,
+        &editing,
+        &view,
+        &form_errors,
+    );
 
     let on_view_detail = {
         let view = view.clone();
@@ -1293,12 +1318,7 @@ pub fn Mantenimiento() -> Html {
         })
     };
 
-    let on_delete_click = {
-        let delete_target = delete_target.clone();
-        Callback::from(move |s: Solicitud| {
-            delete_target.set(Some(s));
-        })
-    };
+    let on_delete_click = super::page_helpers::delete_click_cb(&delete_target);
 
     let on_delete_confirm = {
         let error = error.clone();
@@ -1315,12 +1335,7 @@ pub fn Mantenimiento() -> Html {
         })
     };
 
-    let on_delete_cancel = {
-        let delete_target = delete_target.clone();
-        Callback::from(move |_: MouseEvent| {
-            delete_target.set(None);
-        })
-    };
+    let on_delete_cancel = super::page_helpers::delete_cancel_cb(&delete_target);
 
     let validate_form = {
         let f_titulo = f_titulo.clone();
@@ -1378,10 +1393,7 @@ pub fn Mantenimiento() -> Html {
         })
     };
 
-    let on_cancel = {
-        let reset_form = reset_form.clone();
-        Callback::from(move |_: MouseEvent| reset_form())
-    };
+    let on_cancel = super::page_helpers::cancel_cb(reset_form.clone());
 
     let on_cambiar_estado = {
         let error = error.clone();
@@ -1437,24 +1449,8 @@ pub fn Mantenimiento() -> Html {
         })
     };
 
-    let on_page_change = {
-        let page = page.clone();
-        let reload = reload.clone();
-        Callback::from(move |p: u64| {
-            page.set(p);
-            reload.set(*reload + 1);
-        })
-    };
-    let on_per_page_change = {
-        let per_page = per_page.clone();
-        let page = page.clone();
-        let reload = reload.clone();
-        Callback::from(move |pp: u64| {
-            per_page.set(pp);
-            page.set(1);
-            reload.set(*reload + 1);
-        })
-    };
+    let (on_page_change, on_per_page_change) =
+        super::page_helpers::pagination_cbs(&page, &per_page, &reload);
 
     let on_error_close = {
         let error = error.clone();

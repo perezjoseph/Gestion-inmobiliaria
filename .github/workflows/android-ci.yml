@@ -897,7 +897,11 @@ jobs:
       GH_EVENT_NAME: ${{ github.event_name }}
       GH_REF: ${{ github.ref }}
     needs: [secret-scan, dependency-review, lint, unit-test, quality-gate, build, sonarqube, notify-failure]
-    if: always() && github.ref == 'refs/heads/main'
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      !contains(github.event.head_commit.message, 'ci: improve pipeline') &&
+      !contains(github.event.head_commit.message, 'fix: resolve CI failures (auto-fix)')
     steps:
       - name: Validate webhook configuration
         id: webhook-check

@@ -322,6 +322,43 @@ fn PagoList(props: &PagoListProps) -> Html {
     }
 }
 
+fn make_pago_edit_cb(
+    contrato_id: &UseStateHandle<String>,
+    monto: &UseStateHandle<String>,
+    moneda: &UseStateHandle<String>,
+    fecha_pago: &UseStateHandle<String>,
+    fecha_vencimiento: &UseStateHandle<String>,
+    metodo_pago: &UseStateHandle<String>,
+    estado_form: &UseStateHandle<String>,
+    notas: &UseStateHandle<String>,
+    editing: &UseStateHandle<Option<Pago>>,
+    show_form: &UseStateHandle<bool>,
+    form_errors: &UseStateHandle<FormErrors>,
+) -> Callback<Pago> {
+    let (contrato_id, monto, moneda) = (contrato_id.clone(), monto.clone(), moneda.clone());
+    let (fecha_pago, fecha_vencimiento, metodo_pago) = (
+        fecha_pago.clone(),
+        fecha_vencimiento.clone(),
+        metodo_pago.clone(),
+    );
+    let (estado_form, notas) = (estado_form.clone(), notas.clone());
+    let (editing, show_form, form_errors) =
+        (editing.clone(), show_form.clone(), form_errors.clone());
+    Callback::from(move |p: Pago| {
+        contrato_id.set(p.contrato_id.clone());
+        monto.set(p.monto.to_string());
+        moneda.set(p.moneda.clone());
+        fecha_pago.set(p.fecha_pago.clone().unwrap_or_default());
+        fecha_vencimiento.set(p.fecha_vencimiento.clone());
+        metodo_pago.set(p.metodo_pago.clone().unwrap_or_default());
+        estado_form.set(p.estado.clone());
+        notas.set(p.notas.clone().unwrap_or_default());
+        editing.set(Some(p));
+        show_form.set(true);
+        form_errors.set(FormErrors::default());
+    })
+}
+
 fn build_pagos_url(pg: u64, pp: u64, f_contrato: &str, f_estado: &str) -> String {
     let mut params = vec![format!("page={pg}"), format!("perPage={pp}")];
     if !f_contrato.is_empty() {
@@ -711,48 +748,23 @@ pub fn Pagos() -> Html {
         });
     }
 
-    let on_new = {
-        let reset_form = reset_form.clone();
-        let show_form = show_form.clone();
-        Callback::from(move |_: MouseEvent| {
-            reset_form();
-            show_form.set(true);
-        })
-    };
+    let on_new = super::page_helpers::new_cb(reset_form.clone(), &show_form, true);
 
-    let on_edit = {
-        let contrato_id = contrato_id.clone();
-        let monto = monto.clone();
-        let moneda = moneda.clone();
-        let fecha_pago = fecha_pago.clone();
-        let fecha_vencimiento = fecha_vencimiento.clone();
-        let metodo_pago = metodo_pago.clone();
-        let estado_form = estado_form.clone();
-        let notas = notas.clone();
-        let editing = editing.clone();
-        let show_form = show_form.clone();
-        let form_errors = form_errors.clone();
-        Callback::from(move |p: Pago| {
-            contrato_id.set(p.contrato_id.clone());
-            monto.set(p.monto.to_string());
-            moneda.set(p.moneda.clone());
-            fecha_pago.set(p.fecha_pago.clone().unwrap_or_default());
-            fecha_vencimiento.set(p.fecha_vencimiento.clone());
-            metodo_pago.set(p.metodo_pago.clone().unwrap_or_default());
-            estado_form.set(p.estado.clone());
-            notas.set(p.notas.clone().unwrap_or_default());
-            editing.set(Some(p));
-            show_form.set(true);
-            form_errors.set(FormErrors::default());
-        })
-    };
+    let on_edit = make_pago_edit_cb(
+        &contrato_id,
+        &monto,
+        &moneda,
+        &fecha_pago,
+        &fecha_vencimiento,
+        &metodo_pago,
+        &estado_form,
+        &notas,
+        &editing,
+        &show_form,
+        &form_errors,
+    );
 
-    let on_delete_click = {
-        let delete_target = delete_target.clone();
-        Callback::from(move |p: Pago| {
-            delete_target.set(Some(p));
-        })
-    };
+    let on_delete_click = super::page_helpers::delete_click_cb(&delete_target);
 
     let on_delete_confirm = {
         let error = error.clone();
@@ -769,12 +781,7 @@ pub fn Pagos() -> Html {
         })
     };
 
-    let on_delete_cancel = {
-        let delete_target = delete_target.clone();
-        Callback::from(move |_: MouseEvent| {
-            delete_target.set(None);
-        })
-    };
+    let on_delete_cancel = super::page_helpers::delete_cancel_cb(&delete_target);
 
     let validate_form = {
         let contrato_id = contrato_id.clone();
@@ -827,10 +834,7 @@ pub fn Pagos() -> Html {
         })
     };
 
-    let on_cancel = {
-        let reset_form = reset_form.clone();
-        Callback::from(move |_: MouseEvent| reset_form())
-    };
+    let on_cancel = super::page_helpers::cancel_cb(reset_form.clone());
 
     let on_filter_apply = {
         let reload = reload.clone();
@@ -853,24 +857,8 @@ pub fn Pagos() -> Html {
         })
     };
 
-    let on_page_change = {
-        let page = page.clone();
-        let reload = reload.clone();
-        Callback::from(move |p: u64| {
-            page.set(p);
-            reload.set(*reload + 1);
-        })
-    };
-    let on_per_page_change = {
-        let per_page = per_page.clone();
-        let page = page.clone();
-        let reload = reload.clone();
-        Callback::from(move |pp: u64| {
-            per_page.set(pp);
-            page.set(1);
-            reload.set(*reload + 1);
-        })
-    };
+    let (on_page_change, on_per_page_change) =
+        super::page_helpers::pagination_cbs(&page, &per_page, &reload);
 
     render_pagos_view(
         &loading,

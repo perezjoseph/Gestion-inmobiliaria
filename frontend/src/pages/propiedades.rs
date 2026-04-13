@@ -424,7 +424,6 @@ fn make_propiedad_edit_cb(
 }
 
 fn validate_propiedad_fields(
-
     titulo: &str,
     direccion: &str,
     ciudad: &str,
@@ -967,9 +966,6 @@ pub fn Propiedades() -> Html {
         });
     }
 
-    let on_new = {
-        let reset_form = reset_form.clone();
-        let show_form = show_form.clone();
     let on_new = super::page_helpers::new_cb(reset_form.clone(), &show_form, true);
 
     let on_edit = make_propiedad_edit_cb(
