@@ -47,3 +47,32 @@ pub fn new_cb<T: Clone + PartialEq + 'static>(
 pub fn cancel_cb(reset: impl Fn() + 'static) -> Callback<MouseEvent> {
     Callback::from(move |_: MouseEvent| reset())
 }
+
+pub fn filter_apply_cb(
+    page: &UseStateHandle<u64>,
+    reload: &UseStateHandle<u32>,
+) -> Callback<MouseEvent> {
+    let (p, r) = (page.clone(), reload.clone());
+    Callback::from(move |_: MouseEvent| {
+        p.set(1);
+        r.set(*r + 1);
+    })
+}
+
+pub fn filter_clear_cb(
+    clear_fn: impl Fn() + 'static,
+    page: &UseStateHandle<u64>,
+    reload: &UseStateHandle<u32>,
+) -> Callback<MouseEvent> {
+    let (p, r) = (page.clone(), reload.clone());
+    Callback::from(move |_: MouseEvent| {
+        clear_fn();
+        p.set(1);
+        r.set(*r + 1);
+    })
+}
+
+pub fn error_close_cb(error: &UseStateHandle<Option<String>>) -> Callback<MouseEvent> {
+    let e = error.clone();
+    Callback::from(move |_: MouseEvent| e.set(None))
+}

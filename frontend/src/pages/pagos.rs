@@ -837,25 +837,18 @@ pub fn Pagos() -> Html {
 
     let on_cancel = super::page_helpers::cancel_cb(reset_form.clone());
 
-    let on_filter_apply = {
-        let reload = reload.clone();
-        let page = page.clone();
-        Callback::from(move |_: MouseEvent| {
-            page.set(1);
-            reload.set(*reload + 1);
-        })
-    };
+    let on_filter_apply = super::page_helpers::filter_apply_cb(&page, &reload);
     let on_filter_clear = {
-        let filter_contrato = filter_contrato.clone();
-        let filter_estado = filter_estado.clone();
-        let reload = reload.clone();
-        let page = page.clone();
-        Callback::from(move |_: MouseEvent| {
-            filter_contrato.set(String::new());
-            filter_estado.set(String::new());
-            page.set(1);
-            reload.set(*reload + 1);
-        })
+        let fc = filter_contrato.clone();
+        let fe = filter_estado.clone();
+        super::page_helpers::filter_clear_cb(
+            move || {
+                fc.set(String::new());
+                fe.set(String::new());
+            },
+            &page,
+            &reload,
+        )
     };
 
     let (on_page_change, on_per_page_change) =

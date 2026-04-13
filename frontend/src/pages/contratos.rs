@@ -1112,10 +1112,7 @@ pub fn Contratos() -> Html {
         })
     };
 
-    let on_renew_cancel = {
-        let renew_target = renew_target.clone();
-        Callback::from(move |_: MouseEvent| renew_target.set(None))
-    };
+    let on_renew_cancel = super::page_helpers::delete_cancel_cb(&renew_target);
 
     let on_terminate_click = {
         let terminate_target = terminate_target.clone();
@@ -1141,10 +1138,7 @@ pub fn Contratos() -> Html {
         })
     };
 
-    let on_terminate_cancel = {
-        let terminate_target = terminate_target.clone();
-        Callback::from(move |_: MouseEvent| terminate_target.set(None))
-    };
+    let on_terminate_cancel = super::page_helpers::delete_cancel_cb(&terminate_target);
 
     let (on_page_change, on_per_page_change) =
         super::page_helpers::pagination_cbs(&page, &per_page, &reload);

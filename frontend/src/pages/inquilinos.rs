@@ -786,25 +786,23 @@ pub fn Inquilinos() -> Html {
     let on_search_apply = {
         let search = search.clone();
         let applied_search = applied_search.clone();
-        let reload = reload.clone();
-        let page = page.clone();
-        Callback::from(move |_: MouseEvent| {
-            applied_search.set((*search).clone());
-            page.set(1);
-            reload.set(*reload + 1);
-        })
+        super::page_helpers::filter_clear_cb(
+            move || applied_search.set((*search).clone()),
+            &page,
+            &reload,
+        )
     };
     let on_search_clear = {
         let search = search.clone();
         let applied_search = applied_search.clone();
-        let reload = reload.clone();
-        let page = page.clone();
-        Callback::from(move |_: MouseEvent| {
-            search.set(String::new());
-            applied_search.set(String::new());
-            page.set(1);
-            reload.set(*reload + 1);
-        })
+        super::page_helpers::filter_clear_cb(
+            move || {
+                search.set(String::new());
+                applied_search.set(String::new());
+            },
+            &page,
+            &reload,
+        )
     };
     let (on_page_change, on_per_page_change) =
         super::page_helpers::pagination_cbs(&page, &per_page, &reload);

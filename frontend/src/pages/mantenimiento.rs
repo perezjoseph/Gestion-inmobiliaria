@@ -1,5 +1,6 @@
 use crate::app::AuthContext;
 use crate::components::common::data_table::DataTable;
+use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::loading::Loading;
 use crate::components::common::pagination::Pagination;
@@ -1092,18 +1093,11 @@ fn render_mantenimiento_list_view(
             }
 
             if let Some(ref target) = **delete_target {
-                <div class="gi-modal-overlay">
-                    <div class="gi-modal">
-                        <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-2); color: var(--text-primary);">
-                            {"Confirmar eliminación"}</h3>
-                        <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-5);">
-                            {format!("¿Está seguro de que desea eliminar la solicitud \"{}\"? Esta acción no se puede deshacer.", target.titulo)}</p>
-                        <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
-                            <button onclick={on_delete_cancel} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                            <button onclick={on_delete_confirm} class="gi-btn gi-btn-danger">{"Eliminar"}</button>
-                        </div>
-                    </div>
-                </div>
+                <DeleteConfirmModal
+                    message={format!("¿Está seguro de que desea eliminar la solicitud \"{}\"? Esta acción no se puede deshacer.", target.titulo)}
+                    on_confirm={on_delete_confirm.clone()}
+                    on_cancel={on_delete_cancel.clone()}
+                />
             }
 
             <div class="gi-filter-bar">
@@ -1428,34 +1422,24 @@ pub fn Mantenimiento() -> Html {
         })
     };
 
-    let on_filter_apply = {
-        let reload = reload.clone();
-        let page = page.clone();
-        Callback::from(move |_: MouseEvent| {
-            page.set(1);
-            reload.set(*reload + 1);
-        })
-    };
+    let on_filter_apply = super::page_helpers::filter_apply_cb(&page, &reload);
     let on_filter_clear = {
-        let filter_estado = filter_estado.clone();
-        let filter_prioridad = filter_prioridad.clone();
-        let reload = reload.clone();
-        let page = page.clone();
-        Callback::from(move |_: MouseEvent| {
-            filter_estado.set(String::new());
-            filter_prioridad.set(String::new());
-            page.set(1);
-            reload.set(*reload + 1);
-        })
+        let fe = filter_estado.clone();
+        let fp = filter_prioridad.clone();
+        super::page_helpers::filter_clear_cb(
+            move || {
+                fe.set(String::new());
+                fp.set(String::new());
+            },
+            &page,
+            &reload,
+        )
     };
 
     let (on_page_change, on_per_page_change) =
         super::page_helpers::pagination_cbs(&page, &per_page, &reload);
 
-    let on_error_close = {
-        let error = error.clone();
-        Callback::from(move |_: MouseEvent| error.set(None))
-    };
+    let on_error_close = super::page_helpers::error_close_cb(&error);
 
     render_mantenimiento_view(
         *loading,
