@@ -244,7 +244,13 @@ struct PagoListProps {
     on_per_page_change: Callback<u64>,
 }
 
-fn render_pago_row(p: &Pago, user_rol: &str, contrato_label: &Callback<String, String>, on_edit: &Callback<Pago>, on_delete: &Callback<Pago>) -> Html {
+fn render_pago_row(
+    p: &Pago,
+    user_rol: &str,
+    contrato_label: &Callback<String, String>,
+    on_edit: &Callback<Pago>,
+    on_delete: &Callback<Pago>,
+) -> Html {
     let c_label = contrato_label.emit(p.contrato_id.clone());
     let (badge_cls, badge_label) = estado_badge(&p.estado);
     let is_pagado = p.estado == "pagado";

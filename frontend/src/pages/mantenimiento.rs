@@ -447,7 +447,14 @@ struct MantenimientoListProps {
     on_per_page_change: Callback<u64>,
 }
 
-fn render_mantenimiento_row(s: &Solicitud, user_rol: &str, prop_label: &Callback<String, String>, on_edit: &Callback<Solicitud>, on_delete: &Callback<Solicitud>, on_view_detail: &Callback<String>) -> Html {
+fn render_mantenimiento_row(
+    s: &Solicitud,
+    user_rol: &str,
+    prop_label: &Callback<String, String>,
+    on_edit: &Callback<Solicitud>,
+    on_delete: &Callback<Solicitud>,
+    on_view_detail: &Callback<String>,
+) -> Html {
     let p_label = prop_label.emit(s.propiedad_id.clone());
     let costo_display = match (&s.costo_monto, &s.costo_moneda) {
         (Some(monto), Some(moneda)) => format_currency(moneda, *monto),
