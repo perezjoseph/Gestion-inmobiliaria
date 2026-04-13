@@ -585,6 +585,7 @@ fn non_empty_mant(s: &str) -> Option<String> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn do_save_solicitud(
     editing_id: Option<String>,
     update: UpdateSolicitud,
@@ -731,10 +732,10 @@ fn register_escape_listener_m(
     web_sys::window().and_then(|w| w.document()).map(|doc| {
         EventListener::new(&doc, "keydown", move |event| {
             let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
-            if event.key() == "Escape" {
-                if let Some(ref cb) = *escape_handler.borrow() {
-                    cb();
-                }
+            if event.key() == "Escape"
+                && let Some(ref cb) = *escape_handler.borrow()
+            {
+                cb();
             }
         })
     })
@@ -763,7 +764,7 @@ fn load_mantenimiento_data(
 fn handle_escape_mantenimiento(
     delete_target: &UseStateHandle<Option<Solicitud>>,
     view_state: &UseStateHandle<View>,
-    reset_form: &(dyn Fn()),
+    reset_form: &dyn Fn(),
 ) {
     if delete_target.is_some() {
         delete_target.set(None);
@@ -809,6 +810,7 @@ fn handle_mantenimiento_delete_confirm(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_mantenimiento_submit(
     submitting: &UseStateHandle<bool>,
     validate_form: &dyn Fn() -> bool,
@@ -895,6 +897,7 @@ fn handle_add_nota(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_mantenimiento_view(
     loading: bool,
     view: &UseStateHandle<View>,
@@ -959,23 +962,23 @@ fn render_mantenimiento_view(
         })
     };
 
-    if let View::Detail(ref _id) = **view {
-        if let Some(ref sol) = **detail_item {
-            return html! {
-                <MantenimientoDetail
-                    sol={sol.clone()}
-                    user_rol={user_rol.to_string()}
-                    error={(**error).clone()}
-                    on_error_close={on_error_close}
-                    on_back={on_back_to_list}
-                    on_cambiar_estado={on_cambiar_estado}
-                    on_add_nota={on_add_nota}
-                    nota_contenido={nota_contenido.clone()}
-                    nota_submitting={nota_submitting}
-                    prop_label={prop_label_cb}
-                />
-            };
-        }
+    if let View::Detail(ref _id) = **view
+        && let Some(ref sol) = **detail_item
+    {
+        return html! {
+            <MantenimientoDetail
+                sol={sol.clone()}
+                user_rol={user_rol.to_string()}
+                error={(**error).clone()}
+                on_error_close={on_error_close}
+                on_back={on_back_to_list}
+                on_cambiar_estado={on_cambiar_estado}
+                on_add_nota={on_add_nota}
+                nota_contenido={nota_contenido.clone()}
+                nota_submitting={nota_submitting}
+                prop_label={prop_label_cb}
+            />
+        };
     }
 
     if matches!(**view, View::Form) {

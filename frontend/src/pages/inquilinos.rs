@@ -276,6 +276,7 @@ fn non_empty_inq(s: &str) -> Option<String> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn do_save_inquilino(
     editing_id: Option<String>,
     update: UpdateInquilino,
@@ -347,10 +348,10 @@ fn register_escape_listener_i(
     web_sys::window().and_then(|w| w.document()).map(|doc| {
         EventListener::new(&doc, "keydown", move |event| {
             let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
-            if event.key() == "Escape" {
-                if let Some(ref cb) = *escape_handler.borrow() {
-                    cb();
-                }
+            if event.key() == "Escape"
+                && let Some(ref cb) = *escape_handler.borrow()
+            {
+                cb();
             }
         })
     })
@@ -383,6 +384,7 @@ fn load_inquilinos_data(
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_inquilino_submit(
     submitting: UseStateHandle<bool>,
     validate_form: impl Fn() -> bool,
@@ -496,6 +498,7 @@ fn make_inquilino_edit_cb(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_inquilinos_view(
     loading: &UseStateHandle<bool>,
     user_rol: &str,

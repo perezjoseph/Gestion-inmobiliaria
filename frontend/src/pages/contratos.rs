@@ -426,6 +426,7 @@ fn validate_contrato_fields(
     errs
 }
 
+#[allow(clippy::too_many_arguments)]
 fn do_save_contrato(
     editing_id: Option<String>,
     update: UpdateContrato,
@@ -491,6 +492,7 @@ fn do_delete_contrato(
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 fn do_renew_contrato(
     id: String,
     fecha_fin: String,
@@ -560,10 +562,10 @@ fn register_escape_listener(
     web_sys::window().and_then(|w| w.document()).map(|doc| {
         EventListener::new(&doc, "keydown", move |event| {
             let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
-            if event.key() == "Escape" {
-                if let Some(ref cb) = *escape_handler.borrow() {
-                    cb();
-                }
+            if event.key() == "Escape"
+                && let Some(ref cb) = *escape_handler.borrow()
+            {
+                cb();
             }
         })
     })
@@ -589,6 +591,7 @@ fn load_contratos_data(
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_contrato_submit(
     submitting: UseStateHandle<bool>,
     validate_form: impl Fn() -> bool,
@@ -977,7 +980,7 @@ pub fn Contratos() -> Html {
         let reset_form = reset_form.clone();
         let handler = escape_handler.clone();
         *handler.borrow_mut() = Some(Box::new(move || {
-            handle_escape_contratos(&delete_target, &show_form, || reset_form());
+            handle_escape_contratos(&delete_target, &show_form, &reset_form);
         }) as Box<dyn Fn()>);
     }
     {
@@ -1064,7 +1067,7 @@ pub fn Contratos() -> Html {
             e.prevent_default();
             handle_contrato_submit(
                 submitting.clone(),
-                || validate_form(),
+                &validate_form,
                 &monto_mensual,
                 &deposito,
                 &fecha_fin,

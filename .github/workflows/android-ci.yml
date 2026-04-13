@@ -619,7 +619,12 @@ jobs:
         run: |
           SONAR_URL="${SONAR_HOST_URL}"
           for i in $(seq 1 12); do
-            STATUS=$(curl -sf --connect-timeout 5 --max-time 10 "$SONAR_URL/api/system/status" 2>/dev/null | jq -r '.status // "UNREACHABLE"')
+            RESPONSE=$(curl -sf --connect-timeout 5 --max-time 10 "$SONAR_URL/api/system/status" 2>/dev/null) || RESPONSE=""
+            if [ -n "$RESPONSE" ]; then
+              STATUS=$(echo "$RESPONSE" | jq -r '.status // "UNREACHABLE"' 2>/dev/null) || STATUS="UNREACHABLE"
+            else
+              STATUS="UNREACHABLE"
+            fi
             if [ "$STATUS" = "UP" ]; then
               echo "SonarQube is ready."
               exit 0
@@ -654,9 +659,9 @@ jobs:
           TOKEN_NAME="android-ci-token-${{ github.run_id }}"
           curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
             "$SONAR_URL/api/user_tokens/revoke?name=${TOKEN_NAME}" 2>/dev/null || true
-          TOKEN=$(curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
-            "$SONAR_URL/api/user_tokens/generate?name=${TOKEN_NAME}" \
-            | jq -r '.token')
+          TOKEN_RESPONSE=$(curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
+            "$SONAR_URL/api/user_tokens/generate?name=${TOKEN_NAME}" 2>/dev/null) || TOKEN_RESPONSE=""
+          TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token' 2>/dev/null) || TOKEN=""
 
           if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
             echo "::error::Failed to generate SonarQube token"
@@ -990,9 +995,9 @@ jobs:
             TOKEN_NAME="android-ci-improve-${GH_RUN_ID}"
             curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
               "$SONAR_URL/api/user_tokens/revoke?name=${TOKEN_NAME}" 2>/dev/null || true
-            TOKEN=$(curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
-              "$SONAR_URL/api/user_tokens/generate?name=${TOKEN_NAME}" 2>/dev/null \
-              | jq -r '.token // empty' || true)
+            TOKEN_RESPONSE=$(curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
+              "$SONAR_URL/api/user_tokens/generate?name=${TOKEN_NAME}" 2>/dev/null) || TOKEN_RESPONSE=""
+            TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token // empty' 2>/dev/null) || TOKEN=""
             if [ -z "$TOKEN" ]; then
               echo "sonar_report=SonarQube token unavailable -- skipping issue collection." >> $GITHUB_OUTPUT
               exit 0

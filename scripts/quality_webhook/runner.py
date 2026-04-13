@@ -1,5 +1,8 @@
+import codecs
 import os
+import re
 import subprocess
+import threading
 import uuid
 from datetime import datetime
 
@@ -8,6 +11,8 @@ from .config import (
     KIRO_CLI, KIRO_TIMEOUT, MAX_LOG_BYTES, log, to_wsl_path,
 )
 
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|\x1b\][^\x07]*\x07|\x1b\(B")
+
 
 def wsl_bash(bash_command, timeout=60):
     uid = uuid.uuid4().hex[:8]
@@ -15,7 +20,7 @@ def wsl_bash(bash_command, timeout=60):
     script_file_wsl = to_wsl_path(script_file)
     try:
         script_file.write_text(
-            f"#!/bin/bash\ncd {PROJECT_DIR} && {bash_command}\n",
+            f"#!/bin/bash\nexport LANG=C.UTF-8 LC_ALL=C.UTF-8\ncd {PROJECT_DIR} && {bash_command}\n",
             encoding="utf-8",
             newline="\n",
         )
@@ -34,6 +39,52 @@ def wsl_bash(bash_command, timeout=60):
         )
     finally:
         script_file.unlink(missing_ok=True)
+
+
+def _ts():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _stream_to_log(pipe, log_handle, collected, lock):
+    """Stream bytes character-by-character, decode UTF-8 incrementally,
+    strip ANSI codes, and timestamp each completed line."""
+    decoder = codecs.getincrementaldecoder("utf-8")("replace")
+    buf = []
+    line_start = True
+
+    while True:
+        chunk = pipe.read(1024)
+        if not chunk:
+            text = decoder.decode(b"", final=True)
+        else:
+            text = decoder.decode(chunk)
+
+        if not text and not chunk:
+            if buf:
+                raw_line = "".join(buf)
+                clean = _ANSI_RE.sub("", raw_line)
+                if clean.strip():
+                    stamped = f"[{_ts()}] {clean}\n"
+                    with lock:
+                        log_handle.write(stamped)
+                        log_handle.flush()
+                    collected.append(clean + "\n")
+            break
+
+        for ch in text:
+            if ch == "\n":
+                raw_line = "".join(buf)
+                buf.clear()
+                line_start = True
+                clean = _ANSI_RE.sub("", raw_line)
+                stamped = f"[{_ts()}] {clean}\n"
+                with lock:
+                    log_handle.write(stamped)
+                    log_handle.flush()
+                collected.append(clean + "\n")
+            else:
+                buf.append(ch)
+                line_start = False
 
 
 def run_kiro(prompt, label):
@@ -70,32 +121,78 @@ def run_kiro(prompt, label):
         f"{KIRO_CLI} chat --trust-all-tools --agent sisyphus --no-interactive -- \"$KIRO_PROMPT\""
     )
 
+    script_uid = uuid.uuid4().hex[:8]
+    script_file = WIN_PROJECT_DIR / f".kiro-wsl-cmd-{script_uid}.sh"
+    script_file_wsl = to_wsl_path(script_file)
+    script_file.write_text(
+        f"#!/bin/bash\nexport LANG=C.UTF-8 LC_ALL=C.UTF-8\ncd {PROJECT_DIR} && {bash_cmd}\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+
+    cmd = [
+        "wsl", "-u", WSL_USER, "-d", WSL_DISTRO,
+        "bash", "-l", script_file_wsl,
+    ]
+
     flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     fd = os.open(log_file, flags, 0o600)
+    full_output = ""
+    timed_out = False
+
     with os.fdopen(fd, "a", encoding="utf-8") as f:
         f.write(f"\n{'=' * 80}\n")
-        f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {label}\n")
+        f.write(f"[{_ts()}] {label}\n")
         f.write(f"{'=' * 80}\n\n")
         f.flush()
 
-        timed_out = False
         try:
-            result = wsl_bash(bash_cmd, timeout=KIRO_TIMEOUT)
-            full_output = (result.stdout or "") + (result.stderr or "")
-            f.write(full_output)
-            f.flush()
-        except subprocess.TimeoutExpired as e:
-            timed_out = True
-            full_output = (e.stdout or "") + (e.stderr or "") if hasattr(e, "stdout") else ""
-            f.write(full_output)
-            f.write("\n[TIMEOUT] Process killed\n")
-            f.flush()
-            log.warning(f"kiro-cli timed out after {KIRO_TIMEOUT // 60} minutes")
+            proc = subprocess.Popen(
+                cmd,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            stdout_lines = []
+            stderr_lines = []
+            write_lock = threading.Lock()
+
+            t_out = threading.Thread(
+                target=_stream_to_log,
+                args=(proc.stdout, f, stdout_lines, write_lock),
+                daemon=True,
+            )
+            t_err = threading.Thread(
+                target=_stream_to_log,
+                args=(proc.stderr, f, stderr_lines, write_lock),
+                daemon=True,
+            )
+            t_out.start()
+            t_err.start()
+
+            try:
+                proc.wait(timeout=KIRO_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                proc.kill()
+                log.warning(f"kiro-cli timed out after {KIRO_TIMEOUT // 60} minutes")
+
+            t_out.join(timeout=10)
+            t_err.join(timeout=10)
+
+            full_output = "".join(stdout_lines) + "".join(stderr_lines)
+
+            if timed_out:
+                with write_lock:
+                    f.write(f"[{_ts()}] [TIMEOUT] Process killed\n")
+                    f.flush()
+
         except Exception as e:
             full_output = ""
-            f.write(f"\n[ERROR] {e}\n")
+            f.write(f"[{_ts()}] [ERROR] {e}\n")
             f.flush()
             log.error(f"kiro-cli process error: {e}", exc_info=True)
         finally:
@@ -103,11 +200,15 @@ def run_kiro(prompt, label):
                 prompt_file_win.unlink(missing_ok=True)
             except OSError:
                 pass
+            try:
+                script_file.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     if timed_out:
         return False, full_output
 
-    log.info(f"kiro-cli exit code: {result.returncode}")
+    log.info(f"kiro-cli exit code: {proc.returncode}")
     if full_output:
         log.info(f"stdout (last 500 chars): ...{full_output[-500:]}")
 
@@ -115,8 +216,8 @@ def run_kiro(prompt, label):
         log.error("Tool approval/denied error detected")
         return False, full_output
 
-    if result.returncode not in (0, 1):
-        log.error(f"kiro-cli exited with unexpected code {result.returncode}")
+    if proc.returncode not in (0, 1):
+        log.error(f"kiro-cli exited with unexpected code {proc.returncode}")
         return False, full_output
 
     log.info(f"kiro-cli completed successfully for: {label}")

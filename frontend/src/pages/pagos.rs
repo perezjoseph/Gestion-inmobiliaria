@@ -396,10 +396,10 @@ fn register_escape_listener(
     web_sys::window().and_then(|w| w.document()).map(|doc| {
         EventListener::new(&doc, "keydown", move |event| {
             let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
-            if event.key() == "Escape" {
-                if let Some(ref cb) = *escape_handler.borrow() {
-                    cb();
-                }
+            if event.key() == "Escape"
+                && let Some(ref cb) = *escape_handler.borrow()
+            {
+                cb();
             }
         })
     })
@@ -461,6 +461,7 @@ fn format_contrato_label(
         .unwrap_or_else(|| id.to_string())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn do_save_pago(
     editing_id: Option<String>,
     update: UpdatePago,
@@ -544,6 +545,7 @@ fn load_pagos_data(
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_pago_submit(
     submitting: &UseStateHandle<bool>,
     validate_form: &dyn Fn() -> bool,
