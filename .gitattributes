@@ -1,0 +1,12 @@
+# Enforce LF line endings for shell scripts and Gradle wrapper files
+*.sh text eol=lf
+gradlew text eol=lf
+gradlew.bat text eol=crlf
+
+# Gradle config files
+*.properties text eol=lf
+*.toml text eol=lf
+*.kts text eol=lf
+
+# Preserve Gradle wrapper JAR as binary
+gradle-wrapper.jar binary
