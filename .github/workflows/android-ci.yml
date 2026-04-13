@@ -18,7 +18,7 @@ permissions: {}
 
 concurrency:
   group: android-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   JAVA_VERSION: "17"
