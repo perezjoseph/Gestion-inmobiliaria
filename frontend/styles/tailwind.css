@@ -1638,3 +1638,187 @@ h1, h2, h3, h4, h5, h6,
 .w-64 { width: 16rem; }
 .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
 .px-1 { padding-left: 0.25rem; padding-right: 0.25rem; }
+
+/* ============================================
+   Skeleton Loading
+   ============================================ */
+.gi-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-sand-200) 25%,
+    var(--color-sand-100) 50%,
+    var(--color-sand-200) 75%
+  );
+  background-size: 200% 100%;
+  animation: gi-shimmer 1.5s ease-in-out infinite;
+}
+
+[data-theme="dark"] .gi-skeleton {
+  background: linear-gradient(
+    90deg,
+    oklch(22% 0.012 185) 25%,
+    oklch(26% 0.014 185) 50%,
+    oklch(22% 0.012 185) 75%
+  );
+  background-size: 200% 100%;
+}
+
+@keyframes gi-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gi-skeleton {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/* ============================================
+   Layout Utility Classes
+   ============================================ */
+.gi-mt-1 { margin-top: var(--space-1); }
+.gi-mt-2 { margin-top: var(--space-2); }
+.gi-mt-3 { margin-top: var(--space-3); }
+.gi-mt-4 { margin-top: var(--space-4); }
+.gi-mt-5 { margin-top: var(--space-5); }
+.gi-mt-6 { margin-top: var(--space-6); }
+.gi-mb-2 { margin-bottom: var(--space-2); }
+.gi-mb-3 { margin-bottom: var(--space-3); }
+.gi-mb-4 { margin-bottom: var(--space-4); }
+.gi-mb-5 { margin-bottom: var(--space-5); }
+.gi-mb-6 { margin-bottom: var(--space-6); }
+.gi-p-4 { padding: var(--space-4); }
+.gi-p-5 { padding: var(--space-5); }
+.gi-p-6 { padding: var(--space-6); }
+.gi-py-3 { padding-top: var(--space-3); padding-bottom: var(--space-3); }
+
+/* Text utility classes */
+.gi-text-lg { font-size: var(--text-lg); }
+.gi-text-xl { font-size: var(--text-xl); }
+.gi-text-2xl { font-size: var(--text-2xl); }
+.gi-font-medium { font-weight: 500; }
+.gi-font-semibold { font-weight: 600; }
+.gi-font-bold { font-weight: 700; }
+
+/* Flex layout utilities */
+.gi-flex-col { display: flex; flex-direction: column; }
+.gi-flex-row { display: flex; flex-direction: row; }
+.gi-flex-between { display: flex; justify-content: space-between; align-items: center; }
+.gi-flex-center { display: flex; align-items: center; justify-content: center; }
+.gi-gap-2 { gap: var(--space-2); }
+.gi-gap-3 { gap: var(--space-3); }
+.gi-gap-4 { gap: var(--space-4); }
+.gi-flex-shrink-0 { flex-shrink: 0; }
+.gi-min-w-0 { min-width: 0; }
+.gi-flex-1 { flex: 1; }
+
+/* Welcome step title/description */
+.gi-welcome-step-title {
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.gi-welcome-step-desc {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+/* Overdue payment row */
+.gi-overdue-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 8px;
+  background-color: var(--color-error-light);
+}
+
+[data-theme="dark"] .gi-overdue-row {
+  background-color: oklch(18% 0.03 25);
+}
+
+.gi-overdue-row-title {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.gi-overdue-row-detail {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+/* Stat value suffix (e.g. "/ mes") */
+.gi-stat-suffix {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--text-tertiary);
+  margin-left: var(--space-2);
+}
+
+/* Card section (card with padding and top margin) */
+.gi-card-section {
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+  margin-top: var(--space-5);
+}
+
+/* Section header (flex between with title) */
+.gi-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.gi-section-header-title {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Login page layout */
+.gi-login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--surface-base);
+}
+
+.gi-login-container {
+  width: 100%;
+  max-width: 420px;
+  padding: var(--space-4);
+}
+
+.gi-login-header {
+  text-align: center;
+  margin-bottom: var(--space-6);
+}
+
+.gi-login-title {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-primary-500);
+}
+
+.gi-login-subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  margin-top: var(--space-1);
+}
+
+.gi-login-footer {
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-top: var(--space-4);
+}

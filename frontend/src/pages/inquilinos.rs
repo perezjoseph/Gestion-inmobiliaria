@@ -342,6 +342,7 @@ fn do_delete_inquilino(
     });
 }
 
+#[allow(clippy::type_complexity)]
 fn register_escape_listener_i(
     escape_handler: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>>,
 ) -> Option<EventListener> {

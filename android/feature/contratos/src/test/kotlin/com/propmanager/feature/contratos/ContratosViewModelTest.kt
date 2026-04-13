@@ -7,10 +7,8 @@ import com.propmanager.core.model.Contrato
 import com.propmanager.core.model.Inquilino
 import com.propmanager.core.model.Propiedad
 import com.propmanager.core.model.dto.CreateContratoRequest
-import com.propmanager.core.model.dto.CreatePropiedadRequest
 import com.propmanager.core.model.dto.RenovarContratoRequest
 import com.propmanager.core.model.dto.TerminarContratoRequest
-import com.propmanager.core.model.dto.UpdatePropiedadRequest
 import com.propmanager.core.network.ConnectivityObserver
 import io.kotest.core.spec.style.FreeSpec
 import io.kotest.matchers.collections.shouldHaveSize
@@ -21,6 +19,10 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotBeBlank
 import io.kotest.matchers.types.shouldBeInstanceOf
+import java.lang.reflect.Proxy
+import java.math.BigDecimal
+import java.time.Instant
+import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -34,10 +36,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.Json
-import java.lang.reflect.Proxy
-import java.math.BigDecimal
-import java.time.Instant
-import java.time.LocalDate
 
 /**
  * Unit tests for ContratosViewModel.
@@ -47,23 +45,20 @@ import java.time.LocalDate
 @OptIn(ExperimentalCoroutinesApi::class)
 class ContratosViewModelTest :
     FreeSpec({
-
         val testDispatcher = StandardTestDispatcher()
 
-        beforeEach {
-            Dispatchers.setMain(testDispatcher)
-        }
+        beforeEach { Dispatchers.setMain(testDispatcher) }
 
-        afterEach {
-            Dispatchers.resetMain()
-        }
+        afterEach { Dispatchers.resetMain() }
 
         "list state" -
             {
                 "emits Success with contratos and resolved names" {
                     val propiedades = listOf(samplePropiedad("p1", titulo = "Casa Centro"))
-                    val inquilinos = listOf(sampleInquilino("i1", nombre = "Juan", apellido = "Perez"))
-                    val contratos = listOf(sampleContrato("c1", propiedadId = "p1", inquilinoId = "i1"))
+                    val inquilinos =
+                        listOf(sampleInquilino("i1", nombre = "Juan", apellido = "Perez"))
+                    val contratos =
+                        listOf(sampleContrato("c1", propiedadId = "p1", inquilinoId = "i1"))
                     val contratosRepo = FakeContratosRepository(initialData = contratos)
                     val propRepo = FakePropiedadesRepository(initialData = propiedades)
                     val inqRepo = FakeInquilinosRepository(initialData = inquilinos)
@@ -221,7 +216,8 @@ class ContratosViewModelTest :
         "renew flow" -
             {
                 "showRenew opens dialog and dismissRenew closes it" {
-                    val contratosRepo = FakeContratosRepository(initialData = listOf(sampleContrato("c1")))
+                    val contratosRepo =
+                        FakeContratosRepository(initialData = listOf(sampleContrato("c1")))
                     runTest(testDispatcher) {
                         val vm = createViewModel(contratosRepo)
                         advanceUntilIdle()
@@ -238,7 +234,8 @@ class ContratosViewModelTest :
                 }
 
                 "confirmRenew with blank fields shows errors" {
-                    val contratosRepo = FakeContratosRepository(initialData = listOf(sampleContrato("c1")))
+                    val contratosRepo =
+                        FakeContratosRepository(initialData = listOf(sampleContrato("c1")))
                     runTest(testDispatcher) {
                         val vm = createViewModel(contratosRepo)
                         advanceUntilIdle()
@@ -258,7 +255,8 @@ class ContratosViewModelTest :
                 }
 
                 "confirmRenew with valid data calls repository and closes dialog" {
-                    val contratosRepo = FakeContratosRepository(initialData = listOf(sampleContrato("c1")))
+                    val contratosRepo =
+                        FakeContratosRepository(initialData = listOf(sampleContrato("c1")))
                     runTest(testDispatcher) {
                         val vm = createViewModel(contratosRepo)
                         advanceUntilIdle()
@@ -279,7 +277,8 @@ class ContratosViewModelTest :
                 }
 
                 "onRenewFechaFinChange clears fechaFin error" {
-                    val contratosRepo = FakeContratosRepository(initialData = listOf(sampleContrato("c1")))
+                    val contratosRepo =
+                        FakeContratosRepository(initialData = listOf(sampleContrato("c1")))
                     runTest(testDispatcher) {
                         val vm = createViewModel(contratosRepo)
                         advanceUntilIdle()
@@ -301,7 +300,8 @@ class ContratosViewModelTest :
         "terminate flow" -
             {
                 "showTerminate opens dialog and dismissTerminate closes it" {
-                    val contratosRepo = FakeContratosRepository(initialData = listOf(sampleContrato("c1")))
+                    val contratosRepo =
+                        FakeContratosRepository(initialData = listOf(sampleContrato("c1")))
                     runTest(testDispatcher) {
                         val vm = createViewModel(contratosRepo)
                         advanceUntilIdle()
@@ -318,7 +318,8 @@ class ContratosViewModelTest :
                 }
 
                 "confirmTerminate calls repository and closes dialog" {
-                    val contratosRepo = FakeContratosRepository(initialData = listOf(sampleContrato("c1")))
+                    val contratosRepo =
+                        FakeContratosRepository(initialData = listOf(sampleContrato("c1")))
                     runTest(testDispatcher) {
                         val vm = createViewModel(contratosRepo)
                         advanceUntilIdle()
@@ -343,10 +344,11 @@ class ContratosViewModelTest :
                     val today = LocalDate.now()
                     val expiringSoon = sampleContrato("c1", fechaFin = today.plusDays(15))
                     val expiringLater = sampleContrato("c2", fechaFin = today.plusDays(60))
-                    val contratosRepo = FakeContratosRepository(
-                        initialData = listOf(expiringSoon, expiringLater),
-                        expiringData = listOf(expiringSoon),
-                    )
+                    val contratosRepo =
+                        FakeContratosRepository(
+                            initialData = listOf(expiringSoon, expiringLater),
+                            expiringData = listOf(expiringSoon),
+                        )
 
                     runTest(testDispatcher) {
                         val vm = createViewModel(contratosRepo)
@@ -359,10 +361,14 @@ class ContratosViewModelTest :
                 }
 
                 "expiring state is empty when no contracts are expiring" {
-                    val contratosRepo = FakeContratosRepository(
-                        initialData = listOf(sampleContrato("c1", fechaFin = LocalDate.now().plusDays(90))),
-                        expiringData = emptyList(),
-                    )
+                    val contratosRepo =
+                        FakeContratosRepository(
+                            initialData =
+                                listOf(
+                                    sampleContrato("c1", fechaFin = LocalDate.now().plusDays(90))
+                                ),
+                            expiringData = emptyList(),
+                        )
 
                     runTest(testDispatcher) {
                         val vm = createViewModel(contratosRepo)
@@ -401,7 +407,8 @@ class ContratosViewModelTest :
                 }
 
                 "create failure sets general error on form" {
-                    val contratosRepo = FakeContratosRepository(createError = RuntimeException("DB error"))
+                    val contratosRepo =
+                        FakeContratosRepository(createError = RuntimeException("DB error"))
                     runTest(testDispatcher) {
                         val vm = createViewModel(contratosRepo)
                         advanceUntilIdle()
@@ -464,8 +471,10 @@ class ContratosViewModelTest :
             {
                 "loadDetail emits Success for existing contrato" {
                     val propiedades = listOf(samplePropiedad("p1", titulo = "Mi Casa"))
-                    val inquilinos = listOf(sampleInquilino("i1", nombre = "Ana", apellido = "Lopez"))
-                    val contratos = listOf(sampleContrato("c1", propiedadId = "p1", inquilinoId = "i1"))
+                    val inquilinos =
+                        listOf(sampleInquilino("i1", nombre = "Ana", apellido = "Lopez"))
+                    val contratos =
+                        listOf(sampleContrato("c1", propiedadId = "p1", inquilinoId = "i1"))
                     val contratosRepo = FakeContratosRepository(initialData = contratos)
                     val propRepo = FakePropiedadesRepository(initialData = propiedades)
                     val inqRepo = FakeInquilinosRepository(initialData = inquilinos)
@@ -517,12 +526,13 @@ class ContratosViewModelTest :
                 }
 
                 "initEditForm populates form from contrato" {
-                    val contrato = sampleContrato(
-                        "c1",
-                        propiedadId = "p1",
-                        inquilinoId = "i1",
-                        montoMensual = BigDecimal("25000.00"),
-                    )
+                    val contrato =
+                        sampleContrato(
+                            "c1",
+                            propiedadId = "p1",
+                            inquilinoId = "i1",
+                            montoMensual = BigDecimal("25000.00"),
+                        )
                     val contratosRepo = FakeContratosRepository()
                     runTest(testDispatcher) {
                         val vm = createViewModel(contratosRepo)
@@ -571,65 +581,63 @@ private fun sampleContrato(
     fechaFin: LocalDate = LocalDate.of(2025, 12, 31),
     montoMensual: BigDecimal = BigDecimal("15000.00"),
     estado: String = "activo",
-) = Contrato(
-    id = id,
-    propiedadId = propiedadId,
-    inquilinoId = inquilinoId,
-    fechaInicio = fechaInicio,
-    fechaFin = fechaFin,
-    montoMensual = montoMensual,
-    deposito = null,
-    moneda = "DOP",
-    estado = estado,
-    createdAt = Instant.now(),
-    updatedAt = Instant.now(),
-    isPendingSync = false,
-)
+) =
+    Contrato(
+        id = id,
+        propiedadId = propiedadId,
+        inquilinoId = inquilinoId,
+        fechaInicio = fechaInicio,
+        fechaFin = fechaFin,
+        montoMensual = montoMensual,
+        deposito = null,
+        moneda = "DOP",
+        estado = estado,
+        createdAt = Instant.now(),
+        updatedAt = Instant.now(),
+        isPendingSync = false,
+    )
 
-private fun samplePropiedad(
-    id: String,
-    titulo: String = "Propiedad $id",
-) = Propiedad(
-    id = id,
-    titulo = titulo,
-    descripcion = null,
-    direccion = "Calle $id",
-    ciudad = "Santiago",
-    provincia = "Santiago",
-    tipoPropiedad = "apartamento",
-    habitaciones = 2,
-    banos = 1,
-    areaM2 = BigDecimal("80"),
-    precio = BigDecimal("15000.00"),
-    moneda = "DOP",
-    estado = "disponible",
-    imagenes = emptyList(),
-    createdAt = Instant.now(),
-    updatedAt = Instant.now(),
-    isPendingSync = false,
-)
+private fun samplePropiedad(id: String, titulo: String = "Propiedad $id") =
+    Propiedad(
+        id = id,
+        titulo = titulo,
+        descripcion = null,
+        direccion = "Calle $id",
+        ciudad = "Santiago",
+        provincia = "Santiago",
+        tipoPropiedad = "apartamento",
+        habitaciones = 2,
+        banos = 1,
+        areaM2 = BigDecimal("80"),
+        precio = BigDecimal("15000.00"),
+        moneda = "DOP",
+        estado = "disponible",
+        imagenes = emptyList(),
+        createdAt = Instant.now(),
+        updatedAt = Instant.now(),
+        isPendingSync = false,
+    )
 
 private fun sampleInquilino(
     id: String,
     nombre: String = "Inquilino $id",
     apellido: String = "Apellido $id",
-) = Inquilino(
-    id = id,
-    nombre = nombre,
-    apellido = apellido,
-    email = null,
-    telefono = null,
-    cedula = "001-000000$id-0",
-    contactoEmergencia = null,
-    notas = null,
-    createdAt = Instant.now(),
-    updatedAt = Instant.now(),
-    isPendingSync = false,
-)
+) =
+    Inquilino(
+        id = id,
+        nombre = nombre,
+        apellido = apellido,
+        email = null,
+        telefono = null,
+        cedula = "001-000000$id-0",
+        contactoEmergencia = null,
+        notas = null,
+        createdAt = Instant.now(),
+        updatedAt = Instant.now(),
+        isPendingSync = false,
+    )
 
-private class FakeConnectivityObserver(
-    online: Boolean = true,
-) : ConnectivityObserver {
+private class FakeConnectivityObserver(online: Boolean = true) : ConnectivityObserver {
     override val isOnline: StateFlow<Boolean> = MutableStateFlow(online).asStateFlow()
 }
 
@@ -640,55 +648,70 @@ private fun stubContratoDao(): com.propmanager.core.database.dao.ContratoDao =
     Proxy.newProxyInstance(
         com.propmanager.core.database.dao.ContratoDao::class.java.classLoader,
         arrayOf(com.propmanager.core.database.dao.ContratoDao::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.ContratoDao
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.database.dao.ContratoDao
 
 @Suppress("UNCHECKED_CAST")
 private fun stubSyncQueueDao(): com.propmanager.core.database.dao.SyncQueueDao =
     Proxy.newProxyInstance(
         com.propmanager.core.database.dao.SyncQueueDao::class.java.classLoader,
         arrayOf(com.propmanager.core.database.dao.SyncQueueDao::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.SyncQueueDao
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.database.dao.SyncQueueDao
 
 @Suppress("UNCHECKED_CAST")
 private fun stubContratosApiService(): com.propmanager.core.network.api.ContratosApiService =
     Proxy.newProxyInstance(
         com.propmanager.core.network.api.ContratosApiService::class.java.classLoader,
         arrayOf(com.propmanager.core.network.api.ContratosApiService::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.network.api.ContratosApiService
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.network.api.ContratosApiService
 
 @Suppress("UNCHECKED_CAST")
 private fun stubPropiedadDao(): com.propmanager.core.database.dao.PropiedadDao =
     Proxy.newProxyInstance(
         com.propmanager.core.database.dao.PropiedadDao::class.java.classLoader,
         arrayOf(com.propmanager.core.database.dao.PropiedadDao::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.PropiedadDao
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.database.dao.PropiedadDao
 
 @Suppress("UNCHECKED_CAST")
 private fun stubPropiedadesApiService(): com.propmanager.core.network.api.PropiedadesApiService =
     Proxy.newProxyInstance(
         com.propmanager.core.network.api.PropiedadesApiService::class.java.classLoader,
         arrayOf(com.propmanager.core.network.api.PropiedadesApiService::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.network.api.PropiedadesApiService
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.network.api.PropiedadesApiService
 
 @Suppress("UNCHECKED_CAST")
 private fun stubInquilinoDao(): com.propmanager.core.database.dao.InquilinoDao =
     Proxy.newProxyInstance(
         com.propmanager.core.database.dao.InquilinoDao::class.java.classLoader,
         arrayOf(com.propmanager.core.database.dao.InquilinoDao::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.InquilinoDao
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.database.dao.InquilinoDao
 
 @Suppress("UNCHECKED_CAST")
 private fun stubInquilinosApiService(): com.propmanager.core.network.api.InquilinosApiService =
     Proxy.newProxyInstance(
         com.propmanager.core.network.api.InquilinosApiService::class.java.classLoader,
         arrayOf(com.propmanager.core.network.api.InquilinosApiService::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.network.api.InquilinosApiService
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.network.api.InquilinosApiService
 
 private class FakeContratosRepository(
     private val initialData: List<Contrato> = emptyList(),
     private val expiringData: List<Contrato>? = null,
     private val createError: Throwable? = null,
-) : ContratosRepository(
+) :
+    ContratosRepository(
         dao = stubContratoDao(),
         syncQueueDao = stubSyncQueueDao(),
         apiService = stubContratosApiService(),
@@ -696,10 +719,13 @@ private class FakeContratosRepository(
     ) {
     var createCallCount = 0
         private set
+
     var renewCallCount = 0
         private set
+
     var terminateCallCount = 0
         private set
+
     var deleteCallCount = 0
         private set
 
@@ -707,7 +733,8 @@ private class FakeContratosRepository(
 
     override fun observeAll(): Flow<List<Contrato>> = store
 
-    override fun observeById(id: String): Flow<Contrato?> = store.map { list -> list.find { it.id == id } }
+    override fun observeById(id: String): Flow<Contrato?> =
+        store.map { list -> list.find { it.id == id } }
 
     override fun observeExpiring(daysThreshold: Int): Flow<List<Contrato>> =
         MutableStateFlow(expiringData ?: initialData)
@@ -715,20 +742,21 @@ private class FakeContratosRepository(
     override suspend fun create(request: CreateContratoRequest): Result<Contrato> {
         createCallCount++
         if (createError != null) return Result.failure(createError)
-        val c = Contrato(
-            id = "new-$createCallCount",
-            propiedadId = request.propiedadId,
-            inquilinoId = request.inquilinoId,
-            fechaInicio = LocalDate.parse(request.fechaInicio),
-            fechaFin = LocalDate.parse(request.fechaFin),
-            montoMensual = request.montoMensual.toBigDecimal(),
-            deposito = request.deposito?.toBigDecimalOrNull(),
-            moneda = request.moneda ?: "DOP",
-            estado = "activo",
-            createdAt = Instant.now(),
-            updatedAt = Instant.now(),
-            isPendingSync = true,
-        )
+        val c =
+            Contrato(
+                id = "new-$createCallCount",
+                propiedadId = request.propiedadId,
+                inquilinoId = request.inquilinoId,
+                fechaInicio = LocalDate.parse(request.fechaInicio),
+                fechaFin = LocalDate.parse(request.fechaFin),
+                montoMensual = request.montoMensual.toBigDecimal(),
+                deposito = request.deposito?.toBigDecimalOrNull(),
+                moneda = request.moneda ?: "DOP",
+                estado = "activo",
+                createdAt = Instant.now(),
+                updatedAt = Instant.now(),
+                isPendingSync = true,
+            )
         store.value = store.value + c
         return Result.success(c)
     }
@@ -750,9 +778,8 @@ private class FakeContratosRepository(
     }
 }
 
-private class FakePropiedadesRepository(
-    private val initialData: List<Propiedad> = emptyList(),
-) : PropiedadesRepository(
+private class FakePropiedadesRepository(private val initialData: List<Propiedad> = emptyList()) :
+    PropiedadesRepository(
         dao = stubPropiedadDao(),
         syncQueueDao = stubSyncQueueDao(),
         apiService = stubPropiedadesApiService(),
@@ -761,9 +788,8 @@ private class FakePropiedadesRepository(
     override fun observeAll(): Flow<List<Propiedad>> = MutableStateFlow(initialData)
 }
 
-private class FakeInquilinosRepository(
-    private val initialData: List<Inquilino> = emptyList(),
-) : InquilinosRepository(
+private class FakeInquilinosRepository(private val initialData: List<Inquilino> = emptyList()) :
+    InquilinosRepository(
         dao = stubInquilinoDao(),
         syncQueueDao = stubSyncQueueDao(),
         apiService = stubInquilinosApiService(),

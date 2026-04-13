@@ -43,11 +43,7 @@ fun LoadingScreen(
 }
 
 @Composable
-fun ErrorScreen(
-    message: String,
-    modifier: Modifier = Modifier,
-    onRetry: (() -> Unit)? = null,
-) {
+fun ErrorScreen(message: String, modifier: Modifier = Modifier, onRetry: (() -> Unit)? = null) {
     Column(
         modifier = modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -68,18 +64,13 @@ fun ErrorScreen(
         )
         if (onRetry != null) {
             Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onRetry) {
-                Text(text = stringResource(R.string.retry))
-            }
+            Button(onClick = onRetry) { Text(text = stringResource(R.string.retry)) }
         }
     }
 }
 
 @Composable
-fun EmptyStateScreen(
-    message: String,
-    modifier: Modifier = Modifier,
-) {
+fun EmptyStateScreen(message: String, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,

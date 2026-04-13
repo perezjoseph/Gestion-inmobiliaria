@@ -447,64 +447,70 @@ struct MantenimientoListProps {
     on_per_page_change: Callback<u64>,
 }
 
+fn render_mantenimiento_row(s: &Solicitud, user_rol: &str, prop_label: &Callback<String, String>, on_edit: &Callback<Solicitud>, on_delete: &Callback<Solicitud>, on_view_detail: &Callback<String>) -> Html {
+    let p_label = prop_label.emit(s.propiedad_id.clone());
+    let costo_display = match (&s.costo_monto, &s.costo_moneda) {
+        (Some(monto), Some(moneda)) => format_currency(moneda, *monto),
+        _ => "—".into(),
+    };
+    let sc = s.clone();
+    let sd = s.clone();
+    let sv = s.id.clone();
+    let on_edit = on_edit.clone();
+    let on_delete_click = on_delete.clone();
+    let on_view_detail = on_view_detail.clone();
+    let user_rol = user_rol.to_string();
+    html! {
+        <tr>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{p_label}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">
+                <button onclick={Callback::from(move |_: MouseEvent| on_view_detail.emit(sv.clone()))}
+                    class="gi-btn-text" style="font-weight: 500;">{&s.titulo}</button>
+            </td>
+            <td style="padding: var(--space-3) var(--space-5);">{prioridad_badge(&s.prioridad)}</td>
+            <td style="padding: var(--space-3) var(--space-5);">{estado_badge(&s.estado)}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
+                {s.nombre_proveedor.as_deref().unwrap_or("—")}</td>
+            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{costo_display}</td>
+            if can_write(&user_rol) {
+                <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2);">
+                    <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(sc.clone()))} class="gi-btn-text">{"Editar"}</button>
+                    if can_delete(&user_rol) {
+                        <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(sd.clone()))} class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button>
+                    }
+                </td>
+            }
+        </tr>
+    }
+}
+
+fn render_mantenimiento_empty_state(user_rol: &str, on_new: &Callback<MouseEvent>) -> Html {
+    html! {
+        <div class="gi-empty-state">
+            <div class="gi-empty-state-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
+                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                </svg>
+            </div>
+            <div class="gi-empty-state-title">{"Sin solicitudes de mantenimiento"}</div>
+            <p class="gi-empty-state-text">{"Registre solicitudes de mantenimiento para dar seguimiento a reparaciones y trabajos en sus propiedades."}</p>
+            if can_write(user_rol) {
+                <button onclick={on_new.clone()} class="gi-btn gi-btn-primary" style="margin-top: var(--space-3);">{"+ Nueva Solicitud"}</button>
+            }
+        </div>
+    }
+}
+
 #[function_component]
 fn MantenimientoList(props: &MantenimientoListProps) -> Html {
     if props.items.is_empty() {
-        return html! {
-            <div class="gi-empty-state">
-                <div class="gi-empty-state-icon">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
-                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-                    </svg>
-                </div>
-                <div class="gi-empty-state-title">{"Sin solicitudes de mantenimiento"}</div>
-                <p class="gi-empty-state-text">{"Registre solicitudes de mantenimiento para dar seguimiento a reparaciones y trabajos en sus propiedades."}</p>
-                if can_write(&props.user_rol) {
-                    <button onclick={props.on_new.clone()} class="gi-btn gi-btn-primary" style="margin-top: var(--space-3);">{"+ Nueva Solicitud"}</button>
-                }
-            </div>
-        };
+        return render_mantenimiento_empty_state(&props.user_rol, &props.on_new);
     }
 
     html! {
         <>
             <DataTable headers={props.headers.clone()}>
-                { for props.items.iter().map(|s| {
-                    let on_edit = props.on_edit.clone();
-                    let on_delete_click = props.on_delete.clone();
-                    let on_view_detail = props.on_view_detail.clone();
-                    let sc = s.clone();
-                    let sd = s.clone();
-                    let sv = s.id.clone();
-                    let user_rol = props.user_rol.clone();
-                    let p_label = props.prop_label.emit(s.propiedad_id.clone());
-                    let costo_display = match (&s.costo_monto, &s.costo_moneda) {
-                        (Some(monto), Some(moneda)) => format_currency(moneda, *monto),
-                        _ => "—".into(),
-                    };
-                    html! {
-                        <tr>
-                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{p_label}</td>
-                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">
-                                <button onclick={Callback::from(move |_: MouseEvent| on_view_detail.emit(sv.clone()))}
-                                    class="gi-btn-text" style="font-weight: 500;">{&s.titulo}</button>
-                            </td>
-                            <td style="padding: var(--space-3) var(--space-5);">{prioridad_badge(&s.prioridad)}</td>
-                            <td style="padding: var(--space-3) var(--space-5);">{estado_badge(&s.estado)}</td>
-                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
-                                {s.nombre_proveedor.as_deref().unwrap_or("—")}</td>
-                            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{costo_display}</td>
-                            if can_write(&user_rol) {
-                                <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2);">
-                                    <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(sc.clone()))} class="gi-btn-text">{"Editar"}</button>
-                                    if can_delete(&user_rol) {
-                                        <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(sd.clone()))} class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button>
-                                    }
-                                </td>
-                            }
-                        </tr>
-                    }
-                })}
+                { for props.items.iter().map(|s| render_mantenimiento_row(s, &props.user_rol, &props.prop_label, &props.on_edit, &props.on_delete, &props.on_view_detail)) }
             </DataTable>
             <Pagination
                 total={props.total}
@@ -726,6 +732,7 @@ fn load_mant_refs(
     });
 }
 
+#[allow(clippy::type_complexity)]
 fn register_escape_listener_m(
     escape_handler: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>>,
 ) -> Option<EventListener> {

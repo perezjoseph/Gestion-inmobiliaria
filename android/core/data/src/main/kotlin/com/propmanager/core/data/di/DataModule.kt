@@ -45,25 +45,23 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import kotlinx.serialization.json.Json
 import javax.inject.Singleton
+import kotlinx.serialization.json.Json
 
 @Module
 @InstallIn(SingletonComponent::class)
 object DataModule {
     @Provides
     @Singleton
-    fun provideJson(): Json =
-        Json {
-            ignoreUnknownKeys = true
-            encodeDefaults = true
-        }
+    fun provideJson(): Json = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
 
     @Provides
     @Singleton
-    fun provideWorkManager(
-        @ApplicationContext context: Context,
-    ): WorkManager = WorkManager.getInstance(context)
+    fun provideWorkManager(@ApplicationContext context: Context): WorkManager =
+        WorkManager.getInstance(context)
 
     @Provides
     @Singleton
@@ -122,7 +120,8 @@ object DataModule {
         syncQueueDao: SyncQueueDao,
         apiService: MantenimientoApiService,
         json: Json,
-    ): MantenimientoRepository = MantenimientoRepository(solicitudDao, notaDao, syncQueueDao, apiService, json)
+    ): MantenimientoRepository =
+        MantenimientoRepository(solicitudDao, notaDao, syncQueueDao, apiService, json)
 
     @Provides
     @Singleton
@@ -134,30 +133,38 @@ object DataModule {
 
     @Provides
     @Singleton
-    fun provideReportesRepository(apiService: ReportesApiService): ReportesRepository = ReportesRepository(apiService)
+    fun provideReportesRepository(apiService: ReportesApiService): ReportesRepository =
+        ReportesRepository(apiService)
 
     @Provides
     @Singleton
-    fun provideDocumentosRepository(apiService: DocumentosApiService): DocumentosRepository = DocumentosRepository(apiService)
+    fun provideDocumentosRepository(apiService: DocumentosApiService): DocumentosRepository =
+        DocumentosRepository(apiService)
 
     @Provides
     @Singleton
-    fun provideNotificacionesRepository(apiService: NotificacionesApiService): NotificacionesRepository =
-        NotificacionesRepository(apiService)
+    fun provideNotificacionesRepository(
+        apiService: NotificacionesApiService
+    ): NotificacionesRepository = NotificacionesRepository(apiService)
 
     @Provides
     @Singleton
-    fun provideAuditoriaRepository(apiService: AuditoriaApiService): AuditoriaRepository = AuditoriaRepository(apiService)
+    fun provideAuditoriaRepository(apiService: AuditoriaApiService): AuditoriaRepository =
+        AuditoriaRepository(apiService)
 
     @Provides
     @Singleton
-    fun providePerfilRepository(apiService: PerfilApiService): PerfilRepository = PerfilRepository(apiService)
+    fun providePerfilRepository(apiService: PerfilApiService): PerfilRepository =
+        PerfilRepository(apiService)
 
     @Provides
     @Singleton
-    fun provideConfiguracionRepository(apiService: ConfiguracionApiService): ConfiguracionRepository = ConfiguracionRepository(apiService)
+    fun provideConfiguracionRepository(
+        apiService: ConfiguracionApiService
+    ): ConfiguracionRepository = ConfiguracionRepository(apiService)
 
     @Provides
     @Singleton
-    fun provideImportacionRepository(apiService: ImportacionApiService): ImportacionRepository = ImportacionRepository(apiService)
+    fun provideImportacionRepository(apiService: ImportacionApiService): ImportacionRepository =
+        ImportacionRepository(apiService)
 }

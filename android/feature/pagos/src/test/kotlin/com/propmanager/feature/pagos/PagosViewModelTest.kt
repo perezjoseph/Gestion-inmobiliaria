@@ -4,10 +4,7 @@ import com.propmanager.core.data.repository.ContratosRepository
 import com.propmanager.core.data.repository.PagosRepository
 import com.propmanager.core.model.Contrato
 import com.propmanager.core.model.Pago
-import com.propmanager.core.model.dto.CreateContratoRequest
 import com.propmanager.core.model.dto.CreatePagoRequest
-import com.propmanager.core.model.dto.RenovarContratoRequest
-import com.propmanager.core.model.dto.TerminarContratoRequest
 import com.propmanager.core.model.dto.UpdatePagoRequest
 import com.propmanager.core.network.ConnectivityObserver
 import io.kotest.core.spec.style.FreeSpec
@@ -19,6 +16,10 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotBeBlank
 import io.kotest.matchers.types.shouldBeInstanceOf
+import java.lang.reflect.Proxy
+import java.math.BigDecimal
+import java.time.Instant
+import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -33,10 +34,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.Json
-import java.lang.reflect.Proxy
-import java.math.BigDecimal
-import java.time.Instant
-import java.time.LocalDate
 
 /**
  * Unit tests for PagosViewModel.
@@ -46,26 +43,22 @@ import java.time.LocalDate
 @OptIn(ExperimentalCoroutinesApi::class)
 class PagosViewModelTest :
     FreeSpec({
-
         val testDispatcher = StandardTestDispatcher()
 
-        beforeEach {
-            Dispatchers.setMain(testDispatcher)
-        }
+        beforeEach { Dispatchers.setMain(testDispatcher) }
 
-        afterEach {
-            Dispatchers.resetMain()
-        }
+        afterEach { Dispatchers.resetMain() }
 
         "list state" -
             {
                 "emits Success with pagos from repository" {
                     val repo =
                         FakePagosRepository(
-                            initialData = listOf(
-                                samplePago("1", estado = "pendiente"),
-                                samplePago("2", estado = "pagado"),
-                            ),
+                            initialData =
+                                listOf(
+                                    samplePago("1", estado = "pendiente"),
+                                    samplePago("2", estado = "pagado"),
+                                )
                         )
                     runTest(testDispatcher) {
                         val vm = createViewModel(pagosRepo = repo)
@@ -95,11 +88,12 @@ class PagosViewModelTest :
                 "updateFilter filters by contratoId" {
                     val repo =
                         FakePagosRepository(
-                            initialData = listOf(
-                                samplePago("1", contratoId = "c1"),
-                                samplePago("2", contratoId = "c2"),
-                                samplePago("3", contratoId = "c1"),
-                            ),
+                            initialData =
+                                listOf(
+                                    samplePago("1", contratoId = "c1"),
+                                    samplePago("2", contratoId = "c2"),
+                                    samplePago("3", contratoId = "c1"),
+                                )
                         )
                     runTest(testDispatcher) {
                         val vm = createViewModel(pagosRepo = repo)
@@ -119,11 +113,12 @@ class PagosViewModelTest :
                 "updateFilter filters by estado" {
                     val repo =
                         FakePagosRepository(
-                            initialData = listOf(
-                                samplePago("1", estado = "pendiente"),
-                                samplePago("2", estado = "pagado"),
-                                samplePago("3", estado = "pendiente"),
-                            ),
+                            initialData =
+                                listOf(
+                                    samplePago("1", estado = "pendiente"),
+                                    samplePago("2", estado = "pagado"),
+                                    samplePago("3", estado = "pendiente"),
+                                )
                         )
                     runTest(testDispatcher) {
                         val vm = createViewModel(pagosRepo = repo)
@@ -142,11 +137,12 @@ class PagosViewModelTest :
                 "updateFilter filters by fecha range" {
                     val repo =
                         FakePagosRepository(
-                            initialData = listOf(
-                                samplePago("1", fechaVencimiento = LocalDate.of(2025, 1, 15)),
-                                samplePago("2", fechaVencimiento = LocalDate.of(2025, 3, 15)),
-                                samplePago("3", fechaVencimiento = LocalDate.of(2025, 6, 15)),
-                            ),
+                            initialData =
+                                listOf(
+                                    samplePago("1", fechaVencimiento = LocalDate.of(2025, 1, 15)),
+                                    samplePago("2", fechaVencimiento = LocalDate.of(2025, 3, 15)),
+                                    samplePago("3", fechaVencimiento = LocalDate.of(2025, 6, 15)),
+                                )
                         )
                     runTest(testDispatcher) {
                         val vm = createViewModel(pagosRepo = repo)
@@ -164,10 +160,11 @@ class PagosViewModelTest :
                 "clearFilters resets all filters and shows all pagos" {
                     val repo =
                         FakePagosRepository(
-                            initialData = listOf(
-                                samplePago("1", contratoId = "c1"),
-                                samplePago("2", contratoId = "c2"),
-                            ),
+                            initialData =
+                                listOf(
+                                    samplePago("1", contratoId = "c1"),
+                                    samplePago("2", contratoId = "c2"),
+                                )
                         )
                     runTest(testDispatcher) {
                         val vm = createViewModel(pagosRepo = repo)
@@ -364,13 +361,14 @@ class PagosViewModelTest :
                 }
 
                 "initEditForm populates form from pago" {
-                    val pago = samplePago(
-                        "1",
-                        contratoId = "c1",
-                        monto = BigDecimal("7500.00"),
-                        metodoPago = "transferencia",
-                        notas = "Pago parcial",
-                    )
+                    val pago =
+                        samplePago(
+                            "1",
+                            contratoId = "c1",
+                            monto = BigDecimal("7500.00"),
+                            metodoPago = "transferencia",
+                            notas = "Pago parcial",
+                        )
                     val repo = FakePagosRepository()
                     runTest(testDispatcher) {
                         val vm = createViewModel(pagosRepo = repo)
@@ -388,9 +386,10 @@ class PagosViewModelTest :
             }
 
         "contratos list is exposed for form selectors" {
-            val contratosRepo = FakeContratosRepository(
-                initialData = listOf(sampleContrato("c1"), sampleContrato("c2")),
-            )
+            val contratosRepo =
+                FakeContratosRepository(
+                    initialData = listOf(sampleContrato("c1"), sampleContrato("c2"))
+                )
             val pagosRepo = FakePagosRepository()
             runTest(testDispatcher) {
                 val vm = createViewModel(pagosRepo = pagosRepo, contratosRepo = contratosRepo)
@@ -435,41 +434,39 @@ private fun samplePago(
     metodoPago: String? = null,
     estado: String = "pendiente",
     notas: String? = null,
-) = Pago(
-    id = id,
-    contratoId = contratoId,
-    monto = monto,
-    moneda = moneda,
-    fechaPago = fechaPago,
-    fechaVencimiento = fechaVencimiento,
-    metodoPago = metodoPago,
-    estado = estado,
-    notas = notas,
-    createdAt = Instant.now(),
-    updatedAt = Instant.now(),
-    isPendingSync = false,
-)
+) =
+    Pago(
+        id = id,
+        contratoId = contratoId,
+        monto = monto,
+        moneda = moneda,
+        fechaPago = fechaPago,
+        fechaVencimiento = fechaVencimiento,
+        metodoPago = metodoPago,
+        estado = estado,
+        notas = notas,
+        createdAt = Instant.now(),
+        updatedAt = Instant.now(),
+        isPendingSync = false,
+    )
 
-private fun sampleContrato(
-    id: String,
-) = Contrato(
-    id = id,
-    propiedadId = "p1",
-    inquilinoId = "i1",
-    fechaInicio = LocalDate.of(2025, 1, 1),
-    fechaFin = LocalDate.of(2025, 12, 31),
-    montoMensual = BigDecimal("15000.00"),
-    deposito = null,
-    moneda = "DOP",
-    estado = "activo",
-    createdAt = Instant.now(),
-    updatedAt = Instant.now(),
-    isPendingSync = false,
-)
+private fun sampleContrato(id: String) =
+    Contrato(
+        id = id,
+        propiedadId = "p1",
+        inquilinoId = "i1",
+        fechaInicio = LocalDate.of(2025, 1, 1),
+        fechaFin = LocalDate.of(2025, 12, 31),
+        montoMensual = BigDecimal("15000.00"),
+        deposito = null,
+        moneda = "DOP",
+        estado = "activo",
+        createdAt = Instant.now(),
+        updatedAt = Instant.now(),
+        isPendingSync = false,
+    )
 
-private class FakeConnectivityObserver(
-    online: Boolean = true,
-) : ConnectivityObserver {
+private class FakeConnectivityObserver(online: Boolean = true) : ConnectivityObserver {
     override val isOnline: StateFlow<Boolean> = MutableStateFlow(online).asStateFlow()
 }
 
@@ -480,41 +477,52 @@ private fun stubPagoDao(): com.propmanager.core.database.dao.PagoDao =
     Proxy.newProxyInstance(
         com.propmanager.core.database.dao.PagoDao::class.java.classLoader,
         arrayOf(com.propmanager.core.database.dao.PagoDao::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.PagoDao
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.database.dao.PagoDao
 
 @Suppress("UNCHECKED_CAST")
 private fun stubSyncQueueDao(): com.propmanager.core.database.dao.SyncQueueDao =
     Proxy.newProxyInstance(
         com.propmanager.core.database.dao.SyncQueueDao::class.java.classLoader,
         arrayOf(com.propmanager.core.database.dao.SyncQueueDao::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.SyncQueueDao
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.database.dao.SyncQueueDao
 
 @Suppress("UNCHECKED_CAST")
 private fun stubPagosApiService(): com.propmanager.core.network.api.PagosApiService =
     Proxy.newProxyInstance(
         com.propmanager.core.network.api.PagosApiService::class.java.classLoader,
         arrayOf(com.propmanager.core.network.api.PagosApiService::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.network.api.PagosApiService
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.network.api.PagosApiService
 
 @Suppress("UNCHECKED_CAST")
 private fun stubContratoDao(): com.propmanager.core.database.dao.ContratoDao =
     Proxy.newProxyInstance(
         com.propmanager.core.database.dao.ContratoDao::class.java.classLoader,
         arrayOf(com.propmanager.core.database.dao.ContratoDao::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.ContratoDao
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.database.dao.ContratoDao
 
 @Suppress("UNCHECKED_CAST")
 private fun stubContratosApiService(): com.propmanager.core.network.api.ContratosApiService =
     Proxy.newProxyInstance(
         com.propmanager.core.network.api.ContratosApiService::class.java.classLoader,
         arrayOf(com.propmanager.core.network.api.ContratosApiService::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.network.api.ContratosApiService
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.network.api.ContratosApiService
 
 private class FakePagosRepository(
     private val initialData: List<Pago> = emptyList(),
     private val createError: Throwable? = null,
     private val updateError: Throwable? = null,
-) : PagosRepository(
+) :
+    PagosRepository(
         dao = stubPagoDao(),
         syncQueueDao = stubSyncQueueDao(),
         apiService = stubPagosApiService(),
@@ -522,8 +530,10 @@ private class FakePagosRepository(
     ) {
     var createCallCount = 0
         private set
+
     var updateCallCount = 0
         private set
+
     var deleteCallCount = 0
         private set
 
@@ -549,28 +559,26 @@ private class FakePagosRepository(
     override suspend fun create(request: CreatePagoRequest): Result<Pago> {
         createCallCount++
         if (createError != null) return Result.failure(createError)
-        val p = Pago(
-            id = "new-$createCallCount",
-            contratoId = request.contratoId,
-            monto = request.monto.toBigDecimal(),
-            moneda = request.moneda ?: "DOP",
-            fechaPago = request.fechaPago?.let { LocalDate.parse(it) },
-            fechaVencimiento = LocalDate.parse(request.fechaVencimiento),
-            metodoPago = request.metodoPago,
-            estado = "pendiente",
-            notas = request.notas,
-            createdAt = Instant.now(),
-            updatedAt = Instant.now(),
-            isPendingSync = true,
-        )
+        val p =
+            Pago(
+                id = "new-$createCallCount",
+                contratoId = request.contratoId,
+                monto = request.monto.toBigDecimal(),
+                moneda = request.moneda ?: "DOP",
+                fechaPago = request.fechaPago?.let { LocalDate.parse(it) },
+                fechaVencimiento = LocalDate.parse(request.fechaVencimiento),
+                metodoPago = request.metodoPago,
+                estado = "pendiente",
+                notas = request.notas,
+                createdAt = Instant.now(),
+                updatedAt = Instant.now(),
+                isPendingSync = true,
+            )
         store.value = store.value + p
         return Result.success(p)
     }
 
-    override suspend fun update(
-        id: String,
-        request: UpdatePagoRequest,
-    ): Result<Unit> {
+    override suspend fun update(id: String, request: UpdatePagoRequest): Result<Unit> {
         updateCallCount++
         if (updateError != null) return Result.failure(updateError)
         return Result.success(Unit)
@@ -583,9 +591,8 @@ private class FakePagosRepository(
     }
 }
 
-private class FakeContratosRepository(
-    private val initialData: List<Contrato> = emptyList(),
-) : ContratosRepository(
+private class FakeContratosRepository(private val initialData: List<Contrato> = emptyList()) :
+    ContratosRepository(
         dao = stubContratoDao(),
         syncQueueDao = stubSyncQueueDao(),
         apiService = stubContratosApiService(),

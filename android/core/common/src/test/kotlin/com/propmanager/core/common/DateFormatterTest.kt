@@ -1,10 +1,10 @@
 package com.propmanager.core.common
 
 import com.google.common.truth.Truth.assertThat
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 
 class DateFormatterTest {
     @Test
@@ -33,16 +33,12 @@ class DateFormatterTest {
 
     @Test
     fun `fromApi rejects invalid format`() {
-        assertThrows<DateTimeParseException> {
-            DateFormatter.fromApi("15/06/2025")
-        }
+        assertThrows<DateTimeParseException> { DateFormatter.fromApi("15/06/2025") }
     }
 
     @Test
     fun `fromDisplay rejects API format`() {
-        assertThrows<DateTimeParseException> {
-            DateFormatter.fromDisplay("2025-06-15")
-        }
+        assertThrows<DateTimeParseException> { DateFormatter.fromDisplay("2025-06-15") }
     }
 
     @Test

@@ -6,5 +6,6 @@ pub mod error_banner;
 pub mod loading;
 pub mod offline_banner;
 pub mod pagination;
+pub mod skeleton;
 pub mod sortable_header;
 pub mod toast;

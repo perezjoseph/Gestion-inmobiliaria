@@ -17,12 +17,11 @@ import kotlinx.serialization.json.Json
  *
  * Property 1: Login response extraction round-trip
  *
- * For any valid LoginResponse DTO containing a user profile with arbitrary id, nombre,
- * email, and rol values, serializing to JSON and deserializing back yields the same object.
+ * For any valid LoginResponse DTO containing a user profile with arbitrary id, nombre, email, and
+ * rol values, serializing to JSON and deserializing back yields the same object.
  */
 class LoginResponseRoundTripPropertyTest :
     FreeSpec({
-
         val json = Json { ignoreUnknownKeys = true }
 
         val userDtoArb: Arb<UserDto> =
@@ -36,8 +35,8 @@ class LoginResponseRoundTripPropertyTest :
                             rol = "gerente",
                             activo = true,
                             createdAt = "2024-01-01T00:00:00Z",
-                        ),
-                    ),
+                        )
+                    )
             ) {
                 UserDto(
                     id = Arb.string(1..50).bind(),
@@ -49,17 +48,12 @@ class LoginResponseRoundTripPropertyTest :
                 )
             }
 
-        val loginResponseArb: Arb<LoginResponse> =
-            arbitrary {
-                LoginResponse(
-                    token = Arb.string(1..200).bind(),
-                    user = userDtoArb.bind(),
-                )
-            }
+        val loginResponseArb: Arb<LoginResponse> = arbitrary {
+            LoginResponse(token = Arb.string(1..200).bind(), user = userDtoArb.bind())
+        }
 
         "Property 1: Login response extraction round-trip" -
             {
-
                 "serializing and deserializing LoginResponse preserves all fields" {
                     checkAll(100, loginResponseArb) { response ->
                         val serialized = json.encodeToString(response)

@@ -15,28 +15,18 @@ data class ImportResultDto(
     val fallidos: List<ImportErrorDto>,
 )
 
-@Serializable
-data class ImportErrorDto(
-    val fila: Int,
-    val error: String,
-)
+@Serializable data class ImportErrorDto(val fila: Int, val error: String)
 
 interface ImportacionApiService {
     @Multipart
     @POST("api/importar/propiedades")
-    suspend fun importPropiedades(
-        @Part file: MultipartBody.Part,
-    ): Response<ImportResultDto>
+    suspend fun importPropiedades(@Part file: MultipartBody.Part): Response<ImportResultDto>
 
     @Multipart
     @POST("api/importar/inquilinos")
-    suspend fun importInquilinos(
-        @Part file: MultipartBody.Part,
-    ): Response<ImportResultDto>
+    suspend fun importInquilinos(@Part file: MultipartBody.Part): Response<ImportResultDto>
 
     @Multipart
     @POST("api/importar/gastos")
-    suspend fun importGastos(
-        @Part file: MultipartBody.Part,
-    ): Response<ImportResultDto>
+    suspend fun importGastos(@Part file: MultipartBody.Part): Response<ImportResultDto>
 }

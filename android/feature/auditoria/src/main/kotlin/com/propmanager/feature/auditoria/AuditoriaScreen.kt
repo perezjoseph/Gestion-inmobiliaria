@@ -17,14 +17,12 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
@@ -39,7 +37,8 @@ import com.propmanager.core.ui.components.LoadingScreen
 import com.propmanager.core.ui.components.OfflineIndicator
 import com.propmanager.core.ui.components.PropManagerTopAppBar
 
-private val ENTITY_TYPES = listOf("propiedad", "inquilino", "contrato", "pago", "gasto", "solicitud")
+private val ENTITY_TYPES =
+    listOf("propiedad", "inquilino", "contrato", "pago", "gasto", "solicitud")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,12 +61,7 @@ fun AuditoriaScreen(
         },
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-        ) {
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             OfflineIndicator(isOffline = !isOnline)
 
             if (!isOnline) {
@@ -88,30 +82,21 @@ fun AuditoriaScreen(
                         onRetry = { viewModel.loadAuditLog() },
                     )
                 uiState.entries.isEmpty() ->
-                    EmptyStateScreen(
-                        message = stringResource(R.string.auditoria_empty),
-                    )
+                    EmptyStateScreen(message = stringResource(R.string.auditoria_empty))
                 else -> {
                     val listState = rememberLazyListState()
                     val shouldLoadMore by remember {
                         derivedStateOf {
                             val lastVisible =
-                                listState.layoutInfo.visibleItemsInfo
-                                    .lastOrNull()
-                                    ?.index ?: 0
+                                listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
                             lastVisible >= uiState.entries.size - 3
                         }
                     }
-                    LaunchedEffect(shouldLoadMore) {
-                        if (shouldLoadMore) viewModel.loadNextPage()
-                    }
+                    LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) viewModel.loadNextPage() }
 
                     LazyColumn(
                         state = listState,
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 16.dp),
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         item(key = "top_spacer") { Spacer(modifier = Modifier.height(4.dp)) }
@@ -122,10 +107,7 @@ fun AuditoriaScreen(
                             item(key = "loading_more") {
                                 Text(
                                     text = stringResource(R.string.loading),
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(16.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                             }
@@ -145,10 +127,7 @@ private fun EntityTypeFilterRow(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         FilterChip(
@@ -160,17 +139,19 @@ private fun EntityTypeFilterRow(
             FilterChip(
                 selected = selected == type,
                 onClick = { onSelect(type) },
-                label = { Text(type.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelSmall) },
+                label = {
+                    Text(
+                        type.replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                },
             )
         }
     }
 }
 
 @Composable
-private fun AuditoriaItem(
-    entry: AuditoriaDto,
-    modifier: Modifier = Modifier,
-) {
+private fun AuditoriaItem(entry: AuditoriaDto, modifier: Modifier = Modifier) {
     Card(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(

@@ -14,6 +14,8 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotBeBlank
 import io.kotest.matchers.types.shouldBeInstanceOf
+import java.lang.reflect.Proxy
+import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -27,8 +29,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.Json
-import java.lang.reflect.Proxy
-import java.time.Instant
 
 /**
  * Unit tests for InquilinosViewModel.
@@ -38,16 +38,11 @@ import java.time.Instant
 @OptIn(ExperimentalCoroutinesApi::class)
 class InquilinosViewModelTest :
     FreeSpec({
-
         val testDispatcher = StandardTestDispatcher()
 
-        beforeEach {
-            Dispatchers.setMain(testDispatcher)
-        }
+        beforeEach { Dispatchers.setMain(testDispatcher) }
 
-        afterEach {
-            Dispatchers.resetMain()
-        }
+        afterEach { Dispatchers.resetMain() }
 
         "list state" -
             {
@@ -58,7 +53,7 @@ class InquilinosViewModelTest :
                                 listOf(
                                     sampleInquilino("1", nombre = "Juan"),
                                     sampleInquilino("2", nombre = "Maria"),
-                                ),
+                                )
                         )
                     runTest(testDispatcher) {
                         val vm = createViewModel(repo)
@@ -90,10 +85,25 @@ class InquilinosViewModelTest :
                         FakeInquilinosRepository(
                             initialData =
                                 listOf(
-                                    sampleInquilino("1", nombre = "Juan", apellido = "Perez", cedula = "001-0000001-1"),
-                                    sampleInquilino("2", nombre = "Maria", apellido = "Lopez", cedula = "001-0000002-2"),
-                                    sampleInquilino("3", nombre = "Juanita", apellido = "Garcia", cedula = "001-0000003-3"),
-                                ),
+                                    sampleInquilino(
+                                        "1",
+                                        nombre = "Juan",
+                                        apellido = "Perez",
+                                        cedula = "001-0000001-1",
+                                    ),
+                                    sampleInquilino(
+                                        "2",
+                                        nombre = "Maria",
+                                        apellido = "Lopez",
+                                        cedula = "001-0000002-2",
+                                    ),
+                                    sampleInquilino(
+                                        "3",
+                                        nombre = "Juanita",
+                                        apellido = "Garcia",
+                                        cedula = "001-0000003-3",
+                                    ),
+                                )
                         )
                     runTest(testDispatcher) {
                         val vm = createViewModel(repo)
@@ -117,7 +127,7 @@ class InquilinosViewModelTest :
                                 listOf(
                                     sampleInquilino("1", nombre = "Juan", apellido = "Perez"),
                                     sampleInquilino("2", nombre = "Maria", apellido = "Lopez"),
-                                ),
+                                )
                         )
                     runTest(testDispatcher) {
                         val vm = createViewModel(repo)
@@ -140,7 +150,7 @@ class InquilinosViewModelTest :
                                 listOf(
                                     sampleInquilino("1", cedula = "001-0000001-1"),
                                     sampleInquilino("2", cedula = "002-0000002-2"),
-                                ),
+                                )
                         )
                     runTest(testDispatcher) {
                         val vm = createViewModel(repo)
@@ -159,11 +169,7 @@ class InquilinosViewModelTest :
                 "empty search shows all inquilinos" {
                     val repo =
                         FakeInquilinosRepository(
-                            initialData =
-                                listOf(
-                                    sampleInquilino("1"),
-                                    sampleInquilino("2"),
-                                ),
+                            initialData = listOf(sampleInquilino("1"), sampleInquilino("2"))
                         )
                     runTest(testDispatcher) {
                         val vm = createViewModel(repo)
@@ -200,8 +206,7 @@ class InquilinosViewModelTest :
                         advanceUntilIdle()
 
                         successCalled shouldBe true
-                        vm.formState.value.errors
-                            .shouldBeEmpty()
+                        vm.formState.value.errors.shouldBeEmpty()
                         vm.formState.value.isSubmitting shouldBe false
                         vm.successMessage.value shouldBe "Creado correctamente"
                         repo.createCallCount shouldBe 1
@@ -320,8 +325,7 @@ class InquilinosViewModelTest :
                         vm.formState.value.errors shouldContainKey "nombre"
 
                         vm.onFieldChange("nombre", "Juan")
-                        vm.formState.value.errors
-                            .containsKey("nombre") shouldBe false
+                        vm.formState.value.errors.containsKey("nombre") shouldBe false
                     }
                 }
             }
@@ -398,8 +402,7 @@ class InquilinosViewModelTest :
                         vm.initCreateForm()
 
                         vm.formState.value.nombre shouldBe ""
-                        vm.formState.value.errors
-                            .shouldBeEmpty()
+                        vm.formState.value.errors.shouldBeEmpty()
                         vm.formState.value.isSubmitting shouldBe false
                     }
                 }
@@ -455,23 +458,22 @@ private fun sampleInquilino(
     cedula: String = "001-000000$id-0",
     email: String? = null,
     telefono: String? = null,
-) = Inquilino(
-    id = id,
-    nombre = nombre,
-    apellido = apellido,
-    email = email,
-    telefono = telefono,
-    cedula = cedula,
-    contactoEmergencia = null,
-    notas = null,
-    createdAt = Instant.now(),
-    updatedAt = Instant.now(),
-    isPendingSync = false,
-)
+) =
+    Inquilino(
+        id = id,
+        nombre = nombre,
+        apellido = apellido,
+        email = email,
+        telefono = telefono,
+        cedula = cedula,
+        contactoEmergencia = null,
+        notas = null,
+        createdAt = Instant.now(),
+        updatedAt = Instant.now(),
+        isPendingSync = false,
+    )
 
-private class FakeConnectivityObserver(
-    online: Boolean = true,
-) : ConnectivityObserver {
+private class FakeConnectivityObserver(online: Boolean = true) : ConnectivityObserver {
     override val isOnline: StateFlow<Boolean> = MutableStateFlow(online).asStateFlow()
 }
 
@@ -480,28 +482,37 @@ private class FakeInquilinosRepository(
     private val initialData: List<Inquilino> = emptyList(),
     private val createError: Throwable? = null,
     private val updateError: Throwable? = null,
-) : InquilinosRepository(
+) :
+    InquilinosRepository(
         dao =
             Proxy.newProxyInstance(
                 com.propmanager.core.database.dao.InquilinoDao::class.java.classLoader,
                 arrayOf(com.propmanager.core.database.dao.InquilinoDao::class.java),
-            ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.InquilinoDao,
+            ) { _, _, _ ->
+                error("stub")
+            } as com.propmanager.core.database.dao.InquilinoDao,
         syncQueueDao =
             Proxy.newProxyInstance(
                 com.propmanager.core.database.dao.SyncQueueDao::class.java.classLoader,
                 arrayOf(com.propmanager.core.database.dao.SyncQueueDao::class.java),
-            ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.SyncQueueDao,
+            ) { _, _, _ ->
+                error("stub")
+            } as com.propmanager.core.database.dao.SyncQueueDao,
         apiService =
             Proxy.newProxyInstance(
                 com.propmanager.core.network.api.InquilinosApiService::class.java.classLoader,
                 arrayOf(com.propmanager.core.network.api.InquilinosApiService::class.java),
-            ) { _, _, _ -> error("stub") } as com.propmanager.core.network.api.InquilinosApiService,
+            ) { _, _, _ ->
+                error("stub")
+            } as com.propmanager.core.network.api.InquilinosApiService,
         json = Json { ignoreUnknownKeys = true },
     ) {
     var createCallCount = 0
         private set
+
     var updateCallCount = 0
         private set
+
     var deleteCallCount = 0
         private set
 
@@ -518,7 +529,8 @@ private class FakeInquilinosRepository(
             }
         }
 
-    override fun observeById(id: String): Flow<Inquilino?> = store.map { list -> list.find { it.id == id } }
+    override fun observeById(id: String): Flow<Inquilino?> =
+        store.map { list -> list.find { it.id == id } }
 
     override suspend fun create(request: CreateInquilinoRequest): Result<Inquilino> {
         createCallCount++
@@ -541,10 +553,7 @@ private class FakeInquilinosRepository(
         return Result.success(i)
     }
 
-    override suspend fun update(
-        id: String,
-        request: UpdateInquilinoRequest,
-    ): Result<Unit> {
+    override suspend fun update(id: String, request: UpdateInquilinoRequest): Result<Unit> {
         updateCallCount++
         if (updateError != null) return Result.failure(updateError)
         return Result.success(Unit)

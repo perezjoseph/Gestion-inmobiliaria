@@ -32,19 +32,10 @@ data class ContratoCalendario(
     val color: String,
 )
 
-@Serializable
-data class OcupacionTendencia(
-    val mes: Int,
-    val anio: Int,
-    val tasa: Double,
-)
+@Serializable data class OcupacionTendencia(val mes: Int, val anio: Int, val tasa: Double)
 
 @Serializable
-data class IngresosComparacion(
-    val esperado: String,
-    val cobrado: String,
-    val diferencia: String,
-)
+data class IngresosComparacion(val esperado: String, val cobrado: String, val diferencia: String)
 
 @Serializable
 data class GastosComparacion(

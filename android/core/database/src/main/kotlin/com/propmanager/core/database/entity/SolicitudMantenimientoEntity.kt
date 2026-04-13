@@ -8,13 +8,14 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "solicitudes_mantenimiento",
-    foreignKeys = [
-        ForeignKey(
-            entity = PropiedadEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["propiedad_id"],
-        ),
-    ],
+    foreignKeys =
+        [
+            ForeignKey(
+                entity = PropiedadEntity::class,
+                parentColumns = ["id"],
+                childColumns = ["propiedad_id"],
+            )
+        ],
     indices = [Index("propiedad_id")],
 )
 data class SolicitudMantenimientoEntity(

@@ -9,7 +9,6 @@ import io.kotest.property.arbitrary.arbitrary
 import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.list
 import io.kotest.property.arbitrary.long
-import io.kotest.property.arbitrary.string
 import io.kotest.property.arbitrary.uuid
 import io.kotest.property.checkAll
 
@@ -18,16 +17,24 @@ import io.kotest.property.checkAll
  *
  * Property 8: Inquilino text search matches nombre, apellido, or cédula
  *
- * For any list of inquilinos and any non-empty search term, the search query
- * returns only inquilinos where nombre, apellido, or cedula contains the search
- * term (case-insensitive), and does not exclude any inquilino that matches in
- * at least one of those fields.
+ * For any list of inquilinos and any non-empty search term, the search query returns only
+ * inquilinos where nombre, apellido, or cedula contains the search term (case-insensitive), and
+ * does not exclude any inquilino that matches in at least one of those fields.
  */
 class InquilinoTextSearchPropertyTest :
     FreeSpec({
-
         val nombres = listOf("Juan", "María", "Carlos", "Ana", "Pedro", "Luisa", "José", "Carmen")
-        val apellidos = listOf("García", "Rodríguez", "Martínez", "López", "Hernández", "Pérez", "Díaz", "Morales")
+        val apellidos =
+            listOf(
+                "García",
+                "Rodríguez",
+                "Martínez",
+                "López",
+                "Hernández",
+                "Pérez",
+                "Díaz",
+                "Morales",
+            )
         val cedulaFormats =
             listOf(
                 "001-1234567-8",
@@ -38,23 +45,22 @@ class InquilinoTextSearchPropertyTest :
                 "226-4443322-5",
             )
 
-        val inquilinoArb: Arb<InquilinoEntity> =
-            arbitrary {
-                InquilinoEntity(
-                    id = Arb.uuid().bind().toString(),
-                    nombre = Arb.element(nombres).bind(),
-                    apellido = Arb.element(apellidos).bind(),
-                    email = null,
-                    telefono = null,
-                    cedula = Arb.element(cedulaFormats).bind(),
-                    contactoEmergencia = null,
-                    notas = null,
-                    createdAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
-                    updatedAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
-                    isDeleted = false,
-                    isPendingSync = false,
-                )
-            }
+        val inquilinoArb: Arb<InquilinoEntity> = arbitrary {
+            InquilinoEntity(
+                id = Arb.uuid().bind().toString(),
+                nombre = Arb.element(nombres).bind(),
+                apellido = Arb.element(apellidos).bind(),
+                email = null,
+                telefono = null,
+                cedula = Arb.element(cedulaFormats).bind(),
+                contactoEmergencia = null,
+                notas = null,
+                createdAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
+                updatedAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
+                isDeleted = false,
+                isPendingSync = false,
+            )
+        }
 
         fun searchInquilinos(
             entities: List<InquilinoEntity>,
@@ -70,7 +76,6 @@ class InquilinoTextSearchPropertyTest :
 
         "Property 8: Inquilino text search matches nombre, apellido, or cédula" -
             {
-
                 "search results contain only inquilinos matching in nombre, apellido, or cedula" {
                     checkAll(
                         100,

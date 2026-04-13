@@ -22,6 +22,6 @@ data class AuditoriaDto(
 interface AuditoriaApiService {
     @GET("api/auditoria")
     suspend fun list(
-        @QueryMap filters: Map<String, String> = emptyMap(),
+        @QueryMap filters: Map<String, String> = emptyMap()
     ): Response<PaginatedResponse<AuditoriaDto>>
 }

@@ -26,13 +26,7 @@ fun PropManagerTopAppBar(
     scrollBehavior: TopAppBarScrollBehavior? = null,
 ) {
     CenterAlignedTopAppBar(
-        title = {
-            Text(
-                text = title,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
+        title = { Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         modifier = modifier,
         navigationIcon = {
             if (onNavigateBack != null) {

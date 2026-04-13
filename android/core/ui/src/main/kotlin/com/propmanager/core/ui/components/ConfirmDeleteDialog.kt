@@ -19,14 +19,8 @@ fun ConfirmDeleteDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = modifier,
-        title = {
-            Text(text = stringResource(R.string.confirm_delete_title))
-        },
-        text = {
-            Text(
-                text = stringResource(R.string.confirm_delete_message, itemName),
-            )
-        },
+        title = { Text(text = stringResource(R.string.confirm_delete_title)) },
+        text = { Text(text = stringResource(R.string.confirm_delete_message, itemName)) },
         confirmButton = {
             TextButton(onClick = onConfirm) {
                 Text(
@@ -36,9 +30,7 @@ fun ConfirmDeleteDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(text = stringResource(R.string.cancel))
-            }
+            TextButton(onClick = onDismiss) { Text(text = stringResource(R.string.cancel)) }
         },
     )
 }

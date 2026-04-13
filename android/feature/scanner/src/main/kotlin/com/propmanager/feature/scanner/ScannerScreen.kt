@@ -35,7 +35,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.propmanager.core.ui.R
 import com.propmanager.core.ui.components.PropManagerTopAppBar
 
-enum class ScannerMode { CEDULA, RECEIPT }
+enum class ScannerMode {
+    CEDULA,
+    RECEIPT,
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,10 +65,7 @@ fun ScannerScreen(
     ) { paddingValues ->
         Column(
             modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .verticalScroll(rememberScrollState()),
+                Modifier.fillMaxSize().padding(paddingValues).verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             CameraPreviewPlaceholder(
@@ -143,12 +143,7 @@ private fun CameraPreviewPlaceholder(
                 textAlign = TextAlign.Center,
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = onCapture,
-                enabled = !isProcessing,
-            ) {
-                Text("Capturar")
-            }
+            Button(onClick = onCapture, enabled = !isProcessing) { Text("Capturar") }
         }
     }
 }
@@ -162,7 +157,11 @@ private fun CedulaResultPreview(
 ) {
     Card(modifier = modifier.fillMaxWidth().padding(16.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Resultado del escaneo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Resultado del escaneo",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
             Spacer(modifier = Modifier.height(8.dp))
             ResultField("Nombre", result.nombre)
             ResultField("Apellido", result.apellido)
@@ -187,7 +186,11 @@ private fun ReceiptResultPreview(
 ) {
     Card(modifier = modifier.fillMaxWidth().padding(16.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Resultado del escaneo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Resultado del escaneo",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
             Spacer(modifier = Modifier.height(8.dp))
             ResultField("Monto", result.monto?.toPlainString())
             ResultField("Fecha", result.fecha?.toString())
@@ -205,17 +208,21 @@ private fun ReceiptResultPreview(
 }
 
 @Composable
-private fun ResultField(
-    label: String,
-    value: String?,
-    modifier: Modifier = Modifier,
-) {
+private fun ResultField(label: String, value: String?, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier.fillMaxWidth().padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value ?: "—", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            value ?: "—",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 
@@ -226,9 +233,7 @@ private fun ConfirmRetakeButtons(
     modifier: Modifier = Modifier,
 ) {
     Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = onRetake, modifier = Modifier.weight(1f)) {
-            Text("Reintentar")
-        }
+        OutlinedButton(onClick = onRetake, modifier = Modifier.weight(1f)) { Text("Reintentar") }
         Button(onClick = onConfirm, modifier = Modifier.weight(1f)) {
             Text(stringResource(R.string.confirm))
         }

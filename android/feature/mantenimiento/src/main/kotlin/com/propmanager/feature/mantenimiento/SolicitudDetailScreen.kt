@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Send
@@ -23,7 +22,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -51,11 +49,11 @@ import com.propmanager.core.ui.components.LoadingScreen
 import com.propmanager.core.ui.components.PropManagerTextField
 import com.propmanager.core.ui.components.PropManagerTopAppBar
 import com.propmanager.core.ui.components.SyncStatusBadge
-import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-private val displayFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneId.systemDefault())
+private val displayFormatter =
+    DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneId.systemDefault())
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,10 +81,14 @@ fun SolicitudDetailScreen(
     }
 
     deleteTarget?.let { s ->
-        ConfirmDeleteDialog(itemName = s.titulo, onConfirm = {
-            viewModel.confirmDelete()
-            onNavigateBack()
-        }, onDismiss = viewModel::dismissDelete)
+        ConfirmDeleteDialog(
+            itemName = s.titulo,
+            onConfirm = {
+                viewModel.confirmDelete()
+                onNavigateBack()
+            },
+            onDismiss = viewModel::dismissDelete,
+        )
     }
 
     if (showEstado) {
@@ -97,14 +99,21 @@ fun SolicitudDetailScreen(
             text = {
                 Column {
                     estados.forEach { estado ->
-                        TextButton(onClick = { viewModel.changeEstado(estado) }, modifier = Modifier.fillMaxWidth()) {
+                        TextButton(
+                            onClick = { viewModel.changeEstado(estado) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
                             Text(estado)
                         }
                     }
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = viewModel::dismissEstadoChange) { Text(stringResource(R.string.cancel)) } },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissEstadoChange) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
         )
     }
 
@@ -117,13 +126,23 @@ fun SolicitudDetailScreen(
                 actions = {
                     if (detailState is SolicitudDetailUiState.Success) {
                         val s = (detailState as SolicitudDetailUiState.Success).solicitud
-                        IconButton(onClick = {
-                            viewModel.initEditForm(s)
-                            onNavigateToEdit()
-                        }) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.edit)) }
                         IconButton(
-                            onClick = { viewModel.requestDelete(s) },
-                        ) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete)) }
+                            onClick = {
+                                viewModel.initEditForm(s)
+                                onNavigateToEdit()
+                            }
+                        ) {
+                            Icon(
+                                Icons.Filled.Edit,
+                                contentDescription = stringResource(R.string.edit),
+                            )
+                        }
+                        IconButton(onClick = { viewModel.requestDelete(s) }) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = stringResource(R.string.delete),
+                            )
+                        }
                     }
                 },
             )
@@ -132,21 +151,29 @@ fun SolicitudDetailScreen(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
         when (val state = detailState) {
-            is SolicitudDetailUiState.Loading -> LoadingScreen(modifier = Modifier.padding(paddingValues))
-            is SolicitudDetailUiState.NotFound -> ErrorScreen(message = state.message, modifier = Modifier.padding(paddingValues))
+            is SolicitudDetailUiState.Loading ->
+                LoadingScreen(modifier = Modifier.padding(paddingValues))
+            is SolicitudDetailUiState.NotFound ->
+                ErrorScreen(message = state.message, modifier = Modifier.padding(paddingValues))
             is SolicitudDetailUiState.Success -> {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp),
+                    modifier =
+                        Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     item { SolicitudHeader(state.solicitud) }
                     item { SolicitudFields(state.solicitud) }
                     item {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
                             Button(
                                 onClick = viewModel::showEstadoChange,
                                 modifier = Modifier.weight(1f),
-                            ) { Text(stringResource(R.string.solicitud_cambiar_estado)) }
+                            ) {
+                                Text(stringResource(R.string.solicitud_cambiar_estado))
+                            }
                         }
                     }
                     item {
@@ -160,7 +187,10 @@ fun SolicitudDetailScreen(
                     }
                     items(state.notas, key = { it.id }) { nota -> NotaItem(nota) }
                     item {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
                             PropManagerTextField(
                                 value = notaInput,
                                 onValueChange = viewModel::onNotaInputChange,
@@ -168,7 +198,11 @@ fun SolicitudDetailScreen(
                                 modifier = Modifier.weight(1f),
                             )
                             IconButton(onClick = viewModel::addNota) {
-                                Icon(Icons.Filled.Send, contentDescription = stringResource(R.string.solicitud_agregar_nota))
+                                Icon(
+                                    Icons.Filled.Send,
+                                    contentDescription =
+                                        stringResource(R.string.solicitud_agregar_nota),
+                                )
                             }
                         }
                     }
@@ -183,12 +217,24 @@ fun SolicitudDetailScreen(
 private fun SolicitudHeader(solicitud: SolicitudMantenimiento) {
     Spacer(Modifier.height(8.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(solicitud.titulo, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(
+            solicitud.titulo,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+        )
         SyncStatusBadge(isPendingSync = solicitud.isPendingSync)
     }
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(solicitud.estado, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
-        Text(solicitud.prioridad, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            solicitud.estado,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            solicitud.prioridad,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -197,11 +243,20 @@ private fun SolicitudFields(solicitud: SolicitudMantenimiento) {
     HorizontalDivider()
     Spacer(Modifier.height(8.dp))
     solicitud.descripcion?.let { DetailRow(stringResource(R.string.solicitud_descripcion), it) }
-    solicitud.nombreProveedor?.let { DetailRow(stringResource(R.string.solicitud_proveedor_nombre), it) }
-    solicitud.telefonoProveedor?.let { DetailRow(stringResource(R.string.solicitud_proveedor_telefono), it) }
-    solicitud.emailProveedor?.let { DetailRow(stringResource(R.string.solicitud_proveedor_email), it) }
+    solicitud.nombreProveedor?.let {
+        DetailRow(stringResource(R.string.solicitud_proveedor_nombre), it)
+    }
+    solicitud.telefonoProveedor?.let {
+        DetailRow(stringResource(R.string.solicitud_proveedor_telefono), it)
+    }
+    solicitud.emailProveedor?.let {
+        DetailRow(stringResource(R.string.solicitud_proveedor_email), it)
+    }
     solicitud.costoMonto?.let { costo ->
-        DetailRow(stringResource(R.string.solicitud_costo), CurrencyFormatter.format(costo, solicitud.costoMoneda ?: "DOP"))
+        DetailRow(
+            stringResource(R.string.solicitud_costo),
+            CurrencyFormatter.format(costo, solicitud.costoMoneda ?: "DOP"),
+        )
     }
 }
 
@@ -220,12 +275,16 @@ private fun NotaItem(nota: NotaMantenimiento) {
 }
 
 @Composable
-private fun DetailRow(
-    label: String,
-    value: String,
-) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun DetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
     }
 }

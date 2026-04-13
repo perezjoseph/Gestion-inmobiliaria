@@ -11,7 +11,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .unwrap();
 
     cfg.service(
-        web::scope("/api")
+        web::scope("/api/v1")
             .service(
                 web::scope("/auth")
                     .wrap(Governor::new(&auth_governor_conf))

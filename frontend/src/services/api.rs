@@ -2,7 +2,7 @@ use gloo_net::http::{Request, RequestBuilder};
 use serde::{Serialize, de::DeserializeOwned};
 use web_sys::window;
 
-pub const BASE_URL: &str = "http://localhost:3000/api";
+pub const BASE_URL: &str = "http://localhost:3000/api/v1";
 const TOKEN_KEY: &str = "jwt_token";
 
 fn get_token() -> Option<String> {
@@ -75,10 +75,9 @@ fn humanize_parsed_error(parsed: &ApiErr) -> Option<String> {
 fn humanize_error(status: u16, raw: &str) -> String {
     if let Ok(parsed) = serde_json::from_str::<ApiErr>(raw)
         && !parsed.message.is_empty()
+        && let Some(msg) = humanize_parsed_error(&parsed)
     {
-        if let Some(msg) = humanize_parsed_error(&parsed) {
-            return msg;
-        }
+        return msg;
     }
 
     match status {

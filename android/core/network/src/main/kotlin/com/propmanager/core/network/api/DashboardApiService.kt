@@ -10,11 +10,9 @@ import retrofit2.Response
 import retrofit2.http.GET
 
 interface DashboardApiService {
-    @GET("api/dashboard/stats")
-    suspend fun stats(): Response<DashboardStats>
+    @GET("api/dashboard/stats") suspend fun stats(): Response<DashboardStats>
 
-    @GET("api/dashboard/pagos-proximos")
-    suspend fun pagosProximos(): Response<List<PagoProximo>>
+    @GET("api/dashboard/pagos-proximos") suspend fun pagosProximos(): Response<List<PagoProximo>>
 
     @GET("api/dashboard/contratos-calendario")
     suspend fun contratosCalendario(): Response<List<ContratoCalendario>>

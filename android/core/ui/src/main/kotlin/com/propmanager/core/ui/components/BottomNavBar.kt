@@ -16,11 +16,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import com.propmanager.core.ui.R
 
-enum class BottomNavItem(
-    val icon: ImageVector,
-    val labelResId: Int,
-    val route: String,
-) {
+enum class BottomNavItem(val icon: ImageVector, val labelResId: Int, val route: String) {
     Dashboard(Icons.Filled.Home, R.string.nav_dashboard, "dashboard"),
     Propiedades(Icons.Filled.Home, R.string.nav_propiedades, "propiedades"),
     Inquilinos(Icons.Filled.Person, R.string.nav_inquilinos, "inquilinos"),
@@ -40,11 +36,7 @@ fun PropManagerBottomNavBar(
             NavigationBarItem(
                 icon = {
                     if (item == BottomNavItem.Mas && notificationBadgeCount > 0) {
-                        BadgedBox(
-                            badge = {
-                                Badge { Text(notificationBadgeCount.toString()) }
-                            },
-                        ) {
+                        BadgedBox(badge = { Badge { Text(notificationBadgeCount.toString()) } }) {
                             Icon(
                                 imageVector = item.icon,
                                 contentDescription = stringResource(item.labelResId),

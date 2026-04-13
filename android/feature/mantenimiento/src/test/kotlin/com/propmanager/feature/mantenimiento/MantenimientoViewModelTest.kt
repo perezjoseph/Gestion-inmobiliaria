@@ -19,6 +19,9 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotBeBlank
 import io.kotest.matchers.types.shouldBeInstanceOf
+import java.lang.reflect.Proxy
+import java.math.BigDecimal
+import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -32,9 +35,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.Json
-import java.lang.reflect.Proxy
-import java.math.BigDecimal
-import java.time.Instant
 
 /**
  * Unit tests for MantenimientoViewModel.
@@ -44,26 +44,23 @@ import java.time.Instant
 @OptIn(ExperimentalCoroutinesApi::class)
 class MantenimientoViewModelTest :
     FreeSpec({
-
         val testDispatcher = StandardTestDispatcher()
 
-        beforeEach {
-            Dispatchers.setMain(testDispatcher)
-        }
+        beforeEach { Dispatchers.setMain(testDispatcher) }
 
-        afterEach {
-            Dispatchers.resetMain()
-        }
+        afterEach { Dispatchers.resetMain() }
 
         "list state" -
             {
                 "emits Success with solicitudes from repository" {
-                    val repo = FakeMantenimientoRepository(
-                        initialData = listOf(
-                            sampleSolicitud("1", estado = "pendiente"),
-                            sampleSolicitud("2", estado = "en_progreso"),
-                        ),
-                    )
+                    val repo =
+                        FakeMantenimientoRepository(
+                            initialData =
+                                listOf(
+                                    sampleSolicitud("1", estado = "pendiente"),
+                                    sampleSolicitud("2", estado = "en_progreso"),
+                                )
+                        )
                     runTest(testDispatcher) {
                         val vm = createViewModel(mantenimientoRepo = repo)
                         advanceUntilIdle()
@@ -90,13 +87,15 @@ class MantenimientoViewModelTest :
         "filter application (Req 8.2)" -
             {
                 "updateFilter filters by estado" {
-                    val repo = FakeMantenimientoRepository(
-                        initialData = listOf(
-                            sampleSolicitud("1", estado = "pendiente"),
-                            sampleSolicitud("2", estado = "en_progreso"),
-                            sampleSolicitud("3", estado = "pendiente"),
-                        ),
-                    )
+                    val repo =
+                        FakeMantenimientoRepository(
+                            initialData =
+                                listOf(
+                                    sampleSolicitud("1", estado = "pendiente"),
+                                    sampleSolicitud("2", estado = "en_progreso"),
+                                    sampleSolicitud("3", estado = "pendiente"),
+                                )
+                        )
                     runTest(testDispatcher) {
                         val vm = createViewModel(mantenimientoRepo = repo)
                         advanceUntilIdle()
@@ -113,13 +112,15 @@ class MantenimientoViewModelTest :
                 }
 
                 "updateFilter filters by prioridad" {
-                    val repo = FakeMantenimientoRepository(
-                        initialData = listOf(
-                            sampleSolicitud("1", prioridad = "alta"),
-                            sampleSolicitud("2", prioridad = "baja"),
-                            sampleSolicitud("3", prioridad = "alta"),
-                        ),
-                    )
+                    val repo =
+                        FakeMantenimientoRepository(
+                            initialData =
+                                listOf(
+                                    sampleSolicitud("1", prioridad = "alta"),
+                                    sampleSolicitud("2", prioridad = "baja"),
+                                    sampleSolicitud("3", prioridad = "alta"),
+                                )
+                        )
                     runTest(testDispatcher) {
                         val vm = createViewModel(mantenimientoRepo = repo)
                         advanceUntilIdle()
@@ -135,13 +136,15 @@ class MantenimientoViewModelTest :
                 }
 
                 "updateFilter filters by propiedadId" {
-                    val repo = FakeMantenimientoRepository(
-                        initialData = listOf(
-                            sampleSolicitud("1", propiedadId = "p1"),
-                            sampleSolicitud("2", propiedadId = "p2"),
-                            sampleSolicitud("3", propiedadId = "p1"),
-                        ),
-                    )
+                    val repo =
+                        FakeMantenimientoRepository(
+                            initialData =
+                                listOf(
+                                    sampleSolicitud("1", propiedadId = "p1"),
+                                    sampleSolicitud("2", propiedadId = "p2"),
+                                    sampleSolicitud("3", propiedadId = "p1"),
+                                )
+                        )
                     runTest(testDispatcher) {
                         val vm = createViewModel(mantenimientoRepo = repo)
                         advanceUntilIdle()
@@ -157,12 +160,14 @@ class MantenimientoViewModelTest :
                 }
 
                 "clearFilters resets all filters and shows all solicitudes" {
-                    val repo = FakeMantenimientoRepository(
-                        initialData = listOf(
-                            sampleSolicitud("1", propiedadId = "p1"),
-                            sampleSolicitud("2", propiedadId = "p2"),
-                        ),
-                    )
+                    val repo =
+                        FakeMantenimientoRepository(
+                            initialData =
+                                listOf(
+                                    sampleSolicitud("1", propiedadId = "p1"),
+                                    sampleSolicitud("2", propiedadId = "p2"),
+                                )
+                        )
                     runTest(testDispatcher) {
                         val vm = createViewModel(mantenimientoRepo = repo)
                         advanceUntilIdle()
@@ -264,7 +269,8 @@ class MantenimientoViewModelTest :
                 }
 
                 "create failure sets general error on form" {
-                    val repo = FakeMantenimientoRepository(createError = RuntimeException("DB error"))
+                    val repo =
+                        FakeMantenimientoRepository(createError = RuntimeException("DB error"))
                     runTest(testDispatcher) {
                         val vm = createViewModel(mantenimientoRepo = repo)
                         advanceUntilIdle()
@@ -419,15 +425,16 @@ class MantenimientoViewModelTest :
                 }
 
                 "initEditForm populates form from solicitud" {
-                    val solicitud = sampleSolicitud(
-                        "1",
-                        propiedadId = "p1",
-                        titulo = "Fuga de agua",
-                        descripcion = "En el baño principal",
-                        prioridad = "alta",
-                        nombreProveedor = "Plomero Juan",
-                        costoMonto = BigDecimal("3500.00"),
-                    )
+                    val solicitud =
+                        sampleSolicitud(
+                            "1",
+                            propiedadId = "p1",
+                            titulo = "Fuga de agua",
+                            descripcion = "En el baño principal",
+                            prioridad = "alta",
+                            nombreProveedor = "Plomero Juan",
+                            costoMonto = BigDecimal("3500.00"),
+                        )
                     val repo = FakeMantenimientoRepository()
                     runTest(testDispatcher) {
                         val vm = createViewModel(mantenimientoRepo = repo)
@@ -480,30 +487,29 @@ private fun sampleSolicitud(
     emailProveedor: String? = null,
     costoMonto: BigDecimal? = null,
     costoMoneda: String? = null,
-) = SolicitudMantenimiento(
-    id = id,
-    propiedadId = propiedadId,
-    unidadId = null,
-    inquilinoId = null,
-    titulo = titulo,
-    descripcion = descripcion,
-    estado = estado,
-    prioridad = prioridad,
-    nombreProveedor = nombreProveedor,
-    telefonoProveedor = telefonoProveedor,
-    emailProveedor = emailProveedor,
-    costoMonto = costoMonto,
-    costoMoneda = costoMoneda,
-    fechaInicio = null,
-    fechaFin = null,
-    createdAt = Instant.now(),
-    updatedAt = Instant.now(),
-    isPendingSync = false,
-)
+) =
+    SolicitudMantenimiento(
+        id = id,
+        propiedadId = propiedadId,
+        unidadId = null,
+        inquilinoId = null,
+        titulo = titulo,
+        descripcion = descripcion,
+        estado = estado,
+        prioridad = prioridad,
+        nombreProveedor = nombreProveedor,
+        telefonoProveedor = telefonoProveedor,
+        emailProveedor = emailProveedor,
+        costoMonto = costoMonto,
+        costoMoneda = costoMoneda,
+        fechaInicio = null,
+        fechaFin = null,
+        createdAt = Instant.now(),
+        updatedAt = Instant.now(),
+        isPendingSync = false,
+    )
 
-private class FakeConnectivityObserver(
-    online: Boolean = true,
-) : ConnectivityObserver {
+private class FakeConnectivityObserver(online: Boolean = true) : ConnectivityObserver {
     override val isOnline: StateFlow<Boolean> = MutableStateFlow(online).asStateFlow()
 }
 
@@ -514,48 +520,62 @@ private fun stubSolicitudDao(): com.propmanager.core.database.dao.SolicitudMante
     Proxy.newProxyInstance(
         com.propmanager.core.database.dao.SolicitudMantenimientoDao::class.java.classLoader,
         arrayOf(com.propmanager.core.database.dao.SolicitudMantenimientoDao::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.SolicitudMantenimientoDao
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.database.dao.SolicitudMantenimientoDao
 
 @Suppress("UNCHECKED_CAST")
 private fun stubNotaDao(): com.propmanager.core.database.dao.NotaMantenimientoDao =
     Proxy.newProxyInstance(
         com.propmanager.core.database.dao.NotaMantenimientoDao::class.java.classLoader,
         arrayOf(com.propmanager.core.database.dao.NotaMantenimientoDao::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.NotaMantenimientoDao
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.database.dao.NotaMantenimientoDao
 
 @Suppress("UNCHECKED_CAST")
 private fun stubSyncQueueDao(): com.propmanager.core.database.dao.SyncQueueDao =
     Proxy.newProxyInstance(
         com.propmanager.core.database.dao.SyncQueueDao::class.java.classLoader,
         arrayOf(com.propmanager.core.database.dao.SyncQueueDao::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.SyncQueueDao
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.database.dao.SyncQueueDao
 
 @Suppress("UNCHECKED_CAST")
-private fun stubMantenimientoApiService(): com.propmanager.core.network.api.MantenimientoApiService =
+private fun stubMantenimientoApiService():
+    com.propmanager.core.network.api.MantenimientoApiService =
     Proxy.newProxyInstance(
         com.propmanager.core.network.api.MantenimientoApiService::class.java.classLoader,
         arrayOf(com.propmanager.core.network.api.MantenimientoApiService::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.network.api.MantenimientoApiService
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.network.api.MantenimientoApiService
 
 @Suppress("UNCHECKED_CAST")
 private fun stubPropiedadDao(): com.propmanager.core.database.dao.PropiedadDao =
     Proxy.newProxyInstance(
         com.propmanager.core.database.dao.PropiedadDao::class.java.classLoader,
         arrayOf(com.propmanager.core.database.dao.PropiedadDao::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.PropiedadDao
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.database.dao.PropiedadDao
 
 @Suppress("UNCHECKED_CAST")
 private fun stubPropiedadesApiService(): com.propmanager.core.network.api.PropiedadesApiService =
     Proxy.newProxyInstance(
         com.propmanager.core.network.api.PropiedadesApiService::class.java.classLoader,
         arrayOf(com.propmanager.core.network.api.PropiedadesApiService::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.network.api.PropiedadesApiService
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.network.api.PropiedadesApiService
 
 private class FakeMantenimientoRepository(
     private val initialData: List<SolicitudMantenimiento> = emptyList(),
     private val createError: Throwable? = null,
     private val updateError: Throwable? = null,
-) : MantenimientoRepository(
+) :
+    MantenimientoRepository(
         solicitudDao = stubSolicitudDao(),
         notaDao = stubNotaDao(),
         syncQueueDao = stubSyncQueueDao(),
@@ -564,14 +584,19 @@ private class FakeMantenimientoRepository(
     ) {
     var createCallCount = 0
         private set
+
     var updateCallCount = 0
         private set
+
     var deleteCallCount = 0
         private set
+
     var updateEstadoCallCount = 0
         private set
+
     var addNotaCallCount = 0
         private set
+
     var lastEstadoRequest: UpdateEstadoRequest? = null
         private set
 
@@ -602,43 +627,38 @@ private class FakeMantenimientoRepository(
     override suspend fun create(request: CreateSolicitudRequest): Result<SolicitudMantenimiento> {
         createCallCount++
         if (createError != null) return Result.failure(createError)
-        val s = SolicitudMantenimiento(
-            id = "new-$createCallCount",
-            propiedadId = request.propiedadId,
-            unidadId = request.unidadId,
-            inquilinoId = request.inquilinoId,
-            titulo = request.titulo,
-            descripcion = request.descripcion,
-            estado = "pendiente",
-            prioridad = request.prioridad ?: "media",
-            nombreProveedor = request.nombreProveedor,
-            telefonoProveedor = request.telefonoProveedor,
-            emailProveedor = request.emailProveedor,
-            costoMonto = request.costoMonto?.toBigDecimalOrNull(),
-            costoMoneda = request.costoMoneda,
-            fechaInicio = null,
-            fechaFin = null,
-            createdAt = Instant.now(),
-            updatedAt = Instant.now(),
-            isPendingSync = true,
-        )
+        val s =
+            SolicitudMantenimiento(
+                id = "new-$createCallCount",
+                propiedadId = request.propiedadId,
+                unidadId = request.unidadId,
+                inquilinoId = request.inquilinoId,
+                titulo = request.titulo,
+                descripcion = request.descripcion,
+                estado = "pendiente",
+                prioridad = request.prioridad ?: "media",
+                nombreProveedor = request.nombreProveedor,
+                telefonoProveedor = request.telefonoProveedor,
+                emailProveedor = request.emailProveedor,
+                costoMonto = request.costoMonto?.toBigDecimalOrNull(),
+                costoMoneda = request.costoMoneda,
+                fechaInicio = null,
+                fechaFin = null,
+                createdAt = Instant.now(),
+                updatedAt = Instant.now(),
+                isPendingSync = true,
+            )
         store.value = store.value + s
         return Result.success(s)
     }
 
-    override suspend fun update(
-        id: String,
-        request: UpdateSolicitudRequest,
-    ): Result<Unit> {
+    override suspend fun update(id: String, request: UpdateSolicitudRequest): Result<Unit> {
         updateCallCount++
         if (updateError != null) return Result.failure(updateError)
         return Result.success(Unit)
     }
 
-    override suspend fun updateEstado(
-        id: String,
-        request: UpdateEstadoRequest,
-    ): Result<Unit> {
+    override suspend fun updateEstado(id: String, request: UpdateEstadoRequest): Result<Unit> {
         updateEstadoCallCount++
         lastEstadoRequest = request
         return Result.success(Unit)
@@ -649,13 +669,14 @@ private class FakeMantenimientoRepository(
         request: CreateNotaRequest,
     ): Result<NotaMantenimiento> {
         addNotaCallCount++
-        val nota = NotaMantenimiento(
-            id = "nota-$addNotaCallCount",
-            solicitudId = solicitudId,
-            autorId = "",
-            contenido = request.contenido,
-            createdAt = Instant.now(),
-        )
+        val nota =
+            NotaMantenimiento(
+                id = "nota-$addNotaCallCount",
+                solicitudId = solicitudId,
+                autorId = "",
+                contenido = request.contenido,
+                createdAt = Instant.now(),
+            )
         notasStore.value = notasStore.value + nota
         return Result.success(nota)
     }
@@ -667,9 +688,8 @@ private class FakeMantenimientoRepository(
     }
 }
 
-private class FakePropiedadesRepository(
-    private val initialData: List<Propiedad> = emptyList(),
-) : PropiedadesRepository(
+private class FakePropiedadesRepository(private val initialData: List<Propiedad> = emptyList()) :
+    PropiedadesRepository(
         dao = stubPropiedadDao(),
         syncQueueDao = stubSyncQueueDao(),
         apiService = stubPropiedadesApiService(),

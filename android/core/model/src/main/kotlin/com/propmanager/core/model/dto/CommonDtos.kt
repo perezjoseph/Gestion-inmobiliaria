@@ -11,8 +11,4 @@ data class PaginatedResponse<T>(
     @SerialName("perPage") val perPage: Long,
 )
 
-@Serializable
-data class ApiError(
-    val error: String,
-    val message: String,
-)
+@Serializable data class ApiError(val error: String, val message: String)

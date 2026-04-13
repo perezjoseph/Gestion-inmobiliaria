@@ -10,25 +10,16 @@ android {
     namespace = "com.propmanager.core.network"
     compileSdk = 36
 
-    defaultConfig {
-        minSdk = 24
-    }
+    defaultConfig { minSdk = 24 }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    kotlinOptions {
-        jvmTarget = "11"
-    }
+    kotlinOptions { jvmTarget = "11" }
 
-    @Suppress("UnstableApiUsage")
-    testOptions {
-        unitTests.all {
-            it.useJUnitPlatform()
-        }
-    }
+    @Suppress("UnstableApiUsage") testOptions { unitTests.all { it.useJUnitPlatform() } }
 }
 
 dependencies {

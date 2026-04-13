@@ -12,13 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -48,7 +44,6 @@ import com.propmanager.core.ui.components.ConfirmDeleteDialog
 import com.propmanager.core.ui.components.EmptyStateScreen
 import com.propmanager.core.ui.components.LoadingScreen
 import com.propmanager.core.ui.components.OfflineIndicator
-import com.propmanager.core.ui.components.PropManagerTextField
 import com.propmanager.core.ui.components.PropManagerTopAppBar
 import com.propmanager.core.ui.components.SyncStatusBadge
 
@@ -90,11 +85,16 @@ fun PropiedadesListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = {
-                viewModel.initCreateForm()
-                onNavigateToCreate()
-            }) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.propiedad_create))
+            FloatingActionButton(
+                onClick = {
+                    viewModel.initCreateForm()
+                    onNavigateToCreate()
+                }
+            ) {
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = stringResource(R.string.propiedad_create),
+                )
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -138,13 +138,14 @@ private fun PropiedadListItem(
     modifier: Modifier = Modifier,
 ) {
     Card(modifier = modifier.fillMaxWidth().clickable(onClick = onClick)) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(propiedad.titulo, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    Text(
+                        propiedad.titulo,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                    )
                     Spacer(Modifier.width(4.dp))
                     SyncStatusBadge(isPendingSync = propiedad.isPendingSync)
                 }

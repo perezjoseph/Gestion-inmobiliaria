@@ -23,19 +23,20 @@ import io.kotest.property.checkAll
  *
  * Property 7: Entity filtering returns only matching results
  *
- * For any entity list and any combination of filter criteria, applying the filter
- * returns only entities where every active filter criterion matches, and does not
- * exclude any entity that matches all active criteria.
+ * For any entity list and any combination of filter criteria, applying the filter returns only
+ * entities where every active filter criterion matches, and does not exclude any entity that
+ * matches all active criteria.
  *
- * This validates the filtering contract at the data level, mirroring the WHERE clause
- * logic that Room DAOs enforce via their @Query annotations.
+ * This validates the filtering contract at the data level, mirroring the WHERE clause logic that
+ * Room DAOs enforce via their @Query annotations.
  */
 class EntityFilteringPropertyTest :
     FreeSpec({
 
         // -- Domain value pools for realistic filter testing --
 
-        val ciudades = listOf("Santo Domingo", "Santiago", "La Romana", "Puerto Plata", "Punta Cana")
+        val ciudades =
+            listOf("Santo Domingo", "Santiago", "La Romana", "Puerto Plata", "Punta Cana")
         val estadosProp = listOf("disponible", "ocupada", "mantenimiento", "inactiva")
         val tiposProp = listOf("apartamento", "casa", "local", "oficina", "terreno")
 
@@ -47,95 +48,91 @@ class EntityFilteringPropertyTest :
 
         // -- Arb generators --
 
-        val propiedadArb: Arb<PropiedadEntity> =
-            arbitrary {
-                PropiedadEntity(
-                    id = Arb.uuid().bind().toString(),
-                    titulo = Arb.string(3..30).bind(),
-                    descripcion = null,
-                    direccion = Arb.string(5..40).bind(),
-                    ciudad = Arb.element(ciudades).bind(),
-                    provincia = Arb.string(3..20).bind(),
-                    tipoPropiedad = Arb.element(tiposProp).bind(),
-                    habitaciones = Arb.int(1..10).bind(),
-                    banos = Arb.int(1..5).bind(),
-                    areaM2 = "100.00",
-                    precio = "50000.00",
-                    moneda = Arb.element("DOP", "USD").bind(),
-                    estado = Arb.element(estadosProp).bind(),
-                    imagenes = null,
-                    createdAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
-                    updatedAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
-                    isDeleted = false,
-                    isPendingSync = false,
-                )
-            }
+        val propiedadArb: Arb<PropiedadEntity> = arbitrary {
+            PropiedadEntity(
+                id = Arb.uuid().bind().toString(),
+                titulo = Arb.string(3..30).bind(),
+                descripcion = null,
+                direccion = Arb.string(5..40).bind(),
+                ciudad = Arb.element(ciudades).bind(),
+                provincia = Arb.string(3..20).bind(),
+                tipoPropiedad = Arb.element(tiposProp).bind(),
+                habitaciones = Arb.int(1..10).bind(),
+                banos = Arb.int(1..5).bind(),
+                areaM2 = "100.00",
+                precio = "50000.00",
+                moneda = Arb.element("DOP", "USD").bind(),
+                estado = Arb.element(estadosProp).bind(),
+                imagenes = null,
+                createdAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
+                updatedAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
+                isDeleted = false,
+                isPendingSync = false,
+            )
+        }
 
-        val pagoArb: Arb<PagoEntity> =
-            arbitrary {
-                PagoEntity(
-                    id = Arb.uuid().bind().toString(),
-                    contratoId = Arb.uuid().bind().toString(),
-                    monto = "15000.00",
-                    moneda = Arb.element("DOP", "USD").bind(),
-                    fechaPago = null,
-                    fechaVencimiento = "2025-01-15",
-                    metodoPago = null,
-                    estado = Arb.element(estadosPago).bind(),
-                    notas = null,
-                    createdAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
-                    updatedAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
-                    isDeleted = false,
-                    isPendingSync = false,
-                )
-            }
+        val pagoArb: Arb<PagoEntity> = arbitrary {
+            PagoEntity(
+                id = Arb.uuid().bind().toString(),
+                contratoId = Arb.uuid().bind().toString(),
+                monto = "15000.00",
+                moneda = Arb.element("DOP", "USD").bind(),
+                fechaPago = null,
+                fechaVencimiento = "2025-01-15",
+                metodoPago = null,
+                estado = Arb.element(estadosPago).bind(),
+                notas = null,
+                createdAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
+                updatedAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
+                isDeleted = false,
+                isPendingSync = false,
+            )
+        }
 
-        val gastoArb: Arb<GastoEntity> =
-            arbitrary {
-                GastoEntity(
-                    id = Arb.uuid().bind().toString(),
-                    propiedadId = Arb.uuid().bind().toString(),
-                    unidadId = null,
-                    categoria = Arb.element(categorias).bind(),
-                    descripcion = Arb.string(3..30).bind(),
-                    monto = "5000.00",
-                    moneda = Arb.element("DOP", "USD").bind(),
-                    fechaGasto = "2025-01-10",
-                    estado = Arb.element(estadosGasto).bind(),
-                    proveedor = null,
-                    numeroFactura = null,
-                    notas = null,
-                    createdAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
-                    updatedAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
-                    isDeleted = false,
-                    isPendingSync = false,
-                )
-            }
+        val gastoArb: Arb<GastoEntity> = arbitrary {
+            GastoEntity(
+                id = Arb.uuid().bind().toString(),
+                propiedadId = Arb.uuid().bind().toString(),
+                unidadId = null,
+                categoria = Arb.element(categorias).bind(),
+                descripcion = Arb.string(3..30).bind(),
+                monto = "5000.00",
+                moneda = Arb.element("DOP", "USD").bind(),
+                fechaGasto = "2025-01-10",
+                estado = Arb.element(estadosGasto).bind(),
+                proveedor = null,
+                numeroFactura = null,
+                notas = null,
+                createdAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
+                updatedAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
+                isDeleted = false,
+                isPendingSync = false,
+            )
+        }
 
-        val solicitudArb: Arb<SolicitudMantenimientoEntity> =
-            arbitrary {
-                SolicitudMantenimientoEntity(
-                    id = Arb.uuid().bind().toString(),
-                    propiedadId = Arb.uuid().bind().toString(),
-                    unidadId = null,
-                    inquilinoId = null,
-                    titulo = Arb.string(3..30).bind(),
-                    descripcion = null,
-                    estado = Arb.element(estadosSolicitud).bind(),
-                    prioridad = Arb.element(prioridades).bind(),
-                    nombreProveedor = null,
-                    telefonoProveedor = null,
-                    emailProveedor = null,
-                    costoMonto = null,
-                    costoMoneda = null,
-                    fechaInicio = null,
-                    fechaFin = null,
-                    createdAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
-                    updatedAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
-                    isDeleted = false,
-                    isPendingSync = false,
-                )
-            }
+        val solicitudArb: Arb<SolicitudMantenimientoEntity> = arbitrary {
+            SolicitudMantenimientoEntity(
+                id = Arb.uuid().bind().toString(),
+                propiedadId = Arb.uuid().bind().toString(),
+                unidadId = null,
+                inquilinoId = null,
+                titulo = Arb.string(3..30).bind(),
+                descripcion = null,
+                estado = Arb.element(estadosSolicitud).bind(),
+                prioridad = Arb.element(prioridades).bind(),
+                nombreProveedor = null,
+                telefonoProveedor = null,
+                emailProveedor = null,
+                costoMonto = null,
+                costoMoneda = null,
+                fechaInicio = null,
+                fechaFin = null,
+                createdAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
+                updatedAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
+                isDeleted = false,
+                isPendingSync = false,
+            )
+        }
 
         // -- Filter functions mirroring Room DAO WHERE clause logic --
         // These replicate the SQL: WHERE (:param IS NULL OR column = :param)
@@ -188,14 +185,12 @@ class EntityFilteringPropertyTest :
 
         // -- Nullable filter value generator: picks from pool or null --
 
-        fun <T> nullableElement(values: List<T>): Arb<T?> =
-            arbitrary {
-                if (Arb.boolean().bind()) Arb.element(values).bind() else null
-            }
+        fun <T> nullableElement(values: List<T>): Arb<T?> = arbitrary {
+            if (Arb.boolean().bind()) Arb.element(values).bind() else null
+        }
 
         "Property 7: Entity filtering returns only matching results" -
             {
-
                 "PropiedadEntity — filtered results match all active criteria" {
                     checkAll(
                         100,
@@ -224,7 +219,8 @@ class EntityFilteringPropertyTest :
 
                 "PropiedadEntity — null filters return all entities" {
                     checkAll(100, Arb.list(propiedadArb, 1..30)) { entities ->
-                        filterPropiedades(entities, null, null, null) shouldContainExactlyInAnyOrder entities
+                        filterPropiedades(entities, null, null, null) shouldContainExactlyInAnyOrder
+                            entities
                     }
                 }
 
@@ -232,13 +228,7 @@ class EntityFilteringPropertyTest :
                     checkAll(
                         100,
                         Arb.list(pagoArb, 1..30),
-                        nullableElement(
-                            listOf(
-                                "contract-1",
-                                "contract-2",
-                                "contract-3",
-                            ),
-                        ),
+                        nullableElement(listOf("contract-1", "contract-2", "contract-3")),
                         nullableElement(estadosPago),
                     ) { entities, contratoId, estado ->
                         val result = filterPagos(entities, contratoId, estado)
@@ -271,13 +261,7 @@ class EntityFilteringPropertyTest :
                     checkAll(
                         100,
                         Arb.list(gastoArb, 1..30),
-                        nullableElement(
-                            listOf(
-                                "prop-1",
-                                "prop-2",
-                                "prop-3",
-                            ),
-                        ),
+                        nullableElement(listOf("prop-1", "prop-2", "prop-3")),
                         nullableElement(categorias),
                         nullableElement(estadosGasto),
                     ) { entities, propiedadId, categoria, estado ->
@@ -315,13 +299,7 @@ class EntityFilteringPropertyTest :
                         Arb.list(solicitudArb, 1..30),
                         nullableElement(estadosSolicitud),
                         nullableElement(prioridades),
-                        nullableElement(
-                            listOf(
-                                "prop-1",
-                                "prop-2",
-                                "prop-3",
-                            ),
-                        ),
+                        nullableElement(listOf("prop-1", "prop-2", "prop-3")),
                     ) { entities, estado, prioridad, propiedadId ->
                         val result = filterSolicitudes(entities, estado, prioridad, propiedadId)
 

@@ -55,12 +55,7 @@ fun ImportacionScreen(
         },
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-        ) {
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             OfflineIndicator(isOffline = !isOnline)
 
             if (!isOnline) {
@@ -68,35 +63,23 @@ fun ImportacionScreen(
                 return@Column
             }
 
-            ImportTypeSelector(
-                selected = uiState.selectedType,
-                onSelect = viewModel::selectType,
-            )
+            ImportTypeSelector(selected = uiState.selectedType, onSelect = viewModel::selectType)
 
             OutlinedButton(
                 onClick = onPickFile,
                 enabled = !uiState.isLoading,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 Text(stringResource(R.string.importacion_seleccionar_archivo))
             }
 
             when {
                 uiState.isLoading -> LoadingScreen()
-                uiState.errorMessage != null ->
-                    ErrorScreen(
-                        message = uiState.errorMessage!!,
-                    )
+                uiState.errorMessage != null -> ErrorScreen(message = uiState.errorMessage!!)
                 uiState.result != null -> {
                     val result = uiState.result!!
                     LazyColumn(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 16.dp),
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         item(key = "summary") {
@@ -104,7 +87,7 @@ fun ImportacionScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors =
                                     CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer
                                     ),
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
@@ -127,7 +110,10 @@ fun ImportacionScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors =
                                         CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                                            containerColor =
+                                                MaterialTheme.colorScheme.errorContainer.copy(
+                                                    alpha = 0.3f
+                                                )
                                         ),
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
@@ -160,10 +146,7 @@ private fun ImportTypeSelector(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ImportType.entries.forEach { type ->
@@ -174,10 +157,12 @@ private fun ImportTypeSelector(
                     Text(
                         text =
                             when (type) {
-                                ImportType.PROPIEDADES -> stringResource(R.string.importacion_propiedades)
-                                ImportType.INQUILINOS -> stringResource(R.string.importacion_inquilinos)
+                                ImportType.PROPIEDADES ->
+                                    stringResource(R.string.importacion_propiedades)
+                                ImportType.INQUILINOS ->
+                                    stringResource(R.string.importacion_inquilinos)
                                 ImportType.GASTOS -> stringResource(R.string.importacion_gastos)
-                            },
+                            }
                     )
                 },
             )

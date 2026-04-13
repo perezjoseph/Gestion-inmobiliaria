@@ -12,39 +12,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,20 +39,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.propmanager.core.common.CurrencyFormatter
-import com.propmanager.core.model.NotaMantenimiento
 import com.propmanager.core.model.SolicitudMantenimiento
 import com.propmanager.core.ui.R
 import com.propmanager.core.ui.components.ConfirmDeleteDialog
 import com.propmanager.core.ui.components.EmptyStateScreen
-import com.propmanager.core.ui.components.ErrorScreen
 import com.propmanager.core.ui.components.LoadingScreen
 import com.propmanager.core.ui.components.OfflineIndicator
-import com.propmanager.core.ui.components.PropManagerTextField
 import com.propmanager.core.ui.components.PropManagerTopAppBar
 import com.propmanager.core.ui.components.SyncStatusBadge
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -92,16 +70,32 @@ fun MantenimientoListScreen(
         }
     }
     deleteTarget?.let { s ->
-        ConfirmDeleteDialog(itemName = s.titulo, onConfirm = viewModel::confirmDelete, onDismiss = viewModel::dismissDelete)
+        ConfirmDeleteDialog(
+            itemName = s.titulo,
+            onConfirm = viewModel::confirmDelete,
+            onDismiss = viewModel::dismissDelete,
+        )
     }
 
     Scaffold(
-        topBar = { PropManagerTopAppBar(title = stringResource(R.string.mantenimiento_title), scrollBehavior = scrollBehavior) },
+        topBar = {
+            PropManagerTopAppBar(
+                title = stringResource(R.string.mantenimiento_title),
+                scrollBehavior = scrollBehavior,
+            )
+        },
         floatingActionButton = {
-            FloatingActionButton(onClick = {
-                viewModel.initCreateForm()
-                onNavigateToCreate()
-            }) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.solicitud_create)) }
+            FloatingActionButton(
+                onClick = {
+                    viewModel.initCreateForm()
+                    onNavigateToCreate()
+                }
+            ) {
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = stringResource(R.string.solicitud_create),
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -146,12 +140,20 @@ private fun SolicitudListItem(
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(solicitud.titulo, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    Text(
+                        solicitud.titulo,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                    )
                     Spacer(Modifier.width(4.dp))
                     SyncStatusBadge(isPendingSync = solicitud.isPendingSync)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(solicitud.estado, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        solicitud.estado,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                     Text(
                         solicitud.prioridad,
                         style = MaterialTheme.typography.bodySmall,
@@ -166,7 +168,9 @@ private fun SolicitudListItem(
                     )
                 }
             }
-            IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete)) }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete))
+            }
         }
     }
 }

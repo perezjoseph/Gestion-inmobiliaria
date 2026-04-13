@@ -21,7 +21,7 @@ interface GastoDao {
           AND (:fechaDesde IS NULL OR fecha_gasto >= :fechaDesde)
           AND (:fechaHasta IS NULL OR fecha_gasto <= :fechaHasta)
         ORDER BY fecha_gasto DESC
-        """,
+        """
     )
     fun observeFiltered(
         propiedadId: String?,
@@ -31,15 +31,11 @@ interface GastoDao {
         fechaHasta: String?,
     ): Flow<List<GastoEntity>>
 
-    @Upsert
-    suspend fun upsert(entity: GastoEntity)
+    @Upsert suspend fun upsert(entity: GastoEntity)
 
-    @Upsert
-    suspend fun upsertAll(entities: List<GastoEntity>)
+    @Upsert suspend fun upsertAll(entities: List<GastoEntity>)
 
-    @Query("UPDATE gastos SET is_deleted = 1 WHERE id = :id")
-    suspend fun markDeleted(id: String)
+    @Query("UPDATE gastos SET is_deleted = 1 WHERE id = :id") suspend fun markDeleted(id: String)
 
-    @Query("DELETE FROM gastos")
-    suspend fun deleteAll()
+    @Query("DELETE FROM gastos") suspend fun deleteAll()
 }

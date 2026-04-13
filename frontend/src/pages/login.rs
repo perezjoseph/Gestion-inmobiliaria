@@ -33,25 +33,25 @@ pub fn Login() -> Html {
     };
 
     html! {
-        <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: var(--surface-base);">
-            <div style="width: 100%; max-width: 420px; padding: var(--space-4);">
-                <div class="gi-card" style="padding: var(--space-7) var(--space-6);">
-                    <div style="text-align: center; margin-bottom: var(--space-6);">
-                        <div class="gi-logo-mark" style="margin: 0 auto var(--space-3);">
+        <div class="gi-login-page">
+            <div class="gi-login-container">
+                <div class="gi-card gi-p-6">
+                    <div class="gi-login-header">
+                        <div class="gi-logo-mark gi-mb-3" style="margin-inline: auto;">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M3 21V9l9-7 9 7v12"/>
                                 <path d="M9 21V12h6v9"/>
                             </svg>
                         </div>
-                        <h1 class="text-display" style="font-size: var(--text-xl); font-weight: 700; color: var(--color-primary-500);">
+                        <h1 class="text-display gi-login-title">
                             {"Gestión Inmobiliaria"}
                         </h1>
-                        <p style="font-size: var(--text-sm); color: var(--text-tertiary); margin-top: var(--space-1);">
+                        <p class="gi-login-subtitle">
                             {"Inicie sesión para continuar"}
                         </p>
                     </div>
                     <LoginForm on_success={on_success} />
-                    <p style="text-align: center; font-size: var(--text-sm); color: var(--text-secondary); margin-top: var(--space-4);">
+                    <p class="gi-login-footer">
                         <Link<Route> to={Route::Registro} classes="gi-btn-text">
                             {"¿No tiene cuenta? Regístrese"}
                         </Link<Route>>

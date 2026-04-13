@@ -1,6 +1,7 @@
 package com.propmanager.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -43,9 +44,7 @@ fun PropManagerNavHost(
     ) {
         // Auth graph
         navigation(startDestination = Routes.LOGIN, route = Routes.AUTH_GRAPH) {
-            composable(Routes.LOGIN) {
-                LoginScreen(viewModel = authViewModel)
-            }
+            composable(Routes.LOGIN) { LoginScreen(viewModel = authViewModel) }
         }
 
         // Main graph
@@ -68,10 +67,7 @@ fun PropManagerNavHost(
             // Online-only features
             composable(Routes.REPORTES) {
                 val vm: ReportesViewModel = hiltViewModel()
-                ReportesScreen(
-                    viewModel = vm,
-                    onNavigateBack = { navController.popBackStack() },
-                )
+                ReportesScreen(viewModel = vm, onNavigateBack = { navController.popBackStack() })
             }
 
             composable(Routes.NOTIFICACIONES) {
@@ -84,18 +80,12 @@ fun PropManagerNavHost(
 
             composable(Routes.AUDITORIA) {
                 val vm: AuditoriaViewModel = hiltViewModel()
-                AuditoriaScreen(
-                    viewModel = vm,
-                    onNavigateBack = { navController.popBackStack() },
-                )
+                AuditoriaScreen(viewModel = vm, onNavigateBack = { navController.popBackStack() })
             }
 
             composable(Routes.PERFIL) {
                 val vm: PerfilViewModel = hiltViewModel()
-                PerfilScreen(
-                    viewModel = vm,
-                    onNavigateBack = { navController.popBackStack() },
-                )
+                PerfilScreen(viewModel = vm, onNavigateBack = { navController.popBackStack() })
             }
 
             composable(Routes.CONFIGURACION) {
@@ -116,10 +106,11 @@ fun PropManagerNavHost(
             }
 
             composable("documentos/{entityType}/{entityId}") { backStackEntry ->
-                val entityType = backStackEntry.arguments?.getString("entityType") ?: return@composable
+                val entityType =
+                    backStackEntry.arguments?.getString("entityType") ?: return@composable
                 val entityId = backStackEntry.arguments?.getString("entityId") ?: return@composable
                 val vm: DocumentosViewModel = hiltViewModel()
-                vm.loadDocuments(entityType, entityId)
+                LaunchedEffect(entityType, entityId) { vm.loadDocuments(entityType, entityId) }
                 DocumentosScreen(
                     viewModel = vm,
                     onNavigateBack = { navController.popBackStack() },

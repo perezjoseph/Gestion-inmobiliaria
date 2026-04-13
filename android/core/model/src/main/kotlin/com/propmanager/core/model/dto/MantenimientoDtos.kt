@@ -63,12 +63,6 @@ data class UpdateSolicitudRequest(
     @SerialName("inquilinoId") val inquilinoId: String? = null,
 )
 
-@Serializable
-data class UpdateEstadoRequest(
-    val estado: String,
-)
+@Serializable data class UpdateEstadoRequest(val estado: String)
 
-@Serializable
-data class CreateNotaRequest(
-    val contenido: String,
-)
+@Serializable data class CreateNotaRequest(val contenido: String)

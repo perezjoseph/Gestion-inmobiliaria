@@ -18,9 +18,9 @@ import io.kotest.property.checkAll
  *
  * Property 3: Sync queue records complete entries
  *
- * For any entity type (propiedad, inquilino, contrato, pago, gasto, solicitud),
- * any valid entity ID, and any operation type (CREATE, UPDATE, DELETE),
- * creating a SyncQueueEntry preserves all fields correctly:
+ * For any entity type (propiedad, inquilino, contrato, pago, gasto, solicitud), any valid entity
+ * ID, and any operation type (CREATE, UPDATE, DELETE), creating a SyncQueueEntry preserves all
+ * fields correctly:
  * - entityType is one of the valid types
  * - operation is one of CREATE, UPDATE, DELETE
  * - payload is non-empty
@@ -28,8 +28,8 @@ import io.kotest.property.checkAll
  */
 class SyncQueueEntryRecordingPropertyTest :
     FreeSpec({
-
-        val validEntityTypes = listOf("propiedad", "inquilino", "contrato", "pago", "gasto", "solicitud")
+        val validEntityTypes =
+            listOf("propiedad", "inquilino", "contrato", "pago", "gasto", "solicitud")
         val validOperations = listOf("CREATE", "UPDATE", "DELETE")
 
         val entityTypeArb = Arb.element(validEntityTypes)
@@ -38,31 +38,29 @@ class SyncQueueEntryRecordingPropertyTest :
         val payloadArb = Arb.string(1..500)
         val timestampArb = Arb.long(1L..Long.MAX_VALUE / 2)
 
-        val syncQueueEntryArb: Arb<SyncQueueEntry> =
-            arbitrary {
-                SyncQueueEntry(
-                    id = 0,
-                    entityType = entityTypeArb.bind(),
-                    entityId = entityIdArb.bind(),
-                    operation = operationArb.bind(),
-                    payload = payloadArb.bind(),
-                    createdAt = timestampArb.bind(),
-                    retryCount = Arb.int(0..10).bind(),
-                )
-            }
+        val syncQueueEntryArb: Arb<SyncQueueEntry> = arbitrary {
+            SyncQueueEntry(
+                id = 0,
+                entityType = entityTypeArb.bind(),
+                entityId = entityIdArb.bind(),
+                operation = operationArb.bind(),
+                payload = payloadArb.bind(),
+                createdAt = timestampArb.bind(),
+                retryCount = Arb.int(0..10).bind(),
+            )
+        }
 
         "Property 3: Sync queue records complete entries" -
             {
-
                 "all fields are preserved after construction" {
-                    checkAll(100, entityTypeArb, entityIdArb, operationArb, payloadArb, timestampArb) {
-                        entityType,
-                        entityId,
-                        operation,
-                        payload,
-                        createdAt,
-                        ->
-
+                    checkAll(
+                        100,
+                        entityTypeArb,
+                        entityIdArb,
+                        operationArb,
+                        payloadArb,
+                        timestampArb,
+                    ) { entityType, entityId, operation, payload, createdAt ->
                         val entry =
                             SyncQueueEntry(
                                 entityType = entityType,
@@ -94,9 +92,7 @@ class SyncQueueEntryRecordingPropertyTest :
                 }
 
                 "payload is non-empty" {
-                    checkAll(100, syncQueueEntryArb) { entry ->
-                        entry.payload.shouldNotBeEmpty()
-                    }
+                    checkAll(100, syncQueueEntryArb) { entry -> entry.payload.shouldNotBeEmpty() }
                 }
 
                 "createdAt is a positive timestamp" {
@@ -106,14 +102,14 @@ class SyncQueueEntryRecordingPropertyTest :
                 }
 
                 "retryCount defaults to zero for new entries" {
-                    checkAll(100, entityTypeArb, entityIdArb, operationArb, payloadArb, timestampArb) {
-                        entityType,
-                        entityId,
-                        operation,
-                        payload,
-                        createdAt,
-                        ->
-
+                    checkAll(
+                        100,
+                        entityTypeArb,
+                        entityIdArb,
+                        operationArb,
+                        payloadArb,
+                        timestampArb,
+                    ) { entityType, entityId, operation, payload, createdAt ->
                         val entry =
                             SyncQueueEntry(
                                 entityType = entityType,

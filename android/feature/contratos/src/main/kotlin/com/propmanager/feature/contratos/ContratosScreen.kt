@@ -12,29 +12,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,12 +41,9 @@ import com.propmanager.core.common.CurrencyFormatter
 import com.propmanager.core.common.DateFormatter
 import com.propmanager.core.ui.R
 import com.propmanager.core.ui.components.ConfirmDeleteDialog
-import com.propmanager.core.ui.components.DatePickerField
 import com.propmanager.core.ui.components.EmptyStateScreen
-import com.propmanager.core.ui.components.ErrorScreen
 import com.propmanager.core.ui.components.LoadingScreen
 import com.propmanager.core.ui.components.OfflineIndicator
-import com.propmanager.core.ui.components.PropManagerTextField
 import com.propmanager.core.ui.components.PropManagerTopAppBar
 import com.propmanager.core.ui.components.SyncStatusBadge
 
@@ -82,17 +69,31 @@ fun ContratosListScreen(
         }
     }
     deleteTarget?.let { c ->
-        ConfirmDeleteDialog(itemName = c.id.take(8), onConfirm = viewModel::confirmDelete, onDismiss = viewModel::dismissDelete)
+        ConfirmDeleteDialog(
+            itemName = c.id.take(8),
+            onConfirm = viewModel::confirmDelete,
+            onDismiss = viewModel::dismissDelete,
+        )
     }
 
     Scaffold(
-        topBar = { PropManagerTopAppBar(title = stringResource(R.string.contratos_title), scrollBehavior = scrollBehavior) },
+        topBar = {
+            PropManagerTopAppBar(
+                title = stringResource(R.string.contratos_title),
+                scrollBehavior = scrollBehavior,
+            )
+        },
         floatingActionButton = {
-            FloatingActionButton(onClick = {
-                viewModel.initCreateForm()
-                onNavigateToCreate()
-            }) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.contrato_create))
+            FloatingActionButton(
+                onClick = {
+                    viewModel.initCreateForm()
+                    onNavigateToCreate()
+                }
+            ) {
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = stringResource(R.string.contrato_create),
+                )
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -139,26 +140,43 @@ private fun ContratoListItem(
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(cwn.propiedadTitulo, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    Text(
+                        cwn.propiedadTitulo,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                    )
                     Spacer(Modifier.width(4.dp))
                     SyncStatusBadge(isPendingSync = c.isPendingSync)
                 }
-                Text(cwn.inquilinoNombre, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    cwn.inquilinoNombre,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Text(
                     "${DateFormatter.toDisplay(c.fechaInicio)} — ${DateFormatter.toDisplay(c.fechaFin)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     Text(
                         CurrencyFormatter.format(c.montoMensual, c.moneda),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
-                    Text(c.estado, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        c.estado,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
             }
-            IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete)) }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete))
+            }
         }
     }
 }

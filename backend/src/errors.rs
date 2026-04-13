@@ -8,6 +8,8 @@ pub enum AppError {
     NotFound(String),
     #[error("{}", .0.as_deref().unwrap_or("No autorizado"))]
     Unauthorized(Option<String>),
+    #[error("Solicitud inválida: {0}")]
+    BadRequest(String),
     #[error("Acceso denegado")]
     Forbidden,
     #[error("{0}")]
@@ -23,6 +25,7 @@ impl actix_web::error::ResponseError for AppError {
         match self {
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
+            AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
             AppError::Forbidden => StatusCode::FORBIDDEN,
             AppError::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
             AppError::Conflict(_) => StatusCode::CONFLICT,
@@ -34,6 +37,7 @@ impl actix_web::error::ResponseError for AppError {
         let (error_type, message) = match self {
             AppError::NotFound(msg) => ("not_found", msg.clone()),
             AppError::Unauthorized(_) => ("unauthorized", self.to_string()),
+            AppError::BadRequest(msg) => ("bad_request", msg.clone()),
             AppError::Forbidden => ("forbidden", self.to_string()),
             AppError::Validation(msg) => ("validation", msg.clone()),
             AppError::Conflict(msg) => ("conflict", msg.clone()),
@@ -74,6 +78,12 @@ mod tests {
     fn forbidden_returns_403() {
         let err = AppError::Forbidden;
         assert_eq!(err.status_code(), StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn bad_request_returns_400() {
+        let err = AppError::BadRequest("campo faltante".to_string());
+        assert_eq!(err.status_code(), StatusCode::BAD_REQUEST);
     }
 
     #[test]

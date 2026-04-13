@@ -19,15 +19,15 @@ class ValidatorsTest {
 
     @Test
     fun `PropiedadValidator accepts valid input`() {
-        PropiedadValidator
-            .validateCreate(
+        PropiedadValidator.validateCreate(
                 titulo = "Casa Centro",
                 direccion = "Calle 1",
                 ciudad = "Santo Domingo",
                 provincia = "Distrito Nacional",
                 tipoPropiedad = "casa",
                 precio = "50000.00",
-            ).assertAllValid()
+            )
+            .assertAllValid()
     }
 
     @Test
@@ -41,7 +41,14 @@ class ValidatorsTest {
                 tipoPropiedad = "",
                 precio = "",
             )
-        result.assertInvalid("titulo", "direccion", "ciudad", "provincia", "tipoPropiedad", "precio")
+        result.assertInvalid(
+            "titulo",
+            "direccion",
+            "ciudad",
+            "provincia",
+            "tipoPropiedad",
+            "precio",
+        )
     }
 
     @Test
@@ -62,48 +69,44 @@ class ValidatorsTest {
 
     @Test
     fun `InquilinoValidator accepts valid input`() {
-        InquilinoValidator
-            .validateCreate(
+        InquilinoValidator.validateCreate(
                 nombre = "Juan",
                 apellido = "Pérez",
                 cedula = "001-1234567-8",
-            ).assertAllValid()
+            )
+            .assertAllValid()
     }
 
     @Test
     fun `InquilinoValidator rejects blank fields`() {
-        InquilinoValidator
-            .validateCreate(
-                nombre = "",
-                apellido = "",
-                cedula = "  ",
-            ).assertInvalid("nombre", "apellido", "cedula")
+        InquilinoValidator.validateCreate(nombre = "", apellido = "", cedula = "  ")
+            .assertInvalid("nombre", "apellido", "cedula")
     }
 
     // ContratoValidator
 
     @Test
     fun `ContratoValidator accepts valid input`() {
-        ContratoValidator
-            .validateCreate(
+        ContratoValidator.validateCreate(
                 propiedadId = "abc-123",
                 inquilinoId = "def-456",
                 fechaInicio = "2025-01-01",
                 fechaFin = "2026-01-01",
                 montoMensual = "25000.00",
-            ).assertAllValid()
+            )
+            .assertAllValid()
     }
 
     @Test
     fun `ContratoValidator rejects blank required fields`() {
-        ContratoValidator
-            .validateCreate(
+        ContratoValidator.validateCreate(
                 propiedadId = "",
                 inquilinoId = "",
                 fechaInicio = "",
                 fechaFin = "",
                 montoMensual = "",
-            ).assertInvalid("propiedadId", "inquilinoId", "fechaInicio", "fechaFin", "montoMensual")
+            )
+            .assertInvalid("propiedadId", "inquilinoId", "fechaInicio", "fechaFin", "montoMensual")
     }
 
     @Test
@@ -136,69 +139,66 @@ class ValidatorsTest {
 
     @Test
     fun `PagoValidator accepts valid input`() {
-        PagoValidator
-            .validateCreate(
+        PagoValidator.validateCreate(
                 contratoId = "abc-123",
                 monto = "25000.00",
                 fechaVencimiento = "2025-07-01",
-            ).assertAllValid()
+            )
+            .assertAllValid()
     }
 
     @Test
     fun `PagoValidator rejects blank fields`() {
-        PagoValidator
-            .validateCreate(
-                contratoId = "",
-                monto = "",
-                fechaVencimiento = "",
-            ).assertInvalid("contratoId", "monto", "fechaVencimiento")
+        PagoValidator.validateCreate(contratoId = "", monto = "", fechaVencimiento = "")
+            .assertInvalid("contratoId", "monto", "fechaVencimiento")
     }
 
     // GastoValidator
 
     @Test
     fun `GastoValidator accepts valid input`() {
-        GastoValidator
-            .validateCreate(
+        GastoValidator.validateCreate(
                 propiedadId = "abc",
                 categoria = "reparacion",
                 descripcion = "Arreglo de tubería",
                 monto = "5000.00",
                 moneda = "DOP",
                 fechaGasto = "2025-06-15",
-            ).assertAllValid()
+            )
+            .assertAllValid()
     }
 
     @Test
     fun `GastoValidator rejects blank fields`() {
-        GastoValidator
-            .validateCreate(
+        GastoValidator.validateCreate(
                 propiedadId = "",
                 categoria = "",
                 descripcion = "",
                 monto = "",
                 moneda = "",
                 fechaGasto = "",
-            ).assertInvalid("propiedadId", "categoria", "descripcion", "monto", "moneda", "fechaGasto")
+            )
+            .assertInvalid(
+                "propiedadId",
+                "categoria",
+                "descripcion",
+                "monto",
+                "moneda",
+                "fechaGasto",
+            )
     }
 
     // SolicitudValidator
 
     @Test
     fun `SolicitudValidator accepts valid input`() {
-        SolicitudValidator
-            .validateCreate(
-                propiedadId = "abc",
-                titulo = "Fuga de agua",
-            ).assertAllValid()
+        SolicitudValidator.validateCreate(propiedadId = "abc", titulo = "Fuga de agua")
+            .assertAllValid()
     }
 
     @Test
     fun `SolicitudValidator rejects blank fields`() {
-        SolicitudValidator
-            .validateCreate(
-                propiedadId = "",
-                titulo = "",
-            ).assertInvalid("propiedadId", "titulo")
+        SolicitudValidator.validateCreate(propiedadId = "", titulo = "")
+            .assertInvalid("propiedadId", "titulo")
     }
 }

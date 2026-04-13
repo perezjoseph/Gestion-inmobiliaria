@@ -43,7 +43,8 @@ fun ConfiguracionScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(uiState.saveSuccess) {
-        if (uiState.saveSuccess) snackbarHostState.showSnackbar("Configuración actualizada correctamente")
+        if (uiState.saveSuccess)
+            snackbarHostState.showSnackbar("Configuración actualizada correctamente")
     }
 
     Scaffold(
@@ -57,28 +58,15 @@ fun ConfiguracionScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-        ) {
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             OfflineIndicator(isOffline = !isOnline)
 
             when {
                 uiState.isLoading -> LoadingScreen()
                 uiState.errorMessage != null && uiState.tasa.isEmpty() ->
-                    ErrorScreen(
-                        message = uiState.errorMessage!!,
-                        onRetry = viewModel::loadMoneda,
-                    )
+                    ErrorScreen(message = uiState.errorMessage!!, onRetry = viewModel::loadMoneda)
                 else ->
-                    Column(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                    ) {
+                    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                         Text(
                             text = stringResource(R.string.configuracion_moneda),
                             style = MaterialTheme.typography.titleMedium,

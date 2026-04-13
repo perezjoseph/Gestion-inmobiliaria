@@ -17,37 +17,30 @@ import java.time.format.DateTimeFormatter
  *
  * Property 11: Contrato date ordering validation
  *
- * For any pair of dates (fechaInicio, fechaFin), the contrato validator SHALL return
- * Invalid when fechaFin is on or before fechaInicio, and SHALL return Valid when
- * fechaFin is strictly after fechaInicio.
+ * For any pair of dates (fechaInicio, fechaFin), the contrato validator SHALL return Invalid when
+ * fechaFin is on or before fechaInicio, and SHALL return Valid when fechaFin is strictly after
+ * fechaInicio.
  */
 class ContratoDateOrderingPropertyTest :
     FreeSpec({
-
         val apiFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
-        val nonBlankArb: Arb<String> =
-            arbitrary {
-                val base = Arb.string(minSize = 1, maxSize = 50).bind()
-                if (base.isBlank()) "x$base" else base
-            }
+        val nonBlankArb: Arb<String> = arbitrary {
+            val base = Arb.string(minSize = 1, maxSize = 50).bind()
+            if (base.isBlank()) "x$base" else base
+        }
 
-        val posDecimalArb: Arb<String> =
-            arbitrary {
-                val i = Arb.int(1..999999).bind()
-                val d = Arb.int(0..99).bind()
-                "$i.${d.toString().padStart(2, '0')}"
-            }
+        val posDecimalArb: Arb<String> = arbitrary {
+            val i = Arb.int(1..999999).bind()
+            val d = Arb.int(0..99).bind()
+            "$i.${d.toString().padStart(2, '0')}"
+        }
 
         val dateArb: Arb<LocalDate> =
-            Arb.localDate(
-                minDate = LocalDate.of(2000, 1, 1),
-                maxDate = LocalDate.of(2099, 12, 31),
-            )
+            Arb.localDate(minDate = LocalDate.of(2000, 1, 1), maxDate = LocalDate.of(2099, 12, 31))
 
         "Property 11: Contrato date ordering validation" -
             {
-
                 "fechaFin before fechaInicio returns Invalid for fechaFin" {
                     checkAll(
                         100,
@@ -57,7 +50,6 @@ class ContratoDateOrderingPropertyTest :
                         nonBlankArb,
                         posDecimalArb,
                     ) { inicio, daysBefore, propId, inquId, monto ->
-
                         val fechaInicio = inicio
                         val fechaFin = inicio.minusDays(daysBefore.toLong())
 
@@ -75,8 +67,11 @@ class ContratoDateOrderingPropertyTest :
                 }
 
                 "fechaFin equal to fechaInicio returns Invalid for fechaFin" {
-                    checkAll(100, dateArb, nonBlankArb, nonBlankArb, posDecimalArb) { date, propId, inquId, monto ->
-
+                    checkAll(100, dateArb, nonBlankArb, nonBlankArb, posDecimalArb) {
+                        date,
+                        propId,
+                        inquId,
+                        monto ->
                         val dateStr = date.format(apiFormat)
 
                         val result =
@@ -101,7 +96,6 @@ class ContratoDateOrderingPropertyTest :
                         nonBlankArb,
                         posDecimalArb,
                     ) { inicio, daysAfter, propId, inquId, monto ->
-
                         val fechaInicio = inicio
                         val fechaFin = inicio.plusDays(daysAfter.toLong())
 

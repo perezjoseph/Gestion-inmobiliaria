@@ -10,9 +10,7 @@ interface DashboardCacheDao {
     @Query("SELECT * FROM dashboard_cache WHERE `key` = :key")
     suspend fun getByKey(key: String): DashboardCache?
 
-    @Upsert
-    suspend fun upsert(cache: DashboardCache)
+    @Upsert suspend fun upsert(cache: DashboardCache)
 
-    @Query("DELETE FROM dashboard_cache")
-    suspend fun deleteAll()
+    @Query("DELETE FROM dashboard_cache") suspend fun deleteAll()
 }

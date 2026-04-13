@@ -11,22 +11,16 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.propmanager.core.ui.theme.SyncPendingColor
-import com.propmanager.core.ui.theme.SyncedColor
 
 @Composable
-fun SyncStatusBadge(
-    isPendingSync: Boolean,
-    modifier: Modifier = Modifier,
-) {
+fun SyncStatusBadge(isPendingSync: Boolean, modifier: Modifier = Modifier) {
     if (!isPendingSync) return
 
     val description = "Pendiente de sincronización"
     Box(
         modifier =
-            modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(SyncPendingColor)
-                .semantics { contentDescription = description },
+            modifier.size(8.dp).clip(CircleShape).background(SyncPendingColor).semantics {
+                contentDescription = description
+            }
     )
 }

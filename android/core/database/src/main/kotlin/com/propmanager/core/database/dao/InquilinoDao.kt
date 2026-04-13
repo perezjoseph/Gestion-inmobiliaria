@@ -22,19 +22,16 @@ interface InquilinoDao {
                OR apellido LIKE '%' || :query || '%'
                OR cedula LIKE '%' || :query || '%')
         ORDER BY apellido ASC, nombre ASC
-        """,
+        """
     )
     fun search(query: String): Flow<List<InquilinoEntity>>
 
-    @Upsert
-    suspend fun upsert(entity: InquilinoEntity)
+    @Upsert suspend fun upsert(entity: InquilinoEntity)
 
-    @Upsert
-    suspend fun upsertAll(entities: List<InquilinoEntity>)
+    @Upsert suspend fun upsertAll(entities: List<InquilinoEntity>)
 
     @Query("UPDATE inquilinos SET is_deleted = 1 WHERE id = :id")
     suspend fun markDeleted(id: String)
 
-    @Query("DELETE FROM inquilinos")
-    suspend fun deleteAll()
+    @Query("DELETE FROM inquilinos") suspend fun deleteAll()
 }

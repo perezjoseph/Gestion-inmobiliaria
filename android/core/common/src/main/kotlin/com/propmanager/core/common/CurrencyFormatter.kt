@@ -7,10 +7,7 @@ import java.util.Locale
 object CurrencyFormatter {
     private val dominicanLocale = Locale("es", "DO")
 
-    fun format(
-        amount: BigDecimal,
-        currency: String,
-    ): String {
+    fun format(amount: BigDecimal, currency: String): String {
         val symbol =
             when (currency) {
                 "DOP" -> "RD$"
@@ -18,12 +15,12 @@ object CurrencyFormatter {
                 else -> currency
             }
         val formatted =
-            NumberFormat
-                .getNumberInstance(dominicanLocale)
+            NumberFormat.getNumberInstance(dominicanLocale)
                 .apply {
                     minimumFractionDigits = 2
                     maximumFractionDigits = 2
-                }.format(amount)
+                }
+                .format(amount)
         return "$symbol $formatted"
     }
 }

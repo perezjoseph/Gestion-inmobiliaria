@@ -54,12 +54,7 @@ fun DocumentosScreen(
         },
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-        ) {
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             OfflineIndicator(isOffline = !isOnline)
 
             if (!isOnline) {
@@ -70,10 +65,7 @@ fun DocumentosScreen(
             OutlinedButton(
                 onClick = onPickFile,
                 enabled = !uiState.isUploading,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 Text(stringResource(R.string.documento_subir))
             }
@@ -81,20 +73,12 @@ fun DocumentosScreen(
             when {
                 uiState.isLoading -> LoadingScreen()
                 uiState.errorMessage != null ->
-                    ErrorScreen(
-                        message = uiState.errorMessage!!,
-                        onRetry = { },
-                    )
+                    ErrorScreen(message = uiState.errorMessage!!, onRetry = {})
                 uiState.documents.isEmpty() ->
-                    EmptyStateScreen(
-                        message = stringResource(R.string.documentos_empty),
-                    )
+                    EmptyStateScreen(message = stringResource(R.string.documentos_empty))
                 else ->
                     LazyColumn(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 16.dp),
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(uiState.documents, key = { it.id }) { doc ->
@@ -135,9 +119,17 @@ fun DocumentosScreen(
     }
 }
 
+@Suppress("MagicNumber")
 private fun formatFileSize(bytes: Long): String =
     when {
-        bytes < 1024 -> "$bytes B"
-        bytes < 1024 * 1024 -> "${bytes / 1024} KB"
-        else -> String.format("%.1f MB", bytes / (1024.0 * 1024.0))
+        bytes < BYTES_PER_KB -> "$bytes B"
+        bytes < BYTES_PER_KB * BYTES_PER_KB -> "${bytes / BYTES_PER_KB} KB"
+        else ->
+            String.format(
+                java.util.Locale.US,
+                "%.1f MB",
+                bytes / (BYTES_PER_KB.toDouble() * BYTES_PER_KB.toDouble()),
+            )
     }
+
+private const val BYTES_PER_KB = 1024L

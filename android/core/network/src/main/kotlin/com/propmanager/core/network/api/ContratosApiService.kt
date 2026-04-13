@@ -17,18 +17,13 @@ import retrofit2.http.QueryMap
 interface ContratosApiService {
     @GET("api/contratos")
     suspend fun list(
-        @QueryMap filters: Map<String, String> = emptyMap(),
+        @QueryMap filters: Map<String, String> = emptyMap()
     ): Response<PaginatedResponse<ContratoDto>>
 
-    @GET("api/contratos/{id}")
-    suspend fun getById(
-        @Path("id") id: String,
-    ): Response<ContratoDto>
+    @GET("api/contratos/{id}") suspend fun getById(@Path("id") id: String): Response<ContratoDto>
 
     @POST("api/contratos")
-    suspend fun create(
-        @Body request: CreateContratoRequest,
-    ): Response<ContratoDto>
+    suspend fun create(@Body request: CreateContratoRequest): Response<ContratoDto>
 
     @PUT("api/contratos/{id}")
     suspend fun update(
@@ -36,10 +31,7 @@ interface ContratosApiService {
         @Body request: CreateContratoRequest,
     ): Response<ContratoDto>
 
-    @DELETE("api/contratos/{id}")
-    suspend fun delete(
-        @Path("id") id: String,
-    ): Response<Unit>
+    @DELETE("api/contratos/{id}") suspend fun delete(@Path("id") id: String): Response<Unit>
 
     @POST("api/contratos/{id}/renovar")
     suspend fun renovar(
@@ -55,6 +47,6 @@ interface ContratosApiService {
 
     @GET("api/contratos/por-vencer")
     suspend fun expiring(
-        @QueryMap filters: Map<String, String> = emptyMap(),
+        @QueryMap filters: Map<String, String> = emptyMap()
     ): Response<List<ContratoDto>>
 }

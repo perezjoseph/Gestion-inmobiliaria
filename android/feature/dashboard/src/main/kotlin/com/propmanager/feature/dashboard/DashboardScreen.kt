@@ -53,10 +53,7 @@ import java.math.BigDecimal
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(
-    viewModel: DashboardViewModel,
-    modifier: Modifier = Modifier,
-) {
+fun DashboardScreen(viewModel: DashboardViewModel, modifier: Modifier = Modifier) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
@@ -78,12 +75,7 @@ fun DashboardScreen(
         },
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-        ) {
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             OfflineIndicator(isOffline = !isOnline)
 
             when {
@@ -101,21 +93,13 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun DashboardContent(
-    uiState: DashboardUiState,
-    modifier: Modifier = Modifier,
-) {
+private fun DashboardContent(uiState: DashboardUiState, modifier: Modifier = Modifier) {
     LazyColumn(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
+        modifier = modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         if (uiState.isFromCache && uiState.lastUpdated != null) {
-            item(key = "staleness") {
-                StalenessIndicator(lastUpdated = uiState.lastUpdated)
-            }
+            item(key = "staleness") { StalenessIndicator(lastUpdated = uiState.lastUpdated) }
         }
 
         uiState.stats?.let { stats ->
@@ -129,10 +113,7 @@ private fun DashboardContent(
             item(key = "pagos_header") {
                 SectionHeader(title = stringResource(R.string.dashboard_pagos_proximos))
             }
-            items(
-                items = uiState.pagosProximos,
-                key = { it.pagoId },
-            ) { pago ->
+            items(items = uiState.pagosProximos, key = { it.pagoId }) { pago ->
                 PagoProximoItem(pago = pago)
             }
         }
@@ -141,10 +122,7 @@ private fun DashboardContent(
             item(key = "contratos_header") {
                 SectionHeader(title = stringResource(R.string.dashboard_contratos_por_vencer))
             }
-            items(
-                items = uiState.contratosCalendario,
-                key = { it.contratoId },
-            ) { contrato ->
+            items(items = uiState.contratosCalendario, key = { it.contratoId }) { contrato ->
                 ContratoCalendarioItem(contrato = contrato)
             }
         }
@@ -153,10 +131,8 @@ private fun DashboardContent(
             item(key = "ocupacion_header") {
                 SectionHeader(title = stringResource(R.string.dashboard_ocupacion))
             }
-            items(
-                items = uiState.ocupacionTendencia,
-                key = { "${it.anio}-${it.mes}" },
-            ) { tendencia ->
+            items(items = uiState.ocupacionTendencia, key = { "${it.anio}-${it.mes}" }) { tendencia
+                ->
                 OcupacionTendenciaItem(tendencia = tendencia)
             }
         }
@@ -177,23 +153,16 @@ private fun DashboardContent(
             }
         }
 
-        item(key = "bottom_spacer") {
-            Spacer(modifier = Modifier.height(16.dp))
-        }
+        item(key = "bottom_spacer") { Spacer(modifier = Modifier.height(16.dp)) }
     }
 }
 
 @Composable
-private fun StalenessIndicator(
-    lastUpdated: String,
-    modifier: Modifier = Modifier,
-) {
+private fun StalenessIndicator(lastUpdated: String, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier.fillMaxWidth(),
         colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-            ),
+            CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
     ) {
         Text(
             text = stringResource(R.string.last_updated, lastUpdated),
@@ -236,11 +205,7 @@ private fun StatsGrid(
             )
             StatCard(
                 label = stringResource(R.string.dashboard_total_inquilinos),
-                value =
-                    CurrencyFormatter.format(
-                        BigDecimal(stats.ingresoMensual),
-                        "DOP",
-                    ),
+                value = CurrencyFormatter.format(BigDecimal(stats.ingresoMensual), "DOP"),
                 modifier = Modifier.weight(1f),
             )
         }
@@ -248,23 +213,14 @@ private fun StatsGrid(
 }
 
 @Composable
-private fun StatCard(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-) {
+private fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
         colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-            ),
+            CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
     ) {
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
@@ -286,10 +242,7 @@ private fun StatCard(
 }
 
 @Composable
-private fun SectionHeader(
-    title: String,
-    modifier: Modifier = Modifier,
-) {
+private fun SectionHeader(title: String, modifier: Modifier = Modifier) {
     Text(
         text = title,
         style = MaterialTheme.typography.titleMedium,
@@ -299,10 +252,7 @@ private fun SectionHeader(
 }
 
 @Composable
-private fun PagoProximoItem(
-    pago: PagoProximo,
-    modifier: Modifier = Modifier,
-) {
+private fun PagoProximoItem(pago: PagoProximo, modifier: Modifier = Modifier) {
     Card(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
@@ -336,24 +286,12 @@ private fun PagoProximoItem(
 }
 
 @Composable
-private fun ContratoCalendarioItem(
-    contrato: ContratoCalendario,
-    modifier: Modifier = Modifier,
-) {
+private fun ContratoCalendarioItem(contrato: ContratoCalendario, modifier: Modifier = Modifier) {
     val indicatorColor = parseColorIndicator(contrato.color)
 
     Card(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Spacer(
-                modifier =
-                    Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(indicatorColor),
-            )
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Spacer(modifier = Modifier.size(12.dp).clip(CircleShape).background(indicatorColor))
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -385,11 +323,15 @@ private fun ContratoCalendarioItem(
     }
 }
 
+@Suppress("MagicNumber")
 private fun parseColorIndicator(color: String): Color =
     when (color.lowercase()) {
-        "red", "rojo" -> Color(0xFFD32F2F)
-        "yellow", "amarillo" -> Color(0xFFF9A825)
-        "green", "verde" -> Color(0xFF388E3C)
+        "red",
+        "rojo" -> Color(0xFFD32F2F)
+        "yellow",
+        "amarillo" -> Color(0xFFF9A825)
+        "green",
+        "verde" -> Color(0xFF388E3C)
         else -> {
             runCatching { Color(android.graphics.Color.parseColor(color)) }
                 .getOrDefault(Color(0xFF757575))
@@ -397,24 +339,15 @@ private fun parseColorIndicator(color: String): Color =
     }
 
 @Composable
-private fun OcupacionTendenciaItem(
-    tendencia: OcupacionTendencia,
-    modifier: Modifier = Modifier,
-) {
+private fun OcupacionTendenciaItem(tendencia: OcupacionTendencia, modifier: Modifier = Modifier) {
     val monthName = getMonthName(tendencia.mes)
 
     Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
+        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "$monthName ${tendencia.anio}",
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        Text(text = "$monthName ${tendencia.anio}", style = MaterialTheme.typography.bodyMedium)
         Text(
             text = String.format("%.1f%%", tendencia.tasa),
             style = MaterialTheme.typography.bodyMedium,
@@ -424,6 +357,7 @@ private fun OcupacionTendenciaItem(
     HorizontalDivider()
 }
 
+@Suppress("MagicNumber")
 private fun getMonthName(mes: Int): String =
     when (mes) {
         1 -> "Enero"
@@ -442,10 +376,7 @@ private fun getMonthName(mes: Int): String =
     }
 
 @Composable
-private fun IngresosComparacionCard(
-    ingresos: IngresosComparacion,
-    modifier: Modifier = Modifier,
-) {
+private fun IngresosComparacionCard(ingresos: IngresosComparacion, modifier: Modifier = Modifier) {
     Card(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             ComparisonRow(
@@ -473,10 +404,7 @@ private fun IngresosComparacionCard(
 }
 
 @Composable
-private fun GastosComparacionCard(
-    gastos: GastosComparacion,
-    modifier: Modifier = Modifier,
-) {
+private fun GastosComparacionCard(gastos: GastosComparacion, modifier: Modifier = Modifier) {
     Card(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             ComparisonRow(
@@ -511,10 +439,7 @@ private fun ComparisonRow(
     modifier: Modifier = Modifier,
     valueColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
+    Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,

@@ -8,18 +8,19 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "contratos",
-    foreignKeys = [
-        ForeignKey(
-            entity = PropiedadEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["propiedad_id"],
-        ),
-        ForeignKey(
-            entity = InquilinoEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["inquilino_id"],
-        ),
-    ],
+    foreignKeys =
+        [
+            ForeignKey(
+                entity = PropiedadEntity::class,
+                parentColumns = ["id"],
+                childColumns = ["propiedad_id"],
+            ),
+            ForeignKey(
+                entity = InquilinoEntity::class,
+                parentColumns = ["id"],
+                childColumns = ["inquilino_id"],
+            ),
+        ],
     indices = [Index("propiedad_id"), Index("inquilino_id")],
 )
 data class ContratoEntity(

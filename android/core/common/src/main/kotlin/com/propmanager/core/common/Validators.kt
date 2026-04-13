@@ -3,15 +3,10 @@ package com.propmanager.core.common
 import com.propmanager.core.model.ValidationResult
 import java.math.BigDecimal
 
-private fun requireNotBlank(
-    value: String,
-    message: String,
-): ValidationResult = if (value.isBlank()) ValidationResult.Invalid(message) else ValidationResult.Valid
+private fun requireNotBlank(value: String, message: String): ValidationResult =
+    if (value.isBlank()) ValidationResult.Invalid(message) else ValidationResult.Valid
 
-private fun requirePositiveDecimal(
-    value: String,
-    message: String,
-): ValidationResult {
+private fun requirePositiveDecimal(value: String, message: String): ValidationResult {
     val decimal = value.toBigDecimalOrNull()
     return if (decimal == null || decimal <= BigDecimal.ZERO) {
         ValidationResult.Invalid(message)
@@ -66,7 +61,8 @@ object ContratoValidator {
                 "inquilinoId" to requireNotBlank(inquilinoId, "El inquilino es requerido"),
                 "fechaInicio" to requireNotBlank(fechaInicio, "La fecha de inicio es requerida"),
                 "fechaFin" to requireNotBlank(fechaFin, "La fecha de fin es requerida"),
-                "montoMensual" to requirePositiveDecimal(montoMensual, "El monto mensual debe ser mayor a cero"),
+                "montoMensual" to
+                    requirePositiveDecimal(montoMensual, "El monto mensual debe ser mayor a cero"),
             )
 
         if (fechaInicio.isNotBlank() && fechaFin.isNotBlank()) {
@@ -76,7 +72,7 @@ object ContratoValidator {
                 if (!fin.isAfter(inicio)) {
                     results["fechaFin"] =
                         ValidationResult.Invalid(
-                            "La fecha de fin debe ser posterior a la fecha de inicio",
+                            "La fecha de fin debe ser posterior a la fecha de inicio"
                         )
                 }
             } catch (_: Exception) {
@@ -97,7 +93,8 @@ object PagoValidator {
         mapOf(
             "contratoId" to requireNotBlank(contratoId, "El contrato es requerido"),
             "monto" to requirePositiveDecimal(monto, "El monto debe ser mayor a cero"),
-            "fechaVencimiento" to requireNotBlank(fechaVencimiento, "La fecha de vencimiento es requerida"),
+            "fechaVencimiento" to
+                requireNotBlank(fechaVencimiento, "La fecha de vencimiento es requerida"),
         )
 }
 
@@ -121,10 +118,7 @@ object GastoValidator {
 }
 
 object SolicitudValidator {
-    fun validateCreate(
-        propiedadId: String,
-        titulo: String,
-    ): Map<String, ValidationResult> =
+    fun validateCreate(propiedadId: String, titulo: String): Map<String, ValidationResult> =
         mapOf(
             "propiedadId" to requireNotBlank(propiedadId, "La propiedad es requerida"),
             "titulo" to requireNotBlank(titulo, "El título es requerido"),

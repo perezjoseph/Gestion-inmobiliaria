@@ -8,11 +8,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PUT
 
-@Serializable
-data class UpdatePerfilRequest(
-    val nombre: String? = null,
-    val email: String? = null,
-)
+@Serializable data class UpdatePerfilRequest(val nombre: String? = null, val email: String? = null)
 
 @Serializable
 data class ChangePasswordRequest(
@@ -20,22 +16,14 @@ data class ChangePasswordRequest(
     @SerialName("passwordNuevo") val passwordNuevo: String,
 )
 
-@Serializable
-data class MessageResponse(
-    val message: String,
-)
+@Serializable data class MessageResponse(val message: String)
 
 interface PerfilApiService {
-    @GET("api/perfil")
-    suspend fun getPerfil(): Response<UserDto>
+    @GET("api/perfil") suspend fun getPerfil(): Response<UserDto>
 
     @PUT("api/perfil")
-    suspend fun updatePerfil(
-        @Body request: UpdatePerfilRequest,
-    ): Response<UserDto>
+    suspend fun updatePerfil(@Body request: UpdatePerfilRequest): Response<UserDto>
 
     @PUT("api/perfil/password")
-    suspend fun changePassword(
-        @Body request: ChangePasswordRequest,
-    ): Response<MessageResponse>
+    suspend fun changePassword(@Body request: ChangePasswordRequest): Response<MessageResponse>
 }

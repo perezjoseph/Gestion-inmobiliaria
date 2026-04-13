@@ -5,7 +5,7 @@ use yew_router::prelude::*;
 use crate::app::Route;
 use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::error_banner::ErrorBanner;
-use crate::components::common::loading::Loading;
+use crate::components::common::skeleton::DashboardSkeleton;
 use crate::services::api::api_get;
 use crate::types::DashboardStats;
 use crate::types::dashboard_extra::IngresoComparacion;
@@ -57,7 +57,7 @@ pub fn Dashboard() -> Html {
     }
 
     if *loading {
-        return html! { <Loading /> };
+        return html! { <DashboardSkeleton /> };
     }
 
     let on_close_error = {
@@ -91,36 +91,36 @@ pub fn Dashboard() -> Html {
 fn WelcomeCard() -> Html {
     html! {
         <div class="gi-welcome-card">
-            <h2 class="text-display" style="font-size: var(--text-xl); font-weight: 700; color: var(--text-primary); margin-bottom: var(--space-2);">
+            <h2 class="text-display gi-text-xl gi-font-bold gi-text-primary gi-mb-2">
                 {"Bienvenido a Gestión Inmobiliaria"}
             </h2>
-            <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-6);">
+            <p class="gi-text-sm gi-text-secondary gi-mb-6">
                 {"Comience configurando su portafolio en tres pasos:"}
             </p>
-            <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+            <div class="gi-flex-col gi-gap-3">
                 <div class="gi-welcome-step">
                     <div class="gi-welcome-step-num">{"1"}</div>
                     <div>
-                        <div style="font-weight: 600; font-size: var(--text-sm); color: var(--text-primary);">{"Agregue una propiedad"}</div>
-                        <div style="font-size: var(--text-xs); color: var(--text-secondary);">{"Registre la dirección, tipo y precio de alquiler."}</div>
+                        <div class="gi-welcome-step-title">{"Agregue una propiedad"}</div>
+                        <div class="gi-welcome-step-desc">{"Registre la dirección, tipo y precio de alquiler."}</div>
                     </div>
                 </div>
                 <div class="gi-welcome-step">
                     <div class="gi-welcome-step-num">{"2"}</div>
                     <div>
-                        <div style="font-weight: 600; font-size: var(--text-sm); color: var(--text-primary);">{"Registre un inquilino"}</div>
-                        <div style="font-size: var(--text-xs); color: var(--text-secondary);">{"Agregue los datos del arrendatario con su cédula."}</div>
+                        <div class="gi-welcome-step-title">{"Registre un inquilino"}</div>
+                        <div class="gi-welcome-step-desc">{"Agregue los datos del arrendatario con su cédula."}</div>
                     </div>
                 </div>
                 <div class="gi-welcome-step">
                     <div class="gi-welcome-step-num">{"3"}</div>
                     <div>
-                        <div style="font-weight: 600; font-size: var(--text-sm); color: var(--text-primary);">{"Cree un contrato"}</div>
-                        <div style="font-size: var(--text-xs); color: var(--text-secondary);">{"Vincule propiedad e inquilino con fechas y monto mensual."}</div>
+                        <div class="gi-welcome-step-title">{"Cree un contrato"}</div>
+                        <div class="gi-welcome-step-desc">{"Vincule propiedad e inquilino con fechas y monto mensual."}</div>
                     </div>
                 </div>
             </div>
-            <div style="margin-top: var(--space-6);">
+            <div class="gi-mt-6">
                 <Link<Route> to={Route::Propiedades} classes="gi-btn gi-btn-primary">
                     {"Agregar primera propiedad"}
                 </Link<Route>>
@@ -153,9 +153,9 @@ fn StatsHeader(props: &StatsHeaderProps) -> Html {
                     <p class="gi-stat-label">{"Ocupación del portafolio"}</p>
                     <p class="gi-stat-value">
                         <CurrencyDisplay monto={s.ingreso_mensual} moneda={"DOP".to_string()} />
-                        <span style="font-size: var(--text-sm); font-weight: 400; color: var(--text-tertiary); margin-left: var(--space-2);">{"/ mes"}</span>
+                        <span class="gi-stat-suffix">{"/ mes"}</span>
                     </p>
-                    <p class="gi-text-xs gi-text-tertiary" style="margin-top: var(--space-1);">
+                    <p class="gi-text-xs gi-text-tertiary gi-mt-1">
                         {format!("{} propiedades registradas", s.total_propiedades)}
                     </p>
                 </div>
@@ -164,20 +164,20 @@ fn StatsHeader(props: &StatsHeaderProps) -> Html {
                 <p class="gi-stat-label">{if s.pagos_atrasados > 0 { "⚠ Pagos atrasados" } else { "Pagos atrasados" }}</p>
                 <p class="gi-stat-value">{s.pagos_atrasados}</p>
                 if s.pagos_atrasados > 0 {
-                    <span style="font-size: var(--text-xs); padding: 0; margin-top: var(--space-1);">
+                    <span class="gi-text-xs gi-mt-1">
                         <Link<Route> to={Route::Pagos} classes="gi-btn-text">{"Ver detalles →"}</Link<Route>>
                     </span>
                 } else {
-                    <p class="gi-text-xs gi-text-tertiary" style="margin-top: var(--space-1);">{"Todo al día"}</p>
+                    <p class="gi-text-xs gi-text-tertiary gi-mt-1">{"Todo al día"}</p>
                 }
             </div>
             if let Some(ref comp) = props.ingreso_comp {
                 <div class="gi-dashboard-secondary">
                     <p class="gi-stat-label">{"Ingresos del Mes"}</p>
-                    <p class="gi-stat-value" style="font-size: var(--text-base);">
+                    <p class="gi-stat-value gi-text-base">
                         <CurrencyDisplay monto={comp.cobrado} moneda={"DOP".to_string()} />
                     </p>
-                    <p class="gi-text-xs gi-text-tertiary" style="margin-top: var(--space-1);">
+                    <p class="gi-text-xs gi-text-tertiary gi-mt-1">
                         {"Esperado: "}<CurrencyDisplay monto={comp.esperado} moneda={"DOP".to_string()} />
                     </p>
                 </div>
@@ -194,26 +194,24 @@ struct OverdueSectionProps {
 #[function_component]
 fn OverdueSection(props: &OverdueSectionProps) -> Html {
     html! {
-        <div class="gi-card" style="padding: var(--space-5); margin-top: var(--space-5);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
-                <h2 class="text-display" style="font-size: var(--text-base); font-weight: 600; color: var(--text-primary);">
-                    {"Pagos Atrasados"}
-                </h2>
+        <div class="gi-card-section">
+            <div class="gi-section-header">
+                <h2 class="gi-section-header-title">{"Pagos Atrasados"}</h2>
                 <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-xs">{"Ver todos →"}</Link<Route>>
             </div>
             if props.pagos.is_empty() {
-                <p class="gi-text-sm gi-text-tertiary" style="padding: var(--space-3) 0;">{"Sin pagos atrasados. ¡Todo al día!"}</p>
+                <p class="gi-text-sm gi-text-tertiary gi-py-3">{"Sin pagos atrasados. ¡Todo al día!"}</p>
             } else {
-                <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+                <div class="gi-flex-col gi-gap-2">
                     { for props.pagos.iter().take(5).map(|p| html! {
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-2) var(--space-3); border-radius: 8px; background-color: var(--color-error-light);">
-                            <div style="min-width: 0; flex: 1;">
-                                <div style="font-size: var(--text-sm); font-weight: 500; color: var(--text-primary);">{&p.propiedad_titulo}</div>
-                                <div style="font-size: var(--text-xs); color: var(--text-secondary);">
+                        <div class="gi-overdue-row">
+                            <div class="gi-min-w-0 gi-flex-1">
+                                <div class="gi-overdue-row-title">{&p.propiedad_titulo}</div>
+                                <div class="gi-overdue-row-detail">
                                     {format!("{} {} — ", p.inquilino_nombre, p.inquilino_apellido)}<CurrencyDisplay monto={p.monto} moneda={p.moneda.clone()} />
                                 </div>
                             </div>
-                            <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
+                            <div class="flex items-center gi-gap-2 gi-flex-shrink-0">
                                 <Link<Route> to={Route::Pagos} classes="gi-btn gi-btn-primary gi-btn-sm">
                                     {"Registrar Pago"}
                                 </Link<Route>>

@@ -36,6 +36,4 @@ data class RenovarContratoRequest(
 )
 
 @Serializable
-data class TerminarContratoRequest(
-    @SerialName("fechaTerminacion") val fechaTerminacion: String,
-)
+data class TerminarContratoRequest(@SerialName("fechaTerminacion") val fechaTerminacion: String)

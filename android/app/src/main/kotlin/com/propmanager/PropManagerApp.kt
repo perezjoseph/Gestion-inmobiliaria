@@ -7,8 +7,7 @@ import javax.inject.Inject
 
 @HiltAndroidApp
 class PropManagerApp : Application() {
-    @Inject
-    lateinit var syncManager: SyncManager
+    @Inject lateinit var syncManager: SyncManager
 
     override fun onCreate() {
         super.onCreate()

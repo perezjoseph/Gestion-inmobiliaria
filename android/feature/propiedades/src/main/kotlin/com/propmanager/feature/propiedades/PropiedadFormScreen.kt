@@ -8,13 +8,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -40,7 +36,9 @@ fun PropiedadFormScreen(
 ) {
     val formState by viewModel.formState.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    val title = if (isEditing) stringResource(R.string.propiedad_edit) else stringResource(R.string.propiedad_create)
+    val title =
+        if (isEditing) stringResource(R.string.propiedad_edit)
+        else stringResource(R.string.propiedad_create)
 
     Scaffold(
         topBar = {
@@ -54,16 +52,19 @@ fun PropiedadFormScreen(
     ) { paddingValues ->
         Column(
             modifier =
-                Modifier
-                    .fillMaxSize()
+                Modifier.fillMaxSize()
                     .padding(paddingValues)
                     .padding(horizontal = 16.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
         ) {
             Spacer(Modifier.height(8.dp))
 
             formState.errors["general"]?.let { error ->
-                Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 Spacer(Modifier.height(8.dp))
             }
 

@@ -16,47 +16,43 @@ import io.kotest.property.checkAll
  *
  * Property 4: Sync queue chronological processing order
  *
- * For any set of SyncQueueEntry items with distinct createdAt timestamps
- * inserted in arbitrary order, sorting by createdAt ASC produces chronological order.
- * This validates the ordering contract that SyncQueueDao.getAllPending() enforces
- * via its ORDER BY created_at ASC query.
+ * For any set of SyncQueueEntry items with distinct createdAt timestamps inserted in arbitrary
+ * order, sorting by createdAt ASC produces chronological order. This validates the ordering
+ * contract that SyncQueueDao.getAllPending() enforces via its ORDER BY created_at ASC query.
  */
 class SyncQueueChronologicalOrderPropertyTest :
     FreeSpec({
-
-        val entityTypeArb = Arb.element("propiedad", "inquilino", "contrato", "pago", "gasto", "solicitud")
+        val entityTypeArb =
+            Arb.element("propiedad", "inquilino", "contrato", "pago", "gasto", "solicitud")
         val operationArb = Arb.element("CREATE", "UPDATE", "DELETE")
 
-        val syncQueueEntryArb: Arb<SyncQueueEntry> =
-            arbitrary {
-                SyncQueueEntry(
-                    id = 0,
-                    entityType = entityTypeArb.bind(),
-                    entityId = Arb.string(8..36).bind(),
-                    operation = operationArb.bind(),
-                    payload = Arb.string(1..100).bind(),
-                    createdAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
-                    retryCount = Arb.int(0..5).bind(),
-                )
-            }
+        val syncQueueEntryArb: Arb<SyncQueueEntry> = arbitrary {
+            SyncQueueEntry(
+                id = 0,
+                entityType = entityTypeArb.bind(),
+                entityId = Arb.string(8..36).bind(),
+                operation = operationArb.bind(),
+                payload = Arb.string(1..100).bind(),
+                createdAt = Arb.long(1_000_000L..9_999_999_999L).bind(),
+                retryCount = Arb.int(0..5).bind(),
+            )
+        }
 
-        val syncQueueListArb: Arb<List<SyncQueueEntry>> =
-            arbitrary {
-                val size = Arb.int(2..30).bind()
-                val usedTimestamps = mutableSetOf<Long>()
-                (1..size).map {
-                    var entry = syncQueueEntryArb.bind()
-                    while (entry.createdAt in usedTimestamps) {
-                        entry = entry.copy(createdAt = Arb.long(1_000_000L..9_999_999_999L).bind())
-                    }
-                    usedTimestamps.add(entry.createdAt)
-                    entry
+        val syncQueueListArb: Arb<List<SyncQueueEntry>> = arbitrary {
+            val size = Arb.int(2..30).bind()
+            val usedTimestamps = mutableSetOf<Long>()
+            (1..size).map {
+                var entry = syncQueueEntryArb.bind()
+                while (entry.createdAt in usedTimestamps) {
+                    entry = entry.copy(createdAt = Arb.long(1_000_000L..9_999_999_999L).bind())
                 }
+                usedTimestamps.add(entry.createdAt)
+                entry
             }
+        }
 
         "Property 4: Sync queue chronological processing order" -
             {
-
                 "entries sorted by createdAt ASC are in chronological order" {
                     checkAll(100, syncQueueListArb) { entries ->
                         val sorted = entries.sortedBy { it.createdAt }

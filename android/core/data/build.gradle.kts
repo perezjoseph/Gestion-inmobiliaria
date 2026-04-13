@@ -10,27 +10,20 @@ android {
     namespace = "com.propmanager.core.data"
     compileSdk = 36
 
-    defaultConfig {
-        minSdk = 24
-    }
+    defaultConfig { minSdk = 24 }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    kotlinOptions {
-        jvmTarget = "11"
-    }
+    kotlinOptions { jvmTarget = "11" }
 
-    testOptions {
-        unitTests.all {
-            it.useJUnitPlatform()
-        }
-    }
+    testOptions { unitTests.all { it.useJUnitPlatform() } }
 }
 
 dependencies {
+    implementation(project(":core:common"))
     implementation(project(":core:database"))
     implementation(project(":core:network"))
     implementation(project(":core:model"))

@@ -20,32 +20,29 @@ import io.kotest.property.checkAll
  *
  * Property 5: Successful sync removes entry and updates local DB
  *
- * For any list of SyncQueueEntry items and a successfully synced entry,
- * removing that entry from the list results in a list that no longer
- * contains it, while all other entries remain intact.
+ * For any list of SyncQueueEntry items and a successfully synced entry, removing that entry from
+ * the list results in a list that no longer contains it, while all other entries remain intact.
  */
 class SyncRemovesEntryPropertyTest :
     FreeSpec({
-
-        val validEntityTypes = listOf("propiedad", "inquilino", "contrato", "pago", "gasto", "solicitud")
+        val validEntityTypes =
+            listOf("propiedad", "inquilino", "contrato", "pago", "gasto", "solicitud")
         val validOperations = listOf("CREATE", "UPDATE", "DELETE")
 
-        val syncQueueEntryArb: Arb<SyncQueueEntry> =
-            arbitrary {
-                SyncQueueEntry(
-                    id = Arb.long(1L..100_000L).bind(),
-                    entityType = Arb.element(validEntityTypes).bind(),
-                    entityId = Arb.uuid().map { it.toString() }.bind(),
-                    operation = Arb.element(validOperations).bind(),
-                    payload = Arb.string(1..200).bind(),
-                    createdAt = Arb.long(1L..Long.MAX_VALUE / 2).bind(),
-                    retryCount = Arb.int(0..10).bind(),
-                )
-            }
+        val syncQueueEntryArb: Arb<SyncQueueEntry> = arbitrary {
+            SyncQueueEntry(
+                id = Arb.long(1L..100_000L).bind(),
+                entityType = Arb.element(validEntityTypes).bind(),
+                entityId = Arb.uuid().map { it.toString() }.bind(),
+                operation = Arb.element(validOperations).bind(),
+                payload = Arb.string(1..200).bind(),
+                createdAt = Arb.long(1L..Long.MAX_VALUE / 2).bind(),
+                retryCount = Arb.int(0..10).bind(),
+            )
+        }
 
         "Property 5: Successful sync removes entry and updates local DB" -
             {
-
                 "removing a synced entry leaves it absent from the queue" {
                     checkAll(100, Arb.list(syncQueueEntryArb, 1..20)) { entries ->
                         val uniqueEntries = entries.distinctBy { it.id }

@@ -244,72 +244,78 @@ struct PagoListProps {
     on_per_page_change: Callback<u64>,
 }
 
+fn render_pago_row(p: &Pago, user_rol: &str, contrato_label: &Callback<String, String>, on_edit: &Callback<Pago>, on_delete: &Callback<Pago>) -> Html {
+    let c_label = contrato_label.emit(p.contrato_id.clone());
+    let (badge_cls, badge_label) = estado_badge(&p.estado);
+    let is_pagado = p.estado == "pagado";
+    let recibo_id = p.id.clone();
+    let pc = p.clone();
+    let pd = p.clone();
+    let on_edit = on_edit.clone();
+    let on_delete_click = on_delete.clone();
+    let user_rol = user_rol.to_string();
+    html! {
+        <tr>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{c_label}</td>
+            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={p.monto} moneda={p.moneda.clone()} /></td>
+            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
+                {p.fecha_pago.as_deref().map(format_date_display).unwrap_or_else(|| "—".into())}</td>
+            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&p.fecha_vencimiento)}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
+                {p.metodo_pago.as_deref().map(metodo_label).unwrap_or("—")}</td>
+            <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
+            if can_write(&user_rol) {
+                <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2);">
+                    <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(pc.clone()))} class="gi-btn-text">{"Editar"}</button>
+                    if is_pagado {
+                        <button onclick={Callback::from(move |_: MouseEvent| {
+                            let url = format!("{BASE_URL}/pagos/{recibo_id}/recibo");
+                            let _ = web_sys::window().and_then(|w| w.open_with_url(&url).ok());
+                        })} class="gi-btn-text" style="color: var(--color-primary-500);">{"Recibo"}</button>
+                    }
+                    if can_delete(&user_rol) {
+                        <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(pd.clone()))} class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button>
+                    }
+                </td>
+            }
+        </tr>
+    }
+}
+
+fn render_pago_empty_state(user_rol: &str, on_new: &Callback<MouseEvent>) -> Html {
+    html! {
+        <div class="gi-empty-state">
+            <div class="gi-empty-state-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
+                    <line x1="12" y1="1" x2="12" y2="23"/>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+            </div>
+            <div class="gi-empty-state-title">{"Sin pagos registrados"}</div>
+            <p class="gi-empty-state-text">{"Los pagos se registran contra contratos activos. Necesita al menos un contrato vigente para comenzar a registrar cobros."}</p>
+            if can_write(user_rol) {
+                <button onclick={on_new.clone()} class="gi-btn gi-btn-primary" style="margin-top: var(--space-3);">{"+ Nuevo Pago"}</button>
+            }
+            <div class="gi-empty-state-hint">
+                {"¿No tiene contratos? "}
+                <Link<Route> to={Route::Contratos} classes="gi-btn-text">
+                    {"Crear contrato primero"}
+                </Link<Route>>
+            </div>
+        </div>
+    }
+}
+
 #[function_component]
 fn PagoList(props: &PagoListProps) -> Html {
     if props.items.is_empty() {
-        return html! {
-            <div class="gi-empty-state">
-                <div class="gi-empty-state-icon">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
-                        <line x1="12" y1="1" x2="12" y2="23"/>
-                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                    </svg>
-                </div>
-                <div class="gi-empty-state-title">{"Sin pagos registrados"}</div>
-                <p class="gi-empty-state-text">{"Los pagos se registran contra contratos activos. Necesita al menos un contrato vigente para comenzar a registrar cobros."}</p>
-                if can_write(&props.user_rol) {
-                    <button onclick={props.on_new.clone()} class="gi-btn gi-btn-primary" style="margin-top: var(--space-3);">{"+ Nuevo Pago"}</button>
-                }
-                <div class="gi-empty-state-hint">
-                    {"¿No tiene contratos? "}
-                    <Link<Route> to={Route::Contratos} classes="gi-btn-text">
-                        {"Crear contrato primero"}
-                    </Link<Route>>
-                </div>
-            </div>
-        };
+        return render_pago_empty_state(&props.user_rol, &props.on_new);
     }
 
     html! {
         <>
             <DataTable headers={props.headers.clone()}>
-                { for props.items.iter().map(|p| {
-                    let on_edit = props.on_edit.clone();
-                    let on_delete_click = props.on_delete.clone();
-                    let pc = p.clone();
-                    let pd = p.clone();
-                    let user_rol = props.user_rol.clone();
-                    let c_label = props.contrato_label.emit(p.contrato_id.clone());
-                    let (badge_cls, badge_label) = estado_badge(&p.estado);
-                    let is_pagado = p.estado == "pagado";
-                    let recibo_id = p.id.clone();
-                    html! {
-                        <tr>
-                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{c_label}</td>
-                            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={p.monto} moneda={p.moneda.clone()} /></td>
-                            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
-                                {p.fecha_pago.as_deref().map(format_date_display).unwrap_or_else(|| "—".into())}</td>
-                            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&p.fecha_vencimiento)}</td>
-                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
-                                {p.metodo_pago.as_deref().map(metodo_label).unwrap_or("—")}</td>
-                            <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
-                            if can_write(&user_rol) {
-                                <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2);">
-                                    <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(pc.clone()))} class="gi-btn-text">{"Editar"}</button>
-                                    if is_pagado {
-                                        <button onclick={Callback::from(move |_: MouseEvent| {
-                                            let url = format!("{BASE_URL}/pagos/{recibo_id}/recibo");
-                                            let _ = web_sys::window().and_then(|w| w.open_with_url(&url).ok());
-                                        })} class="gi-btn-text" style="color: var(--color-primary-500);">{"Recibo"}</button>
-                                    }
-                                    if can_delete(&user_rol) {
-                                        <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(pd.clone()))} class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button>
-                                    }
-                                </td>
-                            }
-                        </tr>
-                    }
-                })}
+                { for props.items.iter().map(|p| render_pago_row(p, &props.user_rol, &props.contrato_label, &props.on_edit, &props.on_delete)) }
             </DataTable>
             <Pagination
                 total={props.total}
@@ -390,6 +396,7 @@ fn load_pago_refs(
     });
 }
 
+#[allow(clippy::type_complexity)]
 fn register_escape_listener(
     escape_handler: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>>,
 ) -> Option<EventListener> {

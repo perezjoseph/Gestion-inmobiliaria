@@ -14,6 +14,9 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotBeBlank
 import io.kotest.matchers.types.shouldBeInstanceOf
+import java.lang.reflect.Proxy
+import java.math.BigDecimal
+import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -27,9 +30,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.Json
-import java.lang.reflect.Proxy
-import java.math.BigDecimal
-import java.time.Instant
 
 /**
  * Unit tests for PropiedadesViewModel.
@@ -39,23 +39,22 @@ import java.time.Instant
 @OptIn(ExperimentalCoroutinesApi::class)
 class PropiedadesViewModelTest :
     FreeSpec({
-
         val testDispatcher = StandardTestDispatcher()
 
-        beforeEach {
-            Dispatchers.setMain(testDispatcher)
-        }
+        beforeEach { Dispatchers.setMain(testDispatcher) }
 
-        afterEach {
-            Dispatchers.resetMain()
-        }
+        afterEach { Dispatchers.resetMain() }
 
         "list state" -
             {
                 "emits Success with propiedades from repository" {
                     val repo =
                         FakePropiedadesRepository(
-                            initialData = listOf(samplePropiedad("1", ciudad = "Santiago"), samplePropiedad("2", ciudad = "Santo Domingo")),
+                            initialData =
+                                listOf(
+                                    samplePropiedad("1", ciudad = "Santiago"),
+                                    samplePropiedad("2", ciudad = "Santo Domingo"),
+                                )
                         )
                     runTest(testDispatcher) {
                         val vm = createViewModel(repo)
@@ -90,7 +89,7 @@ class PropiedadesViewModelTest :
                                     samplePropiedad("1", ciudad = "Santiago"),
                                     samplePropiedad("2", ciudad = "Santo Domingo"),
                                     samplePropiedad("3", ciudad = "Santiago"),
-                                ),
+                                )
                         )
                     runTest(testDispatcher) {
                         val vm = createViewModel(repo)
@@ -114,7 +113,7 @@ class PropiedadesViewModelTest :
                                 listOf(
                                     samplePropiedad("1", estado = "disponible"),
                                     samplePropiedad("2", estado = "ocupada"),
-                                ),
+                                )
                         )
                     runTest(testDispatcher) {
                         val vm = createViewModel(repo)
@@ -138,7 +137,7 @@ class PropiedadesViewModelTest :
                                     samplePropiedad("1", tipoPropiedad = "apartamento"),
                                     samplePropiedad("2", tipoPropiedad = "casa"),
                                     samplePropiedad("3", tipoPropiedad = "apartamento"),
-                                ),
+                                )
                         )
                     runTest(testDispatcher) {
                         val vm = createViewModel(repo)
@@ -160,7 +159,7 @@ class PropiedadesViewModelTest :
                                 listOf(
                                     samplePropiedad("1", ciudad = "Santiago"),
                                     samplePropiedad("2", ciudad = "Santo Domingo"),
-                                ),
+                                )
                         )
                     runTest(testDispatcher) {
                         val vm = createViewModel(repo)
@@ -201,8 +200,7 @@ class PropiedadesViewModelTest :
                         advanceUntilIdle()
 
                         successCalled shouldBe true
-                        vm.formState.value.errors
-                            .shouldBeEmpty()
+                        vm.formState.value.errors.shouldBeEmpty()
                         vm.formState.value.isSubmitting shouldBe false
                         vm.successMessage.value shouldBe "Creado correctamente"
                         repo.createCallCount shouldBe 1
@@ -371,8 +369,7 @@ class PropiedadesViewModelTest :
                         vm.formState.value.errors shouldContainKey "titulo"
 
                         vm.onFieldChange("titulo", "Casa Nueva")
-                        vm.formState.value.errors
-                            .containsKey("titulo") shouldBe false
+                        vm.formState.value.errors.containsKey("titulo") shouldBe false
                     }
                 }
             }
@@ -422,8 +419,7 @@ class PropiedadesViewModelTest :
                         vm.initCreateForm()
 
                         vm.formState.value.titulo shouldBe ""
-                        vm.formState.value.errors
-                            .shouldBeEmpty()
+                        vm.formState.value.errors.shouldBeEmpty()
                         vm.formState.value.isSubmitting shouldBe false
                     }
                 }
@@ -484,29 +480,28 @@ private fun samplePropiedad(
     tipoPropiedad: String = "apartamento",
     estado: String = "disponible",
     precio: BigDecimal = BigDecimal("15000.00"),
-) = Propiedad(
-    id = id,
-    titulo = titulo,
-    descripcion = null,
-    direccion = "Calle $id",
-    ciudad = ciudad,
-    provincia = provincia,
-    tipoPropiedad = tipoPropiedad,
-    habitaciones = 2,
-    banos = 1,
-    areaM2 = BigDecimal("80"),
-    precio = precio,
-    moneda = "DOP",
-    estado = estado,
-    imagenes = emptyList(),
-    createdAt = Instant.now(),
-    updatedAt = Instant.now(),
-    isPendingSync = false,
-)
+) =
+    Propiedad(
+        id = id,
+        titulo = titulo,
+        descripcion = null,
+        direccion = "Calle $id",
+        ciudad = ciudad,
+        provincia = provincia,
+        tipoPropiedad = tipoPropiedad,
+        habitaciones = 2,
+        banos = 1,
+        areaM2 = BigDecimal("80"),
+        precio = precio,
+        moneda = "DOP",
+        estado = estado,
+        imagenes = emptyList(),
+        createdAt = Instant.now(),
+        updatedAt = Instant.now(),
+        isPendingSync = false,
+    )
 
-private class FakeConnectivityObserver(
-    online: Boolean = true,
-) : ConnectivityObserver {
+private class FakeConnectivityObserver(online: Boolean = true) : ConnectivityObserver {
     override val isOnline: StateFlow<Boolean> = MutableStateFlow(online).asStateFlow()
 }
 
@@ -515,28 +510,37 @@ private class FakePropiedadesRepository(
     private val initialData: List<Propiedad> = emptyList(),
     private val createError: Throwable? = null,
     private val updateError: Throwable? = null,
-) : PropiedadesRepository(
+) :
+    PropiedadesRepository(
         dao =
             Proxy.newProxyInstance(
                 com.propmanager.core.database.dao.PropiedadDao::class.java.classLoader,
                 arrayOf(com.propmanager.core.database.dao.PropiedadDao::class.java),
-            ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.PropiedadDao,
+            ) { _, _, _ ->
+                error("stub")
+            } as com.propmanager.core.database.dao.PropiedadDao,
         syncQueueDao =
             Proxy.newProxyInstance(
                 com.propmanager.core.database.dao.SyncQueueDao::class.java.classLoader,
                 arrayOf(com.propmanager.core.database.dao.SyncQueueDao::class.java),
-            ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.SyncQueueDao,
+            ) { _, _, _ ->
+                error("stub")
+            } as com.propmanager.core.database.dao.SyncQueueDao,
         apiService =
             Proxy.newProxyInstance(
                 com.propmanager.core.network.api.PropiedadesApiService::class.java.classLoader,
                 arrayOf(com.propmanager.core.network.api.PropiedadesApiService::class.java),
-            ) { _, _, _ -> error("stub") } as com.propmanager.core.network.api.PropiedadesApiService,
+            ) { _, _, _ ->
+                error("stub")
+            } as com.propmanager.core.network.api.PropiedadesApiService,
         json = Json { ignoreUnknownKeys = true },
     ) {
     var createCallCount = 0
         private set
+
     var updateCallCount = 0
         private set
+
     var deleteCallCount = 0
         private set
 
@@ -557,7 +561,8 @@ private class FakePropiedadesRepository(
             }
         }
 
-    override fun observeById(id: String): Flow<Propiedad?> = store.map { list -> list.find { it.id == id } }
+    override fun observeById(id: String): Flow<Propiedad?> =
+        store.map { list -> list.find { it.id == id } }
 
     override suspend fun create(request: CreatePropiedadRequest): Result<Propiedad> {
         createCallCount++
@@ -586,10 +591,7 @@ private class FakePropiedadesRepository(
         return Result.success(p)
     }
 
-    override suspend fun update(
-        id: String,
-        request: UpdatePropiedadRequest,
-    ): Result<Unit> {
+    override suspend fun update(id: String, request: UpdatePropiedadRequest): Result<Unit> {
         updateCallCount++
         if (updateError != null) return Result.failure(updateError)
         return Result.success(Unit)

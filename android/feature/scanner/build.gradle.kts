@@ -10,26 +10,16 @@ android {
     namespace = "com.propmanager.feature.scanner"
     compileSdk = 36
 
-    defaultConfig {
-        minSdk = 24
-    }
+    defaultConfig { minSdk = 24 }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    kotlinOptions {
-        jvmTarget = "11"
-    }
-    testOptions {
-        unitTests.all {
-            it.useJUnitPlatform()
-        }
-    }
-    buildFeatures {
-        compose = true
-    }
+    kotlinOptions { jvmTarget = "11" }
+    testOptions { unitTests.all { it.useJUnitPlatform() } }
+    buildFeatures { compose = true }
 }
 
 dependencies {

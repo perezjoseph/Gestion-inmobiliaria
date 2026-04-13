@@ -26,10 +26,7 @@ import com.propmanager.core.ui.theme.OfflineBannerBackground
 import com.propmanager.core.ui.theme.OfflineBannerContent
 
 @Composable
-fun OfflineIndicator(
-    isOffline: Boolean,
-    modifier: Modifier = Modifier,
-) {
+fun OfflineIndicator(isOffline: Boolean, modifier: Modifier = Modifier) {
     AnimatedVisibility(
         visible = isOffline,
         enter = expandVertically(),
@@ -38,8 +35,7 @@ fun OfflineIndicator(
     ) {
         Row(
             modifier =
-                Modifier
-                    .fillMaxWidth()
+                Modifier.fillMaxWidth()
                     .background(OfflineBannerBackground)
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,

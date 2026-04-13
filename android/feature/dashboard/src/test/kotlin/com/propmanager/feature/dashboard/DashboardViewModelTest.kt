@@ -12,6 +12,7 @@ import io.kotest.core.spec.style.FreeSpec
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,15 +23,11 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import java.time.Instant
 
-/**
- * Validates: Requirements 9.1, 9.7
- */
+/** Validates: Requirements 9.1, 9.7 */
 @OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModelTest :
     FreeSpec({
-
         val testDispatcher = StandardTestDispatcher()
 
         beforeEach { Dispatchers.setMain(testDispatcher) }
@@ -47,11 +44,25 @@ class DashboardViewModelTest :
                 )
             val pagos =
                 listOf(
-                    PagoProximo("p1", "Apartamento Centro", "Juan García", "25000.00", "DOP", "2025-07-15"),
+                    PagoProximo(
+                        "p1",
+                        "Apartamento Centro",
+                        "Juan García",
+                        "25000.00",
+                        "DOP",
+                        "2025-07-15",
+                    )
                 )
             val contratos =
                 listOf(
-                    ContratoCalendario("c1", "Casa Norte", "María López", "2025-08-01", 30, "yellow"),
+                    ContratoCalendario(
+                        "c1",
+                        "Casa Norte",
+                        "María López",
+                        "2025-08-01",
+                        30,
+                        "yellow",
+                    )
                 )
             val ocupacion = listOf(OcupacionTendencia(mes = 6, anio = 2025, tasa = 90.0))
             val ingresos = IngresosComparacion("200000.00", "175000.00", "-25000.00")
@@ -102,11 +113,25 @@ class DashboardViewModelTest :
                 )
             val cachedPagos =
                 listOf(
-                    PagoProximo("p2", "Local Comercial", "Pedro Martínez", "15000.00", "DOP", "2025-07-10"),
+                    PagoProximo(
+                        "p2",
+                        "Local Comercial",
+                        "Pedro Martínez",
+                        "15000.00",
+                        "DOP",
+                        "2025-07-10",
+                    )
                 )
             val cachedContratos =
                 listOf(
-                    ContratoCalendario("c2", "Oficina Este", "Ana Rodríguez", "2025-09-15", 75, "green"),
+                    ContratoCalendario(
+                        "c2",
+                        "Oficina Este",
+                        "Ana Rodríguez",
+                        "2025-09-15",
+                        75,
+                        "green",
+                    )
                 )
             val cachedAt = Instant.parse("2025-07-01T14:30:00Z")
 
@@ -185,17 +210,17 @@ class DashboardViewModelTest :
         }
     })
 
-private class FakeConnectivityObserver(
-    online: Boolean,
-) : ConnectivityObserver {
+private class FakeConnectivityObserver(online: Boolean) : ConnectivityObserver {
     override val isOnline: StateFlow<Boolean> = MutableStateFlow(online).asStateFlow()
 }
 
 private class FakeDashboardRepository(
     private val statsResult: Result<DashboardStats> = Result.failure(Exception("no data")),
     private val pagosResult: Result<List<PagoProximo>> = Result.failure(Exception("no data")),
-    private val contratosResult: Result<List<ContratoCalendario>> = Result.failure(Exception("no data")),
-    private val ocupacionResult: Result<List<OcupacionTendencia>> = Result.failure(Exception("no data")),
+    private val contratosResult: Result<List<ContratoCalendario>> =
+        Result.failure(Exception("no data")),
+    private val ocupacionResult: Result<List<OcupacionTendencia>> =
+        Result.failure(Exception("no data")),
     private val ingresosResult: Result<IngresosComparacion> = Result.failure(Exception("no data")),
     private val gastosResult: Result<GastosComparacion> = Result.failure(Exception("no data")),
     private val cachedStats: DashboardStats? = null,
@@ -205,7 +230,8 @@ private class FakeDashboardRepository(
     private val cachedIngresos: IngresosComparacion? = null,
     private val cachedGastos: GastosComparacion? = null,
     private val cachedAtInstant: Instant? = null,
-) : DashboardRepository(
+) :
+    DashboardRepository(
         apiService = StubDashboardApiService,
         cacheDao = StubDashboardCacheDao,
         json = kotlinx.serialization.json.Json,
@@ -242,11 +268,14 @@ private object StubDashboardApiService : com.propmanager.core.network.api.Dashbo
 
     override suspend fun pagosProximos(): retrofit2.Response<List<PagoProximo>> = error("stub")
 
-    override suspend fun contratosCalendario(): retrofit2.Response<List<ContratoCalendario>> = error("stub")
+    override suspend fun contratosCalendario(): retrofit2.Response<List<ContratoCalendario>> =
+        error("stub")
 
-    override suspend fun ocupacionTendencia(): retrofit2.Response<List<OcupacionTendencia>> = error("stub")
+    override suspend fun ocupacionTendencia(): retrofit2.Response<List<OcupacionTendencia>> =
+        error("stub")
 
-    override suspend fun ingresosComparacion(): retrofit2.Response<IngresosComparacion> = error("stub")
+    override suspend fun ingresosComparacion(): retrofit2.Response<IngresosComparacion> =
+        error("stub")
 
     override suspend fun gastosComparacion(): retrofit2.Response<GastosComparacion> = error("stub")
 }

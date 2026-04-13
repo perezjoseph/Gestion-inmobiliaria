@@ -57,12 +57,7 @@ fun NotificacionesScreen(
         },
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-        ) {
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             OfflineIndicator(isOffline = !isOnline)
 
             when {
@@ -73,15 +68,10 @@ fun NotificacionesScreen(
                         onRetry = viewModel::loadPagosVencidos,
                     )
                 uiState.pagosVencidos.isEmpty() ->
-                    EmptyStateScreen(
-                        message = stringResource(R.string.notificaciones_empty),
-                    )
+                    EmptyStateScreen(message = stringResource(R.string.notificaciones_empty))
                 else ->
                     LazyColumn(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 16.dp),
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         item(key = "top_spacer") { Spacer(modifier = Modifier.height(8.dp)) }
@@ -96,15 +86,12 @@ fun NotificacionesScreen(
 }
 
 @Composable
-private fun PagoVencidoItem(
-    pago: PagoVencidoDto,
-    modifier: Modifier = Modifier,
-) {
+private fun PagoVencidoItem(pago: PagoVencidoDto, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier.fillMaxWidth(),
         colors =
             CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
             ),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -129,7 +116,11 @@ private fun PagoVencidoItem(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = stringResource(R.string.notificacion_dias_vencido, pago.diasVencido.toInt()),
+                    text =
+                        stringResource(
+                            R.string.notificacion_dias_vencido,
+                            pago.diasVencido.toInt(),
+                        ),
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFFD32F2F),

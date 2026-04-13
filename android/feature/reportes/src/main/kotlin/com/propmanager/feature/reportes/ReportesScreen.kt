@@ -56,12 +56,7 @@ fun ReportesScreen(
         },
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-        ) {
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             OfflineIndicator(isOffline = !isOnline)
 
             if (!isOnline) {
@@ -81,7 +76,12 @@ fun ReportesScreen(
                         message = uiState.errorMessage!!,
                         onRetry = { viewModel.loadReport() },
                     )
-                else -> ReportContent(uiState = uiState, onExportPdf = viewModel::exportPdf, onExportXlsx = viewModel::exportXlsx)
+                else ->
+                    ReportContent(
+                        uiState = uiState,
+                        onExportPdf = viewModel::exportPdf,
+                        onExportXlsx = viewModel::exportXlsx,
+                    )
             }
         }
     }
@@ -94,10 +94,7 @@ private fun ReportTypeSelector(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ReportType.entries.forEach { type ->
@@ -109,8 +106,10 @@ private fun ReportTypeSelector(
                         text =
                             when (type) {
                                 ReportType.INGRESOS -> stringResource(R.string.reporte_ingresos)
-                                ReportType.RENTABILIDAD -> stringResource(R.string.reporte_rentabilidad)
-                                ReportType.HISTORIAL_PAGOS -> stringResource(R.string.reporte_historial_pagos)
+                                ReportType.RENTABILIDAD ->
+                                    stringResource(R.string.reporte_rentabilidad)
+                                ReportType.HISTORIAL_PAGOS ->
+                                    stringResource(R.string.reporte_historial_pagos)
                                 ReportType.OCUPACION -> stringResource(R.string.reporte_ocupacion)
                             },
                         style = MaterialTheme.typography.labelSmall,
@@ -129,13 +128,13 @@ private fun ReportContent(
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
+        modifier = modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (uiState.selectedReport == ReportType.INGRESOS || uiState.selectedReport == ReportType.RENTABILIDAD) {
+        if (
+            uiState.selectedReport == ReportType.INGRESOS ||
+                uiState.selectedReport == ReportType.RENTABILIDAD
+        ) {
             item(key = "export_buttons") {
                 ExportButtons(
                     onExportPdf = onExportPdf,
@@ -148,16 +147,24 @@ private fun ReportContent(
         when (uiState.selectedReport) {
             ReportType.INGRESOS ->
                 uiState.ingresos?.let { summary ->
-                    items(summary.rows, key = { "${it.propiedadTitulo}-${it.inquilinoNombre}" }) { row ->
+                    items(summary.rows, key = { "${it.propiedadTitulo}-${it.inquilinoNombre}" }) {
+                        row ->
                         Card(modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Text(row.propiedadTitulo, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                Text(
+                                    row.propiedadTitulo,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium,
+                                )
                                 Text(
                                     row.inquilinoNombre,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
                                     Text(
                                         CurrencyFormatter.format(BigDecimal(row.monto), row.moneda),
                                         style = MaterialTheme.typography.bodyMedium,
@@ -174,22 +181,56 @@ private fun ReportContent(
                     items(summary.rows, key = { it.propiedadId }) { row ->
                         Card(modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Text(row.propiedadTitulo, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                Text(
+                                    row.propiedadTitulo,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium,
+                                )
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                                LabelValue("Ingresos", CurrencyFormatter.format(BigDecimal(row.totalIngresos), row.moneda))
-                                LabelValue("Gastos", CurrencyFormatter.format(BigDecimal(row.totalGastos), row.moneda))
-                                LabelValue("Neto", CurrencyFormatter.format(BigDecimal(row.ingresoNeto), row.moneda))
+                                LabelValue(
+                                    "Ingresos",
+                                    CurrencyFormatter.format(
+                                        BigDecimal(row.totalIngresos),
+                                        row.moneda,
+                                    ),
+                                )
+                                LabelValue(
+                                    "Gastos",
+                                    CurrencyFormatter.format(
+                                        BigDecimal(row.totalGastos),
+                                        row.moneda,
+                                    ),
+                                )
+                                LabelValue(
+                                    "Neto",
+                                    CurrencyFormatter.format(
+                                        BigDecimal(row.ingresoNeto),
+                                        row.moneda,
+                                    ),
+                                )
                             }
                         }
                     }
                 }
             ReportType.HISTORIAL_PAGOS -> {
-                items(uiState.historialPagos, key = { "${it.contratoId}-${it.fechaVencimiento}" }) { row ->
+                items(
+                    uiState.historialPagos,
+                    key = { "${it.contratoId}-${it.fechaVencimiento}" },
+                ) { row ->
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text("Contrato: ${row.contratoId.take(8)}…", style = MaterialTheme.typography.bodyMedium)
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(CurrencyFormatter.format(BigDecimal(row.monto), row.moneda), fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Contrato: ${row.contratoId.take(8)}…",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(
+                                    CurrencyFormatter.format(BigDecimal(row.monto), row.moneda),
+                                    fontWeight = FontWeight.SemiBold,
+                                )
                                 Text(row.estado, style = MaterialTheme.typography.bodySmall)
                             }
                             Text(
@@ -210,9 +251,16 @@ private fun ReportContent(
             }
             ReportType.OCUPACION -> {
                 items(uiState.ocupacion, key = { "${it.anio}-${it.mes}" }) { t ->
-                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
                         Text("${t.mes}/${t.anio}", style = MaterialTheme.typography.bodyMedium)
-                        Text(String.format("%.1f%%", t.tasa), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            String.format("%.1f%%", t.tasa),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
                     }
                     HorizontalDivider()
                 }
@@ -231,23 +279,31 @@ private fun ExportButtons(
     modifier: Modifier = Modifier,
 ) {
     Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = onExportPdf, enabled = !isExporting, modifier = Modifier.weight(1f)) {
+        OutlinedButton(
+            onClick = onExportPdf,
+            enabled = !isExporting,
+            modifier = Modifier.weight(1f),
+        ) {
             Text(stringResource(R.string.reporte_exportar_pdf))
         }
-        OutlinedButton(onClick = onExportXlsx, enabled = !isExporting, modifier = Modifier.weight(1f)) {
+        OutlinedButton(
+            onClick = onExportXlsx,
+            enabled = !isExporting,
+            modifier = Modifier.weight(1f),
+        ) {
             Text(stringResource(R.string.reporte_exportar_xlsx))
         }
     }
 }
 
 @Composable
-private fun LabelValue(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-) {
+private fun LabelValue(label: String, value: String, modifier: Modifier = Modifier) {
     Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
     }
 }

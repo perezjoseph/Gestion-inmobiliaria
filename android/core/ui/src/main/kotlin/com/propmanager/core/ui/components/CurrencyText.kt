@@ -16,13 +16,6 @@ fun CurrencyText(
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.bodyLarge,
 ) {
-    val formatted =
-        remember(amount, currency) {
-            CurrencyFormatter.format(amount, currency)
-        }
-    Text(
-        text = formatted,
-        style = style,
-        modifier = modifier,
-    )
+    val formatted = remember(amount, currency) { CurrencyFormatter.format(amount, currency) }
+    Text(text = formatted, style = style, modifier = modifier)
 }

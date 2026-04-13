@@ -14,14 +14,12 @@ import java.time.LocalDate
  *
  * Property 12: Date formatting round-trip
  *
- * For any valid LocalDate, formatting to display format (DD/MM/YYYY) then parsing back
- * yields the original date. Formatting to API format (YYYY-MM-DD) then parsing back
- * yields the original date. Display format matches \d{2}/\d{2}/\d{4} and API format
- * matches \d{4}-\d{2}-\d{2}.
+ * For any valid LocalDate, formatting to display format (DD/MM/YYYY) then parsing back yields the
+ * original date. Formatting to API format (YYYY-MM-DD) then parsing back yields the original date.
+ * Display format matches \d{2}/\d{2}/\d{4} and API format matches \d{4}-\d{2}-\d{2}.
  */
 class DateFormatterPropertyTest :
     FreeSpec({
-
         val localDateArb: Arb<LocalDate> =
             arbitrary(
                 edgecases =
@@ -30,7 +28,7 @@ class DateFormatterPropertyTest :
                         LocalDate.of(2024, 2, 29),
                         LocalDate.of(1970, 1, 1),
                         LocalDate.of(2099, 12, 31),
-                    ),
+                    )
             ) {
                 val year = Arb.int(1900..2099).bind()
                 val month = Arb.int(1..12).bind()
@@ -41,7 +39,6 @@ class DateFormatterPropertyTest :
 
         "Property 12: Date formatting round-trip" -
             {
-
                 "display format round-trip preserves date" {
                     checkAll(100, localDateArb) { date ->
                         val formatted = DateFormatter.toDisplay(date)

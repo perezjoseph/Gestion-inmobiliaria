@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
@@ -84,16 +83,29 @@ fun PagosListScreen(
         }
     }
     deleteTarget?.let { p ->
-        ConfirmDeleteDialog(itemName = p.id.take(8), onConfirm = viewModel::confirmDelete, onDismiss = viewModel::dismissDelete)
+        ConfirmDeleteDialog(
+            itemName = p.id.take(8),
+            onConfirm = viewModel::confirmDelete,
+            onDismiss = viewModel::dismissDelete,
+        )
     }
 
     Scaffold(
-        topBar = { PropManagerTopAppBar(title = stringResource(R.string.pagos_title), scrollBehavior = scrollBehavior) },
+        topBar = {
+            PropManagerTopAppBar(
+                title = stringResource(R.string.pagos_title),
+                scrollBehavior = scrollBehavior,
+            )
+        },
         floatingActionButton = {
-            FloatingActionButton(onClick = {
-                viewModel.initCreateForm()
-                onNavigateToCreate()
-            }) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.pago_create)) }
+            FloatingActionButton(
+                onClick = {
+                    viewModel.initCreateForm()
+                    onNavigateToCreate()
+                }
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.pago_create))
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -112,10 +124,14 @@ fun PagosListScreen(
                         ) {
                             item { Spacer(Modifier.height(8.dp)) }
                             items(state.pagos, key = { it.id }) { pago ->
-                                PagoListItem(pago = pago, onClick = {
-                                    viewModel.initEditForm(pago)
-                                    onNavigateToEdit(pago.id)
-                                }, onDelete = { viewModel.requestDelete(pago) })
+                                PagoListItem(
+                                    pago = pago,
+                                    onClick = {
+                                        viewModel.initEditForm(pago)
+                                        onNavigateToEdit(pago.id)
+                                    },
+                                    onDelete = { viewModel.requestDelete(pago) },
+                                )
                             }
                             item { Spacer(Modifier.height(80.dp)) }
                         }
@@ -157,12 +173,21 @@ private fun PagoListItem(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     pago.metodoPago?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                    Text(pago.estado, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        pago.estado,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
             }
-            IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete)) }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete))
+            }
         }
     }
 }
@@ -178,25 +203,33 @@ fun PagoFormScreen(
     val formState by viewModel.formState.collectAsStateWithLifecycle()
     val contratos by viewModel.contratos.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    val title = if (isEditing) stringResource(R.string.pago_edit) else stringResource(R.string.pago_create)
+    val title =
+        if (isEditing) stringResource(R.string.pago_edit) else stringResource(R.string.pago_create)
 
     Scaffold(
         topBar = {
-            PropManagerTopAppBar(title = title, scrollBehavior = scrollBehavior, onNavigateBack = onNavigateBack)
+            PropManagerTopAppBar(
+                title = title,
+                scrollBehavior = scrollBehavior,
+                onNavigateBack = onNavigateBack,
+            )
         },
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
         Column(
             modifier =
-                Modifier
-                    .fillMaxSize()
+                Modifier.fillMaxSize()
                     .padding(paddingValues)
                     .padding(horizontal = 16.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
         ) {
             Spacer(Modifier.height(8.dp))
             formState.errors["general"]?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 Spacer(Modifier.height(8.dp))
             }
 
@@ -204,25 +237,32 @@ fun PagoFormScreen(
             val selectedContrato = contratos.find { it.id == formState.contratoId }
             ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
                 OutlinedTextField(
-                    value = selectedContrato?.let { "${it.propiedadId.take(8)}… — ${DateFormatter.toDisplay(it.fechaInicio)}" } ?: "",
+                    value =
+                        selectedContrato?.let {
+                            "${it.propiedadId.take(8)}… — ${DateFormatter.toDisplay(it.fechaInicio)}"
+                        } ?: "",
                     onValueChange = {},
                     readOnly = true,
                     label = { Text(stringResource(R.string.pago_contrato)) },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                    },
                     isError = formState.errors.containsKey("contratoId"),
                     modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
                 )
                 ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     contratos.forEach { c ->
-                        DropdownMenuItem(text = {
-                            Text(
-                                "${c.propiedadId.take(8)}… — ${DateFormatter.toDisplay(c.fechaInicio)}",
-                            )
-                        }, onClick = {
-                            viewModel.onFieldChange("contratoId", c.id)
-                            expanded =
-                                false
-                        })
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    "${c.propiedadId.take(8)}… — ${DateFormatter.toDisplay(c.fechaInicio)}"
+                                )
+                            },
+                            onClick = {
+                                viewModel.onFieldChange("contratoId", c.id)
+                                expanded = false
+                            },
+                        )
                     }
                 }
             }
@@ -236,13 +276,20 @@ fun PagoFormScreen(
             }
 
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.monto, onValueChange = {
-                viewModel.onFieldChange("monto", it)
-            }, label = stringResource(R.string.pago_monto), error = formState.errors["monto"], modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.monto,
+                onValueChange = { viewModel.onFieldChange("monto", it) },
+                label = stringResource(R.string.pago_monto),
+                error = formState.errors["monto"],
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.moneda, onValueChange = {
-                viewModel.onFieldChange("moneda", it)
-            }, label = stringResource(R.string.pago_moneda), modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.moneda,
+                onValueChange = { viewModel.onFieldChange("moneda", it) },
+                label = stringResource(R.string.pago_moneda),
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
             DatePickerField(
                 value = formState.fechaVencimiento,
@@ -259,20 +306,29 @@ fun PagoFormScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.metodoPago, onValueChange = {
-                viewModel.onFieldChange("metodoPago", it)
-            }, label = stringResource(R.string.pago_metodo), modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.metodoPago,
+                onValueChange = { viewModel.onFieldChange("metodoPago", it) },
+                label = stringResource(R.string.pago_metodo),
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.notas, onValueChange = {
-                viewModel.onFieldChange("notas", it)
-            }, label = stringResource(R.string.pago_notas), singleLine = false, maxLines = 3, modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.notas,
+                onValueChange = { viewModel.onFieldChange("notas", it) },
+                label = stringResource(R.string.pago_notas),
+                singleLine = false,
+                maxLines = 3,
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = { viewModel.save(onSuccess = onNavigateBack) },
                 enabled = !formState.isSubmitting,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                if (formState.isSubmitting) CircularProgressIndicator() else Text(stringResource(R.string.save))
+                if (formState.isSubmitting) CircularProgressIndicator()
+                else Text(stringResource(R.string.save))
             }
             Spacer(Modifier.height(16.dp))
         }

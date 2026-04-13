@@ -24,17 +24,18 @@ import com.propmanager.core.database.entity.SolicitudMantenimientoEntity
 import com.propmanager.core.database.entity.SyncQueueEntry
 
 @Database(
-    entities = [
-        PropiedadEntity::class,
-        InquilinoEntity::class,
-        ContratoEntity::class,
-        PagoEntity::class,
-        GastoEntity::class,
-        SolicitudMantenimientoEntity::class,
-        NotaMantenimientoEntity::class,
-        SyncQueueEntry::class,
-        DashboardCache::class,
-    ],
+    entities =
+        [
+            PropiedadEntity::class,
+            InquilinoEntity::class,
+            ContratoEntity::class,
+            PagoEntity::class,
+            GastoEntity::class,
+            SolicitudMantenimientoEntity::class,
+            NotaMantenimientoEntity::class,
+            SyncQueueEntry::class,
+            DashboardCache::class,
+        ],
     version = 1,
     exportSchema = true,
 )

@@ -30,16 +30,11 @@ import retrofit2.Response
 @OptIn(ExperimentalCoroutinesApi::class)
 class AuthViewModelTest :
     FreeSpec({
-
         val testDispatcher = StandardTestDispatcher()
 
-        beforeEach {
-            Dispatchers.setMain(testDispatcher)
-        }
+        beforeEach { Dispatchers.setMain(testDispatcher) }
 
-        afterEach {
-            Dispatchers.resetMain()
-        }
+        afterEach { Dispatchers.resetMain() }
 
         "successful login stores token and profile" {
             val fakeToken = FakeTokenProvider()
@@ -58,8 +53,8 @@ class AuthViewModelTest :
                                         activo = true,
                                         createdAt = "2025-01-01T00:00:00Z",
                                     ),
-                            ),
-                        ),
+                            )
+                        )
                 )
 
             runTest(testDispatcher) {
@@ -81,8 +76,7 @@ class AuthViewModelTest :
 
                 vm.authState.value.shouldBeInstanceOf<AuthState.Authenticated>()
                 vm.formState.value.isLoading shouldBe false
-                vm.formState.value.errorMessage
-                    .shouldBeNull()
+                vm.formState.value.errorMessage.shouldBeNull()
             }
         }
 
@@ -95,7 +89,7 @@ class AuthViewModelTest :
                         Response.error(
                             401,
                             errorJson.toResponseBody("application/json".toMediaType()),
-                        ),
+                        )
                 )
 
             runTest(testDispatcher) {
@@ -108,8 +102,7 @@ class AuthViewModelTest :
                 advanceUntilIdle()
 
                 fakeToken.getToken().shouldBeNull()
-                vm.formState.value.errorMessage
-                    .shouldNotBeNull()
+                vm.formState.value.errorMessage.shouldNotBeNull()
                 vm.formState.value.isLoading shouldBe false
                 vm.authState.value.shouldBeInstanceOf<AuthState.Unauthenticated>()
             }
@@ -120,7 +113,7 @@ class AuthViewModelTest :
                 FakeTokenProvider().apply {
                     saveToken("existing-token")
                     saveUserProfile(
-                        UserProfile(id = "u1", nombre = "Test", email = "t@t.com", rol = "gerente"),
+                        UserProfile(id = "u1", nombre = "Test", email = "t@t.com", rol = "gerente")
                     )
                 }
             val fakeApi = FakeAuthApiService()
@@ -136,8 +129,7 @@ class AuthViewModelTest :
                 fakeToken.getToken().shouldBeNull()
                 fakeToken.getUserProfile().shouldBeNull()
                 vm.authState.value.shouldBeInstanceOf<AuthState.Unauthenticated>()
-                vm.formState.value.errorMessage
-                    .shouldNotBeNull()
+                vm.formState.value.errorMessage.shouldNotBeNull()
             }
         }
 
@@ -146,7 +138,7 @@ class AuthViewModelTest :
                 FakeTokenProvider().apply {
                     saveToken("existing-token")
                     saveUserProfile(
-                        UserProfile(id = "u1", nombre = "Test", email = "t@t.com", rol = "gerente"),
+                        UserProfile(id = "u1", nombre = "Test", email = "t@t.com", rol = "gerente")
                     )
                 }
             val fakeApi = FakeAuthApiService()
@@ -176,10 +168,8 @@ class AuthViewModelTest :
                 vm.login()
                 advanceUntilIdle()
 
-                vm.formState.value.emailError
-                    .shouldNotBeNull()
-                vm.formState.value.passwordError
-                    .shouldNotBeNull()
+                vm.formState.value.emailError.shouldNotBeNull()
+                vm.formState.value.passwordError.shouldNotBeNull()
                 fakeApi.loginCallCount shouldBe 0
             }
         }
@@ -239,9 +229,7 @@ private class FakeAuthApiService(
     override suspend fun login(request: LoginRequest): Response<LoginResponse> {
         loginCallCount++
         throwOnLogin?.let { throw it }
-        return loginResult ?: Response.error(
-            500,
-            "{}".toResponseBody("application/json".toMediaType()),
-        )
+        return loginResult
+            ?: Response.error(500, "{}".toResponseBody("application/json".toMediaType()))
     }
 }

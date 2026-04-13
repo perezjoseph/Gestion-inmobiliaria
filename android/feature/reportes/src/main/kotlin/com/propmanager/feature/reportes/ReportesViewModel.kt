@@ -11,6 +11,8 @@ import com.propmanager.core.model.dto.RentabilidadReporteSummary
 import com.propmanager.core.network.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -19,10 +21,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import okhttp3.ResponseBody
-import java.io.File
-import javax.inject.Inject
 
-enum class ReportType { INGRESOS, RENTABILIDAD, HISTORIAL_PAGOS, OCUPACION }
+enum class ReportType {
+    INGRESOS,
+    RENTABILIDAD,
+    HISTORIAL_PAGOS,
+    OCUPACION,
+}
 
 data class ReportesUiState(
     val isLoading: Boolean = false,
@@ -38,98 +43,97 @@ data class ReportesUiState(
 
 @HiltViewModel
 class ReportesViewModel
-    @Inject
-    constructor(
-        private val reportesRepository: ReportesRepository,
-        private val networkMonitor: NetworkMonitor,
-        @ApplicationContext private val context: Context,
-    ) : ViewModel() {
-        private val _uiState = MutableStateFlow(ReportesUiState())
-        val uiState: StateFlow<ReportesUiState> = _uiState.asStateFlow()
+@Inject
+constructor(
+    private val reportesRepository: ReportesRepository,
+    private val networkMonitor: NetworkMonitor,
+    @ApplicationContext private val context: Context,
+) : ViewModel() {
+    private val _uiState = MutableStateFlow(ReportesUiState())
+    val uiState: StateFlow<ReportesUiState> = _uiState.asStateFlow()
 
-        val isOnline: StateFlow<Boolean> =
-            networkMonitor.isOnline
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    val isOnline: StateFlow<Boolean> =
+        networkMonitor.isOnline.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
-        fun selectReport(type: ReportType) {
-            _uiState.update { it.copy(selectedReport = type, errorMessage = null) }
-            loadReport(type)
-        }
+    fun selectReport(type: ReportType) {
+        _uiState.update { it.copy(selectedReport = type, errorMessage = null) }
+        loadReport(type)
+    }
 
-        fun loadReport(type: ReportType = _uiState.value.selectedReport) {
-            viewModelScope.launch {
-                _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-                val result =
-                    when (type) {
-                        ReportType.INGRESOS ->
-                            reportesRepository
-                                .fetchIngresos()
-                                .map { _uiState.update { s -> s.copy(ingresos = it) } }
-                        ReportType.RENTABILIDAD ->
-                            reportesRepository
-                                .fetchRentabilidad()
-                                .map { _uiState.update { s -> s.copy(rentabilidad = it) } }
-                        ReportType.HISTORIAL_PAGOS ->
-                            reportesRepository
-                                .fetchHistorialPagos()
-                                .map { _uiState.update { s -> s.copy(historialPagos = it) } }
-                        ReportType.OCUPACION ->
-                            reportesRepository
-                                .fetchOcupacionTendencia()
-                                .map { _uiState.update { s -> s.copy(ocupacion = it) } }
-                    }
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = result.exceptionOrNull()?.message,
-                    )
-                }
-            }
-        }
-
-        fun exportPdf() {
-            export("pdf")
-        }
-
-        fun exportXlsx() {
-            export("xlsx")
-        }
-
-        private fun export(format: String) {
-            viewModelScope.launch {
-                _uiState.update { it.copy(isExporting = true, exportSuccess = null) }
-                val result: Result<ResponseBody> =
-                    when (_uiState.value.selectedReport) {
-                        ReportType.INGRESOS ->
-                            if (format == "pdf") {
-                                reportesRepository.downloadIngresosPdf()
-                            } else {
-                                reportesRepository.downloadIngresosXlsx()
-                            }
-                        ReportType.RENTABILIDAD ->
-                            if (format == "pdf") {
-                                reportesRepository.downloadRentabilidadPdf()
-                            } else {
-                                reportesRepository.downloadRentabilidadXlsx()
-                            }
-                        else -> {
-                            _uiState.update { it.copy(isExporting = false) }
-                            return@launch
+    fun loadReport(type: ReportType = _uiState.value.selectedReport) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val result =
+                when (type) {
+                    ReportType.INGRESOS ->
+                        reportesRepository.fetchIngresos().map {
+                            _uiState.update { s -> s.copy(ingresos = it) }
                         }
-                    }
-                result
-                    .onSuccess { body ->
-                        val ext = if (format == "pdf") "pdf" else "xlsx"
-                        val file = File(context.cacheDir, "reporte_${System.currentTimeMillis()}.$ext")
-                        file.outputStream().use { body.byteStream().copyTo(it) }
-                        _uiState.update { it.copy(isExporting = false, exportSuccess = file.absolutePath) }
-                    }.onFailure { e ->
-                        _uiState.update { it.copy(isExporting = false, errorMessage = e.message) }
-                    }
+                    ReportType.RENTABILIDAD ->
+                        reportesRepository.fetchRentabilidad().map {
+                            _uiState.update { s -> s.copy(rentabilidad = it) }
+                        }
+                    ReportType.HISTORIAL_PAGOS ->
+                        reportesRepository.fetchHistorialPagos().map {
+                            _uiState.update { s -> s.copy(historialPagos = it) }
+                        }
+                    ReportType.OCUPACION ->
+                        reportesRepository.fetchOcupacionTendencia().map {
+                            _uiState.update { s -> s.copy(ocupacion = it) }
+                        }
+                }
+            _uiState.update {
+                it.copy(isLoading = false, errorMessage = result.exceptionOrNull()?.message)
             }
-        }
-
-        fun clearExportSuccess() {
-            _uiState.update { it.copy(exportSuccess = null) }
         }
     }
+
+    fun exportPdf() {
+        export("pdf")
+    }
+
+    fun exportXlsx() {
+        export("xlsx")
+    }
+
+    private fun export(format: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isExporting = true, exportSuccess = null) }
+            val result: Result<ResponseBody> =
+                when (_uiState.value.selectedReport) {
+                    ReportType.INGRESOS ->
+                        if (format == "pdf") {
+                            reportesRepository.downloadIngresosPdf()
+                        } else {
+                            reportesRepository.downloadIngresosXlsx()
+                        }
+                    ReportType.RENTABILIDAD ->
+                        if (format == "pdf") {
+                            reportesRepository.downloadRentabilidadPdf()
+                        } else {
+                            reportesRepository.downloadRentabilidadXlsx()
+                        }
+                    else -> {
+                        _uiState.update { it.copy(isExporting = false) }
+                        return@launch
+                    }
+                }
+            result
+                .onSuccess { body ->
+                    val ext = if (format == "pdf") "pdf" else "xlsx"
+                    val file = File(context.cacheDir, "reporte_${System.currentTimeMillis()}.$ext")
+                    file.outputStream().use { body.byteStream().copyTo(it) }
+                    _uiState.update {
+                        it.copy(isExporting = false, exportSuccess = file.absolutePath)
+                    }
+                }
+                .onFailure { e ->
+                    _uiState.update { it.copy(isExporting = false, errorMessage = e.message) }
+                }
+        }
+    }
+
+    fun clearExportSuccess() {
+        _uiState.update { it.copy(exportSuccess = null) }
+    }
+}

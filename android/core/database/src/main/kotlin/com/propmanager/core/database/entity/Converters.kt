@@ -7,6 +7,5 @@ class Converters {
     @TypeConverter
     fun fromTimestamp(value: Long?): Instant? = value?.let { Instant.ofEpochMilli(it) }
 
-    @TypeConverter
-    fun toTimestamp(instant: Instant?): Long? = instant?.toEpochMilli()
+    @TypeConverter fun toTimestamp(instant: Instant?): Long? = instant?.toEpochMilli()
 }

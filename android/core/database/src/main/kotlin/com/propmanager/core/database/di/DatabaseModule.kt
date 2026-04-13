@@ -24,40 +24,27 @@ import javax.inject.Singleton
 object DatabaseModule {
     @Provides
     @Singleton
-    fun provideDatabase(
-        @ApplicationContext context: Context,
-    ): PropManagerDatabase =
-        Room
-            .databaseBuilder(
-                context,
-                PropManagerDatabase::class.java,
-                "propmanager.db",
-            ).build()
+    fun provideDatabase(@ApplicationContext context: Context): PropManagerDatabase =
+        Room.databaseBuilder(context, PropManagerDatabase::class.java, "propmanager.db").build()
 
-    @Provides
-    fun providePropiedadDao(db: PropManagerDatabase): PropiedadDao = db.propiedadDao()
+    @Provides fun providePropiedadDao(db: PropManagerDatabase): PropiedadDao = db.propiedadDao()
 
-    @Provides
-    fun provideInquilinoDao(db: PropManagerDatabase): InquilinoDao = db.inquilinoDao()
+    @Provides fun provideInquilinoDao(db: PropManagerDatabase): InquilinoDao = db.inquilinoDao()
 
-    @Provides
-    fun provideContratoDao(db: PropManagerDatabase): ContratoDao = db.contratoDao()
+    @Provides fun provideContratoDao(db: PropManagerDatabase): ContratoDao = db.contratoDao()
 
-    @Provides
-    fun providePagoDao(db: PropManagerDatabase): PagoDao = db.pagoDao()
+    @Provides fun providePagoDao(db: PropManagerDatabase): PagoDao = db.pagoDao()
 
-    @Provides
-    fun provideGastoDao(db: PropManagerDatabase): GastoDao = db.gastoDao()
+    @Provides fun provideGastoDao(db: PropManagerDatabase): GastoDao = db.gastoDao()
 
     @Provides
     fun provideSolicitudDao(db: PropManagerDatabase): SolicitudMantenimientoDao = db.solicitudDao()
 
-    @Provides
-    fun provideNotaDao(db: PropManagerDatabase): NotaMantenimientoDao = db.notaDao()
+    @Provides fun provideNotaDao(db: PropManagerDatabase): NotaMantenimientoDao = db.notaDao()
+
+    @Provides fun provideSyncQueueDao(db: PropManagerDatabase): SyncQueueDao = db.syncQueueDao()
 
     @Provides
-    fun provideSyncQueueDao(db: PropManagerDatabase): SyncQueueDao = db.syncQueueDao()
-
-    @Provides
-    fun provideDashboardCacheDao(db: PropManagerDatabase): DashboardCacheDao = db.dashboardCacheDao()
+    fun provideDashboardCacheDao(db: PropManagerDatabase): DashboardCacheDao =
+        db.dashboardCacheDao()
 }

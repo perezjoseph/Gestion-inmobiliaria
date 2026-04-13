@@ -51,7 +51,8 @@ fun PerfilScreen(
         if (uiState.saveSuccess) snackbarHostState.showSnackbar("Perfil actualizado correctamente")
     }
     LaunchedEffect(uiState.passwordChanged) {
-        if (uiState.passwordChanged) snackbarHostState.showSnackbar("Contraseña actualizada correctamente")
+        if (uiState.passwordChanged)
+            snackbarHostState.showSnackbar("Contraseña actualizada correctamente")
     }
 
     Scaffold(
@@ -65,21 +66,13 @@ fun PerfilScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-        ) {
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             OfflineIndicator(isOffline = !isOnline)
 
             when {
                 uiState.isLoading -> LoadingScreen()
                 uiState.errorMessage != null && uiState.nombre.isEmpty() ->
-                    ErrorScreen(
-                        message = uiState.errorMessage!!,
-                        onRetry = viewModel::loadPerfil,
-                    )
+                    ErrorScreen(message = uiState.errorMessage!!, onRetry = viewModel::loadPerfil)
                 else ->
                     PerfilContent(
                         uiState = uiState,
@@ -106,13 +99,7 @@ private fun PerfilContent(
     onChangePassword: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-    ) {
+    Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
         PropManagerTextField(
             value = uiState.nombre,
             onValueChange = onNombreChange,
@@ -146,20 +133,13 @@ private fun PerfilContent(
             )
         }
 
-        Button(
-            onClick = onSave,
-            enabled = !uiState.isSaving,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        Button(onClick = onSave, enabled = !uiState.isSaving, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.save))
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        OutlinedButton(
-            onClick = onTogglePasswordForm,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        OutlinedButton(onClick = onTogglePasswordForm, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.perfil_cambiar_password))
         }
 

@@ -460,6 +460,7 @@ fn non_empty_prop(s: &str) -> Option<String> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn do_save_propiedad(
     editing_id: Option<String>,
     update: UpdatePropiedad,
@@ -525,16 +526,17 @@ fn do_delete_propiedad(
     });
 }
 
+#[allow(clippy::type_complexity)]
 fn register_escape_listener_p(
     escape_handler: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>>,
 ) -> Option<EventListener> {
     web_sys::window().and_then(|w| w.document()).map(|doc| {
         EventListener::new(&doc, "keydown", move |event| {
             let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
-            if event.key() == "Escape" {
-                if let Some(ref cb) = *escape_handler.borrow() {
-                    cb();
-                }
+            if event.key() == "Escape"
+                && let Some(ref cb) = *escape_handler.borrow()
+            {
+                cb();
             }
         })
     })
@@ -588,6 +590,7 @@ fn load_propiedades_data(
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_propiedad_submit(
     submitting: &UseStateHandle<bool>,
     validate_form: &dyn Fn() -> bool,

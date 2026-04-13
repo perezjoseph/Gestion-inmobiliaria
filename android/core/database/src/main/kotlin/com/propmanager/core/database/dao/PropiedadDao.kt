@@ -22,7 +22,7 @@ interface PropiedadDao {
           AND (:estado IS NULL OR estado = :estado)
           AND (:tipoPropiedad IS NULL OR tipo_propiedad = :tipoPropiedad)
         ORDER BY titulo ASC
-        """,
+        """
     )
     fun observeFiltered(
         ciudad: String?,
@@ -30,15 +30,12 @@ interface PropiedadDao {
         tipoPropiedad: String?,
     ): Flow<List<PropiedadEntity>>
 
-    @Upsert
-    suspend fun upsert(entity: PropiedadEntity)
+    @Upsert suspend fun upsert(entity: PropiedadEntity)
 
-    @Upsert
-    suspend fun upsertAll(entities: List<PropiedadEntity>)
+    @Upsert suspend fun upsertAll(entities: List<PropiedadEntity>)
 
     @Query("UPDATE propiedades SET is_deleted = 1 WHERE id = :id")
     suspend fun markDeleted(id: String)
 
-    @Query("DELETE FROM propiedades")
-    suspend fun deleteAll()
+    @Query("DELETE FROM propiedades") suspend fun deleteAll()
 }

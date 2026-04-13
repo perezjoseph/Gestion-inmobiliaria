@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
@@ -85,16 +84,29 @@ fun GastosListScreen(
         }
     }
     deleteTarget?.let { g ->
-        ConfirmDeleteDialog(itemName = g.descripcion, onConfirm = viewModel::confirmDelete, onDismiss = viewModel::dismissDelete)
+        ConfirmDeleteDialog(
+            itemName = g.descripcion,
+            onConfirm = viewModel::confirmDelete,
+            onDismiss = viewModel::dismissDelete,
+        )
     }
 
     Scaffold(
-        topBar = { PropManagerTopAppBar(title = stringResource(R.string.gastos_title), scrollBehavior = scrollBehavior) },
+        topBar = {
+            PropManagerTopAppBar(
+                title = stringResource(R.string.gastos_title),
+                scrollBehavior = scrollBehavior,
+            )
+        },
         floatingActionButton = {
-            FloatingActionButton(onClick = {
-                viewModel.initCreateForm()
-                onNavigateToCreate()
-            }) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.gasto_create)) }
+            FloatingActionButton(
+                onClick = {
+                    viewModel.initCreateForm()
+                    onNavigateToCreate()
+                }
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.gasto_create))
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -113,10 +125,14 @@ fun GastosListScreen(
                         ) {
                             item { Spacer(Modifier.height(8.dp)) }
                             items(state.gastos, key = { it.id }) { gasto ->
-                                GastoListItem(gasto = gasto, onClick = {
-                                    viewModel.initEditForm(gasto)
-                                    onNavigateToEdit(gasto.id)
-                                }, onDelete = { viewModel.requestDelete(gasto) })
+                                GastoListItem(
+                                    gasto = gasto,
+                                    onClick = {
+                                        viewModel.initEditForm(gasto)
+                                        onNavigateToEdit(gasto.id)
+                                    },
+                                    onDelete = { viewModel.requestDelete(gasto) },
+                                )
                             }
                             item { Spacer(Modifier.height(80.dp)) }
                         }
@@ -138,7 +154,11 @@ private fun GastoListItem(
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(gasto.categoria, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    Text(
+                        gasto.categoria,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                    )
                     Spacer(Modifier.width(4.dp))
                     SyncStatusBadge(isPendingSync = gasto.isPendingSync)
                 }
@@ -148,7 +168,10 @@ private fun GastoListItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                 )
-                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     Text(
                         CurrencyFormatter.format(gasto.monto, gasto.moneda),
                         style = MaterialTheme.typography.bodyMedium,
@@ -160,9 +183,15 @@ private fun GastoListItem(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text(gasto.estado, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    gasto.estado,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
-            IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete)) }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete))
+            }
         }
     }
 }
@@ -179,47 +208,66 @@ fun GastoFormScreen(
     val formState by viewModel.formState.collectAsStateWithLifecycle()
     val propiedades by viewModel.propiedades.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    val title = if (isEditing) stringResource(R.string.gasto_edit) else stringResource(R.string.gasto_create)
+    val title =
+        if (isEditing) stringResource(R.string.gasto_edit)
+        else stringResource(R.string.gasto_create)
 
     Scaffold(
         topBar = {
-            PropManagerTopAppBar(title = title, scrollBehavior = scrollBehavior, onNavigateBack = onNavigateBack)
+            PropManagerTopAppBar(
+                title = title,
+                scrollBehavior = scrollBehavior,
+                onNavigateBack = onNavigateBack,
+            )
         },
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
         Column(
             modifier =
-                Modifier
-                    .fillMaxSize()
+                Modifier.fillMaxSize()
                     .padding(paddingValues)
                     .padding(horizontal = 16.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
         ) {
             Spacer(Modifier.height(8.dp))
             formState.errors["general"]?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 Spacer(Modifier.height(8.dp))
             }
 
             var propExpanded by remember { mutableStateOf(false) }
             val selectedProp = propiedades.find { it.id == formState.propiedadId }
-            ExposedDropdownMenuBox(expanded = propExpanded, onExpandedChange = { propExpanded = it }) {
+            ExposedDropdownMenuBox(
+                expanded = propExpanded,
+                onExpandedChange = { propExpanded = it },
+            ) {
                 OutlinedTextField(
                     value = selectedProp?.titulo ?: "",
                     onValueChange = {},
                     readOnly = true,
                     label = { Text(stringResource(R.string.gasto_propiedad)) },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = propExpanded) },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = propExpanded)
+                    },
                     isError = formState.errors.containsKey("propiedadId"),
                     modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
                 )
-                ExposedDropdownMenu(expanded = propExpanded, onDismissRequest = { propExpanded = false }) {
+                ExposedDropdownMenu(
+                    expanded = propExpanded,
+                    onDismissRequest = { propExpanded = false },
+                ) {
                     propiedades.forEach { p ->
-                        DropdownMenuItem(text = { Text(p.titulo) }, onClick = {
-                            viewModel.onFieldChange("propiedadId", p.id)
-                            propExpanded =
-                                false
-                        })
+                        DropdownMenuItem(
+                            text = { Text(p.titulo) },
+                            onClick = {
+                                viewModel.onFieldChange("propiedadId", p.id)
+                                propExpanded = false
+                            },
+                        )
                     }
                 }
             }
@@ -235,24 +283,43 @@ fun GastoFormScreen(
             Spacer(Modifier.height(8.dp))
 
             var catExpanded by remember { mutableStateOf(false) }
-            val categorias = listOf("mantenimiento", "reparacion", "servicios", "impuestos", "seguros", "administracion", "otro")
-            ExposedDropdownMenuBox(expanded = catExpanded, onExpandedChange = { catExpanded = it }) {
+            val categorias =
+                listOf(
+                    "mantenimiento",
+                    "reparacion",
+                    "servicios",
+                    "impuestos",
+                    "seguros",
+                    "administracion",
+                    "otro",
+                )
+            ExposedDropdownMenuBox(
+                expanded = catExpanded,
+                onExpandedChange = { catExpanded = it },
+            ) {
                 OutlinedTextField(
                     value = formState.categoria,
                     onValueChange = {},
                     readOnly = true,
                     label = { Text(stringResource(R.string.gasto_categoria)) },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = catExpanded) },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = catExpanded)
+                    },
                     isError = formState.errors.containsKey("categoria"),
                     modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
                 )
-                ExposedDropdownMenu(expanded = catExpanded, onDismissRequest = { catExpanded = false }) {
+                ExposedDropdownMenu(
+                    expanded = catExpanded,
+                    onDismissRequest = { catExpanded = false },
+                ) {
                     categorias.forEach { cat ->
-                        DropdownMenuItem(text = { Text(cat) }, onClick = {
-                            viewModel.onFieldChange("categoria", cat)
-                            catExpanded =
-                                false
-                        })
+                        DropdownMenuItem(
+                            text = { Text(cat) },
+                            onClick = {
+                                viewModel.onFieldChange("categoria", cat)
+                                catExpanded = false
+                            },
+                        )
                     }
                 }
             }
@@ -268,24 +335,27 @@ fun GastoFormScreen(
             Spacer(Modifier.height(8.dp))
             PropManagerTextField(
                 value = formState.descripcion,
-                onValueChange = {
-                    viewModel.onFieldChange("descripcion", it)
-                },
-                label =
-                    stringResource(
-                        R.string.gasto_descripcion,
-                    ),
+                onValueChange = { viewModel.onFieldChange("descripcion", it) },
+                label = stringResource(R.string.gasto_descripcion),
                 error = formState.errors["descripcion"],
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.monto, onValueChange = {
-                viewModel.onFieldChange("monto", it)
-            }, label = stringResource(R.string.gasto_monto), error = formState.errors["monto"], modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.monto,
+                onValueChange = { viewModel.onFieldChange("monto", it) },
+                label = stringResource(R.string.gasto_monto),
+                error = formState.errors["monto"],
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.moneda, onValueChange = {
-                viewModel.onFieldChange("moneda", it)
-            }, label = stringResource(R.string.gasto_moneda), error = formState.errors["moneda"], modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.moneda,
+                onValueChange = { viewModel.onFieldChange("moneda", it) },
+                label = stringResource(R.string.gasto_moneda),
+                error = formState.errors["moneda"],
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
             DatePickerField(
                 value = formState.fechaGasto,
@@ -295,26 +365,40 @@ fun GastoFormScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.proveedor, onValueChange = {
-                viewModel.onFieldChange("proveedor", it)
-            }, label = stringResource(R.string.gasto_proveedor), modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.proveedor,
+                onValueChange = { viewModel.onFieldChange("proveedor", it) },
+                label = stringResource(R.string.gasto_proveedor),
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.numeroFactura, onValueChange = {
-                viewModel.onFieldChange("numeroFactura", it)
-            }, label = stringResource(R.string.gasto_numero_factura), modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.numeroFactura,
+                onValueChange = { viewModel.onFieldChange("numeroFactura", it) },
+                label = stringResource(R.string.gasto_numero_factura),
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onScanRecibo, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.gasto_scan_recibo)) }
+            OutlinedButton(onClick = onScanRecibo, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.gasto_scan_recibo))
+            }
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.notas, onValueChange = {
-                viewModel.onFieldChange("notas", it)
-            }, label = stringResource(R.string.gasto_notas), singleLine = false, maxLines = 3, modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.notas,
+                onValueChange = { viewModel.onFieldChange("notas", it) },
+                label = stringResource(R.string.gasto_notas),
+                singleLine = false,
+                maxLines = 3,
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = { viewModel.save(onSuccess = onNavigateBack) },
                 enabled = !formState.isSubmitting,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                if (formState.isSubmitting) CircularProgressIndicator() else Text(stringResource(R.string.save))
+                if (formState.isSubmitting) CircularProgressIndicator()
+                else Text(stringResource(R.string.save))
             }
             Spacer(Modifier.height(16.dp))
         }

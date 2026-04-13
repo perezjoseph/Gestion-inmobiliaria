@@ -21,68 +21,73 @@ import io.kotest.property.checkAll
  *
  * Property 6: Conflict resolution applies server-wins
  *
- * For any entity where the local version differs from the server version
- * and the sync operation returns HTTP 409, the conflict resolution handler
- * SHALL overwrite the local Room entity with the server version, such that
- * reading the entity back yields field values matching the server response,
- * not the local version. The sync queue entry for the conflicted entity
- * is removed after resolution.
+ * For any entity where the local version differs from the server version and the sync operation
+ * returns HTTP 409, the conflict resolution handler SHALL overwrite the local Room entity with the
+ * server version, such that reading the entity back yields field values matching the server
+ * response, not the local version. The sync queue entry for the conflicted entity is removed after
+ * resolution.
  */
 class ConflictResolutionServerWinsPropertyTest :
     FreeSpec({
-
         val validEstados = listOf("disponible", "ocupada", "mantenimiento", "inactiva")
         val validTipos = listOf("apartamento", "casa", "local", "oficina", "terreno")
         val validMonedas = listOf("DOP", "USD")
 
-        val propiedadEntityArb: Arb<PropiedadEntity> =
-            arbitrary {
-                PropiedadEntity(
-                    id = Arb.uuid().map { it.toString() }.bind(),
-                    titulo = Arb.string(1..100).bind(),
-                    descripcion = Arb.string(0..200).bind().ifEmpty { null },
-                    direccion = Arb.string(1..150).bind(),
-                    ciudad = Arb.string(1..50).bind(),
-                    provincia = Arb.string(1..50).bind(),
-                    tipoPropiedad = Arb.element(validTipos).bind(),
-                    habitaciones = Arb.int(0..20).bind(),
-                    banos = Arb.int(0..10).bind(),
-                    areaM2 = Arb.string(1..10).bind(),
-                    precio = Arb.long(100L..999_999L).map { it.toString() }.bind(),
-                    moneda = Arb.element(validMonedas).bind(),
-                    estado = Arb.element(validEstados).bind(),
-                    imagenes = null,
-                    createdAt = Arb.long(1L..Long.MAX_VALUE / 2).bind(),
-                    updatedAt = Arb.long(1L..Long.MAX_VALUE / 2).bind(),
-                    isDeleted = false,
-                    isPendingSync = true,
-                )
-            }
+        val propiedadEntityArb: Arb<PropiedadEntity> = arbitrary {
+            PropiedadEntity(
+                id = Arb.uuid().map { it.toString() }.bind(),
+                titulo = Arb.string(1..100).bind(),
+                descripcion = Arb.string(0..200).bind().ifEmpty { null },
+                direccion = Arb.string(1..150).bind(),
+                ciudad = Arb.string(1..50).bind(),
+                provincia = Arb.string(1..50).bind(),
+                tipoPropiedad = Arb.element(validTipos).bind(),
+                habitaciones = Arb.int(0..20).bind(),
+                banos = Arb.int(0..10).bind(),
+                areaM2 = Arb.string(1..10).bind(),
+                precio = Arb.long(100L..999_999L).map { it.toString() }.bind(),
+                moneda = Arb.element(validMonedas).bind(),
+                estado = Arb.element(validEstados).bind(),
+                imagenes = null,
+                createdAt = Arb.long(1L..Long.MAX_VALUE / 2).bind(),
+                updatedAt = Arb.long(1L..Long.MAX_VALUE / 2).bind(),
+                isDeleted = false,
+                isPendingSync = true,
+            )
+        }
 
-        val syncQueueEntryArb: Arb<SyncQueueEntry> =
-            arbitrary {
-                SyncQueueEntry(
-                    id = Arb.long(1L..100_000L).bind(),
-                    entityType = Arb.element(listOf("propiedad", "inquilino", "contrato", "pago", "gasto", "solicitud")).bind(),
-                    entityId = Arb.uuid().map { it.toString() }.bind(),
-                    operation = Arb.element(listOf("CREATE", "UPDATE", "DELETE")).bind(),
-                    payload = Arb.string(1..200).bind(),
-                    createdAt = Arb.long(1L..Long.MAX_VALUE / 2).bind(),
-                    retryCount = Arb.int(0..10).bind(),
-                )
-            }
+        val syncQueueEntryArb: Arb<SyncQueueEntry> = arbitrary {
+            SyncQueueEntry(
+                id = Arb.long(1L..100_000L).bind(),
+                entityType =
+                    Arb.element(
+                            listOf(
+                                "propiedad",
+                                "inquilino",
+                                "contrato",
+                                "pago",
+                                "gasto",
+                                "solicitud",
+                            )
+                        )
+                        .bind(),
+                entityId = Arb.uuid().map { it.toString() }.bind(),
+                operation = Arb.element(listOf("CREATE", "UPDATE", "DELETE")).bind(),
+                payload = Arb.string(1..200).bind(),
+                createdAt = Arb.long(1L..Long.MAX_VALUE / 2).bind(),
+                retryCount = Arb.int(0..10).bind(),
+            )
+        }
 
         "Property 6: Conflict resolution applies server-wins" -
             {
-
                 "server version replaces local version entirely" {
-                    checkAll(100, propiedadEntityArb, propiedadEntityArb) { localVersion, serverTemplate ->
+                    checkAll(100, propiedadEntityArb, propiedadEntityArb) {
+                        localVersion,
+                        serverTemplate ->
                         val sharedId = localVersion.id
                         val serverVersion =
-                            serverTemplate.copy(
-                                id = sharedId,
-                                isPendingSync = false,
-                            )
+                            serverTemplate.copy(id = sharedId, isPendingSync = false)
 
                         val resolved = serverVersion
 
@@ -105,13 +110,12 @@ class ConflictResolutionServerWinsPropertyTest :
                 }
 
                 "resolved entity matches server version, not local version, when fields differ" {
-                    checkAll(100, propiedadEntityArb, propiedadEntityArb) { localVersion, serverTemplate ->
+                    checkAll(100, propiedadEntityArb, propiedadEntityArb) {
+                        localVersion,
+                        serverTemplate ->
                         val sharedId = localVersion.id
                         val serverVersion =
-                            serverTemplate.copy(
-                                id = sharedId,
-                                isPendingSync = false,
-                            )
+                            serverTemplate.copy(id = sharedId, isPendingSync = false)
 
                         val resolved = serverVersion
 
@@ -131,13 +135,12 @@ class ConflictResolutionServerWinsPropertyTest :
                 }
 
                 "resolved entity is not marked as pending sync" {
-                    checkAll(100, propiedadEntityArb, propiedadEntityArb) { localVersion, serverTemplate ->
+                    checkAll(100, propiedadEntityArb, propiedadEntityArb) {
+                        localVersion,
+                        serverTemplate ->
                         val sharedId = localVersion.id
                         val serverVersion =
-                            serverTemplate.copy(
-                                id = sharedId,
-                                isPendingSync = false,
-                            )
+                            serverTemplate.copy(id = sharedId, isPendingSync = false)
 
                         val resolved = serverVersion
 
@@ -146,7 +149,9 @@ class ConflictResolutionServerWinsPropertyTest :
                 }
 
                 "entity ID is preserved through conflict resolution" {
-                    checkAll(100, propiedadEntityArb, propiedadEntityArb) { localVersion, serverTemplate ->
+                    checkAll(100, propiedadEntityArb, propiedadEntityArb) {
+                        localVersion,
+                        serverTemplate ->
                         val sharedId = localVersion.id
                         val serverVersion = serverTemplate.copy(id = sharedId)
 
@@ -158,12 +163,19 @@ class ConflictResolutionServerWinsPropertyTest :
                 }
 
                 "sync queue entry for conflicted entity is removed after resolution" {
-                    checkAll(100, syncQueueEntryArb, Arb.list(syncQueueEntryArb, 1..15)) { conflictedEntry, otherEntries ->
-                        val allEntries = (otherEntries.distinctBy { it.id } + conflictedEntry).distinctBy { it.id }
+                    checkAll(100, syncQueueEntryArb, Arb.list(syncQueueEntryArb, 1..15)) {
+                        conflictedEntry,
+                        otherEntries ->
+                        val allEntries =
+                            (otherEntries.distinctBy { it.id } + conflictedEntry).distinctBy {
+                                it.id
+                            }
                         val afterResolution = allEntries.filter { it.id != conflictedEntry.id }
 
                         afterResolution shouldNotContain conflictedEntry
-                        afterResolution.none { it.entityId == conflictedEntry.entityId && it.id == conflictedEntry.id } shouldBe true
+                        afterResolution.none {
+                            it.entityId == conflictedEntry.entityId && it.id == conflictedEntry.id
+                        } shouldBe true
                     }
                 }
 

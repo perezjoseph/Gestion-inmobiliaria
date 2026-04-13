@@ -16,18 +16,13 @@ import retrofit2.http.QueryMap
 interface PropiedadesApiService {
     @GET("api/propiedades")
     suspend fun list(
-        @QueryMap filters: Map<String, String> = emptyMap(),
+        @QueryMap filters: Map<String, String> = emptyMap()
     ): Response<PaginatedResponse<PropiedadDto>>
 
-    @GET("api/propiedades/{id}")
-    suspend fun getById(
-        @Path("id") id: String,
-    ): Response<PropiedadDto>
+    @GET("api/propiedades/{id}") suspend fun getById(@Path("id") id: String): Response<PropiedadDto>
 
     @POST("api/propiedades")
-    suspend fun create(
-        @Body request: CreatePropiedadRequest,
-    ): Response<PropiedadDto>
+    suspend fun create(@Body request: CreatePropiedadRequest): Response<PropiedadDto>
 
     @PUT("api/propiedades/{id}")
     suspend fun update(
@@ -35,8 +30,5 @@ interface PropiedadesApiService {
         @Body request: UpdatePropiedadRequest,
     ): Response<PropiedadDto>
 
-    @DELETE("api/propiedades/{id}")
-    suspend fun delete(
-        @Path("id") id: String,
-    ): Response<Unit>
+    @DELETE("api/propiedades/{id}") suspend fun delete(@Path("id") id: String): Response<Unit>
 }

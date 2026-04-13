@@ -20,7 +20,7 @@ interface PagoDao {
           AND (:fechaDesde IS NULL OR fecha_vencimiento >= :fechaDesde)
           AND (:fechaHasta IS NULL OR fecha_vencimiento <= :fechaHasta)
         ORDER BY fecha_vencimiento DESC
-        """,
+        """
     )
     fun observeFiltered(
         contratoId: String?,
@@ -29,15 +29,11 @@ interface PagoDao {
         fechaHasta: String?,
     ): Flow<List<PagoEntity>>
 
-    @Upsert
-    suspend fun upsert(entity: PagoEntity)
+    @Upsert suspend fun upsert(entity: PagoEntity)
 
-    @Upsert
-    suspend fun upsertAll(entities: List<PagoEntity>)
+    @Upsert suspend fun upsertAll(entities: List<PagoEntity>)
 
-    @Query("UPDATE pagos SET is_deleted = 1 WHERE id = :id")
-    suspend fun markDeleted(id: String)
+    @Query("UPDATE pagos SET is_deleted = 1 WHERE id = :id") suspend fun markDeleted(id: String)
 
-    @Query("DELETE FROM pagos")
-    suspend fun deleteAll()
+    @Query("DELETE FROM pagos") suspend fun deleteAll()
 }

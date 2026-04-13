@@ -11,6 +11,7 @@ import com.propmanager.core.common.DateFormatter
 import com.propmanager.core.ui.R
 import java.time.LocalDate
 
+@Suppress("UnusedParameter")
 @Composable
 fun DatePickerField(
     value: LocalDate?,

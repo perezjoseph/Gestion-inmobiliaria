@@ -8,16 +8,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
@@ -49,7 +45,9 @@ fun SolicitudFormScreen(
     val formState by viewModel.formState.collectAsStateWithLifecycle()
     val propiedades by viewModel.propiedades.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    val title = if (isEditing) stringResource(R.string.solicitud_edit) else stringResource(R.string.solicitud_create)
+    val title =
+        if (isEditing) stringResource(R.string.solicitud_edit)
+        else stringResource(R.string.solicitud_create)
 
     Scaffold(
         topBar = {
@@ -63,37 +61,50 @@ fun SolicitudFormScreen(
     ) { paddingValues ->
         Column(
             modifier =
-                Modifier
-                    .fillMaxSize()
+                Modifier.fillMaxSize()
                     .padding(paddingValues)
                     .padding(horizontal = 16.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
         ) {
             Spacer(Modifier.height(8.dp))
             formState.errors["general"]?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 Spacer(Modifier.height(8.dp))
             }
 
             var propExpanded by remember { mutableStateOf(false) }
             val selectedProp = propiedades.find { it.id == formState.propiedadId }
-            ExposedDropdownMenuBox(expanded = propExpanded, onExpandedChange = { propExpanded = it }) {
+            ExposedDropdownMenuBox(
+                expanded = propExpanded,
+                onExpandedChange = { propExpanded = it },
+            ) {
                 OutlinedTextField(
                     value = selectedProp?.titulo ?: "",
                     onValueChange = {},
                     readOnly = true,
                     label = { Text(stringResource(R.string.solicitud_propiedad)) },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = propExpanded) },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = propExpanded)
+                    },
                     isError = formState.errors.containsKey("propiedadId"),
                     modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
                 )
-                ExposedDropdownMenu(expanded = propExpanded, onDismissRequest = { propExpanded = false }) {
+                ExposedDropdownMenu(
+                    expanded = propExpanded,
+                    onDismissRequest = { propExpanded = false },
+                ) {
                     propiedades.forEach { p ->
-                        DropdownMenuItem(text = { Text(p.titulo) }, onClick = {
-                            viewModel.onFieldChange("propiedadId", p.id)
-                            propExpanded =
-                                false
-                        })
+                        DropdownMenuItem(
+                            text = { Text(p.titulo) },
+                            onClick = {
+                                viewModel.onFieldChange("propiedadId", p.id)
+                                propExpanded = false
+                            },
+                        )
                     }
                 }
             }
@@ -107,64 +118,99 @@ fun SolicitudFormScreen(
             }
 
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.titulo, onValueChange = {
-                viewModel.onFieldChange("titulo", it)
-            }, label = stringResource(R.string.solicitud_titulo), error = formState.errors["titulo"], modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.titulo,
+                onValueChange = { viewModel.onFieldChange("titulo", it) },
+                label = stringResource(R.string.solicitud_titulo),
+                error = formState.errors["titulo"],
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.descripcion, onValueChange = {
-                viewModel.onFieldChange("descripcion", it)
-            }, label = stringResource(R.string.solicitud_descripcion), singleLine = false, maxLines = 4, modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.descripcion,
+                onValueChange = { viewModel.onFieldChange("descripcion", it) },
+                label = stringResource(R.string.solicitud_descripcion),
+                singleLine = false,
+                maxLines = 4,
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
 
             var prioExpanded by remember { mutableStateOf(false) }
             val prioridades = listOf("baja", "media", "alta", "urgente")
-            ExposedDropdownMenuBox(expanded = prioExpanded, onExpandedChange = { prioExpanded = it }) {
+            ExposedDropdownMenuBox(
+                expanded = prioExpanded,
+                onExpandedChange = { prioExpanded = it },
+            ) {
                 OutlinedTextField(
                     value = formState.prioridad,
                     onValueChange = {},
                     readOnly = true,
                     label = { Text(stringResource(R.string.solicitud_prioridad)) },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = prioExpanded) },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = prioExpanded)
+                    },
                     modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
                 )
-                ExposedDropdownMenu(expanded = prioExpanded, onDismissRequest = { prioExpanded = false }) {
+                ExposedDropdownMenu(
+                    expanded = prioExpanded,
+                    onDismissRequest = { prioExpanded = false },
+                ) {
                     prioridades.forEach { p ->
-                        DropdownMenuItem(text = { Text(p) }, onClick = {
-                            viewModel.onFieldChange("prioridad", p)
-                            prioExpanded =
-                                false
-                        })
+                        DropdownMenuItem(
+                            text = { Text(p) },
+                            onClick = {
+                                viewModel.onFieldChange("prioridad", p)
+                                prioExpanded = false
+                            },
+                        )
                     }
                 }
             }
 
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.nombreProveedor, onValueChange = {
-                viewModel.onFieldChange("nombreProveedor", it)
-            }, label = stringResource(R.string.solicitud_proveedor_nombre), modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.nombreProveedor,
+                onValueChange = { viewModel.onFieldChange("nombreProveedor", it) },
+                label = stringResource(R.string.solicitud_proveedor_nombre),
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.telefonoProveedor, onValueChange = {
-                viewModel.onFieldChange("telefonoProveedor", it)
-            }, label = stringResource(R.string.solicitud_proveedor_telefono), modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.telefonoProveedor,
+                onValueChange = { viewModel.onFieldChange("telefonoProveedor", it) },
+                label = stringResource(R.string.solicitud_proveedor_telefono),
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.emailProveedor, onValueChange = {
-                viewModel.onFieldChange("emailProveedor", it)
-            }, label = stringResource(R.string.solicitud_proveedor_email), modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.emailProveedor,
+                onValueChange = { viewModel.onFieldChange("emailProveedor", it) },
+                label = stringResource(R.string.solicitud_proveedor_email),
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.costoMonto, onValueChange = {
-                viewModel.onFieldChange("costoMonto", it)
-            }, label = stringResource(R.string.solicitud_costo), modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.costoMonto,
+                onValueChange = { viewModel.onFieldChange("costoMonto", it) },
+                label = stringResource(R.string.solicitud_costo),
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.costoMoneda, onValueChange = {
-                viewModel.onFieldChange("costoMoneda", it)
-            }, label = stringResource(R.string.pago_moneda), modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.costoMoneda,
+                onValueChange = { viewModel.onFieldChange("costoMoneda", it) },
+                label = stringResource(R.string.pago_moneda),
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = { viewModel.save(onSuccess = onNavigateBack) },
                 enabled = !formState.isSubmitting,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                if (formState.isSubmitting) CircularProgressIndicator() else Text(stringResource(R.string.save))
+                if (formState.isSubmitting) CircularProgressIndicator()
+                else Text(stringResource(R.string.save))
             }
             Spacer(Modifier.height(16.dp))
         }

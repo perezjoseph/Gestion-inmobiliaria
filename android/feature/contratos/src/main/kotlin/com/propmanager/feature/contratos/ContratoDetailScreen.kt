@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
@@ -76,10 +75,14 @@ fun ContratoDetailScreen(
     }
 
     deleteTarget?.let { c ->
-        ConfirmDeleteDialog(itemName = c.id.take(8), onConfirm = {
-            viewModel.confirmDelete()
-            onNavigateBack()
-        }, onDismiss = viewModel::dismissDelete)
+        ConfirmDeleteDialog(
+            itemName = c.id.take(8),
+            onConfirm = {
+                viewModel.confirmDelete()
+                onNavigateBack()
+            },
+            onDismiss = viewModel::dismissDelete,
+        )
     }
 
     if (showRenew) {
@@ -103,8 +106,16 @@ fun ContratoDetailScreen(
                     )
                 }
             },
-            confirmButton = { TextButton(onClick = viewModel::confirmRenew) { Text(stringResource(R.string.confirm)) } },
-            dismissButton = { TextButton(onClick = viewModel::dismissRenew) { Text(stringResource(R.string.cancel)) } },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmRenew) {
+                    Text(stringResource(R.string.confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissRenew) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
         )
     }
 
@@ -114,11 +125,21 @@ fun ContratoDetailScreen(
             title = { Text(stringResource(R.string.contrato_terminar)) },
             text = {
                 Text(
-                    stringResource(R.string.contrato_fecha_terminacion) + ": " + DateFormatter.toDisplay(java.time.LocalDate.now()),
+                    stringResource(R.string.contrato_fecha_terminacion) +
+                        ": " +
+                        DateFormatter.toDisplay(java.time.LocalDate.now())
                 )
             },
-            confirmButton = { TextButton(onClick = viewModel::confirmTerminate) { Text(stringResource(R.string.confirm)) } },
-            dismissButton = { TextButton(onClick = viewModel::dismissTerminate) { Text(stringResource(R.string.cancel)) } },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmTerminate) {
+                    Text(stringResource(R.string.confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissTerminate) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
         )
     }
 
@@ -131,13 +152,23 @@ fun ContratoDetailScreen(
                 actions = {
                     if (detailState is ContratoDetailUiState.Success) {
                         val c = (detailState as ContratoDetailUiState.Success).contrato.contrato
-                        IconButton(onClick = {
-                            viewModel.initEditForm(c)
-                            onNavigateToEdit()
-                        }) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.edit)) }
                         IconButton(
-                            onClick = { viewModel.requestDelete(c) },
-                        ) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete)) }
+                            onClick = {
+                                viewModel.initEditForm(c)
+                                onNavigateToEdit()
+                            }
+                        ) {
+                            Icon(
+                                Icons.Filled.Edit,
+                                contentDescription = stringResource(R.string.edit),
+                            )
+                        }
+                        IconButton(onClick = { viewModel.requestDelete(c) }) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = stringResource(R.string.delete),
+                            )
+                        }
                     }
                 },
             )
@@ -146,8 +177,10 @@ fun ContratoDetailScreen(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
         when (val state = detailState) {
-            is ContratoDetailUiState.Loading -> LoadingScreen(modifier = Modifier.padding(paddingValues))
-            is ContratoDetailUiState.NotFound -> ErrorScreen(message = state.message, modifier = Modifier.padding(paddingValues))
+            is ContratoDetailUiState.Loading ->
+                LoadingScreen(modifier = Modifier.padding(paddingValues))
+            is ContratoDetailUiState.NotFound ->
+                ErrorScreen(message = state.message, modifier = Modifier.padding(paddingValues))
             is ContratoDetailUiState.Success ->
                 ContratoDetailContent(
                     cwn = state.contrato,
@@ -169,36 +202,70 @@ private fun ContratoDetailContent(
     val c = cwn.contrato
     Column(modifier = modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(cwn.propiedadTitulo, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(
+                cwn.propiedadTitulo,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+            )
             SyncStatusBadge(isPendingSync = c.isPendingSync)
         }
-        Text(cwn.inquilinoNombre, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(c.estado, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        Text(
+            cwn.inquilinoNombre,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            c.estado,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
         Spacer(Modifier.height(16.dp))
         HorizontalDivider()
         Spacer(Modifier.height(12.dp))
-        DetailRow(stringResource(R.string.contrato_fecha_inicio), DateFormatter.toDisplay(c.fechaInicio))
+        DetailRow(
+            stringResource(R.string.contrato_fecha_inicio),
+            DateFormatter.toDisplay(c.fechaInicio),
+        )
         DetailRow(stringResource(R.string.contrato_fecha_fin), DateFormatter.toDisplay(c.fechaFin))
-        DetailRow(stringResource(R.string.contrato_monto_mensual), CurrencyFormatter.format(c.montoMensual, c.moneda))
-        c.deposito?.let { DetailRow(stringResource(R.string.contrato_deposito), CurrencyFormatter.format(it, c.moneda)) }
+        DetailRow(
+            stringResource(R.string.contrato_monto_mensual),
+            CurrencyFormatter.format(c.montoMensual, c.moneda),
+        )
+        c.deposito?.let {
+            DetailRow(
+                stringResource(R.string.contrato_deposito),
+                CurrencyFormatter.format(it, c.moneda),
+            )
+        }
         DetailRow(stringResource(R.string.contrato_moneda), c.moneda)
         Spacer(Modifier.height(16.dp))
         if (c.estado == "activo") {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(onClick = onRenew, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.contrato_renovar)) }
-                OutlinedButton(onClick = onTerminate, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.contrato_terminar)) }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Button(onClick = onRenew, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.contrato_renovar))
+                }
+                OutlinedButton(onClick = onTerminate, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.contrato_terminar))
+                }
             }
         }
     }
 }
 
 @Composable
-private fun DetailRow(
-    label: String,
-    value: String,
-) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun DetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
     }
 }

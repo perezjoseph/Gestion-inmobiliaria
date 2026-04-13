@@ -8,38 +8,33 @@ import io.kotest.property.Arb
 import io.kotest.property.arbitrary.filter
 import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
+import java.util.concurrent.TimeUnit
 import okhttp3.Call
 import okhttp3.Connection
 import okhttp3.Interceptor
 import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
-import java.util.concurrent.TimeUnit
 
 /**
  * **Validates: Requirements 1.7**
  *
  * Property 2: Auth interceptor attaches Bearer token
  *
- * For any OkHttp request and any non-null stored JWT token string, passing the request
- * through AuthInterceptor.intercept() produces a request whose Authorization header
- * equals "Bearer {token}". When token is null, no Authorization header is added.
+ * For any OkHttp request and any non-null stored JWT token string, passing the request through
+ * AuthInterceptor.intercept() produces a request whose Authorization header equals "Bearer
+ * {token}". When token is null, no Authorization header is added.
  */
 class AuthInterceptorPropertyTest :
     FreeSpec({
-
         "Property 2: Auth interceptor attaches Bearer token" -
             {
-
                 "non-null token attaches Bearer header to any request" {
                     checkAll(100, Arb.string(1..200)) { token ->
                         val provider = InMemoryTokenProvider(token)
                         val interceptor = AuthInterceptor(provider)
                         val originalRequest =
-                            Request
-                                .Builder()
-                                .url("https://api.example.com/test")
-                                .build()
+                            Request.Builder().url("https://api.example.com/test").build()
                         val chain = CapturingChain(originalRequest)
 
                         interceptor.intercept(chain)
@@ -54,10 +49,7 @@ class AuthInterceptorPropertyTest :
                         val provider = InMemoryTokenProvider(null)
                         val interceptor = AuthInterceptor(provider)
                         val originalRequest =
-                            Request
-                                .Builder()
-                                .url("https://api.example.com/$path")
-                                .build()
+                            Request.Builder().url("https://api.example.com/$path").build()
                         val chain = CapturingChain(originalRequest)
 
                         interceptor.intercept(chain)
@@ -68,12 +60,15 @@ class AuthInterceptorPropertyTest :
                 }
 
                 "original request headers are preserved when token is added" {
-                    checkAll(100, Arb.string(1..200), Arb.string(1..50).filter { it.isNotBlank() }) { token, customValue ->
+                    checkAll(
+                        100,
+                        Arb.string(1..200),
+                        Arb.string(1..50).filter { it.isNotBlank() },
+                    ) { token, customValue ->
                         val provider = InMemoryTokenProvider(token)
                         val interceptor = AuthInterceptor(provider)
                         val originalRequest =
-                            Request
-                                .Builder()
+                            Request.Builder()
                                 .url("https://api.example.com/test")
                                 .addHeader("X-Custom", customValue)
                                 .build()
@@ -89,9 +84,7 @@ class AuthInterceptorPropertyTest :
             }
     })
 
-private class InMemoryTokenProvider(
-    private var token: String?,
-) : TokenProvider {
+private class InMemoryTokenProvider(private var token: String?) : TokenProvider {
     override fun getToken(): String? = token
 
     override fun saveToken(token: String) {
@@ -111,17 +104,14 @@ private class InMemoryTokenProvider(
     }
 }
 
-private class CapturingChain(
-    private val originalRequest: Request,
-) : Interceptor.Chain {
+private class CapturingChain(private val originalRequest: Request) : Interceptor.Chain {
     var capturedRequest: Request? = null
 
     override fun request(): Request = originalRequest
 
     override fun proceed(request: Request): Response {
         capturedRequest = request
-        return Response
-            .Builder()
+        return Response.Builder()
             .request(request)
             .protocol(Protocol.HTTP_1_1)
             .code(200)
@@ -135,22 +125,13 @@ private class CapturingChain(
 
     override fun connectTimeoutMillis(): Int = 10_000
 
-    override fun withConnectTimeout(
-        timeout: Int,
-        unit: TimeUnit,
-    ): Interceptor.Chain = this
+    override fun withConnectTimeout(timeout: Int, unit: TimeUnit): Interceptor.Chain = this
 
     override fun readTimeoutMillis(): Int = 10_000
 
-    override fun withReadTimeout(
-        timeout: Int,
-        unit: TimeUnit,
-    ): Interceptor.Chain = this
+    override fun withReadTimeout(timeout: Int, unit: TimeUnit): Interceptor.Chain = this
 
     override fun writeTimeoutMillis(): Int = 10_000
 
-    override fun withWriteTimeout(
-        timeout: Int,
-        unit: TimeUnit,
-    ): Interceptor.Chain = this
+    override fun withWriteTimeout(timeout: Int, unit: TimeUnit): Interceptor.Chain = this
 }

@@ -50,8 +50,5 @@ object Routes {
 
     fun solicitudForm(id: String? = null) = "mantenimiento/form?id=${id ?: ""}"
 
-    fun documentos(
-        entityType: String,
-        entityId: String,
-    ) = "documentos/$entityType/$entityId"
+    fun documentos(entityType: String, entityId: String) = "documentos/$entityType/$entityId"
 }

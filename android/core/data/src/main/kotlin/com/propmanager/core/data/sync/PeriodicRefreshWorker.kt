@@ -16,41 +16,41 @@ import dagger.assisted.AssistedInject
 
 @HiltWorker
 class PeriodicRefreshWorker
-    @AssistedInject
-    constructor(
-        @Assisted context: Context,
-        @Assisted params: WorkerParameters,
-        private val propiedadesRepository: PropiedadesRepository,
-        private val inquilinosRepository: InquilinosRepository,
-        private val contratosRepository: ContratosRepository,
-        private val pagosRepository: PagosRepository,
-        private val gastosRepository: GastosRepository,
-        private val mantenimientoRepository: MantenimientoRepository,
-    ) : CoroutineWorker(context, params) {
-        override suspend fun doWork(): Result {
-            var hasError = false
+@AssistedInject
+constructor(
+    @Assisted context: Context,
+    @Assisted params: WorkerParameters,
+    private val propiedadesRepository: PropiedadesRepository,
+    private val inquilinosRepository: InquilinosRepository,
+    private val contratosRepository: ContratosRepository,
+    private val pagosRepository: PagosRepository,
+    private val gastosRepository: GastosRepository,
+    private val mantenimientoRepository: MantenimientoRepository,
+) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result {
+        var hasError = false
 
-            val refreshTasks: List<Pair<String, suspend () -> kotlin.Result<Unit>>> =
-                listOf(
-                    "propiedades" to { propiedadesRepository.refreshFromServer() },
-                    "inquilinos" to { inquilinosRepository.refreshFromServer() },
-                    "contratos" to { contratosRepository.refreshFromServer() },
-                    "pagos" to { pagosRepository.refreshFromServer() },
-                    "gastos" to { gastosRepository.refreshFromServer() },
-                    "mantenimiento" to { mantenimientoRepository.refreshFromServer() },
-                )
-            refreshTasks.forEach { (name, refresh) ->
-                refresh().onFailure { e ->
-                    Log.e(TAG, "Failed to refresh $name", e)
-                    hasError = true
-                }
+        val refreshTasks: List<Pair<String, suspend () -> kotlin.Result<Unit>>> =
+            listOf(
+                "propiedades" to { propiedadesRepository.refreshFromServer() },
+                "inquilinos" to { inquilinosRepository.refreshFromServer() },
+                "contratos" to { contratosRepository.refreshFromServer() },
+                "pagos" to { pagosRepository.refreshFromServer() },
+                "gastos" to { gastosRepository.refreshFromServer() },
+                "mantenimiento" to { mantenimientoRepository.refreshFromServer() },
+            )
+        refreshTasks.forEach { (name, refresh) ->
+            refresh().onFailure { e ->
+                Log.e(TAG, "Failed to refresh $name", e)
+                hasError = true
             }
-
-            return if (hasError) Result.retry() else Result.success()
         }
 
-        companion object {
-            const val TAG = "PeriodicRefreshWorker"
-            const val WORK_NAME = "periodic_refresh"
-        }
+        return if (hasError) Result.retry() else Result.success()
     }
+
+    companion object {
+        const val TAG = "PeriodicRefreshWorker"
+        const val WORK_NAME = "periodic_refresh"
+    }
+}

@@ -556,6 +556,7 @@ fn load_contrato_refs(
     });
 }
 
+#[allow(clippy::type_complexity)]
 fn register_escape_listener(
     escape_handler: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>>,
 ) -> Option<EventListener> {

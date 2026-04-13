@@ -16,16 +16,15 @@ import retrofit2.Response
  *
  * Property 16: API error message extraction
  *
- * For any JSON string conforming to the backend error format {"error": "<type>", "message": "<msg>"},
- * the error parser extracts the message field value exactly as provided, regardless of the error type
- * or message content. For malformed/non-JSON input, the parser returns a fallback message without crashing.
+ * For any JSON string conforming to the backend error format {"error": "<type>", "message":
+ * "<msg>"}, the error parser extracts the message field value exactly as provided, regardless of
+ * the error type or message content. For malformed/non-JSON input, the parser returns a fallback
+ * message without crashing.
  */
 class ApiErrorParserPropertyTest :
     FreeSpec({
-
         "Property 16: API error message extraction" -
             {
-
                 "valid JSON error body extracts message exactly" {
                     checkAll(
                         100,
@@ -50,9 +49,11 @@ class ApiErrorParserPropertyTest :
                         100,
                         Arb.string(1..200).filter { input ->
                             runCatching {
-                                kotlinx.serialization.json.Json
-                                    .decodeFromString<ApiErrorBody>(input)
-                            }.isFailure
+                                    kotlinx.serialization.json.Json.decodeFromString<ApiErrorBody>(
+                                        input
+                                    )
+                                }
+                                .isFailure
                         },
                     ) { malformedInput ->
                         val errorResponse =

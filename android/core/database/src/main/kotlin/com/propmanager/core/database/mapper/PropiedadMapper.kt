@@ -4,12 +4,12 @@ import com.propmanager.core.database.entity.PropiedadEntity
 import com.propmanager.core.model.Propiedad
 import com.propmanager.core.model.dto.CreatePropiedadRequest
 import com.propmanager.core.model.dto.PropiedadDto
+import java.math.BigDecimal
+import java.time.Instant
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
-import java.math.BigDecimal
-import java.time.Instant
 
 fun PropiedadEntity.toDomain(): Propiedad =
     Propiedad(
@@ -76,10 +76,9 @@ fun Propiedad.toCreateRequest(): CreatePropiedadRequest =
 
 private fun parseImagenesJson(json: String): List<String> =
     try {
-        kotlinx.serialization.json.Json
-            .parseToJsonElement(json)
-            .jsonArray
-            .map { it.jsonPrimitive.content }
+        kotlinx.serialization.json.Json.parseToJsonElement(json).jsonArray.map {
+            it.jsonPrimitive.content
+        }
     } catch (_: Exception) {
         emptyList()
     }

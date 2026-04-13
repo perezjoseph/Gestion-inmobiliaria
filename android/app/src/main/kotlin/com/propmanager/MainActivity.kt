@@ -3,6 +3,7 @@ package com.propmanager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -31,13 +32,12 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    @Inject
-    lateinit var networkMonitor: NetworkMonitor
+    @Inject lateinit var networkMonitor: NetworkMonitor
 
-    @Inject
-    lateinit var notificacionesRepository: NotificacionesRepository
+    @Inject lateinit var notificacionesRepository: NotificacionesRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
             PropManagerTheme {
@@ -85,17 +85,13 @@ private fun PropManagerApp(
 
     LaunchedEffect(authState) {
         if (authState is AuthState.Unauthenticated && currentRoute != Routes.LOGIN) {
-            navController.navigate(Routes.AUTH_GRAPH) {
-                popUpTo(0) { inclusive = true }
-            }
+            navController.navigate(Routes.AUTH_GRAPH) { popUpTo(0) { inclusive = true } }
         }
     }
 
     LaunchedEffect(authState, isOnline) {
         if (authState is AuthState.Authenticated && isOnline) {
-            notificacionesRepository
-                .fetchPagosVencidos()
-                .onSuccess { badgeCount = it.size }
+            notificacionesRepository.fetchPagosVencidos().onSuccess { badgeCount = it.size }
         }
     }
 

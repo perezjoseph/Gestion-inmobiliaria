@@ -21,10 +21,7 @@ import androidx.compose.ui.res.stringResource
 import com.propmanager.core.ui.R
 import com.propmanager.core.ui.components.PropManagerTopAppBar
 
-private data class MenuItem(
-    val labelResId: Int,
-    val route: String,
-)
+private data class MenuItem(val labelResId: Int, val route: String)
 
 private val menuItems =
     listOf(
@@ -61,10 +58,7 @@ fun MasMenuScreen(
     ) { paddingValues ->
         Column(
             modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .verticalScroll(rememberScrollState()),
+                Modifier.fillMaxSize().padding(paddingValues).verticalScroll(rememberScrollState())
         ) {
             menuItems.forEach { item ->
                 ListItem(
@@ -74,10 +68,7 @@ fun MasMenuScreen(
                             style = MaterialTheme.typography.bodyLarge,
                         )
                     },
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { onNavigate(item.route) },
+                    modifier = Modifier.fillMaxWidth().clickable { onNavigate(item.route) },
                 )
                 HorizontalDivider()
             }

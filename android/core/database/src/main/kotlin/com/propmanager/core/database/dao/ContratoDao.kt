@@ -21,22 +21,15 @@ interface ContratoDao {
           AND fecha_fin >= :todayStr
           AND fecha_fin <= :thresholdStr
         ORDER BY fecha_fin ASC
-        """,
+        """
     )
-    fun observeExpiring(
-        todayStr: String,
-        thresholdStr: String,
-    ): Flow<List<ContratoEntity>>
+    fun observeExpiring(todayStr: String, thresholdStr: String): Flow<List<ContratoEntity>>
 
-    @Upsert
-    suspend fun upsert(entity: ContratoEntity)
+    @Upsert suspend fun upsert(entity: ContratoEntity)
 
-    @Upsert
-    suspend fun upsertAll(entities: List<ContratoEntity>)
+    @Upsert suspend fun upsertAll(entities: List<ContratoEntity>)
 
-    @Query("UPDATE contratos SET is_deleted = 1 WHERE id = :id")
-    suspend fun markDeleted(id: String)
+    @Query("UPDATE contratos SET is_deleted = 1 WHERE id = :id") suspend fun markDeleted(id: String)
 
-    @Query("DELETE FROM contratos")
-    suspend fun deleteAll()
+    @Query("DELETE FROM contratos") suspend fun deleteAll()
 }

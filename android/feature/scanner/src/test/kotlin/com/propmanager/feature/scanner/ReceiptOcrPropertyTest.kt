@@ -8,7 +8,6 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.arbitrary
-import io.kotest.property.arbitrary.bigDecimal
 import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.string
@@ -21,42 +20,39 @@ import java.math.RoundingMode
  *
  * Property 15: Receipt OCR text parsing
  *
- * For any text block containing a currency amount pattern (e.g., "RD$ 1,500.00" or "$1500"),
- * a date pattern, and a provider name, ReceiptOcrExtractor.parseReceiptLines() extracts a
- * ReceiptOcrResult where the monto matches the numeric value from the amount pattern and
- * the fecha matches the date in the text.
+ * For any text block containing a currency amount pattern (e.g., "RD$ 1,500.00" or "$1500"), a date
+ * pattern, and a provider name, ReceiptOcrExtractor.parseReceiptLines() extracts a ReceiptOcrResult
+ * where the monto matches the numeric value from the amount pattern and the fecha matches the date
+ * in the text.
  */
 class ReceiptOcrPropertyTest :
     FreeSpec({
-
         val extractor = ReceiptOcrExtractor()
 
         val currencyPrefixArb: Arb<String> = Arb.element("RD$", "US$", "$")
 
-        val receiptAmountArb: Arb<BigDecimal> =
-            arbitrary {
-                val intPart = Arb.int(1..999999).bind()
-                val decPart = Arb.int(0..99).bind()
-                BigDecimal("$intPart.${decPart.toString().padStart(2, '0')}")
-            }
+        val receiptAmountArb: Arb<BigDecimal> = arbitrary {
+            val intPart = Arb.int(1..999999).bind()
+            val decPart = Arb.int(0..99).bind()
+            BigDecimal("$intPart.${decPart.toString().padStart(2, '0')}")
+        }
 
         val dayArb: Arb<Int> = Arb.int(1..28)
         val monthArb: Arb<Int> = Arb.int(1..12)
         val yearArb: Arb<Int> = Arb.int(2020..2030)
 
-        val facturaNumberArb: Arb<String> =
-            arbitrary {
-                val prefix = Arb.element("A", "B", "NCF", "FAC", "INV").bind()
-                val num = Arb.int(1..999999).bind().toString().padStart(6, '0')
-                "$prefix-$num"
-            }
+        val facturaNumberArb: Arb<String> = arbitrary {
+            val prefix = Arb.element("A", "B", "NCF", "FAC", "INV").bind()
+            val num = Arb.int(1..999999).bind().toString().padStart(6, '0')
+            "$prefix-$num"
+        }
 
         "Property 15: Receipt OCR text parsing" -
             {
-
                 "text with currency amount extracts monto correctly" {
                     checkAll(100, currencyPrefixArb, receiptAmountArb) { prefix, amount ->
-                        val formattedAmount = amount.setScale(2, RoundingMode.HALF_UP).toPlainString()
+                        val formattedAmount =
+                            amount.setScale(2, RoundingMode.HALF_UP).toPlainString()
                         val lines = listOf("$prefix $formattedAmount")
                         val result = extractor.parseReceiptLines(lines)
                         result.monto.shouldNotBeNull()
@@ -66,7 +62,8 @@ class ReceiptOcrPropertyTest :
 
                 "text with DD/MM/YYYY date extracts fecha correctly" {
                     checkAll(100, dayArb, monthArb, yearArb) { day, month, year ->
-                        val dateStr = "${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/$year"
+                        val dateStr =
+                            "${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/$year"
                         val lines = listOf("Fecha: $dateStr")
                         val result = extractor.parseReceiptLines(lines)
                         result.fecha.shouldNotBeNull()

@@ -18,13 +18,12 @@ import java.math.RoundingMode
  * Property 13: Currency formatting correctness
  *
  * For any non-negative BigDecimal amount and currency code in {"DOP", "USD"},
- * CurrencyFormatter.format(amount, currency) produces a string that starts with
- * "RD$" for DOP or "US$" for USD, contains the amount with exactly 2 decimal places,
- * and uses proper thousands separators.
+ * CurrencyFormatter.format(amount, currency) produces a string that starts with "RD$" for DOP or
+ * "US$" for USD, contains the amount with exactly 2 decimal places, and uses proper thousands
+ * separators.
  */
 class CurrencyFormatterPropertyTest :
     FreeSpec({
-
         val currencyArb: Arb<String> = Arb.element("DOP", "USD")
 
         val nonNegativeBigDecimalArb: Arb<BigDecimal> =
@@ -36,7 +35,7 @@ class CurrencyFormatterPropertyTest :
                         BigDecimal("999.99"),
                         BigDecimal("1000.00"),
                         BigDecimal("1234567.89"),
-                    ),
+                    )
             ) {
                 val cents = Arb.long(0L..99999999999L).bind()
                 BigDecimal(cents).divide(BigDecimal(100))
@@ -44,7 +43,6 @@ class CurrencyFormatterPropertyTest :
 
         "Property 13: Currency formatting correctness" -
             {
-
                 "formatted output starts with correct currency symbol" {
                     checkAll(100, nonNegativeBigDecimalArb, currencyArb) { amount, currency ->
                         val result = CurrencyFormatter.format(amount, currency)
@@ -62,11 +60,10 @@ class CurrencyFormatterPropertyTest :
                 }
 
                 "formatted output uses thousands separators for amounts >= 1000" {
-                    val largeAmountArb: Arb<BigDecimal> =
-                        arbitrary {
-                            val cents = Arb.long(100000L..99999999999L).bind()
-                            BigDecimal(cents).divide(BigDecimal(100))
-                        }
+                    val largeAmountArb: Arb<BigDecimal> = arbitrary {
+                        val cents = Arb.long(100000L..99999999999L).bind()
+                        BigDecimal(cents).divide(BigDecimal(100))
+                    }
 
                     checkAll(100, largeAmountArb, currencyArb) { amount, currency ->
                         val result = CurrencyFormatter.format(amount, currency)

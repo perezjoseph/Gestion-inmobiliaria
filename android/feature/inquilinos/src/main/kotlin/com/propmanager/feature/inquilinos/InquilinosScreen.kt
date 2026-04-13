@@ -15,10 +15,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -87,13 +85,23 @@ fun InquilinosListScreen(
     }
 
     Scaffold(
-        topBar = { PropManagerTopAppBar(title = stringResource(R.string.inquilinos_title), scrollBehavior = scrollBehavior) },
+        topBar = {
+            PropManagerTopAppBar(
+                title = stringResource(R.string.inquilinos_title),
+                scrollBehavior = scrollBehavior,
+            )
+        },
         floatingActionButton = {
-            FloatingActionButton(onClick = {
-                viewModel.initCreateForm()
-                onNavigateToCreate()
-            }) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.inquilino_create))
+            FloatingActionButton(
+                onClick = {
+                    viewModel.initCreateForm()
+                    onNavigateToCreate()
+                }
+            ) {
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = stringResource(R.string.inquilino_create),
+                )
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -153,9 +161,17 @@ private fun InquilinoListItem(
                     Spacer(Modifier.width(4.dp))
                     SyncStatusBadge(isPendingSync = inquilino.isPendingSync)
                 }
-                Text(inquilino.cedula, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    inquilino.cedula,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 inquilino.telefono?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
             IconButton(onClick = onDelete) {
@@ -176,7 +192,9 @@ fun InquilinoFormScreen(
 ) {
     val formState by viewModel.formState.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    val title = if (isEditing) stringResource(R.string.inquilino_edit) else stringResource(R.string.inquilino_create)
+    val title =
+        if (isEditing) stringResource(R.string.inquilino_edit)
+        else stringResource(R.string.inquilino_create)
 
     Scaffold(
         topBar = {
@@ -190,64 +208,85 @@ fun InquilinoFormScreen(
     ) { paddingValues ->
         Column(
             modifier =
-                Modifier
-                    .fillMaxSize()
+                Modifier.fillMaxSize()
                     .padding(paddingValues)
                     .padding(horizontal = 16.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
         ) {
             Spacer(Modifier.height(8.dp))
             formState.errors["general"]?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 Spacer(Modifier.height(8.dp))
             }
-            PropManagerTextField(value = formState.nombre, onValueChange = {
-                viewModel.onFieldChange("nombre", it)
-            }, label = stringResource(R.string.inquilino_nombre), error = formState.errors["nombre"], modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.nombre,
+                onValueChange = { viewModel.onFieldChange("nombre", it) },
+                label = stringResource(R.string.inquilino_nombre),
+                error = formState.errors["nombre"],
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
             PropManagerTextField(
                 value = formState.apellido,
-                onValueChange = {
-                    viewModel.onFieldChange("apellido", it)
-                },
-                label =
-                    stringResource(
-                        R.string.inquilino_apellido,
-                    ),
+                onValueChange = { viewModel.onFieldChange("apellido", it) },
+                label = stringResource(R.string.inquilino_apellido),
                 error = formState.errors["apellido"],
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.cedula, onValueChange = {
-                viewModel.onFieldChange("cedula", it)
-            }, label = stringResource(R.string.inquilino_cedula), error = formState.errors["cedula"], modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.cedula,
+                onValueChange = { viewModel.onFieldChange("cedula", it) },
+                label = stringResource(R.string.inquilino_cedula),
+                error = formState.errors["cedula"],
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = onScanCedula, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.inquilino_scan_cedula))
             }
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.email, onValueChange = {
-                viewModel.onFieldChange("email", it)
-            }, label = stringResource(R.string.inquilino_email), modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.email,
+                onValueChange = { viewModel.onFieldChange("email", it) },
+                label = stringResource(R.string.inquilino_email),
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.telefono, onValueChange = {
-                viewModel.onFieldChange("telefono", it)
-            }, label = stringResource(R.string.inquilino_telefono), modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.telefono,
+                onValueChange = { viewModel.onFieldChange("telefono", it) },
+                label = stringResource(R.string.inquilino_telefono),
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.contactoEmergencia, onValueChange = {
-                viewModel.onFieldChange("contactoEmergencia", it)
-            }, label = stringResource(R.string.inquilino_contacto_emergencia), modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.contactoEmergencia,
+                onValueChange = { viewModel.onFieldChange("contactoEmergencia", it) },
+                label = stringResource(R.string.inquilino_contacto_emergencia),
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
-            PropManagerTextField(value = formState.notas, onValueChange = {
-                viewModel.onFieldChange("notas", it)
-            }, label = stringResource(R.string.inquilino_notas), singleLine = false, maxLines = 4, modifier = Modifier.fillMaxWidth())
+            PropManagerTextField(
+                value = formState.notas,
+                onValueChange = { viewModel.onFieldChange("notas", it) },
+                label = stringResource(R.string.inquilino_notas),
+                singleLine = false,
+                maxLines = 4,
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = { viewModel.save(onSuccess = onNavigateBack) },
                 enabled = !formState.isSubmitting,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                if (formState.isSubmitting) CircularProgressIndicator() else Text(stringResource(R.string.save))
+                if (formState.isSubmitting) CircularProgressIndicator()
+                else Text(stringResource(R.string.save))
             }
             Spacer(Modifier.height(16.dp))
         }

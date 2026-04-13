@@ -16,13 +16,10 @@ import retrofit2.http.QueryMap
 interface GastosApiService {
     @GET("api/gastos")
     suspend fun list(
-        @QueryMap filters: Map<String, String> = emptyMap(),
+        @QueryMap filters: Map<String, String> = emptyMap()
     ): Response<PaginatedResponse<GastoDto>>
 
-    @POST("api/gastos")
-    suspend fun create(
-        @Body request: CreateGastoRequest,
-    ): Response<GastoDto>
+    @POST("api/gastos") suspend fun create(@Body request: CreateGastoRequest): Response<GastoDto>
 
     @PUT("api/gastos/{id}")
     suspend fun update(
@@ -30,13 +27,10 @@ interface GastosApiService {
         @Body request: UpdateGastoRequest,
     ): Response<GastoDto>
 
-    @DELETE("api/gastos/{id}")
-    suspend fun delete(
-        @Path("id") id: String,
-    ): Response<Unit>
+    @DELETE("api/gastos/{id}") suspend fun delete(@Path("id") id: String): Response<Unit>
 
     @GET("api/gastos/resumen-categorias")
     suspend fun resumenCategorias(
-        @QueryMap filters: Map<String, String> = emptyMap(),
+        @QueryMap filters: Map<String, String> = emptyMap()
     ): Response<List<Map<String, String>>>
 }

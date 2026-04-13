@@ -33,30 +33,19 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.propmanager.core.ui.components.PropManagerTextField
 
 @Composable
-fun LoginScreen(
-    viewModel: AuthViewModel,
-    modifier: Modifier = Modifier,
-) {
+fun LoginScreen(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
     val formState by viewModel.formState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val focusManager = LocalFocusManager.current
 
     LaunchedEffect(formState.errorMessage) {
-        formState.errorMessage?.let { message ->
-            snackbarHostState.showSnackbar(message)
-        }
+        formState.errorMessage?.let { message -> snackbarHostState.showSnackbar(message) }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        modifier = modifier,
-    ) { paddingValues ->
+    Scaffold(snackbarHost = { SnackbarHost(hostState = snackbarHostState) }, modifier = modifier) {
+        paddingValues ->
         Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(horizontal = 24.dp),
+            modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -136,10 +125,7 @@ private fun PasswordTextField(
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions =
-                KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done,
-                ),
+                KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { onDone() }),
         )
         if (error != null) {

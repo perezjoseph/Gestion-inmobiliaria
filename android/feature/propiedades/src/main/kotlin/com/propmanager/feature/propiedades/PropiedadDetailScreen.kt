@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,7 +31,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.propmanager.core.common.CurrencyFormatter
-import com.propmanager.core.common.DateFormatter
 import com.propmanager.core.model.Propiedad
 import com.propmanager.core.ui.R
 import com.propmanager.core.ui.components.ConfirmDeleteDialog
@@ -40,7 +38,6 @@ import com.propmanager.core.ui.components.ErrorScreen
 import com.propmanager.core.ui.components.LoadingScreen
 import com.propmanager.core.ui.components.PropManagerTopAppBar
 import com.propmanager.core.ui.components.SyncStatusBadge
-import java.time.ZoneId
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,14 +74,22 @@ fun PropiedadDetailScreen(
                 actions = {
                     if (detailState is PropiedadDetailUiState.Success) {
                         val propiedad = (detailState as PropiedadDetailUiState.Success).propiedad
-                        IconButton(onClick = {
-                            viewModel.initEditForm(propiedad)
-                            onNavigateToEdit()
-                        }) {
-                            Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.edit))
+                        IconButton(
+                            onClick = {
+                                viewModel.initEditForm(propiedad)
+                                onNavigateToEdit()
+                            }
+                        ) {
+                            Icon(
+                                Icons.Filled.Edit,
+                                contentDescription = stringResource(R.string.edit),
+                            )
                         }
                         IconButton(onClick = { viewModel.requestDelete(propiedad) }) {
-                            Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete))
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = stringResource(R.string.delete),
+                            )
                         }
                     }
                 },
@@ -93,8 +98,10 @@ fun PropiedadDetailScreen(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { paddingValues ->
         when (val state = detailState) {
-            is PropiedadDetailUiState.Loading -> LoadingScreen(modifier = Modifier.padding(paddingValues))
-            is PropiedadDetailUiState.NotFound -> ErrorScreen(message = state.message, modifier = Modifier.padding(paddingValues))
+            is PropiedadDetailUiState.Loading ->
+                LoadingScreen(modifier = Modifier.padding(paddingValues))
+            is PropiedadDetailUiState.NotFound ->
+                ErrorScreen(message = state.message, modifier = Modifier.padding(paddingValues))
             is PropiedadDetailUiState.Success ->
                 PropiedadDetailContent(
                     propiedad = state.propiedad,
@@ -105,23 +112,22 @@ fun PropiedadDetailScreen(
 }
 
 @Composable
-private fun PropiedadDetailContent(
-    propiedad: Propiedad,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-    ) {
+private fun PropiedadDetailContent(propiedad: Propiedad, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(propiedad.titulo, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(
+                propiedad.titulo,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+            )
             SyncStatusBadge(isPendingSync = propiedad.isPendingSync)
         }
         Spacer(Modifier.height(4.dp))
-        Text(propiedad.estado, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        Text(
+            propiedad.estado,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
         Spacer(Modifier.height(16.dp))
         HorizontalDivider()
         Spacer(Modifier.height(12.dp))
@@ -130,10 +136,17 @@ private fun PropiedadDetailContent(
         DetailRow(stringResource(R.string.propiedad_ciudad), propiedad.ciudad)
         DetailRow(stringResource(R.string.propiedad_provincia), propiedad.provincia)
         DetailRow(stringResource(R.string.propiedad_tipo), propiedad.tipoPropiedad)
-        DetailRow(stringResource(R.string.propiedad_precio), CurrencyFormatter.format(propiedad.precio, propiedad.moneda))
-        propiedad.habitaciones?.let { DetailRow(stringResource(R.string.propiedad_habitaciones), it.toString()) }
+        DetailRow(
+            stringResource(R.string.propiedad_precio),
+            CurrencyFormatter.format(propiedad.precio, propiedad.moneda),
+        )
+        propiedad.habitaciones?.let {
+            DetailRow(stringResource(R.string.propiedad_habitaciones), it.toString())
+        }
         propiedad.banos?.let { DetailRow(stringResource(R.string.propiedad_banos), it.toString()) }
-        propiedad.areaM2?.let { DetailRow(stringResource(R.string.propiedad_area), it.toPlainString()) }
+        propiedad.areaM2?.let {
+            DetailRow(stringResource(R.string.propiedad_area), it.toPlainString())
+        }
         propiedad.descripcion?.let {
             Spacer(Modifier.height(8.dp))
             Text(
@@ -147,12 +160,16 @@ private fun PropiedadDetailContent(
 }
 
 @Composable
-private fun DetailRow(
-    label: String,
-    value: String,
-) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun DetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
     }
 }

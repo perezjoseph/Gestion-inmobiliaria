@@ -5,9 +5,7 @@ import com.propmanager.core.data.repository.PropiedadesRepository
 import com.propmanager.core.model.Gasto
 import com.propmanager.core.model.Propiedad
 import com.propmanager.core.model.dto.CreateGastoRequest
-import com.propmanager.core.model.dto.CreatePropiedadRequest
 import com.propmanager.core.model.dto.UpdateGastoRequest
-import com.propmanager.core.model.dto.UpdatePropiedadRequest
 import com.propmanager.core.network.ConnectivityObserver
 import io.kotest.core.spec.style.FreeSpec
 import io.kotest.matchers.collections.shouldHaveSize
@@ -18,6 +16,10 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotBeBlank
 import io.kotest.matchers.types.shouldBeInstanceOf
+import java.lang.reflect.Proxy
+import java.math.BigDecimal
+import java.time.Instant
+import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -31,10 +33,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.Json
-import java.lang.reflect.Proxy
-import java.math.BigDecimal
-import java.time.Instant
-import java.time.LocalDate
 
 /**
  * Unit tests for GastosViewModel.
@@ -44,26 +42,23 @@ import java.time.LocalDate
 @OptIn(ExperimentalCoroutinesApi::class)
 class GastosViewModelTest :
     FreeSpec({
-
         val testDispatcher = StandardTestDispatcher()
 
-        beforeEach {
-            Dispatchers.setMain(testDispatcher)
-        }
+        beforeEach { Dispatchers.setMain(testDispatcher) }
 
-        afterEach {
-            Dispatchers.resetMain()
-        }
+        afterEach { Dispatchers.resetMain() }
 
         "list state" -
             {
                 "emits Success with gastos from repository" {
-                    val repo = FakeGastosRepository(
-                        initialData = listOf(
-                            sampleGasto("1", categoria = "mantenimiento"),
-                            sampleGasto("2", categoria = "servicios"),
-                        ),
-                    )
+                    val repo =
+                        FakeGastosRepository(
+                            initialData =
+                                listOf(
+                                    sampleGasto("1", categoria = "mantenimiento"),
+                                    sampleGasto("2", categoria = "servicios"),
+                                )
+                        )
                     runTest(testDispatcher) {
                         val vm = createViewModel(gastosRepo = repo)
                         advanceUntilIdle()
@@ -90,13 +85,15 @@ class GastosViewModelTest :
         "filter application (Req 7.2)" -
             {
                 "updateFilter filters by propiedadId" {
-                    val repo = FakeGastosRepository(
-                        initialData = listOf(
-                            sampleGasto("1", propiedadId = "p1"),
-                            sampleGasto("2", propiedadId = "p2"),
-                            sampleGasto("3", propiedadId = "p1"),
-                        ),
-                    )
+                    val repo =
+                        FakeGastosRepository(
+                            initialData =
+                                listOf(
+                                    sampleGasto("1", propiedadId = "p1"),
+                                    sampleGasto("2", propiedadId = "p2"),
+                                    sampleGasto("3", propiedadId = "p1"),
+                                )
+                        )
                     runTest(testDispatcher) {
                         val vm = createViewModel(gastosRepo = repo)
                         advanceUntilIdle()
@@ -113,13 +110,15 @@ class GastosViewModelTest :
                 }
 
                 "updateFilter filters by categoria" {
-                    val repo = FakeGastosRepository(
-                        initialData = listOf(
-                            sampleGasto("1", categoria = "mantenimiento"),
-                            sampleGasto("2", categoria = "servicios"),
-                            sampleGasto("3", categoria = "mantenimiento"),
-                        ),
-                    )
+                    val repo =
+                        FakeGastosRepository(
+                            initialData =
+                                listOf(
+                                    sampleGasto("1", categoria = "mantenimiento"),
+                                    sampleGasto("2", categoria = "servicios"),
+                                    sampleGasto("3", categoria = "mantenimiento"),
+                                )
+                        )
                     runTest(testDispatcher) {
                         val vm = createViewModel(gastosRepo = repo)
                         advanceUntilIdle()
@@ -135,13 +134,15 @@ class GastosViewModelTest :
                 }
 
                 "updateFilter filters by estado" {
-                    val repo = FakeGastosRepository(
-                        initialData = listOf(
-                            sampleGasto("1", estado = "pendiente"),
-                            sampleGasto("2", estado = "pagado"),
-                            sampleGasto("3", estado = "pendiente"),
-                        ),
-                    )
+                    val repo =
+                        FakeGastosRepository(
+                            initialData =
+                                listOf(
+                                    sampleGasto("1", estado = "pendiente"),
+                                    sampleGasto("2", estado = "pagado"),
+                                    sampleGasto("3", estado = "pendiente"),
+                                )
+                        )
                     runTest(testDispatcher) {
                         val vm = createViewModel(gastosRepo = repo)
                         advanceUntilIdle()
@@ -157,12 +158,14 @@ class GastosViewModelTest :
                 }
 
                 "clearFilters resets all filters and shows all gastos" {
-                    val repo = FakeGastosRepository(
-                        initialData = listOf(
-                            sampleGasto("1", propiedadId = "p1"),
-                            sampleGasto("2", propiedadId = "p2"),
-                        ),
-                    )
+                    val repo =
+                        FakeGastosRepository(
+                            initialData =
+                                listOf(
+                                    sampleGasto("1", propiedadId = "p1"),
+                                    sampleGasto("2", propiedadId = "p2"),
+                                )
+                        )
                     runTest(testDispatcher) {
                         val vm = createViewModel(gastosRepo = repo)
                         advanceUntilIdle()
@@ -376,7 +379,12 @@ class GastosViewModelTest :
                         vm.initCreateForm()
                         vm.onFieldChange("monto", "1000")
                         vm.onFieldChange("proveedor", "Existing")
-                        vm.prefillFromOcr(monto = null, fecha = LocalDate.of(2025, 3, 1), proveedor = null, numeroFactura = "F-999")
+                        vm.prefillFromOcr(
+                            monto = null,
+                            fecha = LocalDate.of(2025, 3, 1),
+                            proveedor = null,
+                            numeroFactura = "F-999",
+                        )
 
                         vm.formState.value.monto shouldBe "1000"
                         vm.formState.value.proveedor shouldBe "Existing"
@@ -431,15 +439,16 @@ class GastosViewModelTest :
                 }
 
                 "initEditForm populates form from gasto" {
-                    val gasto = sampleGasto(
-                        "1",
-                        propiedadId = "p1",
-                        categoria = "servicios",
-                        descripcion = "Agua",
-                        monto = BigDecimal("2500.00"),
-                        proveedor = "CORAASAN",
-                        numeroFactura = "W-123",
-                    )
+                    val gasto =
+                        sampleGasto(
+                            "1",
+                            propiedadId = "p1",
+                            categoria = "servicios",
+                            descripcion = "Agua",
+                            monto = BigDecimal("2500.00"),
+                            proveedor = "CORAASAN",
+                            numeroFactura = "W-123",
+                        )
                     val repo = FakeGastosRepository()
                     runTest(testDispatcher) {
                         val vm = createViewModel(gastosRepo = repo)
@@ -492,50 +501,47 @@ private fun sampleGasto(
     estado: String = "pendiente",
     proveedor: String? = null,
     numeroFactura: String? = null,
-) = Gasto(
-    id = id,
-    propiedadId = propiedadId,
-    unidadId = null,
-    categoria = categoria,
-    descripcion = descripcion,
-    monto = monto,
-    moneda = moneda,
-    fechaGasto = fechaGasto,
-    estado = estado,
-    proveedor = proveedor,
-    numeroFactura = numeroFactura,
-    notas = null,
-    createdAt = Instant.now(),
-    updatedAt = Instant.now(),
-    isPendingSync = false,
-)
+) =
+    Gasto(
+        id = id,
+        propiedadId = propiedadId,
+        unidadId = null,
+        categoria = categoria,
+        descripcion = descripcion,
+        monto = monto,
+        moneda = moneda,
+        fechaGasto = fechaGasto,
+        estado = estado,
+        proveedor = proveedor,
+        numeroFactura = numeroFactura,
+        notas = null,
+        createdAt = Instant.now(),
+        updatedAt = Instant.now(),
+        isPendingSync = false,
+    )
 
-private fun samplePropiedad(
-    id: String,
-    titulo: String = "Propiedad $id",
-) = Propiedad(
-    id = id,
-    titulo = titulo,
-    descripcion = null,
-    direccion = "Calle $id",
-    ciudad = "Santiago",
-    provincia = "Santiago",
-    tipoPropiedad = "apartamento",
-    habitaciones = 2,
-    banos = 1,
-    areaM2 = BigDecimal("80"),
-    precio = BigDecimal("15000.00"),
-    moneda = "DOP",
-    estado = "disponible",
-    imagenes = emptyList(),
-    createdAt = Instant.now(),
-    updatedAt = Instant.now(),
-    isPendingSync = false,
-)
+private fun samplePropiedad(id: String, titulo: String = "Propiedad $id") =
+    Propiedad(
+        id = id,
+        titulo = titulo,
+        descripcion = null,
+        direccion = "Calle $id",
+        ciudad = "Santiago",
+        provincia = "Santiago",
+        tipoPropiedad = "apartamento",
+        habitaciones = 2,
+        banos = 1,
+        areaM2 = BigDecimal("80"),
+        precio = BigDecimal("15000.00"),
+        moneda = "DOP",
+        estado = "disponible",
+        imagenes = emptyList(),
+        createdAt = Instant.now(),
+        updatedAt = Instant.now(),
+        isPendingSync = false,
+    )
 
-private class FakeConnectivityObserver(
-    online: Boolean = true,
-) : ConnectivityObserver {
+private class FakeConnectivityObserver(online: Boolean = true) : ConnectivityObserver {
     override val isOnline: StateFlow<Boolean> = MutableStateFlow(online).asStateFlow()
 }
 
@@ -546,41 +552,52 @@ private fun stubGastoDao(): com.propmanager.core.database.dao.GastoDao =
     Proxy.newProxyInstance(
         com.propmanager.core.database.dao.GastoDao::class.java.classLoader,
         arrayOf(com.propmanager.core.database.dao.GastoDao::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.GastoDao
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.database.dao.GastoDao
 
 @Suppress("UNCHECKED_CAST")
 private fun stubSyncQueueDao(): com.propmanager.core.database.dao.SyncQueueDao =
     Proxy.newProxyInstance(
         com.propmanager.core.database.dao.SyncQueueDao::class.java.classLoader,
         arrayOf(com.propmanager.core.database.dao.SyncQueueDao::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.SyncQueueDao
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.database.dao.SyncQueueDao
 
 @Suppress("UNCHECKED_CAST")
 private fun stubGastosApiService(): com.propmanager.core.network.api.GastosApiService =
     Proxy.newProxyInstance(
         com.propmanager.core.network.api.GastosApiService::class.java.classLoader,
         arrayOf(com.propmanager.core.network.api.GastosApiService::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.network.api.GastosApiService
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.network.api.GastosApiService
 
 @Suppress("UNCHECKED_CAST")
 private fun stubPropiedadDao(): com.propmanager.core.database.dao.PropiedadDao =
     Proxy.newProxyInstance(
         com.propmanager.core.database.dao.PropiedadDao::class.java.classLoader,
         arrayOf(com.propmanager.core.database.dao.PropiedadDao::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.database.dao.PropiedadDao
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.database.dao.PropiedadDao
 
 @Suppress("UNCHECKED_CAST")
 private fun stubPropiedadesApiService(): com.propmanager.core.network.api.PropiedadesApiService =
     Proxy.newProxyInstance(
         com.propmanager.core.network.api.PropiedadesApiService::class.java.classLoader,
         arrayOf(com.propmanager.core.network.api.PropiedadesApiService::class.java),
-    ) { _, _, _ -> error("stub") } as com.propmanager.core.network.api.PropiedadesApiService
+    ) { _, _, _ ->
+        error("stub")
+    } as com.propmanager.core.network.api.PropiedadesApiService
 
 private class FakeGastosRepository(
     private val initialData: List<Gasto> = emptyList(),
     private val createError: Throwable? = null,
     private val updateError: Throwable? = null,
-) : GastosRepository(
+) :
+    GastosRepository(
         dao = stubGastoDao(),
         syncQueueDao = stubSyncQueueDao(),
         apiService = stubGastosApiService(),
@@ -588,8 +605,10 @@ private class FakeGastosRepository(
     ) {
     var createCallCount = 0
         private set
+
     var updateCallCount = 0
         private set
+
     var deleteCallCount = 0
         private set
 
@@ -617,31 +636,29 @@ private class FakeGastosRepository(
     override suspend fun create(request: CreateGastoRequest): Result<Gasto> {
         createCallCount++
         if (createError != null) return Result.failure(createError)
-        val g = Gasto(
-            id = "new-$createCallCount",
-            propiedadId = request.propiedadId,
-            unidadId = request.unidadId,
-            categoria = request.categoria,
-            descripcion = request.descripcion,
-            monto = request.monto.toBigDecimal(),
-            moneda = request.moneda,
-            fechaGasto = LocalDate.parse(request.fechaGasto),
-            estado = "pendiente",
-            proveedor = request.proveedor,
-            numeroFactura = request.numeroFactura,
-            notas = request.notas,
-            createdAt = Instant.now(),
-            updatedAt = Instant.now(),
-            isPendingSync = true,
-        )
+        val g =
+            Gasto(
+                id = "new-$createCallCount",
+                propiedadId = request.propiedadId,
+                unidadId = request.unidadId,
+                categoria = request.categoria,
+                descripcion = request.descripcion,
+                monto = request.monto.toBigDecimal(),
+                moneda = request.moneda,
+                fechaGasto = LocalDate.parse(request.fechaGasto),
+                estado = "pendiente",
+                proveedor = request.proveedor,
+                numeroFactura = request.numeroFactura,
+                notas = request.notas,
+                createdAt = Instant.now(),
+                updatedAt = Instant.now(),
+                isPendingSync = true,
+            )
         store.value = store.value + g
         return Result.success(g)
     }
 
-    override suspend fun update(
-        id: String,
-        request: UpdateGastoRequest,
-    ): Result<Unit> {
+    override suspend fun update(id: String, request: UpdateGastoRequest): Result<Unit> {
         updateCallCount++
         if (updateError != null) return Result.failure(updateError)
         return Result.success(Unit)
@@ -654,9 +671,8 @@ private class FakeGastosRepository(
     }
 }
 
-private class FakePropiedadesRepository(
-    private val initialData: List<Propiedad> = emptyList(),
-) : PropiedadesRepository(
+private class FakePropiedadesRepository(private val initialData: List<Propiedad> = emptyList()) :
+    PropiedadesRepository(
         dao = stubPropiedadDao(),
         syncQueueDao = stubSyncQueueDao(),
         apiService = stubPropiedadesApiService(),
