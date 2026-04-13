@@ -279,6 +279,33 @@ jobs:
           umask 077
           ./gradlew testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee "${RUNNER_TEMP}/test-output.txt"
 
+      - name: Generate JaCoCo coverage reports
+        id: coverage
+        if: always() && steps.unit-tests.outcome == 'success'
+        timeout-minutes: 10
+        working-directory: android
+        run: |
+          umask 077
+          ./gradlew createDebugUnitTestCoverageReport --no-daemon --continue --stacktrace 2>&1 || true
+
+      - name: Upload JaCoCo coverage XML for SonarQube
+        if: always() && steps.coverage.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-coverage-xml
+          path: android/**/build/reports/coverage/test/debug/report.xml
+          retention-days: 1
+          if-no-files-found: warn
+
+      - name: Upload JUnit XML test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-test-results-xml
+          path: android/**/build/test-results/testDebugUnitTest/*.xml
+          retention-days: 7
+          if-no-files-found: warn
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -528,7 +555,7 @@ jobs:
       contents: read
     env:
       DOCKER_CONTENT_TRUST: "1"
-      SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
     needs: [lint, unit-test]
     if: |
       always() &&
@@ -562,6 +589,14 @@ jobs:
         with:
           name: android-lint-xml
           path: android/app/build/reports/
+        continue-on-error: true
+
+      - name: Download JaCoCo coverage XML reports
+        id: download-coverage
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: android-coverage-xml
+          path: android/
         continue-on-error: true
 
       - name: Validate SONAR_HOST_URL format
@@ -660,6 +695,14 @@ jobs:
             echo "::warning::Android Lint XML report not found -- skipping lint import"
           fi
 
+          COVERAGE_PATHS=$(find android -path '*/coverage/test/debug/report.xml' -type f 2>/dev/null | sed 's|^|/usr/src/|' | paste -sd ',' -)
+          if [ -n "$COVERAGE_PATHS" ]; then
+            echo "JaCoCo coverage reports found -- including in SonarQube analysis"
+            SCAN_ARGS+=("-Dsonar.coverage.jacoco.xmlReportPaths=${COVERAGE_PATHS}")
+          else
+            echo "::warning::No JaCoCo coverage reports found -- SonarQube will report 0% coverage"
+          fi
+
           if [ "$IS_PR" = "true" ] && [ -n "$PR_KEY" ]; then
             echo "PR detected (#${PR_KEY}) -- enabling PR decoration"
             SCAN_ARGS+=("-Dsonar.pullrequest.key=${PR_KEY}")
@@ -698,6 +741,7 @@ jobs:
             echo "|--------|----------|"
             echo "| Detekt | ${{ steps.download-detekt.outcome == 'success' && '✅' || '⏭️ Skipped' }} |"
             echo "| Android Lint | ${{ steps.download-lint.outcome == 'success' && '✅' || '⏭️ Skipped' }} |"
+            echo "| JaCoCo Coverage | ${{ steps.download-coverage.outcome == 'success' && '✅' || '⏭️ Skipped' }} |"
             echo "| Scanner | ${{ steps.sonar-scan.outcome == 'success' && '✅ Pass' || (steps.sonar-url-check.outputs.skip == 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -887,7 +931,7 @@ jobs:
     env:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
       WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
-      SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
       GH_SERVER_URL: ${{ github.server_url }}
       GH_REPOSITORY: ${{ github.repository }}
       GH_RUN_ID: ${{ github.run_id }}

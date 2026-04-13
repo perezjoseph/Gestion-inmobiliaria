@@ -38,7 +38,7 @@ env:
   CARGO_HTTP_TIMEOUT: "30"
   CARGO_NET_RETRY: "3"
   RUSTFLAGS: "-D warnings"
-  SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+  SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
 jobs:
   # ── Stage 1: Quality Checks (all run in parallel) ──
