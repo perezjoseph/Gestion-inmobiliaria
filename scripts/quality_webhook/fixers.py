@@ -6,7 +6,7 @@ from .config import WIN_PROJECT_DIR, MAX_RETRIES, SCOPE_CONSTRAINTS, log
 from .runner import wsl_bash, run_kiro
 from .classifier import classify_error
 from .history import record_fix_attempt, get_past_attempts
-from .memory import store_fix_attempt, store_fix_outcome, search_relevant_context
+from .memory import store_fix_attempt, store_fix_outcome, search_relevant_context, extract_outcome_from_output
 
 _fix_lock = threading.Lock()
 _sonar_fix_lock = threading.Lock()
@@ -193,19 +193,30 @@ def fix_with_retry(job, step, error_log, context=None):
                 "  If push fails: git pull --rebase origin main && git push origin main"
             )
 
-            success = run_kiro(prompt, f"CI fix ({job}/{step}) attempt {attempt}")
+            result = run_kiro(prompt, f"CI fix ({job}/{step}) attempt {attempt}")
+            success = result[0] if isinstance(result, tuple) else result
+            kiro_output = result[1] if isinstance(result, tuple) else ""
+
+            outcome = extract_outcome_from_output(kiro_output) if kiro_output else {}
+            strategy_note = outcome.get("strategy", "")
+
             record_fix_attempt(job, error_log, attempt, success,
-                               f"class={error_class}, job={job}, step={step}")
+                               f"class={error_class}, job={job}, step={step}. {strategy_note}")
             store_fix_attempt(job, step, error_class, error_log, attempt, success)
 
             if success:
-                store_fix_outcome(job, error_class, strategy=f"Fixed via attempt {attempt}")
+                store_fix_outcome(
+                    job, error_class,
+                    files_changed=outcome.get("files_changed", ""),
+                    strategy=strategy_note or f"Fixed via attempt {attempt}",
+                )
                 log.info(f"Attempt {attempt} completed for {job}/{step}")
                 return True
 
             previous_attempt_result = (
                 f"kiro-cli returned failure for attempt {attempt}. "
-                f"The fix either did not compile, tests still failed, or the push was rejected. "
+                f"Strategy tried: {strategy_note or 'unknown'}. "
+                f"Files touched: {outcome.get('files_changed', 'unknown')}. "
                 f"Error class: {error_class}. Job: {job}, Step: {step}."
             )
             log.warning(f"Attempt {attempt} failed for {job}/{step}")
@@ -316,7 +327,8 @@ def fix_sonar_issues(sonar_report, run_url):
                 f"Run URL for context: {run_url}"
             )
 
-            success = run_kiro(prompt, f"SonarQube issue fix attempt {attempt}")
+            result = run_kiro(prompt, f"SonarQube issue fix attempt {attempt}")
+            success = result[0] if isinstance(result, tuple) else result
 
             if success:
                 log.info(f"SonarQube fix attempt {attempt} completed")
@@ -407,7 +419,9 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
                 f"Run URL: {run_url}"
             )
 
-            if run_kiro(prompt, f"Pipeline improve ({focus}) attempt {attempt}"):
+            result = run_kiro(prompt, f"Pipeline improve ({focus}) attempt {attempt}")
+            success = result[0] if isinstance(result, tuple) else result
+            if success:
                 log.info(f"Pipeline improvement attempt {attempt} completed")
                 return True
 

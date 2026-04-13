@@ -9,6 +9,7 @@ Falls back gracefully when SimpleMem isn't installed.
 """
 
 import json
+import re
 import threading
 from datetime import datetime
 
@@ -183,3 +184,64 @@ def get_memory_stats():
         }
     except Exception as e:
         return {"status": "error", "error": str(e)}
+
+
+def extract_outcome_from_output(kiro_output):
+    """Parse kiro-cli output to extract what the agent actually did.
+
+    Looks for git commit messages, file modifications, and cargo/gradle
+    commands to build a summary of the fix strategy.
+    """
+    if not kiro_output:
+        return {"files_changed": "", "strategy": "", "commit_msg": ""}
+
+    tail = kiro_output[-8000:]
+
+    commit_msg = ""
+    commit_matches = re.findall(r"git commit.*?-m\s+['\"](.+?)['\"]", tail)
+    if commit_matches:
+        commit_msg = commit_matches[-1][:200]
+
+    files = set()
+    for pattern in [
+        r"(?:modified|changed|created|wrote|updated):\s*(\S+\.(?:rs|toml|kt|kts|yml|yaml|xml|json))",
+        r"strReplace.*?path[\"']:\s*[\"']([^\"']+)[\"']",
+        r"fsWrite.*?path[\"']:\s*[\"']([^\"']+)[\"']",
+    ]:
+        for m in re.findall(pattern, tail, re.IGNORECASE):
+            if len(m) < 200 and not m.startswith("."):
+                files.add(m)
+
+    git_diff = re.findall(r"(\d+) files? changed", tail)
+    if git_diff and not files:
+        files.add(f"({git_diff[-1]} files from git diff)")
+
+    strategy_hints = []
+    for pattern, label in [
+        (r"cargo update -p (\S+)", "updated crate: {}"),
+        (r"cargo audit", "ran cargo audit"),
+        (r"cargo fmt", "ran cargo fmt"),
+        (r"cargo clippy", "ran cargo clippy"),
+        (r"cargo test", "ran cargo test"),
+        (r"gradlew (\S+)", "ran gradlew {}"),
+        (r"Updated? (\S+) (?:from|version) (\S+) to (\S+)", "updated {} from {} to {}"),
+        (r"added.*suppress", "added suppression"),
+        (r"\.cargo/audit\.toml", "modified audit.toml ignore list"),
+    ]:
+        matches = re.findall(pattern, tail, re.IGNORECASE)
+        if matches:
+            last = matches[-1]
+            if isinstance(last, tuple):
+                strategy_hints.append(label.format(*last))
+            else:
+                strategy_hints.append(label.format(last) if "{}" in label else label)
+
+    pushed = bool(re.search(r"git push.*origin", tail))
+    if pushed:
+        strategy_hints.append("pushed to origin")
+
+    return {
+        "files_changed": ", ".join(sorted(files)[:10]),
+        "strategy": "; ".join(strategy_hints[:8]) or commit_msg or "unknown",
+        "commit_msg": commit_msg,
+    }

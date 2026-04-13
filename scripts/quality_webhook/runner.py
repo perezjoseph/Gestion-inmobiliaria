@@ -41,7 +41,7 @@ def run_kiro(prompt, label):
 
     if not prompt or not prompt.strip():
         log.error(f"Empty prompt for {label} — skipping")
-        return False
+        return False, ""
 
     log_file = os.path.join(os.path.dirname(__file__), "..", "..", "kiro-debug.log")
 
@@ -62,7 +62,7 @@ def run_kiro(prompt, label):
         prompt_file_win.write_text(prompt, encoding="utf-8", newline="\n")
     except OSError as e:
         log.error(f"Failed to write prompt file {prompt_file_win}: {e}")
-        return False
+        return False, ""
 
     bash_cmd = (
         f"KIRO_PROMPT=$(cat '{prompt_file_wsl}') && "
@@ -105,7 +105,7 @@ def run_kiro(prompt, label):
                 pass
 
     if timed_out:
-        return False
+        return False, full_output
 
     log.info(f"kiro-cli exit code: {result.returncode}")
     if full_output:
@@ -113,11 +113,11 @@ def run_kiro(prompt, label):
 
     if "Tool approval required" in full_output or "denied list" in full_output:
         log.error("Tool approval/denied error detected")
-        return False
+        return False, full_output
 
     if result.returncode not in (0, 1):
         log.error(f"kiro-cli exited with unexpected code {result.returncode}")
-        return False
+        return False, full_output
 
     log.info(f"kiro-cli completed successfully for: {label}")
-    return True
+    return True, full_output
