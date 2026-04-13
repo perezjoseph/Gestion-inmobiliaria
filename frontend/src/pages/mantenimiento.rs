@@ -1,6 +1,5 @@
 use crate::app::AuthContext;
 use crate::components::common::data_table::DataTable;
-use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::loading::Loading;
 use crate::components::common::pagination::Pagination;
@@ -372,7 +371,7 @@ fn render_detail_notas(
         };
         html! {
             <form onsubmit={on_add_nota.clone()} style="display: flex; gap: var(--space-3); margin-bottom: var(--space-4);">
-                <textarea value={(*nota_contenido).clone()} oninput={textarea_cb}
+                <textarea value={(**nota_contenido).clone()} oninput={textarea_cb}
                     class="gi-input" style="flex: 1; min-height: 60px;" placeholder="Agregar una nota..." />
                 <button type="submit" disabled={nota_submitting} class="gi-btn gi-btn-primary" style="align-self: flex-end;">{btn_text}</button>
             </form>
@@ -517,6 +516,7 @@ fn MantenimientoList(props: &MantenimientoListProps) -> Html {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn make_mantenimiento_edit_cb(
     f_propiedad_id: &UseStateHandle<String>,
     f_unidad_id: &UseStateHandle<String>,

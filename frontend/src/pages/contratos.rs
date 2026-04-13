@@ -352,6 +352,7 @@ fn ContratoList(props: &ContratoListProps) -> Html {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn make_contrato_edit_cb(
     propiedad_id: &UseStateHandle<String>,
     inquilino_id: &UseStateHandle<String>,

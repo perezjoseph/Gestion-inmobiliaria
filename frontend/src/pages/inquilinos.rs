@@ -459,6 +459,7 @@ fn handle_escape_inquilinos(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn make_inquilino_edit_cb(
     nombre: &UseStateHandle<String>,
     apellido: &UseStateHandle<String>,

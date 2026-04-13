@@ -511,9 +511,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: v2-${{ runner.os }}-cargo-frontend-test-v2-${{ hashFiles('**/Cargo.lock') }}
+          key: v2-${{ runner.os }}-cargo-frontend-test-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            v2-${{ runner.os }}-cargo-frontend-test-v2-
+            v2-${{ runner.os }}-cargo-frontend-test-
             v2-${{ runner.os }}-cargo-
 
       - name: Run frontend tests (native target)
@@ -910,7 +910,8 @@ jobs:
     if: |
       always() &&
       !(inputs.skip_sonarqube || false) &&
-      (needs.test-backend.result == 'success' || needs.test-frontend.result == 'success' || needs.lint.result == 'success')
+      (needs.test-backend.result == 'success' || needs.test-frontend.result == 'success' || needs.lint.result == 'success' ||
+       (needs.test-backend.result != 'failure' && needs.test-frontend.result != 'failure' && needs.lint.result != 'failure'))
     outputs:
       duration: ${{ steps.timing.outputs.duration }}
     steps:
@@ -2600,8 +2601,29 @@ jobs:
             echo "Commit: \`${GH_SHA}\` by @${GH_ACTOR} on \`${GH_REF_NAME}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Send pipeline improvement request to webhook
+      - name: Detect concurrency cancellation
+        id: concurrency-check
         if: steps.webhook-check.outputs.skip != 'true'
+        run: |
+          CANCELLED=0
+          TOTAL=0
+          for R in "${{ needs.lint.result }}" "${{ needs.test-backend.result }}" "${{ needs.test-frontend.result }}" "${{ needs.quality-gate.result }}" "${{ needs.sonarqube.result }}" "${{ needs.build-frontend.result }}" "${{ needs.build-backend.result }}"; do
+            TOTAL=$((TOTAL + 1))
+            [ "$R" = "cancelled" ] && CANCELLED=$((CANCELLED + 1))
+          done
+          HAS_FAILURE=false
+          for R in "${{ needs.lint.result }}" "${{ needs.test-backend.result }}" "${{ needs.test-frontend.result }}" "${{ needs.quality-gate.result }}"; do
+            [ "$R" = "failure" ] && HAS_FAILURE=true
+          done
+          if [ "$CANCELLED" -ge 4 ] && [ "$HAS_FAILURE" = "false" ]; then
+            echo "::notice::${CANCELLED}/${TOTAL} jobs cancelled with no core failures -- concurrency cancellation detected, skipping webhooks"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send pipeline improvement request to webhook
+        if: steps.webhook-check.outputs.skip != 'true' && steps.concurrency-check.outputs.skip != 'true'
         env:
           FOCUS: ${{ steps.analyze.outputs.focus }}
           REPORT: ${{ steps.analyze.outputs.report }}
@@ -2621,7 +2643,7 @@ jobs:
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping pipeline improvement"
 
       - name: Send SonarQube issues to dedicated fix webhook
-        if: steps.webhook-check.outputs.skip != 'true'
+        if: steps.webhook-check.outputs.skip != 'true' && steps.concurrency-check.outputs.skip != 'true'
         env:
           SONAR_REPORT: ${{ steps.sonar-issues.outputs.sonar_report }}
         run: |

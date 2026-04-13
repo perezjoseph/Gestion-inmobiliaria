@@ -371,6 +371,7 @@ fn PropiedadList(props: &PropiedadListProps) -> Html {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn make_propiedad_edit_cb(
     titulo: &UseStateHandle<String>,
     descripcion: &UseStateHandle<String>,

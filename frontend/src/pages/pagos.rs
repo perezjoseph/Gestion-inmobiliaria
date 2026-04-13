@@ -322,6 +322,7 @@ fn PagoList(props: &PagoListProps) -> Html {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn make_pago_edit_cb(
     contrato_id: &UseStateHandle<String>,
     monto: &UseStateHandle<String>,
