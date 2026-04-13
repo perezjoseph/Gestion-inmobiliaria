@@ -614,6 +614,7 @@ jobs:
           echo "skip=false" >> $GITHUB_OUTPUT
 
       - name: Verify SonarQube server is reachable
+        id: sonar-reachable
         if: steps.sonar-url-check.outputs.skip != 'true'
         timeout-minutes: 2
         run: |
@@ -627,17 +628,18 @@ jobs:
             fi
             if [ "$STATUS" = "UP" ]; then
               echo "SonarQube is ready."
+              echo "reachable=true" >> $GITHUB_OUTPUT
               exit 0
             fi
             echo "Attempt $i/12 -- status: $STATUS. Retrying in 5s..."
             sleep 5
           done
-          echo "::error::SonarQube at $SONAR_URL did not respond within ~60 seconds"
-          exit 1
+          echo "::warning::SonarQube at $SONAR_URL did not respond within ~60 seconds -- skipping analysis"
+          echo "reachable=false" >> $GITHUB_OUTPUT
 
       - name: Bootstrap SonarQube token
         id: sonar-bootstrap
-        if: steps.sonar-url-check.outputs.skip != 'true'
+        if: steps.sonar-url-check.outputs.skip != 'true' && steps.sonar-reachable.outputs.reachable == 'true'
         timeout-minutes: 2
         run: |
           SONAR_URL="${SONAR_HOST_URL}"
@@ -673,7 +675,7 @@ jobs:
 
       - name: Run SonarQube analysis
         id: sonar-scan
-        if: steps.sonar-url-check.outputs.skip != 'true'
+        if: steps.sonar-url-check.outputs.skip != 'true' && steps.sonar-reachable.outputs.reachable == 'true'
         env:
           IS_PR: ${{ github.event_name == 'pull_request' }}
           PR_KEY: ${{ github.event.pull_request.number }}
@@ -758,7 +760,7 @@ jobs:
             echo "| Detekt | ${{ steps.download-detekt.outcome == 'success' && '✅' || '⏭️ Skipped' }} |"
             echo "| Android Lint | ${{ steps.download-lint.outcome == 'success' && '✅' || '⏭️ Skipped' }} |"
             echo "| JaCoCo Coverage | ${{ steps.download-coverage.outcome == 'success' && '✅' || '⏭️ Skipped' }} |"
-            echo "| Scanner | ${{ steps.sonar-scan.outcome == 'success' && '✅ Pass' || (steps.sonar-url-check.outputs.skip == 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
+            echo "| Scanner | ${{ steps.sonar-scan.outcome == 'success' && '✅ Pass' || (steps.sonar-url-check.outputs.skip == 'true' || steps.sonar-reachable.outputs.reachable != 'true') && '⏭️ Skipped' || '❌ Fail' }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ── Stage 3: Failure Notification ──
