@@ -129,6 +129,9 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      - name: Ensure gradlew is executable
+        run: chmod +x android/gradlew
+
       - name: Run Android Lint
         id: android-lint
         if: always()
@@ -271,6 +274,9 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      - name: Ensure gradlew is executable
+        run: chmod +x android/gradlew
+
       - name: Run unit tests
         id: unit-tests
         timeout-minutes: 20
@@ -392,6 +398,9 @@ jobs:
         uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Ensure gradlew is executable
+        run: chmod +x android/gradlew
 
       - name: Run Gradle dependency verification
         id: dep-verify
@@ -529,6 +538,9 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      - name: Ensure gradlew is executable
+        run: chmod +x android/gradlew
+
       - name: Build debug APK
         id: build-debug
         timeout-minutes: 25
@@ -618,6 +630,7 @@ jobs:
       always() &&
       (needs.lint.result == 'success' || needs.unit-test.result == 'success')
     outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
       duration: ${{ steps.timing.outputs.duration }}
     steps:
       - name: Record start time
@@ -753,8 +766,14 @@ jobs:
 
           # Scope scan to Android sources only (override root sonar-project.properties
           # which includes backend/src and frontend/src -- Rust issues must not fail this gate)
-          ANDROID_SOURCES=$(find android -path '*/src/main/kotlin' -type d 2>/dev/null | sort | paste -sd ',' -)
-          ANDROID_TESTS=$(find android -path '*/src/test/kotlin' -type d 2>/dev/null | sort | paste -sd ',' -)
+          ANDROID_SOURCES=$(find android -path '*/src/main/kotlin' -type d -not -path '*/build/*' 2>/dev/null | sort | paste -sd ',' -)
+          ANDROID_TESTS=$(find android -path '*/src/test/kotlin' -type d -not -path '*/build/*' 2>/dev/null | sort | paste -sd ',' -)
+
+          if [ -z "$ANDROID_SOURCES" ]; then
+            echo "::warning::No Kotlin source directories found -- skipping SonarQube analysis"
+            exit 0
+          fi
+
           SCAN_ARGS+=("-Dsonar.sources=${ANDROID_SOURCES}")
           if [ -n "$ANDROID_TESTS" ]; then
             SCAN_ARGS+=("-Dsonar.tests=${ANDROID_TESTS}")
@@ -808,11 +827,27 @@ jobs:
             --pids-limit 256 \
             --tmpfs /tmp:rw,noexec,nosuid,nodev,size=256m \
             --tmpfs /opt/sonar-scanner/.sonar:rw,noexec,nosuid,nodev,size=512m \
+            --tmpfs /home/scanner:rw,noexec,nosuid,nodev,size=64m \
             -e SONAR_TOKEN="${SONAR_ANALYSIS_TOKEN}" \
             -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
+            -e HOME=/home/scanner \
             -v "${GITHUB_WORKSPACE}:/usr/src" \
             sonarsource/sonar-scanner-cli:11.3@sha256:7462f132388135e32b948f8f18ff0db9ae28a87c6777f1df5b2207e04a6d7c5c \
-            "${SCAN_ARGS[@]}"
+            "${SCAN_ARGS[@]}" 2>&1 | tee "${RUNNER_TEMP}/sonar-output.txt"
+
+      - name: Collect SonarQube errors
+        id: collect-errors
+        if: failure()
+        run: |
+          ERROR=""
+          [ -f "${RUNNER_TEMP}/sonar-output.txt" ] && ERROR="$(tail -c 3000 "${RUNNER_TEMP}/sonar-output.txt")"
+          if [ -z "$ERROR" ]; then
+            ERROR="SonarQube analysis failed but no captured output. Check the sonarqube job logs for details."
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
 
       - name: Write SonarQube summary
         if: always()
@@ -831,6 +866,10 @@ jobs:
         id: timing
         if: always()
         run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
+
+      - name: Clean up temp files
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/sonar-output.txt"
 
   # ── Stage 3: Failure Notification ──
 
@@ -965,9 +1004,16 @@ jobs:
 
       - name: Notify -- SonarQube analysis failed
         if: always() && needs.sonarqube.result == 'failure' && steps.webhook-check.outputs.skip != 'true'
+        env:
+          ERROR_LOG: ${{ needs.sonarqube.outputs.error_log }}
         run: |
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g'; }
+          if [ -z "$ERROR_LOG" ]; then
+            ERROR_LOG="SonarQube analysis failed or quality gate not passed. Check the sonarqube job output for details."
+          fi
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
           PAYLOAD=$(jq -n --arg job "android-sonarqube" --arg step "sonar-scan" \
-            --arg error_log "SonarQube analysis failed or quality gate not passed. Check the sonarqube job output for details." \
+            --arg error_log "$ERROR_LOG" \
             --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
             --arg commit "$GH_SHA" --arg branch "$GH_REF_NAME" --arg actor "$GH_ACTOR" \
             '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
@@ -1123,6 +1169,7 @@ jobs:
           TEST_ERRORS: ${{ needs.unit-test.outputs.error_log }}
           QUALITY_ERRORS: ${{ needs.quality-gate.outputs.error_log }}
           BUILD_ERRORS: ${{ needs.build.outputs.error_log }}
+          SONAR_ERRORS: ${{ needs.sonarqube.outputs.error_log }}
         run: |
           sanitize_log() {
             sed -E \
@@ -1163,6 +1210,10 @@ jobs:
             SANITIZED=$(printf '%s' "$BUILD_ERRORS" | sanitize_log)
             ERRORS="${ERRORS}\n--- ANDROID BUILD ERRORS ---\n${SANITIZED}\n"
           fi
+          if [ "${{ needs.sonarqube.result }}" = "failure" ] && [ -n "$SONAR_ERRORS" ]; then
+            SANITIZED=$(printf '%s' "$SONAR_ERRORS" | sanitize_log)
+            ERRORS="${ERRORS}\n--- ANDROID SONARQUBE ERRORS ---\n${SANITIZED}\n"
+          fi
 
           if [ -n "$ERRORS" ]; then
             REPORT="${REPORT}\nFailed Job Error Logs:${ERRORS}\n"
@@ -1174,6 +1225,8 @@ jobs:
             FOCUS="bugs"
           elif [ "${{ needs.build.result }}" = "failure" ]; then
             FOCUS="pipeline"
+          elif [ "${{ needs.sonarqube.result }}" = "failure" ]; then
+            FOCUS="sonarqube,pipeline"
           else
             FOCUS="security,pipeline,reporting,sonarqube"
           fi
