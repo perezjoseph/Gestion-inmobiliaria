@@ -1124,6 +1124,7 @@ jobs:
             --cpus 2 \
             --pids-limit 256 \
             --tmpfs /tmp:rw,noexec,nosuid,nodev,size=256m \
+            --tmpfs /opt/sonar-scanner/.sonar:rw,noexec,nosuid,nodev,size=512m \
             -e SONAR_TOKEN="${SONAR_ANALYSIS_TOKEN}" \
             -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
             -v "${GITHUB_WORKSPACE}:/usr/src" \
