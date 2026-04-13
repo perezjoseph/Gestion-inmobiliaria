@@ -355,7 +355,7 @@ jobs:
 
   quality-gate:
     name: Dependency Security Scan
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","docker"]') }}
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
     timeout-minutes: 20
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -405,6 +405,38 @@ jobs:
             echo "::warning::Gradle dependency verification metadata changed -- review for supply chain integrity"
           fi
 
+      - name: Install Trivy for dependency vulnerability scanning
+        id: install-trivy
+        if: always()
+        timeout-minutes: 3
+        run: |
+          TRIVY_VERSION="0.69.3"
+          TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
+          if command -v trivy &>/dev/null && [ "$(trivy --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" = "$TRIVY_VERSION" ]; then
+            echo "installed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          ARCHIVE="${RUNNER_TEMP}/trivy.tar.gz"
+          curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          mkdir -p "${HOME}/.local/bin"
+          tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" trivy
+          rm -f "$ARCHIVE"
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+          export PATH="${HOME}/.local/bin:$PATH"
+          echo "installed=true" >> $GITHUB_OUTPUT
+
+      - name: Scan Android dependencies for known vulnerabilities (Trivy)
+        id: trivy-deps
+        if: always() && steps.install-trivy.outputs.installed == 'true'
+        timeout-minutes: 5
+        run: |
+          export PATH="${HOME}/.local/bin:$PATH"
+          trivy fs --scanners vuln --exit-code 1 --severity CRITICAL,HIGH \
+            --no-progress --format table \
+            android/ 2>&1 | tee "${RUNNER_TEMP}/trivy-deps-output.txt"
+
       - name: Write quality gate summary
         if: always()
         run: |
@@ -413,17 +445,22 @@ jobs:
             echo "| Check | Status |"
             echo "|-------|--------|"
             echo "| Gradle Dependencies | ${{ steps.dep-verify.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| Trivy Dependency CVEs | ${{ steps.trivy-deps.outcome == 'success' && '✅ Pass' || (steps.install-trivy.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect quality gate errors
         id: collect-errors
-        if: always() && steps.dep-verify.outcome == 'failure'
+        if: always() && (steps.dep-verify.outcome == 'failure' || steps.trivy-deps.outcome == 'failure')
         run: |
           ERROR=""
           FAILED=""
           if [ "${{ steps.dep-verify.outcome }}" = "failure" ]; then
             FAILED="${FAILED}dep-verify,"
             ERROR="${ERROR}[dep-verify] $(tail -c 1500 "${RUNNER_TEMP}/dep-output.txt" 2>/dev/null || echo 'Gradle dependency verification failed.')\n\n"
+          fi
+          if [ "${{ steps.trivy-deps.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}trivy-deps,"
+            ERROR="${ERROR}[trivy-deps] $(tail -c 1500 "${RUNNER_TEMP}/trivy-deps-output.txt" 2>/dev/null || echo 'Trivy found vulnerable Android dependencies.')\n\n"
           fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
@@ -432,7 +469,7 @@ jobs:
           echo "$EOF" >> $GITHUB_OUTPUT
 
       - name: Fail job if any check failed
-        if: always() && steps.dep-verify.outcome == 'failure'
+        if: always() && (steps.dep-verify.outcome == 'failure' || steps.trivy-deps.outcome == 'failure')
         run: exit 1
 
       - name: Record duration
@@ -442,7 +479,7 @@ jobs:
 
       - name: Clean up temp files
         if: always()
-        run: rm -f "${RUNNER_TEMP}/dep-output.txt"
+        run: rm -f "${RUNNER_TEMP}/dep-output.txt" "${RUNNER_TEMP}/trivy-deps-output.txt"
 
   # ── Stage 2: Build (gated on all quality checks) ──
 
@@ -499,6 +536,26 @@ jobs:
         run: |
           umask 077
           ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee "${RUNNER_TEMP}/build-output.txt"
+
+      - name: Scan APK for embedded secrets
+        if: success()
+        run: |
+          if command -v gitleaks &>/dev/null; then
+            gitleaks detect --source android/app/build/outputs/apk/debug/ --no-git --verbose --redact --exit-code 1
+          else
+            GITLEAKS_VERSION="8.24.3"
+            GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
+            ARCHIVE="${RUNNER_TEMP}/gitleaks.tar.gz"
+            curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+              "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+            echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
+            mkdir -p "${HOME}/.local/bin"
+            tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" gitleaks
+            rm -f "$ARCHIVE"
+            export PATH="${HOME}/.local/bin:$PATH"
+            echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+            gitleaks detect --source android/app/build/outputs/apk/debug/ --no-git --verbose --redact --exit-code 1
+          fi
 
       - name: Upload debug APK
         if: success()
@@ -560,7 +617,13 @@ jobs:
     if: |
       always() &&
       (needs.lint.result == 'success' || needs.unit-test.result == 'success')
+    outputs:
+      duration: ${{ steps.timing.outputs.duration }}
     steps:
+      - name: Record start time
+        id: start
+        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
+
       - name: Clean workspace
         run: |
           if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
@@ -762,6 +825,11 @@ jobs:
             echo "| JaCoCo Coverage | ${{ steps.download-coverage.outcome == 'success' && '✅' || '⏭️ Skipped' }} |"
             echo "| Scanner | ${{ steps.sonar-scan.outcome == 'success' && '✅ Pass' || (steps.sonar-url-check.outputs.skip == 'true' || steps.sonar-reachable.outputs.reachable != 'true') && '⏭️ Skipped' || '❌ Fail' }} |"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Record duration
+        id: timing
+        if: always()
+        run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
 
   # ── Stage 3: Failure Notification ──
 
@@ -1074,7 +1142,7 @@ jobs:
           REPORT="${REPORT}  lint               | ${{ needs.lint.result }} | ${{ needs.lint.outputs.duration || 'n/a' }}\n"
           REPORT="${REPORT}  unit-test          | ${{ needs.unit-test.result }} | ${{ needs.unit-test.outputs.duration || 'n/a' }}\n"
           REPORT="${REPORT}  quality-gate       | ${{ needs.quality-gate.result }} | ${{ needs.quality-gate.outputs.duration || 'n/a' }}\n"
-          REPORT="${REPORT}  sonarqube          | ${{ needs.sonarqube.result }} | n/a\n"
+          REPORT="${REPORT}  sonarqube          | ${{ needs.sonarqube.result }} | ${{ needs.sonarqube.outputs.duration || 'n/a' }}\n"
           REPORT="${REPORT}  build              | ${{ needs.build.result }} | ${{ needs.build.outputs.duration || 'n/a' }}\n"
 
           ERRORS=""
@@ -1130,7 +1198,7 @@ jobs:
             echo "| lint | ${{ needs.lint.result }} | ${{ needs.lint.outputs.duration || 'n/a' }} |"
             echo "| unit-test | ${{ needs.unit-test.result }} | ${{ needs.unit-test.outputs.duration || 'n/a' }} |"
             echo "| quality-gate | ${{ needs.quality-gate.result }} | ${{ needs.quality-gate.outputs.duration || 'n/a' }} |"
-            echo "| sonarqube | ${{ needs.sonarqube.result }} | -- |"
+            echo "| sonarqube | ${{ needs.sonarqube.result }} | ${{ needs.sonarqube.outputs.duration || 'n/a' }} |"
             echo "| build | ${{ needs.build.result }} | ${{ needs.build.outputs.duration || 'n/a' }} |"
             echo ""
             echo "Commit: \`${GH_SHA}\` by @${GH_ACTOR} on \`${GH_REF_NAME}\`"
