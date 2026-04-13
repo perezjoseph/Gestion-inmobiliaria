@@ -681,6 +681,17 @@ jobs:
           SCAN_ARGS+=("-Dsonar.qualitygate.wait=true")
           SCAN_ARGS+=("-Dsonar.qualitygate.timeout=300")
 
+          # Scope scan to Android sources only (override root sonar-project.properties
+          # which includes backend/src and frontend/src -- Rust issues must not fail this gate)
+          ANDROID_SOURCES=$(find android -path '*/src/main/kotlin' -type d 2>/dev/null | sort | paste -sd ',' -)
+          ANDROID_TESTS=$(find android -path '*/src/test/kotlin' -type d 2>/dev/null | sort | paste -sd ',' -)
+          SCAN_ARGS+=("-Dsonar.sources=${ANDROID_SOURCES}")
+          if [ -n "$ANDROID_TESTS" ]; then
+            SCAN_ARGS+=("-Dsonar.tests=${ANDROID_TESTS}")
+          fi
+          SCAN_ARGS+=("-Dsonar.rust.lcov.reportPaths=")
+          SCAN_ARGS+=("-Dsonar.rust.clippy.reportPaths=")
+
           if [ -f android/build/reports/detekt/detekt.xml ]; then
             echo "Detekt report found -- including in SonarQube analysis"
             SCAN_ARGS+=("-Dsonar.kotlin.detekt.reportPaths=/usr/src/android/build/reports/detekt/detekt.xml")
