@@ -132,32 +132,27 @@ jobs:
       - name: Ensure gradlew is executable
         run: chmod +x android/gradlew
 
-      - name: Run Android Lint
-        id: android-lint
-        if: always()
+      - name: Run lint, detekt, and spotless checks
+        id: lint-checks
         timeout-minutes: 15
         working-directory: android
         run: |
           umask 077
-          ./gradlew lint --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/lint-output.txt"
+          set +e
+          ./gradlew lint detekt spotlessCheck --parallel --continue --stacktrace 2>&1 | tee "${RUNNER_TEMP}/lint-all-output.txt"
+          GRADLE_EXIT=$?
+          set -e
 
-      - name: Run detekt static analysis
-        id: detekt
-        if: always()
-        timeout-minutes: 10
-        working-directory: android
-        run: |
-          umask 077
-          ./gradlew detekt --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/detekt-output.txt"
+          LINT_OK="true"; DETEKT_OK="true"; KTFMT_OK="true"
+          if grep -qE "> Task .*:lint[A-Z].* FAILED" "${RUNNER_TEMP}/lint-all-output.txt"; then LINT_OK="false"; fi
+          if grep -qE "> Task .*:detekt.* FAILED" "${RUNNER_TEMP}/lint-all-output.txt"; then DETEKT_OK="false"; fi
+          if grep -qE "> Task .*[Ss]potless.* FAILED" "${RUNNER_TEMP}/lint-all-output.txt"; then KTFMT_OK="false"; fi
 
-      - name: Check ktfmt formatting (via Spotless)
-        id: ktfmt
-        if: always()
-        timeout-minutes: 5
-        working-directory: android
-        run: |
-          umask 077
-          ./gradlew spotlessCheck --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/ktfmt-output.txt"
+          echo "lint_ok=$LINT_OK" >> $GITHUB_OUTPUT
+          echo "detekt_ok=$DETEKT_OK" >> $GITHUB_OUTPUT
+          echo "ktfmt_ok=$KTFMT_OK" >> $GITHUB_OUTPUT
+
+          exit $GRADLE_EXIT
 
       - name: Upload lint XML report for SonarQube
         if: always()
@@ -169,7 +164,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload detekt XML report for SonarQube
-        if: always() && steps.detekt.outcome == 'success'
+        if: always() && steps.lint-checks.outputs.detekt_ok == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: android-detekt-xml
@@ -193,28 +188,28 @@ jobs:
             echo "## Android Lint Results"
             echo "| Check | Status |"
             echo "|-------|--------|"
-            echo "| Android Lint | ${{ steps.android-lint.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
-            echo "| Detekt | ${{ steps.detekt.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
-            echo "| ktfmt (Spotless) | ${{ steps.ktfmt.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| Android Lint | ${{ steps.lint-checks.outputs.lint_ok == 'true' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| Detekt | ${{ steps.lint-checks.outputs.detekt_ok == 'true' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| ktfmt (Spotless) | ${{ steps.lint-checks.outputs.ktfmt_ok == 'true' && '✅ Pass' || '❌ Fail' }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect lint errors
         id: collect-errors
-        if: always() && (steps.android-lint.outcome == 'failure' || steps.detekt.outcome == 'failure' || steps.ktfmt.outcome == 'failure')
+        if: always() && steps.lint-checks.outcome == 'failure'
         run: |
           ERROR=""
           FAILED=""
-          if [ "${{ steps.android-lint.outcome }}" = "failure" ]; then
+          if [ "${{ steps.lint-checks.outputs.lint_ok }}" = "false" ]; then
             FAILED="android-lint"
-            ERROR="[android-lint] $(tail -c 3000 "${RUNNER_TEMP}/lint-output.txt" 2>/dev/null || echo 'Android lint failed.')"
+            ERROR="[android-lint] $(grep -A5 'FAILED' "${RUNNER_TEMP}/lint-all-output.txt" 2>/dev/null | head -30 || echo 'Android lint failed.')"
           fi
-          if [ "${{ steps.detekt.outcome }}" = "failure" ]; then
+          if [ "${{ steps.lint-checks.outputs.detekt_ok }}" = "false" ]; then
             FAILED="${FAILED:+${FAILED},}detekt"
-            ERROR="${ERROR:+${ERROR}\n\n}[detekt] $(tail -c 3000 "${RUNNER_TEMP}/detekt-output.txt" 2>/dev/null || echo 'Detekt found issues.')"
+            ERROR="${ERROR:+${ERROR}\n\n}[detekt] $(grep -B2 -A5 'detekt.*FAILED' "${RUNNER_TEMP}/lint-all-output.txt" 2>/dev/null | head -30 || echo 'Detekt found issues.')"
           fi
-          if [ "${{ steps.ktfmt.outcome }}" = "failure" ]; then
+          if [ "${{ steps.lint-checks.outputs.ktfmt_ok }}" = "false" ]; then
             FAILED="${FAILED:+${FAILED},}ktfmt"
-            ERROR="${ERROR:+${ERROR}\n\n}[ktfmt] $(tail -c 3000 "${RUNNER_TEMP}/ktfmt-output.txt" 2>/dev/null || echo 'ktfmt formatting check failed. Run ./gradlew spotlessApply in android/ to fix.')"
+            ERROR="${ERROR:+${ERROR}\n\n}[ktfmt] $(grep -B2 -A5 '[Ss]potless.*FAILED' "${RUNNER_TEMP}/lint-all-output.txt" 2>/dev/null | head -30 || echo 'ktfmt formatting check failed. Run ./gradlew spotlessApply in android/ to fix.')"
           fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED}" >> $GITHUB_OUTPUT
@@ -228,12 +223,12 @@ jobs:
         run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
 
       - name: Fail job if lint failed
-        if: always() && (steps.android-lint.outcome == 'failure' || steps.detekt.outcome == 'failure' || steps.ktfmt.outcome == 'failure')
+        if: always() && steps.lint-checks.outcome == 'failure'
         run: exit 1
 
       - name: Clean up temp files
         if: always()
-        run: rm -f "${RUNNER_TEMP}/lint-output.txt" "${RUNNER_TEMP}/detekt-output.txt" "${RUNNER_TEMP}/ktfmt-output.txt"
+        run: rm -f "${RUNNER_TEMP}/lint-all-output.txt"
 
   unit-test:
     name: Android Unit Tests
@@ -327,12 +322,45 @@ jobs:
           {
             echo "## Android Unit Test Results"
             if [ "${{ steps.unit-tests.outcome }}" = "success" ]; then
+              # Parse JUnit XML for test counts
+              TESTS=0; FAILURES=0; ERRORS=0; SKIPPED=0
+              for xml in android/**/build/test-results/testDebugUnitTest/*.xml; do
+                [ -f "$xml" ] || continue
+                TESTS=$((TESTS + $(grep -oP 'tests="\K[0-9]+' "$xml" | head -1 || echo 0)))
+                FAILURES=$((FAILURES + $(grep -oP 'failures="\K[0-9]+' "$xml" | head -1 || echo 0)))
+                ERRORS=$((ERRORS + $(grep -oP 'errors="\K[0-9]+' "$xml" | head -1 || echo 0)))
+                SKIPPED=$((SKIPPED + $(grep -oP 'skipped="\K[0-9]+' "$xml" | head -1 || echo 0)))
+              done
+              PASSED=$((TESTS - FAILURES - ERRORS - SKIPPED))
               echo "✅ All unit tests passed"
+              if [ "$TESTS" -gt 0 ]; then
+                echo "| Metric | Count |"
+                echo "|--------|-------|"
+                echo "| Total | $TESTS |"
+                echo "| Passed | $PASSED |"
+                echo "| Failed | $FAILURES |"
+                echo "| Errors | $ERRORS |"
+                echo "| Skipped | $SKIPPED |"
+              fi
             else
               echo "❌ Unit tests failed"
               echo '```'
               grep -E "(FAILED|FAILURE|> Task .* FAILED)" "${RUNNER_TEMP}/test-output.txt" 2>/dev/null | head -20 || true
               echo '```'
+            fi
+
+            # Parse JaCoCo XML for coverage %
+            COVERED=0; MISSED=0
+            for xml in android/**/build/reports/coverage/test/debug/report.xml; do
+              [ -f "$xml" ] || continue
+              COVERED=$((COVERED + $(grep -oP 'type="LINE"[^/]*covered="\K[0-9]+' "$xml" | tail -1 || echo 0)))
+              MISSED=$((MISSED + $(grep -oP 'type="LINE"[^/]*missed="\K[0-9]+' "$xml" | tail -1 || echo 0)))
+            done
+            TOTAL_LINES=$((COVERED + MISSED))
+            if [ "$TOTAL_LINES" -gt 0 ]; then
+              COVERAGE=$((COVERED * 100 / TOTAL_LINES))
+              echo ""
+              echo "**Line Coverage:** ${COVERAGE}% (${COVERED}/${TOTAL_LINES} lines)"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -412,7 +440,8 @@ jobs:
           umask 077
           ./gradlew dependencies --write-verification-metadata sha256 --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/dep-output.txt"
           if ! git diff --exit-code gradle/verification-metadata.xml 2>/dev/null; then
-            echo "::warning::Gradle dependency verification metadata changed -- review for supply chain integrity"
+            echo "::error::Gradle dependency verification metadata changed -- possible supply chain integrity issue. Run './gradlew dependencies --write-verification-metadata sha256' locally and commit the updated file."
+            exit 1
           fi
 
       - name: Install Trivy for dependency vulnerability scanning
@@ -783,6 +812,8 @@ jobs:
 
           echo "::add-mask::$TOKEN"
           echo "SONAR_ANALYSIS_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          echo "temp_token=true" >> $GITHUB_OUTPUT
+          echo "token_name=${TOKEN_NAME}" >> $GITHUB_OUTPUT
 
       - name: Run SonarQube analysis
         id: sonar-scan
@@ -911,6 +942,16 @@ jobs:
         id: timing
         if: always()
         run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
+
+      - name: Revoke temporary SonarQube token
+        if: always() && steps.sonar-bootstrap.outputs.temp_token == 'true'
+        run: |
+          ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD }}"
+          TOKEN_NAME="${{ steps.sonar-bootstrap.outputs.token_name }}"
+          if [ -n "$ADMIN_PASS" ] && [ -n "$TOKEN_NAME" ]; then
+            curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
+              "${SONAR_HOST_URL}/api/user_tokens/revoke?name=${TOKEN_NAME}" 2>/dev/null || true
+          fi
 
       - name: Clean up temp files
         if: always()
