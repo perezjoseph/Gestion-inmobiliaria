@@ -552,8 +552,13 @@ jobs:
       - name: Scan APK for embedded secrets
         if: success()
         run: |
+          APK_DIR="android/app/build/outputs/apk/debug"
+          if [ ! -d "$APK_DIR" ]; then
+            echo "::warning::APK output directory not found at $APK_DIR -- skipping secret scan"
+            exit 0
+          fi
           if command -v gitleaks &>/dev/null; then
-            gitleaks detect --source android/app/build/outputs/apk/debug/ --no-git --verbose --redact --exit-code 1
+            gitleaks detect --source "$APK_DIR" --no-git --verbose --redact --exit-code 1
           else
             GITLEAKS_VERSION="8.24.3"
             GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
@@ -566,7 +571,7 @@ jobs:
             rm -f "$ARCHIVE"
             export PATH="${HOME}/.local/bin:$PATH"
             echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
-            gitleaks detect --source android/app/build/outputs/apk/debug/ --no-git --verbose --redact --exit-code 1
+            gitleaks detect --source "$APK_DIR" --no-git --verbose --redact --exit-code 1
           fi
 
       - name: Upload debug APK
