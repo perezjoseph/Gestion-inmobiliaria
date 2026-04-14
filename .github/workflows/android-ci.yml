@@ -23,6 +23,7 @@ concurrency:
 env:
   JAVA_VERSION: "17"
   JAVA_DISTRIBUTION: "temurin"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   # ── Stage 0: Runner Disk Cleanup (self-hosted only) ──
@@ -605,9 +606,18 @@ jobs:
         if: always()
         timeout-minutes: 10
         working-directory: android
+        env:
+          GRADLE_OPTS: "-Xmx512m -Dorg.gradle.jvmargs=-Xmx1536m"
         run: |
           umask 077
-          ./gradlew dependencies --write-verification-metadata sha256 --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/dep-output.txt"
+          set +e
+          ./gradlew dependencies --write-verification-metadata sha256 --no-daemon --stacktrace 2>&1 | tee "${RUNNER_TEMP}/dep-output.txt"
+          GRADLE_EXIT=$?
+          set -e
+          if [ "$GRADLE_EXIT" -ne 0 ]; then
+            echo "::error::Gradle dependency resolution failed (exit $GRADLE_EXIT). This is likely a runner memory or network issue, not a supply chain problem. Check the Gradle output above."
+            exit 1
+          fi
           if ! git diff --exit-code gradle/verification-metadata.xml 2>/dev/null; then
             echo "::error::Gradle dependency verification metadata changed -- possible supply chain integrity issue. Run './gradlew dependencies --write-verification-metadata sha256' locally and commit the updated file."
             exit 1
