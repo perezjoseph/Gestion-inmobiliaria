@@ -910,6 +910,13 @@ jobs:
             sonarsource/sonar-scanner-cli:11.3@sha256:7462f132388135e32b948f8f18ff0db9ae28a87c6777f1df5b2207e04a6d7c5c \
             "${SCAN_ARGS[@]}" 2>&1 | tee "${RUNNER_TEMP}/sonar-output.txt"
 
+      - name: Extract quality gate result
+        id: quality-gate-result
+        if: always() && steps.sonar-scan.outcome == 'success'
+        run: |
+          QG_STATUS=$(grep -oP 'Quality Gate[^:]*:\s*\K\S+' "${RUNNER_TEMP}/sonar-output.txt" 2>/dev/null | tail -1 || echo "UNKNOWN")
+          echo "status=$QG_STATUS" >> $GITHUB_OUTPUT
+
       - name: Collect SonarQube errors
         id: collect-errors
         if: failure()
@@ -936,6 +943,14 @@ jobs:
             echo "| JaCoCo Coverage | ${{ steps.download-coverage.outcome == 'success' && '✅' || '⏭️ Skipped' }} |"
             echo "| JUnit Results | ${{ steps.download-junit.outcome == 'success' && '✅' || '⏭️ Skipped' }} |"
             echo "| Scanner | ${{ steps.sonar-scan.outcome == 'success' && '✅ Pass' || (steps.sonar-url-check.outputs.skip == 'true' || steps.sonar-reachable.outputs.reachable != 'true') && '⏭️ Skipped' || '❌ Fail' }} |"
+            QG="${{ steps.quality-gate-result.outputs.status }}"
+            if [ -n "$QG" ] && [ "$QG" != "UNKNOWN" ]; then
+              if [ "$QG" = "OK" ]; then
+                echo "| Quality Gate | ✅ Passed |"
+              else
+                echo "| Quality Gate | ❌ $QG |"
+              fi
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Record duration
