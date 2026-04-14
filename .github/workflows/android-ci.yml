@@ -792,7 +792,6 @@ jobs:
         run: |
           SCAN_ARGS=()
           SCAN_ARGS+=("-Dsonar.projectBaseDir=/usr/src")
-          SCAN_ARGS+=("-Dsonar.scanner.javaExePath=/opt/java/openjdk/bin/java")
           SCAN_ARGS+=("-Dsonar.qualitygate.wait=true")
           SCAN_ARGS+=("-Dsonar.qualitygate.timeout=300")
 
