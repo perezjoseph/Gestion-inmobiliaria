@@ -18,7 +18,10 @@ use crate::types::contrato::Contrato;
 use crate::types::inquilino::Inquilino;
 use crate::types::pago::{CreatePago, Pago, UpdatePago};
 use crate::types::propiedad::Propiedad;
-use crate::utils::{can_delete, can_write, format_currency, format_date_display};
+use crate::utils::{
+    EscapeHandler, can_delete, can_write, field_error, format_currency, format_date_display,
+    input_class,
+};
 
 fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
     if let Some(t) = toasts {
@@ -161,7 +164,7 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                 <div>
                     <label class="gi-label">{"Contrato *"}</label>
                     <select onchange={select_cb!(props.contrato_id)} disabled={props.is_editing}
-                        class={if fe.contrato_id.is_some() { "gi-input gi-input-error" } else { "gi-input" }}>
+                        class={input_class(fe.contrato_id.is_some())}>
                         <option value="" selected={props.contrato_id.is_empty()}>{"— Seleccionar contrato —"}</option>
                         { for props.contratos.iter().map(|c| {
                             let sel = *props.contrato_id == c.id;
@@ -169,13 +172,13 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                             html! { <option value={c.id.clone()} selected={sel}>{label}</option> }
                         })}
                     </select>
-                    if let Some(ref msg) = fe.contrato_id { <p class="gi-field-error">{msg}</p> }
+                    {field_error(&fe.contrato_id)}
                 </div>
                 <div>
                     <label class="gi-label">{"Monto *"}</label>
                     <input type="number" step="0.01" min="0" value={(*props.monto).clone()} oninput={input_cb!(props.monto)}
-                        class={if fe.monto.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                    if let Some(ref msg) = fe.monto { <p class="gi-field-error">{msg}</p> }
+                        class={input_class(fe.monto.is_some())} />
+                    {field_error(&fe.monto)}
                 </div>
                 <div>
                     <label class="gi-label">{"Moneda"}</label>
@@ -187,8 +190,8 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                 <div>
                     <label class="gi-label">{"Fecha de Vencimiento *"}</label>
                     <input type="date" value={(*props.fecha_vencimiento).clone()} oninput={input_cb!(props.fecha_vencimiento)} disabled={props.is_editing}
-                        class={if fe.fecha_vencimiento.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                    if let Some(ref msg) = fe.fecha_vencimiento { <p class="gi-field-error">{msg}</p> }
+                        class={input_class(fe.fecha_vencimiento.is_some())} />
+                    {field_error(&fe.fecha_vencimiento)}
                 </div>
                 <div>
                     <label class="gi-label">{"Fecha de Pago"}</label>
@@ -253,13 +256,11 @@ fn render_pago_row(
 ) -> Html {
     let c_label = contrato_label.emit(p.contrato_id.clone());
     let (badge_cls, badge_label) = estado_badge(&p.estado);
-    let is_pagado = p.estado == "pagado";
-    let recibo_id = p.id.clone();
     let pc = p.clone();
     let pd = p.clone();
     let on_edit = on_edit.clone();
     let on_delete_click = on_delete.clone();
-    let user_rol = user_rol.to_string();
+    let actions = render_pago_actions(user_rol, &p.estado, &p.id, pc, pd, on_edit, on_delete_click);
     html! {
         <tr>
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{c_label}</td>
@@ -270,21 +271,45 @@ fn render_pago_row(
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
                 {p.metodo_pago.as_deref().map(metodo_label).unwrap_or("—")}</td>
             <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
-            if can_write(&user_rol) {
-                <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2);">
-                    <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(pc.clone()))} class="gi-btn-text">{"Editar"}</button>
-                    if is_pagado {
-                        <button onclick={Callback::from(move |_: MouseEvent| {
-                            let url = format!("{BASE_URL}/pagos/{recibo_id}/recibo");
-                            let _ = web_sys::window().and_then(|w| w.open_with_url(&url).ok());
-                        })} class="gi-btn-text" style="color: var(--color-primary-500);">{"Recibo"}</button>
-                    }
-                    if can_delete(&user_rol) {
-                        <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(pd.clone()))} class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button>
-                    }
-                </td>
-            }
+            {actions}
         </tr>
+    }
+}
+
+fn render_pago_actions(
+    user_rol: &str,
+    estado: &str,
+    pago_id: &str,
+    pc: Pago,
+    pd: Pago,
+    on_edit: Callback<Pago>,
+    on_delete_click: Callback<Pago>,
+) -> Html {
+    if !can_write(user_rol) {
+        return html! {};
+    }
+    let recibo_btn = if estado == "pagado" {
+        let recibo_id = pago_id.to_string();
+        html! {
+            <button onclick={Callback::from(move |_: MouseEvent| {
+                let url = format!("{BASE_URL}/pagos/{recibo_id}/recibo");
+                let _ = web_sys::window().and_then(|w| w.open_with_url(&url).ok());
+            })} class="gi-btn-text" style="color: var(--color-primary-500);">{"Recibo"}</button>
+        }
+    } else {
+        html! {}
+    };
+    let delete_btn = if can_delete(user_rol) {
+        html! { <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(pd.clone()))} class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button> }
+    } else {
+        html! {}
+    };
+    html! {
+        <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2);">
+            <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(pc.clone()))} class="gi-btn-text">{"Editar"}</button>
+            {recibo_btn}
+            {delete_btn}
+        </td>
     }
 }
 
@@ -402,10 +427,7 @@ fn load_pago_refs(
     });
 }
 
-#[allow(clippy::type_complexity)]
-fn register_escape_listener(
-    escape_handler: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>>,
-) -> Option<EventListener> {
+fn register_escape_listener(escape_handler: EscapeHandler) -> Option<EventListener> {
     web_sys::window().and_then(|w| w.document()).map(|doc| {
         EventListener::new(&doc, "keydown", move |event| {
             let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
@@ -950,86 +972,136 @@ fn render_pagos_view(
         return html! { <Loading /> };
     }
 
-    let mut headers: Vec<String> = vec![
+    let last_header: String = if can_write(user_rol) {
+        "Acciones".into()
+    } else {
+        String::new()
+    };
+    let headers: Vec<String> = vec![
         "Contrato".into(),
         "Monto".into(),
         "Fecha Pago".into(),
         "Vencimiento".into(),
         "Método".into(),
         "Estado".into(),
+        last_header,
     ];
-    if can_write(user_rol) {
-        headers.push("Acciones".into());
-    } else {
-        headers.push(String::new());
-    }
+    let new_btn = render_new_btn_pago(user_rol, &on_new);
+    let error_html = render_opt_error_pago(error, &on_delete_cancel);
+    let delete_html =
+        render_delete_confirm_pago(delete_target, &on_delete_confirm, &on_delete_cancel);
+    let form_html = render_pago_form_section(
+        show_form,
+        editing,
+        contrato_id,
+        monto,
+        moneda,
+        fecha_pago,
+        fecha_vencimiento,
+        metodo_pago,
+        estado_form,
+        notas,
+        contratos,
+        contrato_label,
+        form_errors,
+        submitting,
+        on_submit,
+        on_cancel,
+    );
 
     html! {
         <div>
             <div class="gi-page-header">
                 <h1 class="gi-page-title">{"Pagos"}</h1>
-                if can_write(user_rol) {
-                    <button onclick={on_new.clone()} class="gi-btn gi-btn-primary">{"+ Nuevo Pago"}</button>
-                }
+                {new_btn}
             </div>
-
-            if let Some(err) = (**error).as_ref() {
-                <ErrorBanner message={err.clone()} onclose={Callback::from({
-                    let error = error.clone(); move |_: MouseEvent| error.set(None)
-                })} />
-            }
-
-            if let Some(ref target) = **delete_target {
-                <DeleteConfirmModal
-                    message={format!("¿Está seguro de que desea eliminar el pago de {}? Esta acción no se puede deshacer.", format_currency(&target.moneda, target.monto))}
-                    on_confirm={on_delete_confirm.clone()}
-                    on_cancel={on_delete_cancel.clone()}
-                />
-            }
-
+            {error_html}
+            {delete_html}
             <PagoFilterBar
-                filter_contrato={filter_contrato}
-                filter_estado={filter_estado}
-                contratos={(**contratos).clone()}
-                contrato_label={contrato_label.clone()}
-                on_apply={on_filter_apply}
-                on_clear={on_filter_clear}
+                filter_contrato={filter_contrato} filter_estado={filter_estado}
+                contratos={(**contratos).clone()} contrato_label={contrato_label.clone()}
+                on_apply={on_filter_apply} on_clear={on_filter_clear}
             />
-
-            if **show_form {
-                <PagoForm
-                    is_editing={editing.is_some()}
-                    contrato_id={contrato_id}
-                    monto={monto}
-                    moneda={moneda}
-                    fecha_pago={fecha_pago}
-                    fecha_vencimiento={fecha_vencimiento}
-                    metodo_pago={metodo_pago}
-                    estado_form={estado_form}
-                    notas={notas}
-                    contratos={(**contratos).clone()}
-                    contrato_label={contrato_label.clone()}
-                    form_errors={(**form_errors).clone()}
-                    submitting={**submitting}
-                    on_submit={on_submit}
-                    on_cancel={on_cancel}
-                />
-            }
-
+            {form_html}
             <PagoList
-                items={(**items).clone()}
-                user_rol={user_rol.to_string()}
-                headers={headers}
-                total={**total}
-                page={**page}
-                per_page={**per_page}
-                contrato_label={contrato_label.clone()}
-                on_edit={on_edit}
-                on_delete={on_delete_click}
-                on_new={on_new}
-                on_page_change={on_page_change}
-                on_per_page_change={on_per_page_change}
+                items={(**items).clone()} user_rol={user_rol.to_string()} headers={headers}
+                total={**total} page={**page} per_page={**per_page}
+                contrato_label={contrato_label.clone()} on_edit={on_edit}
+                on_delete={on_delete_click} on_new={on_new}
+                on_page_change={on_page_change} on_per_page_change={on_per_page_change}
             />
         </div>
+    }
+}
+
+fn render_new_btn_pago(user_rol: &str, on_new: &Callback<MouseEvent>) -> Html {
+    if can_write(user_rol) {
+        html! { <button onclick={on_new.clone()} class="gi-btn gi-btn-primary">{"+ Nuevo Pago"}</button> }
+    } else {
+        html! {}
+    }
+}
+
+fn render_opt_error_pago(
+    error: &UseStateHandle<Option<String>>,
+    _on_cancel: &Callback<MouseEvent>,
+) -> Html {
+    match (**error).as_ref() {
+        Some(err) => {
+            let error = error.clone();
+            html! { <ErrorBanner message={err.clone()} onclose={Callback::from(move |_: MouseEvent| error.set(None))} /> }
+        }
+        None => html! {},
+    }
+}
+
+fn render_delete_confirm_pago(
+    target: &UseStateHandle<Option<Pago>>,
+    on_confirm: &Callback<MouseEvent>,
+    on_cancel: &Callback<MouseEvent>,
+) -> Html {
+    match (**target).as_ref() {
+        Some(p) => html! {
+            <DeleteConfirmModal
+                message={format!("¿Está seguro de que desea eliminar el pago de {}? Esta acción no se puede deshacer.", format_currency(&p.moneda, p.monto))}
+                on_confirm={on_confirm.clone()} on_cancel={on_cancel.clone()}
+            />
+        },
+        None => html! {},
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_pago_form_section(
+    show_form: &UseStateHandle<bool>,
+    editing: &UseStateHandle<Option<Pago>>,
+    contrato_id: UseStateHandle<String>,
+    monto: UseStateHandle<String>,
+    moneda: UseStateHandle<String>,
+    fecha_pago: UseStateHandle<String>,
+    fecha_vencimiento: UseStateHandle<String>,
+    metodo_pago: UseStateHandle<String>,
+    estado_form: UseStateHandle<String>,
+    notas: UseStateHandle<String>,
+    contratos: &UseStateHandle<Vec<Contrato>>,
+    contrato_label: &Callback<String, String>,
+    form_errors: &UseStateHandle<FormErrors>,
+    submitting: &UseStateHandle<bool>,
+    on_submit: Callback<SubmitEvent>,
+    on_cancel: Callback<MouseEvent>,
+) -> Html {
+    if !**show_form {
+        return html! {};
+    }
+    html! {
+        <PagoForm
+            is_editing={editing.is_some()}
+            contrato_id={contrato_id} monto={monto} moneda={moneda}
+            fecha_pago={fecha_pago} fecha_vencimiento={fecha_vencimiento}
+            metodo_pago={metodo_pago} estado_form={estado_form} notas={notas}
+            contratos={(**contratos).clone()} contrato_label={contrato_label.clone()}
+            form_errors={(**form_errors).clone()} submitting={**submitting}
+            on_submit={on_submit} on_cancel={on_cancel}
+        />
     }
 }

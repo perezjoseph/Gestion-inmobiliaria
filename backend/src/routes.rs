@@ -207,8 +207,23 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                         web::post().to(handlers::importacion::importar_inquilinos),
                     )
                     .route(
+                        "/pagos",
+                        web::post().to(handlers::importacion::importar_pagos),
+                    )
+                    .route(
                         "/gastos",
                         web::post().to(handlers::importacion::importar_gastos),
+                    )
+                    .service(
+                        web::scope("/ocr")
+                            .route(
+                                "/confirmar",
+                                web::post().to(handlers::importacion::confirmar_preview),
+                            )
+                            .route(
+                                "/preview/{preview_id}",
+                                web::delete().to(handlers::importacion::descartar_preview),
+                            ),
                     ),
             ),
     );

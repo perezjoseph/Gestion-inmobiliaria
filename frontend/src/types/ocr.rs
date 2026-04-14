@@ -1,29 +1,16 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct OcrResult {
-    pub document_type: String,
-    pub lines: Vec<OcrLine>,
-    pub structured_fields: HashMap<String, String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct OcrLine {
-    pub text: String,
-    pub confidence: f64,
-    pub bbox: Vec<f64>,
-}
-
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportPreview {
-    pub preview_id: Uuid,
+    pub preview_id: String,
     pub document_type: String,
     pub fields: Vec<PreviewField>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PreviewField {
@@ -33,9 +20,10 @@ pub struct PreviewField {
     pub label: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfirmPreviewRequest {
-    pub preview_id: Uuid,
+    pub preview_id: String,
     pub corrections: Option<HashMap<String, String>>,
 }

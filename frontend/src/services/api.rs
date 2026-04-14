@@ -172,3 +172,17 @@ pub async fn api_delete(path: &str) -> Result<(), String> {
     handle_response(response).await?;
     Ok(())
 }
+
+use crate::types::ocr::ConfirmPreviewRequest;
+
+#[allow(dead_code)]
+pub async fn confirmar_preview(
+    request: &ConfirmPreviewRequest,
+) -> Result<serde_json::Value, String> {
+    api_post("/importar/ocr/confirmar", request).await
+}
+
+#[allow(dead_code)]
+pub async fn descartar_preview(preview_id: &str) -> Result<(), String> {
+    api_delete(&format!("/importar/ocr/preview/{preview_id}")).await
+}

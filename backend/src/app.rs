@@ -10,6 +10,7 @@ use tracing_actix_web::TracingLogger;
 use crate::config::AppConfig;
 use crate::errors::AppError;
 use crate::routes;
+use crate::services::ocr_preview::PreviewStore;
 
 fn build_cors(config: &AppConfig) -> Cors {
     match config.cors_origin.as_deref() {
@@ -25,6 +26,7 @@ fn build_cors(config: &AppConfig) -> Cors {
 pub fn create_app(
     db: DatabaseConnection,
     config: AppConfig,
+    preview_store: web::Data<PreviewStore>,
 ) -> actix_web::App<
     impl actix_web::dev::ServiceFactory<
         actix_web::dev::ServiceRequest,
@@ -52,6 +54,7 @@ pub fn create_app(
         .wrap(cors)
         .app_data(web::Data::new(db))
         .app_data(web::Data::new(config))
+        .app_data(preview_store)
         .app_data(json_cfg)
         .configure(routes::configure)
         .service(Files::new("/uploads", &upload_dir).show_files_listing())

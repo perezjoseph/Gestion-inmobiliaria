@@ -160,7 +160,12 @@ async fn test_crud_cycle() {
     let token = make_token(admin_id, "admin");
     let propiedad_id = create_test_propiedad(&db).await;
 
-    let app = test::init_service(create_app(db.clone(), config)).await;
+    let app = test::init_service(create_app(
+        db.clone(),
+        config,
+        actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+    ))
+    .await;
 
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
@@ -243,7 +248,12 @@ async fn test_state_machine_flow() {
     let token = make_token(admin_id, "admin");
     let propiedad_id = create_test_propiedad(&db).await;
 
-    let app = test::init_service(create_app(db.clone(), config)).await;
+    let app = test::init_service(create_app(
+        db.clone(),
+        config,
+        actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+    ))
+    .await;
 
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
@@ -293,7 +303,12 @@ async fn test_invalid_state_transitions() {
     let token = make_token(admin_id, "admin");
     let propiedad_id = create_test_propiedad(&db).await;
 
-    let app = test::init_service(create_app(db.clone(), config)).await;
+    let app = test::init_service(create_app(
+        db.clone(),
+        config,
+        actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+    ))
+    .await;
 
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
@@ -370,7 +385,12 @@ async fn test_notes_add_and_list() {
     let token = make_token(admin_id, "admin");
     let propiedad_id = create_test_propiedad(&db).await;
 
-    let app = test::init_service(create_app(db.clone(), config)).await;
+    let app = test::init_service(create_app(
+        db.clone(),
+        config,
+        actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+    ))
+    .await;
 
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
@@ -428,7 +448,12 @@ async fn test_filters() {
     let propiedad_id = create_test_propiedad(&db).await;
     let propiedad_id2 = create_test_propiedad(&db).await;
 
-    let app = test::init_service(create_app(db.clone(), config)).await;
+    let app = test::init_service(create_app(
+        db.clone(),
+        config,
+        actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+    ))
+    .await;
 
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
@@ -509,7 +534,12 @@ async fn test_access_control() {
     let viewer_token = make_token(visualizador_id, "visualizador");
     let propiedad_id = create_test_propiedad(&db).await;
 
-    let app = test::init_service(create_app(db.clone(), config)).await;
+    let app = test::init_service(create_app(
+        db.clone(),
+        config,
+        actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+    ))
+    .await;
 
     let req = test::TestRequest::get()
         .uri("/api/mantenimiento")
@@ -598,7 +628,12 @@ async fn test_fk_validations() {
     let propiedad_id2 = create_test_propiedad(&db).await;
     let unidad_id = create_test_unidad(&db, propiedad_id2).await;
 
-    let app = test::init_service(create_app(db.clone(), config)).await;
+    let app = test::init_service(create_app(
+        db.clone(),
+        config,
+        actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+    ))
+    .await;
 
     // Non-existent propiedad_id → 404
     let req = test::TestRequest::post()
@@ -649,7 +684,12 @@ async fn test_validations() {
     let token = make_token(admin_id, "admin");
     let propiedad_id = create_test_propiedad(&db).await;
 
-    let app = test::init_service(create_app(db.clone(), config)).await;
+    let app = test::init_service(create_app(
+        db.clone(),
+        config,
+        actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+    ))
+    .await;
 
     // Empty titulo → 422
     let req = test::TestRequest::post()
@@ -746,7 +786,12 @@ async fn test_auditoria_entries() {
     let token = make_token(admin_id, "admin");
     let propiedad_id = create_test_propiedad(&db).await;
 
-    let app = test::init_service(create_app(db.clone(), config)).await;
+    let app = test::init_service(create_app(
+        db.clone(),
+        config,
+        actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+    ))
+    .await;
 
     let req = test::TestRequest::post()
         .uri("/api/mantenimiento")
@@ -840,7 +885,12 @@ async fn test_default_prioridad() {
     let token = make_token(admin_id, "admin");
     let propiedad_id = create_test_propiedad(&db).await;
 
-    let app = test::init_service(create_app(db.clone(), config)).await;
+    let app = test::init_service(create_app(
+        db.clone(),
+        config,
+        actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+    ))
+    .await;
 
     // Create without specifying prioridad → defaults to "media"
     let req = test::TestRequest::post()

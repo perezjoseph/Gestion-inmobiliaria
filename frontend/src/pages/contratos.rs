@@ -17,7 +17,9 @@ use crate::types::PaginatedResponse;
 use crate::types::contrato::{Contrato, CreateContrato, UpdateContrato};
 use crate::types::inquilino::Inquilino;
 use crate::types::propiedad::Propiedad;
-use crate::utils::{can_delete, can_write, format_date_display};
+use crate::utils::{
+    EscapeHandler, can_delete, can_write, field_error, format_date_display, input_class,
+};
 
 fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
     if let Some(t) = toasts {
@@ -102,44 +104,44 @@ fn ContratoForm(props: &ContratoFormProps) -> Html {
                 <div>
                     <label class="gi-label">{"Propiedad *"}</label>
                     <select onchange={select_cb!(props.propiedad_id)} disabled={props.is_editing}
-                        class={if fe.propiedad_id.is_some() { "gi-input gi-input-error" } else { "gi-input" }}>
+                        class={input_class(fe.propiedad_id.is_some())}>
                         <option value="" selected={props.propiedad_id.is_empty()}>{"— Seleccionar propiedad —"}</option>
                         { for props.propiedades.iter().map(|p| {
                             let sel = *props.propiedad_id == p.id;
                             html! { <option value={p.id.clone()} selected={sel}>{format!("{} — {}", p.titulo, p.direccion)}</option> }
                         })}
                     </select>
-                    if let Some(ref msg) = fe.propiedad_id { <p class="gi-field-error">{msg}</p> }
+                    {field_error(&fe.propiedad_id)}
                 </div>
                 <div>
                     <label class="gi-label">{"Inquilino *"}</label>
                     <select onchange={select_cb!(props.inquilino_id)} disabled={props.is_editing}
-                        class={if fe.inquilino_id.is_some() { "gi-input gi-input-error" } else { "gi-input" }}>
+                        class={input_class(fe.inquilino_id.is_some())}>
                         <option value="" selected={props.inquilino_id.is_empty()}>{"— Seleccionar inquilino —"}</option>
                         { for props.inquilinos.iter().map(|i| {
                             let sel = *props.inquilino_id == i.id;
                             html! { <option value={i.id.clone()} selected={sel}>{format!("{} {} ({})", i.nombre, i.apellido, i.cedula)}</option> }
                         })}
                     </select>
-                    if let Some(ref msg) = fe.inquilino_id { <p class="gi-field-error">{msg}</p> }
+                    {field_error(&fe.inquilino_id)}
                 </div>
                 <div>
                     <label class="gi-label" title="No puede solaparse con otro contrato activo de la misma propiedad">{"Fecha Inicio *"}</label>
                     <input type="date" value={(*props.fecha_inicio).clone()} oninput={input_cb!(props.fecha_inicio)} disabled={props.is_editing}
-                        class={if fe.fecha_inicio.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                    if let Some(ref msg) = fe.fecha_inicio { <p class="gi-field-error">{msg}</p> }
+                        class={input_class(fe.fecha_inicio.is_some())} />
+                    {field_error(&fe.fecha_inicio)}
                 </div>
                 <div>
                     <label class="gi-label" title="Debe ser posterior a la fecha de inicio. No puede solaparse con otro contrato activo">{"Fecha Fin *"}</label>
                     <input type="date" value={(*props.fecha_fin).clone()} oninput={input_cb!(props.fecha_fin)}
-                        class={if fe.fecha_fin.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                    if let Some(ref msg) = fe.fecha_fin { <p class="gi-field-error">{msg}</p> }
+                        class={input_class(fe.fecha_fin.is_some())} />
+                    {field_error(&fe.fecha_fin)}
                 </div>
                 <div>
                     <label class="gi-label">{"Monto Mensual *"}</label>
                     <input type="number" step="0.01" min="0" value={(*props.monto_mensual).clone()} oninput={input_cb!(props.monto_mensual)}
-                        class={if fe.monto_mensual.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                    if let Some(ref msg) = fe.monto_mensual { <p class="gi-field-error">{msg}</p> }
+                        class={input_class(fe.monto_mensual.is_some())} />
+                    {field_error(&fe.monto_mensual)}
                 </div>
                 <div>
                     <label class="gi-label">{"Depósito"}</label>
@@ -277,78 +279,112 @@ struct ContratoListProps {
 #[function_component]
 fn ContratoList(props: &ContratoListProps) -> Html {
     if props.items.is_empty() {
-        return html! {
-            <div class="gi-empty-state">
-                <div class="gi-empty-state-icon">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                        <line x1="16" y1="13" x2="8" y2="13"/>
-                        <line x1="16" y1="17" x2="8" y2="17"/>
-                    </svg>
-                </div>
-                <div class="gi-empty-state-title">{"Sin contratos registrados"}</div>
-                <p class="gi-empty-state-text">{"Un contrato vincula una propiedad con un inquilino. Necesita tener al menos una propiedad y un inquilino registrados antes de crear un contrato."}</p>
-                <div class="gi-empty-state-hint">
-                    <Link<Route> to={Route::Propiedades} classes="gi-btn-text">
-                        {"Propiedades"}
-                    </Link<Route>>
-                    {" · "}
-                    <Link<Route> to={Route::Inquilinos} classes="gi-btn-text">
-                        {"Inquilinos"}
-                    </Link<Route>>
-                </div>
-            </div>
-        };
+        return render_contrato_empty_state();
     }
 
     html! {
         <>
             <DataTable headers={props.headers.clone()}>
-                { for props.items.iter().map(|c| {
-                    let on_edit = props.on_edit.clone();
-                    let on_delete_click = props.on_delete.clone();
-                    let on_renew_click = props.on_renew.clone();
-                    let on_terminate_click = props.on_terminate.clone();
-                    let cc = c.clone(); let cd = c.clone(); let cr = c.clone(); let ct = c.clone();
-                    let user_rol = props.user_rol.clone();
-                    let p_label = props.prop_label.emit(c.propiedad_id.clone());
-                    let i_label = props.inq_label.emit(c.inquilino_id.clone());
-                    let (badge_cls, badge_label) = estado_badge(&c.estado);
-                    let is_active = c.estado == "activo";
-                    html! {
-                        <tr>
-                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{p_label}</td>
-                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{i_label}</td>
-                            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&c.fecha_inicio)}</td>
-                            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&c.fecha_fin)}</td>
-                            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={c.monto_mensual} moneda={c.moneda.clone()} /></td>
-                            <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
-                            if can_write(&user_rol) {
-                                <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2); flex-wrap: wrap;">
-                                    <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(cc.clone()))} class="gi-btn-text">{"Editar"}</button>
-                                    if is_active {
-                                        <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-success">{"Registrar Pago"}</Link<Route>>
-                                        <button onclick={Callback::from(move |_: MouseEvent| on_renew_click.emit(cr.clone()))} class="gi-btn-text" style="color: var(--color-primary-500);">{"Renovar"}</button>
-                                        <button onclick={Callback::from(move |_: MouseEvent| on_terminate_click.emit(ct.clone()))} class="gi-btn-text" style="color: var(--color-warning);">{"Terminar"}</button>
-                                    }
-                                    if can_delete(&user_rol) {
-                                        <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(cd.clone()))} class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button>
-                                    }
-                                </td>
-                            }
-                        </tr>
-                    }
-                })}
+                { for props.items.iter().map(|c| render_contrato_row(c, &props.user_rol, &props.prop_label, &props.inq_label, &props.on_edit, &props.on_delete, &props.on_renew, &props.on_terminate)) }
             </DataTable>
             <Pagination
-                total={props.total}
-                page={props.page}
-                per_page={props.per_page}
-                on_page_change={props.on_page_change.clone()}
-                on_per_page_change={props.on_per_page_change.clone()}
+                total={props.total} page={props.page} per_page={props.per_page}
+                on_page_change={props.on_page_change.clone()} on_per_page_change={props.on_per_page_change.clone()}
             />
         </>
+    }
+}
+
+fn render_contrato_empty_state() -> Html {
+    html! {
+        <div class="gi-empty-state">
+            <div class="gi-empty-state-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                </svg>
+            </div>
+            <div class="gi-empty-state-title">{"Sin contratos registrados"}</div>
+            <p class="gi-empty-state-text">{"Un contrato vincula una propiedad con un inquilino. Necesita tener al menos una propiedad y un inquilino registrados antes de crear un contrato."}</p>
+            <div class="gi-empty-state-hint">
+                <Link<Route> to={Route::Propiedades} classes="gi-btn-text">{"Propiedades"}</Link<Route>>
+                {" · "}
+                <Link<Route> to={Route::Inquilinos} classes="gi-btn-text">{"Inquilinos"}</Link<Route>>
+            </div>
+        </div>
+    }
+}
+
+fn render_contrato_row(
+    c: &Contrato,
+    user_rol: &str,
+    prop_label: &Callback<String, String>,
+    inq_label: &Callback<String, String>,
+    on_edit: &Callback<Contrato>,
+    on_delete: &Callback<Contrato>,
+    on_renew: &Callback<Contrato>,
+    on_terminate: &Callback<Contrato>,
+) -> Html {
+    let p_label = prop_label.emit(c.propiedad_id.clone());
+    let i_label = inq_label.emit(c.inquilino_id.clone());
+    let (badge_cls, badge_label) = estado_badge(&c.estado);
+    let actions = render_contrato_actions(user_rol, c, on_edit, on_delete, on_renew, on_terminate);
+    html! {
+        <tr>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{p_label}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{i_label}</td>
+            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&c.fecha_inicio)}</td>
+            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&c.fecha_fin)}</td>
+            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={c.monto_mensual} moneda={c.moneda.clone()} /></td>
+            <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
+            {actions}
+        </tr>
+    }
+}
+
+fn render_contrato_actions(
+    user_rol: &str,
+    c: &Contrato,
+    on_edit: &Callback<Contrato>,
+    on_delete: &Callback<Contrato>,
+    on_renew: &Callback<Contrato>,
+    on_terminate: &Callback<Contrato>,
+) -> Html {
+    if !can_write(user_rol) {
+        return html! {};
+    }
+    let cc = c.clone();
+    let cd = c.clone();
+    let cr = c.clone();
+    let ct = c.clone();
+    let on_edit = on_edit.clone();
+    let on_delete_click = on_delete.clone();
+    let on_renew_click = on_renew.clone();
+    let on_terminate_click = on_terminate.clone();
+    let active_btns = if c.estado == "activo" {
+        html! {
+            <>
+                <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-success">{"Registrar Pago"}</Link<Route>>
+                <button onclick={Callback::from(move |_: MouseEvent| on_renew_click.emit(cr.clone()))} class="gi-btn-text" style="color: var(--color-primary-500);">{"Renovar"}</button>
+                <button onclick={Callback::from(move |_: MouseEvent| on_terminate_click.emit(ct.clone()))} class="gi-btn-text" style="color: var(--color-warning);">{"Terminar"}</button>
+            </>
+        }
+    } else {
+        html! {}
+    };
+    let delete_btn = if can_delete(user_rol) {
+        html! { <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(cd.clone()))} class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button> }
+    } else {
+        html! {}
+    };
+    html! {
+        <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2); flex-wrap: wrap;">
+            <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(cc.clone()))} class="gi-btn-text">{"Editar"}</button>
+            {active_btns}
+            {delete_btn}
+        </td>
     }
 }
 
@@ -556,10 +592,7 @@ fn load_contrato_refs(
     });
 }
 
-#[allow(clippy::type_complexity)]
-fn register_escape_listener(
-    escape_handler: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>>,
-) -> Option<EventListener> {
+fn register_escape_listener(escape_handler: EscapeHandler) -> Option<EventListener> {
     web_sys::window().and_then(|w| w.document()).map(|doc| {
         EventListener::new(&doc, "keydown", move |event| {
             let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
@@ -764,97 +797,140 @@ fn render_contratos_view(
         return html! { <Loading /> };
     }
 
+    let last_header: String = if can_write(user_rol) { "Acciones".into() } else { String::new() };
     let headers = vec![
-        "Propiedad".into(),
-        "Inquilino".into(),
-        "Inicio".into(),
-        "Fin".into(),
-        "Monto".into(),
-        "Estado".into(),
-        if can_write(user_rol) {
-            "Acciones".into()
-        } else {
-            String::new()
-        },
+        "Propiedad".into(), "Inquilino".into(), "Inicio".into(),
+        "Fin".into(), "Monto".into(), "Estado".into(), last_header,
     ];
+    let new_btn = render_new_btn_contrato(user_rol, &on_new);
+    let error_html = render_opt_error_contrato(error);
+    let delete_html = render_delete_confirm_contrato(delete_target, &prop_label, &on_delete_confirm, &on_delete_cancel);
+    let renew_html = render_renew_modal(renew_target, renew_fecha_fin, renew_monto, on_renew_confirm, on_renew_cancel);
+    let terminate_html = render_terminate_modal(terminate_target, terminate_fecha, on_terminate_confirm, on_terminate_cancel);
+    let form_html = render_contrato_form_section(
+        show_form, editing, propiedad_id, inquilino_id, fecha_inicio, fecha_fin,
+        monto_mensual, deposito, moneda, estado, propiedades, inquilinos,
+        form_errors, submitting, on_submit, on_cancel,
+    );
 
     html! {
         <div>
             <div class="gi-page-header">
                 <h1 class="gi-page-title">{"Contratos"}</h1>
-                if can_write(user_rol) {
-                    <button onclick={on_new} class="gi-btn gi-btn-primary">{"+ Nuevo Contrato"}</button>
-                }
+                {new_btn}
             </div>
-
-            if let Some(err) = (*error).as_ref() {
-                <ErrorBanner message={err.clone()} onclose={Callback::from({
-                    let error = error.clone(); move |_: MouseEvent| error.set(None)
-                })} />
-            }
-
-            if let Some(ref target) = **delete_target {
-                <DeleteConfirmModal
-                    message={format!("¿Está seguro de que desea eliminar el contrato de la propiedad \"{}\"? Esta acción no se puede deshacer.", prop_label.emit(target.propiedad_id.clone()))}
-                    on_confirm={on_delete_confirm.clone()}
-                    on_cancel={on_delete_cancel.clone()}
-                />
-            }
-
-            if renew_target.is_some() {
-                <RenewModal
-                    renew_fecha_fin={renew_fecha_fin.clone()}
-                    renew_monto={renew_monto.clone()}
-                    on_confirm={on_renew_confirm}
-                    on_cancel={on_renew_cancel}
-                />
-            }
-
-            if terminate_target.is_some() {
-                <TerminateModal
-                    terminate_fecha={terminate_fecha.clone()}
-                    on_confirm={on_terminate_confirm}
-                    on_cancel={on_terminate_cancel}
-                />
-            }
-
-            if show_form {
-                <ContratoForm
-                    is_editing={editing.is_some()}
-                    propiedad_id={propiedad_id.clone()}
-                    inquilino_id={inquilino_id.clone()}
-                    fecha_inicio={fecha_inicio.clone()}
-                    fecha_fin={fecha_fin.clone()}
-                    monto_mensual={monto_mensual.clone()}
-                    deposito={deposito.clone()}
-                    moneda={moneda.clone()}
-                    estado={estado.clone()}
-                    propiedades={(**propiedades).clone()}
-                    inquilinos={(**inquilinos).clone()}
-                    form_errors={(**form_errors).clone()}
-                    submitting={submitting}
-                    on_submit={on_submit}
-                    on_cancel={on_cancel}
-                />
-            }
-
+            {error_html}
+            {delete_html}
+            {renew_html}
+            {terminate_html}
+            {form_html}
             <ContratoList
-                items={(**items).clone()}
-                user_rol={user_rol.to_string()}
-                headers={headers}
-                total={total}
-                page={page}
-                per_page={per_page}
-                prop_label={prop_label.clone()}
-                inq_label={inq_label.clone()}
-                on_edit={on_edit}
-                on_delete={on_delete_click}
-                on_renew={on_renew_click}
-                on_terminate={on_terminate_click}
-                on_page_change={on_page_change}
-                on_per_page_change={on_per_page_change}
+                items={(**items).clone()} user_rol={user_rol.to_string()} headers={headers}
+                total={total} page={page} per_page={per_page}
+                prop_label={prop_label.clone()} inq_label={inq_label.clone()}
+                on_edit={on_edit} on_delete={on_delete_click}
+                on_renew={on_renew_click} on_terminate={on_terminate_click}
+                on_page_change={on_page_change} on_per_page_change={on_per_page_change}
             />
         </div>
+    }
+}
+
+fn render_new_btn_contrato(user_rol: &str, on_new: &Callback<MouseEvent>) -> Html {
+    if can_write(user_rol) {
+        html! { <button onclick={on_new.clone()} class="gi-btn gi-btn-primary">{"+ Nuevo Contrato"}</button> }
+    } else {
+        html! {}
+    }
+}
+
+fn render_opt_error_contrato(error: &UseStateHandle<Option<String>>) -> Html {
+    match (*error).as_ref() {
+        Some(err) => {
+            let error = error.clone();
+            html! { <ErrorBanner message={err.clone()} onclose={Callback::from(move |_: MouseEvent| error.set(None))} /> }
+        }
+        None => html! {},
+    }
+}
+
+fn render_delete_confirm_contrato(
+    target: &UseStateHandle<Option<Contrato>>,
+    prop_label: &Callback<String, String>,
+    on_confirm: &Callback<MouseEvent>,
+    on_cancel: &Callback<MouseEvent>,
+) -> Html {
+    match (**target).as_ref() {
+        Some(t) => html! {
+            <DeleteConfirmModal
+                message={format!("¿Está seguro de que desea eliminar el contrato de la propiedad \"{}\"? Esta acción no se puede deshacer.", prop_label.emit(t.propiedad_id.clone()))}
+                on_confirm={on_confirm.clone()} on_cancel={on_cancel.clone()}
+            />
+        },
+        None => html! {},
+    }
+}
+
+fn render_renew_modal(
+    target: &UseStateHandle<Option<Contrato>>,
+    fecha_fin: &UseStateHandle<String>,
+    monto: &UseStateHandle<String>,
+    on_confirm: Callback<MouseEvent>,
+    on_cancel: Callback<MouseEvent>,
+) -> Html {
+    if target.is_some() {
+        html! { <RenewModal renew_fecha_fin={fecha_fin.clone()} renew_monto={monto.clone()} on_confirm={on_confirm} on_cancel={on_cancel} /> }
+    } else {
+        html! {}
+    }
+}
+
+fn render_terminate_modal(
+    target: &UseStateHandle<Option<Contrato>>,
+    fecha: &UseStateHandle<String>,
+    on_confirm: Callback<MouseEvent>,
+    on_cancel: Callback<MouseEvent>,
+) -> Html {
+    if target.is_some() {
+        html! { <TerminateModal terminate_fecha={fecha.clone()} on_confirm={on_confirm} on_cancel={on_cancel} /> }
+    } else {
+        html! {}
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_contrato_form_section(
+    show_form: bool,
+    editing: &UseStateHandle<Option<Contrato>>,
+    propiedad_id: &UseStateHandle<String>,
+    inquilino_id: &UseStateHandle<String>,
+    fecha_inicio: &UseStateHandle<String>,
+    fecha_fin: &UseStateHandle<String>,
+    monto_mensual: &UseStateHandle<String>,
+    deposito: &UseStateHandle<String>,
+    moneda: &UseStateHandle<String>,
+    estado: &UseStateHandle<String>,
+    propiedades: &UseStateHandle<Vec<Propiedad>>,
+    inquilinos: &UseStateHandle<Vec<Inquilino>>,
+    form_errors: &UseStateHandle<FormErrors>,
+    submitting: bool,
+    on_submit: Callback<SubmitEvent>,
+    on_cancel: Callback<MouseEvent>,
+) -> Html {
+    if !show_form {
+        return html! {};
+    }
+    html! {
+        <ContratoForm
+            is_editing={editing.is_some()}
+            propiedad_id={propiedad_id.clone()} inquilino_id={inquilino_id.clone()}
+            fecha_inicio={fecha_inicio.clone()} fecha_fin={fecha_fin.clone()}
+            monto_mensual={monto_mensual.clone()} deposito={deposito.clone()}
+            moneda={moneda.clone()} estado={estado.clone()}
+            propiedades={(**propiedades).clone()} inquilinos={(**inquilinos).clone()}
+            form_errors={(**form_errors).clone()} submitting={submitting}
+            on_submit={on_submit} on_cancel={on_cancel}
+        />
     }
 }
 

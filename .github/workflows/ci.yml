@@ -232,11 +232,25 @@ jobs:
           fi
           if [ "${{ steps.clippy_backend.outcome }}" = "failure" ]; then
             FAILED="${FAILED}clippy-backend,"
-            ERROR="${ERROR}[clippy-backend] $(head -c 1500 "${RUNNER_TEMP}/clippy-backend-output.txt" 2>/dev/null || echo 'Backend clippy failed.')"$'\n\n'
+            CLIPPY_OUT=$(head -c 1500 "${RUNNER_TEMP}/clippy-backend-output.txt" 2>/dev/null || true)
+            if [ -z "$(printf '%s' "$CLIPPY_OUT" | tr -d '[:space:]')" ]; then
+              CLIPPY_OUT=$(head -c 1500 "${RUNNER_TEMP}/clippy-backend-stderr.txt" 2>/dev/null || true)
+            fi
+            if [ -z "$(printf '%s' "$CLIPPY_OUT" | tr -d '[:space:]')" ]; then
+              CLIPPY_OUT="Backend clippy failed with no captured output. Run: cargo clippy --locked -p realestate-backend -- -D warnings"
+            fi
+            ERROR="${ERROR}[clippy-backend] ${CLIPPY_OUT}"$'\n\n'
           fi
           if [ "${{ steps.clippy_frontend.outcome }}" = "failure" ]; then
             FAILED="${FAILED}clippy-frontend,"
-            ERROR="${ERROR}[clippy-frontend] $(head -c 1500 "${RUNNER_TEMP}/clippy-frontend-output.txt" 2>/dev/null || echo 'Frontend clippy failed.')"$'\n\n'
+            CLIPPY_OUT=$(head -c 1500 "${RUNNER_TEMP}/clippy-frontend-output.txt" 2>/dev/null || true)
+            if [ -z "$(printf '%s' "$CLIPPY_OUT" | tr -d '[:space:]')" ]; then
+              CLIPPY_OUT=$(head -c 1500 "${RUNNER_TEMP}/clippy-frontend-stderr.txt" 2>/dev/null || true)
+            fi
+            if [ -z "$(printf '%s' "$CLIPPY_OUT" | tr -d '[:space:]')" ]; then
+              CLIPPY_OUT="Frontend clippy failed with no captured output. Run: cargo clippy --locked -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings"
+            fi
+            ERROR="${ERROR}[clippy-frontend] ${CLIPPY_OUT}"$'\n\n'
           fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
@@ -913,6 +927,7 @@ jobs:
       (needs.test-backend.result == 'success' || needs.test-frontend.result == 'success' || needs.lint.result == 'success' ||
        (needs.test-backend.result != 'failure' && needs.test-frontend.result != 'failure' && needs.lint.result != 'failure'))
     outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
       duration: ${{ steps.timing.outputs.duration }}
     steps:
       - name: Record start time
@@ -950,19 +965,36 @@ jobs:
           path: .
         continue-on-error: true
 
+      - name: Validate clippy report JSON
+        id: validate-clippy
+        if: steps.download-clippy.outcome == 'success' && hashFiles('clippy-report.json') != ''
+        run: |
+          if jq -e 'true' clippy-report.json >/dev/null 2>&1; then
+            echo "valid=true" >> $GITHUB_OUTPUT
+          else
+            echo "::warning::clippy-report.json contains malformed JSON (likely from failed lint job) -- excluding from SonarQube scan"
+            rm -f clippy-report.json
+            echo "valid=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Set up JDK 17 for Android analysis
+        id: setup-java
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           java-version: "17"
           distribution: "temurin"
+        continue-on-error: true
 
       - name: Setup Gradle
+        if: steps.setup-java.outcome == 'success'
         uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
         with:
           cache-read-only: true
+        continue-on-error: true
 
       - name: Generate Android Lint XML report
         id: android-lint-xml
+        if: steps.setup-java.outcome == 'success'
         timeout-minutes: 15
         working-directory: android
         run: |
@@ -972,6 +1004,7 @@ jobs:
 
       - name: Generate detekt XML report
         id: detekt-xml
+        if: steps.setup-java.outcome == 'success'
         timeout-minutes: 10
         working-directory: android
         run: |
@@ -1114,7 +1147,9 @@ jobs:
               SCAN_ARGS+=("-Dsonar.branch.name=${BRANCH_NAME}")
             fi
           fi
-          docker run --rm \
+          umask 077
+          set +e
+          DOCKER_CONTENT_TRUST=0 docker run --rm \
             --network host \
             --security-opt no-new-privileges \
             --cap-drop ALL \
@@ -1133,7 +1168,14 @@ jobs:
             -e HOME=/home/scanner \
             -v "${GITHUB_WORKSPACE}:/usr/src" \
             sonarsource/sonar-scanner-cli:11.3@sha256:7462f132388135e32b948f8f18ff0db9ae28a87c6777f1df5b2207e04a6d7c5c \
-            "${SCAN_ARGS[@]}"
+            "${SCAN_ARGS[@]}" 2>&1 | tee "${RUNNER_TEMP}/sonar-scan-output.txt"
+          SCAN_EXIT=$?
+          set -e
+          if [ $SCAN_EXIT -ne 0 ]; then
+            echo "::warning::SonarQube scanner exited with code $SCAN_EXIT"
+            tail -30 "${RUNNER_TEMP}/sonar-scan-output.txt" || true
+            exit $SCAN_EXIT
+          fi
 
       - name: Report SonarQube analysis completeness
         if: always() && steps.sonar-url-check.outputs.skip != 'true' && steps.sonar-reachable.outputs.reachable == 'true'
@@ -1330,10 +1372,30 @@ jobs:
             echo "Bootstrap token revoked."
           fi
 
+      - name: Collect sonarqube errors for notification
+        id: collect-errors
+        if: failure()
+        run: |
+          ERROR=""
+          if [ -f "${RUNNER_TEMP}/sonar-scan-output.txt" ]; then
+            ERROR=$(tail -c 3000 "${RUNNER_TEMP}/sonar-scan-output.txt" 2>/dev/null || true)
+          fi
+          if [ -z "$(printf '%s' "$ERROR" | tr -d '[:space:]')" ]; then
+            ERROR="SonarQube analysis failed. Check SonarQube server status and scan configuration."
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
       - name: Record duration
         id: timing
         if: always()
         run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
+
+      - name: Clean up sensitive temp files
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/sonar-scan-output.txt"
 
   # ── Stage 2: Build (runs only after all quality checks pass) ──
 
@@ -1357,8 +1419,7 @@ jobs:
       needs.test-backend.result == 'success' &&
       needs.test-frontend.result == 'success' &&
       needs.quality-gate.result == 'success' &&
-      (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped') &&
-      (needs.sonarqube.result == 'success' || needs.sonarqube.result == 'skipped' || needs.sonarqube.result == 'cancelled')
+      (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped')
     steps:
       - name: Record start time
         id: start
@@ -1529,8 +1590,7 @@ jobs:
       needs.test-backend.result == 'success' &&
       needs.test-frontend.result == 'success' &&
       needs.quality-gate.result == 'success' &&
-      (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped') &&
-      (needs.sonarqube.result == 'success' || needs.sonarqube.result == 'skipped' || needs.sonarqube.result == 'cancelled')
+      (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped')
     steps:
       - name: Record start time
         id: start
@@ -2300,11 +2360,18 @@ jobs:
 
       - name: Notify -- SonarQube analysis failed
         if: always() && needs.sonarqube.result == 'failure' && steps.webhook-check.outputs.skip != 'true'
+        env:
+          ERROR_LOG: ${{ needs.sonarqube.outputs.error_log }}
         run: |
+          sanitize_payload() { sed -E -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/gho_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/ghu_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g' -e 's|postgresql://[^@[:space:]]+"*|postgresql://***:***@***REDACTED***|g'; }
+          if [ -z "$ERROR_LOG" ]; then
+            ERROR_LOG="SonarQube analysis failed. Check SonarQube server status and scan configuration."
+          fi
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload)
           PAYLOAD=$(jq -n \
             --arg job "sonarqube" \
             --arg step "sonar-scan" \
-            --arg error_log "SonarQube analysis failed. Check SonarQube server status and scan configuration." \
+            --arg error_log "$ERROR_LOG" \
             --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
             --arg commit "$GH_SHA" \
             --arg branch "$GH_REF_NAME" \

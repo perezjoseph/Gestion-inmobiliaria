@@ -387,7 +387,14 @@ mod db_async {
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
             let propiedad_id = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri("/api/gastos")
@@ -455,7 +462,14 @@ mod db_async {
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
             let propiedad_id = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let mut created_ids = Vec::new();
             for i in 0..3u32 {
@@ -503,7 +517,14 @@ mod db_async {
             let token = make_token(admin_id, "admin");
             let prop_a = create_test_propiedad(&db).await;
             let prop_b = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri("/api/gastos")
@@ -558,7 +579,14 @@ mod db_async {
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
             let propiedad_id = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri("/api/gastos")
@@ -598,7 +626,14 @@ mod db_async {
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
             let propiedad_id = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let mut ids = Vec::new();
             for date in &["2025-01-15", "2025-03-15", "2025-06-15"] {
@@ -644,7 +679,14 @@ mod db_async {
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
             let propiedad_id = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let csv = format!(
                 "propiedad_id,categoria,descripcion,monto,moneda,fecha_gasto\n\
@@ -680,7 +722,14 @@ mod db_async {
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
             let propiedad_id = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let fake_prop = Uuid::new_v4();
             let csv = format!(
@@ -719,7 +768,14 @@ mod db_async {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let csv = "propiedad_id,categoria,descripcion,monto,moneda,fecha_gasto\n";
             let boundary = "----TestBoundary3";
@@ -746,7 +802,14 @@ mod db_async {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::get()
                 .uri("/api/reportes/rentabilidad?mes=4&anio=2025")
@@ -769,7 +832,14 @@ mod db_async {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::get()
                 .uri("/api/reportes/rentabilidad/pdf?mes=4&anio=2025")
@@ -787,7 +857,14 @@ mod db_async {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::get()
                 .uri("/api/reportes/rentabilidad/xlsx?mes=4&anio=2025")
@@ -805,7 +882,14 @@ mod db_async {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::get()
                 .uri("/api/dashboard/stats")
@@ -823,7 +907,14 @@ mod db_async {
             let config = make_config();
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::get()
                 .uri("/api/dashboard/gastos-comparacion")

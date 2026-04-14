@@ -3,8 +3,11 @@ use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use crate::components::common::error_banner::ErrorBanner;
+use crate::components::importacion::file_type_indicator::FileTypeIndicator;
+use crate::components::importacion::ocr_preview::OcrPreview;
 use crate::services::api::BASE_URL;
 use crate::types::importacion::ImportResult;
+use crate::types::ocr::ImportPreview;
 
 fn get_token() -> Option<String> {
     web_sys::window()?
@@ -16,10 +19,27 @@ fn get_token() -> Option<String> {
         .flatten()
 }
 
-async fn handle_upload_response(resp: gloo_net::http::Response) -> Result<ImportResult, String> {
+#[derive(Clone, PartialEq)]
+enum UploadResult {
+    Standard(ImportResult),
+    Preview(ImportPreview),
+}
+
+async fn handle_upload_response(resp: gloo_net::http::Response) -> Result<UploadResult, String> {
     if resp.ok() {
-        resp.json::<ImportResult>()
+        let text = resp
+            .text()
             .await
+            .map_err(|err| format!("Error al procesar respuesta: {err}"))?;
+
+        if let Ok(preview) = serde_json::from_str::<ImportPreview>(&text)
+            && !preview.preview_id.is_empty()
+        {
+            return Ok(UploadResult::Preview(preview));
+        }
+
+        serde_json::from_str::<ImportResult>(&text)
+            .map(UploadResult::Standard)
             .map_err(|err| format!("Error al procesar respuesta: {err}"))
     } else {
         let text = resp
@@ -30,7 +50,7 @@ async fn handle_upload_response(resp: gloo_net::http::Response) -> Result<Import
     }
 }
 
-async fn perform_upload(file: web_sys::File, entity_type: String) -> Result<ImportResult, String> {
+async fn perform_upload(file: web_sys::File, entity_type: String) -> Result<UploadResult, String> {
     let form_data =
         web_sys::FormData::new().map_err(|_| "Error al crear formulario".to_string())?;
     let _ = form_data.append_with_blob("file", &file);
@@ -54,8 +74,10 @@ async fn perform_upload(file: web_sys::File, entity_type: String) -> Result<Impo
 pub fn Importar() -> Html {
     let entity_type = use_state(|| "propiedades".to_string());
     let result = use_state(|| Option::<ImportResult>::None);
+    let preview = use_state(|| Option::<ImportPreview>::None);
     let error = use_state(|| Option::<String>::None);
     let uploading = use_state(|| false);
+    let selected_filename = use_state(|| Option::<String>::None);
 
     let on_entity_change = {
         let entity_type = entity_type.clone();
@@ -68,31 +90,59 @@ pub fn Importar() -> Html {
     let on_upload = {
         let entity_type = entity_type.clone();
         let result = result.clone();
+        let preview = preview.clone();
         let error = error.clone();
         let uploading = uploading.clone();
+        let selected_filename = selected_filename.clone();
         Callback::from(move |e: Event| {
             let input: web_sys::HtmlInputElement = e.target_unchecked_into();
             let Some(files) = input.files() else { return };
             let Some(file) = files.get(0) else { return };
 
+            let filename = file.name();
             let entity_type = (*entity_type).clone();
             let result = result.clone();
+            let preview = preview.clone();
             let error = error.clone();
             let uploading = uploading.clone();
+            let selected_filename = selected_filename.clone();
 
+            selected_filename.set(Some(filename));
             uploading.set(true);
             error.set(None);
             result.set(None);
+            preview.set(None);
 
             spawn_local(async move {
                 match perform_upload(file, entity_type).await {
-                    Ok(r) => result.set(Some(r)),
+                    Ok(UploadResult::Standard(r)) => result.set(Some(r)),
+                    Ok(UploadResult::Preview(p)) => preview.set(Some(p)),
                     Err(err) => error.set(Some(err)),
                 }
                 uploading.set(false);
             });
 
             input.set_value("");
+        })
+    };
+
+    let on_confirmed = {
+        let result = result.clone();
+        let preview = preview.clone();
+        let selected_filename = selected_filename.clone();
+        Callback::from(move |import_result: ImportResult| {
+            result.set(Some(import_result));
+            preview.set(None);
+            selected_filename.set(None);
+        })
+    };
+
+    let on_discarded = {
+        let preview = preview.clone();
+        let selected_filename = selected_filename.clone();
+        Callback::from(move |_: ()| {
+            preview.set(None);
+            selected_filename.set(None);
         })
     };
 
@@ -110,7 +160,7 @@ pub fn Importar() -> Html {
 
             <div class="gi-card" style="padding: var(--space-6);">
                 <h2 style="font-size: var(--text-base); font-weight: 600; color: var(--text-primary); margin-bottom: var(--space-4);">
-                    {"Importar datos desde archivo CSV o XLSX"}
+                    {"Importar datos desde archivo"}
                 </h2>
 
                 <div style="display: flex; gap: var(--space-4); align-items: end; flex-wrap: wrap;">
@@ -129,18 +179,29 @@ pub fn Importar() -> Html {
                             { if *uploading { "Importando..." } else { "📁 Seleccionar Archivo" } }
                             <input
                                 type="file"
-                                accept=".csv,.xlsx"
+                                accept=".csv,.xlsx,.jpg,.jpeg,.png,.pdf"
                                 onchange={on_upload}
                                 style="display: none;"
                             />
                         </label>
                     </div>
+                    if let Some(ref fname) = *selected_filename {
+                        <FileTypeIndicator filename={fname.clone()} />
+                    }
                 </div>
 
                 <div style="margin-top: var(--space-3); font-size: var(--text-xs); color: var(--text-tertiary);">
-                    {"Formatos aceptados: CSV (.csv) y Excel (.xlsx). La primera fila debe contener los encabezados."}
+                    {"Formatos aceptados: CSV (.csv), Excel (.xlsx) e imágenes (.jpg, .jpeg, .png, .pdf). La primera fila debe contener los encabezados para archivos CSV/XLSX."}
                 </div>
             </div>
+
+            if let Some(ref p) = *preview {
+                <OcrPreview
+                    preview={p.clone()}
+                    on_confirmed={on_confirmed.clone()}
+                    on_discarded={on_discarded.clone()}
+                />
+            }
 
             if let Some(ref r) = *result {
                 <div class="gi-card" style="padding: var(--space-5); margin-top: var(--space-4);">

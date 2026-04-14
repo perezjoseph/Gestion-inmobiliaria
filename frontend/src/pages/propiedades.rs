@@ -15,7 +15,7 @@ use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{api_delete, api_get, api_post, api_put};
 use crate::types::PaginatedResponse;
 use crate::types::propiedad::{CreatePropiedad, Propiedad, UpdatePropiedad};
-use crate::utils::{can_delete, can_write};
+use crate::utils::{EscapeHandler, can_delete, can_write, field_error, input_class};
 
 fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
     if let Some(t) = toasts {
@@ -179,32 +179,32 @@ fn PropiedadForm(props: &PropiedadFormProps) -> Html {
                 <div>
                     <label class="gi-label">{"Título *"}</label>
                     <input type="text" value={(*props.titulo).clone()} oninput={input_cb!(props.titulo)}
-                        class={if fe.titulo.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                    if let Some(ref msg) = fe.titulo { <p class="gi-field-error">{msg}</p> }
+                        class={input_class(fe.titulo.is_some())} />
+                    {field_error(&fe.titulo)}
                 </div>
                 <div>
                     <label class="gi-label">{"Dirección *"}</label>
                     <input type="text" value={(*props.direccion).clone()} oninput={input_cb!(props.direccion)}
-                        class={if fe.direccion.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                    if let Some(ref msg) = fe.direccion { <p class="gi-field-error">{msg}</p> }
+                        class={input_class(fe.direccion.is_some())} />
+                    {field_error(&fe.direccion)}
                 </div>
                 <div>
                     <label class="gi-label">{"Ciudad *"}</label>
                     <input type="text" value={(*props.ciudad).clone()} oninput={input_cb!(props.ciudad)}
-                        class={if fe.ciudad.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                    if let Some(ref msg) = fe.ciudad { <p class="gi-field-error">{msg}</p> }
+                        class={input_class(fe.ciudad.is_some())} />
+                    {field_error(&fe.ciudad)}
                 </div>
                 <div>
                     <label class="gi-label">{"Provincia *"}</label>
                     <input type="text" value={(*props.provincia).clone()} oninput={input_cb!(props.provincia)}
-                        class={if fe.provincia.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                    if let Some(ref msg) = fe.provincia { <p class="gi-field-error">{msg}</p> }
+                        class={input_class(fe.provincia.is_some())} />
+                    {field_error(&fe.provincia)}
                 </div>
                 <div>
                     <label class="gi-label">{"Precio *"}</label>
                     <input type="number" step="0.01" min="0" value={(*props.precio).clone()} oninput={input_cb!(props.precio)}
-                        class={if fe.precio.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                    if let Some(ref msg) = fe.precio { <p class="gi-field-error">{msg}</p> }
+                        class={input_class(fe.precio.is_some())} />
+                    {field_error(&fe.precio)}
                 </div>
                 <div>
                     <label class="gi-label">{"Moneda"}</label>
@@ -302,72 +302,98 @@ struct PropiedadListProps {
 #[function_component]
 fn PropiedadList(props: &PropiedadListProps) -> Html {
     if props.items.is_empty() {
-        return html! {
-            <div class="gi-empty-state">
-                <div class="gi-empty-state-icon">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
-                        <path d="M3 21V9l9-6 9 6v12"/><path d="M9 21V12h6v9"/>
-                    </svg>
-                </div>
-                <div class="gi-empty-state-title">{"Sin propiedades registradas"}</div>
-                <p class="gi-empty-state-text">{"Las propiedades son la base de su portafolio. Agregue la primera para luego asignar inquilinos y contratos."}</p>
-                if can_write(&props.user_rol) {
-                    <button onclick={props.on_new.clone()} class="gi-btn gi-btn-primary" style="margin-top: var(--space-4);">
-                        {"+ Nueva Propiedad"}
-                    </button>
-                }
-            </div>
-        };
+        return render_propiedad_empty_state(&props.user_rol, &props.on_new);
     }
 
     html! {
         <>
             <DataTable headers={props.headers.clone()} sortable_fields={props.sortable_fields.clone()} current_sort={props.current_sort.clone()} current_order={props.current_order.clone()} on_sort={props.on_sort.clone()}>
-                { for props.items.iter().map(|p| {
-                    let on_edit = props.on_edit.clone();
-                    let on_delete_click = props.on_delete.clone();
-                    let pc = p.clone();
-                    let pd = p.clone();
-                    let user_rol = props.user_rol.clone();
-                    let (badge_cls, badge_label) = estado_badge(&p.estado);
-                    let tipo_label = match p.tipo_propiedad.as_str() {
-                        "casa" => "Casa",
-                        "apartamento" => "Apartamento",
-                        "local" => "Local",
-                        "terreno" => "Terreno",
-                        "oficina" => "Oficina",
-                        other => other,
-                    };
-                    html! {
-                        <tr>
-                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{&p.titulo}</td>
-                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&p.direccion}</td>
-                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{&p.ciudad}</td>
-                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{tipo_label}</td>
-                            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={p.precio} moneda={p.moneda.clone()} /></td>
-                            <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
-                            if can_write(&user_rol) {
-                                <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2);">
-                                    <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(pc.clone()))}
-                                        class="gi-btn-text">{"Editar"}</button>
-                                    if can_delete(&user_rol) {
-                                        <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(pd.clone()))}
-                                            class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button>
-                                    }
-                                </td>
-                            }
-                        </tr>
-                    }
-                })}
+                { for props.items.iter().map(|p| render_propiedad_row(p, &props.user_rol, &props.on_edit, &props.on_delete)) }
             </DataTable>
             <Pagination
-                total={props.total}
-                page={props.page}
-                per_page={props.per_page}
-                on_page_change={props.on_page_change.clone()}
-                on_per_page_change={props.on_per_page_change.clone()}
+                total={props.total} page={props.page} per_page={props.per_page}
+                on_page_change={props.on_page_change.clone()} on_per_page_change={props.on_per_page_change.clone()}
             />
         </>
+    }
+}
+
+fn render_propiedad_empty_state(user_rol: &str, on_new: &Callback<MouseEvent>) -> Html {
+    let btn = if can_write(user_rol) {
+        html! { <button onclick={on_new.clone()} class="gi-btn gi-btn-primary" style="margin-top: var(--space-4);">{"+ Nueva Propiedad"}</button> }
+    } else {
+        html! {}
+    };
+    html! {
+        <div class="gi-empty-state">
+            <div class="gi-empty-state-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
+                    <path d="M3 21V9l9-6 9 6v12"/><path d="M9 21V12h6v9"/>
+                </svg>
+            </div>
+            <div class="gi-empty-state-title">{"Sin propiedades registradas"}</div>
+            <p class="gi-empty-state-text">{"Las propiedades son la base de su portafolio. Agregue la primera para luego asignar inquilinos y contratos."}</p>
+            {btn}
+        </div>
+    }
+}
+
+fn tipo_propiedad_label(tipo: &str) -> &str {
+    match tipo {
+        "casa" => "Casa",
+        "apartamento" => "Apartamento",
+        "local" => "Local",
+        "terreno" => "Terreno",
+        "oficina" => "Oficina",
+        other => other,
+    }
+}
+
+fn render_propiedad_row(
+    p: &Propiedad,
+    user_rol: &str,
+    on_edit: &Callback<Propiedad>,
+    on_delete: &Callback<Propiedad>,
+) -> Html {
+    let (badge_cls, badge_label) = estado_badge(&p.estado);
+    let tipo_label = tipo_propiedad_label(&p.tipo_propiedad);
+    let actions = render_propiedad_actions(user_rol, p, on_edit, on_delete);
+    html! {
+        <tr>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{&p.titulo}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&p.direccion}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{&p.ciudad}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{tipo_label}</td>
+            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={p.precio} moneda={p.moneda.clone()} /></td>
+            <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
+            {actions}
+        </tr>
+    }
+}
+
+fn render_propiedad_actions(
+    user_rol: &str,
+    p: &Propiedad,
+    on_edit: &Callback<Propiedad>,
+    on_delete: &Callback<Propiedad>,
+) -> Html {
+    if !can_write(user_rol) {
+        return html! {};
+    }
+    let pc = p.clone();
+    let pd = p.clone();
+    let on_edit = on_edit.clone();
+    let on_delete_click = on_delete.clone();
+    let delete_btn = if can_delete(user_rol) {
+        html! { <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(pd.clone()))} class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button> }
+    } else {
+        html! {}
+    };
+    html! {
+        <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2);">
+            <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(pc.clone()))} class="gi-btn-text">{"Editar"}</button>
+            {delete_btn}
+        </td>
     }
 }
 
@@ -526,10 +552,7 @@ fn do_delete_propiedad(
     });
 }
 
-#[allow(clippy::type_complexity)]
-fn register_escape_listener_p(
-    escape_handler: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>>,
-) -> Option<EventListener> {
+fn register_escape_listener_p(escape_handler: EscapeHandler) -> Option<EventListener> {
     web_sys::window().and_then(|w| w.document()).map(|doc| {
         EventListener::new(&doc, "keydown", move |event| {
             let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();

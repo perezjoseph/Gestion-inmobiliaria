@@ -11,6 +11,7 @@ pub mod mantenimiento;
 pub mod notificaciones;
 pub mod ocr_client;
 pub mod ocr_mapping;
+pub mod ocr_preview;
 pub mod pagos;
 pub mod perfil;
 pub mod propiedades;

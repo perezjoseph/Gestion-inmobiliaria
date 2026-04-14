@@ -238,7 +238,14 @@ mod pbt_async {
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
             let propiedad_id = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
@@ -289,7 +296,14 @@ mod pbt_async {
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
             let propiedad_id = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let mut created_ids = Vec::new();
             for i in 0..count {
@@ -334,7 +348,14 @@ mod pbt_async {
             let token = make_token(admin_id, "admin");
             let propiedad_a = create_test_propiedad(&db).await;
             let propiedad_b = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
@@ -395,7 +416,14 @@ mod pbt_async {
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
             let propiedad_id = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
@@ -446,7 +474,14 @@ mod pbt_async {
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
             let propiedad_id = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
@@ -492,7 +527,14 @@ mod pbt_async {
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
             let propiedad_id = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
@@ -509,7 +551,14 @@ mod pbt_async {
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
             let propiedad_id = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
@@ -526,7 +575,14 @@ mod pbt_async {
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
             let propiedad_id = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
@@ -543,7 +599,14 @@ mod pbt_async {
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
             let propiedad_id = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
@@ -580,7 +643,14 @@ mod pbt_async {
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
             let propiedad_id = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
@@ -626,7 +696,14 @@ mod pbt_async {
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
             let propiedad_id = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
@@ -681,7 +758,14 @@ mod pbt_async {
             let propiedad_a = create_test_propiedad(&db).await;
             let propiedad_b = create_test_propiedad(&db).await;
             let unidad_on_b = create_test_unidad(&db, propiedad_b).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")
@@ -703,7 +787,14 @@ mod pbt_async {
             let admin_id = create_test_usuario(&db, "admin").await;
             let token = make_token(admin_id, "admin");
             let real_propiedad_id = create_test_propiedad(&db).await;
-            let app = test::init_service(create_app(db.clone(), config)).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri("/api/mantenimiento")

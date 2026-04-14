@@ -14,7 +14,7 @@ use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{api_delete, api_get, api_post, api_put};
 use crate::types::PaginatedResponse;
 use crate::types::inquilino::{CreateInquilino, Inquilino, UpdateInquilino};
-use crate::utils::{can_delete, can_write};
+use crate::utils::{EscapeHandler, can_delete, can_write, field_error, input_class};
 
 fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
     if let Some(t) = toasts {
@@ -113,20 +113,20 @@ fn InquilinoForm(props: &InquilinoFormProps) -> Html {
                 <div>
                     <label class="gi-label">{"Nombre *"}</label>
                     <input type="text" value={(*props.nombre).clone()} oninput={input_cb!(props.nombre)}
-                        class={if fe.nombre.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                    if let Some(ref msg) = fe.nombre { <p class="gi-field-error">{msg}</p> }
+                        class={input_class(fe.nombre.is_some())} />
+                    {field_error(&fe.nombre)}
                 </div>
                 <div>
                     <label class="gi-label">{"Apellido *"}</label>
                     <input type="text" value={(*props.apellido).clone()} oninput={input_cb!(props.apellido)}
-                        class={if fe.apellido.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                    if let Some(ref msg) = fe.apellido { <p class="gi-field-error">{msg}</p> }
+                        class={input_class(fe.apellido.is_some())} />
+                    {field_error(&fe.apellido)}
                 </div>
                 <div>
                     <label class="gi-label" title="Documento de identidad dominicano. Formato: XXX-XXXXXXX-X">{"Cédula *"}</label>
                     <input type="text" value={(*props.cedula).clone()} oninput={input_cb!(props.cedula)}
-                        class={if fe.cedula.is_some() { "gi-input gi-input-error" } else { "gi-input" }} />
-                    if let Some(ref msg) = fe.cedula { <p class="gi-field-error">{msg}</p> }
+                        class={input_class(fe.cedula.is_some())} />
+                    {field_error(&fe.cedula)}
                 </div>
                 <div style="grid-column: 1 / -1;">
                     <button type="button" class="gi-collapsible-trigger" onclick={toggle_optional}>
@@ -186,71 +186,91 @@ struct InquilinoListProps {
 #[function_component]
 fn InquilinoList(props: &InquilinoListProps) -> Html {
     if props.items.is_empty() {
-        return html! {
-            <div class="gi-empty-state">
-                <div class="gi-empty-state-icon">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-                        <circle cx="9" cy="7" r="4"/>
-                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                    </svg>
-                </div>
-                <div class="gi-empty-state-title">{"Sin inquilinos registrados"}</div>
-                <p class="gi-empty-state-text">{"Registre sus inquilinos con nombre y cédula. Luego podrá vincularlos a propiedades mediante contratos."}</p>
-                if can_write(&props.user_rol) {
-                    <button onclick={props.on_new.clone()} class="gi-btn gi-btn-primary" style="margin-top: var(--space-4);">
-                        {"+ Nuevo Inquilino"}
-                    </button>
-                }
-                <div class="gi-empty-state-hint">
-                    {"¿Aún no tiene propiedades? "}
-                    <Link<Route> to={Route::Propiedades} classes="gi-btn-text">
-                        {"Agregar propiedad primero"}
-                    </Link<Route>>
-                </div>
-            </div>
-        };
+        return render_inquilino_empty_state(&props.user_rol, &props.on_new);
     }
 
     html! {
         <>
             <DataTable headers={props.headers.clone()}>
-                { for props.items.iter().map(|i| {
-                    let on_edit = props.on_edit.clone();
-                    let on_delete_click = props.on_delete.clone();
-                    let ic = i.clone();
-                    let id = i.clone();
-                    let user_rol = props.user_rol.clone();
-                    html! {
-                        <tr>
-                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{&i.nombre}</td>
-                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&i.apellido}</td>
-                            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&i.cedula}</td>
-                            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{i.email.as_deref().unwrap_or("—")}</td>
-                            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{i.telefono.as_deref().unwrap_or("—")}</td>
-                            if can_write(&user_rol) {
-                                <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2);">
-                                    <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(ic.clone()))}
-                                        class="gi-btn-text">{"Editar"}</button>
-                                    if can_delete(&user_rol) {
-                                        <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(id.clone()))}
-                                            class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button>
-                                    }
-                                </td>
-                            }
-                        </tr>
-                    }
-                })}
+                { for props.items.iter().map(|i| render_inquilino_row(i, &props.user_rol, &props.on_edit, &props.on_delete)) }
             </DataTable>
             <Pagination
-                total={props.total}
-                page={props.page}
-                per_page={props.per_page}
-                on_page_change={props.on_page_change.clone()}
-                on_per_page_change={props.on_per_page_change.clone()}
+                total={props.total} page={props.page} per_page={props.per_page}
+                on_page_change={props.on_page_change.clone()} on_per_page_change={props.on_per_page_change.clone()}
             />
         </>
+    }
+}
+
+fn render_inquilino_empty_state(user_rol: &str, on_new: &Callback<MouseEvent>) -> Html {
+    let btn = if can_write(user_rol) {
+        html! { <button onclick={on_new.clone()} class="gi-btn gi-btn-primary" style="margin-top: var(--space-4);">{"+ Nuevo Inquilino"}</button> }
+    } else {
+        html! {}
+    };
+    html! {
+        <div class="gi-empty-state">
+            <div class="gi-empty-state-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+            </div>
+            <div class="gi-empty-state-title">{"Sin inquilinos registrados"}</div>
+            <p class="gi-empty-state-text">{"Registre sus inquilinos con nombre y cédula. Luego podrá vincularlos a propiedades mediante contratos."}</p>
+            {btn}
+            <div class="gi-empty-state-hint">
+                {"¿Aún no tiene propiedades? "}
+                <Link<Route> to={Route::Propiedades} classes="gi-btn-text">{"Agregar propiedad primero"}</Link<Route>>
+            </div>
+        </div>
+    }
+}
+
+fn render_inquilino_row(
+    i: &Inquilino,
+    user_rol: &str,
+    on_edit: &Callback<Inquilino>,
+    on_delete: &Callback<Inquilino>,
+) -> Html {
+    let actions = render_inquilino_actions(user_rol, i, on_edit, on_delete);
+    html! {
+        <tr>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{&i.nombre}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&i.apellido}</td>
+            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&i.cedula}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{i.email.as_deref().unwrap_or("—")}</td>
+            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{i.telefono.as_deref().unwrap_or("—")}</td>
+            {actions}
+        </tr>
+    }
+}
+
+fn render_inquilino_actions(
+    user_rol: &str,
+    i: &Inquilino,
+    on_edit: &Callback<Inquilino>,
+    on_delete: &Callback<Inquilino>,
+) -> Html {
+    if !can_write(user_rol) {
+        return html! {};
+    }
+    let ic = i.clone();
+    let id = i.clone();
+    let on_edit = on_edit.clone();
+    let on_delete_click = on_delete.clone();
+    let delete_btn = if can_delete(user_rol) {
+        html! { <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(id.clone()))} class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button> }
+    } else {
+        html! {}
+    };
+    html! {
+        <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2);">
+            <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(ic.clone()))} class="gi-btn-text">{"Editar"}</button>
+            {delete_btn}
+        </td>
     }
 }
 
@@ -342,10 +362,7 @@ fn do_delete_inquilino(
     });
 }
 
-#[allow(clippy::type_complexity)]
-fn register_escape_listener_i(
-    escape_handler: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>>,
-) -> Option<EventListener> {
+fn register_escape_listener_i(escape_handler: EscapeHandler) -> Option<EventListener> {
     web_sys::window().and_then(|w| w.document()).map(|doc| {
         EventListener::new(&doc, "keydown", move |event| {
             let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();

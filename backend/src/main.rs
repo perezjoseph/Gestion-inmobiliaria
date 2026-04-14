@@ -1,5 +1,7 @@
+use actix_web::web;
 use realestate_backend::app;
 use realestate_backend::config::AppConfig;
+use realestate_backend::services::ocr_preview::PreviewStore;
 
 #[path = "../migrations/mod.rs"]
 pub mod migrations;
@@ -26,10 +28,22 @@ async fn main() -> std::io::Result<()> {
 
     let port = config.server_port;
 
+    let preview_store = web::Data::new(PreviewStore::new());
+    let cleanup_store = preview_store.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
+        loop {
+            interval.tick().await;
+            cleanup_store.cleanup_expired();
+        }
+    });
+
     tracing::info!("Servidor iniciando en 0.0.0.0:{}", port);
 
-    actix_web::HttpServer::new(move || app::create_app(db.clone(), config.clone()))
-        .bind(("0.0.0.0", port))?
-        .run()
-        .await
+    actix_web::HttpServer::new(move || {
+        app::create_app(db.clone(), config.clone(), preview_store.clone())
+    })
+    .bind(("0.0.0.0", port))?
+    .run()
+    .await
 }
