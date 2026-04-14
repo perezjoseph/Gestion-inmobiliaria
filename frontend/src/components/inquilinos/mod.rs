@@ -1,1 +1,1 @@
-// Stub for inquilinos components
+

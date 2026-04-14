@@ -8,9 +8,8 @@ from collections import defaultdict
 
 from .config import BIND_ADDRESS, MAX_FIELD_LENGTH, SAFE_NAME_RE, SAFE_URL_RE
 
-# =============================================================================
 # NETWORK BINDING — DO NOT CHANGE
-# =============================================================================
+#
 # This listener MUST bind to 0.0.0.0 to accept webhooks from GitHub Actions
 # runners on the local network 192.168.88.0/24.
 #
@@ -23,7 +22,6 @@ from .config import BIND_ADDRESS, MAX_FIELD_LENGTH, SAFE_NAME_RE, SAFE_URL_RE
 # DO NOT remove 192.168.88.0/24 from ALLOWED_NETWORKS.
 # DO NOT restrict the default to localhost-only.
 # If you have a security concern, raise it — do not silently change this.
-# =============================================================================
 
 ALLOWED_NETWORKS = [
     ipaddress.ip_network("127.0.0.0/8"),

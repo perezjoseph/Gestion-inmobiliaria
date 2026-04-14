@@ -1,12 +1,35 @@
+"""
+CI fixer workflows with GSD-inspired patterns:
+
+1. Post-fix verification gate — independent verify after kiro returns
+2. Scope enforcement gate — reject diffs exceeding file/line limits
+3. Fresh context on retry — trim prompts instead of accumulating context
+4. Time-based dedup — skip to escalation if same error hash failed recently
+5. Parallel sonar file groups — wave-based execution for independent files
+6. Diagnose-before-fix — separate "read and plan" from "execute the fix"
+"""
+
 import json
+import re
 import threading
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
-from .config import WIN_PROJECT_DIR, MAX_RETRIES, SCOPE_CONSTRAINTS, log
+from .config import (
+    WIN_PROJECT_DIR, MAX_RETRIES, SCOPE_CONSTRAINTS,
+    SONAR_PARALLEL_GROUPS, log,
+)
 from .runner import wsl_bash, run_kiro
 from .classifier import classify_error
 from .history import record_fix_attempt, get_past_attempts
-from .memory import store_fix_attempt, store_fix_outcome, search_relevant_context, extract_outcome_from_output
+from .memory import (
+    store_fix_attempt, store_fix_outcome,
+    search_relevant_context, extract_outcome_from_output,
+)
+from .gates import (
+    preflight_dedup, revision_scope_check, verification_run,
+)
 
 _fix_lock = threading.Lock()
 _sonar_fix_lock = threading.Lock()
@@ -139,7 +162,41 @@ def _build_error_notes(error_class):
     return notes.get(error_class, "")
 
 
+def _diagnose(job, step, error_log, error_class, context):
+    """Stage 1: Diagnose the error and produce a fix plan without executing.
+
+    Returns a short strategy string the executor can use.
+    """
+    ctx = ""
+    if context:
+        ctx = f" (commit: {context.get('commit', '?')[:8]}, branch: {context.get('branch', '?')})"
+
+    instruction = _JOB_INSTRUCTIONS.get(job, "Analyze the error and fix the issue.")
+    error_note = _build_error_notes(error_class)
+
+    prompt = (
+        f"DIAGNOSE ONLY -- do NOT make changes yet.\n\n"
+        f"The CI pipeline FAILED in job '{job}', step '{step}'.{ctx}\n"
+        f"Error classification: {error_class}\n\n"
+        f"Error output:\n```\n{error_log[:4000]}\n```\n\n"
+        f"Context: {instruction}\n"
+        f"{error_note}\n\n"
+        "YOUR TASK:\n"
+        "1. Read the error output carefully.\n"
+        "2. Identify the root cause.\n"
+        "3. List the specific files that need changes.\n"
+        "4. Describe the minimal fix strategy in 2-3 sentences.\n"
+        "5. Do NOT edit any files. Do NOT run git commands.\n"
+        "6. Output your diagnosis as plain text."
+    )
+
+    result = run_kiro(prompt, f"Diagnose ({job}/{step})")
+    kiro_output = result[1] if isinstance(result, tuple) else ""
+    return kiro_output[-2000:] if kiro_output else "diagnosis unavailable"
+
+
 def fix_with_retry(job, step, error_log, context=None):
+    """GSD-inspired fix pipeline: preflight → diagnose → execute → verify → gate."""
     if not _fix_lock.acquire(blocking=False):
         log.warning(f"Another fix is already running -- skipping {job}/{step}")
         return False
@@ -149,37 +206,57 @@ def fix_with_retry(job, step, error_log, context=None):
             log.warning(f"Last commit is an auto-fix -- skipping {job}/{step} to prevent loop")
             return False
 
-        ctx = ""
+        # Gate 1: Time-based dedup
+        passed, reason = preflight_dedup(job, error_log)
+        if not passed:
+            log.warning(f"Preflight dedup rejected {job}/{step}: {reason}")
+            _write_escalation(job, step, error_log, "dedup_rejected", context,
+                              extra_reason=reason)
+            return False
+
+        ctx_str = ""
         if context:
-            ctx = f" (commit: {context.get('commit', '?')[:8]}, branch: {context.get('branch', '?')}, actor: {context.get('actor', '?')})"
+            ctx_str = (
+                f" (commit: {context.get('commit', '?')[:8]}, "
+                f"branch: {context.get('branch', '?')}, "
+                f"actor: {context.get('actor', '?')})"
+            )
 
         error_class = classify_error(error_log)
         log.info(f"Error classified as: {error_class} for {job}/{step}")
 
+        # Stage 1: Diagnose before fixing
+        log.info(f"=== Diagnosing {job}/{step} ===")
+        diagnosis = _diagnose(job, step, error_log, error_class, context)
+        log.info(f"Diagnosis complete for {job}/{step}")
+
         past_attempts_section = get_past_attempts(job, error_log)
         semantic_context = search_relevant_context(job, error_log)
-        previous_attempt_result = ""
+        last_strategy_summary = ""
 
         for attempt in range(1, MAX_RETRIES + 1):
-            log.info(f"=== Attempt {attempt}/{MAX_RETRIES} for {job}/{step}{ctx} (class: {error_class}) ===")
+            log.info(f"=== Attempt {attempt}/{MAX_RETRIES} for {job}/{step}{ctx_str} (class: {error_class}) ===")
 
             instruction = _JOB_INSTRUCTIONS.get(job, "Analyze the error and fix the issue.")
             error_note = _build_error_notes(error_class)
 
+            # Fresh context per retry: only include what's needed
             history_section = f"\n\n{past_attempts_section}" if past_attempts_section else ""
             semantic_section = f"\n\n{semantic_context}" if semantic_context else ""
+
+            # On retry, send a minimal "try different approach" directive
             retry_section = ""
-            if previous_attempt_result:
+            if last_strategy_summary:
                 retry_section = (
-                    f"\n\nPREVIOUS ATTEMPT FAILED (attempt {attempt - 1}):\n"
-                    f"{previous_attempt_result}\n"
-                    "You MUST try a DIFFERENT approach this time. Do not repeat the same fix."
+                    f"\n\nPREVIOUS ATTEMPT FAILED. Strategy tried: {last_strategy_summary}\n"
+                    "You MUST try a DIFFERENT approach. Do not repeat the same fix."
                 )
 
             prompt = (
-                f"The CI pipeline FAILED in job '{job}', step '{step}'.{ctx}\n"
+                f"The CI pipeline FAILED in job '{job}', step '{step}'.{ctx_str}\n"
                 f"Error classification: {error_class}\n"
                 f"Fix attempt: {attempt} of {MAX_RETRIES}\n\n"
+                f"DIAGNOSIS:\n{diagnosis[:1500]}\n\n"
                 f"Error output:\n```\n{error_log}\n```\n\n"
                 f"TASK: {instruction}"
                 f"{error_note}"
@@ -188,9 +265,9 @@ def fix_with_retry(job, step, error_log, context=None):
                 f"{retry_section}"
                 f"{SCOPE_CONSTRAINTS}\n\n"
                 "After fixing, run only the targeted verification command for this job. "
-                "Then commit and push:\n"
-                "  git add -A && git commit -m 'fix: resolve CI failures (auto-fix)' && git push origin main\n"
-                "  If push fails: git pull --rebase origin main && git push origin main"
+                "Then stage your changes:\n"
+                "  git add -A\n"
+                "Do NOT commit yet -- the system will verify and commit."
             )
 
             result = run_kiro(prompt, f"CI fix ({job}/{step}) attempt {attempt}")
@@ -200,11 +277,52 @@ def fix_with_retry(job, step, error_log, context=None):
             outcome = extract_outcome_from_output(kiro_output) if kiro_output else {}
             strategy_note = outcome.get("strategy", "")
 
-            record_fix_attempt(job, error_log, attempt, success,
-                               f"class={error_class}, job={job}, step={step}. {strategy_note}")
-            store_fix_attempt(job, step, error_class, error_log, attempt, success)
+            if not success:
+                last_strategy_summary = strategy_note or "unknown"
+                record_fix_attempt(job, error_log, attempt, False,
+                                   f"class={error_class}, job={job}, step={step}. {strategy_note}")
+                store_fix_attempt(job, step, error_class, error_log, attempt, False)
+                log.warning(f"Attempt {attempt} kiro-cli returned failure for {job}/{step}")
+                continue
 
-            if success:
+            # Gate 2: Scope enforcement
+            scope_passed, scope_reason = revision_scope_check()
+            if not scope_passed:
+                log.warning(f"Scope gate rejected attempt {attempt} for {job}/{step}: {scope_reason}")
+                wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+                last_strategy_summary = f"SCOPE VIOLATION ({scope_reason}). {strategy_note}"
+                record_fix_attempt(job, error_log, attempt, False,
+                                   f"scope_rejected: {scope_reason}. {strategy_note}")
+                store_fix_attempt(job, step, error_class, error_log, attempt, False)
+                continue
+
+            # Gate 3: Independent verification
+            verify_passed, verify_reason = verification_run(job)
+            if not verify_passed:
+                log.warning(f"Verification gate failed for attempt {attempt} ({job}/{step}): {verify_reason}")
+                wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+                last_strategy_summary = f"VERIFY FAILED ({verify_reason[:200]}). {strategy_note}"
+                record_fix_attempt(job, error_log, attempt, False,
+                                   f"verify_failed: {verify_reason[:200]}. {strategy_note}")
+                store_fix_attempt(job, step, error_class, error_log, attempt, False)
+                continue
+
+            # All gates passed -- commit and push
+            log.info(f"All gates passed for attempt {attempt} ({job}/{step}). Committing.")
+            commit_result = wsl_bash(
+                "git add -A && "
+                "git commit -m 'fix: resolve CI failures (auto-fix)' && "
+                "git push origin main || "
+                "(git pull --rebase origin main && git push origin main)",
+                timeout=120,
+            )
+
+            commit_ok = commit_result.returncode == 0
+            record_fix_attempt(job, error_log, attempt, commit_ok,
+                               f"class={error_class}, job={job}, step={step}. {strategy_note}")
+            store_fix_attempt(job, step, error_class, error_log, attempt, commit_ok)
+
+            if commit_ok:
                 store_fix_outcome(
                     job, error_class,
                     files_changed=outcome.get("files_changed", ""),
@@ -213,13 +331,8 @@ def fix_with_retry(job, step, error_log, context=None):
                 log.info(f"Attempt {attempt} completed for {job}/{step}")
                 return True
 
-            previous_attempt_result = (
-                f"kiro-cli returned failure for attempt {attempt}. "
-                f"Strategy tried: {strategy_note or 'unknown'}. "
-                f"Files touched: {outcome.get('files_changed', 'unknown')}. "
-                f"Error class: {error_class}. Job: {job}, Step: {step}."
-            )
-            log.warning(f"Attempt {attempt} failed for {job}/{step}")
+            log.warning(f"Commit/push failed for attempt {attempt} ({job}/{step})")
+            last_strategy_summary = f"commit/push failed. {strategy_note}"
 
         _write_escalation(job, step, error_log, error_class, context)
         log.error(f"Failed after {MAX_RETRIES} attempts for {job}/{step}. Escalation written.")
@@ -228,11 +341,16 @@ def fix_with_retry(job, step, error_log, context=None):
         _fix_lock.release()
 
 
-def _write_escalation(job, step, error_log, error_class, context):
+def _write_escalation(job, step, error_log, error_class, context, extra_reason=""):
     escalation_dir = WIN_PROJECT_DIR / "escalations"
     try:
         escalation_dir.mkdir(exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Include actual strategies attempted from history
+        past = get_past_attempts(job, error_log)
+        semantic = search_relevant_context(job, error_log)
+
         report = {
             "timestamp": datetime.now().isoformat(),
             "job": job,
@@ -242,6 +360,9 @@ def _write_escalation(job, step, error_log, error_class, context):
             "max_retries_exhausted": MAX_RETRIES,
             "error_log_preview": error_log[:3000],
             "recommendation": _escalation_recommendation(error_class, job),
+            "strategies_attempted": past or "no history",
+            "similar_past_fixes": semantic or "no semantic matches",
+            "extra_reason": extra_reason,
         }
         path = escalation_dir / f"{ts}_{job}.json"
         path.write_text(json.dumps(report, indent=2, ensure_ascii=False),
@@ -271,11 +392,69 @@ def _escalation_recommendation(error_class, job):
             f"Code quality issue in {job} that auto-fix could not resolve. "
             "May require architectural changes or understanding of the broader context."
         ),
+        "dedup_rejected": (
+            f"Fix for {job} was rejected by dedup gate. The same error pattern "
+            "has failed multiple times recently. This likely requires human investigation."
+        ),
     }
     return recs.get(error_class, f"Auto-fix exhausted {MAX_RETRIES} attempts for {job}. Manual investigation required.")
 
 
+def _parse_sonar_report_by_file(sonar_report):
+    """Group sonar issues by file for wave-based parallel execution.
+
+    Expected format per line: severity | file:line | rule | message
+    """
+    file_groups = defaultdict(list)
+    for line in sonar_report.strip().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or line.startswith("---"):
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) >= 3:
+            file_ref = parts[1] if len(parts) > 1 else ""
+            file_name = file_ref.split(":")[0].strip() if ":" in file_ref else file_ref.strip()
+            if file_name:
+                file_groups[file_name].append(line)
+            else:
+                file_groups["_ungrouped"].append(line)
+        else:
+            file_groups["_ungrouped"].append(line)
+
+    return dict(file_groups)
+
+
+def _fix_sonar_file_group(file_group_report, run_url, group_label):
+    """Fix sonar issues for a single file group. Returns (success, label)."""
+    is_kotlin = any(f.endswith((".kt", ".kts")) for f in group_label.split(","))
+    verify_cmd = (
+        "(cd android && ./gradlew spotlessApply detekt testDebugUnitTest)"
+        if is_kotlin else
+        "cargo fmt && cargo clippy --locked -- -D warnings && cargo test --locked"
+    )
+
+    prompt = (
+        "You are a code quality specialist. Fix ONLY the issues listed below.\n\n"
+        f"SonarQube issues for this file group:\n```\n{file_group_report}\n```\n\n"
+        "METHODOLOGY:\n"
+        "1. Open each file at the specified line.\n"
+        "2. Read 10 lines of context above and below.\n"
+        "3. Apply the minimal fix for each violation.\n"
+        "4. For security hotspots: evaluate if actually vulnerable before changing.\n"
+        f"5. Verify: {verify_cmd}\n"
+        "6. Stage changes: git add -A\n"
+        "Do NOT commit -- the orchestrator handles commits.\n"
+        f"{SCOPE_CONSTRAINTS}\n\n"
+        f"Run URL: {run_url}"
+    )
+
+    result = run_kiro(prompt, f"Sonar fix ({group_label})")
+    success = result[0] if isinstance(result, tuple) else result
+    return success, group_label
+
+
 def fix_sonar_issues(sonar_report, run_url):
+    """Wave-based sonar fix: parse by file, execute groups in parallel."""
     if not _sonar_fix_lock.acquire(blocking=False):
         log.warning("Another SonarQube fix is already running -- skipping")
         return False
@@ -285,60 +464,84 @@ def fix_sonar_issues(sonar_report, run_url):
             log.warning("Last commit is an auto-fix -- skipping SonarQube fix to prevent loop")
             return False
 
-        previous_attempt_result = ""
+        file_groups = _parse_sonar_report_by_file(sonar_report)
+
+        if not file_groups:
+            log.warning("No parseable issues in sonar report, falling back to single prompt")
+            file_groups = {"all": sonar_report.splitlines()}
+
+        # Build waves: group files into batches for parallel execution
+        group_items = list(file_groups.items())
+        waves = []
+        for i in range(0, len(group_items), SONAR_PARALLEL_GROUPS):
+            waves.append(group_items[i:i + SONAR_PARALLEL_GROUPS])
+
+        log.info(f"Sonar fix: {len(file_groups)} file groups in {len(waves)} waves")
 
         for attempt in range(1, MAX_RETRIES + 1):
-            log.info(f"=== SonarQube issue fix attempt {attempt}/{MAX_RETRIES} ===")
+            log.info(f"=== SonarQube fix attempt {attempt}/{MAX_RETRIES} ({len(waves)} waves) ===")
 
-            retry_section = ""
-            if previous_attempt_result:
-                retry_section = (
-                    f"\n\nPREVIOUS ATTEMPT FAILED (attempt {attempt - 1}):\n"
-                    f"{previous_attempt_result}\n"
-                    "Try a different approach. Focus on the issues that were NOT fixed in the previous attempt."
-                )
+            all_succeeded = True
+            failed_groups = []
 
-            prompt = (
-                "You are a code quality specialist working on a Rust/WASM real estate management project "
-                "with a Kotlin Android module.\n\n"
-                f"SonarQube issue report:\n```\n{sonar_report}\n```\n\n"
-                "METHODOLOGY:\n"
-                "1. Parse the report: each line has severity | file:line | rule | message.\n"
-                "2. Group issues by file to minimize context switches.\n"
-                "3. Fix BLOCKER and HIGH severity first, then MEDIUM.\n"
-                "4. For each issue:\n"
-                "   a. Open the file at the specified line.\n"
-                "   b. Read the surrounding context (10 lines above and below).\n"
-                "   c. Understand the rule violation (the rule ID tells you what's wrong).\n"
-                "   d. Apply the minimal fix that resolves the violation.\n"
-                "5. For security hotspots: evaluate if the code is actually vulnerable. "
-                "If safe, note it. If vulnerable, fix it.\n"
-                "6. After all fixes:\n"
-                "   - For Rust files: run 'cargo fmt', 'cargo clippy --locked -- -D warnings', "
-                "and 'cargo test --locked' to verify.\n"
-                "   - For Kotlin files: run './gradlew spotlessApply detekt testDebugUnitTest' in android/.\n"
-                "7. If tests fail after your changes, fix the test failures before proceeding.\n"
-                "8. Stage, commit, and push:\n"
-                "   git add -A && git commit -m 'fix: resolve SonarQube issues (auto-fix)' && git push origin main\n"
-                "   If push fails: git pull --rebase origin main && git push origin main\n"
-                "9. Do NOT stop until all reported issues are addressed.\n"
-                f"{retry_section}"
-                f"{SCOPE_CONSTRAINTS}\n\n"
-                f"Run URL for context: {run_url}"
+            for wave_idx, wave in enumerate(waves):
+                log.info(f"  Wave {wave_idx + 1}/{len(waves)}: {len(wave)} groups")
+
+                if len(wave) == 1:
+                    file_name, issues = wave[0]
+                    group_report = "\n".join(issues)
+                    success, label = _fix_sonar_file_group(group_report, run_url, file_name)
+                    if not success:
+                        all_succeeded = False
+                        failed_groups.append(label)
+                else:
+                    with ThreadPoolExecutor(max_workers=SONAR_PARALLEL_GROUPS) as executor:
+                        futures = {}
+                        for file_name, issues in wave:
+                            group_report = "\n".join(issues)
+                            future = executor.submit(
+                                _fix_sonar_file_group, group_report, run_url, file_name,
+                            )
+                            futures[future] = file_name
+
+                        for future in as_completed(futures):
+                            try:
+                                success, label = future.result(timeout=600)
+                                if not success:
+                                    all_succeeded = False
+                                    failed_groups.append(label)
+                            except Exception as e:
+                                all_succeeded = False
+                                failed_groups.append(futures[future])
+                                log.warning(f"Sonar fix group failed: {e}")
+
+            # After all waves, verify scope and commit
+            scope_passed, scope_reason = revision_scope_check()
+            if not scope_passed:
+                log.warning(f"Sonar fix scope gate rejected: {scope_reason}")
+                wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+                if attempt < MAX_RETRIES:
+                    continue
+                log.error("Sonar fix exceeded scope limits on all attempts")
+                return False
+
+            commit_result = wsl_bash(
+                "git add -A && "
+                "git diff --cached --quiet && echo 'nothing to commit' || "
+                "(git commit -m 'fix: resolve SonarQube issues (auto-fix)' && "
+                "git push origin main || "
+                "(git pull --rebase origin main && git push origin main))",
+                timeout=120,
             )
 
-            result = run_kiro(prompt, f"SonarQube issue fix attempt {attempt}")
-            success = result[0] if isinstance(result, tuple) else result
-
-            if success:
-                log.info(f"SonarQube fix attempt {attempt} completed")
+            if commit_result.returncode == 0:
+                if failed_groups:
+                    log.warning(f"Sonar fix partial success. Failed groups: {failed_groups}")
+                else:
+                    log.info(f"SonarQube fix attempt {attempt} completed (all groups)")
                 return True
 
-            previous_attempt_result = (
-                f"kiro-cli returned failure for SonarQube fix attempt {attempt}. "
-                "Some issues may remain unfixed or the verification step failed."
-            )
-            log.warning(f"SonarQube fix attempt {attempt} failed")
+            log.warning(f"SonarQube fix attempt {attempt} commit/push failed")
 
         log.error(f"SonarQube fix failed after {MAX_RETRIES} attempts.")
         return False
@@ -412,20 +615,39 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
                 "1. Read the relevant workflow YAML files fully before making changes.\n"
                 "2. Make ALL improvements you identify. Do not stop at one.\n"
                 "3. After making changes, verify the YAML is valid.\n"
-                "4. Stage, commit, and push:\n"
-                f"   git add -A && git commit -m 'ci: improve pipeline ({focus})' && git push origin main\n"
-                "   If push fails: git pull --rebase origin main && git push origin main\n"
-                "5. Do NOT stop until you are confident the pipeline is meaningfully better.\n\n"
+                "4. Stage changes: git add -A\n"
+                "Do NOT commit -- the system will verify and commit.\n\n"
                 f"Run URL: {run_url}"
             )
 
             result = run_kiro(prompt, f"Pipeline improve ({focus}) attempt {attempt}")
             success = result[0] if isinstance(result, tuple) else result
-            if success:
+
+            if not success:
+                log.warning(f"Pipeline improvement attempt {attempt} failed")
+                continue
+
+            # Scope gate
+            scope_passed, scope_reason = revision_scope_check()
+            if not scope_passed:
+                log.warning(f"Pipeline improve scope gate rejected: {scope_reason}")
+                wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+                continue
+
+            commit_result = wsl_bash(
+                "git add -A && "
+                "git diff --cached --quiet && echo 'nothing to commit' || "
+                f"(git commit -m 'ci: improve pipeline ({focus})' && "
+                "git push origin main || "
+                "(git pull --rebase origin main && git push origin main))",
+                timeout=120,
+            )
+
+            if commit_result.returncode == 0:
                 log.info(f"Pipeline improvement attempt {attempt} completed")
                 return True
 
-            log.warning(f"Pipeline improvement attempt {attempt} failed")
+            log.warning(f"Pipeline improvement attempt {attempt} commit/push failed")
 
         log.error(f"Pipeline improvement failed after {MAX_RETRIES} attempts.")
         return False

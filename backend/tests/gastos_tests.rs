@@ -381,8 +381,6 @@ mod db_async {
         let _ = gasto::Entity::delete_by_id(id).exec(db).await;
     }
 
-    // ========== Task 9.1: Full CRUD cycle ==========
-
     pub fn crud_cycle() {
         with_db(|db| async move {
             let config = make_config();
@@ -451,8 +449,6 @@ mod db_async {
         });
     }
 
-    // ========== Task 9.1: Pagination ==========
-
     pub fn pagination() {
         with_db(|db| async move {
             let config = make_config();
@@ -499,8 +495,6 @@ mod db_async {
             }
         });
     }
-
-    // ========== Task 9.1: Filter by propiedad_id ==========
 
     pub fn filter_propiedad_id() {
         with_db(|db| async move {
@@ -558,8 +552,6 @@ mod db_async {
         });
     }
 
-    // ========== Task 9.1: Filter by categoria ==========
-
     pub fn filter_categoria() {
         with_db(|db| async move {
             let config = make_config();
@@ -599,8 +591,6 @@ mod db_async {
             cleanup_gasto(&db, gasto_id).await;
         });
     }
-
-    // ========== Task 9.1: Filter by date range ==========
 
     pub fn filter_date_range() {
         with_db(|db| async move {
@@ -648,8 +638,6 @@ mod db_async {
         });
     }
 
-    // ========== Task 9.2: CSV import valid ==========
-
     pub fn csv_import_valid() {
         with_db(|db| async move {
             let config = make_config();
@@ -685,8 +673,6 @@ mod db_async {
             assert_eq!(result["fallidos"].as_array().unwrap().len(), 0);
         });
     }
-
-    // ========== Task 9.2: CSV import mixed valid/invalid ==========
 
     pub fn csv_import_mixed() {
         with_db(|db| async move {
@@ -728,8 +714,6 @@ mod db_async {
         });
     }
 
-    // ========== Task 9.2: CSV import empty returns 422 ==========
-
     pub fn csv_import_empty() {
         with_db(|db| async move {
             let config = make_config();
@@ -757,8 +741,6 @@ mod db_async {
         });
     }
 
-    // ========== Task 9.3: Profitability report JSON ==========
-
     pub fn profitability_json() {
         with_db(|db| async move {
             let config = make_config();
@@ -782,8 +764,6 @@ mod db_async {
         });
     }
 
-    // ========== Task 9.3: Profitability report PDF ==========
-
     pub fn profitability_pdf() {
         with_db(|db| async move {
             let config = make_config();
@@ -801,8 +781,6 @@ mod db_async {
             assert!(!body.is_empty());
         });
     }
-
-    // ========== Task 9.3: Profitability report XLSX ==========
 
     pub fn profitability_xlsx() {
         with_db(|db| async move {
@@ -822,8 +800,6 @@ mod db_async {
         });
     }
 
-    // ========== Task 9.4: Dashboard stats includes totalGastosMes ==========
-
     pub fn dashboard_stats_gastos() {
         with_db(|db| async move {
             let config = make_config();
@@ -841,8 +817,6 @@ mod db_async {
             assert!(body.get("totalGastosMes").is_some());
         });
     }
-
-    // ========== Task 9.4: Gastos comparacion ==========
 
     pub fn gastos_comparacion() {
         with_db(|db| async move {

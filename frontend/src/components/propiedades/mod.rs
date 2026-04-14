@@ -1,1 +1,1 @@
-// Stub for propiedades components
+

@@ -1,1 +1,1 @@
-// Stub for pagos components
+

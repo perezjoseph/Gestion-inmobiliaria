@@ -82,10 +82,6 @@ mod structural_checks {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Task 2: Preservation Property Tests
-// ---------------------------------------------------------------------------
-//
 // These tests verify baseline behavior on UNFIXED code. They must PASS,
 // confirming the behavior that the bugfix must preserve.
 

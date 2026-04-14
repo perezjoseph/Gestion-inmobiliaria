@@ -209,7 +209,6 @@ pub fn ProtectedRoute(props: &ProtectedRouteProps) -> Html {
 
     html! {
         <div class="flex min-h-screen" style="background-color: var(--surface-base);">
-            // Mobile overlay
             if *sidebar_open {
                 <div class="gi-sidebar-overlay open" onclick={on_close_sidebar}></div>
             }

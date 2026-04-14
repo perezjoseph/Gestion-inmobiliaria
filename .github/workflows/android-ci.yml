@@ -792,6 +792,7 @@ jobs:
         run: |
           SCAN_ARGS=()
           SCAN_ARGS+=("-Dsonar.projectBaseDir=/usr/src")
+          SCAN_ARGS+=("-Dsonar.scanner.javaExePath=/opt/java/openjdk/bin/java")
           SCAN_ARGS+=("-Dsonar.qualitygate.wait=true")
           SCAN_ARGS+=("-Dsonar.qualitygate.timeout=300")
 
@@ -865,7 +866,7 @@ jobs:
             --cpus 2 \
             --pids-limit 256 \
             --tmpfs /tmp:rw,noexec,nosuid,nodev,size=256m \
-            --tmpfs /opt/sonar-scanner/.sonar:rw,noexec,nosuid,nodev,size=512m \
+            --tmpfs /opt/sonar-scanner/.sonar:rw,nosuid,nodev,size=512m \
             --tmpfs /home/scanner:rw,noexec,nosuid,nodev,size=64m \
             -e SONAR_TOKEN="${SONAR_ANALYSIS_TOKEN}" \
             -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
