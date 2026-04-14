@@ -41,10 +41,42 @@ env:
   SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
 jobs:
+  # ── Stage 0: Runner Disk Cleanup (self-hosted only) ──
+
+  runner-cleanup:
+    name: Runner Disk Cleanup
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    timeout-minutes: 5
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+    steps:
+      - name: Check disk space and clean if low
+        run: |
+          AVAIL_KB=$(df -k "${RUNNER_TEMP:-/tmp}" | awk 'NR==2 {print $4}')
+          AVAIL_MB=$((AVAIL_KB / 1024))
+          echo "Available disk space: ${AVAIL_MB}MB"
+          if [ "$AVAIL_MB" -lt 2048 ]; then
+            echo "::warning::Low disk space (${AVAIL_MB}MB). Running cleanup."
+            rm -rf "${RUNNER_TEMP:-/tmp}"/runner-*/_actions/_temp_* 2>/dev/null || true
+            docker system prune -f --volumes 2>/dev/null || true
+            docker builder prune -f 2>/dev/null || true
+            AFTER_KB=$(df -k "${RUNNER_TEMP:-/tmp}" | awk 'NR==2 {print $4}')
+            AFTER_MB=$((AFTER_KB / 1024))
+            echo "Disk space after cleanup: ${AFTER_MB}MB (freed $((AFTER_MB - AVAIL_MB))MB)"
+            if [ "$AFTER_MB" -lt 1024 ]; then
+              echo "::error::Disk space critically low after cleanup (${AFTER_MB}MB). Runner needs manual intervention."
+              exit 1
+            fi
+          else
+            echo "Disk space OK (${AVAIL_MB}MB)."
+          fi
+
   # ── Stage 1: Quality Checks (all run in parallel) ──
 
   secret-scan:
     name: Secret Scanning (Gitleaks)
+    needs: [runner-cleanup]
     runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
     timeout-minutes: 10
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -107,6 +139,7 @@ jobs:
 
   lint:
     name: Code Formatting & Static Analysis
+    needs: [runner-cleanup]
     runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
     timeout-minutes: 20
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -290,6 +323,7 @@ jobs:
 
   test-backend:
     name: Backend Unit & Integration Tests
+    needs: [runner-cleanup]
     runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","docker"]') }}
     timeout-minutes: 30
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -499,6 +533,7 @@ jobs:
 
   test-frontend:
     name: Frontend WASM Compilation & Tests
+    needs: [runner-cleanup]
     runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
     timeout-minutes: 20
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -607,6 +642,7 @@ jobs:
 
   quality-gate:
     name: Dependency Security & Health Check
+    needs: [runner-cleanup]
     runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","docker"]') }}
     timeout-minutes: 30
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
