@@ -35,25 +35,41 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Check disk space and clean if low
+      - name: Aggressive disk cleanup
         run: |
-          AVAIL_KB=$(df -k "${RUNNER_TEMP:-/tmp}" | awk 'NR==2 {print $4}')
+          echo "=== Disk before cleanup ==="
+          df -h / || true
+
+          # Docker cleanup
+          docker system prune -af --volumes 2>/dev/null || true
+          docker builder prune -af 2>/dev/null || true
+
+          # Gradle caches (build-cache, transforms, journal, wrapper dists, daemon)
+          rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
+          rm -rf ~/.gradle/wrapper/dists/ ~/.gradle/daemon 2>/dev/null || true
+          rm -rf ~/.gradle/caches/*/scripts ~/.gradle/caches/*/generated-gradle-jars 2>/dev/null || true
+
+          # Tool caches older than 2 days
+          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +2 -exec rm -rf {} + 2>/dev/null || true
+
+          # Temp files older than 1 day
+          find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
+          rm -rf "${RUNNER_TEMP:-/tmp}"/runner-*/_actions/_temp_* 2>/dev/null || true
+
+          # Old workspace leftovers (previous job checkouts)
+          if [ -n "${GITHUB_WORKSPACE}" ] && [ "${GITHUB_WORKSPACE}" != "/" ]; then
+            WORK_DIR=$(dirname "${GITHUB_WORKSPACE}")
+            find "$WORK_DIR" -maxdepth 2 -mindepth 1 -name '.git' -mtime +1 -execdir rm -rf . \; 2>/dev/null || true
+          fi
+
+          echo "=== Disk after cleanup ==="
+          df -h / || true
+          AVAIL_KB=$(df --output=avail / | tail -1)
           AVAIL_MB=$((AVAIL_KB / 1024))
           echo "Available disk space: ${AVAIL_MB}MB"
-          if [ "$AVAIL_MB" -lt 2048 ]; then
-            echo "::warning::Low disk space (${AVAIL_MB}MB). Running cleanup."
-            rm -rf "${RUNNER_TEMP:-/tmp}"/runner-*/_actions/_temp_* 2>/dev/null || true
-            docker system prune -f --volumes 2>/dev/null || true
-            docker builder prune -f 2>/dev/null || true
-            AFTER_KB=$(df -k "${RUNNER_TEMP:-/tmp}" | awk 'NR==2 {print $4}')
-            AFTER_MB=$((AFTER_KB / 1024))
-            echo "Disk space after cleanup: ${AFTER_MB}MB (freed $((AFTER_MB - AVAIL_MB))MB)"
-            if [ "$AFTER_MB" -lt 1024 ]; then
-              echo "::error::Disk space critically low after cleanup (${AFTER_MB}MB). Runner needs manual intervention."
-              exit 1
-            fi
-          else
-            echo "Disk space OK (${AVAIL_MB}MB)."
+          if [ "$AVAIL_MB" -lt 1024 ]; then
+            echo "::error::Disk space critically low after cleanup (${AVAIL_MB}MB). Runner needs manual intervention."
+            exit 1
           fi
 
   # ── Stage 1: Quality Checks (all run in parallel) ──
@@ -124,6 +140,12 @@ jobs:
 
       - name: Run Gitleaks secret detection
         run: gitleaks detect --source . --verbose --redact --exit-code 1
+
+      - name: Post-job workspace cleanup
+        if: always() && !startsWith(runner.name, 'GitHub Actions')
+        run: |
+          rm -rf "${GITHUB_WORKSPACE:?}"/* 2>/dev/null || true
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -maxdepth 1 -name '.*' ! -name '.runner' -exec rm -rf {} + 2>/dev/null || true
 
   dependency-review:
     name: Dependency Review (PR)
@@ -313,6 +335,12 @@ jobs:
         if: always()
         run: rm -f "${RUNNER_TEMP}/lint-all-output.txt"
 
+      - name: Post-job workspace cleanup
+        if: always() && !startsWith(runner.name, 'GitHub Actions')
+        run: |
+          rm -rf "${GITHUB_WORKSPACE:?}"/* 2>/dev/null || true
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -maxdepth 1 -name '.*' ! -name '.runner' -exec rm -rf {} + 2>/dev/null || true
+
   unit-test:
     name: Android Unit Tests
     needs: [runner-cleanup]
@@ -496,6 +524,12 @@ jobs:
         if: always()
         run: rm -f "${RUNNER_TEMP}/test-output.txt"
 
+      - name: Post-job workspace cleanup
+        if: always() && !startsWith(runner.name, 'GitHub Actions')
+        run: |
+          rm -rf "${GITHUB_WORKSPACE:?}"/* 2>/dev/null || true
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -maxdepth 1 -name '.*' ! -name '.runner' -exec rm -rf {} + 2>/dev/null || true
+
   quality-gate:
     name: Dependency Security Scan
     needs: [runner-cleanup]
@@ -672,6 +706,12 @@ jobs:
         if: always()
         run: rm -f "${RUNNER_TEMP}/dep-output.txt" "${RUNNER_TEMP}/trivy-deps-output.txt" trivy-android-deps.sarif
 
+      - name: Post-job workspace cleanup
+        if: always() && !startsWith(runner.name, 'GitHub Actions')
+        run: |
+          rm -rf "${GITHUB_WORKSPACE:?}"/* 2>/dev/null || true
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -maxdepth 1 -name '.*' ! -name '.runner' -exec rm -rf {} + 2>/dev/null || true
+
   # ── Stage 2: Build (gated on all quality checks) ──
 
   build:
@@ -825,6 +865,12 @@ jobs:
       - name: Clean up temp files
         if: always()
         run: rm -f "${RUNNER_TEMP}/build-output.txt"
+
+      - name: Post-job workspace cleanup
+        if: always() && !startsWith(runner.name, 'GitHub Actions')
+        run: |
+          rm -rf "${GITHUB_WORKSPACE:?}"/* 2>/dev/null || true
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -maxdepth 1 -name '.*' ! -name '.runner' -exec rm -rf {} + 2>/dev/null || true
 
   # ── Stage 2b: SonarQube Analysis (runs after lint + unit-test) ──
 
@@ -1156,6 +1202,12 @@ jobs:
       - name: Clean up temp files
         if: always()
         run: rm -f "${RUNNER_TEMP}/sonar-output.txt"
+
+      - name: Post-job workspace cleanup
+        if: always() && !startsWith(runner.name, 'GitHub Actions')
+        run: |
+          rm -rf "${GITHUB_WORKSPACE:?}"/* 2>/dev/null || true
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -maxdepth 1 -name '.*' ! -name '.runner' -exec rm -rf {} + 2>/dev/null || true
 
   # ── Stage 3: Failure Notification ──
 
