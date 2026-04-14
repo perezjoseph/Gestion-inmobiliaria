@@ -7,6 +7,7 @@ pub mod importacion;
 pub mod inquilino;
 pub mod mantenimiento;
 pub mod notificacion;
+pub mod ocr;
 pub mod pago;
 pub mod propiedad;
 pub mod reporte;

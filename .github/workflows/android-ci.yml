@@ -139,7 +139,7 @@ jobs:
         working-directory: android
         run: |
           umask 077
-          ./gradlew lint --no-daemon --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/lint-output.txt"
+          ./gradlew lint --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/lint-output.txt"
 
       - name: Run detekt static analysis
         id: detekt
@@ -148,7 +148,7 @@ jobs:
         working-directory: android
         run: |
           umask 077
-          ./gradlew detekt --no-daemon --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/detekt-output.txt"
+          ./gradlew detekt --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/detekt-output.txt"
 
       - name: Check ktfmt formatting (via Spotless)
         id: ktfmt
@@ -157,7 +157,7 @@ jobs:
         working-directory: android
         run: |
           umask 077
-          ./gradlew spotlessCheck --no-daemon --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/ktfmt-output.txt"
+          ./gradlew spotlessCheck --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/ktfmt-output.txt"
 
       - name: Upload lint XML report for SonarQube
         if: always()
@@ -283,7 +283,7 @@ jobs:
         working-directory: android
         run: |
           umask 077
-          ./gradlew testDebugUnitTest --no-daemon --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/test-output.txt"
+          ./gradlew testDebugUnitTest --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/test-output.txt"
 
       - name: Generate JaCoCo coverage reports
         id: coverage
@@ -292,7 +292,7 @@ jobs:
         working-directory: android
         run: |
           umask 077
-          ./gradlew createDebugUnitTestCoverageReport --no-daemon --parallel --continue --stacktrace 2>&1 || true
+          ./gradlew createDebugUnitTestCoverageReport --parallel --continue --stacktrace 2>&1 || true
 
       - name: Upload JaCoCo coverage XML for SonarQube
         if: always() && steps.coverage.outcome == 'success'
@@ -410,7 +410,7 @@ jobs:
         working-directory: android
         run: |
           umask 077
-          ./gradlew dependencies --write-verification-metadata sha256 --no-daemon --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/dep-output.txt"
+          ./gradlew dependencies --write-verification-metadata sha256 --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/dep-output.txt"
           if ! git diff --exit-code gradle/verification-metadata.xml 2>/dev/null; then
             echo "::warning::Gradle dependency verification metadata changed -- review for supply chain integrity"
           fi
@@ -565,7 +565,7 @@ jobs:
         working-directory: android
         run: |
           umask 077
-          ./gradlew assembleDebug --no-daemon --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/build-output.txt"
+          ./gradlew assembleDebug --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/build-output.txt"
 
       - name: Scan APK for embedded secrets
         if: success()
@@ -868,9 +868,9 @@ jobs:
             --memory-swap 1g \
             --cpus 2 \
             --pids-limit 256 \
-            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=256m \
-            --tmpfs /opt/sonar-scanner/.sonar:rw,nosuid,nodev,size=512m \
-            --tmpfs /home/scanner:rw,noexec,nosuid,nodev,size=64m \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=256m,uid=1000,gid=1000 \
+            --tmpfs /opt/sonar-scanner/.sonar:rw,nosuid,nodev,size=512m,uid=1000,gid=1000 \
+            --tmpfs /home/scanner:rw,noexec,nosuid,nodev,size=64m,uid=1000,gid=1000 \
             -e SONAR_TOKEN="${SONAR_ANALYSIS_TOKEN}" \
             -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
             -e SONAR_SCANNER_JAVA_EXE_PATH="/opt/java/openjdk/bin/java" \

@@ -19,4 +19,5 @@ pub struct ImportError {
 pub enum ImportFormat {
     Csv,
     Xlsx,
+    Image,
 }

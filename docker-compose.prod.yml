@@ -27,11 +27,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      ocr-service:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-realestate}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-realestate}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
       SERVER_PORT: "8080"
       CORS_ORIGIN: ${CORS_ORIGIN:-}
+      OCR_SERVICE_URL: http://ocr-service:8000
     volumes:
       - uploads:/app/uploads
 
@@ -50,6 +53,25 @@ services:
     volumes:
       - caddy_data:/data
       - caddy_config:/config
+
+  ocr-service:
+    build:
+      context: ./ocr-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,nodev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    environment:
+      - PADDLEOCR_HOME=/app/.paddleocr
 
 volumes:
   postgres_data:

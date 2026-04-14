@@ -76,6 +76,9 @@ fn parse_rows(data: &[u8], formato: ImportFormat) -> Result<Vec<Vec<String>>, Ap
     match formato {
         ImportFormat::Csv => parse_csv_rows(data),
         ImportFormat::Xlsx => parse_xlsx_rows(data),
+        ImportFormat::Image => Err(AppError::Validation(
+            "Las imágenes deben procesarse mediante el pipeline OCR".to_string(),
+        )),
     }
 }
 
