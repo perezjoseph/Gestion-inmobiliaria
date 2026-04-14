@@ -36,6 +36,40 @@ _sonar_fix_lock = threading.Lock()
 _improve_lock = threading.Lock()
 
 
+def _parse_run_id(run_url):
+    """Extract the numeric run ID from a GitHub Actions run URL."""
+    if not run_url:
+        return "", ""
+    match = re.search(r"github\.com/([^/]+/[^/]+)/actions/runs/(\d+)", run_url)
+    if match:
+        return match.group(2), match.group(1)
+    match = re.search(r"/actions/runs/(\d+)", run_url)
+    return (match.group(1), "") if match else ("", "")
+
+
+def _gh_troubleshoot_instructions(run_url, job):
+    """Build gh CLI instructions for fetching full pipeline logs and annotations."""
+    run_id, repo = _parse_run_id(run_url)
+    if not run_id:
+        return ""
+    repo_flag = f" -R {repo}" if repo else ""
+    return (
+        f"\n\nTROUBLESHOOTING WITH GH CLI (do this FIRST):\n"
+        f"The error_log below may be truncated. Use gh cli to get the full picture:\n"
+        f"  1. View the failed run summary:  gh run view {run_id}{repo_flag}\n"
+        f"  2. View full logs of failed jobs: gh run view {run_id}{repo_flag} --log-failed\n"
+        f"  3. If you need a specific job:    gh run view {run_id}{repo_flag} --job <job-id> --log\n"
+        f"  4. List jobs with their IDs:      gh run view {run_id}{repo_flag} --json jobs --jq '.jobs[] | \"\\(.name) (\\(.conclusion)) id=\\(.databaseId)\"'\n"
+        f"  5. View annotations (::error:: and ::warning:: messages from the pipeline):\n"
+        f"     gh api repos/{repo}/check-runs/<check_run_id>/annotations\n"
+        f"     Get check_run_ids from step 4 (databaseId values), then query annotations for failed jobs.\n"
+        f"     Annotations often contain the most precise error location (file, line, message).\n"
+        f"The gh output gives you the COMPLETE untruncated logs. "
+        f"Use them to understand the real root cause before making any changes.\n"
+        f"Run URL: {run_url}\n"
+    )
+
+
 def _is_autofix_commit():
     try:
         result = wsl_bash("git log -1 --format='%s' HEAD 2>/dev/null", timeout=15)
@@ -163,31 +197,36 @@ def _build_error_notes(error_class):
 
 
 def _diagnose(job, step, error_log, error_class, context):
-    """Stage 1: Diagnose the error and produce a fix plan without executing.
+    """Stage 1: Diagnose the error using gh CLI for full logs, then produce a fix plan.
 
     Returns a short strategy string the executor can use.
     """
     ctx = ""
+    run_url = ""
     if context:
         ctx = f" (commit: {context.get('commit', '?')[:8]}, branch: {context.get('branch', '?')})"
+        run_url = context.get("run_url", "")
 
     instruction = _JOB_INSTRUCTIONS.get(job, "Analyze the error and fix the issue.")
     error_note = _build_error_notes(error_class)
+    gh_instructions = _gh_troubleshoot_instructions(run_url, job)
 
     prompt = (
         f"DIAGNOSE ONLY -- do NOT make changes yet.\n\n"
         f"The CI pipeline FAILED in job '{job}', step '{step}'.{ctx}\n"
-        f"Error classification: {error_class}\n\n"
-        f"Error output:\n```\n{error_log[:4000]}\n```\n\n"
+        f"Error classification: {error_class}\n"
+        f"{gh_instructions}\n"
+        f"Webhook error preview (may be truncated):\n```\n{error_log[:2000]}\n```\n\n"
         f"Context: {instruction}\n"
         f"{error_note}\n\n"
         "YOUR TASK:\n"
-        "1. Read the error output carefully.\n"
-        "2. Identify the root cause.\n"
-        "3. List the specific files that need changes.\n"
-        "4. Describe the minimal fix strategy in 2-3 sentences.\n"
-        "5. Do NOT edit any files. Do NOT run git commands.\n"
-        "6. Output your diagnosis as plain text."
+        "1. Use the gh CLI commands above to fetch the FULL error logs from the pipeline run.\n"
+        "2. Read the complete output carefully.\n"
+        "3. Identify the root cause.\n"
+        "4. List the specific files that need changes.\n"
+        "5. Describe the minimal fix strategy in 2-3 sentences.\n"
+        "6. Do NOT edit any files. Do NOT run git commands.\n"
+        "7. Output your diagnosis as plain text."
     )
 
     result = run_kiro(prompt, f"Diagnose ({job}/{step})")
@@ -252,13 +291,18 @@ def fix_with_retry(job, step, error_log, context=None):
                     "You MUST try a DIFFERENT approach. Do not repeat the same fix."
                 )
 
+            run_url = context.get("run_url", "") if context else ""
+            gh_instructions = _gh_troubleshoot_instructions(run_url, job)
+
             prompt = (
                 f"The CI pipeline FAILED in job '{job}', step '{step}'.{ctx_str}\n"
                 f"Error classification: {error_class}\n"
                 f"Fix attempt: {attempt} of {MAX_RETRIES}\n\n"
-                f"DIAGNOSIS:\n{diagnosis[:1500]}\n\n"
-                f"Error output:\n```\n{error_log}\n```\n\n"
-                f"TASK: {instruction}"
+                f"DIAGNOSIS:\n{diagnosis[:1500]}\n"
+                f"{gh_instructions}\n"
+                f"Webhook error preview (may be truncated):\n```\n{error_log[:3000]}\n```\n\n"
+                f"TASK: First use the gh CLI commands above to fetch the FULL error logs, "
+                f"then apply the fix.\n{instruction}"
                 f"{error_note}"
                 f"{history_section}"
                 f"{semantic_section}"
@@ -590,12 +634,17 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
                 if f in focus_guidance:
                     focus_specific += focus_guidance[f] + "\n"
 
+            gh_instructions = _gh_troubleshoot_instructions(run_url, "pipeline")
+
             prompt = (
                 "You are a CI/CD pipeline engineer for a Rust/WASM real estate management project "
                 "with an Android module.\n\n"
-                f"Focus area: {focus}\n\n"
+                f"Focus area: {focus}\n"
+                f"{gh_instructions}\n"
                 f"--- PIPELINE REPORT ---\n{pipeline_report}\n--- END PIPELINE REPORT ---\n"
                 f"{sonar_section}\n"
+                "FIRST: Use the gh CLI commands above to fetch the FULL logs from the pipeline run. "
+                "The pipeline report below may be truncated or incomplete.\n\n"
                 "DECISION FRAMEWORK -- read the error logs and classify each failure:\n"
                 "  A) RUNNER ENVIRONMENT (missing tool, network, disk, Docker): "
                 "Document the issue but do NOT change code. These need admin intervention.\n"

@@ -267,6 +267,13 @@ jobs:
         if: always() && (steps.fmt.outcome == 'failure' || steps.clippy_backend.outcome == 'failure' || steps.clippy_frontend.outcome == 'failure')
         run: exit 1
 
+      - name: Prune cargo target for cache efficiency
+        if: always()
+        run: |
+          find target -name "incremental" -type d -exec rm -rf {} + 2>/dev/null || true
+          find target -path "*/deps/librealestate_*" -delete 2>/dev/null || true
+          find target -path "*/.fingerprint/realestate-*" -type d -exec rm -rf {} + 2>/dev/null || true
+
       - name: Upload clippy report for SonarQube
         if: always() && hashFiles('clippy-report.json') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -479,6 +486,13 @@ jobs:
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
 
+      - name: Prune cargo target for cache efficiency
+        if: always()
+        run: |
+          find target -name "incremental" -type d -exec rm -rf {} + 2>/dev/null || true
+          find target -path "*/deps/librealestate_*" -delete 2>/dev/null || true
+          find target -path "*/.fingerprint/realestate-*" -type d -exec rm -rf {} + 2>/dev/null || true
+
       - name: Clean up sensitive temp files
         if: always()
         run: rm -f "${RUNNER_TEMP}/test-backend-output.txt" "${RUNNER_TEMP}/tarpaulin-output.txt"
@@ -579,6 +593,13 @@ jobs:
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Prune cargo target for cache efficiency
+        if: always()
+        run: |
+          find target -name "incremental" -type d -exec rm -rf {} + 2>/dev/null || true
+          find target -path "*/deps/librealestate_*" -delete 2>/dev/null || true
+          find target -path "*/.fingerprint/realestate-*" -type d -exec rm -rf {} + 2>/dev/null || true
 
       - name: Clean up sensitive temp files
         if: always()
@@ -1164,6 +1185,7 @@ jobs:
             --tmpfs /home/scanner:rw,noexec,nosuid,nodev,size=64m,uid=1000,gid=1000 \
             -e SONAR_TOKEN="${SONAR_ANALYSIS_TOKEN}" \
             -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
+            -e SONAR_SCANNER_SKIP_JRE_PROVISIONING=true \
             -e HOME=/home/scanner \
             -v "${GITHUB_WORKSPACE}:/usr/src" \
             sonarsource/sonar-scanner-cli:11.3@sha256:7462f132388135e32b948f8f18ff0db9ae28a87c6777f1df5b2207e04a6d7c5c \

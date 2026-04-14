@@ -184,7 +184,9 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
         for attempt in range(1, MAX_RETRIES + 1):
             log.info(f"=== SonarQube fix attempt {attempt}/{MAX_RETRIES} ===")
-            if run_kiro(prompt, f"SonarQube fix attempt {attempt}"):
+            result = run_kiro(prompt, f"SonarQube fix attempt {attempt}")
+            success = result[0] if isinstance(result, tuple) else result
+            if success:
                 return
 
         log.error(f"Failed after {MAX_RETRIES} attempts.")
@@ -193,10 +195,12 @@ class WebhookHandler(BaseHTTPRequestHandler):
         job = validate_name(payload.get("job", "unknown"))
         step = validate_name(payload.get("step", "unknown"))
         error_log = sanitize_text(payload.get("error_log", "No error details provided"))
+        run_url = validate_url(payload.get("run_url", ""))
         context = {
             "commit": sanitize_text(payload.get("commit", ""), 64),
             "branch": sanitize_text(payload.get("branch", ""), 128),
             "actor": sanitize_text(payload.get("actor", ""), 64),
+            "run_url": run_url,
         }
 
         log.info(f"CI failure webhook: job={job}, step={step}, commit={context['commit'][:8]}, branch={context['branch']}")

@@ -27,6 +27,13 @@ fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
     }
 }
 
+struct ContratoActions {
+    on_edit: Callback<Contrato>,
+    on_delete: Callback<Contrato>,
+    on_renew: Callback<Contrato>,
+    on_terminate: Callback<Contrato>,
+}
+
 fn estado_badge(estado: &str) -> (&'static str, &'static str) {
     match estado {
         "activo" => ("gi-badge gi-badge-success", "Activo"),
@@ -285,7 +292,15 @@ fn ContratoList(props: &ContratoListProps) -> Html {
     html! {
         <>
             <DataTable headers={props.headers.clone()}>
-                { for props.items.iter().map(|c| render_contrato_row(c, &props.user_rol, &props.prop_label, &props.inq_label, &props.on_edit, &props.on_delete, &props.on_renew, &props.on_terminate)) }
+                { for {
+                    let actions = ContratoActions {
+                        on_edit: props.on_edit.clone(),
+                        on_delete: props.on_delete.clone(),
+                        on_renew: props.on_renew.clone(),
+                        on_terminate: props.on_terminate.clone(),
+                    };
+                    props.items.iter().map(move |c| render_contrato_row(c, &props.user_rol, &props.prop_label, &props.inq_label, &actions))
+                } }
             </DataTable>
             <Pagination
                 total={props.total} page={props.page} per_page={props.per_page}
@@ -322,15 +337,12 @@ fn render_contrato_row(
     user_rol: &str,
     prop_label: &Callback<String, String>,
     inq_label: &Callback<String, String>,
-    on_edit: &Callback<Contrato>,
-    on_delete: &Callback<Contrato>,
-    on_renew: &Callback<Contrato>,
-    on_terminate: &Callback<Contrato>,
+    actions: &ContratoActions,
 ) -> Html {
     let p_label = prop_label.emit(c.propiedad_id.clone());
     let i_label = inq_label.emit(c.inquilino_id.clone());
     let (badge_cls, badge_label) = estado_badge(&c.estado);
-    let actions = render_contrato_actions(user_rol, c, on_edit, on_delete, on_renew, on_terminate);
+    let action_html = render_contrato_actions(user_rol, c, actions);
     html! {
         <tr>
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{p_label}</td>
@@ -339,19 +351,12 @@ fn render_contrato_row(
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&c.fecha_fin)}</td>
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={c.monto_mensual} moneda={c.moneda.clone()} /></td>
             <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
-            {actions}
+            {action_html}
         </tr>
     }
 }
 
-fn render_contrato_actions(
-    user_rol: &str,
-    c: &Contrato,
-    on_edit: &Callback<Contrato>,
-    on_delete: &Callback<Contrato>,
-    on_renew: &Callback<Contrato>,
-    on_terminate: &Callback<Contrato>,
-) -> Html {
+fn render_contrato_actions(user_rol: &str, c: &Contrato, actions: &ContratoActions) -> Html {
     if !can_write(user_rol) {
         return html! {};
     }
@@ -359,10 +364,10 @@ fn render_contrato_actions(
     let cd = c.clone();
     let cr = c.clone();
     let ct = c.clone();
-    let on_edit = on_edit.clone();
-    let on_delete_click = on_delete.clone();
-    let on_renew_click = on_renew.clone();
-    let on_terminate_click = on_terminate.clone();
+    let on_edit = actions.on_edit.clone();
+    let on_delete_click = actions.on_delete.clone();
+    let on_renew_click = actions.on_renew.clone();
+    let on_terminate_click = actions.on_terminate.clone();
     let active_btns = if c.estado == "activo" {
         html! {
             <>

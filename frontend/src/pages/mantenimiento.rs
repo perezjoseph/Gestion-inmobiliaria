@@ -648,11 +648,7 @@ fn do_delete_solicitud(
             Ok(()) => {
                 delete_target.set(None);
                 reload.set(*reload + 1);
-                push_toast(
-                    &toasts,
-                    &format!("\"{}\" eliminada", label),
-                    ToastKind::Info,
-                );
+                push_toast(&toasts, &format!("\"{label}\" eliminada"), ToastKind::Info);
             }
             Err(err) => {
                 delete_target.set(None);
