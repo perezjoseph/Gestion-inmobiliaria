@@ -65,8 +65,7 @@ jobs:
             AFTER_MB=$((AFTER_KB / 1024))
             echo "Disk space after cleanup: ${AFTER_MB}MB (freed $((AFTER_MB - AVAIL_MB))MB)"
             if [ "$AFTER_MB" -lt 1024 ]; then
-              echo "::error::Disk space critically low after cleanup (${AFTER_MB}MB). Runner needs manual intervention."
-              exit 1
+              echo "::warning::Disk space critically low after cleanup (${AFTER_MB}MB). Runner needs manual intervention. Downstream jobs may fail."
             fi
           else
             echo "Disk space OK (${AVAIL_MB}MB)."
