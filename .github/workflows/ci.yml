@@ -2534,6 +2534,8 @@ jobs:
           REPORT="${REPORT}Pipeline Run Summary:\n"
           REPORT="${REPORT}  Job                | Result   | Duration | Cache\n"
           REPORT="${REPORT}  -------------------|----------|----------|------\n"
+          REPORT="${REPORT}  secret-scan        | ${{ needs.secret-scan.result }} | n/a | n/a\n"
+          REPORT="${REPORT}  dependency-review  | ${{ needs.dependency-review.result }} | n/a | n/a\n"
           REPORT="${REPORT}  lint               | ${{ needs.lint.result }} | ${{ needs.lint.outputs.duration || 'n/a' }} | ${{ needs.lint.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }}\n"
           REPORT="${REPORT}  test-backend       | ${{ needs.test-backend.result }} | ${{ needs.test-backend.outputs.duration || 'n/a' }} | ${{ needs.test-backend.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }}\n"
           REPORT="${REPORT}  test-frontend      | ${{ needs.test-frontend.result }} | ${{ needs.test-frontend.outputs.duration || 'n/a' }} | ${{ needs.test-frontend.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }}\n"

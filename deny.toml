@@ -19,6 +19,9 @@ ignore = [
     # rusttype unmaintained: transitive dep from numaelis-rckive-genpdf.
     # No safe upgrade available.
     "RUSTSEC-2021-0140",
+    # rand unsoundness (RUSTSEC-2026-0097): transitive dep, no patch available.
+    # Synced with .cargo/audit.toml.
+    "RUSTSEC-2026-0097",
 ]
 
 [licenses]
