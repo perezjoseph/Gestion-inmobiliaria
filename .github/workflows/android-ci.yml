@@ -676,6 +676,7 @@ jobs:
 
       - name: Download detekt XML report
         id: download-detekt
+        if: needs.lint.result == 'success'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: android-detekt-xml
@@ -684,6 +685,7 @@ jobs:
 
       - name: Download Android Lint XML report
         id: download-lint
+        if: needs.lint.result == 'success'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: android-lint-xml
@@ -692,6 +694,7 @@ jobs:
 
       - name: Download JaCoCo coverage XML reports
         id: download-coverage
+        if: needs.unit-test.result == 'success'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: android-coverage-xml
@@ -700,6 +703,7 @@ jobs:
 
       - name: Download JUnit XML test results
         id: download-junit
+        if: needs.unit-test.result == 'success'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: android-test-results-xml
@@ -864,11 +868,12 @@ jobs:
             --memory-swap 1g \
             --cpus 2 \
             --pids-limit 256 \
-            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=256m,uid=1000,gid=1000 \
-            --tmpfs /opt/sonar-scanner/.sonar:rw,nosuid,nodev,size=512m,uid=1000,gid=1000 \
-            --tmpfs /home/scanner:rw,noexec,nosuid,nodev,size=64m,uid=1000,gid=1000 \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=256m \
+            --tmpfs /opt/sonar-scanner/.sonar:rw,nosuid,nodev,size=512m \
+            --tmpfs /home/scanner:rw,noexec,nosuid,nodev,size=64m \
             -e SONAR_TOKEN="${SONAR_ANALYSIS_TOKEN}" \
             -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
+            -e SONAR_SCANNER_JAVA_EXE_PATH="/opt/java/openjdk/bin/java" \
             -e HOME=/home/scanner \
             -v "${GITHUB_WORKSPACE}:/usr/src" \
             sonarsource/sonar-scanner-cli:11.3@sha256:7462f132388135e32b948f8f18ff0db9ae28a87c6777f1df5b2207e04a6d7c5c \
