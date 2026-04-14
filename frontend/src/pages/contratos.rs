@@ -797,20 +797,58 @@ fn render_contratos_view(
         return html! { <Loading /> };
     }
 
-    let last_header: String = if can_write(user_rol) { "Acciones".into() } else { String::new() };
+    let last_header: String = if can_write(user_rol) {
+        "Acciones".into()
+    } else {
+        String::new()
+    };
     let headers = vec![
-        "Propiedad".into(), "Inquilino".into(), "Inicio".into(),
-        "Fin".into(), "Monto".into(), "Estado".into(), last_header,
+        "Propiedad".into(),
+        "Inquilino".into(),
+        "Inicio".into(),
+        "Fin".into(),
+        "Monto".into(),
+        "Estado".into(),
+        last_header,
     ];
     let new_btn = render_new_btn_contrato(user_rol, &on_new);
     let error_html = render_opt_error_contrato(error);
-    let delete_html = render_delete_confirm_contrato(delete_target, &prop_label, &on_delete_confirm, &on_delete_cancel);
-    let renew_html = render_renew_modal(renew_target, renew_fecha_fin, renew_monto, on_renew_confirm, on_renew_cancel);
-    let terminate_html = render_terminate_modal(terminate_target, terminate_fecha, on_terminate_confirm, on_terminate_cancel);
+    let delete_html = render_delete_confirm_contrato(
+        delete_target,
+        &prop_label,
+        &on_delete_confirm,
+        &on_delete_cancel,
+    );
+    let renew_html = render_renew_modal(
+        renew_target,
+        renew_fecha_fin,
+        renew_monto,
+        on_renew_confirm,
+        on_renew_cancel,
+    );
+    let terminate_html = render_terminate_modal(
+        terminate_target,
+        terminate_fecha,
+        on_terminate_confirm,
+        on_terminate_cancel,
+    );
     let form_html = render_contrato_form_section(
-        show_form, editing, propiedad_id, inquilino_id, fecha_inicio, fecha_fin,
-        monto_mensual, deposito, moneda, estado, propiedades, inquilinos,
-        form_errors, submitting, on_submit, on_cancel,
+        show_form,
+        editing,
+        propiedad_id,
+        inquilino_id,
+        fecha_inicio,
+        fecha_fin,
+        monto_mensual,
+        deposito,
+        moneda,
+        estado,
+        propiedades,
+        inquilinos,
+        form_errors,
+        submitting,
+        on_submit,
+        on_cancel,
     );
 
     html! {
