@@ -61,21 +61,6 @@ def _gh_troubleshoot_instructions(run_url, job):
     )
 
 
-def _is_autofix_commit():
-    try:
-        result = wsl_bash("git log -1 --format='%s' HEAD 2>/dev/null", timeout=15)
-        if result.returncode == 0:
-            msg = result.stdout.strip()
-            autofix_markers = [
-                "(auto-fix)", "resolve CI failures (auto-fix)",
-                "resolve SonarQube issues (auto-fix)", "improve pipeline",
-            ]
-            return any(marker in msg for marker in autofix_markers)
-    except Exception as e:
-        log.warning(f"Auto-fix commit check failed: {e}")
-    return False
-
-
 _JOB_INSTRUCTIONS = {
     "lint": (
         "Fix the formatting and clippy warnings. "
@@ -232,10 +217,6 @@ def fix_with_retry(job, step, error_log, context=None):
         return False
 
     try:
-        if _is_autofix_commit():
-            log.warning(f"Last commit is an auto-fix -- skipping {job}/{step} to prevent loop")
-            return False
-
         # Gate 1: Time-based dedup
         passed, reason = preflight_dedup(job, error_log)
         if not passed:
@@ -495,10 +476,6 @@ def fix_sonar_issues(sonar_report, run_url):
         return False
 
     try:
-        if _is_autofix_commit():
-            log.warning("Last commit is an auto-fix -- skipping SonarQube fix to prevent loop")
-            return False
-
         file_groups = _parse_sonar_report_by_file(sonar_report)
 
         if not file_groups:

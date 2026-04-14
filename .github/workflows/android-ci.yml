@@ -1059,12 +1059,6 @@ jobs:
       - name: Run SonarQube analysis
         id: sonar-scan
         if: steps.sonar-url-check.outputs.skip != 'true' && steps.sonar-reachable.outputs.reachable == 'true'
-        env:
-          IS_PR: ${{ github.event_name == 'pull_request' }}
-          PR_KEY: ${{ github.event.pull_request.number }}
-          PR_BRANCH: ${{ github.head_ref }}
-          PR_BASE: ${{ github.base_ref }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
           SCAN_ARGS=()
           SCAN_ARGS+=("-Dsonar.projectBaseDir=/usr/src")
@@ -1118,17 +1112,8 @@ jobs:
             echo "::warning::No JUnit test results found -- SonarQube will not import test execution data"
           fi
 
-          if [ "$IS_PR" = "true" ] && [ -n "$PR_KEY" ]; then
-            echo "PR detected (#${PR_KEY}) -- enabling PR decoration"
-            SCAN_ARGS+=("-Dsonar.pullrequest.key=${PR_KEY}")
-            SCAN_ARGS+=("-Dsonar.pullrequest.branch=${PR_BRANCH}")
-            SCAN_ARGS+=("-Dsonar.pullrequest.base=${PR_BASE}")
-          else
-            BRANCH_NAME="${GITHUB_REF_NAME}"
-            if [ -n "$BRANCH_NAME" ]; then
-              SCAN_ARGS+=("-Dsonar.branch.name=${BRANCH_NAME}")
-            fi
-          fi
+          # Branch analysis and PR decoration require SonarQube Developer Edition+
+          # Community Build only analyzes the main branch without these properties
 
           docker run --rm \
             --network host \
