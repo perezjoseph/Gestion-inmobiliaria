@@ -1,13 +1,4 @@
-"""
-CI fixer workflows with GSD-inspired patterns:
 
-1. Post-fix verification gate — independent verify after kiro returns
-2. Scope enforcement gate — reject diffs exceeding file/line limits
-3. Fresh context on retry — trim prompts instead of accumulating context
-4. Time-based dedup — skip to escalation if same error hash failed recently
-5. Parallel sonar file groups — wave-based execution for independent files
-6. Diagnose-before-fix — separate "read and plan" from "execute the fix"
-"""
 
 import json
 import re

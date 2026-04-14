@@ -35,13 +35,27 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Free disk space (self-hosted)
+        if: ${{ !startsWith(runner.name, 'GitHub Actions') }}
+        run: |
+          echo "=== Disk before cleanup ==="
+          df -h / || true
+          docker system prune -af --volumes 2>/dev/null || true
+          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+          find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
+          rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
+          rm -rf ~/.gradle/daemon 2>/dev/null || true
+          echo "=== Disk after cleanup ==="
+          df -h / || true
+
       - name: Clean workspace
         run: |
           if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
             echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
             exit 1
           fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+          rm -rf "${GITHUB_WORKSPACE:?}"/* || true
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -maxdepth 1 -name '.*' -exec rm -rf {} + 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -105,13 +119,27 @@ jobs:
         id: start
         run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
 
+      - name: Free disk space (self-hosted)
+        if: ${{ !startsWith(runner.name, 'GitHub Actions') }}
+        run: |
+          echo "=== Disk before cleanup ==="
+          df -h / || true
+          docker system prune -af --volumes 2>/dev/null || true
+          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+          find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
+          rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
+          rm -rf ~/.gradle/daemon 2>/dev/null || true
+          echo "=== Disk after cleanup ==="
+          df -h / || true
+
       - name: Clean workspace
         run: |
           if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
             echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
             exit 1
           fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+          rm -rf "${GITHUB_WORKSPACE:?}"/* || true
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -maxdepth 1 -name '.*' -exec rm -rf {} + 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -245,13 +273,27 @@ jobs:
         id: start
         run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
 
+      - name: Free disk space (self-hosted)
+        if: ${{ !startsWith(runner.name, 'GitHub Actions') }}
+        run: |
+          echo "=== Disk before cleanup ==="
+          df -h / || true
+          docker system prune -af --volumes 2>/dev/null || true
+          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+          find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
+          rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
+          rm -rf ~/.gradle/daemon 2>/dev/null || true
+          echo "=== Disk after cleanup ==="
+          df -h / || true
+
       - name: Clean workspace
         run: |
           if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
             echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
             exit 1
           fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+          rm -rf "${GITHUB_WORKSPACE:?}"/* || true
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -maxdepth 1 -name '.*' -exec rm -rf {} + 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -404,13 +446,27 @@ jobs:
         id: start
         run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
 
+      - name: Free disk space (self-hosted)
+        if: ${{ !startsWith(runner.name, 'GitHub Actions') }}
+        run: |
+          echo "=== Disk before cleanup ==="
+          df -h / || true
+          docker system prune -af --volumes 2>/dev/null || true
+          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+          find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
+          rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
+          rm -rf ~/.gradle/daemon 2>/dev/null || true
+          echo "=== Disk after cleanup ==="
+          df -h / || true
+
       - name: Clean workspace
         run: |
           if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
             echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
             exit 1
           fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+          rm -rf "${GITHUB_WORKSPACE:?}"/* || true
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -maxdepth 1 -name '.*' -exec rm -rf {} + 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -561,13 +617,27 @@ jobs:
         id: start
         run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
 
+      - name: Free disk space (self-hosted)
+        if: ${{ !startsWith(runner.name, 'GitHub Actions') }}
+        run: |
+          echo "=== Disk before cleanup ==="
+          df -h / || true
+          docker system prune -af --volumes 2>/dev/null || true
+          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+          find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
+          rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
+          rm -rf ~/.gradle/daemon 2>/dev/null || true
+          echo "=== Disk after cleanup ==="
+          df -h / || true
+
       - name: Clean workspace
         run: |
           if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
             echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
             exit 1
           fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+          rm -rf "${GITHUB_WORKSPACE:?}"/* || true
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -maxdepth 1 -name '.*' -exec rm -rf {} + 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -689,13 +759,27 @@ jobs:
         id: start
         run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
 
+      - name: Free disk space (self-hosted)
+        if: ${{ !startsWith(runner.name, 'GitHub Actions') }}
+        run: |
+          echo "=== Disk before cleanup ==="
+          df -h / || true
+          docker system prune -af --volumes 2>/dev/null || true
+          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+          find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
+          rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
+          rm -rf ~/.gradle/daemon 2>/dev/null || true
+          echo "=== Disk after cleanup ==="
+          df -h / || true
+
       - name: Clean workspace
         run: |
           if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
             echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
             exit 1
           fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+          rm -rf "${GITHUB_WORKSPACE:?}"/* || true
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -maxdepth 1 -name '.*' -exec rm -rf {} + 2>/dev/null || true
 
       - name: Checkout repository with full history for blame analysis
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
