@@ -41,12 +41,23 @@ jobs:
           echo "=== Disk before cleanup ==="
           df -h / || true
           docker system prune -af --volumes 2>/dev/null || true
-          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +2 -exec rm -rf {} + 2>/dev/null || true
           find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
           rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
-          rm -rf ~/.gradle/daemon 2>/dev/null || true
+          rm -rf ~/.gradle/wrapper/dists/ ~/.gradle/daemon 2>/dev/null || true
           echo "=== Disk after cleanup ==="
           df -h / || true
+
+      - name: Check available disk space
+        if: ${{ !startsWith(runner.name, 'GitHub Actions') }}
+        run: |
+          AVAIL_KB=$(df --output=avail / | tail -1)
+          AVAIL_MB=$((AVAIL_KB / 1024))
+          echo "Available disk space: ${AVAIL_MB}MB"
+          if [ "$AVAIL_MB" -lt 2048 ]; then
+            echo "::error::Insufficient disk space (${AVAIL_MB}MB < 2048MB). Self-hosted runner needs manual cleanup by admin."
+            exit 1
+          fi
 
       - name: Clean workspace
         run: |
@@ -125,12 +136,23 @@ jobs:
           echo "=== Disk before cleanup ==="
           df -h / || true
           docker system prune -af --volumes 2>/dev/null || true
-          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +2 -exec rm -rf {} + 2>/dev/null || true
           find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
           rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
-          rm -rf ~/.gradle/daemon 2>/dev/null || true
+          rm -rf ~/.gradle/wrapper/dists/ ~/.gradle/daemon 2>/dev/null || true
           echo "=== Disk after cleanup ==="
           df -h / || true
+
+      - name: Check available disk space
+        if: ${{ !startsWith(runner.name, 'GitHub Actions') }}
+        run: |
+          AVAIL_KB=$(df --output=avail / | tail -1)
+          AVAIL_MB=$((AVAIL_KB / 1024))
+          echo "Available disk space: ${AVAIL_MB}MB"
+          if [ "$AVAIL_MB" -lt 2048 ]; then
+            echo "::error::Insufficient disk space (${AVAIL_MB}MB < 2048MB). Self-hosted runner needs manual cleanup by admin."
+            exit 1
+          fi
 
       - name: Clean workspace
         run: |
@@ -279,12 +301,23 @@ jobs:
           echo "=== Disk before cleanup ==="
           df -h / || true
           docker system prune -af --volumes 2>/dev/null || true
-          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +2 -exec rm -rf {} + 2>/dev/null || true
           find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
           rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
-          rm -rf ~/.gradle/daemon 2>/dev/null || true
+          rm -rf ~/.gradle/wrapper/dists/ ~/.gradle/daemon 2>/dev/null || true
           echo "=== Disk after cleanup ==="
           df -h / || true
+
+      - name: Check available disk space
+        if: ${{ !startsWith(runner.name, 'GitHub Actions') }}
+        run: |
+          AVAIL_KB=$(df --output=avail / | tail -1)
+          AVAIL_MB=$((AVAIL_KB / 1024))
+          echo "Available disk space: ${AVAIL_MB}MB"
+          if [ "$AVAIL_MB" -lt 2048 ]; then
+            echo "::error::Insufficient disk space (${AVAIL_MB}MB < 2048MB). Self-hosted runner needs manual cleanup by admin."
+            exit 1
+          fi
 
       - name: Clean workspace
         run: |
@@ -452,12 +485,23 @@ jobs:
           echo "=== Disk before cleanup ==="
           df -h / || true
           docker system prune -af --volumes 2>/dev/null || true
-          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +2 -exec rm -rf {} + 2>/dev/null || true
           find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
           rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
-          rm -rf ~/.gradle/daemon 2>/dev/null || true
+          rm -rf ~/.gradle/wrapper/dists/ ~/.gradle/daemon 2>/dev/null || true
           echo "=== Disk after cleanup ==="
           df -h / || true
+
+      - name: Check available disk space
+        if: ${{ !startsWith(runner.name, 'GitHub Actions') }}
+        run: |
+          AVAIL_KB=$(df --output=avail / | tail -1)
+          AVAIL_MB=$((AVAIL_KB / 1024))
+          echo "Available disk space: ${AVAIL_MB}MB"
+          if [ "$AVAIL_MB" -lt 2048 ]; then
+            echo "::error::Insufficient disk space (${AVAIL_MB}MB < 2048MB). Self-hosted runner needs manual cleanup by admin."
+            exit 1
+          fi
 
       - name: Clean workspace
         run: |
@@ -623,12 +667,23 @@ jobs:
           echo "=== Disk before cleanup ==="
           df -h / || true
           docker system prune -af --volumes 2>/dev/null || true
-          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +2 -exec rm -rf {} + 2>/dev/null || true
           find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
           rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
-          rm -rf ~/.gradle/daemon 2>/dev/null || true
+          rm -rf ~/.gradle/wrapper/dists/ ~/.gradle/daemon 2>/dev/null || true
           echo "=== Disk after cleanup ==="
           df -h / || true
+
+      - name: Check available disk space
+        if: ${{ !startsWith(runner.name, 'GitHub Actions') }}
+        run: |
+          AVAIL_KB=$(df --output=avail / | tail -1)
+          AVAIL_MB=$((AVAIL_KB / 1024))
+          echo "Available disk space: ${AVAIL_MB}MB"
+          if [ "$AVAIL_MB" -lt 2048 ]; then
+            echo "::error::Insufficient disk space (${AVAIL_MB}MB < 2048MB). Self-hosted runner needs manual cleanup by admin."
+            exit 1
+          fi
 
       - name: Clean workspace
         run: |
@@ -765,12 +820,23 @@ jobs:
           echo "=== Disk before cleanup ==="
           df -h / || true
           docker system prune -af --volumes 2>/dev/null || true
-          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+          find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +2 -exec rm -rf {} + 2>/dev/null || true
           find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
           rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
-          rm -rf ~/.gradle/daemon 2>/dev/null || true
+          rm -rf ~/.gradle/wrapper/dists/ ~/.gradle/daemon 2>/dev/null || true
           echo "=== Disk after cleanup ==="
           df -h / || true
+
+      - name: Check available disk space
+        if: ${{ !startsWith(runner.name, 'GitHub Actions') }}
+        run: |
+          AVAIL_KB=$(df --output=avail / | tail -1)
+          AVAIL_MB=$((AVAIL_KB / 1024))
+          echo "Available disk space: ${AVAIL_MB}MB"
+          if [ "$AVAIL_MB" -lt 2048 ]; then
+            echo "::error::Insufficient disk space (${AVAIL_MB}MB < 2048MB). Self-hosted runner needs manual cleanup by admin."
+            exit 1
+          fi
 
       - name: Clean workspace
         run: |
