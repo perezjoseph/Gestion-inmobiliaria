@@ -53,18 +53,42 @@ jobs:
     steps:
       - name: Check disk space and clean if low
         run: |
-          AVAIL_KB=$(df -k "${RUNNER_TEMP:-/tmp}" | awk 'NR==2 {print $4}')
+          # Check the partition where workspaces live, not RUNNER_TEMP
+          CHECK_PATH="/tmp"
+          AVAIL_KB=$(df -k "$CHECK_PATH" | awk 'NR==2 {print $4}')
           AVAIL_MB=$((AVAIL_KB / 1024))
-          echo "Available disk space: ${AVAIL_MB}MB"
-          if [ "$AVAIL_MB" -lt 2048 ]; then
-            echo "::warning::Low disk space (${AVAIL_MB}MB). Running cleanup."
+          echo "Available disk space on $CHECK_PATH: ${AVAIL_MB}MB"
+          if [ "$AVAIL_MB" -lt 12288 ]; then
+            echo "::warning::Low disk space (${AVAIL_MB}MB < 12288MB). Running cleanup."
+            # Clean ALL runner workspace target dirs and stale workspaces
+            rm -rf /tmp/runner-*/Gestion-inmobiliaria/*/target 2>/dev/null || true
             rm -rf "${RUNNER_TEMP:-/tmp}"/runner-*/_actions/_temp_* 2>/dev/null || true
-            docker system prune -f --volumes 2>/dev/null || true
-            docker builder prune -f 2>/dev/null || true
-            AFTER_KB=$(df -k "${RUNNER_TEMP:-/tmp}" | awk 'NR==2 {print $4}')
+            # Clean cargo caches
+            rm -rf "${CARGO_HOME:-$HOME/.cargo}"/registry/src 2>/dev/null || true
+            rm -rf "${CARGO_HOME:-$HOME/.cargo}"/registry/cache 2>/dev/null || true
+            rm -rf "${CARGO_HOME:-$HOME/.cargo}"/git/checkouts 2>/dev/null || true
+            # Clean rustup downloads and old toolchains
+            rm -rf "${RUSTUP_HOME:-$HOME/.rustup}"/downloads 2>/dev/null || true
+            rm -rf "${RUSTUP_HOME:-$HOME/.rustup}"/tmp 2>/dev/null || true
+            if command -v rustup &>/dev/null; then
+              rustup toolchain list 2>/dev/null | grep -v '1\.88\.0' | grep -v '^$' | while read -r tc; do
+                rustup toolchain uninstall "$tc" 2>/dev/null || true
+              done
+            fi
+            # Clean temp build artifacts
+            rm -rf /tmp/rustc* /tmp/cargo-install* 2>/dev/null || true
+            # Docker cleanup
+            docker system prune -af --volumes 2>/dev/null || true
+            docker builder prune -af 2>/dev/null || true
+            # System caches
+            sudo apt-get clean 2>/dev/null || true
+            sudo rm -rf /var/cache/apt/archives/*.deb 2>/dev/null || true
+            sudo journalctl --vacuum-size=50M 2>/dev/null || true
+            sudo rm -rf /var/tmp/* 2>/dev/null || true
+            AFTER_KB=$(df -k "$CHECK_PATH" | awk 'NR==2 {print $4}')
             AFTER_MB=$((AFTER_KB / 1024))
             echo "Disk space after cleanup: ${AFTER_MB}MB (freed $((AFTER_MB - AVAIL_MB))MB)"
-            if [ "$AFTER_MB" -lt 1024 ]; then
+            if [ "$AFTER_MB" -lt 4096 ]; then
               echo "::warning::Disk space critically low after cleanup (${AFTER_MB}MB). Runner needs manual intervention. Downstream jobs may fail."
             fi
           else
@@ -1853,47 +1877,21 @@ jobs:
         id: start
         run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
 
-      - name: Clean workspace
-        run: |
-          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
-            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
-            exit 1
-          fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
-
-      - name: Checkout repository
+      - name: Checkout repository (bootstrap for local composite action)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
-      - name: Install OpenSSL development headers
-        run: |
-          if ! dpkg -s libssl-dev pkg-config >/dev/null 2>&1; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq --no-install-recommends pkg-config libssl-dev
-          fi
-
-      - name: Install Rust stable toolchain
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
-
-      - name: Restore cargo cache
-        id: cache
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - name: Rust setup
+        uses: ./.github/actions/rust-setup
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: v2-${{ runner.os }}-cargo-backend-build-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            v2-${{ runner.os }}-cargo-backend-build-
-            v2-${{ runner.os }}-cargo-
+          cache-key: backend-build
 
       - name: Build optimized backend binary
         timeout-minutes: 25
         run: |
           set -o pipefail
-          cargo build --frozen -p realestate-backend --release 2>&1 | tee "${RUNNER_TEMP}/build-backend-output.txt"
+          cargo build --locked -p realestate-backend --release 2>&1 | tee "${RUNNER_TEMP}/build-backend-output.txt"
 
       - name: Scan backend build output for leaked secrets
         run: |
@@ -2085,6 +2083,7 @@ jobs:
         with:
           context: .
           file: Dockerfile.backend
+          pull: true
           load: true
           tags: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ github.sha }}
           provenance: mode=max
@@ -2228,6 +2227,7 @@ jobs:
         with:
           context: .
           file: Dockerfile.frontend
+          pull: true
           load: true
           tags: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ github.sha }}
           provenance: mode=max

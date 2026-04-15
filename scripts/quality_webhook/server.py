@@ -31,9 +31,12 @@ from .correlation import (
     should_dispatch_correlated_fix, build_correlated_fix_prompt,
     get_correlation_summary,
 )
+from .decisions import should_hold_for_correlation, record_co_failure_event, CO_FAILURE_HOLD_S, get_decision_cache_summary
 from .classifier import classify_error
 
 _thread_semaphore = threading.Semaphore(THREAD_POOL_SIZE)
+_holds_lock = threading.Lock()
+_pending_holds: dict[str, dict] = {}
 
 
 def _build_timing_stats():
@@ -159,6 +162,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 "flaky_tests": get_flaky_test_summary(),
                 "vuln_patterns": get_vuln_summary(),
                 "correlations": get_correlation_summary(),
+                **get_decision_cache_summary(),
             }).encode(), "application/json")
             return
         self._send(404, b"Not found")
@@ -289,7 +293,83 @@ class WebhookHandler(BaseHTTPRequestHandler):
         log.info(f"CI failure webhook: job={job}, step={step}, commit={context['commit'][:8]}, branch={context['branch']}")
 
         error_class = classify_error(error_log)
-        group_id = register_failure(job, step, error_log, context["commit"], error_class)
+
+        commit = context["commit"]
+        should_hold, correlated_jobs, hold_seconds = should_hold_for_correlation(job)
+
+        if should_hold and commit:
+            with _holds_lock:
+                if commit in _pending_holds:
+                    entry = _pending_holds[commit]
+                    entry["failed_jobs"].append(job)
+                    entry["payloads"].append((job, step, error_log, error_class, context))
+                    timer = entry.get("timer")
+                    if timer is not None:
+                        timer.cancel()
+                    del _pending_holds[commit]
+
+                    log.info(
+                        f"Correlated failure arrived during hold for commit {commit[:8]}: "
+                        f"jobs={entry['failed_jobs']}"
+                    )
+
+                    all_failed_jobs = entry["failed_jobs"]
+                    all_payloads = entry["payloads"]
+
+                    def _dispatch_correlated():
+                        group_id = None
+                        for j, s, el, ec, _ in all_payloads:
+                            gid = register_failure(j, s, el, commit, ec)
+                            if gid is not None:
+                                group_id = gid
+
+                        if group_id is not None:
+                            group = check_correlation(group_id)
+                            if group is not None and should_dispatch_correlated_fix(group_id):
+                                if not group.dispatched:
+                                    group.dispatched = True
+                                    prompt = build_correlated_fix_prompt(group)
+                                    log.info(
+                                        f"Dispatching correlated fix for commit {commit[:8]} "
+                                        f"({len(all_failed_jobs)} failures)"
+                                    )
+                                    from .runner import run_kiro as _run_kiro
+                                    _run_kiro(prompt, f"Correlated fix (hold-batch, {commit[:8]})")
+                                    record_co_failure_event(commit, all_failed_jobs)
+                                    return
+
+                        record_co_failure_event(commit, all_failed_jobs)
+                        for j, s, el, ec, ctx in all_payloads:
+                            fix_with_retry(j, s, el, ctx)
+
+                    threading.Thread(target=_dispatch_correlated, daemon=True).start()
+                    return
+
+                def _hold_expired():
+                    with _holds_lock:
+                        entry = _pending_holds.pop(commit, None)
+                    if entry is None:
+                        return
+                    log.info(f"Hold expired for commit {commit[:8]}, dispatching independent fix")
+                    failed_jobs = entry["failed_jobs"]
+                    record_co_failure_event(commit, failed_jobs)
+                    for j, s, el, ec, ctx in entry["payloads"]:
+                        fix_with_retry(j, s, el, ctx)
+
+                timer = threading.Timer(hold_seconds, _hold_expired)
+                _pending_holds[commit] = {
+                    "failed_jobs": [job],
+                    "payloads": [(job, step, error_log, error_class, context)],
+                    "timer": timer,
+                }
+                timer.start()
+                log.info(
+                    f"Holding dispatch for commit {commit[:8]} ({hold_seconds}s), "
+                    f"waiting for correlated jobs: {correlated_jobs}"
+                )
+                return
+
+        group_id = register_failure(job, step, error_log, commit, error_class)
 
         if group_id is not None:
             group = check_correlation(group_id)

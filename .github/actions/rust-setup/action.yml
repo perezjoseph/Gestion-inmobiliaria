@@ -35,9 +35,53 @@ runs:
     - name: Install OpenSSL development headers
       shell: bash
       run: |
-        if ! dpkg -s libssl-dev pkg-config >/dev/null 2>&1; then
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends pkg-config libssl-dev
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq --no-install-recommends pkg-config libssl-dev
+
+    - name: Free disk space for Rust compilation
+      shell: bash
+      run: |
+        AVAIL_MB=$(df -m "${GITHUB_WORKSPACE}" | awk 'NR==2 {print $4}')
+        echo "Available disk space: ${AVAIL_MB}MB"
+        if [ "$AVAIL_MB" -lt 12288 ]; then
+          echo "::warning::Low disk (${AVAIL_MB}MB < 12288MB). Cleaning to prevent ENOSPC during compilation."
+          docker system prune -af --volumes 2>/dev/null || true
+          # Clean target dirs from ALL runner workspaces (shared disk)
+          rm -rf /tmp/runner-*/Gestion-inmobiliaria/*/target 2>/dev/null || true
+          # Clean stale workspace checkouts from OTHER runners (not just target/)
+          CURRENT_RUNNER_DIR=$(echo "${GITHUB_WORKSPACE}" | grep -oP '/tmp/runner-\d+' || true)
+          for dir in /tmp/runner-*/Gestion-inmobiliaria; do
+            RUNNER_DIR=$(echo "$dir" | grep -oP '/tmp/runner-\d+' || true)
+            if [ -d "$dir" ] && [ -n "$RUNNER_DIR" ] && [ "$RUNNER_DIR" != "$CURRENT_RUNNER_DIR" ]; then
+              rm -rf "$dir" 2>/dev/null || true
+            fi
+          done
+          # Clean cargo caches (preserve registry/index for sparse protocol)
+          rm -rf "${CARGO_HOME:-$HOME/.cargo}"/registry/src 2>/dev/null || true
+          rm -rf "${CARGO_HOME:-$HOME/.cargo}"/registry/cache 2>/dev/null || true
+          rm -rf "${CARGO_HOME:-$HOME/.cargo}"/git/checkouts 2>/dev/null || true
+          # Clean rustup downloads and old toolchains
+          rm -rf "${RUSTUP_HOME:-$HOME/.rustup}"/downloads 2>/dev/null || true
+          rm -rf "${RUSTUP_HOME:-$HOME/.rustup}"/tmp 2>/dev/null || true
+          if command -v rustup &>/dev/null; then
+            rustup toolchain list 2>/dev/null | grep -v '1\.88\.0' | grep -v '^$' | while read -r tc; do
+              rustup toolchain uninstall "$tc" 2>/dev/null || true
+            done
+          fi
+          # Clean temp build artifacts
+          rm -rf /tmp/rustc* /tmp/cargo-install* 2>/dev/null || true
+          find "${RUNNER_TEMP:-/tmp}" -maxdepth 1 -name '*.sh' -mmin +60 -delete 2>/dev/null || true
+          # System caches
+          sudo apt-get clean 2>/dev/null || true
+          sudo rm -rf /var/cache/apt/archives/*.deb 2>/dev/null || true
+          sudo journalctl --vacuum-size=50M 2>/dev/null || true
+          sudo rm -rf /var/tmp/* 2>/dev/null || true
+          AFTER_MB=$(df -m "${GITHUB_WORKSPACE}" | awk 'NR==2 {print $4}')
+          echo "Disk after cleanup: ${AFTER_MB}MB (freed $((AFTER_MB - AVAIL_MB))MB)"
+          if [ "$AFTER_MB" -lt 4096 ]; then
+            echo "::error::Disk critically low (${AFTER_MB}MB) after cleanup. Runner needs manual intervention."
+            exit 1
+          fi
         fi
 
     - name: Install Rust toolchain

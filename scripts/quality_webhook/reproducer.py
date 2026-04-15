@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass, field
 
 from .config import log
+from .decisions import get_steps_to_skip, record_repro_outcome
 from .runner import wsl_bash
 
 
@@ -371,6 +372,8 @@ def reproduce_locally(job, error_class="", cache: ReproCache | None = None):
 
     log.info(f"Reproducing '{job}' locally ({len(steps)} steps)")
 
+    skip_list = get_steps_to_skip(job) if job else []
+
     all_errors = []
     all_warnings = []
     all_output_parts = []
@@ -378,6 +381,13 @@ def reproduce_locally(job, error_class="", cache: ReproCache | None = None):
     any_failed = False
 
     for step_name, cmd, timeout in steps:
+        if step_name in skip_list:
+            log.info(f"  step '{step_name}' skipped (100% pass rate across last 10 cycles)")
+            record_repro_outcome(job, step_name, True)
+            all_output_parts.append(f"--- {step_name} (skipped, 100% pass rate) ---\n")
+            step_results.append((step_name, 0, [], []))
+            continue
+
         cached_result = cache.get(step_name) if cache else None
         if cached_result is not None and cached_result.exit_code == 0:
             log.info(f"  Cache hit for '{step_name}' (exit 0), skipping execution")
@@ -401,6 +411,9 @@ def reproduce_locally(job, error_class="", cache: ReproCache | None = None):
         all_errors.extend(errors)
         all_warnings.extend(warnings)
         step_results.append((step_name, exit_code, errors, warnings))
+
+        if job:
+            record_repro_outcome(job, step_name, exit_code == 0)
 
         if cache:
             step_result = ReproResult(
