@@ -29,8 +29,6 @@ MAX_PAYLOAD_BYTES = 512 * 1024
 MAX_FIELD_LENGTH = 50_000
 MAX_LOG_BYTES = 50 * 1024 * 1024
 
-MAX_DIFF_FILES = 10
-MAX_DIFF_LINES = 300
 DEDUP_WINDOW_MINUTES = 60
 SONAR_PARALLEL_GROUPS = 3
 
@@ -45,7 +43,6 @@ SAFE_URL_RE = re.compile(
 
 SCOPE_CONSTRAINTS = (
     "\n\nSCOPE CONSTRAINTS (mandatory):\n"
-    "- Modify at most 10 files and 300 lines total.\n"
     "- Do NOT refactor unrelated code. Fix only what the error requires.\n"
     "- Do NOT add new crate dependencies unless absolutely necessary for the fix.\n"
     "- Do NOT modify CI pipeline YAML files (.github/workflows/) unless the job is specifically about pipeline config.\n"

@@ -10,16 +10,26 @@ COPY frontend/ frontend/
 
 RUN cd frontend && trunk build --release
 
-FROM caddy:2-alpine
+FROM golang:1.26.2-alpine AS caddy-builder
 
-RUN apk upgrade --no-cache
+RUN apk add --no-cache git && \
+    go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
+
+RUN xcaddy build v2.11.2 --output /usr/bin/caddy
+
+FROM alpine:3.23
+
+RUN apk upgrade --no-cache && \
+    apk add --no-cache ca-certificates mailcap wget
 
 RUN addgroup -S app && adduser -S app -G app
 
+COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY --from=builder /app/frontend/dist/ /srv/
 
-RUN chown -R app:app /srv /data /config
+RUN mkdir -p /data /config && \
+    chown -R app:app /srv /data /config
 
 USER app
 

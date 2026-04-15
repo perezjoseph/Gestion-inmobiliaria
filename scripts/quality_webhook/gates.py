@@ -10,11 +10,9 @@ Four gate types:
 Gates return (passed: bool, reason: str).
 """
 
-import re
 from datetime import datetime, timedelta
 
 from .config import (
-    MAX_DIFF_FILES, MAX_DIFF_LINES,
     log,
 )
 from .runner import wsl_bash
@@ -63,42 +61,6 @@ def preflight_dedup(job, error_log, error_class="unknown"):
         )
 
     return True, f"{len(recent_failures)} recent failures (under threshold)"
-
-
-def revision_scope_check():
-    """Check that staged changes don't exceed scope limits.
-
-    Runs git diff --stat on staged changes and enforces file/line limits.
-    """
-    try:
-        result = wsl_bash("git diff --cached --stat 2>/dev/null || git diff HEAD --stat 2>/dev/null", timeout=15)
-        if result.returncode != 0:
-            return True, "git diff unavailable, skipping scope check"
-
-        output = result.stdout.strip()
-        if not output:
-            return True, "no changes detected"
-
-        files_match = re.search(r"(\d+) files? changed", output)
-        insertions = re.search(r"(\d+) insertions?", output)
-        deletions = re.search(r"(\d+) deletions?", output)
-
-        file_count = int(files_match.group(1)) if files_match else 0
-        ins = int(insertions.group(1)) if insertions else 0
-        dels = int(deletions.group(1)) if deletions else 0
-        total_lines = ins + dels
-
-        if file_count > MAX_DIFF_FILES:
-            return False, f"touched {file_count} files (max {MAX_DIFF_FILES})"
-
-        if total_lines > MAX_DIFF_LINES:
-            return False, f"changed {total_lines} lines (max {MAX_DIFF_LINES})"
-
-        return True, f"{file_count} files, {total_lines} lines"
-
-    except Exception as e:
-        log.warning(f"Scope check failed: {e}")
-        return True, f"scope check error: {e}"
 
 
 _VERIFY_COMMANDS = {

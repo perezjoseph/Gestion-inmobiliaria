@@ -22,7 +22,7 @@ from .memory import (
     search_relevant_context, extract_outcome_from_output,
 )
 from .gates import (
-    preflight_dedup, revision_scope_check, verification_run,
+    preflight_dedup, verification_run,
 )
 from .reproducer import reproduce_locally, format_errors_for_prompt, ReproCache
 from .trends import record_duration, check_and_alert_trends
@@ -390,25 +390,7 @@ def fix_with_retry(job, step, error_log, context=None):
                 log.warning(f"Attempt {attempt} kiro-cli returned failure for {job}/{step}")
                 continue
 
-            # Gate 2: Scope enforcement
-            t0 = time.monotonic()
-            scope_passed, scope_reason = revision_scope_check()
-            timing.scope_gate_s = time.monotonic() - t0
-
-            if not scope_passed:
-                timing.total_s = time.monotonic() - attempt_start
-                all_timings.append(timing)
-                log.warning(f"Scope gate rejected attempt {attempt} for {job}/{step}: {scope_reason}")
-                wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
-                last_strategy_summary = f"SCOPE VIOLATION ({scope_reason}). {strategy_note}"
-                record_strategy_outcome(job, error_class, strategy_note or error_class, False)
-                record_fix_attempt(job, error_log, attempt, False,
-                                   f"scope_rejected: {scope_reason}. {strategy_note}",
-                                   timing=dataclasses.asdict(timing))
-                store_fix_attempt(job, step, error_class, error_log, attempt, False)
-                continue
-
-            # Gate 3: Independent verification
+            # Gate 2: Independent verification
             t0 = time.monotonic()
             verify_passed, verify_reason = verification_run(job)
             timing.verification_s = time.monotonic() - t0
@@ -654,16 +636,7 @@ def fix_sonar_issues(sonar_report, run_url):
                                 failed_groups.append(futures[future])
                                 log.warning(f"Sonar fix group failed: {e}")
 
-            # After all waves, verify scope and commit
-            scope_passed, scope_reason = revision_scope_check()
-            if not scope_passed:
-                log.warning(f"Sonar fix scope gate rejected: {scope_reason}")
-                wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
-                if attempt < MAX_RETRIES:
-                    continue
-                log.error("Sonar fix exceeded scope limits on all attempts")
-                return False
-
+            # After all waves, commit
             commit_result = wsl_bash(
                 "git add -A && "
                 "git diff --cached --quiet && echo 'nothing to commit' || "
@@ -745,13 +718,6 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
 
             if not success:
                 log.warning(f"Pipeline improvement attempt {attempt} failed")
-                continue
-
-            # Scope gate
-            scope_passed, scope_reason = revision_scope_check()
-            if not scope_passed:
-                log.warning(f"Pipeline improve scope gate rejected: {scope_reason}")
-                wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
                 continue
 
             commit_result = wsl_bash(

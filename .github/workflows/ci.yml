@@ -1379,6 +1379,9 @@ jobs:
           if [ -f android/app/build/reports/lint-results-debug.xml ]; then
             echo "Android Lint XML report found -- including in SonarQube analysis"
             SCAN_ARGS+=("-Dsonar.androidLint.reportPaths=/usr/src/android/app/build/reports/lint-results-debug.xml")
+          else
+            echo "::notice::Android Lint XML report not found -- clearing default path to avoid import warning"
+            SCAN_ARGS+=("-Dsonar.androidLint.reportPaths=")
           fi
           if [ -f android/build/reports/detekt/detekt.xml ]; then
             echo "Detekt report found -- including in SonarQube analysis"
@@ -1403,7 +1406,6 @@ jobs:
             --tmpfs /home/scanner:rw,noexec,nosuid,nodev,size=64m,uid=1000,gid=1000 \
             -e SONAR_TOKEN="${SONAR_ANALYSIS_TOKEN}" \
             -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
-            -e SONAR_SCANNER_SKIP_JRE_PROVISIONING=true \
             -e HOME=/home/scanner \
             -v "${GITHUB_WORKSPACE}:/usr/src" \
             sonarsource/sonar-scanner-cli:11.3@sha256:7462f132388135e32b948f8f18ff0db9ae28a87c6777f1df5b2207e04a6d7c5c \
