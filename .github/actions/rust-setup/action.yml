@@ -39,8 +39,8 @@ runs:
           echo "OpenSSL development headers already available ($(pkg-config --modversion openssl))"
         else
           echo "OpenSSL headers missing -- installing via apt"
-          apt-get update -qq
-          apt-get install -y -qq --no-install-recommends pkg-config libssl-dev
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends pkg-config libssl-dev
         fi
 
     - name: Free disk space for Rust compilation
@@ -77,7 +77,7 @@ runs:
           rm -rf /tmp/rustc* /tmp/cargo-install* 2>/dev/null || true
           find "${RUNNER_TEMP:-/tmp}" -maxdepth 1 -name '*.sh' -mmin +60 -delete 2>/dev/null || true
           # System caches
-          apt-get clean 2>/dev/null || true
+          sudo apt-get clean 2>/dev/null || true
           rm -rf /var/cache/apt/archives/*.deb 2>/dev/null || true
           journalctl --vacuum-size=50M 2>/dev/null || true
           rm -rf /var/tmp/* 2>/dev/null || true
