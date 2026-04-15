@@ -1162,7 +1162,9 @@ jobs:
             "${SCAN_ARGS[@]}" 2>&1 | tee "${RUNNER_TEMP}/sonar-output.txt" || SCAN_EXIT=$?
           echo "scan_exit=${SCAN_EXIT}" >> $GITHUB_OUTPUT
           if [ "$SCAN_EXIT" -ne 0 ]; then
-            echo "::warning::SonarQube scanner exited with code ${SCAN_EXIT} (quality gate may have failed)"
+            echo "::warning::SonarQube scanner exited with code ${SCAN_EXIT}"
+            tail -30 "${RUNNER_TEMP}/sonar-output.txt" || true
+            exit $SCAN_EXIT
           fi
 
       - name: Extract quality gate result
