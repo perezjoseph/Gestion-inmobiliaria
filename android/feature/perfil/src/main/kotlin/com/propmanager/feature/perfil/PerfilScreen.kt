@@ -72,7 +72,10 @@ fun PerfilScreen(
             when {
                 uiState.isLoading -> LoadingScreen()
                 uiState.errorMessage != null && uiState.nombre.isEmpty() ->
-                    ErrorScreen(message = uiState.errorMessage!!, onRetry = viewModel::loadPerfil)
+                    ErrorScreen(
+                        message = uiState.errorMessage.orEmpty(),
+                        onRetry = viewModel::loadPerfil,
+                    )
                 else ->
                     PerfilContent(
                         uiState = uiState,

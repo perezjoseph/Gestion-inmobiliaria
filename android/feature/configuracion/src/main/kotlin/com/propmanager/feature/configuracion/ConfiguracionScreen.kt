@@ -64,7 +64,10 @@ fun ConfiguracionScreen(
             when {
                 uiState.isLoading -> LoadingScreen()
                 uiState.errorMessage != null && uiState.tasa.isEmpty() ->
-                    ErrorScreen(message = uiState.errorMessage!!, onRetry = viewModel::loadMoneda)
+                    ErrorScreen(
+                        message = uiState.errorMessage.orEmpty(),
+                        onRetry = viewModel::loadMoneda,
+                    )
                 else ->
                     ConfiguracionForm(
                         uiState = uiState,

@@ -77,8 +77,8 @@ object ContratoValidator {
                             "La fecha de fin debe ser posterior a la fecha de inicio"
                         )
                 }
-            } catch (_: Exception) {
-                // Date parsing errors are handled by the blank checks above
+            } catch (_: java.time.format.DateTimeParseException) {
+                results["fechaInicio"] = ValidationResult.Invalid("Formato de fecha inválido")
             }
         }
 

@@ -93,7 +93,7 @@ private fun AuditoriaContent(
     when {
         uiState.isLoading && uiState.entries.isEmpty() -> LoadingScreen()
         uiState.errorMessage != null && uiState.entries.isEmpty() ->
-            ErrorScreen(message = uiState.errorMessage!!, onRetry = onRetry)
+            ErrorScreen(message = uiState.errorMessage.orEmpty(), onRetry = onRetry)
         uiState.entries.isEmpty() ->
             EmptyStateScreen(message = stringResource(R.string.auditoria_empty))
         else -> {

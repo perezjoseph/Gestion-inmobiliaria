@@ -70,20 +70,15 @@ constructor(
     val filters: StateFlow<PropiedadesFilterState> = _filters.asStateFlow()
 
     val propiedades: StateFlow<PropiedadesUiState> =
-        _filters
-            .flatMapLatest { f -> repository.observeFiltered(f.ciudad, f.estado, f.tipoPropiedad) }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-            .let { _ ->
-                MutableStateFlow<PropiedadesUiState>(PropiedadesUiState.Loading).also { state ->
-                    viewModelScope.launch {
-                        _filters
-                            .flatMapLatest { f ->
-                                repository.observeFiltered(f.ciudad, f.estado, f.tipoPropiedad)
-                            }
-                            .collect { list -> state.value = PropiedadesUiState.Success(list) }
+        MutableStateFlow<PropiedadesUiState>(PropiedadesUiState.Loading).also { state ->
+            viewModelScope.launch {
+                _filters
+                    .flatMapLatest { f ->
+                        repository.observeFiltered(f.ciudad, f.estado, f.tipoPropiedad)
                     }
-                }
+                    .collect { list -> state.value = PropiedadesUiState.Success(list) }
             }
+        }
 
     private val _formState = MutableStateFlow(PropiedadFormState())
     val formState: StateFlow<PropiedadFormState> = _formState.asStateFlow()
@@ -199,7 +194,7 @@ constructor(
             val result =
                 if (editingId != null) {
                     repository.update(
-                        editingId!!,
+                        editingId.orEmpty(),
                         UpdatePropiedadRequest(
                             titulo = form.titulo,
                             descripcion = form.descripcion.ifBlank { null },
