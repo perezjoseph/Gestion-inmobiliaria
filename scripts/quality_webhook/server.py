@@ -23,6 +23,15 @@ from .fixers import (
 )
 from .memory import get_memory_stats
 from .history import _load_fix_history
+from .trends import get_all_trends
+from .flaky import get_flaky_test_summary
+from .vulns import get_vuln_summary
+from .correlation import (
+    register_failure, check_correlation,
+    should_dispatch_correlated_fix, build_correlated_fix_prompt,
+    get_correlation_summary,
+)
+from .classifier import classify_error
 
 _thread_semaphore = threading.Semaphore(THREAD_POOL_SIZE)
 
@@ -123,6 +132,15 @@ class WebhookHandler(BaseHTTPRequestHandler):
             tp_available = _thread_semaphore._value
             active_threads = THREAD_POOL_SIZE - tp_available
 
+            trends = get_all_trends()
+            duration_trends = {}
+            for job_name, trend in trends.items():
+                duration_trends[job_name] = {
+                    "moving_avg_s": round(trend.moving_avg_s, 1),
+                    "sample_count": trend.sample_count,
+                    "timeout_risk": trend.timeout_risk,
+                }
+
             self._send(200, json.dumps({
                 "status": "ok",
                 "timestamp": datetime.now().isoformat(),
@@ -137,6 +155,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     "active": max(0, active_threads),
                     "max": THREAD_POOL_SIZE,
                 },
+                "duration_trends": duration_trends,
+                "flaky_tests": get_flaky_test_summary(),
+                "vuln_patterns": get_vuln_summary(),
+                "correlations": get_correlation_summary(),
             }).encode(), "application/json")
             return
         self._send(404, b"Not found")
@@ -265,6 +287,26 @@ class WebhookHandler(BaseHTTPRequestHandler):
         }
 
         log.info(f"CI failure webhook: job={job}, step={step}, commit={context['commit'][:8]}, branch={context['branch']}")
+
+        error_class = classify_error(error_log)
+        group_id = register_failure(job, step, error_log, context["commit"], error_class)
+
+        if group_id is not None:
+            group = check_correlation(group_id)
+            if group is not None and should_dispatch_correlated_fix(group_id):
+                if not group.dispatched:
+                    group.dispatched = True
+                    prompt = build_correlated_fix_prompt(group)
+                    log.info(
+                        f"Dispatching correlated fix for group {group_id} "
+                        f"({len(group.failures)} failures, commit {group.commit[:8]})"
+                    )
+                    from .runner import run_kiro as _run_kiro
+                    _run_kiro(prompt, f"Correlated fix ({group_id})")
+                    return
+                log.info(f"Correlated fix already dispatched for group {group_id}")
+                return
+
         fix_with_retry(job, step, error_log, context)
 
     def _handle_ci_improve(self, payload):

@@ -25,6 +25,8 @@ from .gates import (
     preflight_dedup, revision_scope_check, verification_run,
 )
 from .reproducer import reproduce_locally, format_errors_for_prompt, ReproCache
+from .trends import record_duration, check_and_alert_trends
+from .vulns import extract_vuln_info, record_vuln_failure
 
 
 @dataclass
@@ -246,6 +248,25 @@ def fix_with_retry(job, step, error_log, context=None):
         error_class = classify_error(error_log)
         log.info(f"Error classified as: {error_class} for {job}/{step}")
 
+        test_results = parse_test_results(error_log)
+        if test_results:
+            record_test_outcomes(job, test_results)
+
+        if error_class == "test_failure":
+            all_flaky, flaky_names = are_all_failures_flaky(error_log)
+            if all_flaky:
+                log.info(
+                    f"All failing tests are known-flaky for {job}/{step}: "
+                    f"{flaky_names}. Skipping fix attempt. "
+                    f"Recommendation: quarantine these tests."
+                )
+                return False
+
+        if error_class == "dependency":
+            vuln_pairs = extract_vuln_info(error_log)
+            for crate, advisories in vuln_pairs:
+                record_vuln_failure(crate, advisories)
+
         # Create reproduction cache for this fix cycle
         repro_cache = ReproCache(error_hash=_error_hash(job, error_log))
 
@@ -421,6 +442,11 @@ def fix_with_retry(job, step, error_log, context=None):
                 )
                 log.info(f"Attempt {attempt} completed for {job}/{step}")
                 _log_timing_summary(job, step, cycle_start, all_timings)
+                total_cycle_s = time.monotonic() - cycle_start
+                record_duration(job, total_cycle_s, True)
+                at_risk = check_and_alert_trends()
+                for rj in at_risk:
+                    log.warning(f"Trend alert: job '{rj}' approaching timeout threshold")
                 return True
 
             log.warning(f"Commit/push failed for attempt {attempt} ({job}/{step})")
@@ -429,6 +455,11 @@ def fix_with_retry(job, step, error_log, context=None):
         _write_escalation(job, step, error_log, error_class, context, repro=repro)
         log.error(f"Failed after {MAX_RETRIES} attempts for {job}/{step}. Escalation written.")
         _log_timing_summary(job, step, cycle_start, all_timings)
+        total_cycle_s = time.monotonic() - cycle_start
+        record_duration(job, total_cycle_s, False)
+        at_risk = check_and_alert_trends()
+        for rj in at_risk:
+            log.warning(f"Trend alert: job '{rj}' approaching timeout threshold")
         return False
     finally:
         _max_concurrent_fixes.release()

@@ -245,6 +245,8 @@ jobs:
         id: lint-checks
         timeout-minutes: 15
         working-directory: android
+        env:
+          GRADLE_OPTS: "-Xmx512m -Dorg.gradle.jvmargs=-Xmx2g"
         run: |
           umask 077
           set -o pipefail
@@ -424,6 +426,8 @@ jobs:
         id: unit-tests
         timeout-minutes: 20
         working-directory: android
+        env:
+          GRADLE_OPTS: "-Xmx512m -Dorg.gradle.jvmargs=-Xmx2g"
         run: |
           umask 077
           set -o pipefail
@@ -663,19 +667,14 @@ jobs:
       - name: Scan Android dependencies for known vulnerabilities (Trivy)
         id: trivy-deps
         if: always() && steps.install-trivy.outputs.installed == 'true'
-        timeout-minutes: 5
+        timeout-minutes: 10
+        env:
+          GRADLE_OPTS: "-Xmx512m -Dorg.gradle.jvmargs=-Xmx1536m"
         run: |
           export PATH="${HOME}/.local/bin:$PATH"
           # Trivy cannot parse Kotlin DSL (build.gradle.kts) directly.
-          # Generate a CycloneDX SBOM from Gradle's resolved dependency graph,
-          # then scan that. Falls back to filesystem scan if SBOM generation fails.
-          SBOM_FILE="${RUNNER_TEMP}/android-sbom.json"
-          if [ -x android/gradlew ]; then
-            cd android
-            ./gradlew app:dependencies --configuration debugRuntimeClasspath -q 2>/dev/null | \
-              grep -oP '[\w.-]+:[\w.-]+:[\w.-]+' | sort -u > "${RUNNER_TEMP}/gradle-deps.txt" || true
-            cd ..
-          fi
+          # Gradle dependency verification (dep-verify step) handles supply chain integrity.
+          # Skip the redundant Gradle resolution -- trivy fs scans lockfiles/manifests only.
           trivy fs --scanners vuln --exit-code 1 --severity CRITICAL,HIGH \
             --no-progress --format table \
             android/ 2>&1 | tee "${RUNNER_TEMP}/trivy-deps-output.txt" || TRIVY_EXIT=$?
