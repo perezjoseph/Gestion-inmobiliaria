@@ -28,6 +28,7 @@ from .reproducer import reproduce_locally, format_errors_for_prompt, ReproCache
 from .trends import record_duration, check_and_alert_trends
 from .vulns import extract_vuln_info, record_vuln_failure
 from .decisions import record_strategy_outcome, get_ranked_strategies
+from .flaky import parse_test_results, record_test_outcomes, are_all_failures_flaky
 
 
 @dataclass
@@ -329,7 +330,12 @@ def fix_with_retry(job, step, error_log, context=None):
             reproduced = repro and repro.reproduced
             source = "local reproduction output" if reproduced else "gh CLI full logs"
 
-            # Combined prompt: diagnose + fix + verify in a single kiro-cli call
+            ranked_strategies = get_ranked_strategies(job, error_class)
+            strategies_section = ""
+            if ranked_strategies:
+                lines = [f"  - {s}: {r:.0%} success rate" for s, r in ranked_strategies]
+                strategies_section = "\nPREFERRED STRATEGIES (by historical success rate):\n" + "\n".join(lines) + "\n"
+
             prompt = (
                 f"CI FAILED: job='{job}', step='{step}'{ctx_str}, "
                 f"class={error_class}, attempt {attempt}/{MAX_RETRIES}\n\n"
@@ -337,6 +343,7 @@ def fix_with_retry(job, step, error_log, context=None):
                 f"{_gh_cli_block(run_url)}"
                 f"Error preview:\n```\n{error_log[:3000]}\n```\n\n"
                 f"Job context: {instruction}{error_note}\n\n"
+                f"{strategies_section}"
                 f"STEP 1 - DIAGNOSE: Identify root cause from {source}. "
                 f"List specific files/lines that need changes.\n"
                 f"STEP 2 - FIX: Apply the minimal fix to resolve the issue.\n"
@@ -375,6 +382,7 @@ def fix_with_retry(job, step, error_log, context=None):
                 timing.total_s = time.monotonic() - attempt_start
                 all_timings.append(timing)
                 last_strategy_summary = strategy_note or "unknown"
+                record_strategy_outcome(job, error_class, strategy_note or error_class, False)
                 record_fix_attempt(job, error_log, attempt, False,
                                    f"class={error_class}, job={job}, step={step}. {strategy_note}",
                                    timing=dataclasses.asdict(timing))
@@ -393,6 +401,7 @@ def fix_with_retry(job, step, error_log, context=None):
                 log.warning(f"Scope gate rejected attempt {attempt} for {job}/{step}: {scope_reason}")
                 wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
                 last_strategy_summary = f"SCOPE VIOLATION ({scope_reason}). {strategy_note}"
+                record_strategy_outcome(job, error_class, strategy_note or error_class, False)
                 record_fix_attempt(job, error_log, attempt, False,
                                    f"scope_rejected: {scope_reason}. {strategy_note}",
                                    timing=dataclasses.asdict(timing))
@@ -410,6 +419,7 @@ def fix_with_retry(job, step, error_log, context=None):
                 log.warning(f"Verification gate failed for attempt {attempt} ({job}/{step}): {verify_reason}")
                 wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
                 last_strategy_summary = f"VERIFY FAILED ({verify_reason[:200]}). {strategy_note}"
+                record_strategy_outcome(job, error_class, strategy_note or error_class, False)
                 record_fix_attempt(job, error_log, attempt, False,
                                    f"verify_failed: {verify_reason[:200]}. {strategy_note}",
                                    timing=dataclasses.asdict(timing))
@@ -430,6 +440,7 @@ def fix_with_retry(job, step, error_log, context=None):
                 )
 
             commit_ok = commit_result.returncode == 0
+            record_strategy_outcome(job, error_class, strategy_note or error_class, commit_ok)
             record_fix_attempt(job, error_log, attempt, commit_ok,
                                f"class={error_class}, job={job}, step={step}. {strategy_note}",
                                timing=dataclasses.asdict(timing))
