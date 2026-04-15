@@ -180,18 +180,12 @@ jobs:
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
 
-      - name: Restore cargo cache
+      - name: Rust cache
         id: cache
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: v2-${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            v2-${{ runner.os }}-cargo-lint-
-            v2-${{ runner.os }}-cargo-
+          shared-key: lint
+          cache-on-failure: true
 
       - name: Verify rustfmt formatting across all crates
         id: fmt
@@ -310,18 +304,17 @@ jobs:
       - name: Record duration
         id: timing
         if: always()
-        run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
+        run: |
+          START="${{ steps.start.outputs.time }}"
+          if [ -n "$START" ]; then
+            echo "duration=$(( $(date +%s) - $START ))s" >> $GITHUB_OUTPUT
+          else
+            echo "duration=n/a" >> $GITHUB_OUTPUT
+          fi
 
       - name: Fail job if any lint step failed
         if: always() && (steps.fmt.outcome == 'failure' || steps.clippy_backend.outcome == 'failure' || steps.clippy_frontend.outcome == 'failure')
         run: exit 1
-
-      - name: Prune cargo target for cache efficiency
-        if: always()
-        run: |
-          find target -name "incremental" -type d -exec rm -rf {} + 2>/dev/null || true
-          find target -path "*/deps/librealestate_*" -delete 2>/dev/null || true
-          find target -path "*/.fingerprint/realestate-*" -type d -exec rm -rf {} + 2>/dev/null || true
 
       - name: Upload clippy report for SonarQube
         if: always() && hashFiles('clippy-report.json') != ''
@@ -406,19 +399,12 @@ jobs:
       - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
-      - name: Restore cargo cache
+      - name: Rust cache
         id: cache
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: v2-${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            v2-${{ runner.os }}-cargo-test-
-            v2-${{ runner.os }}-cargo-lint-
-            v2-${{ runner.os }}-cargo-
+          shared-key: test-backend
+          cache-on-failure: true
 
       - name: Mask test database credentials
         run: |
@@ -465,7 +451,13 @@ jobs:
       - name: Record duration
         id: timing
         if: always()
-        run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
+        run: |
+          START="${{ steps.start.outputs.time }}"
+          if [ -n "$START" ]; then
+            echo "duration=$(( $(date +%s) - $START ))s" >> $GITHUB_OUTPUT
+          else
+            echo "duration=n/a" >> $GITHUB_OUTPUT
+          fi
 
       - name: Collect backend test errors for notification
         id: collect-errors
@@ -494,14 +486,14 @@ jobs:
 
   coverage-backend:
     name: Backend Test Coverage (LCOV)
-    needs: [runner-cleanup]
+    needs: [runner-cleanup, test-backend]
     runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","docker"]') }}
     timeout-minutes: 30
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
     env:
-      DATABASE_URL: postgresql://realestate:realestate_dev_password@localhost:5432/realestate
+      DATABASE_URL: postgresql://realestate:realestate_dev_password@localhost:5433/realestate
       SERVER_PORT: 8080
       CORS_ORIGIN: http://localhost:8080
     outputs:
@@ -514,7 +506,7 @@ jobs:
           POSTGRES_USER: realestate
           POSTGRES_PASSWORD: realestate_dev_password
         ports:
-          - 5432:5432
+          - 5433:5432
         options: >-
           --health-cmd "pg_isready -U realestate"
           --health-interval 10s
@@ -650,7 +642,13 @@ jobs:
       - name: Record duration
         id: timing
         if: always()
-        run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
+        run: |
+          START="${{ steps.start.outputs.time }}"
+          if [ -n "$START" ]; then
+            echo "duration=$(( $(date +%s) - $START ))s" >> $GITHUB_OUTPUT
+          else
+            echo "duration=n/a" >> $GITHUB_OUTPUT
+          fi
 
       - name: Prune cargo target for cache efficiency
         if: always()
@@ -745,7 +743,13 @@ jobs:
       - name: Record duration
         id: timing
         if: always()
-        run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
+        run: |
+          START="${{ steps.start.outputs.time }}"
+          if [ -n "$START" ]; then
+            echo "duration=$(( $(date +%s) - $START ))s" >> $GITHUB_OUTPUT
+          else
+            echo "duration=n/a" >> $GITHUB_OUTPUT
+          fi
 
       - name: Collect frontend test errors for notification
         id: collect-errors
@@ -911,15 +915,20 @@ jobs:
             exit 0
           fi
           ARCHIVE="${RUNNER_TEMP}/trivy.tar.gz"
-          curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
-            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
-          echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
-          mkdir -p "${HOME}/.local/bin"
-          tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" trivy
-          rm -f "$ARCHIVE"
-          export PATH="${HOME}/.local/bin:$PATH"
-          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
-          echo "installed=true" >> $GITHUB_OUTPUT
+          if curl -sSfL --proto =https --retry 3 --retry-delay 5 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"; then
+            echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
+            mkdir -p "${HOME}/.local/bin"
+            tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" trivy
+            rm -f "$ARCHIVE"
+            export PATH="${HOME}/.local/bin:$PATH"
+            echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+            echo "installed=true" >> $GITHUB_OUTPUT
+          else
+            echo "::warning::Trivy download failed -- IaC and secret scans will be skipped (non-blocking)"
+            rm -f "$ARCHIVE"
+            echo "installed=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Scan Dockerfiles and docker-compose for misconfigurations (Trivy)
         id: trivy_iac
@@ -1089,7 +1098,13 @@ jobs:
       - name: Record duration
         id: timing
         if: always()
-        run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
+        run: |
+          START="${{ steps.start.outputs.time }}"
+          if [ -n "$START" ]; then
+            echo "duration=$(( $(date +%s) - $START ))s" >> $GITHUB_OUTPUT
+          else
+            echo "duration=n/a" >> $GITHUB_OUTPUT
+          fi
 
       - name: Fail job if any quality step failed
         if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.trivy_iac.outcome == 'failure' || steps.trivy_secret.outcome == 'failure')
@@ -1565,7 +1580,13 @@ jobs:
       - name: Record duration
         id: timing
         if: always()
-        run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
+        run: |
+          START="${{ steps.start.outputs.time }}"
+          if [ -n "$START" ]; then
+            echo "duration=$(( $(date +%s) - $START ))s" >> $GITHUB_OUTPUT
+          else
+            echo "duration=n/a" >> $GITHUB_OUTPUT
+          fi
 
       - name: Clean up sensitive temp files
         if: always()
@@ -1612,8 +1633,34 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
-      - name: Install Trunk WASM bundler
-        uses: jetli/trunk-action@1346cc09eace4beb84e403e199a471346d4684c9 # v0.5.1
+      - name: Install Trunk WASM bundler (musl, glibc-independent)
+        timeout-minutes: 3
+        run: |
+          TRUNK_VERSION="0.21.14"
+          TRUNK_SHA256="a67f4054b249fe9acc5fabc25de1aebf19783aca3ad6ff64bf34d7da44d0ea20"
+          NEED_INSTALL=true
+          if command -v trunk &>/dev/null && [ "$(trunk --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" = "$TRUNK_VERSION" ]; then
+            # Verify the existing binary is statically linked (musl), not glibc-dependent
+            if ldd "$(command -v trunk)" 2>&1 | grep -q "not a dynamic executable"; then
+              echo "trunk $TRUNK_VERSION (musl) already installed"
+              NEED_INSTALL=false
+            else
+              echo "::warning::Existing trunk $TRUNK_VERSION is glibc-linked -- reinstalling musl variant"
+            fi
+          fi
+          if [ "$NEED_INSTALL" = "true" ]; then
+            ARCHIVE="${RUNNER_TEMP}/trunk.tar.gz"
+            curl -sSfL --proto =https --retry 3 --retry-delay 5 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+              "https://github.com/trunk-rs/trunk/releases/download/v${TRUNK_VERSION}/trunk-x86_64-unknown-linux-musl.tar.gz"
+            echo "${TRUNK_SHA256}  ${ARCHIVE}" | sha256sum -c -
+            mkdir -p "${HOME}/.local/bin"
+            tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" trunk
+            rm -f "$ARCHIVE"
+            chmod +x "${HOME}/.local/bin/trunk"
+          fi
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+          export PATH="${HOME}/.local/bin:$PATH"
+          trunk --version
 
       - name: Restore cargo cache
         id: cache
@@ -1630,7 +1677,9 @@ jobs:
 
       - name: Build optimized WASM frontend bundle
         timeout-minutes: 25
-        run: trunk build --release 2>&1 | tee "${RUNNER_TEMP}/build-frontend-output.txt"
+        run: |
+          set -o pipefail
+          trunk build --release 2>&1 | tee "${RUNNER_TEMP}/build-frontend-output.txt"
         working-directory: frontend
 
       - name: Verify Cargo.lock was not modified during build
@@ -1641,6 +1690,7 @@ jobs:
           fi
 
       - name: Scan frontend dist for leaked secrets
+        if: success()
         run: |
           if command -v gitleaks &>/dev/null; then
             gitleaks detect --source frontend/dist --no-git --verbose --redact --exit-code 1
@@ -1723,7 +1773,13 @@ jobs:
       - name: Record duration
         id: timing
         if: always()
-        run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
+        run: |
+          START="${{ steps.start.outputs.time }}"
+          if [ -n "$START" ]; then
+            echo "duration=$(( $(date +%s) - $START ))s" >> $GITHUB_OUTPUT
+          else
+            echo "duration=n/a" >> $GITHUB_OUTPUT
+          fi
 
       - name: Collect frontend build errors for notification
         id: collect-errors
@@ -1798,12 +1854,15 @@ jobs:
 
       - name: Build optimized backend binary
         timeout-minutes: 25
-        run: cargo build --frozen -p realestate-backend --release 2>&1 | tee "${RUNNER_TEMP}/build-backend-output.txt"
+        run: |
+          set -o pipefail
+          cargo build --frozen -p realestate-backend --release 2>&1 | tee "${RUNNER_TEMP}/build-backend-output.txt"
 
       - name: Scan backend build output for leaked secrets
         run: |
           if command -v gitleaks &>/dev/null; then
-            gitleaks detect --source target/release --no-git --verbose --redact --exit-code 1
+            gitleaks detect --source target/release --no-git --verbose --redact --exit-code 1 \
+              --config .gitleaks.toml
           else
             GITLEAKS_VERSION="8.24.3"
             GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
@@ -1812,11 +1871,12 @@ jobs:
               "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
             echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
             mkdir -p "${HOME}/.local/bin"
-          tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" gitleaks
+            tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" gitleaks
             rm -f "$ARCHIVE"
             export PATH="${HOME}/.local/bin:$PATH"
-          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
-            gitleaks detect --source target/release --no-git --verbose --redact --exit-code 1
+            echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+            gitleaks detect --source target/release --no-git --verbose --redact --exit-code 1 \
+              --config .gitleaks.toml
           fi
 
       - name: Generate SHA256 checksum for backend binary
@@ -1888,7 +1948,13 @@ jobs:
       - name: Record duration
         id: timing
         if: always()
-        run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
+        run: |
+          START="${{ steps.start.outputs.time }}"
+          if [ -n "$START" ]; then
+            echo "duration=$(( $(date +%s) - $START ))s" >> $GITHUB_OUTPUT
+          else
+            echo "duration=n/a" >> $GITHUB_OUTPUT
+          fi
 
       - name: Collect backend build errors for notification
         id: collect-errors

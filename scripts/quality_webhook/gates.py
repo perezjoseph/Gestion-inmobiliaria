@@ -14,15 +14,33 @@ import re
 from datetime import datetime, timedelta
 
 from .config import (
-    MAX_DIFF_FILES, MAX_DIFF_LINES, DEDUP_WINDOW_MINUTES,
+    MAX_DIFF_FILES, MAX_DIFF_LINES,
     log,
 )
 from .runner import wsl_bash
 from .history import _error_hash, _load_fix_history, _fix_history_lock
 
+# Per-error-class dedup windows and thresholds (Requirements 4.1-4.5)
+DEDUP_CONFIG = {
+    "flaky":              {"window_minutes": 15,  "threshold": 5},
+    "runner_environment": {"window_minutes": 120, "threshold": 2},
+    "test_failure":       {"window_minutes": 60,  "threshold": 3},
+    "code_quality":       {"window_minutes": 60,  "threshold": 3},
+    "dependency":         {"window_minutes": 180, "threshold": 2},
+    "unknown":            {"window_minutes": 60,  "threshold": 3},
+}
 
-def preflight_dedup(job, error_log):
-    """Reject if the same error hash failed N+ times within the dedup window."""
+
+def preflight_dedup(job, error_log, error_class="unknown"):
+    """Reject if the same error hash failed N+ times within the dedup window.
+
+    Uses class-specific window and threshold from DEDUP_CONFIG.
+    Falls back to "unknown" config if error_class is not recognized.
+    """
+    cfg = DEDUP_CONFIG.get(error_class, DEDUP_CONFIG["unknown"])
+    window_minutes = cfg["window_minutes"]
+    threshold = cfg["threshold"]
+
     h = _error_hash(job, error_log)
     with _fix_history_lock:
         history = _load_fix_history()
@@ -31,17 +49,17 @@ def preflight_dedup(job, error_log):
     if not entry:
         return True, "no prior attempts"
 
-    cutoff = datetime.now() - timedelta(minutes=DEDUP_WINDOW_MINUTES)
+    cutoff = datetime.now() - timedelta(minutes=window_minutes)
     recent_failures = [
         a for a in entry.get("attempts", [])
         if not a.get("success")
         and datetime.fromisoformat(a["ts"]) > cutoff
     ]
 
-    if len(recent_failures) >= 3:
+    if len(recent_failures) >= threshold:
         return False, (
             f"same error hash failed {len(recent_failures)} times "
-            f"in the last {DEDUP_WINDOW_MINUTES} minutes"
+            f"in the last {window_minutes} minutes"
         )
 
     return True, f"{len(recent_failures)} recent failures (under threshold)"

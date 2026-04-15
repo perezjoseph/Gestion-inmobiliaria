@@ -8,6 +8,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from .config import (
     PORT, BIND_ADDRESS, WEBHOOK_SECRET, WIN_PROJECT_DIR, PROJECT_DIR,
     MAX_RETRIES, KIRO_TIMEOUT, MAX_PAYLOAD_BYTES, WSL_DISTRO, WSL_USER,
+    THREAD_POOL_SIZE, REQUEST_QUEUE_SIZE, MAX_CONCURRENT_FIXES,
     log, get_local_ip, to_wsl_path,
 )
 from .runner import wsl_bash, run_kiro
@@ -17,11 +18,52 @@ from .security import (
 )
 from .fixers import (
     fix_with_retry, fix_sonar_issues, improve_pipeline,
-    _fix_lock, _sonar_fix_lock, _improve_lock,
+    _job_locks, _git_lock, _max_concurrent_fixes,
+    _sonar_fix_lock, _improve_lock,
 )
 from .memory import get_memory_stats
+from .history import _load_fix_history
 
-_thread_semaphore = threading.Semaphore(4)
+_thread_semaphore = threading.Semaphore(THREAD_POOL_SIZE)
+
+
+def _build_timing_stats():
+    history = _load_fix_history()
+    last_fix = None
+    total_s_sum = 0.0
+    fix_count = 0
+
+    for entry in history.values():
+        if not isinstance(entry, dict):
+            continue
+        for attempt in entry.get("attempts", []):
+            timing = attempt.get("timing")
+            if not timing or not isinstance(timing, dict):
+                continue
+            fix_count += 1
+            total_s = timing.get("total_s", 0.0)
+            total_s_sum += total_s
+            if last_fix is None or attempt.get("ts", "") > last_fix.get("ts", ""):
+                last_fix = {
+                    "job": entry.get("job", "unknown"),
+                    "total_s": total_s,
+                    "phases": {
+                        k: v for k, v in timing.items() if k != "total_s"
+                    },
+                    "ts": attempt.get("ts", ""),
+                }
+
+    result = {
+        "fix_count": fix_count,
+        "avg_total_s": round(total_s_sum / fix_count, 1) if fix_count > 0 else 0.0,
+    }
+    if last_fix:
+        result["last_fix"] = {
+            "job": last_fix["job"],
+            "total_s": last_fix["total_s"],
+            "phases": last_fix["phases"],
+        }
+    return result
 
 
 class TimeoutHTTPServer(HTTPServer):
@@ -67,15 +109,34 @@ class WebhookHandler(BaseHTTPRequestHandler):
             return
 
         if self.path == "/health":
+            job_lock_status = {
+                name: lock.locked() for name, lock in _job_locks.items()
+            }
+            job_lock_status["sonar_fix"] = _sonar_fix_lock.locked()
+            job_lock_status["improve"] = _improve_lock.locked()
+
+            timing_info = _build_timing_stats()
+
+            sem_available = _max_concurrent_fixes._value
+            active_fixes = MAX_CONCURRENT_FIXES - sem_available
+
+            tp_available = _thread_semaphore._value
+            active_threads = THREAD_POOL_SIZE - tp_available
+
             self._send(200, json.dumps({
                 "status": "ok",
                 "timestamp": datetime.now().isoformat(),
-                "locks": {
-                    "fix": _fix_lock.locked(),
-                    "sonar_fix": _sonar_fix_lock.locked(),
-                    "improve": _improve_lock.locked(),
-                },
+                "locks": job_lock_status,
                 "memory": get_memory_stats(),
+                "timing": timing_info,
+                "concurrent_fixes": {
+                    "active": max(0, active_fixes),
+                    "max": MAX_CONCURRENT_FIXES,
+                },
+                "thread_pool": {
+                    "active": max(0, active_threads),
+                    "max": THREAD_POOL_SIZE,
+                },
             }).encode(), "application/json")
             return
         self._send(404, b"Not found")
@@ -137,8 +198,8 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self._send(200, b"OK", request_id=request_id)
 
             def _guarded(fn, p, rid):
-                if not _thread_semaphore.acquire(blocking=False):
-                    log.warning(f"[{rid}] Thread pool exhausted -- dropping {self.path}")
+                if not _thread_semaphore.acquire(blocking=True, timeout=30):
+                    log.warning(f"[{rid}] Thread pool timed out -- deferring {self.path}")
                     return
                 try:
                     fn(p)
@@ -304,7 +365,7 @@ def main():
 
     server = TimeoutHTTPServer((BIND_ADDRESS, PORT), WebhookHandler)
     server.timeout = 30
-    server.request_queue_size = 8
+    server.request_queue_size = REQUEST_QUEUE_SIZE
     log.info(f"Quality webhook listener running on {BIND_ADDRESS}:{PORT}")
     log.info(f"Max retries: {MAX_RETRIES} | Timeout: {KIRO_TIMEOUT // 60}min | Max payload: {MAX_PAYLOAD_BYTES // 1024}KB")
     log.info("Endpoints:")

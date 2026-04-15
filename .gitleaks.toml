@@ -1,0 +1,11 @@
+# Gitleaks configuration for build artifact scanning.
+# Compiled Rust crypto-library .rmeta files (pkcs8, pem_rfc7468, pkcs1) contain
+# PEM header constants ("BEGIN PRIVATE KEY" etc.) that trigger the private-key
+# rule. These are NOT leaked secrets -- they are compiled-in format constants
+# from well-known crates in the RustCrypto ecosystem.
+
+[allowlist]
+  paths = [
+    '''target/release/deps/.*\.rmeta$''',
+    '''target/debug/deps/.*\.rmeta$''',
+  ]

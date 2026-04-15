@@ -1,19 +1,22 @@
 
 
+import dataclasses
 import json
 import re
 import threading
+import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from datetime import datetime
 
 from .config import (
-    WIN_PROJECT_DIR, MAX_RETRIES, SCOPE_CONSTRAINTS,
+    WIN_PROJECT_DIR, MAX_RETRIES, MAX_CONCURRENT_FIXES, SCOPE_CONSTRAINTS,
     SONAR_PARALLEL_GROUPS, log,
 )
 from .runner import wsl_bash, run_kiro
 from .classifier import classify_error
-from .history import record_fix_attempt, get_past_attempts
+from .history import record_fix_attempt, get_past_attempts, _error_hash
 from .memory import (
     store_fix_attempt, store_fix_outcome,
     search_relevant_context, extract_outcome_from_output,
@@ -21,11 +24,36 @@ from .memory import (
 from .gates import (
     preflight_dedup, revision_scope_check, verification_run,
 )
-from .reproducer import reproduce_locally, format_errors_for_prompt
+from .reproducer import reproduce_locally, format_errors_for_prompt, ReproCache
 
-_fix_lock = threading.Lock()
+
+@dataclass
+class PhaseTiming:
+    reproduction_s: float = 0.0
+    diagnosis_s: float = 0.0
+    fix_attempt_s: float = 0.0
+    scope_gate_s: float = 0.0
+    verification_s: float = 0.0
+    total_s: float = 0.0
+
+
+_fix_lock = threading.Lock()  # backward compat: kept for server.py health endpoint
 _sonar_fix_lock = threading.Lock()
 _improve_lock = threading.Lock()
+
+# Per-job lock registry: allows parallel fixes for different jobs
+_job_locks: dict[str, threading.Lock] = {}
+_job_locks_guard = threading.Lock()
+_git_lock = threading.Lock()
+_max_concurrent_fixes = threading.Semaphore(MAX_CONCURRENT_FIXES)
+
+
+def _get_job_lock(job: str) -> threading.Lock:
+    """Lazily create and return a per-job lock."""
+    with _job_locks_guard:
+        if job not in _job_locks:
+            _job_locks[job] = threading.Lock()
+        return _job_locks[job]
 
 
 def _parse_run_id(run_url):
@@ -39,103 +67,63 @@ def _parse_run_id(run_url):
     return (match.group(1), "") if match else ("", "")
 
 
-def _gh_troubleshoot_instructions(run_url, job):
-    """Build gh CLI instructions for fetching full pipeline logs and annotations."""
+def _gh_cli_block(run_url):
+    """Compact gh CLI reference for fetching full pipeline logs."""
     run_id, repo = _parse_run_id(run_url)
     if not run_id:
         return ""
-    repo_flag = f" -R {repo}" if repo else ""
+    r = f" -R {repo}" if repo else ""
     return (
-        f"\n\nTROUBLESHOOTING WITH GH CLI (do this FIRST):\n"
-        f"The error_log below may be truncated. Use gh cli to get the full picture:\n"
-        f"  1. View the failed run summary:  gh run view {run_id}{repo_flag}\n"
-        f"  2. View full logs of failed jobs: gh run view {run_id}{repo_flag} --log-failed\n"
-        f"  3. If you need a specific job:    gh run view {run_id}{repo_flag} --job <job-id> --log\n"
-        f"  4. List jobs with their IDs:      gh run view {run_id}{repo_flag} --json jobs --jq '.jobs[] | \"\\(.name) (\\(.conclusion)) id=\\(.databaseId)\"'\n"
-        f"  5. View annotations (::error:: and ::warning:: messages from the pipeline):\n"
-        f"     gh api repos/{repo}/check-runs/<check_run_id>/annotations\n"
-        f"     Get check_run_ids from step 4 (databaseId values), then query annotations for failed jobs.\n"
-        f"     Annotations often contain the most precise error location (file, line, message).\n"
-        f"The gh output gives you the COMPLETE untruncated logs. "
-        f"Use them to understand the real root cause before making any changes.\n"
-        f"Run URL: {run_url}\n"
+        f"\nGH CLI (error_log may be truncated -- fetch full logs first):\n"
+        f"  gh run view {run_id}{r} --log-failed\n"
+        f"  gh run view {run_id}{r} --json jobs "
+        f"--jq '.jobs[]|\"\\(.name) (\\(.conclusion)) id=\\(.databaseId)\"'\n"
+        f"  gh api repos/{repo}/check-runs/<check_run_id>/annotations\n"
+        f"Run: {run_url}\n"
     )
 
 
+_JOB_VERIFY = {
+    "lint": "cargo fmt --all && cargo clippy --locked -p realestate-backend -- -D warnings && cargo clippy --locked -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings",
+    "test-backend": "cargo test --locked -p realestate-backend --all-targets",
+    "test-frontend": "cargo test --locked -p realestate-frontend --all-targets",
+    "quality-gate": "cargo audit && cargo deny check",
+    "android-lint": "(cd android && ./gradlew lint detekt)",
+    "android-unit-test": "(cd android && ./gradlew testDebugUnitTest)",
+    "android-build": "(cd android && ./gradlew assembleDebug)",
+    "android-quality-gate": "(cd android && ./gradlew dependencies)",
+    "build-frontend": "(cd frontend && trunk build --release)",
+    "build-backend": "cargo build -p realestate-backend --release",
+}
+
 _JOB_INSTRUCTIONS = {
-    "lint": (
-        "Fix the formatting and clippy warnings. "
-        "Run 'cargo fmt --all' for formatting, then 'cargo clippy --locked -p realestate-backend -- -D warnings' "
-        "and 'cargo clippy --locked -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings' to verify."
-    ),
-    "test-backend": (
-        "Fix the failing backend tests. Read the test output carefully to identify which tests failed and why. "
-        "Run 'cargo test --locked -p realestate-backend --all-targets' to verify."
-    ),
-    "test-frontend": (
-        "Fix the failing frontend tests. "
-        "Run 'cargo test --locked -p realestate-frontend --all-targets' to verify."
-    ),
+    "lint": "Fix formatting and clippy warnings.",
+    "test-backend": "Fix failing backend tests. Read test output to identify which tests failed and why.",
+    "test-frontend": "Fix failing frontend tests.",
     "quality-gate": (
-        "Fix the quality gate failures. The error log contains details from cargo-audit, cargo-deny, or OWASP scans. "
-        "For RUSTSEC/CVE advisories: update the affected crate version in Cargo.toml, run 'cargo update' for the specific crate, then verify with 'cargo audit'. "
-        "For OWASP findings: check the vulnerability details and update or suppress as appropriate. "
-        "For license violations: check deny.toml and adjust exceptions if the license is acceptable. "
-        "Do NOT modify the CI pipeline YAML -- fix the dependency versions in Cargo.toml or deny.toml."
+        "Fix quality gate failures (cargo-audit/cargo-deny/OWASP). "
+        "Update crate versions in Cargo.toml or suppress in deny.toml. Do NOT modify CI YAML."
     ),
-    "sonarqube": "Fix the SonarQube analysis failures. Check the SonarQube server configuration and scan settings.",
+    "sonarqube": "Fix SonarQube analysis failures. Check server config and scan settings.",
     "android-lint": (
-        "Fix the Android lint warnings in the android/ directory. "
-        "Read the specific lint errors in the output. "
-        "Run './gradlew lint' in android/ to verify. "
-        "For detekt issues, run './gradlew detekt' in android/. "
-        "For ktfmt issues, run './gradlew spotlessApply' in android/ to auto-fix formatting."
+        "Fix Android lint/detekt warnings in android/. "
+        "For ktfmt: run './gradlew spotlessApply' to auto-fix."
     ),
-    "android-unit-test": (
-        "Fix the failing Android unit tests in the android/ directory. "
-        "Read the test output to identify which tests failed. "
-        "Run './gradlew testDebugUnitTest' in android/ to verify."
-    ),
-    "android-build": (
-        "Fix the Android build errors in the android/ directory. "
-        "Read the Gradle build output for compilation errors. "
-        "Run './gradlew assembleDebug' in android/ to verify."
-    ),
+    "android-unit-test": "Fix failing Android unit tests in android/.",
+    "android-build": "Fix Android build errors in android/.",
     "android-quality-gate": (
-        "Fix the Android dependency security issues. "
-        "The OWASP report found vulnerabilities with CVSS >= 7. "
-        "Update vulnerable dependencies in android/gradle/libs.versions.toml to patched versions. "
-        "If no patch exists, add a suppression to android-owasp-suppressions.xml with justification. "
-        "Run './gradlew dependencies' in android/ to verify resolution."
+        "Fix Android dependency vulnerabilities (CVSS >= 7). "
+        "Update versions in android/gradle/libs.versions.toml or add suppression."
     ),
-    "android-sonarqube": "Fix the Android SonarQube analysis failures. Check scan configuration and server connectivity.",
-    "build-frontend": (
-        "Fix the frontend WASM build errors. "
-        "Run 'trunk build --release' in frontend/ to reproduce. "
-        "Check for compilation errors targeting wasm32-unknown-unknown."
-    ),
-    "build-backend": (
-        "Fix the backend release build errors. "
-        "Run 'cargo build -p realestate-backend --release' to reproduce."
-    ),
-    "container-image-backend": (
-        "Fix the backend container image build or Trivy scan failure. "
-        "Check Dockerfile.backend for build errors. "
-        "For Trivy vulnerabilities, update base image or fix vulnerable packages."
-    ),
-    "container-image-frontend": (
-        "Fix the frontend container image build or Trivy scan failure. "
-        "Check Dockerfile.frontend for build errors."
-    ),
-    "deploy": (
-        "Fix the production deployment failure. "
-        "Check docker-compose.prod.yml and service health. "
-        "This may require infrastructure changes that cannot be auto-fixed."
-    ),
+    "android-sonarqube": "Fix Android SonarQube failures. Check scan config and connectivity.",
+    "build-frontend": "Fix frontend WASM build errors (target wasm32-unknown-unknown).",
+    "build-backend": "Fix backend release build errors.",
+    "container-image-backend": "Fix backend container build or Trivy scan failure. Check Dockerfile.backend.",
+    "container-image-frontend": "Fix frontend container build or Trivy scan failure. Check Dockerfile.frontend.",
+    "deploy": "Fix deployment failure. Check docker-compose.prod.yml. May need infra changes.",
     "secret-scan": (
-        "WARNING: Gitleaks detected secrets in the repository. "
-        "Do NOT commit the secret again. Remove the leaked credential from the codebase, "
-        "add it to .gitleaksignore if it's a false positive, and rotate any exposed credentials."
+        "WARNING: Gitleaks found secrets. Remove the credential, "
+        "add to .gitleaksignore if false positive, rotate any exposed secrets."
     ),
 }
 
@@ -143,37 +131,24 @@ _JOB_INSTRUCTIONS = {
 def _build_error_notes(error_class):
     notes = {
         "runner_environment": (
-            "\n\nIMPORTANT: This error appears to be a RUNNER ENVIRONMENT issue "
-            "(missing tool, network problem, disk space, or Docker issue). "
-            "These cannot be fixed by changing application code. "
-            "If you confirm this is a runner/infra issue, do NOT make code changes. "
-            "Instead, document the issue and suggest what the runner admin should fix. "
-            "Only make code changes if the error is actually caused by the code."
+            "\nRUNNER ENVIRONMENT issue (missing tool, network, disk, Docker). "
+            "Do NOT change application code. Document what the runner admin should fix."
         ),
         "dependency": (
-            "\n\nDEPENDENCY ISSUE METHODOLOGY:\n"
-            "1. Parse the CVE/RUSTSEC/GHSA IDs from the error log.\n"
-            "2. For each advisory, identify the affected crate and its current version.\n"
-            "3. Check if a patched version exists (use 'cargo audit' output or search crates.io).\n"
-            "4. If a patch exists: update the version constraint in Cargo.toml, run 'cargo update -p <crate>'.\n"
-            "5. If no patch exists: evaluate if the vulnerability applies to our usage. "
-            "If not applicable, add to .cargo/audit.toml [advisories.ignore]. "
-            "If applicable, find an alternative crate or implement a workaround.\n"
-            "6. Verify: run 'cargo audit' and 'cargo deny check' to confirm resolution.\n"
-            "7. Run 'cargo test --locked -p realestate-backend --all-targets' to ensure nothing broke."
+            "\nDEPENDENCY FIX: parse CVE/RUSTSEC IDs → find patched version → "
+            "update Cargo.toml → cargo update -p <crate> → cargo audit. "
+            "If no patch: suppress in .cargo/audit.toml or find alternative. "
+            "Verify: cargo test --locked -p realestate-backend --all-targets."
         ),
         "test_failure": (
-            "\n\nFLAKY TEST CHECK (do this FIRST):\n"
-            "Before making any code changes, re-run the failing test 2 times. "
-            "If it passes on re-run, the test is flaky -- do NOT change application code. "
-            "Instead, note which test is flaky and move on. "
-            "Only fix the code if the test fails consistently on every re-run."
+            "\nFLAKY CHECK: re-run the failing test 2x first. "
+            "If it passes on re-run, it's flaky -- do NOT change code. "
+            "Only fix if it fails consistently."
         ),
         "flaky": (
-            "\n\nFLAKY/INTERMITTENT FAILURE DETECTED:\n"
-            "This error pattern suggests an intermittent issue (network, timing, resource contention). "
-            "Do NOT make code changes. Re-run the CI pipeline instead. "
-            "If the same error persists across 3+ runs, escalate as a runner environment issue."
+            "\nINTERMITTENT FAILURE (network/timing/resources). "
+            "Do NOT change code. Re-run CI instead. "
+            "Escalate if same error persists across 3+ runs."
         ),
     }
     return notes.get(error_class, "")
@@ -182,76 +157,75 @@ def _build_error_notes(error_class):
 def _diagnose(job, step, error_log, error_class, context, repro=None):
     """Stage 1: Diagnose using local reproduction + gh CLI for full logs.
 
-    If local reproduction succeeded, the diagnosis prompt includes structured
-    errors with file/line/code info. Otherwise falls back to gh CLI.
-
     Returns a short strategy string the executor can use.
     """
+    run_url = context.get("run_url", "") if context else ""
     ctx = ""
-    run_url = ""
     if context:
         ctx = f" (commit: {context.get('commit', '?')[:8]}, branch: {context.get('branch', '?')})"
-        run_url = context.get("run_url", "")
 
-    instruction = _JOB_INSTRUCTIONS.get(job, "Analyze the error and fix the issue.")
     effective_class = repro.error_class if (repro and repro.error_class) else error_class
-    error_note = _build_error_notes(effective_class)
-    gh_instructions = _gh_troubleshoot_instructions(run_url, job)
 
     repro_section = ""
     if repro and repro.reproduced:
         repro_section = format_errors_for_prompt(repro)
     elif repro:
-        repro_section = (
-            "\n\nLOCAL REPRODUCTION: The failure did NOT reproduce locally. "
-            "This suggests a CI-specific issue (environment, caching, Docker, network). "
-            "Rely on gh CLI logs for diagnosis.\n"
-        )
+        repro_section = "\nDid NOT reproduce locally -- likely CI-specific (env/cache/Docker).\n"
+
+    reproduced = repro and repro.reproduced
+    source = "local reproduction output" if reproduced else "gh CLI full logs"
 
     prompt = (
-        f"DIAGNOSE ONLY -- do NOT make changes yet.\n\n"
-        f"The CI pipeline FAILED in job '{job}', step '{step}'.{ctx}\n"
-        f"Error classification: {effective_class}\n"
-        f"{repro_section}\n"
-        f"{gh_instructions}\n"
-        f"Webhook error preview (may be truncated):\n```\n{error_log[:2000]}\n```\n\n"
-        f"Context: {instruction}\n"
-        f"{error_note}\n\n"
-        "YOUR TASK:\n"
+        f"DIAGNOSE ONLY -- do NOT edit files or run git.\n\n"
+        f"CI FAILED: job='{job}', step='{step}'{ctx}, class={effective_class}\n"
+        f"{repro_section}"
+        f"{_gh_cli_block(run_url)}"
+        f"Error preview:\n```\n{error_log[:2000]}\n```\n\n"
+        f"Job context: {_JOB_INSTRUCTIONS.get(job, 'Analyze and fix.')}"
+        f"{_build_error_notes(effective_class)}\n\n"
+        f"1. Identify root cause from {source}.\n"
+        f"2. List specific files/lines that need changes.\n"
+        f"3. Describe minimal fix strategy in 2-3 sentences."
     )
-
-    if repro and repro.reproduced:
-        prompt += (
-            "1. The error REPRODUCED LOCALLY. The structured errors above show exact files and lines.\n"
-            "2. Cross-reference with the gh CLI logs if needed for additional context.\n"
-            "3. Identify the root cause from the local output.\n"
-            "4. List the specific files and lines that need changes.\n"
-            "5. Describe the minimal fix strategy in 2-3 sentences.\n"
-            "6. Do NOT edit any files. Do NOT run git commands.\n"
-            "7. Output your diagnosis as plain text."
-        )
-    else:
-        prompt += (
-            "1. Use the gh CLI commands above to fetch the FULL error logs from the pipeline run.\n"
-            "2. Read the complete output carefully.\n"
-            "3. Identify the root cause.\n"
-            "4. List the specific files that need changes.\n"
-            "5. Describe the minimal fix strategy in 2-3 sentences.\n"
-            "6. Do NOT edit any files. Do NOT run git commands.\n"
-            "7. Output your diagnosis as plain text."
-        )
 
     result = run_kiro(prompt, f"Diagnose ({job}/{step})")
     kiro_output = result[1] if isinstance(result, tuple) else ""
     return kiro_output[-2000:] if kiro_output else "diagnosis unavailable"
 
 
+def _log_timing_summary(job, step, cycle_start, all_timings):
+    """Log a summary of phase timing for the entire fix cycle."""
+    total_cycle_s = time.monotonic() - cycle_start
+    n = len(all_timings)
+    if n == 0:
+        log.info(f"Fix cycle timing for {job}/{step}: total={total_cycle_s:.1f}s (no attempts)")
+        return
+
+    sum_repro = sum(t.reproduction_s for t in all_timings)
+    sum_fix = sum(t.fix_attempt_s for t in all_timings)
+    sum_scope = sum(t.scope_gate_s for t in all_timings)
+    sum_verify = sum(t.verification_s for t in all_timings)
+
+    log.info(
+        f"Fix cycle timing for {job}/{step}: "
+        f"total={total_cycle_s:.1f}s, attempts={n}, "
+        f"reproduction={sum_repro:.1f}s, "
+        f"diagnosis+fix={sum_fix:.1f}s, "
+        f"scope_gate={sum_scope:.1f}s, "
+        f"verification={sum_verify:.1f}s"
+    )
+
+
 def fix_with_retry(job, step, error_log, context=None):
     """GSD-inspired fix pipeline: preflight → diagnose → execute → verify → gate."""
-    if not _fix_lock.acquire(blocking=False):
-        log.warning(f"Another fix is already running -- skipping {job}/{step}")
+    job_lock = _get_job_lock(job)
+    if not job_lock.acquire(blocking=False):
+        log.warning(f"Fix already running for job '{job}' -- skipping {job}/{step}")
         return False
 
+    _max_concurrent_fixes.acquire()
+    cycle_start = time.monotonic()
+    all_timings: list[PhaseTiming] = []
     try:
         # Gate 1: Time-based dedup
         passed, reason = preflight_dedup(job, error_log)
@@ -272,9 +246,14 @@ def fix_with_retry(job, step, error_log, context=None):
         error_class = classify_error(error_log)
         log.info(f"Error classified as: {error_class} for {job}/{step}")
 
-        # Stage 0: Local reproduction
+        # Create reproduction cache for this fix cycle
+        repro_cache = ReproCache(error_hash=_error_hash(job, error_log))
+
+        # Stage 0: Local reproduction (timed)
         log.info(f"=== Reproducing {job}/{step} locally ===")
-        repro = reproduce_locally(job, error_class)
+        t0 = time.monotonic()
+        repro = reproduce_locally(job, error_class, cache=repro_cache)
+        initial_repro_s = time.monotonic() - t0
         if repro.reproduced:
             log.info(f"Failure REPRODUCED locally: {len(repro.errors)} errors, "
                      f"class refined to '{repro.error_class}'")
@@ -285,81 +264,85 @@ def fix_with_retry(job, step, error_log, context=None):
         else:
             log.info(f"No local reproduction commands for {job}/{step}")
 
-        # Stage 1: Diagnose before fixing
-        log.info(f"=== Diagnosing {job}/{step} ===")
-        diagnosis = _diagnose(job, step, error_log, error_class, context, repro)
-        log.info(f"Diagnosis complete for {job}/{step}")
-
         past_attempts_section = get_past_attempts(job, error_log)
         semantic_context = search_relevant_context(job, error_log)
         last_strategy_summary = ""
 
         for attempt in range(1, MAX_RETRIES + 1):
+            attempt_start = time.monotonic()
+            timing = PhaseTiming()
+
             log.info(f"=== Attempt {attempt}/{MAX_RETRIES} for {job}/{step}{ctx_str} (class: {error_class}) ===")
 
-            instruction = _JOB_INSTRUCTIONS.get(job, "Analyze the error and fix the issue.")
+            instruction = _JOB_INSTRUCTIONS.get(job, "Analyze and fix.")
+            verify_cmd = _JOB_VERIFY.get(job, "")
             error_note = _build_error_notes(error_class)
-
-            # Fresh context per retry: only include what's needed
-            history_section = f"\n\n{past_attempts_section}" if past_attempts_section else ""
-            semantic_section = f"\n\n{semantic_context}" if semantic_context else ""
 
             # On retry, send a minimal "try different approach" directive
             retry_section = ""
             if last_strategy_summary:
                 retry_section = (
-                    f"\n\nPREVIOUS ATTEMPT FAILED. Strategy tried: {last_strategy_summary}\n"
-                    "You MUST try a DIFFERENT approach. Do not repeat the same fix."
+                    f"\nPREVIOUS ATTEMPT FAILED: {last_strategy_summary}\n"
+                    "You MUST try a DIFFERENT approach.\n"
                 )
 
-                # Re-reproduce locally on retry to see if the error changed
                 log.info(f"Re-reproducing {job}/{step} locally after failed attempt")
-                repro = reproduce_locally(job, error_class)
+                t0 = time.monotonic()
+                repro = reproduce_locally(job, error_class, cache=repro_cache)
+                timing.reproduction_s = time.monotonic() - t0
                 if repro.reproduced and repro.error_class:
                     error_class = repro.error_class
+            else:
+                # First attempt uses the initial reproduction timing
+                timing.reproduction_s = initial_repro_s
 
             run_url = context.get("run_url", "") if context else ""
-            gh_instructions = _gh_troubleshoot_instructions(run_url, job)
 
             repro_section = ""
             if repro and repro.reproduced:
                 repro_section = format_errors_for_prompt(repro)
+            elif repro:
+                repro_section = "\nDid NOT reproduce locally -- likely CI-specific (env/cache/Docker).\n"
 
+            reproduced = repro and repro.reproduced
+            source = "local reproduction output" if reproduced else "gh CLI full logs"
+
+            # Combined prompt: diagnose + fix + verify in a single kiro-cli call
             prompt = (
-                f"The CI pipeline FAILED in job '{job}', step '{step}'.{ctx_str}\n"
-                f"Error classification: {error_class}\n"
-                f"Fix attempt: {attempt} of {MAX_RETRIES}\n\n"
-                f"DIAGNOSIS:\n{diagnosis[:1500]}\n"
-                f"{repro_section}\n"
-                f"{gh_instructions}\n"
-                f"Webhook error preview (may be truncated):\n```\n{error_log[:3000]}\n```\n\n"
+                f"CI FAILED: job='{job}', step='{step}'{ctx_str}, "
+                f"class={error_class}, attempt {attempt}/{MAX_RETRIES}\n\n"
+                f"{repro_section}"
+                f"{_gh_cli_block(run_url)}"
+                f"Error preview:\n```\n{error_log[:3000]}\n```\n\n"
+                f"Job context: {instruction}{error_note}\n\n"
+                f"STEP 1 - DIAGNOSE: Identify root cause from {source}. "
+                f"List specific files/lines that need changes.\n"
+                f"STEP 2 - FIX: Apply the minimal fix to resolve the issue.\n"
             )
 
-            if repro and repro.reproduced:
-                prompt += (
-                    "TASK: The error reproduced locally. The structured errors above "
-                    "show exact files and lines. Fix the issues directly, then verify.\n"
-                )
-            else:
-                prompt += (
-                    "TASK: First use the gh CLI commands above to fetch the FULL error logs, "
-                    "then apply the fix.\n"
-                )
+            verify_line = f"STEP 3 - VERIFY: Run: {verify_cmd}\n" if verify_cmd else ""
+            prompt += verify_line
+            prompt += "STEP 4 - STAGE: git add -A\n"
+
+            # Append history/semantic only on first attempt to save tokens
+            extras = ""
+            if attempt == 1:
+                if past_attempts_section:
+                    extras += f"\n{past_attempts_section}"
+                if semantic_context:
+                    extras += f"\n{semantic_context}"
 
             prompt += (
-                f"{instruction}"
-                f"{error_note}"
-                f"{history_section}"
-                f"{semantic_section}"
+                f"{extras}"
                 f"{retry_section}"
-                f"{SCOPE_CONSTRAINTS}\n\n"
-                "After fixing, run only the targeted verification command for this job. "
-                "Then stage your changes:\n"
-                "  git add -A\n"
-                "Do NOT commit yet -- the system will verify and commit."
+                f"{SCOPE_CONSTRAINTS}\n"
+                "Do NOT commit."
             )
 
+            t0 = time.monotonic()
             result = run_kiro(prompt, f"CI fix ({job}/{step}) attempt {attempt}")
+            timing.fix_attempt_s = time.monotonic() - t0
+
             success = result[0] if isinstance(result, tuple) else result
             kiro_output = result[1] if isinstance(result, tuple) else ""
 
@@ -367,48 +350,67 @@ def fix_with_retry(job, step, error_log, context=None):
             strategy_note = outcome.get("strategy", "")
 
             if not success:
+                timing.total_s = time.monotonic() - attempt_start
+                all_timings.append(timing)
                 last_strategy_summary = strategy_note or "unknown"
                 record_fix_attempt(job, error_log, attempt, False,
-                                   f"class={error_class}, job={job}, step={step}. {strategy_note}")
+                                   f"class={error_class}, job={job}, step={step}. {strategy_note}",
+                                   timing=dataclasses.asdict(timing))
                 store_fix_attempt(job, step, error_class, error_log, attempt, False)
                 log.warning(f"Attempt {attempt} kiro-cli returned failure for {job}/{step}")
                 continue
 
             # Gate 2: Scope enforcement
+            t0 = time.monotonic()
             scope_passed, scope_reason = revision_scope_check()
+            timing.scope_gate_s = time.monotonic() - t0
+
             if not scope_passed:
+                timing.total_s = time.monotonic() - attempt_start
+                all_timings.append(timing)
                 log.warning(f"Scope gate rejected attempt {attempt} for {job}/{step}: {scope_reason}")
                 wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
                 last_strategy_summary = f"SCOPE VIOLATION ({scope_reason}). {strategy_note}"
                 record_fix_attempt(job, error_log, attempt, False,
-                                   f"scope_rejected: {scope_reason}. {strategy_note}")
+                                   f"scope_rejected: {scope_reason}. {strategy_note}",
+                                   timing=dataclasses.asdict(timing))
                 store_fix_attempt(job, step, error_class, error_log, attempt, False)
                 continue
 
             # Gate 3: Independent verification
+            t0 = time.monotonic()
             verify_passed, verify_reason = verification_run(job)
+            timing.verification_s = time.monotonic() - t0
+
             if not verify_passed:
+                timing.total_s = time.monotonic() - attempt_start
+                all_timings.append(timing)
                 log.warning(f"Verification gate failed for attempt {attempt} ({job}/{step}): {verify_reason}")
                 wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
                 last_strategy_summary = f"VERIFY FAILED ({verify_reason[:200]}). {strategy_note}"
                 record_fix_attempt(job, error_log, attempt, False,
-                                   f"verify_failed: {verify_reason[:200]}. {strategy_note}")
+                                   f"verify_failed: {verify_reason[:200]}. {strategy_note}",
+                                   timing=dataclasses.asdict(timing))
                 store_fix_attempt(job, step, error_class, error_log, attempt, False)
                 continue
 
             # All gates passed -- commit and push
+            timing.total_s = time.monotonic() - attempt_start
+            all_timings.append(timing)
             log.info(f"All gates passed for attempt {attempt} ({job}/{step}). Committing.")
-            commit_result = wsl_bash(
-                "git add -A && "
-                "git commit -m 'fix: resolve CI failures (auto-fix)' && "
-                "git push origin main || "
-                "(git pull --rebase origin main && git push origin main)",
-                timeout=120,
-            )
+            with _git_lock:
+                commit_result = wsl_bash(
+                    "git add -A && "
+                    "git commit -m 'fix: resolve CI failures (auto-fix)' && "
+                    "git push origin main || "
+                    "(git pull --rebase origin main && git push origin main)",
+                    timeout=120,
+                )
 
             commit_ok = commit_result.returncode == 0
             record_fix_attempt(job, error_log, attempt, commit_ok,
-                               f"class={error_class}, job={job}, step={step}. {strategy_note}")
+                               f"class={error_class}, job={job}, step={step}. {strategy_note}",
+                               timing=dataclasses.asdict(timing))
             store_fix_attempt(job, step, error_class, error_log, attempt, commit_ok)
 
             if commit_ok:
@@ -418,6 +420,7 @@ def fix_with_retry(job, step, error_log, context=None):
                     strategy=strategy_note or f"Fixed via attempt {attempt}",
                 )
                 log.info(f"Attempt {attempt} completed for {job}/{step}")
+                _log_timing_summary(job, step, cycle_start, all_timings)
                 return True
 
             log.warning(f"Commit/push failed for attempt {attempt} ({job}/{step})")
@@ -425,9 +428,11 @@ def fix_with_retry(job, step, error_log, context=None):
 
         _write_escalation(job, step, error_log, error_class, context, repro=repro)
         log.error(f"Failed after {MAX_RETRIES} attempts for {job}/{step}. Escalation written.")
+        _log_timing_summary(job, step, cycle_start, all_timings)
         return False
     finally:
-        _fix_lock.release()
+        _max_concurrent_fixes.release()
+        job_lock.release()
 
 
 def _write_escalation(job, step, error_log, error_class, context, extra_reason="", repro=None):
@@ -524,7 +529,7 @@ def _parse_sonar_report_by_file(sonar_report):
     return dict(file_groups)
 
 
-def _fix_sonar_file_group(file_group_report, run_url, group_label):
+def _fix_sonar_file_group(file_group_report, group_label):
     """Fix sonar issues for a single file group. Returns (success, label)."""
     is_kotlin = any(f.endswith((".kt", ".kts")) for f in group_label.split(","))
     verify_cmd = (
@@ -534,18 +539,13 @@ def _fix_sonar_file_group(file_group_report, run_url, group_label):
     )
 
     prompt = (
-        "You are a code quality specialist. Fix ONLY the issues listed below.\n\n"
-        f"SonarQube issues for this file group:\n```\n{file_group_report}\n```\n\n"
-        "METHODOLOGY:\n"
-        "1. Open each file at the specified line.\n"
-        "2. Read 10 lines of context above and below.\n"
-        "3. Apply the minimal fix for each violation.\n"
-        "4. For security hotspots: evaluate if actually vulnerable before changing.\n"
-        f"5. Verify: {verify_cmd}\n"
-        "6. Stage changes: git add -A\n"
-        "Do NOT commit -- the orchestrator handles commits.\n"
-        f"{SCOPE_CONSTRAINTS}\n\n"
-        f"Run URL: {run_url}"
+        "Fix ONLY the SonarQube issues listed below.\n\n"
+        f"Issues:\n```\n{file_group_report}\n```\n\n"
+        "For each: open file at line, read context, apply minimal fix.\n"
+        "Security hotspots: evaluate if actually vulnerable before changing.\n"
+        f"Verify: {verify_cmd}\n"
+        "Stage: git add -A. Do NOT commit.\n"
+        f"{SCOPE_CONSTRAINTS}"
     )
 
     result = run_kiro(prompt, f"Sonar fix ({group_label})")
@@ -586,7 +586,7 @@ def fix_sonar_issues(sonar_report, run_url):
                 if len(wave) == 1:
                     file_name, issues = wave[0]
                     group_report = "\n".join(issues)
-                    success, label = _fix_sonar_file_group(group_report, run_url, file_name)
+                    success, label = _fix_sonar_file_group(group_report, file_name)
                     if not success:
                         all_succeeded = False
                         failed_groups.append(label)
@@ -596,7 +596,7 @@ def fix_sonar_issues(sonar_report, run_url):
                         for file_name, issues in wave:
                             group_report = "\n".join(issues)
                             future = executor.submit(
-                                _fix_sonar_file_group, group_report, run_url, file_name,
+                                _fix_sonar_file_group, group_report, file_name,
                             )
                             futures[future] = file_name
 
@@ -660,23 +660,15 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
 
             focus_guidance = {
                 "security": (
-                    "SECURITY FOCUS:\n"
-                    "- If the error is from OWASP/cargo-audit/cargo-deny, the fix belongs in Cargo.toml, "
-                    "deny.toml, or android/gradle/libs.versions.toml -- NOT in the pipeline YAML.\n"
-                    "- Only modify the pipeline YAML if the security tool itself is misconfigured.\n"
-                    "- For dependency vulnerabilities: update crate versions, add suppressions for false positives.\n"
+                    "SECURITY: Fix in Cargo.toml/deny.toml/libs.versions.toml, NOT pipeline YAML. "
+                    "Only modify YAML if the security tool itself is misconfigured.\n"
                 ),
                 "bugs": (
-                    "BUG FIX FOCUS:\n"
-                    "- The /ci-failure webhook handles application code fixes.\n"
-                    "- Only improve the pipeline if the failure is caused by pipeline misconfiguration "
-                    "(wrong environment, missing tools, bad caching).\n"
-                    "- If error logs show code compilation or test failures, do NOT change the pipeline.\n"
+                    "BUGS: /ci-failure webhook handles code fixes. "
+                    "Only fix pipeline if failure is from misconfiguration (env, tools, caching).\n"
                 ),
                 "pipeline": (
-                    "PIPELINE FOCUS:\n"
-                    "- Fix build/deploy pipeline configuration issues.\n"
-                    "- Check Dockerfile syntax, docker-compose config, deployment scripts.\n"
+                    "PIPELINE: Fix build/deploy config (Dockerfile, docker-compose, deploy scripts).\n"
                 ),
             }
 
@@ -684,40 +676,24 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
             for f in focus.split(","):
                 f = f.strip()
                 if f in focus_guidance:
-                    focus_specific += focus_guidance[f] + "\n"
-
-            gh_instructions = _gh_troubleshoot_instructions(run_url, "pipeline")
+                    focus_specific += focus_guidance[f]
 
             prompt = (
-                "You are a CI/CD pipeline engineer for a Rust/WASM real estate management project "
-                "with an Android module.\n\n"
-                f"Focus area: {focus}\n"
-                f"{gh_instructions}\n"
-                f"--- PIPELINE REPORT ---\n{pipeline_report}\n--- END PIPELINE REPORT ---\n"
+                f"CI/CD pipeline engineer. Rust/WASM + Android project.\n"
+                f"Focus: {focus}\n"
+                f"{_gh_cli_block(run_url)}\n"
+                f"--- PIPELINE REPORT ---\n{pipeline_report}\n--- END ---\n"
                 f"{sonar_section}\n"
-                "FIRST: Use the gh CLI commands above to fetch the FULL logs from the pipeline run. "
-                "The pipeline report below may be truncated or incomplete.\n\n"
-                "DECISION FRAMEWORK -- read the error logs and classify each failure:\n"
-                "  A) RUNNER ENVIRONMENT (missing tool, network, disk, Docker): "
-                "Document the issue but do NOT change code. These need admin intervention.\n"
-                "  B) PIPELINE CONFIG (wrong step order, bad caching, missing env var): "
-                "Fix in .github/workflows/ci.yml or android-ci.yml.\n"
-                "  C) DEPENDENCY VULNERABILITY (CVE, RUSTSEC, OWASP): "
-                "Fix in Cargo.toml, deny.toml, or android/gradle/libs.versions.toml. NOT the pipeline YAML.\n"
-                "  D) APPLICATION CODE (compilation, test failure): "
-                "Skip -- the /ci-failure webhook handles these.\n\n"
+                "Fetch full logs via gh CLI first.\n\n"
+                "CLASSIFY each failure:\n"
+                "  A) RUNNER ENV → document, don't change code\n"
+                "  B) PIPELINE CONFIG → fix in .github/workflows/\n"
+                "  C) DEPENDENCY VULN → fix in Cargo.toml/deny.toml/libs.versions.toml\n"
+                "  D) APP CODE → skip (handled by /ci-failure)\n\n"
                 f"{focus_specific}"
-                "IMPROVEMENTS TO LOOK FOR:\n"
-                "- Jobs with cache MISS: investigate cache key strategy, consider broader restore-keys.\n"
-                "- Slow jobs (high duration): look for parallelization, unnecessary steps, or missing caching.\n"
-                "- Failed jobs: read the error logs and apply the decision framework above.\n"
-                "- All jobs passed: look for security hardening, redundant steps, or reporting gaps.\n\n"
-                "RULES:\n"
-                "1. Read the relevant workflow YAML files fully before making changes.\n"
-                "2. Make ALL improvements you identify. Do not stop at one.\n"
-                "3. After making changes, verify the YAML is valid.\n"
-                "4. Stage changes: git add -A\n"
-                "Do NOT commit -- the system will verify and commit.\n\n"
+                "Look for: cache misses, slow jobs, failed jobs, redundant steps.\n"
+                "Read workflow YAML fully before editing. Verify YAML validity after.\n"
+                "Stage: git add -A. Do NOT commit.\n"
                 f"Run URL: {run_url}"
             )
 

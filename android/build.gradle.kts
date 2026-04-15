@@ -45,7 +45,9 @@ subprojects {
     plugins.withId("com.android.library") {
         configure<com.android.build.api.dsl.LibraryExtension> {
             buildTypes { getByName("debug") { enableUnitTestCoverage = true } }
+            compileOptions { isCoreLibraryDesugaringEnabled = true }
         }
+        dependencies { add("coreLibraryDesugaring", "com.android.tools:desugar_jdk_libs:2.1.5") }
     }
 }
 

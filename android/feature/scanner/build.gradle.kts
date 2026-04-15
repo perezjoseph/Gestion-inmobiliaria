@@ -20,6 +20,7 @@ android {
     kotlinOptions { jvmTarget = "11" }
     testOptions { unitTests.all { it.useJUnitPlatform() } }
     buildFeatures { compose = true }
+    lint { disable += "FrequentlyChangingValue" }
 }
 
 dependencies {

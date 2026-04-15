@@ -26,6 +26,19 @@ class ReproResult:
 
 
 @dataclass
+class ReproCache:
+    """Cache for reproduction results within a single fix cycle."""
+    error_hash: str
+    results: dict[str, ReproResult] = field(default_factory=dict)
+
+    def get(self, step_name: str) -> ReproResult | None:
+        return self.results.get(step_name)
+
+    def store(self, step_name: str, result: ReproResult):
+        self.results[step_name] = result
+
+
+@dataclass
 class ParsedError:
     """A single error extracted from compiler/test output."""
     file: str = ""
@@ -333,8 +346,14 @@ def _build_summary(step_results):
     return header + "\n" + "\n".join(lines)
 
 
-def reproduce_locally(job, error_class=""):
+def reproduce_locally(job, error_class="", cache: ReproCache | None = None):
     """Run the CI commands for a job locally and return structured results.
+
+    Args:
+        job: CI job name to reproduce.
+        error_class: Optional error classification for reclassification.
+        cache: Optional ReproCache to skip previously-succeeded steps
+               and store new results within the same fix cycle.
 
     Returns a ReproResult with parsed errors, or a result with
     reproduced=False if the job has no local reproduction commands
@@ -359,6 +378,13 @@ def reproduce_locally(job, error_class=""):
     any_failed = False
 
     for step_name, cmd, timeout in steps:
+        cached_result = cache.get(step_name) if cache else None
+        if cached_result is not None and cached_result.exit_code == 0:
+            log.info(f"  Cache hit for '{step_name}' (exit 0), skipping execution")
+            all_output_parts.append(f"--- {step_name} (cached, exit 0) ---\n")
+            step_results.append((step_name, 0, [], []))
+            continue
+
         log.info(f"  Running: {step_name}")
         try:
             result = wsl_bash(cmd, timeout=timeout)
@@ -375,6 +401,16 @@ def reproduce_locally(job, error_class=""):
         all_errors.extend(errors)
         all_warnings.extend(warnings)
         step_results.append((step_name, exit_code, errors, warnings))
+
+        if cache:
+            step_result = ReproResult(
+                reproduced=exit_code != 0,
+                exit_code=exit_code,
+                raw_output=output,
+                errors=errors,
+                warnings=warnings,
+            )
+            cache.store(step_name, step_result)
 
         if exit_code != 0:
             any_failed = True

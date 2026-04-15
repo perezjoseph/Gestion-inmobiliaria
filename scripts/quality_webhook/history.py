@@ -45,7 +45,7 @@ def _save_fix_history(history):
         log.warning(f"Fix history save failed: {e}")
 
 
-def record_fix_attempt(job, error_log, attempt, success, strategy_notes=""):
+def record_fix_attempt(job, error_log, attempt, success, strategy_notes="", timing=None, **kwargs):
     h = _error_hash(job, error_log)
     now = datetime.now().isoformat()
     with _fix_history_lock:
@@ -61,12 +61,15 @@ def record_fix_attempt(job, error_log, attempt, success, strategy_notes=""):
         entry["total_attempts"] = entry.get("total_attempts", 0) + 1
         if success:
             entry["successes"] = entry.get("successes", 0) + 1
-        entry["attempts"] = entry.get("attempts", [])[-9:] + [{
+        attempt_record = {
             "ts": now,
             "attempt": attempt,
             "success": success,
             "notes": strategy_notes[:500],
-        }]
+        }
+        if timing is not None:
+            attempt_record["timing"] = timing
+        entry["attempts"] = entry.get("attempts", [])[-9:] + [attempt_record]
         history[h] = entry
         _save_fix_history(history)
 
