@@ -38,17 +38,9 @@ runs:
         if pkg-config --exists openssl 2>/dev/null; then
           echo "OpenSSL development headers already available ($(pkg-config --modversion openssl))"
         else
-          echo "OpenSSL headers missing -- attempting install"
-          if command -v sudo &>/dev/null && sudo -n true 2>/dev/null; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq --no-install-recommends pkg-config libssl-dev
-          elif [ "$(id -u)" = "0" ]; then
-            apt-get update -qq
-            apt-get install -y -qq --no-install-recommends pkg-config libssl-dev
-          else
-            echo "::error::OpenSSL development headers (pkg-config, libssl-dev) are required but missing. Install them on the runner: sudo apt-get install -y pkg-config libssl-dev"
-            exit 1
-          fi
+          echo "OpenSSL headers missing -- installing via apt"
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends pkg-config libssl-dev
         fi
 
     - name: Free disk space for Rust compilation
@@ -59,9 +51,7 @@ runs:
         if [ "$AVAIL_MB" -lt 12288 ]; then
           echo "::warning::Low disk (${AVAIL_MB}MB < 12288MB). Cleaning to prevent ENOSPC during compilation."
           docker system prune -af --volumes 2>/dev/null || true
-          # Clean target dirs from ALL runner workspaces (shared disk)
           rm -rf /tmp/runner-*/Gestion-inmobiliaria/*/target 2>/dev/null || true
-          # Clean stale workspace checkouts from OTHER runners (not just target/)
           CURRENT_RUNNER_DIR=$(echo "${GITHUB_WORKSPACE}" | grep -oP '/tmp/runner-\d+' || true)
           for dir in /tmp/runner-*/Gestion-inmobiliaria; do
             RUNNER_DIR=$(echo "$dir" | grep -oP '/tmp/runner-\d+' || true)
@@ -69,11 +59,9 @@ runs:
               rm -rf "$dir" 2>/dev/null || true
             fi
           done
-          # Clean cargo caches (preserve registry/index for sparse protocol)
           rm -rf "${CARGO_HOME:-$HOME/.cargo}"/registry/src 2>/dev/null || true
           rm -rf "${CARGO_HOME:-$HOME/.cargo}"/registry/cache 2>/dev/null || true
           rm -rf "${CARGO_HOME:-$HOME/.cargo}"/git/checkouts 2>/dev/null || true
-          # Clean rustup downloads and old toolchains
           rm -rf "${RUSTUP_HOME:-$HOME/.rustup}"/downloads 2>/dev/null || true
           rm -rf "${RUSTUP_HOME:-$HOME/.rustup}"/tmp 2>/dev/null || true
           if command -v rustup &>/dev/null; then
@@ -81,11 +69,9 @@ runs:
               rustup toolchain uninstall "$tc" 2>/dev/null || true
             done
           fi
-          # Clean temp build artifacts
           rm -rf /tmp/rustc* /tmp/cargo-install* 2>/dev/null || true
           find "${RUNNER_TEMP:-/tmp}" -maxdepth 1 -name '*.sh' -mmin +60 -delete 2>/dev/null || true
-          # System caches
-          sudo apt-get clean 2>/dev/null || true
+          apt-get clean 2>/dev/null || true
           rm -rf /var/cache/apt/archives/*.deb 2>/dev/null || true
           journalctl --vacuum-size=50M 2>/dev/null || true
           rm -rf /var/tmp/* 2>/dev/null || true

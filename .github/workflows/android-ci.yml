@@ -47,7 +47,6 @@ jobs:
 
           # Gradle caches (build-cache, transforms, journal, wrapper dists, daemon)
           rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
-          rm -rf ~/.gradle/wrapper/dists/ ~/.gradle/daemon 2>/dev/null || true
           rm -rf ~/.gradle/caches/*/scripts ~/.gradle/caches/*/generated-gradle-jars 2>/dev/null || true
 
           # Tool caches older than 2 days
@@ -93,7 +92,6 @@ jobs:
           find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +2 -exec rm -rf {} + 2>/dev/null || true
           find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
           rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
-          rm -rf ~/.gradle/wrapper/dists/ ~/.gradle/daemon 2>/dev/null || true
           echo "=== Disk after cleanup ==="
           df -h / || true
 
@@ -173,7 +171,7 @@ jobs:
     name: Android Lint & Static Analysis
     needs: [runner-cleanup]
     runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
-    timeout-minutes: 20
+    timeout-minutes: 35
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
@@ -195,7 +193,6 @@ jobs:
           find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +2 -exec rm -rf {} + 2>/dev/null || true
           find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
           rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
-          rm -rf ~/.gradle/wrapper/dists/ ~/.gradle/daemon 2>/dev/null || true
           echo "=== Disk after cleanup ==="
           df -h / || true
 
@@ -355,7 +352,7 @@ jobs:
     name: Android Unit Tests
     needs: [runner-cleanup]
     runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
-    timeout-minutes: 25
+    timeout-minutes: 35
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
@@ -376,7 +373,6 @@ jobs:
           find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +2 -exec rm -rf {} + 2>/dev/null || true
           find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
           rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
-          rm -rf ~/.gradle/wrapper/dists/ ~/.gradle/daemon 2>/dev/null || true
           echo "=== Disk after cleanup ==="
           df -h / || true
 
@@ -577,7 +573,6 @@ jobs:
           find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +2 -exec rm -rf {} + 2>/dev/null || true
           find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
           rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
-          rm -rf ~/.gradle/wrapper/dists/ ~/.gradle/daemon 2>/dev/null || true
           echo "=== Disk after cleanup ==="
           df -h / || true
 
@@ -785,7 +780,6 @@ jobs:
           find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +2 -exec rm -rf {} + 2>/dev/null || true
           find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
           rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
-          rm -rf ~/.gradle/wrapper/dists/ ~/.gradle/daemon 2>/dev/null || true
           echo "=== Disk after cleanup ==="
           df -h / || true
 
@@ -948,7 +942,6 @@ jobs:
           find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -maxdepth 1 -mindepth 1 -mtime +2 -exec rm -rf {} + 2>/dev/null || true
           find /tmp -maxdepth 1 -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
           rm -rf ~/.gradle/caches/build-cache-* ~/.gradle/caches/transforms-* ~/.gradle/caches/journal-* 2>/dev/null || true
-          rm -rf ~/.gradle/wrapper/dists/ ~/.gradle/daemon 2>/dev/null || true
           echo "=== Disk after cleanup ==="
           df -h / || true
 
