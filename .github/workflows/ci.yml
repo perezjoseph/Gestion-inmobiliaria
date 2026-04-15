@@ -204,6 +204,7 @@ jobs:
           persist-credentials: false
 
       - name: Rust setup
+        id: rust-setup
         uses: ./.github/actions/rust-setup
         with:
           components: rustfmt,clippy
@@ -212,7 +213,7 @@ jobs:
 
       - name: Verify rustfmt formatting across all crates
         id: fmt
-        if: always()
+        if: always() && steps.rust-setup.outcome == 'success'
         timeout-minutes: 5
         run: |
           umask 077
@@ -223,7 +224,7 @@ jobs:
 
       - name: Run clippy lints on backend
         id: clippy_backend
-        if: always()
+        if: always() && steps.rust-setup.outcome == 'success'
         timeout-minutes: 15
         run: |
           umask 077
@@ -247,7 +248,7 @@ jobs:
 
       - name: Run clippy lints on frontend WASM target
         id: clippy_frontend
-        if: always()
+        if: always() && steps.rust-setup.outcome == 'success'
         timeout-minutes: 15
         run: |
           umask 077
@@ -288,10 +289,14 @@ jobs:
 
       - name: Collect lint errors for notification
         id: collect-errors
-        if: always() && (steps.fmt.outcome == 'failure' || steps.clippy_backend.outcome == 'failure' || steps.clippy_frontend.outcome == 'failure')
+        if: always() && (steps.rust-setup.outcome == 'failure' || steps.fmt.outcome == 'failure' || steps.clippy_backend.outcome == 'failure' || steps.clippy_frontend.outcome == 'failure')
         run: |
           ERROR=""
           FAILED=""
+          if [ "${{ steps.rust-setup.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}rust-setup,"
+            ERROR="${ERROR}[rust-setup] Rust toolchain setup failed (likely disk space or network issue). Check the 'Rust setup' step logs for details."$'\n\n'
+          fi
           if [ "${{ steps.fmt.outcome }}" = "failure" ]; then
             FAILED="${FAILED}fmt-check,"
             ERROR="${ERROR}[fmt-check] $(head -c 1500 "${RUNNER_TEMP}/fmt-output.txt" 2>/dev/null || echo 'cargo fmt found formatting issues.')"$'\n\n'
@@ -336,7 +341,7 @@ jobs:
           fi
 
       - name: Fail job if any lint step failed
-        if: always() && (steps.fmt.outcome == 'failure' || steps.clippy_backend.outcome == 'failure' || steps.clippy_frontend.outcome == 'failure')
+        if: always() && (steps.rust-setup.outcome == 'failure' || steps.fmt.outcome == 'failure' || steps.clippy_backend.outcome == 'failure' || steps.clippy_frontend.outcome == 'failure')
         run: exit 1
 
       - name: Upload clippy report for SonarQube
@@ -702,6 +707,7 @@ jobs:
           persist-credentials: false
 
       - name: Rust setup
+        id: rust-setup
         uses: ./.github/actions/rust-setup
         with:
           targets: wasm32-unknown-unknown
@@ -754,7 +760,11 @@ jobs:
         if: failure()
         run: |
           ERROR=""
-          [ -f "${RUNNER_TEMP}/test-frontend-output.txt" ] && ERROR="$(tail -c 3000 "${RUNNER_TEMP}/test-frontend-output.txt")"
+          if [ "${{ steps.rust-setup.outcome }}" = "failure" ]; then
+            ERROR="[rust-setup] Rust toolchain setup failed (likely disk space or network issue). Check the 'Rust setup' step logs for details."
+          elif [ -f "${RUNNER_TEMP}/test-frontend-output.txt" ]; then
+            ERROR="$(tail -c 3000 "${RUNNER_TEMP}/test-frontend-output.txt")"
+          fi
           if [ -z "$ERROR" ]; then
             ERROR="Frontend tests failed but no captured output. Run cargo test -p realestate-frontend --all-targets to reproduce."
           fi
