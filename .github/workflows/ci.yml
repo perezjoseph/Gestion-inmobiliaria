@@ -45,7 +45,7 @@ jobs:
 
   runner-cleanup:
     name: Runner Disk Cleanup
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 5
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -57,13 +57,13 @@ jobs:
           AVAIL_KB=$(df -k "$CHECK_PATH" | awk 'NR==2 {print $4}')
           AVAIL_MB=$((AVAIL_KB / 1024))
           echo "Available disk space on $CHECK_PATH: ${AVAIL_MB}MB"
-          echo "Disk space OK (${AVAIL_MB}MB) -- GitHub-hosted runner."
+          echo "Disk space OK (${AVAIL_MB}MB) -- self-hosted runner."
 
   # ── Stage 1: Quality Checks (all run in parallel) ──
 
   secret-scan:
     name: Secret Scanning (Gitleaks)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 10
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -124,7 +124,7 @@ jobs:
 
   dependency-review:
     name: Dependency Review (PR)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 10
     if: github.event_name == 'pull_request'
     permissions:
@@ -145,7 +145,7 @@ jobs:
 
   lint:
     name: Code Formatting & Static Analysis
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 20
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -344,7 +344,7 @@ jobs:
   test-backend:
     name: Backend Unit & Integration Tests
     needs: [runner-cleanup]
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","docker","dependabot"]') }}
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 30
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -499,7 +499,7 @@ jobs:
   coverage-backend:
     name: Backend Test Coverage (LCOV)
     needs: [runner-cleanup, test-backend]
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","docker","dependabot"]') }}
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 30
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -648,7 +648,7 @@ jobs:
 
   test-frontend:
     name: Frontend WASM Compilation & Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 20
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -769,7 +769,7 @@ jobs:
   quality-gate:
     name: Dependency Security & Health Check
     needs: [runner-cleanup]
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","docker","dependabot"]') }}
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 30
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -1129,7 +1129,7 @@ jobs:
 
   sonarqube:
     name: SonarQube Code Quality & Coverage Analysis
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","sonarqube","dependabot"]') }}
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 20
     permissions:
       contents: read
@@ -1609,7 +1609,7 @@ jobs:
 
   build-frontend:
     name: Frontend WASM Release Build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 30
     permissions:
       contents: read
@@ -1831,7 +1831,7 @@ jobs:
 
   build-backend:
     name: Backend Release Build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 30
     permissions:
       contents: read
@@ -2003,7 +2003,7 @@ jobs:
 
   container-image-backend:
     name: Build & Push Backend Image to GHCR
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","docker","dependabot"]') }}
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 45
     permissions:
       contents: read
@@ -2147,7 +2147,7 @@ jobs:
 
   container-image-frontend:
     name: Build & Push Frontend Image to GHCR
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","docker","dependabot"]') }}
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 45
     permissions:
       contents: read
@@ -2293,7 +2293,7 @@ jobs:
 
   deploy:
     name: Deploy to Production
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","sonarqube","dependabot"]') }}
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 10
     environment: production
     concurrency:
@@ -2461,7 +2461,7 @@ jobs:
 
   pipeline-improve:
     name: CI/CD Pipeline Self-Improvement
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 10
     permissions:
       contents: read

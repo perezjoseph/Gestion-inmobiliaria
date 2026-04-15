@@ -30,7 +30,7 @@ jobs:
 
   runner-cleanup:
     name: Runner Disk Cleanup
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 5
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -77,7 +77,7 @@ jobs:
   secret-scan:
     name: Secret Scanning (Gitleaks)
     needs: [runner-cleanup]
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 10
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -148,7 +148,7 @@ jobs:
 
   dependency-review:
     name: Dependency Review (PR)
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 10
     if: github.event_name == 'pull_request'
     permissions:
@@ -170,7 +170,7 @@ jobs:
   lint:
     name: Android Lint & Static Analysis
     needs: [runner-cleanup]
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 35
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -226,6 +226,36 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRIBUTION }}
+
+      - name: Ensure unzip is available
+        run: |
+          if command -v unzip &>/dev/null; then
+            echo "unzip already available: $(unzip -v 2>&1 | head -1)"
+            exit 0
+          fi
+          mkdir -p "$HOME/.local/bin"
+          cat > "$HOME/.local/bin/unzip" << 'SHIM'
+          #!/usr/bin/env python3
+          import zipfile, sys, os
+          args = sys.argv[1:]
+          dest, zippath, i = '.', None, 0
+          while i < len(args):
+              if args[i] == '-d':
+                  i += 1; dest = args[i]
+              elif not args[i].startswith('-'):
+                  zippath = args[i]
+              i += 1
+          if not zippath:
+              sys.exit(1)
+          os.makedirs(dest, exist_ok=True)
+          with zipfile.ZipFile(zippath) as zf:
+              zf.extractall(dest)
+          SHIM
+          sed -i 's/^          //' "$HOME/.local/bin/unzip"
+          chmod +x "$HOME/.local/bin/unzip"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          echo "Installed Python-based unzip shim"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
@@ -351,7 +381,7 @@ jobs:
   unit-test:
     name: Android Unit Tests
     needs: [runner-cleanup]
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 35
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -406,6 +436,36 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRIBUTION }}
+
+      - name: Ensure unzip is available
+        run: |
+          if command -v unzip &>/dev/null; then
+            echo "unzip already available: $(unzip -v 2>&1 | head -1)"
+            exit 0
+          fi
+          mkdir -p "$HOME/.local/bin"
+          cat > "$HOME/.local/bin/unzip" << 'SHIM'
+          #!/usr/bin/env python3
+          import zipfile, sys, os
+          args = sys.argv[1:]
+          dest, zippath, i = '.', None, 0
+          while i < len(args):
+              if args[i] == '-d':
+                  i += 1; dest = args[i]
+              elif not args[i].startswith('-'):
+                  zippath = args[i]
+              i += 1
+          if not zippath:
+              sys.exit(1)
+          os.makedirs(dest, exist_ok=True)
+          with zipfile.ZipFile(zippath) as zf:
+              zf.extractall(dest)
+          SHIM
+          sed -i 's/^          //' "$HOME/.local/bin/unzip"
+          chmod +x "$HOME/.local/bin/unzip"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          echo "Installed Python-based unzip shim"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
@@ -549,7 +609,7 @@ jobs:
   quality-gate:
     name: Dependency Security Scan
     needs: [runner-cleanup]
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 20
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -751,7 +811,7 @@ jobs:
 
   build:
     name: Android Debug Build
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 30
     needs: [secret-scan, dependency-review, lint, unit-test, quality-gate]
     if: |
@@ -813,6 +873,36 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRIBUTION }}
+
+      - name: Ensure unzip is available
+        run: |
+          if command -v unzip &>/dev/null; then
+            echo "unzip already available: $(unzip -v 2>&1 | head -1)"
+            exit 0
+          fi
+          mkdir -p "$HOME/.local/bin"
+          cat > "$HOME/.local/bin/unzip" << 'SHIM'
+          #!/usr/bin/env python3
+          import zipfile, sys, os
+          args = sys.argv[1:]
+          dest, zippath, i = '.', None, 0
+          while i < len(args):
+              if args[i] == '-d':
+                  i += 1; dest = args[i]
+              elif not args[i].startswith('-'):
+                  zippath = args[i]
+              i += 1
+          if not zippath:
+              sys.exit(1)
+          os.makedirs(dest, exist_ok=True)
+          with zipfile.ZipFile(zippath) as zf:
+              zf.extractall(dest)
+          SHIM
+          sed -i 's/^          //' "$HOME/.local/bin/unzip"
+          chmod +x "$HOME/.local/bin/unzip"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          echo "Installed Python-based unzip shim"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
@@ -914,7 +1004,7 @@ jobs:
 
   sonarqube:
     name: SonarQube Code Quality Analysis
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","sonarqube"]') }}
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 20
     permissions:
       contents: read
@@ -1264,7 +1354,7 @@ jobs:
 
   notify-failure:
     name: Android Failure Notification
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 5
     permissions: {}
     env:
@@ -1446,7 +1536,7 @@ jobs:
 
   pipeline-improve:
     name: Android Pipeline Improvement
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux"]') }}
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 10
     permissions:
       contents: read
