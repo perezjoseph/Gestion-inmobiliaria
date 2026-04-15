@@ -74,47 +74,55 @@ fun AuditoriaScreen(
                 onSelect = viewModel::setEntityTypeFilter,
             )
 
-            when {
-                uiState.isLoading && uiState.entries.isEmpty() -> LoadingScreen()
-                uiState.errorMessage != null && uiState.entries.isEmpty() ->
-                    ErrorScreen(
-                        message = uiState.errorMessage!!,
-                        onRetry = { viewModel.loadAuditLog() },
-                    )
-                uiState.entries.isEmpty() ->
-                    EmptyStateScreen(message = stringResource(R.string.auditoria_empty))
-                else -> {
-                    val listState = rememberLazyListState()
-                    val shouldLoadMore by remember {
-                        derivedStateOf {
-                            val lastVisible =
-                                listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                            lastVisible >= uiState.entries.size - 3
-                        }
-                    }
-                    LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) viewModel.loadNextPage() }
+            AuditoriaContent(
+                uiState = uiState,
+                onRetry = { viewModel.loadAuditLog() },
+                onLoadMore = viewModel::loadNextPage,
+            )
+        }
+    }
+}
 
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        item(key = "top_spacer") { Spacer(modifier = Modifier.height(4.dp)) }
-                        items(uiState.entries, key = { it.id }) { entry ->
-                            AuditoriaItem(entry = entry)
-                        }
-                        if (uiState.isLoading) {
-                            item(key = "loading_more") {
-                                Text(
-                                    text = stringResource(R.string.loading),
-                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
-                        }
-                        item(key = "bottom_spacer") { Spacer(modifier = Modifier.height(16.dp)) }
+@Composable
+private fun AuditoriaContent(
+    uiState: AuditoriaUiState,
+    onRetry: () -> Unit,
+    onLoadMore: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    when {
+        uiState.isLoading && uiState.entries.isEmpty() -> LoadingScreen()
+        uiState.errorMessage != null && uiState.entries.isEmpty() ->
+            ErrorScreen(message = uiState.errorMessage!!, onRetry = onRetry)
+        uiState.entries.isEmpty() ->
+            EmptyStateScreen(message = stringResource(R.string.auditoria_empty))
+        else -> {
+            val listState = rememberLazyListState()
+            val shouldLoadMore by remember {
+                derivedStateOf {
+                    val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                    lastVisible >= uiState.entries.size - 3
+                }
+            }
+            LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) onLoadMore() }
+
+            LazyColumn(
+                state = listState,
+                modifier = modifier.fillMaxSize().padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item(key = "top_spacer") { Spacer(modifier = Modifier.height(4.dp)) }
+                items(uiState.entries, key = { it.id }) { entry -> AuditoriaItem(entry = entry) }
+                if (uiState.isLoading) {
+                    item(key = "loading_more") {
+                        Text(
+                            text = stringResource(R.string.loading),
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
                 }
+                item(key = "bottom_spacer") { Spacer(modifier = Modifier.height(16.dp)) }
             }
         }
     }

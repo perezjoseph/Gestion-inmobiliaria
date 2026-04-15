@@ -47,6 +47,8 @@ object InquilinoValidator {
         )
 }
 
+private const val MSG_PROPIEDAD_REQUERIDA = "La propiedad es requerida"
+
 object ContratoValidator {
     fun validateCreate(
         propiedadId: String,
@@ -57,7 +59,7 @@ object ContratoValidator {
     ): Map<String, ValidationResult> {
         val results =
             mutableMapOf<String, ValidationResult>(
-                "propiedadId" to requireNotBlank(propiedadId, "La propiedad es requerida"),
+                "propiedadId" to requireNotBlank(propiedadId, MSG_PROPIEDAD_REQUERIDA),
                 "inquilinoId" to requireNotBlank(inquilinoId, "El inquilino es requerido"),
                 "fechaInicio" to requireNotBlank(fechaInicio, "La fecha de inicio es requerida"),
                 "fechaFin" to requireNotBlank(fechaFin, "La fecha de fin es requerida"),
@@ -108,7 +110,7 @@ object GastoValidator {
         fechaGasto: String,
     ): Map<String, ValidationResult> =
         mapOf(
-            "propiedadId" to requireNotBlank(propiedadId, "La propiedad es requerida"),
+            "propiedadId" to requireNotBlank(propiedadId, MSG_PROPIEDAD_REQUERIDA),
             "categoria" to requireNotBlank(categoria, "La categoría es requerida"),
             "descripcion" to requireNotBlank(descripcion, "La descripción es requerida"),
             "monto" to requirePositiveDecimal(monto, "El monto debe ser mayor a cero"),
@@ -120,7 +122,7 @@ object GastoValidator {
 object SolicitudValidator {
     fun validateCreate(propiedadId: String, titulo: String): Map<String, ValidationResult> =
         mapOf(
-            "propiedadId" to requireNotBlank(propiedadId, "La propiedad es requerida"),
+            "propiedadId" to requireNotBlank(propiedadId, MSG_PROPIEDAD_REQUERIDA),
             "titulo" to requireNotBlank(titulo, "El título es requerido"),
         )
 }

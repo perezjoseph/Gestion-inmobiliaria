@@ -267,16 +267,16 @@ jobs:
           name: android-lint-xml
           path: android/app/build/reports/lint-results-debug.xml
           retention-days: 1
-          if-no-files-found: warn
+          if-no-files-found: ignore
 
       - name: Upload detekt XML report for SonarQube
-        if: always() && steps.lint-checks.outputs.detekt_ok == 'true'
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: android-detekt-xml
           path: android/build/reports/detekt/detekt.xml
           retention-days: 1
-          if-no-files-found: warn
+          if-no-files-found: ignore
 
       - name: Upload lint reports
         if: always()
@@ -431,13 +431,13 @@ jobs:
           ./gradlew createDebugUnitTestCoverageReport --parallel --continue --stacktrace 2>&1 || true
 
       - name: Upload JaCoCo coverage XML for SonarQube
-        if: always() && steps.coverage.outcome == 'success'
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: android-coverage-xml
           path: android/**/build/reports/coverage/test/debug/report.xml
           retention-days: 1
-          if-no-files-found: warn
+          if-no-files-found: ignore
 
       - name: Upload JUnit XML test results
         if: always()
@@ -446,7 +446,7 @@ jobs:
           name: android-test-results-xml
           path: android/**/build/test-results/testDebugUnitTest/*.xml
           retention-days: 7
-          if-no-files-found: warn
+          if-no-files-found: ignore
 
       - name: Upload test reports
         if: always()

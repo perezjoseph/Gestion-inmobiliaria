@@ -218,7 +218,12 @@ jobs:
           jq -r 'select(.reason == "compiler-message") | .message.rendered // empty' \
             "${RUNNER_TEMP}/clippy-backend.json" > "${RUNNER_TEMP}/clippy-backend-output.txt" 2>/dev/null || true
           if [ $RESULT -ne 0 ]; then
-            cat "${RUNNER_TEMP}/clippy-backend-output.txt"
+            if [ -s "${RUNNER_TEMP}/clippy-backend-output.txt" ]; then
+              cat "${RUNNER_TEMP}/clippy-backend-output.txt"
+            else
+              echo "--- stderr (no clippy JSON output -- likely a cargo-level error) ---"
+              cat "${RUNNER_TEMP}/clippy-backend-stderr.txt" 2>/dev/null || true
+            fi
             echo "::error::Backend clippy found warnings/errors."
             exit 1
           fi
@@ -237,7 +242,12 @@ jobs:
           jq -r 'select(.reason == "compiler-message") | .message.rendered // empty' \
             "${RUNNER_TEMP}/clippy-frontend.json" > "${RUNNER_TEMP}/clippy-frontend-output.txt" 2>/dev/null || true
           if [ $RESULT -ne 0 ]; then
-            cat "${RUNNER_TEMP}/clippy-frontend-output.txt"
+            if [ -s "${RUNNER_TEMP}/clippy-frontend-output.txt" ]; then
+              cat "${RUNNER_TEMP}/clippy-frontend-output.txt"
+            else
+              echo "--- stderr (no clippy JSON output -- likely a cargo-level error) ---"
+              cat "${RUNNER_TEMP}/clippy-frontend-stderr.txt" 2>/dev/null || true
+            fi
             echo "::error::Frontend clippy found warnings/errors."
             exit 1
           fi

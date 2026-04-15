@@ -12,6 +12,9 @@ RUNNER_ENV_PATTERNS = [
     "cannot allocate memory",
     "docker daemon is not running",
     "Cannot connect to the Docker daemon",
+    "rate limit",
+    "too many open files",
+    "resource temporarily unavailable",
 ]
 
 DEPENDENCY_PATTERNS = [
@@ -28,6 +31,18 @@ DEPENDENCY_PATTERNS = [
     "CVSS",
     "vulnerability",
     "yanked",
+    "cargo-deny",
+    "advisory",
+]
+
+# Patterns that indicate flaky/intermittent failures
+FLAKY_PATTERNS = [
+    "connection reset by peer",
+    "broken pipe",
+    "timed out waiting",
+    "resource temporarily unavailable",
+    "spurious network error",
+    "intermittent",
 ]
 
 
@@ -39,6 +54,9 @@ def classify_error(error_log):
     for pattern in DEPENDENCY_PATTERNS:
         if pattern.lower() in lower:
             return "dependency"
+    for pattern in FLAKY_PATTERNS:
+        if pattern.lower() in lower:
+            return "flaky"
     if "test" in lower and ("failed" in lower or "FAILED" in lower):
         return "test_failure"
     if "error[E" in error_log or "clippy" in lower or "fmt" in lower:

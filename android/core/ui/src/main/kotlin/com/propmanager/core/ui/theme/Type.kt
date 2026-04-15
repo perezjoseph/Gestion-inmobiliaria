@@ -27,25 +27,27 @@ val BitterFont =
         Font(googleFont = GoogleFont("Bitter"), fontProvider = provider, weight = FontWeight.Bold),
     )
 
+private const val SOURCE_SANS_3 = "Source Sans 3"
+
 val SourceSans3Font =
     FontFamily(
         Font(
-            googleFont = GoogleFont("Source Sans 3"),
+            googleFont = GoogleFont(SOURCE_SANS_3),
             fontProvider = provider,
             weight = FontWeight.Normal,
         ),
         Font(
-            googleFont = GoogleFont("Source Sans 3"),
+            googleFont = GoogleFont(SOURCE_SANS_3),
             fontProvider = provider,
             weight = FontWeight.Medium,
         ),
         Font(
-            googleFont = GoogleFont("Source Sans 3"),
+            googleFont = GoogleFont(SOURCE_SANS_3),
             fontProvider = provider,
             weight = FontWeight.SemiBold,
         ),
         Font(
-            googleFont = GoogleFont("Source Sans 3"),
+            googleFont = GoogleFont(SOURCE_SANS_3),
             fontProvider = provider,
             weight = FontWeight.Bold,
         ),

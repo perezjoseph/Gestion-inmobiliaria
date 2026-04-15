@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
+@Suppress("kotlin:S107")
 @Composable
 fun PropManagerTextField(
     value: String,

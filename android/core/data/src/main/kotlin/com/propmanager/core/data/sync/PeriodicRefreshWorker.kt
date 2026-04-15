@@ -39,8 +39,8 @@ constructor(
                 "gastos" to { gastosRepository.refreshFromServer() },
                 "mantenimiento" to { mantenimientoRepository.refreshFromServer() },
             )
-        refreshTasks.forEach { (name, refresh) ->
-            refresh().onFailure { e ->
+        refreshTasks.forEach { (name, task) ->
+            task().onFailure { e ->
                 Log.e(TAG, "Failed to refresh $name", e)
                 hasError = true
             }

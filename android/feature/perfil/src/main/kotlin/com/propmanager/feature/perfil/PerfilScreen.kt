@@ -78,25 +78,32 @@ fun PerfilScreen(
                         uiState = uiState,
                         onNombreChange = viewModel::onNombreChange,
                         onSave = viewModel::savePerfil,
-                        onTogglePasswordForm = viewModel::togglePasswordForm,
-                        onPasswordActualChange = viewModel::onPasswordActualChange,
-                        onPasswordNuevaChange = viewModel::onPasswordNuevaChange,
-                        onChangePassword = viewModel::changePassword,
+                        passwordActions =
+                            PasswordActions(
+                                onToggleForm = viewModel::togglePasswordForm,
+                                onActualChange = viewModel::onPasswordActualChange,
+                                onNuevaChange = viewModel::onPasswordNuevaChange,
+                                onSubmit = viewModel::changePassword,
+                            ),
                     )
             }
         }
     }
 }
 
+data class PasswordActions(
+    val onToggleForm: () -> Unit,
+    val onActualChange: (String) -> Unit,
+    val onNuevaChange: (String) -> Unit,
+    val onSubmit: () -> Unit,
+)
+
 @Composable
 private fun PerfilContent(
     uiState: PerfilUiState,
     onNombreChange: (String) -> Unit,
     onSave: () -> Unit,
-    onTogglePasswordForm: () -> Unit,
-    onPasswordActualChange: (String) -> Unit,
-    onPasswordNuevaChange: (String) -> Unit,
-    onChangePassword: () -> Unit,
+    passwordActions: PasswordActions,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
@@ -139,7 +146,7 @@ private fun PerfilContent(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        OutlinedButton(onClick = onTogglePasswordForm, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = passwordActions.onToggleForm, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.perfil_cambiar_password))
         }
 
@@ -147,7 +154,7 @@ private fun PerfilContent(
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
                 value = uiState.passwordActual,
-                onValueChange = onPasswordActualChange,
+                onValueChange = passwordActions.onActualChange,
                 label = { Text(stringResource(R.string.perfil_password_actual)) },
                 visualTransformation = PasswordVisualTransformation(),
                 singleLine = true,
@@ -156,7 +163,7 @@ private fun PerfilContent(
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
                 value = uiState.passwordNueva,
-                onValueChange = onPasswordNuevaChange,
+                onValueChange = passwordActions.onNuevaChange,
                 label = { Text(stringResource(R.string.perfil_password_nueva)) },
                 visualTransformation = PasswordVisualTransformation(),
                 singleLine = true,
@@ -164,7 +171,7 @@ private fun PerfilContent(
             )
             Spacer(modifier = Modifier.height(12.dp))
             Button(
-                onClick = onChangePassword,
+                onClick = passwordActions.onSubmit,
                 enabled = !uiState.isChangingPassword,
                 modifier = Modifier.fillMaxWidth(),
             ) {

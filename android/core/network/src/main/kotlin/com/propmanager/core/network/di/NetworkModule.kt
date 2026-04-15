@@ -36,12 +36,10 @@ import retrofit2.converter.kotlinx.serialization.asConverterFactory
 
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class TokenProviderModule {
-    @Binds @Singleton abstract fun bindTokenProvider(impl: EncryptedTokenProvider): TokenProvider
+interface TokenProviderModule {
+    @Binds @Singleton fun bindTokenProvider(impl: EncryptedTokenProvider): TokenProvider
 
-    @Binds
-    @Singleton
-    abstract fun bindConnectivityObserver(impl: NetworkMonitor): ConnectivityObserver
+    @Binds @Singleton fun bindConnectivityObserver(impl: NetworkMonitor): ConnectivityObserver
 }
 
 @Module

@@ -66,44 +66,54 @@ fun ConfiguracionScreen(
                 uiState.errorMessage != null && uiState.tasa.isEmpty() ->
                     ErrorScreen(message = uiState.errorMessage!!, onRetry = viewModel::loadMoneda)
                 else ->
-                    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                        Text(
-                            text = stringResource(R.string.configuracion_moneda),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        PropManagerTextField(
-                            value = uiState.tasa,
-                            onValueChange = viewModel::onTasaChange,
-                            label = "Tasa de cambio (USD → DOP)",
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        if (uiState.actualizado.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Última actualización: ${uiState.actualizado}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        if (uiState.errorMessage != null) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = uiState.errorMessage!!,
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(
-                            onClick = viewModel::saveMoneda,
-                            enabled = !uiState.isSaving,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(stringResource(R.string.save))
-                        }
-                    }
+                    ConfiguracionForm(
+                        uiState = uiState,
+                        onTasaChange = viewModel::onTasaChange,
+                        onSave = viewModel::saveMoneda,
+                    )
             }
+        }
+    }
+}
+
+@Composable
+private fun ConfiguracionForm(
+    uiState: ConfiguracionUiState,
+    onTasaChange: (String) -> Unit,
+    onSave: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
+        Text(
+            text = stringResource(R.string.configuracion_moneda),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        PropManagerTextField(
+            value = uiState.tasa,
+            onValueChange = onTasaChange,
+            label = "Tasa de cambio (USD → DOP)",
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (uiState.actualizado.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Última actualización: ${uiState.actualizado}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (uiState.errorMessage != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = uiState.errorMessage,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(onClick = onSave, enabled = !uiState.isSaving, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.save))
         }
     }
 }

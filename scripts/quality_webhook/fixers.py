@@ -21,6 +21,7 @@ from .memory import (
 from .gates import (
     preflight_dedup, revision_scope_check, verification_run,
 )
+from .reproducer import reproduce_locally, format_errors_for_prompt
 
 _fix_lock = threading.Lock()
 _sonar_fix_lock = threading.Lock()
@@ -168,12 +169,21 @@ def _build_error_notes(error_class):
             "Instead, note which test is flaky and move on. "
             "Only fix the code if the test fails consistently on every re-run."
         ),
+        "flaky": (
+            "\n\nFLAKY/INTERMITTENT FAILURE DETECTED:\n"
+            "This error pattern suggests an intermittent issue (network, timing, resource contention). "
+            "Do NOT make code changes. Re-run the CI pipeline instead. "
+            "If the same error persists across 3+ runs, escalate as a runner environment issue."
+        ),
     }
     return notes.get(error_class, "")
 
 
-def _diagnose(job, step, error_log, error_class, context):
-    """Stage 1: Diagnose the error using gh CLI for full logs, then produce a fix plan.
+def _diagnose(job, step, error_log, error_class, context, repro=None):
+    """Stage 1: Diagnose using local reproduction + gh CLI for full logs.
+
+    If local reproduction succeeded, the diagnosis prompt includes structured
+    errors with file/line/code info. Otherwise falls back to gh CLI.
 
     Returns a short strategy string the executor can use.
     """
@@ -184,26 +194,52 @@ def _diagnose(job, step, error_log, error_class, context):
         run_url = context.get("run_url", "")
 
     instruction = _JOB_INSTRUCTIONS.get(job, "Analyze the error and fix the issue.")
-    error_note = _build_error_notes(error_class)
+    effective_class = repro.error_class if (repro and repro.error_class) else error_class
+    error_note = _build_error_notes(effective_class)
     gh_instructions = _gh_troubleshoot_instructions(run_url, job)
+
+    repro_section = ""
+    if repro and repro.reproduced:
+        repro_section = format_errors_for_prompt(repro)
+    elif repro:
+        repro_section = (
+            "\n\nLOCAL REPRODUCTION: The failure did NOT reproduce locally. "
+            "This suggests a CI-specific issue (environment, caching, Docker, network). "
+            "Rely on gh CLI logs for diagnosis.\n"
+        )
 
     prompt = (
         f"DIAGNOSE ONLY -- do NOT make changes yet.\n\n"
         f"The CI pipeline FAILED in job '{job}', step '{step}'.{ctx}\n"
-        f"Error classification: {error_class}\n"
+        f"Error classification: {effective_class}\n"
+        f"{repro_section}\n"
         f"{gh_instructions}\n"
         f"Webhook error preview (may be truncated):\n```\n{error_log[:2000]}\n```\n\n"
         f"Context: {instruction}\n"
         f"{error_note}\n\n"
         "YOUR TASK:\n"
-        "1. Use the gh CLI commands above to fetch the FULL error logs from the pipeline run.\n"
-        "2. Read the complete output carefully.\n"
-        "3. Identify the root cause.\n"
-        "4. List the specific files that need changes.\n"
-        "5. Describe the minimal fix strategy in 2-3 sentences.\n"
-        "6. Do NOT edit any files. Do NOT run git commands.\n"
-        "7. Output your diagnosis as plain text."
     )
+
+    if repro and repro.reproduced:
+        prompt += (
+            "1. The error REPRODUCED LOCALLY. The structured errors above show exact files and lines.\n"
+            "2. Cross-reference with the gh CLI logs if needed for additional context.\n"
+            "3. Identify the root cause from the local output.\n"
+            "4. List the specific files and lines that need changes.\n"
+            "5. Describe the minimal fix strategy in 2-3 sentences.\n"
+            "6. Do NOT edit any files. Do NOT run git commands.\n"
+            "7. Output your diagnosis as plain text."
+        )
+    else:
+        prompt += (
+            "1. Use the gh CLI commands above to fetch the FULL error logs from the pipeline run.\n"
+            "2. Read the complete output carefully.\n"
+            "3. Identify the root cause.\n"
+            "4. List the specific files that need changes.\n"
+            "5. Describe the minimal fix strategy in 2-3 sentences.\n"
+            "6. Do NOT edit any files. Do NOT run git commands.\n"
+            "7. Output your diagnosis as plain text."
+        )
 
     result = run_kiro(prompt, f"Diagnose ({job}/{step})")
     kiro_output = result[1] if isinstance(result, tuple) else ""
@@ -236,9 +272,22 @@ def fix_with_retry(job, step, error_log, context=None):
         error_class = classify_error(error_log)
         log.info(f"Error classified as: {error_class} for {job}/{step}")
 
+        # Stage 0: Local reproduction
+        log.info(f"=== Reproducing {job}/{step} locally ===")
+        repro = reproduce_locally(job, error_class)
+        if repro.reproduced:
+            log.info(f"Failure REPRODUCED locally: {len(repro.errors)} errors, "
+                     f"class refined to '{repro.error_class}'")
+            if repro.error_class:
+                error_class = repro.error_class
+        elif repro.raw_output:
+            log.info(f"Failure did NOT reproduce locally for {job}/{step}")
+        else:
+            log.info(f"No local reproduction commands for {job}/{step}")
+
         # Stage 1: Diagnose before fixing
         log.info(f"=== Diagnosing {job}/{step} ===")
-        diagnosis = _diagnose(job, step, error_log, error_class, context)
+        diagnosis = _diagnose(job, step, error_log, error_class, context, repro)
         log.info(f"Diagnosis complete for {job}/{step}")
 
         past_attempts_section = get_past_attempts(job, error_log)
@@ -263,18 +312,42 @@ def fix_with_retry(job, step, error_log, context=None):
                     "You MUST try a DIFFERENT approach. Do not repeat the same fix."
                 )
 
+                # Re-reproduce locally on retry to see if the error changed
+                log.info(f"Re-reproducing {job}/{step} locally after failed attempt")
+                repro = reproduce_locally(job, error_class)
+                if repro.reproduced and repro.error_class:
+                    error_class = repro.error_class
+
             run_url = context.get("run_url", "") if context else ""
             gh_instructions = _gh_troubleshoot_instructions(run_url, job)
+
+            repro_section = ""
+            if repro and repro.reproduced:
+                repro_section = format_errors_for_prompt(repro)
 
             prompt = (
                 f"The CI pipeline FAILED in job '{job}', step '{step}'.{ctx_str}\n"
                 f"Error classification: {error_class}\n"
                 f"Fix attempt: {attempt} of {MAX_RETRIES}\n\n"
                 f"DIAGNOSIS:\n{diagnosis[:1500]}\n"
+                f"{repro_section}\n"
                 f"{gh_instructions}\n"
                 f"Webhook error preview (may be truncated):\n```\n{error_log[:3000]}\n```\n\n"
-                f"TASK: First use the gh CLI commands above to fetch the FULL error logs, "
-                f"then apply the fix.\n{instruction}"
+            )
+
+            if repro and repro.reproduced:
+                prompt += (
+                    "TASK: The error reproduced locally. The structured errors above "
+                    "show exact files and lines. Fix the issues directly, then verify.\n"
+                )
+            else:
+                prompt += (
+                    "TASK: First use the gh CLI commands above to fetch the FULL error logs, "
+                    "then apply the fix.\n"
+                )
+
+            prompt += (
+                f"{instruction}"
                 f"{error_note}"
                 f"{history_section}"
                 f"{semantic_section}"
@@ -350,14 +423,14 @@ def fix_with_retry(job, step, error_log, context=None):
             log.warning(f"Commit/push failed for attempt {attempt} ({job}/{step})")
             last_strategy_summary = f"commit/push failed. {strategy_note}"
 
-        _write_escalation(job, step, error_log, error_class, context)
+        _write_escalation(job, step, error_log, error_class, context, repro=repro)
         log.error(f"Failed after {MAX_RETRIES} attempts for {job}/{step}. Escalation written.")
         return False
     finally:
         _fix_lock.release()
 
 
-def _write_escalation(job, step, error_log, error_class, context, extra_reason=""):
+def _write_escalation(job, step, error_log, error_class, context, extra_reason="", repro=None):
     escalation_dir = WIN_PROJECT_DIR / "escalations"
     try:
         escalation_dir.mkdir(exist_ok=True)
@@ -367,6 +440,16 @@ def _write_escalation(job, step, error_log, error_class, context, extra_reason="
         past = get_past_attempts(job, error_log)
         semantic = search_relevant_context(job, error_log)
 
+        repro_info = {}
+        if repro:
+            repro_info = {
+                "reproduced_locally": repro.reproduced,
+                "local_error_count": len(repro.errors),
+                "local_error_class": repro.error_class,
+                "local_errors": [str(e) for e in repro.errors[:10]],
+                "files_affected": sorted({e.file for e in repro.errors if e.file}),
+            }
+
         report = {
             "timestamp": datetime.now().isoformat(),
             "job": job,
@@ -375,6 +458,7 @@ def _write_escalation(job, step, error_log, error_class, context, extra_reason="
             "context": context or {},
             "max_retries_exhausted": MAX_RETRIES,
             "error_log_preview": error_log[:3000],
+            "local_reproduction": repro_info,
             "recommendation": _escalation_recommendation(error_class, job),
             "strategies_attempted": past or "no history",
             "similar_past_fixes": semantic or "no semantic matches",

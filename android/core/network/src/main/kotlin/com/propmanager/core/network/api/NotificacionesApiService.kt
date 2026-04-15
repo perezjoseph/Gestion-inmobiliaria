@@ -16,6 +16,7 @@ data class PagoVencidoDto(
     @SerialName("diasVencido") val diasVencido: Long,
 )
 
+@Suppress("kotlin:S6517")
 interface NotificacionesApiService {
     @GET("api/notificaciones/pagos-vencidos")
     suspend fun pagosVencidos(): Response<List<PagoVencidoDto>>

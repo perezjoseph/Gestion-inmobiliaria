@@ -73,7 +73,7 @@ constructor(
         _filters
             .flatMapLatest { f -> repository.observeFiltered(f.ciudad, f.estado, f.tipoPropiedad) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-            .let { flow ->
+            .let { _ ->
                 MutableStateFlow<PropiedadesUiState>(PropiedadesUiState.Loading).also { state ->
                     viewModelScope.launch {
                         _filters
