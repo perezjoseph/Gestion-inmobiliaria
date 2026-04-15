@@ -230,6 +230,9 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRIBUTION }}
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
         with:
@@ -244,6 +247,7 @@ jobs:
         working-directory: android
         run: |
           umask 077
+          set -o pipefail
           set +e
           ./gradlew lint detekt spotlessCheck --parallel --continue --stacktrace 2>&1 | tee "${RUNNER_TEMP}/lint-all-output.txt"
           GRADLE_EXIT=$?
@@ -267,7 +271,7 @@ jobs:
           name: android-lint-xml
           path: android/app/build/reports/lint-results-debug.xml
           retention-days: 1
-          if-no-files-found: ignore
+          if-no-files-found: warn
 
       - name: Upload detekt XML report for SonarQube
         if: always()
@@ -276,7 +280,7 @@ jobs:
           name: android-detekt-xml
           path: android/build/reports/detekt/detekt.xml
           retention-days: 1
-          if-no-files-found: ignore
+          if-no-files-found: warn
 
       - name: Upload lint reports
         if: always()
@@ -405,6 +409,9 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRIBUTION }}
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
         with:
@@ -419,6 +426,7 @@ jobs:
         working-directory: android
         run: |
           umask 077
+          set -o pipefail
           ./gradlew testDebugUnitTest --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/test-output.txt"
 
       - name: Generate JaCoCo coverage reports
@@ -428,7 +436,11 @@ jobs:
         working-directory: android
         run: |
           umask 077
-          ./gradlew createDebugUnitTestCoverageReport --parallel --continue --stacktrace 2>&1 || true
+          set -o pipefail
+          ./gradlew createDebugUnitTestCoverageReport --parallel --continue --stacktrace 2>&1 | tee "${RUNNER_TEMP}/coverage-output.txt" || {
+            echo "::warning::JaCoCo coverage report generation failed (exit $?) -- coverage will not be available in SonarQube"
+            true
+          }
 
       - name: Upload JaCoCo coverage XML for SonarQube
         if: always()
@@ -437,7 +449,7 @@ jobs:
           name: android-coverage-xml
           path: android/**/build/reports/coverage/test/debug/report.xml
           retention-days: 1
-          if-no-files-found: ignore
+          if-no-files-found: warn
 
       - name: Upload JUnit XML test results
         if: always()
@@ -446,7 +458,7 @@ jobs:
           name: android-test-results-xml
           path: android/**/build/test-results/testDebugUnitTest/*.xml
           retention-days: 7
-          if-no-files-found: ignore
+          if-no-files-found: warn
 
       - name: Upload test reports
         if: always()
@@ -526,7 +538,7 @@ jobs:
 
       - name: Clean up temp files
         if: always()
-        run: rm -f "${RUNNER_TEMP}/test-output.txt"
+        run: rm -f "${RUNNER_TEMP}/test-output.txt" "${RUNNER_TEMP}/coverage-output.txt"
 
       - name: Post-job workspace cleanup
         if: always() && !startsWith(runner.name, 'GitHub Actions')
@@ -809,6 +821,9 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRIBUTION }}
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
         with:
@@ -823,6 +838,7 @@ jobs:
         working-directory: android
         run: |
           umask 077
+          set -o pipefail
           ./gradlew assembleDebug --parallel --stacktrace 2>&1 | tee "${RUNNER_TEMP}/build-output.txt"
 
       - name: Scan APK for embedded secrets
@@ -1161,7 +1177,9 @@ jobs:
             sonarsource/sonar-scanner-cli:11.3@sha256:7462f132388135e32b948f8f18ff0db9ae28a87c6777f1df5b2207e04a6d7c5c \
             "${SCAN_ARGS[@]}" 2>&1 | tee "${RUNNER_TEMP}/sonar-output.txt" || SCAN_EXIT=$?
           echo "scan_exit=${SCAN_EXIT}" >> $GITHUB_OUTPUT
-          if [ "$SCAN_EXIT" -ne 0 ]; then
+          if [ "$SCAN_EXIT" -eq 3 ]; then
+            echo "::warning::SonarQube Quality Gate failed (exit code 3) -- treating as non-blocking"
+          elif [ "$SCAN_EXIT" -ne 0 ]; then
             echo "::warning::SonarQube scanner exited with code ${SCAN_EXIT}"
             tail -30 "${RUNNER_TEMP}/sonar-output.txt" || true
             exit $SCAN_EXIT

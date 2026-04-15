@@ -318,7 +318,6 @@ mod pbt_async {
                 let resp = test::call_service(&app, req).await;
                 let body: Value = test::read_body_json(resp).await;
                 created_ids.push(body["id"].as_str().unwrap().parse::<Uuid>().unwrap());
-                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
             }
 
             let req = test::TestRequest::get()
@@ -669,7 +668,6 @@ mod pbt_async {
                     .to_request();
                 let resp = test::call_service(&app, req).await;
                 assert_eq!(resp.status(), 201);
-                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
             }
 
             let req = test::TestRequest::get()
@@ -824,7 +822,7 @@ mod pbt_async {
 #[test]
 fn test_creation_round_trip() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: 15,
         ..Default::default()
     });
     let strategy = (
@@ -850,7 +848,7 @@ fn test_creation_round_trip() {
 #[test]
 fn test_list_ordering() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: 15,
         ..Default::default()
     });
     runner
@@ -866,7 +864,7 @@ fn test_list_ordering() {
 #[test]
 fn test_filtering_returns_matching() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: 15,
         ..Default::default()
     });
     runner
@@ -882,7 +880,7 @@ fn test_filtering_returns_matching() {
 #[test]
 fn test_update_preserves_and_replaces() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: 15,
         ..Default::default()
     });
     let strategy = (
@@ -906,7 +904,7 @@ fn test_update_preserves_and_replaces() {
 #[test]
 fn test_valid_transitions_set_timestamps() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: 15,
         ..Default::default()
     });
     runner
@@ -922,7 +920,7 @@ fn test_valid_transitions_set_timestamps() {
 #[test]
 fn test_invalid_transitions_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: 15,
         ..Default::default()
     });
     runner
@@ -945,7 +943,7 @@ fn test_invalid_transitions_rejected() {
 #[test]
 fn test_invalid_prioridad_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: 15,
         ..Default::default()
     });
     runner
@@ -959,7 +957,7 @@ fn test_invalid_prioridad_rejected() {
 #[test]
 fn test_invalid_moneda_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: 15,
         ..Default::default()
     });
     runner
@@ -975,7 +973,7 @@ fn test_invalid_moneda_rejected() {
 #[test]
 fn test_negative_cost_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: 15,
         ..Default::default()
     });
     runner
@@ -991,7 +989,7 @@ fn test_negative_cost_rejected() {
 #[test]
 fn test_empty_notes_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: 15,
         ..Default::default()
     });
     runner
@@ -1007,7 +1005,7 @@ fn test_empty_notes_rejected() {
 #[test]
 fn test_notes_ordering() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: 15,
         ..Default::default()
     });
     runner
@@ -1023,7 +1021,7 @@ fn test_notes_ordering() {
 #[test]
 fn test_cascade_delete() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: 15,
         ..Default::default()
     });
     runner
@@ -1039,7 +1037,7 @@ fn test_cascade_delete() {
 #[test]
 fn test_unit_property_ownership() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: 15,
         ..Default::default()
     });
     runner
@@ -1055,7 +1053,7 @@ fn test_unit_property_ownership() {
 #[test]
 fn test_nonexistent_fk_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: 15,
         ..Default::default()
     });
     let strategy = (

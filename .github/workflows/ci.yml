@@ -417,6 +417,7 @@ jobs:
           key: v2-${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             v2-${{ runner.os }}-cargo-test-
+            v2-${{ runner.os }}-cargo-lint-
             v2-${{ runner.os }}-cargo-
 
       - name: Mask test database credentials
@@ -444,9 +445,148 @@ jobs:
             exit 1
           fi
 
+      - name: Write test summary
+        if: always()
+        run: |
+          {
+            echo "## Backend Test Results"
+            if [ "${{ steps.backend-tests.outcome }}" = "success" ]; then
+              PASS=$(grep -c "^test .* ok$" "${RUNNER_TEMP}/test-backend-output.txt" 2>/dev/null || echo "?")
+              echo "✅ All tests passed ($PASS tests)"
+            else
+              FAIL_COUNT=$(grep -c "^test .* FAILED$" "${RUNNER_TEMP}/test-backend-output.txt" 2>/dev/null || echo "?")
+              echo "❌ $FAIL_COUNT test(s) failed"
+              echo '```'
+              grep "^test .* FAILED$" "${RUNNER_TEMP}/test-backend-output.txt" 2>/dev/null | head -20 || true
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Record duration
+        id: timing
+        if: always()
+        run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
+
+      - name: Collect backend test errors for notification
+        id: collect-errors
+        if: failure()
+        run: |
+          ERROR=""
+          [ -f "${RUNNER_TEMP}/test-backend-output.txt" ] && ERROR="$(tail -c 3000 "${RUNNER_TEMP}/test-backend-output.txt")"
+          if [ -z "$ERROR" ]; then
+            ERROR="Backend tests failed but no captured output. Run cargo test -p realestate-backend --all-targets to reproduce."
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Prune cargo target for cache efficiency
+        if: always()
+        run: |
+          find target -name "incremental" -type d -exec rm -rf {} + 2>/dev/null || true
+          find target -path "*/deps/librealestate_*" -delete 2>/dev/null || true
+          find target -path "*/.fingerprint/realestate-*" -type d -exec rm -rf {} + 2>/dev/null || true
+
+      - name: Clean up sensitive temp files
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/test-backend-output.txt"
+
+  coverage-backend:
+    name: Backend Test Coverage (LCOV)
+    needs: [runner-cleanup]
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","docker"]') }}
+    timeout-minutes: 30
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+    env:
+      DATABASE_URL: postgresql://realestate:realestate_dev_password@localhost:5432/realestate
+      SERVER_PORT: 8080
+      CORS_ORIGIN: http://localhost:8080
+    outputs:
+      duration: ${{ steps.timing.outputs.duration }}
+    services:
+      postgres:
+        image: postgres:16@sha256:5a65324fe84dc41709ff914e90b07f3e2f577073ed27bf917d4873aca0c9ec51
+        env:
+          POSTGRES_DB: realestate
+          POSTGRES_USER: realestate
+          POSTGRES_PASSWORD: realestate_dev_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U realestate"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --security-opt no-new-privileges
+          --pids-limit 256
+          --memory 512m
+          --memory-swap 512m
+          --shm-size 128m
+          --cap-drop ALL
+          --cap-add CHOWN
+          --cap-add DAC_OVERRIDE
+          --cap-add FOWNER
+          --cap-add SETGID
+          --cap-add SETUID
+    steps:
+      - name: Record start time
+        id: start
+        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Clean workspace
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install OpenSSL development headers
+        run: |
+          if ! dpkg -s libssl-dev pkg-config >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends pkg-config libssl-dev
+          fi
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+
+      - name: Restore cargo cache
+        id: cache
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: v2-${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            v2-${{ runner.os }}-cargo-coverage-
+            v2-${{ runner.os }}-cargo-test-
+            v2-${{ runner.os }}-cargo-
+
+      - name: Mask test database credentials
+        run: |
+          echo "::add-mask::realestate_dev_password"
+          echo "::add-mask::postgresql://realestate:realestate_dev_password@localhost:5432/realestate"
+
+      - name: Generate random JWT secret for test isolation
+        run: |
+          JWT_SECRET=$(openssl rand -hex 32)
+          echo "::add-mask::$JWT_SECRET"
+          echo "JWT_SECRET=$JWT_SECRET" >> "$GITHUB_ENV"
+
       - name: Generate test coverage report (LCOV)
         id: coverage
-        if: success()
+        timeout-minutes: 25
         run: |
           umask 077
           export PATH="$HOME/.cargo/bin:$PATH"
@@ -507,41 +647,10 @@ jobs:
           overwrite: false
           if-no-files-found: warn
 
-      - name: Write test summary
-        if: always()
-        run: |
-          {
-            echo "## Backend Test Results"
-            if [ "${{ steps.backend-tests.outcome }}" = "success" ]; then
-              PASS=$(grep -c "^test .* ok$" "${RUNNER_TEMP}/test-backend-output.txt" 2>/dev/null || echo "?")
-              echo "✅ All tests passed ($PASS tests)"
-            else
-              FAIL_COUNT=$(grep -c "^test .* FAILED$" "${RUNNER_TEMP}/test-backend-output.txt" 2>/dev/null || echo "?")
-              echo "❌ $FAIL_COUNT test(s) failed"
-              echo '```'
-              grep "^test .* FAILED$" "${RUNNER_TEMP}/test-backend-output.txt" 2>/dev/null | head -20 || true
-              echo '```'
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
       - name: Record duration
         id: timing
         if: always()
         run: echo "duration=$(( $(date +%s) - ${{ steps.start.outputs.time }} ))s" >> $GITHUB_OUTPUT
-
-      - name: Collect backend test errors for notification
-        id: collect-errors
-        if: failure()
-        run: |
-          ERROR=""
-          [ -f "${RUNNER_TEMP}/test-backend-output.txt" ] && ERROR="$(tail -c 3000 "${RUNNER_TEMP}/test-backend-output.txt")"
-          if [ -z "$ERROR" ]; then
-            ERROR="Backend tests failed but no captured output. Run cargo test -p realestate-backend --all-targets to reproduce."
-          fi
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
-          echo "$ERROR" >> $GITHUB_OUTPUT
-          echo "$EOF" >> $GITHUB_OUTPUT
 
       - name: Prune cargo target for cache efficiency
         if: always()
@@ -552,7 +661,7 @@ jobs:
 
       - name: Clean up sensitive temp files
         if: always()
-        run: rm -f "${RUNNER_TEMP}/test-backend-output.txt" "${RUNNER_TEMP}/tarpaulin-output.txt"
+        run: rm -f "${RUNNER_TEMP}/tarpaulin-output.txt"
 
   test-frontend:
     name: Frontend WASM Compilation & Tests
@@ -1000,7 +1109,7 @@ jobs:
       contents: read
     env:
       DOCKER_CONTENT_TRUST: "1"
-    needs: [lint, test-backend, test-frontend]
+    needs: [lint, test-backend, test-frontend, coverage-backend]
     if: |
       always() &&
       !(inputs.skip_sonarqube || false) &&
@@ -1030,7 +1139,7 @@ jobs:
 
       - name: Download backend coverage report
         id: download-coverage
-        if: needs.test-backend.result == 'success'
+        if: needs.coverage-backend.result == 'success'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: backend-coverage
@@ -1248,7 +1357,7 @@ jobs:
           COVERAGE_OK: ${{ steps.download-coverage.outcome == 'success' }}
           CLIPPY_OK: ${{ steps.download-clippy.outcome == 'success' }}
           LINT_RESULT: ${{ needs.lint.result }}
-          TEST_BACKEND_RESULT: ${{ needs.test-backend.result }}
+          COVERAGE_BACKEND_RESULT: ${{ needs.coverage-backend.result }}
         run: |
           MISSING=0
           {
@@ -1256,9 +1365,9 @@ jobs:
             echo "| Report | Status | Source Job |"
             echo "|--------|--------|------------|"
             if [ "$COVERAGE_OK" = "true" ] && [ -f coverage/lcov.info ]; then
-              echo "| Coverage (lcov) | ✅ Imported | test-backend |"
+              echo "| Coverage (lcov) | ✅ Imported | coverage-backend |"
             else
-              echo "| Coverage (lcov) | ⚠️ Missing | test-backend ($TEST_BACKEND_RESULT) |"
+              echo "| Coverage (lcov) | ⚠️ Missing | coverage-backend ($COVERAGE_BACKEND_RESULT) |"
               MISSING=$((MISSING + 1))
             fi
             if [ "$CLIPPY_OK" = "true" ] && [ -f clippy-report.json ]; then
@@ -2259,7 +2368,7 @@ jobs:
       GH_SHA: ${{ github.sha }}
       GH_REF_NAME: ${{ github.ref_name }}
       GH_ACTOR: ${{ github.actor }}
-    needs: [secret-scan, dependency-review, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend, container-image-backend, container-image-frontend, deploy]
+    needs: [secret-scan, dependency-review, lint, test-backend, test-frontend, coverage-backend, quality-gate, sonarqube, build-frontend, build-backend, container-image-backend, container-image-frontend, deploy]
     if: always() && contains(needs.*.result, 'failure')
     steps:
       - name: Define payload sanitizer
@@ -2516,10 +2625,11 @@ jobs:
             echo "## Pipeline Failure Summary"
             echo "| Job | Result |"
             echo "|-----|--------|"
-            for JOB in lint test-backend test-frontend quality-gate sonarqube build-frontend build-backend container-image-backend container-image-frontend deploy; do
+            for JOB in lint test-backend coverage-backend test-frontend quality-gate sonarqube build-frontend build-backend container-image-backend container-image-frontend deploy; do
               case "$JOB" in
                 lint) RESULT="${{ needs.lint.result }}" ;;
                 test-backend) RESULT="${{ needs.test-backend.result }}" ;;
+                coverage-backend) RESULT="${{ needs.coverage-backend.result }}" ;;
                 test-frontend) RESULT="${{ needs.test-frontend.result }}" ;;
                 quality-gate) RESULT="${{ needs.quality-gate.result }}" ;;
                 sonarqube) RESULT="${{ needs.sonarqube.result }}" ;;
@@ -2561,7 +2671,7 @@ jobs:
       GH_ACTOR: ${{ github.actor }}
       GH_EVENT_NAME: ${{ github.event_name }}
       GH_REF: ${{ github.ref }}
-    needs: [secret-scan, dependency-review, lint, test-backend, test-frontend, quality-gate, sonarqube, build-frontend, build-backend, container-image-backend, container-image-frontend, deploy, notify-failure]
+    needs: [secret-scan, dependency-review, lint, test-backend, test-frontend, coverage-backend, quality-gate, sonarqube, build-frontend, build-backend, container-image-backend, container-image-frontend, deploy, notify-failure]
     if: |
       always() &&
       github.ref == 'refs/heads/main' &&
@@ -2678,6 +2788,7 @@ jobs:
           REPORT="${REPORT}  dependency-review  | ${{ needs.dependency-review.result }} | n/a | n/a\n"
           REPORT="${REPORT}  lint               | ${{ needs.lint.result }} | ${{ needs.lint.outputs.duration || 'n/a' }} | ${{ needs.lint.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }}\n"
           REPORT="${REPORT}  test-backend       | ${{ needs.test-backend.result }} | ${{ needs.test-backend.outputs.duration || 'n/a' }} | ${{ needs.test-backend.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }}\n"
+          REPORT="${REPORT}  coverage-backend   | ${{ needs.coverage-backend.result }} | ${{ needs.coverage-backend.outputs.duration || 'n/a' }} | n/a\n"
           REPORT="${REPORT}  test-frontend      | ${{ needs.test-frontend.result }} | ${{ needs.test-frontend.outputs.duration || 'n/a' }} | ${{ needs.test-frontend.outputs.cache_hit == 'true' && 'HIT' || 'MISS' }}\n"
           REPORT="${REPORT}  quality-gate       | ${{ needs.quality-gate.result }} | ${{ needs.quality-gate.outputs.duration || 'n/a' }} | n/a\n"
           REPORT="${REPORT}  sonarqube          | ${{ needs.sonarqube.result }} | ${{ needs.sonarqube.outputs.duration || 'n/a' }} | n/a\n"
