@@ -27,6 +27,7 @@ from .gates import (
 from .reproducer import reproduce_locally, format_errors_for_prompt, ReproCache
 from .trends import record_duration, check_and_alert_trends
 from .vulns import extract_vuln_info, record_vuln_failure
+from .decisions import record_strategy_outcome, get_ranked_strategies
 
 
 @dataclass
