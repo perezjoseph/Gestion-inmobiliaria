@@ -271,9 +271,9 @@ jobs:
             --memory-swap 1g \
             --cpus 2 \
             --pids-limit 256 \
-            --tmpfs /tmp:rw,nosuid,nodev,size=256m,uid=1000,gid=1000 \
-            --tmpfs /opt/sonar-scanner/.sonar:rw,nosuid,nodev,size=512m,uid=1000,gid=1000 \
-            --tmpfs /home/scanner:rw,noexec,nosuid,nodev,size=64m,uid=1000,gid=1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+            --tmpfs /opt/sonar-scanner/.sonar:rw,nosuid,nodev,size=512m \
+            --tmpfs /home/scanner:rw,noexec,nosuid,nodev,size=64m \
             -e SONAR_TOKEN="${SONAR_ANALYSIS_TOKEN}" \
             -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
             -e HOME=/home/scanner \
