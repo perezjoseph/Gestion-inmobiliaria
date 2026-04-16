@@ -19,6 +19,8 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+    env:
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -46,7 +48,7 @@ jobs:
         run: |
           echo "Waiting for SonarQube API to respond..."
           for i in $(seq 1 60); do
-            RESPONSE=$(curl -sf --connect-timeout 5 --max-time 10 "http://localhost:9100/api/system/status" 2>/dev/null) || RESPONSE=""
+            RESPONSE=$(curl -sf --connect-timeout 5 --max-time 10 "${SONAR_HOST_URL%/}/api/system/status" 2>/dev/null) || RESPONSE=""
             if [ -n "$RESPONSE" ]; then
               STATUS=$(echo "$RESPONSE" | jq -r '.status // "UNKNOWN"' 2>/dev/null) || STATUS="UNKNOWN"
             else
@@ -65,11 +67,11 @@ jobs:
 
       - name: Report SonarQube status
         run: |
-          VERSION=$(curl -sf "http://localhost:9100/api/system/status" | jq -r '.version // "unknown"')
+          VERSION=$(curl -sf "${SONAR_HOST_URL%/}/api/system/status" | jq -r '.version // "unknown"')
           {
             echo "## SonarQube Deployment"
             echo "- Status: ✅ Running"
             echo "- Version: $VERSION"
-            echo "- URL: http://localhost:9100"
+            echo "- URL: ${SONAR_HOST_URL}"
             echo "- Runner: $(hostname)"
           } >> "$GITHUB_STEP_SUMMARY"
