@@ -1235,7 +1235,8 @@ jobs:
             echo "skip=true" >> $GITHUB_OUTPUT
             exit 0
           fi
-          if ! echo "$SONAR_HOST_URL" | grep -qE '^https?://[a-zA-Z0-9._-]+(:[0-9]{1,5})?(/[a-zA-Z0-9._/-]*)?$'; then
+          SONAR_URL_CLEAN=$(printf '%s' "$SONAR_HOST_URL" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          if ! printf '%s' "$SONAR_URL_CLEAN" | grep -qE '^https?://[a-zA-Z0-9._\[\]:-]+(:[0-9]{1,5})?(/[a-zA-Z0-9._:@%+~&=?/-]*)?$'; then
             echo "::error::SONAR_HOST_URL has invalid format -- possible SSRF vector"
             exit 1
           fi
