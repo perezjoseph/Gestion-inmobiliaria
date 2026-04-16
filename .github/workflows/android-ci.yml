@@ -272,12 +272,12 @@ jobs:
         timeout-minutes: 15
         working-directory: android
         env:
-          GRADLE_OPTS: "-Xmx512m -Dorg.gradle.jvmargs=-Xmx2g"
+          GRADLE_OPTS: "-Xmx512m -Dorg.gradle.jvmargs=-Xmx4g"
         run: |
           umask 077
           set -o pipefail
           set +e
-          ./gradlew lint detekt spotlessCheck --parallel --continue --stacktrace 2>&1 | tee "${RUNNER_TEMP}/lint-all-output.txt"
+          ./gradlew lint detekt spotlessCheck --parallel --max-workers=4 --continue --stacktrace 2>&1 | tee "${RUNNER_TEMP}/lint-all-output.txt"
           GRADLE_EXIT=$?
           set -e
 

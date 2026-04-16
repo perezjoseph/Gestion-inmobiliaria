@@ -1,0 +1,426 @@
+name: Pipeline Self-Improvement
+
+on:
+  workflow_call:
+    inputs:
+      secret-scan-result:
+        type: string
+        required: false
+        default: ''
+      dependency-review-result:
+        type: string
+        required: false
+        default: ''
+      lint-result:
+        type: string
+        required: false
+        default: ''
+      test-backend-result:
+        type: string
+        required: false
+        default: ''
+      test-frontend-result:
+        type: string
+        required: false
+        default: ''
+      coverage-backend-result:
+        type: string
+        required: false
+        default: ''
+      quality-gate-result:
+        type: string
+        required: false
+        default: ''
+      sonarqube-result:
+        type: string
+        required: false
+        default: ''
+      build-frontend-result:
+        type: string
+        required: false
+        default: ''
+      build-backend-result:
+        type: string
+        required: false
+        default: ''
+      container-backend-result:
+        type: string
+        required: false
+        default: ''
+      container-frontend-result:
+        type: string
+        required: false
+        default: ''
+      deploy-result:
+        type: string
+        required: false
+        default: ''
+      lint-error-log:
+        type: string
+        required: false
+        default: ''
+      test-backend-error-log:
+        type: string
+        required: false
+        default: ''
+      test-frontend-error-log:
+        type: string
+        required: false
+        default: ''
+      quality-gate-error-log:
+        type: string
+        required: false
+        default: ''
+      build-frontend-error-log:
+        type: string
+        required: false
+        default: ''
+      build-backend-error-log:
+        type: string
+        required: false
+        default: ''
+      lint-duration:
+        type: string
+        required: false
+        default: ''
+      test-backend-duration:
+        type: string
+        required: false
+        default: ''
+      coverage-backend-duration:
+        type: string
+        required: false
+        default: ''
+      test-frontend-duration:
+        type: string
+        required: false
+        default: ''
+      quality-gate-duration:
+        type: string
+        required: false
+        default: ''
+      sonarqube-duration:
+        type: string
+        required: false
+        default: ''
+      build-frontend-duration:
+        type: string
+        required: false
+        default: ''
+      build-backend-duration:
+        type: string
+        required: false
+        default: ''
+      lint-cache-hit:
+        type: string
+        required: false
+        default: ''
+      test-backend-cache-hit:
+        type: string
+        required: false
+        default: ''
+      test-frontend-cache-hit:
+        type: string
+        required: false
+        default: ''
+      build-frontend-cache-hit:
+        type: string
+        required: false
+        default: ''
+      build-backend-cache-hit:
+        type: string
+        required: false
+        default: ''
+    secrets: inherit
+
+permissions: {}
+
+jobs:
+  pipeline-improve:
+    name: CI/CD Pipeline Self-Improvement
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      !contains(github.event.head_commit.message, 'ci: improve pipeline') &&
+      !contains(github.event.head_commit.message, 'fix: resolve CI failures (auto-fix)')
+    env:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
+      GH_SERVER_URL: ${{ github.server_url }}
+      GH_REPOSITORY: ${{ github.repository }}
+      GH_RUN_ID: ${{ github.run_id }}
+      GH_SHA: ${{ github.sha }}
+      GH_REF_NAME: ${{ github.ref_name }}
+      GH_ACTOR: ${{ github.actor }}
+      GH_EVENT_NAME: ${{ github.event_name }}
+      GH_REF: ${{ github.ref }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+    steps:
+      - name: Validate webhook configuration
+        id: webhook-check
+        run: |
+          if [ -z "$WEBHOOK_SECRET" ] || [ -z "$WEBHOOK_HOST" ]; then
+            echo "::warning::WEBHOOK_SECRET or WEBHOOK_HOST not configured -- skipping improvement webhooks"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Collect SonarQube open issues
+        id: sonar-issues
+        if: steps.webhook-check.outputs.skip != 'true'
+        run: |
+          SONAR_URL="${SONAR_HOST_URL}"
+          TOKEN="${{ secrets.SONAR_TOKEN }}"
+          PROJECT_KEY="gestion-inmobiliaria"
+
+          if [ -z "$TOKEN" ]; then
+            ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD }}"
+            if [ -z "$ADMIN_PASS" ]; then
+              echo "sonar_report=SonarQube credentials unavailable -- skipping issue collection." >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            TOKEN_NAME="ci-improve-${GH_RUN_ID}"
+            curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
+              "$SONAR_URL/api/user_tokens/revoke?name=${TOKEN_NAME}" 2>/dev/null || true
+            TOKEN_RESPONSE=$(curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
+              "$SONAR_URL/api/user_tokens/generate?name=${TOKEN_NAME}" 2>/dev/null) || TOKEN_RESPONSE=""
+            TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token // empty' 2>/dev/null) || TOKEN=""
+            if [ -z "$TOKEN" ]; then
+              echo "sonar_report=SonarQube token unavailable -- skipping issue collection." >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            echo "::add-mask::$TOKEN"
+            echo "temp_token=true" >> $GITHUB_OUTPUT
+            echo "token_name=${TOKEN_NAME}" >> $GITHUB_OUTPUT
+          fi
+
+          ISSUES_JSON=$(curl -sf --connect-timeout 10 --max-time 30 -u "$TOKEN:" \
+            "$SONAR_URL/api/issues/search?projectKeys=${PROJECT_KEY}&resolved=false&ps=100&s=SEVERITY&asc=false&statuses=OPEN,CONFIRMED,REOPENED" \
+            2>/dev/null || echo '{}')
+
+          TOTAL=$(echo "$ISSUES_JSON" | jq -r '.total // 0')
+          BREAKDOWN=$(echo "$ISSUES_JSON" | jq -r '
+            [.issues // [] | group_by(.severity) | .[] |
+              {severity: .[0].severity, count: length}] |
+            map("\(.count) \(.severity)") | join(", ")' 2>/dev/null || echo "unknown")
+
+          ISSUE_LIST=$(echo "$ISSUES_JSON" | jq -r '
+            [.issues[:80] | .[] |
+              "\(.severity) | \(.component | split(":") | last):\(.line // "?") | \(.rule) | \(.message)"] |
+            join("\n")' 2>/dev/null || echo "")
+
+          HOTSPOTS_JSON=$(curl -sf --connect-timeout 10 --max-time 30 -u "$TOKEN:" \
+            "$SONAR_URL/api/hotspots/search?projectKey=${PROJECT_KEY}&status=TO_REVIEW&ps=50" \
+            2>/dev/null || echo '{}')
+
+          HOTSPOT_TOTAL=$(echo "$HOTSPOTS_JSON" | jq -r '.paging.total // 0')
+          HOTSPOT_LIST=$(echo "$HOTSPOTS_JSON" | jq -r '
+            [.hotspots[:30] | .[] |
+              "\(.vulnerabilityProbability) | \(.component | split(":") | last):\(.line // "?") | \(.securityCategory) | \(.message)"] |
+            join("\n")' 2>/dev/null || echo "")
+
+          SONAR_REPORT="SonarQube Open Issues Report (project: ${PROJECT_KEY}):\n"
+          SONAR_REPORT="${SONAR_REPORT}Total open issues: ${TOTAL}\n"
+          SONAR_REPORT="${SONAR_REPORT}Breakdown: ${BREAKDOWN}\n\n"
+          SONAR_REPORT="${SONAR_REPORT}Issues (severity | file:line | rule | message):\n${ISSUE_LIST}\n\n"
+          SONAR_REPORT="${SONAR_REPORT}Security Hotspots to review: ${HOTSPOT_TOTAL}\n"
+          SONAR_REPORT="${SONAR_REPORT}Hotspots (risk | file:line | category | message):\n${HOTSPOT_LIST}"
+
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "sonar_report<<$EOF" >> $GITHUB_OUTPUT
+          echo -e "$SONAR_REPORT" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Determine improvement focus from pipeline results
+        id: analyze
+        if: steps.webhook-check.outputs.skip != 'true'
+        env:
+          LINT_ERRORS: ${{ inputs.lint-error-log }}
+          BACKEND_TEST_ERRORS: ${{ inputs.test-backend-error-log }}
+          FRONTEND_TEST_ERRORS: ${{ inputs.test-frontend-error-log }}
+          QUALITY_ERRORS: ${{ inputs.quality-gate-error-log }}
+          BUILD_FE_ERRORS: ${{ inputs.build-frontend-error-log }}
+          BUILD_BE_ERRORS: ${{ inputs.build-backend-error-log }}
+        run: |
+          sanitize_log() {
+            sed -E \
+              -e 's/(password|secret|token|key|credential|authorization)[=: ]+[^ "]+/\1=***REDACTED***/gi' \
+              -e 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g' \
+              -e 's/ghs_[A-Za-z0-9_]+/***REDACTED***/g' \
+              -e 's/gho_[A-Za-z0-9_]+/***REDACTED***/g' \
+              -e 's/ghu_[A-Za-z0-9_]+/***REDACTED***/g' \
+              -e 's/github_pat_[A-Za-z0-9_]+/***REDACTED***/g' \
+              -e 's/Bearer [A-Za-z0-9._\-]+/Bearer ***REDACTED***/g' \
+              -e 's/postgresql:\/\/[^@]+@/postgresql:\/\/***:***@/g'
+          }
+
+          FOCUS="general"
+          REPORT=""
+
+          REPORT="${REPORT}Pipeline Run Summary:\n"
+          REPORT="${REPORT}  Job                | Result   | Duration | Cache\n"
+          REPORT="${REPORT}  -------------------|----------|----------|------\n"
+          REPORT="${REPORT}  secret-scan        | ${{ inputs.secret-scan-result }} | n/a | n/a\n"
+          REPORT="${REPORT}  dependency-review  | ${{ inputs.dependency-review-result }} | n/a | n/a\n"
+          REPORT="${REPORT}  lint               | ${{ inputs.lint-result }} | ${{ inputs.lint-duration || 'n/a' }} | ${{ inputs.lint-cache-hit == 'true' && 'HIT' || 'MISS' }}\n"
+          REPORT="${REPORT}  test-backend       | ${{ inputs.test-backend-result }} | ${{ inputs.test-backend-duration || 'n/a' }} | ${{ inputs.test-backend-cache-hit == 'true' && 'HIT' || 'MISS' }}\n"
+          REPORT="${REPORT}  coverage-backend   | ${{ inputs.coverage-backend-result }} | ${{ inputs.coverage-backend-duration || 'n/a' }} | n/a\n"
+          REPORT="${REPORT}  test-frontend      | ${{ inputs.test-frontend-result }} | ${{ inputs.test-frontend-duration || 'n/a' }} | ${{ inputs.test-frontend-cache-hit == 'true' && 'HIT' || 'MISS' }}\n"
+          REPORT="${REPORT}  quality-gate       | ${{ inputs.quality-gate-result }} | ${{ inputs.quality-gate-duration || 'n/a' }} | n/a\n"
+          REPORT="${REPORT}  sonarqube          | ${{ inputs.sonarqube-result }} | ${{ inputs.sonarqube-duration || 'n/a' }} | n/a\n"
+          REPORT="${REPORT}  build-frontend     | ${{ inputs.build-frontend-result }} | ${{ inputs.build-frontend-duration || 'n/a' }} | ${{ inputs.build-frontend-cache-hit == 'true' && 'HIT' || 'MISS' }}\n"
+          REPORT="${REPORT}  build-backend      | ${{ inputs.build-backend-result }} | ${{ inputs.build-backend-duration || 'n/a' }} | ${{ inputs.build-backend-cache-hit == 'true' && 'HIT' || 'MISS' }}\n"
+
+          ERRORS=""
+          if [ "${{ inputs.lint-result }}" = "failure" ] && [ -n "$LINT_ERRORS" ]; then
+            SANITIZED=$(printf '%s' "$LINT_ERRORS" | sanitize_log)
+            ERRORS="${ERRORS}\n--- LINT ERRORS ---\n${SANITIZED}\n"
+          fi
+          if [ "${{ inputs.test-backend-result }}" = "failure" ] && [ -n "$BACKEND_TEST_ERRORS" ]; then
+            SANITIZED=$(printf '%s' "$BACKEND_TEST_ERRORS" | sanitize_log)
+            ERRORS="${ERRORS}\n--- BACKEND TEST ERRORS ---\n${SANITIZED}\n"
+          fi
+          if [ "${{ inputs.test-frontend-result }}" = "failure" ] && [ -n "$FRONTEND_TEST_ERRORS" ]; then
+            SANITIZED=$(printf '%s' "$FRONTEND_TEST_ERRORS" | sanitize_log)
+            ERRORS="${ERRORS}\n--- FRONTEND TEST ERRORS ---\n${SANITIZED}\n"
+          fi
+          if [ "${{ inputs.quality-gate-result }}" = "failure" ] && [ -n "$QUALITY_ERRORS" ]; then
+            SANITIZED=$(printf '%s' "$QUALITY_ERRORS" | sanitize_log)
+            ERRORS="${ERRORS}\n--- QUALITY GATE ERRORS ---\n${SANITIZED}\n"
+          fi
+          if [ "${{ inputs.build-frontend-result }}" = "failure" ] && [ -n "$BUILD_FE_ERRORS" ]; then
+            SANITIZED=$(printf '%s' "$BUILD_FE_ERRORS" | sanitize_log)
+            ERRORS="${ERRORS}\n--- BUILD FRONTEND ERRORS ---\n${SANITIZED}\n"
+          fi
+          if [ "${{ inputs.build-backend-result }}" = "failure" ] && [ -n "$BUILD_BE_ERRORS" ]; then
+            SANITIZED=$(printf '%s' "$BUILD_BE_ERRORS" | sanitize_log)
+            ERRORS="${ERRORS}\n--- BUILD BACKEND ERRORS ---\n${SANITIZED}\n"
+          fi
+
+          if [ -n "$ERRORS" ]; then
+            REPORT="${REPORT}\nFailed Job Error Logs:${ERRORS}\n"
+          fi
+
+          if [ "${{ inputs.quality-gate-result }}" = "failure" ] || [ "${{ inputs.secret-scan-result }}" = "failure" ]; then
+            FOCUS="security"
+          elif [ "${{ inputs.lint-result }}" = "failure" ] || [ "${{ inputs.test-backend-result }}" = "failure" ] || [ "${{ inputs.test-frontend-result }}" = "failure" ]; then
+            FOCUS="bugs"
+          elif [ "${{ inputs.build-frontend-result }}" = "failure" ] || [ "${{ inputs.build-backend-result }}" = "failure" ]; then
+            FOCUS="pipeline"
+          else
+            FOCUS="security,pipeline,reporting,sonarqube"
+          fi
+
+          REPORT="${REPORT}\nFocus: ${FOCUS}\n"
+          REPORT="${REPORT}Trigger: ${GH_EVENT_NAME} on ${GH_REF}\n"
+          REPORT="${REPORT}Commit: ${GH_SHA}\n"
+
+          echo "focus=$FOCUS" >> $GITHUB_OUTPUT
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "report<<$EOF" >> $GITHUB_OUTPUT
+          echo -e "$REPORT" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Write pipeline summary
+        if: always()
+        run: |
+          {
+            echo "## CI Pipeline Summary"
+            echo "| Job | Result | Duration | Cache |"
+            echo "|-----|--------|----------|-------|"
+            echo "| secret-scan | ${{ inputs.secret-scan-result }} | -- | -- |"
+            echo "| lint | ${{ inputs.lint-result }} | ${{ inputs.lint-duration || 'n/a' }} | ${{ inputs.lint-cache-hit == 'true' && 'HIT' || 'MISS' }} |"
+            echo "| test-backend | ${{ inputs.test-backend-result }} | ${{ inputs.test-backend-duration || 'n/a' }} | ${{ inputs.test-backend-cache-hit == 'true' && 'HIT' || 'MISS' }} |"
+            echo "| test-frontend | ${{ inputs.test-frontend-result }} | ${{ inputs.test-frontend-duration || 'n/a' }} | ${{ inputs.test-frontend-cache-hit == 'true' && 'HIT' || 'MISS' }} |"
+            echo "| quality-gate | ${{ inputs.quality-gate-result }} | ${{ inputs.quality-gate-duration || 'n/a' }} | -- |"
+            echo "| sonarqube | ${{ inputs.sonarqube-result }} | ${{ inputs.sonarqube-duration || 'n/a' }} | -- |"
+            echo "| build-frontend | ${{ inputs.build-frontend-result }} | ${{ inputs.build-frontend-duration || 'n/a' }} | ${{ inputs.build-frontend-cache-hit == 'true' && 'HIT' || 'MISS' }} |"
+            echo "| build-backend | ${{ inputs.build-backend-result }} | ${{ inputs.build-backend-duration || 'n/a' }} | ${{ inputs.build-backend-cache-hit == 'true' && 'HIT' || 'MISS' }} |"
+            echo "| container-backend | ${{ inputs.container-backend-result }} | -- | -- |"
+            echo "| container-frontend | ${{ inputs.container-frontend-result }} | -- | -- |"
+            echo "| deploy | ${{ inputs.deploy-result }} | -- | -- |"
+            echo ""
+            echo "Commit: \`${GH_SHA}\` by @${GH_ACTOR} on \`${GH_REF_NAME}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Detect concurrency cancellation
+        id: concurrency-check
+        if: steps.webhook-check.outputs.skip != 'true'
+        run: |
+          CANCELLED=0
+          TOTAL=0
+          for R in "${{ inputs.lint-result }}" "${{ inputs.test-backend-result }}" "${{ inputs.test-frontend-result }}" "${{ inputs.quality-gate-result }}" "${{ inputs.sonarqube-result }}" "${{ inputs.build-frontend-result }}" "${{ inputs.build-backend-result }}"; do
+            TOTAL=$((TOTAL + 1))
+            [ "$R" = "cancelled" ] && CANCELLED=$((CANCELLED + 1))
+          done
+          HAS_FAILURE=false
+          for R in "${{ inputs.lint-result }}" "${{ inputs.test-backend-result }}" "${{ inputs.test-frontend-result }}" "${{ inputs.quality-gate-result }}"; do
+            [ "$R" = "failure" ] && HAS_FAILURE=true
+          done
+          if [ "$CANCELLED" -ge 4 ] && [ "$HAS_FAILURE" = "false" ]; then
+            echo "::notice::${CANCELLED}/${TOTAL} jobs cancelled with no core failures -- concurrency cancellation detected, skipping webhooks"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send pipeline improvement request to webhook
+        if: steps.webhook-check.outputs.skip != 'true' && steps.concurrency-check.outputs.skip != 'true'
+        env:
+          FOCUS: ${{ steps.analyze.outputs.focus }}
+          REPORT: ${{ steps.analyze.outputs.report }}
+          SONAR_REPORT: ${{ steps.sonar-issues.outputs.sonar_report }}
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg focus "$FOCUS" \
+            --arg pipeline_report "$REPORT" \
+            --arg sonar_report "$SONAR_REPORT" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            '{focus: $focus, pipeline_report: $pipeline_report, sonar_report: $sonar_report, run_url: $run_url}')
+
+          SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-improve \
+            -H "Content-Type: application/json" \
+            -H "X-Signature-256: sha256=$SIGNATURE" \
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping pipeline improvement"
+
+      - name: Send SonarQube issues to dedicated fix webhook
+        if: steps.webhook-check.outputs.skip != 'true' && steps.concurrency-check.outputs.skip != 'true'
+        env:
+          SONAR_REPORT: ${{ steps.sonar-issues.outputs.sonar_report }}
+        run: |
+          if [ -z "$SONAR_REPORT" ] || echo "$SONAR_REPORT" | grep -q "unavailable"; then
+            echo "No SonarQube data available -- skipping sonar-fix webhook"
+            exit 0
+          fi
+
+          if echo "$SONAR_REPORT" | grep -q "Total open issues: 0"; then
+            echo "No open SonarQube issues -- skipping sonar-fix webhook"
+            exit 0
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg sonar_report "$SONAR_REPORT" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            '{sonar_report: $sonar_report, run_url: $run_url}')
+
+          SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/sonar-fix \
+            -H "Content-Type: application/json" \
+            -H "X-Signature-256: sha256=$SIGNATURE" \
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping SonarQube fix"
+
+      - name: Revoke temporary SonarQube token
+        if: always() && steps.sonar-issues.outputs.temp_token == 'true'
+        run: |
+          ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD }}"
+          TOKEN_NAME="${{ steps.sonar-issues.outputs.token_name }}"
+          if [ -n "$ADMIN_PASS" ] && [ -n "$TOKEN_NAME" ]; then
+            curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
+              "${SONAR_HOST_URL}/api/user_tokens/revoke?name=${TOKEN_NAME}" 2>/dev/null || true
+          fi

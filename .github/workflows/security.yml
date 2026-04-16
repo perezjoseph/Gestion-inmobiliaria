@@ -1,0 +1,414 @@
+name: Security Scanning
+
+on:
+  workflow_call:
+    inputs:
+      is-pr:
+        type: boolean
+        required: true
+      is-fork-pr:
+        type: boolean
+        required: true
+    outputs:
+      secret-scan-result:
+        value: ${{ jobs.secret-scan.result }}
+      dependency-review-result:
+        value: ${{ jobs.dependency-review.result }}
+      quality-gate-result:
+        value: ${{ jobs.quality-gate.result }}
+      quality-gate-error-log:
+        value: ${{ jobs.quality-gate.outputs.error_log }}
+      quality-gate-failed-steps:
+        value: ${{ jobs.quality-gate.outputs.failed_steps }}
+      quality-gate-duration:
+        value: ${{ jobs.quality-gate.outputs.duration }}
+    secrets: inherit
+
+permissions: {}
+
+jobs:
+  secret-scan:
+    name: Secret Scanning (Gitleaks)
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 10
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+    steps:
+      - name: Clean workspace
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install Gitleaks (with checksum verification)
+        timeout-minutes: 3
+        run: |
+          GITLEAKS_VERSION="8.24.3"
+          GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
+          ARCHIVE="${RUNNER_TEMP}/gitleaks.tar.gz"
+          curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          mkdir -p "${HOME}/.local/bin"
+          tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" gitleaks
+          rm -f "$ARCHIVE"
+          export PATH="${HOME}/.local/bin:$PATH"
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+          gitleaks version
+
+      - name: Run Gitleaks secret detection
+        run: gitleaks detect --source . --verbose --redact --exit-code 1
+
+      - name: Notify webhook on failure
+        if: failure()
+        uses: ./.github/actions/webhook-notify
+        with:
+          job-name: secret-scan
+          step-name: gitleaks
+          error-log: 'Gitleaks detected secrets in the repository.'
+          webhook-secret: ${{ secrets.WEBHOOK_SECRET }}
+          webhook-host: ${{ secrets.WEBHOOK_HOST }}
+
+  dependency-review:
+    name: Dependency Review (PR)
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 10
+    if: ${{ inputs.is-pr }}
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Review dependency changes for vulnerabilities and license issues
+        uses: actions/dependency-review-action@da24556b548a50705dd671f47852072ea4c105d9 # v4.7.1
+        with:
+          fail-on-severity: high
+          deny-licenses: AGPL-3.0, GPL-3.0, GPL-2.0
+          comment-summary-in-pr: on-failure
+
+  quality-gate:
+    name: Dependency Security & Health Check
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 30
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
+      failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
+      duration: ${{ steps.timing.outputs.duration }}
+    steps:
+      - name: Record start time
+        id: start
+        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Clean workspace
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          clean: false
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+
+      - name: Install cargo-audit for CVE scanning
+        id: install_audit
+        timeout-minutes: 5
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if command -v cargo-audit &>/dev/null && cargo audit --version &>/dev/null; then
+            echo "cargo-audit already installed: $(cargo audit --version)"
+            echo "installed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          rm -f "$HOME/.cargo/bin/cargo-audit"
+          mkdir -p "$HOME/.cargo/bin"
+          AUDIT_VERSION="0.22.1"
+          AUDIT_SHA256_musl="c32506f338bdcdaef5a17fb9f33abb6ecf9561324cfd34237fd335f9283a1eab"
+          AUDIT_SHA256_gnu="1890badd5f15831a9af4b074399fcd21e6f7c0fe42c84e9254cdffc9f813765c"
+          INSTALLED=false
+          for VARIANT in musl gnu; do
+            URL="https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-${VARIANT}-v${AUDIT_VERSION}.tgz"
+            EXPECTED_SHA=$(eval echo "\$AUDIT_SHA256_${VARIANT}")
+            if curl -sSfL --proto =https --retry 3 --retry-delay 10 --connect-timeout 30 -o "${RUNNER_TEMP}/cargo-audit.tgz" "$URL" 2>"${RUNNER_TEMP}/install-audit-output.txt"; then
+              if ! echo "${EXPECTED_SHA}  ${RUNNER_TEMP}/cargo-audit.tgz" | sha256sum -c -; then
+                echo "::warning::Checksum mismatch for cargo-audit ${VARIANT} binary -- skipping"
+                rm -f "${RUNNER_TEMP}/cargo-audit.tgz"
+                continue
+              fi
+              if tar xzf "${RUNNER_TEMP}/cargo-audit.tgz" --no-same-owner --strip-components=1 -C "$HOME/.cargo/bin/" 2>>"${RUNNER_TEMP}/install-audit-output.txt"; then
+                chmod +x "$HOME/.cargo/bin/cargo-audit"
+                if cargo audit --version &>/dev/null; then
+                  INSTALLED=true
+                  break
+                fi
+                rm -f "$HOME/.cargo/bin/cargo-audit"
+              fi
+            fi
+          done
+          if [ "$INSTALLED" = "false" ]; then
+            if cargo install cargo-audit --locked 2>&1 | tee -a "${RUNNER_TEMP}/install-audit-output.txt"; then
+              INSTALLED=true
+            fi
+          fi
+          if [ "$INSTALLED" = "true" ] && command -v cargo-audit &>/dev/null; then
+            cargo audit --version
+            echo "installed=true" >> $GITHUB_OUTPUT
+          else
+            echo "::warning::cargo-audit installation failed -- skipping CVE scan"
+            echo "installed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Scan Rust dependencies for known vulnerabilities (CVEs)
+        id: cargo_audit
+        if: always() && steps.install_audit.outputs.installed == 'true'
+        timeout-minutes: 5
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo audit --deny yanked --deny unmaintained --deny unsound 2>&1 | tee "${RUNNER_TEMP}/audit-output.txt"
+
+      - name: Install cargo-deny for supply chain policy checks
+        id: install_deny
+        if: always()
+        timeout-minutes: 5
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if command -v cargo-deny &>/dev/null; then
+            echo "cargo-deny already installed: $(cargo-deny --version)"
+            echo "installed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          DENY_VERSION="0.16.4"
+          DENY_SHA256="28b7f8e12df46a9ce186547e38278c851905fc4bda59a0cc57d2aade9fdf6962"
+          URL="https://github.com/EmbarkStudios/cargo-deny/releases/download/${DENY_VERSION}/cargo-deny-${DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          if curl -sSfL --proto =https --retry 3 --connect-timeout 15 --max-time 120 -o "${RUNNER_TEMP}/cargo-deny.tar.gz" "$URL"; then
+            echo "${DENY_SHA256}  ${RUNNER_TEMP}/cargo-deny.tar.gz" | sha256sum -c -
+            tar xzf "${RUNNER_TEMP}/cargo-deny.tar.gz" --no-same-owner --strip-components=1 -C "$HOME/.cargo/bin/" 2>/dev/null
+            chmod +x "$HOME/.cargo/bin/cargo-deny"
+            rm -f "${RUNNER_TEMP}/cargo-deny.tar.gz"
+          fi
+          if command -v cargo-deny &>/dev/null; then
+            cargo-deny --version
+            echo "installed=true" >> $GITHUB_OUTPUT
+          else
+            cargo install cargo-deny --locked 2>/dev/null && echo "installed=true" >> $GITHUB_OUTPUT || echo "installed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run cargo-deny supply chain checks (advisories, licenses, bans, sources)
+        id: cargo_deny
+        if: always() && steps.install_deny.outputs.installed == 'true'
+        timeout-minutes: 5
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo deny check 2>&1 | tee "${RUNNER_TEMP}/deny-output.txt"
+
+      - name: Install Trivy for IaC scanning
+        id: install_trivy
+        if: always()
+        timeout-minutes: 3
+        run: |
+          TRIVY_VERSION="0.69.3"
+          TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
+          if command -v trivy &>/dev/null && [ "$(trivy --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" = "$TRIVY_VERSION" ]; then
+            echo "installed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          ARCHIVE="${RUNNER_TEMP}/trivy.tar.gz"
+          if curl -sSfL --proto =https --retry 3 --retry-delay 5 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"; then
+            echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
+            mkdir -p "${HOME}/.local/bin"
+            tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" trivy
+            rm -f "$ARCHIVE"
+            export PATH="${HOME}/.local/bin:$PATH"
+            echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+            echo "installed=true" >> $GITHUB_OUTPUT
+          else
+            echo "::warning::Trivy download failed -- IaC and secret scans will be skipped (non-blocking)"
+            rm -f "$ARCHIVE"
+            echo "installed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Scan Dockerfiles and docker-compose for misconfigurations (Trivy)
+        id: trivy_iac
+        if: always() && steps.install_trivy.outputs.installed == 'true'
+        timeout-minutes: 5
+        run: |
+          trivy fs --scanners misconfig --exit-code 1 --severity CRITICAL,HIGH \
+            --no-progress --format table \
+            --include-non-failures \
+            Dockerfile.backend Dockerfile.frontend docker-compose.prod.yml docker-compose.dev.yml 2>&1 | tee "${RUNNER_TEMP}/trivy-iac-output.txt"
+
+      - name: Generate Trivy IaC SARIF report
+        if: always() && steps.install_trivy.outputs.installed == 'true'
+        run: |
+          umask 077
+          trivy fs --scanners misconfig --severity CRITICAL,HIGH,MEDIUM \
+            --no-progress --format sarif --output trivy-iac.sarif \
+            Dockerfile.backend Dockerfile.frontend docker-compose.prod.yml docker-compose.dev.yml || true
+
+      - name: Upload Trivy IaC SARIF to GitHub Security
+        if: always() && steps.install_trivy.outputs.installed == 'true' && hashFiles('trivy-iac.sarif') != ''
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+        with:
+          sarif_file: trivy-iac.sarif
+          category: trivy-iac
+        continue-on-error: true
+
+      - name: Scan source code for embedded secrets (Trivy)
+        id: trivy_secret
+        if: always() && steps.install_trivy.outputs.installed == 'true'
+        timeout-minutes: 5
+        run: |
+          trivy fs --scanners secret --exit-code 1 --no-progress --format table \
+            --skip-dirs target --skip-dirs node_modules --skip-dirs dist --skip-dirs .git \
+            . 2>&1 | tee "${RUNNER_TEMP}/trivy-secret-output.txt"
+
+      - name: Generate cargo-audit SARIF report
+        if: always() && steps.install_audit.outputs.installed == 'true'
+        run: |
+          umask 077
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo audit --json 2>/dev/null | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          sarif = {
+            '\$schema': 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json',
+            'version': '2.1.0',
+            'runs': [{'tool': {'driver': {'name': 'cargo-audit', 'version': '0.22.1', 'rules': []}}, 'results': []}]
+          }
+          rules = {}
+          for vuln in data.get('vulnerabilities', {}).get('list', []):
+            adv = vuln.get('advisory', {})
+            vid = adv.get('id', 'UNKNOWN')
+            pkg = vuln.get('package', {})
+            if vid not in rules:
+              rules[vid] = {'id': vid, 'shortDescription': {'text': adv.get('title', vid)}, 'helpUri': adv.get('url', ''), 'properties': {'tags': ['security', 'vulnerability']}}
+            sarif['runs'][0]['results'].append({'ruleId': vid, 'level': 'error', 'message': {'text': f\"{adv.get('title', '')} in {pkg.get('name', '?')} {pkg.get('version', '?')}\"}, 'locations': [{'physicalLocation': {'artifactLocation': {'uri': 'Cargo.lock'}, 'region': {'startLine': 1}}}]})
+          sarif['runs'][0]['tool']['driver']['rules'] = list(rules.values())
+          json.dump(sarif, sys.stdout, indent=2)
+          " > cargo-audit.sarif 2>/dev/null || echo '{\"version\":\"2.1.0\",\"runs\":[{\"tool\":{\"driver\":{\"name\":\"cargo-audit\",\"rules\":[]}},\"results\":[]}]}' > cargo-audit.sarif
+
+      - name: Upload cargo-audit SARIF to GitHub Security
+        if: always() && steps.install_audit.outputs.installed == 'true' && hashFiles('cargo-audit.sarif') != ''
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+        with:
+          sarif_file: cargo-audit.sarif
+          category: cargo-audit
+        continue-on-error: true
+
+      - name: Generate cargo-deny SARIF report
+        if: always() && steps.install_deny.outputs.installed == 'true'
+        run: |
+          umask 077
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo deny check 2>&1 | python3 -c "
+          import sys, json, re
+          sarif = {'\$schema': 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json', 'version': '2.1.0', 'runs': [{'tool': {'driver': {'name': 'cargo-deny', 'rules': []}}, 'results': []}]}
+          for line in sys.stdin:
+            line = line.strip()
+            if not line or line.startswith('advisories') or line.startswith('licenses') or line.startswith('bans') or line.startswith('sources'): continue
+            m = re.match(r'^(warning|error)\[([^\]]+)\]:\s*(.+)', line)
+            if m:
+              sarif['runs'][0]['results'].append({'ruleId': m.group(2), 'level': 'error' if m.group(1) == 'error' else 'warning', 'message': {'text': m.group(3)}, 'locations': [{'physicalLocation': {'artifactLocation': {'uri': 'Cargo.lock'}, 'region': {'startLine': 1}}}]})
+          json.dump(sarif, sys.stdout, indent=2)
+          " > cargo-deny.sarif 2>/dev/null || echo '{\"version\":\"2.1.0\",\"runs\":[{\"tool\":{\"driver\":{\"name\":\"cargo-deny\",\"rules\":[]}},\"results\":[]}]}' > cargo-deny.sarif
+
+      - name: Upload cargo-deny SARIF to GitHub Security
+        if: always() && steps.install_deny.outputs.installed == 'true' && hashFiles('cargo-deny.sarif') != ''
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+        with:
+          sarif_file: cargo-deny.sarif
+          category: cargo-deny
+        continue-on-error: true
+
+      - name: Write quality gate summary
+        if: always()
+        run: |
+          {
+            echo "## Dependency Security Results"
+            echo "| Check | Status |"
+            echo "|-------|--------|"
+            echo "| cargo audit | ${{ steps.cargo_audit.outcome == 'success' && '✅ Pass' || (steps.install_audit.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
+            echo "| cargo deny | ${{ steps.cargo_deny.outcome == 'success' && '✅ Pass' || (steps.install_deny.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
+            echo "| Trivy IaC scan | ${{ steps.trivy_iac.outcome == 'success' && '✅ Pass' || (steps.install_trivy.outputs.installed != 'true' && '⏭️ Skipped' || '⚠️ Findings') }} |"
+            echo "| Trivy secret scan | ${{ steps.trivy_secret.outcome == 'success' && '✅ Pass' || (steps.install_trivy.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect quality-gate errors for notification
+        id: collect-errors
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.trivy_iac.outcome == 'failure' || steps.trivy_secret.outcome == 'failure')
+        run: |
+          ERROR=""
+          FAILED=""
+          if [ "${{ steps.cargo_audit.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}cargo-audit,"
+            ERROR="${ERROR}[cargo-audit] $(head -c 2000 "${RUNNER_TEMP}/audit-output.txt" 2>/dev/null || echo 'cargo audit found vulnerabilities.')\n\n"
+          fi
+          if [ "${{ steps.cargo_deny.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}cargo-deny,"
+            ERROR="${ERROR}[cargo-deny] $(head -c 2000 "${RUNNER_TEMP}/deny-output.txt" 2>/dev/null || echo 'cargo deny found policy violations.')\n\n"
+          fi
+          if [ "${{ steps.trivy_iac.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}trivy-iac,"
+            ERROR="${ERROR}[trivy-iac] $(head -c 2000 "${RUNNER_TEMP}/trivy-iac-output.txt" 2>/dev/null || echo 'Trivy found Dockerfile/compose misconfigurations.')\n\n"
+          fi
+          if [ "${{ steps.trivy_secret.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}trivy-secret,"
+            ERROR="${ERROR}[trivy-secret] $(head -c 2000 "${RUNNER_TEMP}/trivy-secret-output.txt" 2>/dev/null || echo 'Trivy found embedded secrets in source code.')\n\n"
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Record duration
+        id: timing
+        if: always()
+        uses: ./.github/actions/job-timing
+        with:
+          start-time: ${{ steps.start.outputs.time }}
+
+      - name: Fail job if any quality step failed
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.trivy_iac.outcome == 'failure' || steps.trivy_secret.outcome == 'failure')
+        run: exit 1
+
+      - name: Clean up sensitive temp files
+        if: always()
+        run: |
+          rm -f "${RUNNER_TEMP}/audit-output.txt" "${RUNNER_TEMP}/deny-output.txt" "${RUNNER_TEMP}/trivy-iac-output.txt" "${RUNNER_TEMP}/trivy-secret-output.txt" "${RUNNER_TEMP}/install-audit-output.txt" "${RUNNER_TEMP}/cargo-audit.tgz" "${RUNNER_TEMP}/cargo-deny.tar.gz"
+          rm -f cargo-audit.sarif cargo-deny.sarif trivy-iac.sarif
+
+      - name: Notify webhook on failure
+        if: failure()
+        uses: ./.github/actions/webhook-notify
+        with:
+          job-name: quality-gate
+          step-name: audit-or-deny
+          error-log: ${{ steps.collect-errors.outputs.error_log }}
+          webhook-secret: ${{ secrets.WEBHOOK_SECRET }}
+          webhook-host: ${{ secrets.WEBHOOK_HOST }}

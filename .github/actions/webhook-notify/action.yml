@@ -1,0 +1,61 @@
+name: 'Webhook Failure Notification'
+description: 'Send a signed webhook notification on CI job failure'
+
+inputs:
+  job-name:
+    description: 'Name of the failed job'
+    required: true
+  step-name:
+    description: 'Name of the failed step'
+    required: true
+  error-log:
+    description: 'Error log content to include in the notification'
+    required: false
+    default: 'Job failed with no captured output.'
+  webhook-secret:
+    description: 'HMAC signing secret for the webhook'
+    required: true
+  webhook-host:
+    description: 'Hostname of the webhook receiver'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Send failure notification
+      shell: bash
+      env:
+        JOB_NAME: ${{ inputs.job-name }}
+        STEP_NAME: ${{ inputs.step-name }}
+        ERROR_LOG: ${{ inputs.error-log }}
+        WEBHOOK_SECRET: ${{ inputs.webhook-secret }}
+        WEBHOOK_HOST: ${{ inputs.webhook-host }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        COMMIT: ${{ github.sha }}
+        BRANCH: ${{ github.ref_name }}
+        ACTOR: ${{ github.actor }}
+      run: |
+        sanitize_payload() {
+          sed -E \
+            's/(ghp_|ghs_|gho_|ghu_|github_pat_)[A-Za-z0-9_]+/[REDACTED]/g' \
+          | sed -E 's/Bearer [A-Za-z0-9._-]+/Bearer [REDACTED]/g' \
+          | sed -E 's|postgresql://[^ ]+|postgresql://[REDACTED]|g' \
+          | sed -E 's/(password|secret|token|key)=[^ ]+/\1=[REDACTED]/gi'
+        }
+        ERROR_LOG="${ERROR_LOG:-Job failed with no captured output.}"
+        ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload | head -c 3000)
+        PAYLOAD=$(jq -n \
+          --arg job "$JOB_NAME" \
+          --arg step "$STEP_NAME" \
+          --arg error_log "$ERROR_LOG" \
+          --arg run_url "$RUN_URL" \
+          --arg commit "$COMMIT" \
+          --arg branch "$BRANCH" \
+          --arg actor "$ACTOR" \
+          '{job:$job, step:$step, error_log:$error_log, run_url:$run_url, commit:$commit, branch:$branch, actor:$actor}')
+        SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
+        curl -sf --connect-timeout 5 --max-time 10 -X POST \
+          "http://${WEBHOOK_HOST}:9090/ci-failure" \
+          -H "Content-Type: application/json" \
+          -H "X-Signature-256: sha256=$SIGNATURE" \
+          -d "$PAYLOAD" || echo "::warning::Webhook unreachable"

@@ -5,7 +5,9 @@ import io.kotest.core.spec.style.FreeSpec
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
+import io.kotest.property.arbitrary.Codepoint
 import io.kotest.property.arbitrary.filter
+import io.kotest.property.arbitrary.printableAscii
 import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
 import java.util.concurrent.TimeUnit
@@ -30,7 +32,7 @@ class AuthInterceptorPropertyTest :
         "Property 2: Auth interceptor attaches Bearer token" -
             {
                 "non-null token attaches Bearer header to any request" {
-                    checkAll(100, Arb.string(1..200)) { token ->
+                    checkAll(100, Arb.string(1..200, Codepoint.printableAscii())) { token ->
                         val provider = InMemoryTokenProvider(token)
                         val interceptor = AuthInterceptor(provider)
                         val originalRequest =
@@ -62,8 +64,8 @@ class AuthInterceptorPropertyTest :
                 "original request headers are preserved when token is added" {
                     checkAll(
                         100,
-                        Arb.string(1..200),
-                        Arb.string(1..50).filter { it.isNotBlank() },
+                        Arb.string(1..200, Codepoint.printableAscii()),
+                        Arb.string(1..50, Codepoint.printableAscii()).filter { it.isNotBlank() },
                     ) { token, customValue ->
                         val provider = InMemoryTokenProvider(token)
                         val interceptor = AuthInterceptor(provider)

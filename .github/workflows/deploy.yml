@@ -1,0 +1,118 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      backend-digest:
+        type: string
+        required: true
+      frontend-digest:
+        type: string
+        required: true
+    secrets: inherit
+
+permissions: {}
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 10
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    env:
+      DOCKER_CONTENT_TRUST: "1"
+      IMAGE_OWNER: ${{ github.repository_owner }}
+    steps:
+      - name: Clean workspace
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify backend attestation
+        run: |
+          gh attestation verify \
+            "oci://ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend@${{ inputs.backend-digest }}" \
+            --owner "${{ env.IMAGE_OWNER }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify frontend attestation
+        run: |
+          gh attestation verify \
+            "oci://ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend@${{ inputs.frontend-digest }}" \
+            --owner "${{ env.IMAGE_OWNER }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Mask secrets
+        run: |
+          if [ -n "${{ secrets.DATABASE_URL }}" ]; then
+            echo "::add-mask::${{ secrets.DATABASE_URL }}"
+          fi
+          if [ -n "${{ secrets.JWT_SECRET }}" ]; then
+            echo "::add-mask::${{ secrets.JWT_SECRET }}"
+          fi
+          if [ -n "${{ secrets.WEBHOOK_SECRET }}" ]; then
+            echo "::add-mask::${{ secrets.WEBHOOK_SECRET }}"
+          fi
+
+      - name: Pull and deploy
+        id: deploy
+        env:
+          BACKEND_IMAGE: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend@${{ inputs.backend-digest }}
+          FRONTEND_IMAGE: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend@${{ inputs.frontend-digest }}
+        run: |
+          DOCKER_CONTENT_TRUST=0 docker compose -f docker-compose.prod.yml pull
+          DOCKER_CONTENT_TRUST=0 docker compose -f docker-compose.prod.yml up -d --remove-orphans --wait
+
+      - name: Health check
+        id: health-check
+        run: |
+          MAX_RETRIES=30
+          INTERVAL=5
+          for i in $(seq 1 $MAX_RETRIES); do
+            if curl -sf --connect-timeout 5 --max-time 10 http://localhost:8080/health > /dev/null 2>&1; then
+              echo "Health check passed on attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i/$MAX_RETRIES failed -- retrying in ${INTERVAL}s"
+            sleep $INTERVAL
+          done
+          echo "::error::Health check failed after $MAX_RETRIES attempts"
+          exit 1
+
+      - name: Rollback on failure
+        if: failure() && steps.deploy.outcome == 'success'
+        run: |
+          echo "::warning::Deployment health check failed -- rolling back"
+          DOCKER_CONTENT_TRUST=0 docker compose -f docker-compose.prod.yml down --timeout 30
+          DOCKER_CONTENT_TRUST=0 docker compose -f docker-compose.prod.yml up -d --remove-orphans --wait 2>/dev/null || true
+          echo "::error::Rollback attempted. Manual verification required."
+
+      - name: Credential cleanup
+        if: always()
+        run: |
+          docker logout ghcr.io 2>/dev/null || true
+          rm -f "${HOME}/.docker/config.json" 2>/dev/null || true

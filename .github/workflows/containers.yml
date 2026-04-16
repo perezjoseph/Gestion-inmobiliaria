@@ -1,0 +1,332 @@
+name: Container Images
+
+on:
+  workflow_call:
+    outputs:
+      backend-digest:
+        value: ${{ jobs.container-image-backend.outputs.digest }}
+      frontend-digest:
+        value: ${{ jobs.container-image-frontend.outputs.digest }}
+    secrets: inherit
+
+permissions: {}
+
+jobs:
+  container-image-backend:
+    name: Container Image (Backend)
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 45
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      id-token: write
+      attestations: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    env:
+      DOCKER_CONTENT_TRUST: "1"
+      IMAGE_OWNER: ${{ github.repository_owner }}
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - name: Clean workspace
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+      - name: Build backend container image
+        id: docker-build
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
+        with:
+          context: .
+          file: Dockerfile.backend
+          load: true
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Install Trivy
+        id: install-trivy
+        timeout-minutes: 3
+        run: |
+          TRIVY_VERSION="0.69.3"
+          TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
+          if command -v trivy &>/dev/null && [ "$(trivy --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" = "$TRIVY_VERSION" ]; then
+            exit 0
+          fi
+          ARCHIVE="${RUNNER_TEMP}/trivy.tar.gz"
+          curl -sSfL --proto =https --retry 3 --retry-delay 5 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          mkdir -p "${HOME}/.local/bin"
+          tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" trivy
+          rm -f "$ARCHIVE"
+          export PATH="${HOME}/.local/bin:$PATH"
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Scan container image for vulnerabilities
+        id: trivy-scan
+        run: |
+          trivy image --exit-code 1 --severity CRITICAL,HIGH \
+            --no-progress --format table \
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }} \
+            2>&1 | tee "${RUNNER_TEMP}/trivy-backend-image.txt"
+
+      - name: Generate SARIF report
+        if: always()
+        run: |
+          umask 077
+          trivy image --severity CRITICAL,HIGH,MEDIUM \
+            --no-progress --format sarif --output backend-image.sarif \
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }} || true
+
+      - name: Generate container SBOM
+        run: |
+          umask 077
+          trivy image --format cyclonedx --output backend-container-sbom.cdx.json \
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }}
+
+      - name: Upload backend container SBOM
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: backend-container-sbom
+          path: backend-container-sbom.cdx.json
+          retention-days: 30
+
+      - name: Upload SARIF to GitHub Security
+        if: always() && hashFiles('backend-image.sarif') != ''
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+        with:
+          sarif_file: backend-image.sarif
+          category: trivy-backend-image
+        continue-on-error: true
+
+      - name: Push backend container image
+        id: push
+        run: |
+          DOCKER_CONTENT_TRUST=0 docker push ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }}
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }} 2>/dev/null | cut -d@ -f2)
+          echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecc0c4c32 # v2.2.3
+        with:
+          subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Collect errors
+        id: collect-errors
+        if: always() && failure()
+        run: |
+          ERROR=""
+          if [ "${{ steps.docker-build.outcome }}" = "failure" ]; then
+            ERROR="[docker-build] Backend container image build failed."
+          elif [ "${{ steps.trivy-scan.outcome }}" = "failure" ]; then
+            ERROR="[trivy-scan] $(head -c 3000 "${RUNNER_TEMP}/trivy-backend-image.txt" 2>/dev/null || echo 'Trivy found vulnerabilities in backend image.')"
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Notify webhook on failure
+        if: failure()
+        uses: ./.github/actions/webhook-notify
+        with:
+          job-name: container-image-backend
+          step-name: docker-build-or-scan
+          error-log: ${{ steps.collect-errors.outputs.error_log }}
+          webhook-secret: ${{ secrets.WEBHOOK_SECRET }}
+          webhook-host: ${{ secrets.WEBHOOK_HOST }}
+
+      - name: Docker cleanup
+        if: always()
+        run: |
+          docker rmi ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }} 2>/dev/null || true
+          docker builder prune -f 2>/dev/null || true
+
+      - name: Credential cleanup
+        if: always()
+        run: |
+          docker logout ghcr.io 2>/dev/null || true
+          rm -f "${HOME}/.docker/config.json" 2>/dev/null || true
+          rm -f backend-image.sarif backend-container-sbom.cdx.json 2>/dev/null || true
+
+  container-image-frontend:
+    name: Container Image (Frontend)
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 45
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      id-token: write
+      attestations: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    env:
+      DOCKER_CONTENT_TRUST: "1"
+      IMAGE_OWNER: ${{ github.repository_owner }}
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - name: Clean workspace
+        run: |
+          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
+            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
+            exit 1
+          fi
+          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+      - name: Build frontend container image
+        id: docker-build
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
+        with:
+          context: .
+          file: Dockerfile.frontend
+          load: true
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      - name: Install Trivy
+        timeout-minutes: 3
+        run: |
+          TRIVY_VERSION="0.69.3"
+          TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
+          if command -v trivy &>/dev/null && [ "$(trivy --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" = "$TRIVY_VERSION" ]; then
+            exit 0
+          fi
+          ARCHIVE="${RUNNER_TEMP}/trivy.tar.gz"
+          curl -sSfL --proto =https --retry 3 --retry-delay 5 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          mkdir -p "${HOME}/.local/bin"
+          tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" trivy
+          rm -f "$ARCHIVE"
+          export PATH="${HOME}/.local/bin:$PATH"
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Scan container image for vulnerabilities
+        id: trivy-scan
+        run: |
+          trivy image --exit-code 1 --severity CRITICAL,HIGH \
+            --no-progress --format table \
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }} \
+            2>&1 | tee "${RUNNER_TEMP}/trivy-frontend-image.txt"
+
+      - name: Generate SARIF report
+        if: always()
+        run: |
+          umask 077
+          trivy image --severity CRITICAL,HIGH,MEDIUM \
+            --no-progress --format sarif --output frontend-image.sarif \
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }} || true
+
+      - name: Generate container SBOM
+        run: |
+          umask 077
+          trivy image --format cyclonedx --output frontend-container-sbom.cdx.json \
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }}
+
+      - name: Upload frontend container SBOM
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: frontend-container-sbom
+          path: frontend-container-sbom.cdx.json
+          retention-days: 30
+
+      - name: Upload SARIF to GitHub Security
+        if: always() && hashFiles('frontend-image.sarif') != ''
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+        with:
+          sarif_file: frontend-image.sarif
+          category: trivy-frontend-image
+        continue-on-error: true
+
+      - name: Push frontend container image
+        id: push
+        run: |
+          DOCKER_CONTENT_TRUST=0 docker push ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }}
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }} 2>/dev/null | cut -d@ -f2)
+          echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecc0c4c32 # v2.2.3
+        with:
+          subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Collect errors
+        id: collect-errors
+        if: always() && failure()
+        run: |
+          ERROR=""
+          if [ "${{ steps.docker-build.outcome }}" = "failure" ]; then
+            ERROR="[docker-build] Frontend container image build failed."
+          elif [ "${{ steps.trivy-scan.outcome }}" = "failure" ]; then
+            ERROR="[trivy-scan] $(head -c 3000 "${RUNNER_TEMP}/trivy-frontend-image.txt" 2>/dev/null || echo 'Trivy found vulnerabilities in frontend image.')"
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Notify webhook on failure
+        if: failure()
+        uses: ./.github/actions/webhook-notify
+        with:
+          job-name: container-image-frontend
+          step-name: docker-build-or-scan
+          error-log: ${{ steps.collect-errors.outputs.error_log }}
+          webhook-secret: ${{ secrets.WEBHOOK_SECRET }}
+          webhook-host: ${{ secrets.WEBHOOK_HOST }}
+
+      - name: Docker cleanup
+        if: always()
+        run: |
+          docker rmi ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }} 2>/dev/null || true
+          docker builder prune -f 2>/dev/null || true
+
+      - name: Credential cleanup
+        if: always()
+        run: |
+          docker logout ghcr.io 2>/dev/null || true
+          rm -f "${HOME}/.docker/config.json" 2>/dev/null || true
+          rm -f frontend-image.sarif frontend-container-sbom.cdx.json 2>/dev/null || true
