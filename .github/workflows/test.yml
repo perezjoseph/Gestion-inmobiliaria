@@ -58,12 +58,12 @@ jobs:
           --health-cmd "pg_isready -U realestate"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
           --security-opt no-new-privileges
           --pids-limit 256
           --memory 512m
           --memory-swap 512m
-          --shm-size 128m
+          --shm-size 256m
           --cap-drop ALL
           --cap-add CHOWN
           --cap-add DAC_OVERRIDE
@@ -182,12 +182,12 @@ jobs:
           --health-cmd "pg_isready -U realestate"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
           --security-opt no-new-privileges
           --pids-limit 256
           --memory 512m
           --memory-swap 512m
-          --shm-size 128m
+          --shm-size 256m
           --cap-drop ALL
           --cap-add CHOWN
           --cap-add DAC_OVERRIDE

@@ -227,6 +227,20 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRIBUTION }}
 
+      - name: Verify JAVA_HOME
+        run: |
+          if [ -z "$JAVA_HOME" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
+            echo "::warning::JAVA_HOME not set by setup-java, searching tool cache"
+            JAVA_BIN=$(find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -path "*/bin/java" -type f 2>/dev/null | head -1)
+            if [ -n "$JAVA_BIN" ]; then
+              JAVA_HOME=$(cd "$(dirname "$JAVA_BIN")/.." && pwd)
+              echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+              echo "$(dirname "$JAVA_BIN")" >> "$GITHUB_PATH"
+              export JAVA_HOME PATH="$(dirname "$JAVA_BIN"):$PATH"
+            fi
+          fi
+          java -version || { echo "::error::Java not available after setup-java"; exit 1; }
+
       - name: Ensure unzip is available
         run: |
           if command -v unzip &>/dev/null; then
@@ -272,7 +286,7 @@ jobs:
         timeout-minutes: 15
         working-directory: android
         env:
-          GRADLE_OPTS: "-Xmx512m -Dorg.gradle.jvmargs=-Xmx4g"
+          GRADLE_OPTS: "-Xmx512m -Dorg.gradle.jvmargs=-Xmx2g"
         run: |
           umask 077
           set -o pipefail
@@ -435,6 +449,20 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRIBUTION }}
+
+      - name: Verify JAVA_HOME
+        run: |
+          if [ -z "$JAVA_HOME" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
+            echo "::warning::JAVA_HOME not set by setup-java, searching tool cache"
+            JAVA_BIN=$(find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -path "*/bin/java" -type f 2>/dev/null | head -1)
+            if [ -n "$JAVA_BIN" ]; then
+              JAVA_HOME=$(cd "$(dirname "$JAVA_BIN")/.." && pwd)
+              echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+              echo "$(dirname "$JAVA_BIN")" >> "$GITHUB_PATH"
+              export JAVA_HOME PATH="$(dirname "$JAVA_BIN"):$PATH"
+            fi
+          fi
+          java -version || { echo "::error::Java not available after setup-java"; exit 1; }
 
       - name: Ensure unzip is available
         run: |
@@ -665,6 +693,20 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRIBUTION }}
 
+      - name: Verify JAVA_HOME
+        run: |
+          if [ -z "$JAVA_HOME" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
+            echo "::warning::JAVA_HOME not set by setup-java, searching tool cache"
+            JAVA_BIN=$(find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -path "*/bin/java" -type f 2>/dev/null | head -1)
+            if [ -n "$JAVA_BIN" ]; then
+              JAVA_HOME=$(cd "$(dirname "$JAVA_BIN")/.." && pwd)
+              echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+              echo "$(dirname "$JAVA_BIN")" >> "$GITHUB_PATH"
+              export JAVA_HOME PATH="$(dirname "$JAVA_BIN"):$PATH"
+            fi
+          fi
+          java -version || { echo "::error::Java not available after setup-java"; exit 1; }
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
         with:
@@ -871,6 +913,20 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRIBUTION }}
+
+      - name: Verify JAVA_HOME
+        run: |
+          if [ -z "$JAVA_HOME" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
+            echo "::warning::JAVA_HOME not set by setup-java, searching tool cache"
+            JAVA_BIN=$(find "${RUNNER_TOOL_CACHE:-/opt/hostedtoolcache}" -path "*/bin/java" -type f 2>/dev/null | head -1)
+            if [ -n "$JAVA_BIN" ]; then
+              JAVA_HOME=$(cd "$(dirname "$JAVA_BIN")/.." && pwd)
+              echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+              echo "$(dirname "$JAVA_BIN")" >> "$GITHUB_PATH"
+              export JAVA_HOME PATH="$(dirname "$JAVA_BIN"):$PATH"
+            fi
+          fi
+          java -version || { echo "::error::Java not available after setup-java"; exit 1; }
 
       - name: Ensure unzip is available
         run: |
