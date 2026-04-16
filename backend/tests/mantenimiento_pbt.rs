@@ -248,7 +248,7 @@ mod pbt_async {
             .await;
 
             let req = test::TestRequest::post()
-                .uri("/api/mantenimiento")
+                .uri("/api/v1/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
                     "propiedadId": propiedad_id,
@@ -276,7 +276,7 @@ mod pbt_async {
             }
 
             let req = test::TestRequest::get()
-                .uri(&format!("/api/mantenimiento/{solicitud_id}"))
+                .uri(&format!("/api/v1/mantenimiento/{solicitud_id}"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -308,7 +308,7 @@ mod pbt_async {
             let mut created_ids = Vec::new();
             for i in 0..count {
                 let req = test::TestRequest::post()
-                    .uri("/api/mantenimiento")
+                    .uri("/api/v1/mantenimiento")
                     .insert_header(("Authorization", format!("Bearer {token}")))
                     .set_json(json!({
                         "propiedadId": propiedad_id,
@@ -321,7 +321,7 @@ mod pbt_async {
             }
 
             let req = test::TestRequest::get()
-                .uri(&format!("/api/mantenimiento?propiedadId={propiedad_id}"))
+                .uri(&format!("/api/v1/mantenimiento?propiedadId={propiedad_id}"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -357,7 +357,7 @@ mod pbt_async {
             .await;
 
             let req = test::TestRequest::post()
-                .uri("/api/mantenimiento")
+                .uri("/api/v1/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_a, "titulo": "Filter A", "prioridad": prioridad_a }))
                 .to_request();
@@ -366,7 +366,7 @@ mod pbt_async {
             let id1: Uuid = b1["id"].as_str().unwrap().parse().unwrap();
 
             let req = test::TestRequest::post()
-                .uri("/api/mantenimiento")
+                .uri("/api/v1/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_b, "titulo": "Filter B", "prioridad": prioridad_b }))
                 .to_request();
@@ -375,7 +375,7 @@ mod pbt_async {
             let id2: Uuid = b2["id"].as_str().unwrap().parse().unwrap();
 
             let req = test::TestRequest::get()
-                .uri(&format!("/api/mantenimiento?prioridad={prioridad_a}"))
+                .uri(&format!("/api/v1/mantenimiento?prioridad={prioridad_a}"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -385,7 +385,7 @@ mod pbt_async {
             }
 
             let req = test::TestRequest::get()
-                .uri("/api/mantenimiento?estado=pendiente")
+                .uri("/api/v1/mantenimiento?estado=pendiente")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -395,7 +395,7 @@ mod pbt_async {
             }
 
             let req = test::TestRequest::get()
-                .uri(&format!("/api/mantenimiento?propiedadId={propiedad_a}"))
+                .uri(&format!("/api/v1/mantenimiento?propiedadId={propiedad_a}"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -425,7 +425,7 @@ mod pbt_async {
             .await;
 
             let req = test::TestRequest::post()
-                .uri("/api/mantenimiento")
+                .uri("/api/v1/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_id, "titulo": ot, "prioridad": op }))
                 .to_request();
@@ -443,7 +443,7 @@ mod pbt_async {
             }
 
             let req = test::TestRequest::put()
-                .uri(&format!("/api/mantenimiento/{solicitud_id}"))
+                .uri(&format!("/api/v1/mantenimiento/{solicitud_id}"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(&update_body)
                 .to_request();
@@ -483,7 +483,7 @@ mod pbt_async {
             .await;
 
             let req = test::TestRequest::post()
-                .uri("/api/mantenimiento")
+                .uri("/api/v1/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_id, "titulo": titulo }))
                 .to_request();
@@ -495,7 +495,7 @@ mod pbt_async {
             assert!(body["fechaFin"].is_null());
 
             let req = test::TestRequest::put()
-                .uri(&format!("/api/mantenimiento/{sid}/estado"))
+                .uri(&format!("/api/v1/mantenimiento/{sid}/estado"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "estado": "en_progreso" }))
                 .to_request();
@@ -506,7 +506,7 @@ mod pbt_async {
             assert!(body["fechaFin"].is_null());
 
             let req = test::TestRequest::put()
-                .uri(&format!("/api/mantenimiento/{sid}/estado"))
+                .uri(&format!("/api/v1/mantenimiento/{sid}/estado"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "estado": "completado" }))
                 .to_request();
@@ -535,7 +535,7 @@ mod pbt_async {
             ))
             .await;
             let req = test::TestRequest::post()
-                .uri("/api/mantenimiento")
+                .uri("/api/v1/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_id, "titulo": "Test invalid prioridad", "prioridad": bad }))
                 .to_request();
@@ -559,7 +559,7 @@ mod pbt_async {
             ))
             .await;
             let req = test::TestRequest::post()
-                .uri("/api/mantenimiento")
+                .uri("/api/v1/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_id, "titulo": "Test invalid moneda", "costoMonto": "100.00", "costoMoneda": bad }))
                 .to_request();
@@ -583,7 +583,7 @@ mod pbt_async {
             ))
             .await;
             let req = test::TestRequest::post()
-                .uri("/api/mantenimiento")
+                .uri("/api/v1/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_id, "titulo": "Test negative cost", "costoMonto": neg.to_string(), "costoMoneda": "DOP" }))
                 .to_request();
@@ -608,7 +608,7 @@ mod pbt_async {
             .await;
 
             let req = test::TestRequest::post()
-                .uri("/api/mantenimiento")
+                .uri("/api/v1/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_id, "titulo": "Test empty notes" }))
                 .to_request();
@@ -617,7 +617,7 @@ mod pbt_async {
             let sid = body["id"].as_str().unwrap().to_string();
 
             let req = test::TestRequest::post()
-                .uri(&format!("/api/mantenimiento/{sid}/notas"))
+                .uri(&format!("/api/v1/mantenimiento/{sid}/notas"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "contenido": ws }))
                 .to_request();
@@ -625,7 +625,7 @@ mod pbt_async {
             assert_eq!(resp.status(), 422);
 
             let req = test::TestRequest::get()
-                .uri(&format!("/api/mantenimiento/{sid}"))
+                .uri(&format!("/api/v1/mantenimiento/{sid}"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -652,7 +652,7 @@ mod pbt_async {
             .await;
 
             let req = test::TestRequest::post()
-                .uri("/api/mantenimiento")
+                .uri("/api/v1/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_id, "titulo": "Notes ordering test" }))
                 .to_request();
@@ -662,7 +662,7 @@ mod pbt_async {
 
             for i in 0..note_count {
                 let req = test::TestRequest::post()
-                    .uri(&format!("/api/mantenimiento/{sid}/notas"))
+                    .uri(&format!("/api/v1/mantenimiento/{sid}/notas"))
                     .insert_header(("Authorization", format!("Bearer {token}")))
                     .set_json(json!({ "contenido": format!("Nota {}", i) }))
                     .to_request();
@@ -671,7 +671,7 @@ mod pbt_async {
             }
 
             let req = test::TestRequest::get()
-                .uri(&format!("/api/mantenimiento/{sid}"))
+                .uri(&format!("/api/v1/mantenimiento/{sid}"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -704,7 +704,7 @@ mod pbt_async {
             .await;
 
             let req = test::TestRequest::post()
-                .uri("/api/mantenimiento")
+                .uri("/api/v1/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_id, "titulo": "Cascade delete test" }))
                 .to_request();
@@ -714,7 +714,7 @@ mod pbt_async {
 
             for i in 0..note_count {
                 let req = test::TestRequest::post()
-                    .uri(&format!("/api/mantenimiento/{sid}/notas"))
+                    .uri(&format!("/api/v1/mantenimiento/{sid}/notas"))
                     .insert_header(("Authorization", format!("Bearer {token}")))
                     .set_json(json!({ "contenido": format!("Nota cascade {}", i) }))
                     .to_request();
@@ -723,14 +723,14 @@ mod pbt_async {
             }
 
             let req = test::TestRequest::delete()
-                .uri(&format!("/api/mantenimiento/{sid}"))
+                .uri(&format!("/api/v1/mantenimiento/{sid}"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 204);
 
             let req = test::TestRequest::get()
-                .uri(&format!("/api/mantenimiento/{sid}"))
+                .uri(&format!("/api/v1/mantenimiento/{sid}"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -766,7 +766,7 @@ mod pbt_async {
             .await;
 
             let req = test::TestRequest::post()
-                .uri("/api/mantenimiento")
+                .uri("/api/v1/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": propiedad_a, "titulo": titulo, "unidadId": unidad_on_b }))
                 .to_request();
@@ -795,7 +795,7 @@ mod pbt_async {
             .await;
 
             let req = test::TestRequest::post()
-                .uri("/api/mantenimiento")
+                .uri("/api/v1/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(
                     json!({ "propiedadId": fake_propiedad_id, "titulo": "FK test propiedad" }),
@@ -805,7 +805,7 @@ mod pbt_async {
             assert_eq!(resp.status(), 404);
 
             let req = test::TestRequest::post()
-                .uri("/api/mantenimiento")
+                .uri("/api/v1/mantenimiento")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({ "propiedadId": real_propiedad_id, "titulo": "FK test inquilino", "inquilinoId": fake_inquilino_id }))
                 .to_request();
