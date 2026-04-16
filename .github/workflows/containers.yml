@@ -127,7 +127,7 @@ jobs:
           echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecc0c4c32 # v2.2.3
+        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
         with:
           subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend
           subject-digest: ${{ steps.push.outputs.digest }}
@@ -286,7 +286,7 @@ jobs:
           echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecc0c4c32 # v2.2.3
+        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
         with:
           subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend
           subject-digest: ${{ steps.push.outputs.digest }}
