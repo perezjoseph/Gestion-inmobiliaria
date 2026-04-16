@@ -158,7 +158,7 @@ jobs:
         timeout-minutes: 2
         run: |
           SONAR_URL="${SONAR_HOST_URL}"
-          for i in $(seq 1 12); do
+          for i in $(seq 1 8); do
             RESPONSE=$(curl -sf --connect-timeout 5 --max-time 10 "$SONAR_URL/api/system/status" 2>/dev/null) || RESPONSE=""
             if [ -n "$RESPONSE" ]; then
               STATUS=$(echo "$RESPONSE" | jq -r '.status // "UNREACHABLE"' 2>/dev/null) || STATUS="UNREACHABLE"
@@ -170,10 +170,10 @@ jobs:
               echo "reachable=true" >> $GITHUB_OUTPUT
               exit 0
             fi
-            echo "Attempt $i/12 -- status: $STATUS. Retrying in 5s..."
+            echo "Attempt $i/8 -- status: $STATUS. Retrying in 5s..."
             sleep 5
           done
-          echo "::warning::SonarQube at $SONAR_URL did not respond within ~60 seconds -- skipping analysis"
+          echo "::warning::SonarQube at $SONAR_URL did not respond within ~80 seconds -- skipping analysis"
           echo "reachable=false" >> $GITHUB_OUTPUT
 
       - name: Bootstrap SonarQube project and token
