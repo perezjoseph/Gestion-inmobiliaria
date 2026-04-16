@@ -24,7 +24,7 @@ jobs:
   lint:
     name: Lint & Format
     runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 20
+    timeout-minutes: 35
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read
