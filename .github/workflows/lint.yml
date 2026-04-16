@@ -17,7 +17,6 @@ on:
         value: ${{ jobs.lint.outputs.duration }}
       cache_hit:
         value: ${{ jobs.lint.outputs.cache_hit }}
-    secrets: inherit
 
 permissions: {}
 

@@ -131,7 +131,6 @@ on:
         type: string
         required: false
         default: ''
-    secrets: inherit
 
 permissions: {}
 

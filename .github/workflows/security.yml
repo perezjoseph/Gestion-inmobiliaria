@@ -22,7 +22,6 @@ on:
         value: ${{ jobs.quality-gate.outputs.failed_steps }}
       quality-gate-duration:
         value: ${{ jobs.quality-gate.outputs.duration }}
-    secrets: inherit
 
 permissions: {}
 

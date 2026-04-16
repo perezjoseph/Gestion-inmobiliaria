@@ -63,6 +63,11 @@ jobs:
   security:
     name: Security
     needs: [runner-cleanup]
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+      security-events: write
     uses: ./.github/workflows/security.yml
     with:
       is-pr: ${{ github.event_name == 'pull_request' }}
@@ -72,6 +77,8 @@ jobs:
   lint:
     name: Lint
     needs: [runner-cleanup]
+    permissions:
+      contents: read
     uses: ./.github/workflows/lint.yml
     with:
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
@@ -80,6 +87,8 @@ jobs:
   tests:
     name: Tests
     needs: [runner-cleanup]
+    permissions:
+      contents: read
     uses: ./.github/workflows/test.yml
     with:
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
@@ -91,6 +100,8 @@ jobs:
     name: SonarQube
     needs: [lint, tests]
     if: always()
+    permissions:
+      contents: read
     uses: ./.github/workflows/sonarqube.yml
     with:
       skip-sonarqube: ${{ inputs.skip_sonarqube || false }}
@@ -106,6 +117,10 @@ jobs:
     name: Build
     needs: [lint]
     if: always() && needs.lint.outputs.result == 'success'
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     uses: ./.github/workflows/build.yml
     secrets: inherit
 
@@ -120,6 +135,12 @@ jobs:
       needs.build.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.tests.result == 'success'
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      id-token: write
+      attestations: write
     uses: ./.github/workflows/containers.yml
     secrets: inherit
 
@@ -129,6 +150,9 @@ jobs:
     name: Deploy
     needs: [containers]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.containers.result == 'success'
+    permissions:
+      contents: read
+      packages: read
     uses: ./.github/workflows/deploy.yml
     with:
       backend-digest: ${{ needs.containers.outputs.backend-digest }}
@@ -141,6 +165,8 @@ jobs:
     name: Pipeline Improve
     needs: [security, lint, tests, sonarqube, build, containers, deploy]
     if: always()
+    permissions:
+      contents: read
     uses: ./.github/workflows/pipeline-improve.yml
     with:
       secret-scan-result: ${{ needs.security.outputs.secret-scan-result || '' }}

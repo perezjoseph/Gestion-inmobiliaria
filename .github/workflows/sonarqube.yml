@@ -23,7 +23,6 @@ on:
         description: Result of the coverage-backend job
         type: string
         required: true
-    secrets: inherit
     outputs:
       result:
         description: Job result

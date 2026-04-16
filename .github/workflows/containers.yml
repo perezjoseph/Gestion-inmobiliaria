@@ -7,7 +7,6 @@ on:
         value: ${{ jobs.container-image-backend.outputs.digest }}
       frontend-digest:
         value: ${{ jobs.container-image-frontend.outputs.digest }}
-    secrets: inherit
 
 permissions: {}
 

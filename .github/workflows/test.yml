@@ -27,7 +27,6 @@ on:
         value: ${{ jobs.test-frontend.outputs.duration }}
       test-frontend-cache-hit:
         value: ${{ jobs.test-frontend.outputs.cache_hit }}
-    secrets: inherit
 
 permissions: {}
 

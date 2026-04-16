@@ -9,7 +9,6 @@ on:
       frontend-digest:
         type: string
         required: true
-    secrets: inherit
 
 permissions: {}
 
