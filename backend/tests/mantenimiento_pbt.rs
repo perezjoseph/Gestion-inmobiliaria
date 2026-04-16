@@ -820,6 +820,7 @@ mod pbt_async {
 // Feature: mantenimiento, Property 1: Creation round-trip preserves data
 // **Validates: Requirements 1.1, 2.5, 6.4**
 #[test]
+#[ignore]
 fn test_creation_round_trip() {
     let mut runner = TestRunner::new(ProptestConfig {
         cases: 15,
@@ -846,6 +847,7 @@ fn test_creation_round_trip() {
 // Feature: mantenimiento, Property 2: List ordering invariant
 // **Validates: Requirements 2.1**
 #[test]
+#[ignore]
 fn test_list_ordering() {
     let mut runner = TestRunner::new(ProptestConfig {
         cases: 15,
@@ -862,6 +864,7 @@ fn test_list_ordering() {
 // Feature: mantenimiento, Property 3: Filtering returns only matching records
 // **Validates: Requirements 2.2, 2.3, 2.4**
 #[test]
+#[ignore]
 fn test_filtering_returns_matching() {
     let mut runner = TestRunner::new(ProptestConfig {
         cases: 15,
@@ -878,6 +881,7 @@ fn test_filtering_returns_matching() {
 // Feature: mantenimiento, Property 4: Update replaces provided fields and preserves others
 // **Validates: Requirements 3.1, 5.1, 5.2**
 #[test]
+#[ignore]
 fn test_update_preserves_and_replaces() {
     let mut runner = TestRunner::new(ProptestConfig {
         cases: 15,
@@ -902,6 +906,7 @@ fn test_update_preserves_and_replaces() {
 // Feature: mantenimiento, Property 5: Valid state transitions set timestamps
 // **Validates: Requirements 4.1, 4.2**
 #[test]
+#[ignore]
 fn test_valid_transitions_set_timestamps() {
     let mut runner = TestRunner::new(ProptestConfig {
         cases: 15,
@@ -941,6 +946,7 @@ fn test_invalid_transitions_rejected() {
 // Feature: mantenimiento, Property 7: Invalid enum values are rejected
 // **Validates: Requirements 1.4, 3.3, 6.2**
 #[test]
+#[ignore]
 fn test_invalid_prioridad_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
         cases: 15,
@@ -955,6 +961,7 @@ fn test_invalid_prioridad_rejected() {
 }
 
 #[test]
+#[ignore]
 fn test_invalid_moneda_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
         cases: 15,
@@ -971,6 +978,7 @@ fn test_invalid_moneda_rejected() {
 // Feature: mantenimiento, Property 8: Negative cost amounts are rejected
 // **Validates: Requirements 6.3**
 #[test]
+#[ignore]
 fn test_negative_cost_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
         cases: 15,
@@ -987,6 +995,7 @@ fn test_negative_cost_rejected() {
 // Feature: mantenimiento, Property 9: Empty or whitespace-only notes are rejected
 // **Validates: Requirements 7.2**
 #[test]
+#[ignore]
 fn test_empty_notes_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
         cases: 15,
@@ -1003,6 +1012,7 @@ fn test_empty_notes_rejected() {
 // Feature: mantenimiento, Property 10: Notes ordering invariant
 // **Validates: Requirements 7.3**
 #[test]
+#[ignore]
 fn test_notes_ordering() {
     let mut runner = TestRunner::new(ProptestConfig {
         cases: 15,

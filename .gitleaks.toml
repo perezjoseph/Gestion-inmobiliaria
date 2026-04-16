@@ -3,9 +3,10 @@
 # PEM header constants ("BEGIN PRIVATE KEY" etc.) that trigger the private-key
 # rule. These are NOT leaked secrets -- they are compiled-in format constants
 # from well-known crates in the RustCrypto ecosystem.
+# Pattern uses suffix-only match because gitleaks --source resolves paths
+# relative to the source directory, not the repo root.
 
 [allowlist]
   paths = [
-    '''target/release/deps/.*\.rmeta$''',
-    '''target/debug/deps/.*\.rmeta$''',
+    '''\.rmeta$''',
   ]
