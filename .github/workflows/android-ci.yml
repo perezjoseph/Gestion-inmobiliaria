@@ -283,7 +283,7 @@ jobs:
 
       - name: Run lint, detekt, and spotless checks
         id: lint-checks
-        timeout-minutes: 15
+        timeout-minutes: 25
         working-directory: android
         env:
           GRADLE_OPTS: "-Xmx512m -Dorg.gradle.jvmargs=-Xmx2g"

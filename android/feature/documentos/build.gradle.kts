@@ -27,6 +27,8 @@ dependencies {
     implementation(project(":core:ui"))
     implementation(project(":core:common"))
     implementation(project(":core:network"))
+    implementation(libs.okhttp3)
+    implementation(libs.okhttp3.logging.interceptor)
 
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)

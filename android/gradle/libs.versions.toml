@@ -87,6 +87,7 @@ hilt-work-compiler = { group = "androidx.hilt", name = "hilt-compiler", version 
 # Networking
 retrofit2 = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit2" }
 retrofit2-kotlinx-serialization-converter = { group = "com.squareup.retrofit2", name = "converter-kotlinx-serialization", version.ref = "retrofit2" }
+okhttp3 = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttpLogging" }
 okhttp3-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttpLogging" }
 
 # Kotlinx
