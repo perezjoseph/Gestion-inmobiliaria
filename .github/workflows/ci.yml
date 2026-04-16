@@ -2162,6 +2162,37 @@ jobs:
           subject-digest: ${{ steps.push-backend.outputs.digest }}
           push-to-registry: true
 
+      - name: Collect container build errors for notification
+        id: collect-errors
+        if: failure()
+        run: |
+          ERROR="Docker backend image build/push failed. Check the 'Build backend image (local)', 'Scan backend image', or 'Push backend image' step logs."
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Notify webhook on failure
+        if: failure()
+        env:
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
+          ERROR_LOG: ${{ steps.collect-errors.outputs.error_log }}
+        run: |
+          sanitize_payload() { sed -E 's/(ghp_|ghs_|gho_|ghu_|github_pat_)[A-Za-z0-9_]+/[REDACTED]/g; s/Bearer [A-Za-z0-9._-]+/Bearer [REDACTED]/g; s|postgresql://[^ ]+|postgresql://[REDACTED]|g; s/(password|secret|token|key)=[^ ]+/\1=[REDACTED]/gi'; }
+          ERROR_LOG="${ERROR_LOG:-Job failed with no captured output.}"
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload | head -c 3000)
+          PAYLOAD=$(jq -n --arg job "container-image-backend" --arg step "docker-build" \
+            --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
+            '{job:$job, step:$step, error_log:$error_log, run_url:$run_url, commit:$commit, branch:$branch, actor:$actor}')
+          SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
+          curl -sf --connect-timeout 5 --max-time 10 -X POST \
+            "http://${WEBHOOK_HOST}:9090/ci-failure" \
+            -H "Content-Type: application/json" \
+            -H "X-Signature-256: sha256=$SIGNATURE" \
+            -d "$PAYLOAD" || echo "::warning::Webhook unreachable"
+
       - name: Clean up docker images on self-hosted runner
         if: always()
         run: |
@@ -2305,6 +2336,37 @@ jobs:
           subject-name: ghcr.io/${IMAGE_OWNER}/realestate-frontend
           subject-digest: ${{ steps.push-frontend.outputs.digest }}
           push-to-registry: true
+
+      - name: Collect container build errors for notification
+        id: collect-errors
+        if: failure()
+        run: |
+          ERROR="Docker frontend image build/push failed. Check the 'Build frontend image (local)', 'Scan frontend image', or 'Push frontend image' step logs."
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Notify webhook on failure
+        if: failure()
+        env:
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
+          ERROR_LOG: ${{ steps.collect-errors.outputs.error_log }}
+        run: |
+          sanitize_payload() { sed -E 's/(ghp_|ghs_|gho_|ghu_|github_pat_)[A-Za-z0-9_]+/[REDACTED]/g; s/Bearer [A-Za-z0-9._-]+/Bearer [REDACTED]/g; s|postgresql://[^ ]+|postgresql://[REDACTED]|g; s/(password|secret|token|key)=[^ ]+/\1=[REDACTED]/gi'; }
+          ERROR_LOG="${ERROR_LOG:-Job failed with no captured output.}"
+          ERROR_LOG=$(printf '%s' "$ERROR_LOG" | sanitize_payload | head -c 3000)
+          PAYLOAD=$(jq -n --arg job "container-image-frontend" --arg step "docker-build" \
+            --arg error_log "$ERROR_LOG" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg commit "${{ github.sha }}" --arg branch "${{ github.ref_name }}" --arg actor "${{ github.actor }}" \
+            '{job:$job, step:$step, error_log:$error_log, run_url:$run_url, commit:$commit, branch:$branch, actor:$actor}')
+          SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
+          curl -sf --connect-timeout 5 --max-time 10 -X POST \
+            "http://${WEBHOOK_HOST}:9090/ci-failure" \
+            -H "Content-Type: application/json" \
+            -H "X-Signature-256: sha256=$SIGNATURE" \
+            -d "$PAYLOAD" || echo "::warning::Webhook unreachable"
 
       - name: Clean up docker images on self-hosted runner
         if: always()
