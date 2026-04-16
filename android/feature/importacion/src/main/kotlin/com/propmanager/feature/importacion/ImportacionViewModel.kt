@@ -3,7 +3,7 @@ package com.propmanager.feature.importacion
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.propmanager.core.data.repository.ImportacionRepository
-import com.propmanager.core.network.NetworkMonitor
+import com.propmanager.core.network.ConnectivityObserver
 import com.propmanager.core.network.api.ImportResultDto
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -34,7 +34,7 @@ class ImportacionViewModel
 @Inject
 constructor(
     private val importacionRepository: ImportacionRepository,
-    private val networkMonitor: NetworkMonitor,
+    private val networkMonitor: ConnectivityObserver,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ImportacionUiState())
     val uiState: StateFlow<ImportacionUiState> = _uiState.asStateFlow()

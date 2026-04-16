@@ -3,7 +3,7 @@ package com.propmanager.feature.perfil
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.propmanager.core.data.repository.PerfilRepository
-import com.propmanager.core.network.NetworkMonitor
+import com.propmanager.core.network.ConnectivityObserver
 import com.propmanager.core.network.api.ChangePasswordRequest
 import com.propmanager.core.network.api.UpdatePerfilRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,7 +36,7 @@ class PerfilViewModel
 @Inject
 constructor(
     private val perfilRepository: PerfilRepository,
-    private val networkMonitor: NetworkMonitor,
+    private val networkMonitor: ConnectivityObserver,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(PerfilUiState())
     val uiState: StateFlow<PerfilUiState> = _uiState.asStateFlow()

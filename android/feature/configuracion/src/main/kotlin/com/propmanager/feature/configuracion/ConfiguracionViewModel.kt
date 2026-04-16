@@ -3,7 +3,7 @@ package com.propmanager.feature.configuracion
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.propmanager.core.data.repository.ConfiguracionRepository
-import com.propmanager.core.network.NetworkMonitor
+import com.propmanager.core.network.ConnectivityObserver
 import com.propmanager.core.network.api.UpdateMonedaRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -29,7 +29,7 @@ class ConfiguracionViewModel
 @Inject
 constructor(
     private val configuracionRepository: ConfiguracionRepository,
-    private val networkMonitor: NetworkMonitor,
+    private val networkMonitor: ConnectivityObserver,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ConfiguracionUiState())
     val uiState: StateFlow<ConfiguracionUiState> = _uiState.asStateFlow()

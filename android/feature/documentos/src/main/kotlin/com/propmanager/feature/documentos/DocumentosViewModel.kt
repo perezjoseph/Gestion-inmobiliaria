@@ -3,7 +3,7 @@ package com.propmanager.feature.documentos
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.propmanager.core.data.repository.DocumentosRepository
-import com.propmanager.core.network.NetworkMonitor
+import com.propmanager.core.network.ConnectivityObserver
 import com.propmanager.core.network.api.DocumentoDto
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -29,7 +29,7 @@ class DocumentosViewModel
 @Inject
 constructor(
     private val documentosRepository: DocumentosRepository,
-    private val networkMonitor: NetworkMonitor,
+    private val networkMonitor: ConnectivityObserver,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DocumentosUiState())
     val uiState: StateFlow<DocumentosUiState> = _uiState.asStateFlow()

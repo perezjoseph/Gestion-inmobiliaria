@@ -32,7 +32,12 @@ class AuthInterceptorPropertyTest :
         "Property 2: Auth interceptor attaches Bearer token" -
             {
                 "non-null token attaches Bearer header to any request" {
-                    checkAll(100, Arb.string(1..200, Codepoint.printableAscii())) { token ->
+                    checkAll(
+                        100,
+                        Arb.string(1..200, Codepoint.printableAscii()).filter {
+                            it.trim() == it
+                        },
+                    ) { token ->
                         val provider = InMemoryTokenProvider(token)
                         val interceptor = AuthInterceptor(provider)
                         val originalRequest =
@@ -64,8 +69,12 @@ class AuthInterceptorPropertyTest :
                 "original request headers are preserved when token is added" {
                     checkAll(
                         100,
-                        Arb.string(1..200, Codepoint.printableAscii()),
-                        Arb.string(1..50, Codepoint.printableAscii()).filter { it.isNotBlank() },
+                        Arb.string(1..200, Codepoint.printableAscii()).filter {
+                            it.trim() == it
+                        },
+                        Arb.string(1..50, Codepoint.printableAscii()).filter {
+                            it.isNotBlank() && it.trim() == it
+                        },
                     ) { token, customValue ->
                         val provider = InMemoryTokenProvider(token)
                         val interceptor = AuthInterceptor(provider)

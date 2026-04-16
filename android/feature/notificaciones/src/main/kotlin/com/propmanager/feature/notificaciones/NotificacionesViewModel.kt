@@ -3,7 +3,7 @@ package com.propmanager.feature.notificaciones
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.propmanager.core.data.repository.NotificacionesRepository
-import com.propmanager.core.network.NetworkMonitor
+import com.propmanager.core.network.ConnectivityObserver
 import com.propmanager.core.network.api.PagoVencidoDto
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -26,7 +26,7 @@ class NotificacionesViewModel
 @Inject
 constructor(
     private val notificacionesRepository: NotificacionesRepository,
-    private val networkMonitor: NetworkMonitor,
+    private val networkMonitor: ConnectivityObserver,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(NotificacionesUiState())
     val uiState: StateFlow<NotificacionesUiState> = _uiState.asStateFlow()

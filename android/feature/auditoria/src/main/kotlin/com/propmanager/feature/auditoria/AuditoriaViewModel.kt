@@ -3,7 +3,7 @@ package com.propmanager.feature.auditoria
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.propmanager.core.data.repository.AuditoriaRepository
-import com.propmanager.core.network.NetworkMonitor
+import com.propmanager.core.network.ConnectivityObserver
 import com.propmanager.core.network.api.AuditoriaDto
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -29,7 +29,7 @@ class AuditoriaViewModel
 @Inject
 constructor(
     private val auditoriaRepository: AuditoriaRepository,
-    private val networkMonitor: NetworkMonitor,
+    private val networkMonitor: ConnectivityObserver,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AuditoriaUiState())
     val uiState: StateFlow<AuditoriaUiState> = _uiState.asStateFlow()

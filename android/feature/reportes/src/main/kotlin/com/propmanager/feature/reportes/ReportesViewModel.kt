@@ -8,7 +8,7 @@ import com.propmanager.core.model.dto.HistorialPagoReporte
 import com.propmanager.core.model.dto.IngresoReporteSummary
 import com.propmanager.core.model.dto.OcupacionTendencia
 import com.propmanager.core.model.dto.RentabilidadReporteSummary
-import com.propmanager.core.network.NetworkMonitor
+import com.propmanager.core.network.ConnectivityObserver
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -46,7 +46,7 @@ class ReportesViewModel
 @Inject
 constructor(
     private val reportesRepository: ReportesRepository,
-    private val networkMonitor: NetworkMonitor,
+    private val networkMonitor: ConnectivityObserver,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ReportesUiState())
