@@ -234,24 +234,23 @@ jobs:
             exit 0
           fi
           mkdir -p "$HOME/.local/bin"
-          cat > "$HOME/.local/bin/unzip" << 'SHIM'
-          #!/usr/bin/env python3
-          import zipfile, sys, os
-          args = sys.argv[1:]
-          dest, zippath, i = '.', None, 0
-          while i < len(args):
-              if args[i] == '-d':
-                  i += 1; dest = args[i]
-              elif not args[i].startswith('-'):
-                  zippath = args[i]
-              i += 1
-          if not zippath:
-              sys.exit(1)
-          os.makedirs(dest, exist_ok=True)
-          with zipfile.ZipFile(zippath) as zf:
-              zf.extractall(dest)
-          SHIM
-          sed -i 's/^          //' "$HOME/.local/bin/unzip"
+          printf '%s\n' \
+            '#!/usr/bin/env python3' \
+            'import zipfile, sys, os' \
+            'args = sys.argv[1:]' \
+            'dest, zippath, i = ".", None, 0' \
+            'while i < len(args):' \
+            '    if args[i] == "-d":' \
+            '        i += 1; dest = args[i]' \
+            '    elif not args[i].startswith("-"):' \
+            '        zippath = args[i]' \
+            '    i += 1' \
+            'if not zippath:' \
+            '    sys.exit(1)' \
+            'os.makedirs(dest, exist_ok=True)' \
+            'with zipfile.ZipFile(zippath) as zf:' \
+            '    zf.extractall(dest)' \
+            > "$HOME/.local/bin/unzip"
           chmod +x "$HOME/.local/bin/unzip"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.local/bin:$PATH"
@@ -444,24 +443,23 @@ jobs:
             exit 0
           fi
           mkdir -p "$HOME/.local/bin"
-          cat > "$HOME/.local/bin/unzip" << 'SHIM'
-          #!/usr/bin/env python3
-          import zipfile, sys, os
-          args = sys.argv[1:]
-          dest, zippath, i = '.', None, 0
-          while i < len(args):
-              if args[i] == '-d':
-                  i += 1; dest = args[i]
-              elif not args[i].startswith('-'):
-                  zippath = args[i]
-              i += 1
-          if not zippath:
-              sys.exit(1)
-          os.makedirs(dest, exist_ok=True)
-          with zipfile.ZipFile(zippath) as zf:
-              zf.extractall(dest)
-          SHIM
-          sed -i 's/^          //' "$HOME/.local/bin/unzip"
+          printf '%s\n' \
+            '#!/usr/bin/env python3' \
+            'import zipfile, sys, os' \
+            'args = sys.argv[1:]' \
+            'dest, zippath, i = ".", None, 0' \
+            'while i < len(args):' \
+            '    if args[i] == "-d":' \
+            '        i += 1; dest = args[i]' \
+            '    elif not args[i].startswith("-"):' \
+            '        zippath = args[i]' \
+            '    i += 1' \
+            'if not zippath:' \
+            '    sys.exit(1)' \
+            'os.makedirs(dest, exist_ok=True)' \
+            'with zipfile.ZipFile(zippath) as zf:' \
+            '    zf.extractall(dest)' \
+            > "$HOME/.local/bin/unzip"
           chmod +x "$HOME/.local/bin/unzip"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.local/bin:$PATH"
@@ -881,24 +879,23 @@ jobs:
             exit 0
           fi
           mkdir -p "$HOME/.local/bin"
-          cat > "$HOME/.local/bin/unzip" << 'SHIM'
-          #!/usr/bin/env python3
-          import zipfile, sys, os
-          args = sys.argv[1:]
-          dest, zippath, i = '.', None, 0
-          while i < len(args):
-              if args[i] == '-d':
-                  i += 1; dest = args[i]
-              elif not args[i].startswith('-'):
-                  zippath = args[i]
-              i += 1
-          if not zippath:
-              sys.exit(1)
-          os.makedirs(dest, exist_ok=True)
-          with zipfile.ZipFile(zippath) as zf:
-              zf.extractall(dest)
-          SHIM
-          sed -i 's/^          //' "$HOME/.local/bin/unzip"
+          printf '%s\n' \
+            '#!/usr/bin/env python3' \
+            'import zipfile, sys, os' \
+            'args = sys.argv[1:]' \
+            'dest, zippath, i = ".", None, 0' \
+            'while i < len(args):' \
+            '    if args[i] == "-d":' \
+            '        i += 1; dest = args[i]' \
+            '    elif not args[i].startswith("-"):' \
+            '        zippath = args[i]' \
+            '    i += 1' \
+            'if not zippath:' \
+            '    sys.exit(1)' \
+            'os.makedirs(dest, exist_ok=True)' \
+            'with zipfile.ZipFile(zippath) as zf:' \
+            '    zf.extractall(dest)' \
+            > "$HOME/.local/bin/unzip"
           chmod +x "$HOME/.local/bin/unzip"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.local/bin:$PATH"
