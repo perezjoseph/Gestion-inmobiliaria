@@ -50,7 +50,8 @@ runs:
         echo "Available disk space: ${AVAIL_MB}MB"
         if [ "$AVAIL_MB" -lt 12288 ]; then
           echo "::warning::Low disk (${AVAIL_MB}MB < 12288MB). Cleaning to prevent ENOSPC during compilation."
-          docker system prune -af --volumes 2>/dev/null || true
+          docker image prune -af 2>/dev/null || true
+          docker builder prune -af 2>/dev/null || true
           rm -rf /tmp/runner-*/Gestion-inmobiliaria/*/target 2>/dev/null || true
           CURRENT_RUNNER_DIR=$(echo "${GITHUB_WORKSPACE}" | grep -oP '/tmp/runner-\d+' || true)
           for dir in /tmp/runner-*/Gestion-inmobiliaria; do
@@ -72,12 +73,14 @@ runs:
           rm -rf /tmp/rustc* /tmp/cargo-install* 2>/dev/null || true
           find "${RUNNER_TEMP:-/tmp}" -maxdepth 1 -name '*.sh' -mmin +60 -delete 2>/dev/null || true
           sudo apt-get clean 2>/dev/null || true
-          sudo rm -rf /var/cache/apt/archives/*.deb 2>/dev/null || true
-          sudo journalctl --vacuum-size=50M 2>/dev/null || true
+          sudo rm -rf /var/cache/apt/archives/*.deb /var/lib/apt/lists/* 2>/dev/null || true
+          sudo journalctl --vacuum-size=10M 2>/dev/null || true
+          sudo find /var/log -type f -name '*.gz' -delete 2>/dev/null || true
+          sudo find /var/log -type f -name '*.1' -delete 2>/dev/null || true
           rm -rf /var/tmp/* 2>/dev/null || true
           AFTER_MB=$(df -m "${GITHUB_WORKSPACE}" | awk 'NR==2 {print $4}')
           echo "Disk after cleanup: ${AFTER_MB}MB (freed $((AFTER_MB - AVAIL_MB))MB)"
-          if [ "$AFTER_MB" -lt 4096 ]; then
+          if [ "$AFTER_MB" -lt 2048 ]; then
             echo "::error::Disk critically low (${AFTER_MB}MB) after cleanup. Runner needs manual intervention."
             exit 1
           fi
