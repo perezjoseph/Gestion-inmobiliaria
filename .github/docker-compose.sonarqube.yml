@@ -8,6 +8,8 @@ services:
       POSTGRES_PASSWORD: sonar_password
     volumes:
       - sonarqube_db:/var/lib/postgresql/data
+    networks:
+      - sonarqube-internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U sonar -d sonarqube"]
       interval: 10s
@@ -30,9 +32,24 @@ services:
       - sonarqube_data:/opt/sonarqube/data
       - sonarqube_extensions:/opt/sonarqube/extensions
       - sonarqube_logs:/opt/sonarqube/logs
+    networks:
+      - sonarqube-internal
+      - ci-shared
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/api/system/status | grep -q UP"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
 
 volumes:
   sonarqube_db:
   sonarqube_data:
   sonarqube_extensions:
   sonarqube_logs:
+
+networks:
+  sonarqube-internal:
+  ci-shared:
+    name: ci-shared
+    driver: bridge
