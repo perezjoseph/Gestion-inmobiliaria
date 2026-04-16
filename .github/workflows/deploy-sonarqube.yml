@@ -1,0 +1,75 @@
+name: Deploy SonarQube
+run-name: "Deploy SonarQube [${{ github.event_name }}] ${{ github.ref_name }}"
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions: {}
+
+concurrency:
+  group: deploy-sonarqube
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Ensure SonarQube is Running
+    runs-on: [self-hosted, Linux, X64, sonarqube]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/docker-compose.sonarqube.yml
+          sparse-checkout-cone-mode: false
+
+      - name: Set vm.max_map_count for Elasticsearch
+        run: |
+          CURRENT=$(sysctl -n vm.max_map_count 2>/dev/null || echo 0)
+          if [ "$CURRENT" -lt 262144 ]; then
+            echo "Setting vm.max_map_count=262144 (current: $CURRENT)"
+            sudo sysctl -w vm.max_map_count=262144
+          else
+            echo "vm.max_map_count already sufficient ($CURRENT)"
+          fi
+
+      - name: Start SonarQube via docker compose
+        run: |
+          docker compose -f .github/docker-compose.sonarqube.yml up -d --wait --remove-orphans
+
+      - name: Wait for SonarQube to become healthy
+        timeout-minutes: 5
+        run: |
+          echo "Waiting for SonarQube API to respond..."
+          for i in $(seq 1 60); do
+            RESPONSE=$(curl -sf --connect-timeout 5 --max-time 10 "http://localhost:9000/api/system/status" 2>/dev/null) || RESPONSE=""
+            if [ -n "$RESPONSE" ]; then
+              STATUS=$(echo "$RESPONSE" | jq -r '.status // "UNKNOWN"' 2>/dev/null) || STATUS="UNKNOWN"
+            else
+              STATUS="STARTING"
+            fi
+            if [ "$STATUS" = "UP" ]; then
+              echo "SonarQube is healthy and ready."
+              exit 0
+            fi
+            echo "Attempt $i/60 -- status: $STATUS. Retrying in 5s..."
+            sleep 5
+          done
+          echo "::error::SonarQube did not become healthy within 5 minutes"
+          docker compose -f .github/docker-compose.sonarqube.yml logs --tail=50
+          exit 1
+
+      - name: Report SonarQube status
+        run: |
+          VERSION=$(curl -sf "http://localhost:9000/api/system/status" | jq -r '.version // "unknown"')
+          {
+            echo "## SonarQube Deployment"
+            echo "- Status: ✅ Running"
+            echo "- Version: $VERSION"
+            echo "- URL: http://localhost:9000"
+            echo "- Runner: $(hostname)"
+          } >> "$GITHUB_STEP_SUMMARY"

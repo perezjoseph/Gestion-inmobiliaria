@@ -1129,7 +1129,7 @@ jobs:
 
   sonarqube:
     name: SonarQube Code Quality & Coverage Analysis
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, Linux, X64, sonarqube]
     timeout-minutes: 20
     permissions:
       contents: read
