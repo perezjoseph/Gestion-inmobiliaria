@@ -22,6 +22,8 @@ on:
         value: ${{ jobs.quality-gate.outputs.failed_steps }}
       quality-gate-duration:
         value: ${{ jobs.quality-gate.outputs.duration }}
+      deprecation-report:
+        value: ${{ jobs.quality-gate.outputs.deprecation_report }}
 
 permissions: {}
 
@@ -111,6 +113,7 @@ jobs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
       duration: ${{ steps.timing.outputs.duration }}
+      deprecation_report: ${{ steps.collect-deprecations.outputs.deprecation_report }}
     steps:
       - name: Record start time
         id: start
@@ -188,6 +191,107 @@ jobs:
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           cargo audit --deny yanked --deny unmaintained --deny unsound 2>&1 | tee "${RUNNER_TEMP}/audit-output.txt"
+
+      - name: Collect deprecation and unmaintained crate warnings
+        id: collect-deprecations
+        if: always() && steps.install_audit.outputs.installed == 'true'
+        timeout-minutes: 5
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          AUDIT_JSON=$(cargo audit --json 2>/dev/null || echo '{}')
+
+          REPORT=$(echo "$AUDIT_JSON" | python3 -c "
+          import json, sys
+          try:
+              data = json.load(sys.stdin)
+          except Exception:
+              print('cargo audit JSON unavailable -- skipping deprecation collection.')
+              sys.exit(0)
+
+          warnings = data.get('warnings', {})
+          vulns = data.get('vulnerabilities', {}).get('list', [])
+
+          sections = []
+
+          unmaintained = warnings.get('unmaintained', [])
+          if unmaintained:
+              lines = ['Unmaintained Crates:']
+              for w in unmaintained:
+                  pkg = w.get('package', {})
+                  adv = w.get('advisory', {})
+                  name = pkg.get('name', '?')
+                  ver = pkg.get('version', '?')
+                  rid = adv.get('id', '?')
+                  title = adv.get('title', 'No description')
+                  url = adv.get('url', '')
+                  lines.append(f'  {name} {ver} ({rid}): {title}')
+                  if url:
+                      lines.append(f'    ref: {url}')
+              sections.append('\n'.join(lines))
+
+          yanked = warnings.get('yanked', [])
+          if yanked:
+              lines = ['Yanked Crates:']
+              for w in yanked:
+                  pkg = w.get('package', {})
+                  name = pkg.get('name', '?')
+                  ver = pkg.get('version', '?')
+                  lines.append(f'  {name} {ver}')
+              sections.append('\n'.join(lines))
+
+          informational = warnings.get('informational', [])
+          if informational:
+              lines = ['Informational Advisories:']
+              for w in informational:
+                  pkg = w.get('package', {})
+                  adv = w.get('advisory', {})
+                  name = pkg.get('name', '?')
+                  ver = pkg.get('version', '?')
+                  rid = adv.get('id', '?')
+                  title = adv.get('title', 'No description')
+                  kind = adv.get('informational', 'notice')
+                  lines.append(f'  [{kind}] {name} {ver} ({rid}): {title}')
+              sections.append('\n'.join(lines))
+
+          deprecated_vulns = [v for v in vulns if v.get('advisory', {}).get('informational') == 'deprecated']
+          if deprecated_vulns:
+              lines = ['Deprecated Crates (via advisories):']
+              for v in deprecated_vulns:
+                  pkg = v.get('package', {})
+                  adv = v.get('advisory', {})
+                  name = pkg.get('name', '?')
+                  ver = pkg.get('version', '?')
+                  rid = adv.get('id', '?')
+                  title = adv.get('title', 'No description')
+                  lines.append(f'  {name} {ver} ({rid}): {title}')
+              sections.append('\n'.join(lines))
+
+          unsound = warnings.get('unsound', [])
+          if unsound:
+              lines = ['Unsound Crates:']
+              for w in unsound:
+                  pkg = w.get('package', {})
+                  adv = w.get('advisory', {})
+                  name = pkg.get('name', '?')
+                  ver = pkg.get('version', '?')
+                  rid = adv.get('id', '?')
+                  title = adv.get('title', 'No description')
+                  lines.append(f'  {name} {ver} ({rid}): {title}')
+              sections.append('\n'.join(lines))
+
+          if sections:
+              total = sum(len(warnings.get(k, [])) for k in ['unmaintained', 'yanked', 'informational', 'unsound']) + len(deprecated_vulns)
+              header = f'Deprecation & Health Report ({total} items):'
+              print(header)
+              print('\n\n'.join(sections))
+          else:
+              print('No deprecations, unmaintained, yanked, or unsound crates detected.')
+          " 2>/dev/null || echo "Deprecation scan failed -- python3 error.")
+
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "deprecation_report<<$EOF" >> $GITHUB_OUTPUT
+          echo "$REPORT" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
 
       - name: Install cargo-deny for supply chain policy checks
         id: install_deny

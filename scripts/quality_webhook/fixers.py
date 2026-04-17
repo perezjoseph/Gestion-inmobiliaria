@@ -235,9 +235,12 @@ def fix_with_retry(job, step, error_log, context=None):
         passed, reason = preflight_dedup(job, error_log)
         if not passed:
             log.warning(f"Preflight dedup rejected {job}/{step}: {reason}")
-            _write_escalation(job, step, error_log, "dedup_rejected", context,
-                              extra_reason=reason)
-            return False
+            log.info(f"Entering deep research phase for {job}/{step}")
+            research_fix = _deep_research_fix(job, step, error_log, context)
+            if not research_fix:
+                _write_escalation(job, step, error_log, "dedup_rejected", context,
+                                  extra_reason=reason)
+            return research_fix
 
         ctx_str = ""
         if context:
@@ -466,6 +469,168 @@ def fix_with_retry(job, step, error_log, context=None):
     finally:
         _max_concurrent_fixes.release()
         job_lock.release()
+
+
+def _deep_research_fix(job, step, error_log, context=None):
+    """Last-resort research phase when quick fixes keep failing.
+
+    Instead of giving up, this:
+    1. Runs a diagnosis-only pass to deeply analyze the root cause
+    2. Searches semantic memory for any successful fixes on similar errors
+    3. Builds a detailed plan with the diagnosis
+    4. Attempts one final fix using the research-informed plan
+    5. Gates the result through revision + verification as usual
+    """
+    ctx_str = ""
+    if context:
+        ctx_str = (
+            f" (commit: {context.get('commit', '?')[:8]}, "
+            f"branch: {context.get('branch', '?')})"
+        )
+    run_url = context.get("run_url", "") if context else ""
+
+    error_class = classify_error(error_log)
+    past_attempts_section = get_past_attempts(job, error_log)
+    semantic_context = search_relevant_context(job, error_log)
+
+    repro_cache = ReproCache(error_hash=_error_hash(job, error_log))
+    repro = reproduce_locally(job, error_class, cache=repro_cache)
+    if repro.reproduced and repro.error_class:
+        error_class = repro.error_class
+
+    repro_section = ""
+    if repro and repro.reproduced:
+        repro_section = format_errors_for_prompt(repro)
+    elif repro:
+        repro_section = "\nDid NOT reproduce locally -- likely CI-specific.\n"
+
+    reproduced = repro and repro.reproduced
+    source = "local reproduction output" if reproduced else "gh CLI full logs"
+
+    # Phase 1: Deep research — diagnosis only, no file edits
+    log.info(f"=== Deep research: diagnosing {job}/{step}{ctx_str} ===")
+    research_prompt = (
+        f"DEEP RESEARCH MODE -- previous quick-fix attempts have ALL failed.\n"
+        f"Do NOT edit any files. Do NOT run git commands.\n\n"
+        f"CI FAILED: job='{job}', step='{step}'{ctx_str}, class={error_class}\n\n"
+        f"{repro_section}"
+        f"{_gh_cli_block(run_url)}"
+        f"Error preview:\n```\n{error_log[:3000]}\n```\n\n"
+        f"Job context: {_JOB_INSTRUCTIONS.get(job, 'Analyze and fix.')}\n\n"
+    )
+
+    if past_attempts_section:
+        research_prompt += f"{past_attempts_section}\n\n"
+    if semantic_context:
+        research_prompt += f"{semantic_context}\n\n"
+
+    research_prompt += (
+        f"INSTRUCTIONS:\n"
+        f"1. Fetch the FULL CI logs using: gh run view <id> --log-failed\n"
+        f"2. Read every file mentioned in the errors. Understand the code, not just the error message.\n"
+        f"3. Check git log for recent changes to those files.\n"
+        f"4. Identify the ROOT CAUSE -- not the symptom. Why did previous fixes fail?\n"
+        f"5. Research: if this involves a library or framework, look up docs or changelogs.\n"
+        f"6. Write a detailed analysis to stdout:\n"
+        f"   - Root cause (1-2 sentences)\n"
+        f"   - Why previous approaches failed\n"
+        f"   - Exact fix plan: which files, which lines, what changes\n"
+        f"   - Any risks or side effects\n"
+    )
+
+    research_result = run_kiro(research_prompt, f"Deep research ({job}/{step})")
+    research_output = research_result[1] if isinstance(research_result, tuple) else ""
+
+    if not research_output:
+        log.warning(f"Deep research produced no output for {job}/{step}")
+        return False
+
+    diagnosis = research_output[-4000:]
+    log.info(f"Deep research complete for {job}/{step}, proceeding to planned fix")
+
+    # Phase 2: Execute the researched fix
+    log.info(f"=== Deep research fix attempt for {job}/{step}{ctx_str} ===")
+    verify_cmd = _JOB_VERIFY.get(job, "")
+
+    fix_prompt = (
+        f"RESEARCH-INFORMED FIX for {job}/{step}{ctx_str}\n\n"
+        f"You previously analyzed this failure in depth. "
+        f"Here is your analysis:\n"
+        f"```\n{diagnosis}\n```\n\n"
+        f"{repro_section}"
+        f"EXECUTE the fix plan from your analysis above.\n"
+        f"STEP 1: Apply the changes described in your analysis.\n"
+    )
+    if verify_cmd:
+        fix_prompt += f"STEP 2: Verify with: {verify_cmd}\n"
+    fix_prompt += (
+        f"STEP 3: git add -A\n"
+        f"{SCOPE_CONSTRAINTS}\n"
+        f"Do NOT commit."
+    )
+
+    result = run_kiro(fix_prompt, f"Deep research fix ({job}/{step})")
+    success = result[0] if isinstance(result, tuple) else result
+    kiro_output = result[1] if isinstance(result, tuple) else ""
+
+    if not success:
+        log.warning(f"Deep research fix attempt failed for {job}/{step}")
+        record_fix_attempt(job, error_log, 0, False,
+                           f"deep_research_fix failed. class={error_class}")
+        store_fix_attempt(job, step, error_class, error_log, 0, False)
+        return False
+
+    # Gate: revision check
+    rev_passed, rev_reason = revision_check_diff()
+    if not rev_passed:
+        log.warning(f"Deep research fix rejected by revision gate ({job}/{step}): {rev_reason}")
+        wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+        record_fix_attempt(job, error_log, 0, False,
+                           f"deep_research revision_rejected: {rev_reason}")
+        store_fix_attempt(job, step, error_class, error_log, 0, False)
+        return False
+
+    # Gate: verification
+    verify_passed, verify_reason = verification_run(job)
+    if not verify_passed:
+        log.warning(f"Deep research fix failed verification ({job}/{step}): {verify_reason}")
+        wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+        record_fix_attempt(job, error_log, 0, False,
+                           f"deep_research verify_failed: {verify_reason[:200]}")
+        store_fix_attempt(job, step, error_class, error_log, 0, False)
+        return False
+
+    # All gates passed — commit
+    log.info(f"Deep research fix passed all gates for {job}/{step}. Committing.")
+    with _git_lock:
+        commit_result = wsl_bash(
+            "git add -A && "
+            "git commit -m 'fix: resolve CI failures (deep-research auto-fix)' && "
+            "git push origin main || "
+            "(git pull --rebase origin main && git push origin main)",
+            timeout=120,
+        )
+
+    commit_ok = commit_result.returncode == 0
+    outcome = extract_outcome_from_output(kiro_output) if kiro_output else {}
+    strategy_note = outcome.get("strategy", "deep_research")
+
+    record_strategy_outcome(job, error_class, strategy_note, commit_ok)
+    record_fix_attempt(job, error_log, 0, commit_ok,
+                       f"deep_research class={error_class}. {strategy_note}")
+    store_fix_attempt(job, step, error_class, error_log, 0, commit_ok)
+
+    if commit_ok:
+        store_fix_outcome(
+            job, error_class,
+            files_changed=outcome.get("files_changed", ""),
+            strategy=f"deep_research: {strategy_note}",
+        )
+        log.info(f"Deep research fix succeeded for {job}/{step}")
+        return True
+
+    log.warning(f"Deep research fix commit/push failed for {job}/{step}")
+    return False
 
 
 def _write_escalation(job, step, error_log, error_class, context, extra_reason="", repro=None):

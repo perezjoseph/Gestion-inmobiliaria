@@ -131,6 +131,10 @@ on:
         type: string
         required: false
         default: ''
+      deprecation-report:
+        type: string
+        required: false
+        default: ''
 
 permissions: {}
 
@@ -344,6 +348,13 @@ jobs:
             echo "| container-frontend | ${{ inputs.container-frontend-result }} | -- | -- |"
             echo "| deploy | ${{ inputs.deploy-result }} | -- | -- |"
             echo ""
+            if [ -n "${{ inputs.deprecation-report }}" ] && ! echo "${{ inputs.deprecation-report }}" | grep -q "No deprecations"; then
+              echo "### Deprecation & Health Warnings"
+              echo '```'
+              echo "${{ inputs.deprecation-report }}"
+              echo '```'
+              echo ""
+            fi
             echo "Commit: \`${GH_SHA}\` by @${GH_ACTOR} on \`${GH_REF_NAME}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -413,6 +424,29 @@ jobs:
             -H "Content-Type: application/json" \
             -H "X-Signature-256: sha256=$SIGNATURE" \
             -d "$PAYLOAD" || echo "Webhook unreachable -- skipping SonarQube fix"
+
+      - name: Send deprecation report to webhook
+        if: steps.webhook-check.outputs.skip != 'true' && steps.concurrency-check.outputs.skip != 'true'
+        env:
+          DEPRECATION_REPORT: ${{ inputs.deprecation-report }}
+        run: |
+          if [ -z "$DEPRECATION_REPORT" ] || echo "$DEPRECATION_REPORT" | grep -q "unavailable\|failed\|No deprecations"; then
+            echo "No actionable deprecations -- skipping deprecation webhook"
+            exit 0
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg deprecation_report "$DEPRECATION_REPORT" \
+            --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+            --arg commit "$GH_SHA" \
+            --arg branch "$GH_REF_NAME" \
+            '{deprecation_report: $deprecation_report, run_url: $run_url, commit: $commit, branch: $branch}')
+
+          SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
+          curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-deprecations \
+            -H "Content-Type: application/json" \
+            -H "X-Signature-256: sha256=$SIGNATURE" \
+            -d "$PAYLOAD" || echo "Webhook unreachable -- skipping deprecation report"
 
       - name: Revoke temporary SonarQube token
         if: always() && steps.sonar-issues.outputs.temp_token == 'true'

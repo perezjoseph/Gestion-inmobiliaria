@@ -186,6 +186,7 @@ jobs:
       test-backend-error-log: ${{ needs.tests.outputs.test-backend-error-log || '' }}
       test-frontend-error-log: ${{ needs.tests.outputs.test-frontend-error-log || '' }}
       quality-gate-error-log: ${{ needs.security.outputs.quality-gate-error-log || '' }}
+      deprecation-report: ${{ needs.security.outputs.deprecation-report || '' }}
       build-frontend-error-log: ${{ needs.build.outputs.build-frontend-error-log || '' }}
       build-backend-error-log: ${{ needs.build.outputs.build-backend-error-log || '' }}
       lint-duration: ${{ needs.lint.outputs.duration || '' }}

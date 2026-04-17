@@ -3,10 +3,13 @@ resolver = "3"
 members = ["backend", "frontend"]
 
 [profile.release]
-lto = true
+lto = "thin"
 opt-level = "z"
 codegen-units = 1
 strip = true
+
+[profile.dev]
+debug = "line-tables-only"
 
 [profile.dev.package."*"]
 opt-level = 1

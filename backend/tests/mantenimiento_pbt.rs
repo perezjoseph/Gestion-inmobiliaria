@@ -92,11 +92,19 @@ mod pbt_async {
 
     const JWT_SECRET: &str = "test_secret_key_that_is_long_enough_for_jwt";
 
-    static MIGRATIONS_DONE: std::sync::Once = std::sync::Once::new();
-
     fn db_url() -> String {
         dotenvy::dotenv().ok();
         std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for integration tests")
+    }
+
+    async fn setup_db() -> DatabaseConnection {
+        let db = Database::connect(db_url())
+            .await
+            .expect("Failed to connect to database");
+        super::migrations::Migrator::up(&db, None)
+            .await
+            .expect("Failed to run migrations");
+        db
     }
 
     fn with_db<F, Fut>(f: F)
@@ -104,23 +112,9 @@ mod pbt_async {
         F: FnOnce(DatabaseConnection) -> Fut,
         Fut: std::future::Future<Output = ()>,
     {
-        MIGRATIONS_DONE.call_once(|| {
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(async {
-                let db = Database::connect(db_url())
-                    .await
-                    .expect("Failed to connect to database for migrations");
-                super::migrations::Migrator::up(&db, None)
-                    .await
-                    .expect("Failed to run migrations");
-                db.close().await.ok();
-            });
-        });
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let db = Database::connect(db_url())
-                .await
-                .expect("Failed to connect to database");
+            let db = setup_db().await;
             f(db).await;
         });
     }
