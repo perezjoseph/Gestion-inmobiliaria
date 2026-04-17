@@ -393,7 +393,7 @@ mod db_async {
             .await;
 
             let req = test::TestRequest::post()
-                .uri("/api/gastos")
+                .uri("/api/v1/gastos")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
                     "propiedadId": propiedad_id,
@@ -416,7 +416,7 @@ mod db_async {
             assert_eq!(body["moneda"], "DOP");
 
             let req = test::TestRequest::get()
-                .uri(&format!("/api/gastos/{gasto_id}"))
+                .uri(&format!("/api/v1/gastos/{gasto_id}"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -426,7 +426,7 @@ mod db_async {
             assert_eq!(detail["categoria"], "mantenimiento");
 
             let req = test::TestRequest::put()
-                .uri(&format!("/api/gastos/{gasto_id}"))
+                .uri(&format!("/api/v1/gastos/{gasto_id}"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({"estado": "pagado", "monto": "20000"}))
                 .to_request();
@@ -437,14 +437,14 @@ mod db_async {
             assert_eq!(updated["descripcion"], "Reparación de techo");
 
             let req = test::TestRequest::delete()
-                .uri(&format!("/api/gastos/{gasto_id}"))
+                .uri(&format!("/api/v1/gastos/{gasto_id}"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 204);
 
             let req = test::TestRequest::get()
-                .uri(&format!("/api/gastos/{gasto_id}"))
+                .uri(&format!("/api/v1/gastos/{gasto_id}"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -470,7 +470,7 @@ mod db_async {
             let mut created_ids = Vec::new();
             for i in 0..3u32 {
                 let req = test::TestRequest::post()
-                    .uri("/api/gastos")
+                    .uri("/api/v1/gastos")
                     .insert_header(("Authorization", format!("Bearer {token}")))
                     .set_json(json!({
                         "propiedadId": propiedad_id,
@@ -488,7 +488,7 @@ mod db_async {
 
             let req = test::TestRequest::get()
                 .uri(&format!(
-                    "/api/gastos?propiedadId={propiedad_id}&page=1&perPage=2"
+                    "/api/v1/gastos?propiedadId={propiedad_id}&page=1&perPage=2"
                 ))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
@@ -523,7 +523,7 @@ mod db_async {
             .await;
 
             let req = test::TestRequest::post()
-                .uri("/api/gastos")
+                .uri("/api/v1/gastos")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
                     "propiedadId": prop_a,
@@ -539,7 +539,7 @@ mod db_async {
             let id1: Uuid = b1["id"].as_str().unwrap().parse().unwrap();
 
             let req = test::TestRequest::post()
-                .uri("/api/gastos")
+                .uri("/api/v1/gastos")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
                     "propiedadId": prop_b,
@@ -555,7 +555,7 @@ mod db_async {
             let id2: Uuid = b2["id"].as_str().unwrap().parse().unwrap();
 
             let req = test::TestRequest::get()
-                .uri(&format!("/api/gastos?propiedadId={prop_a}"))
+                .uri(&format!("/api/v1/gastos?propiedadId={prop_a}"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -585,7 +585,7 @@ mod db_async {
             .await;
 
             let req = test::TestRequest::post()
-                .uri("/api/gastos")
+                .uri("/api/v1/gastos")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
                     "propiedadId": propiedad_id,
@@ -602,7 +602,7 @@ mod db_async {
 
             let req = test::TestRequest::get()
                 .uri(&format!(
-                    "/api/gastos?propiedadId={propiedad_id}&categoria=legal"
+                    "/api/v1/gastos?propiedadId={propiedad_id}&categoria=legal"
                 ))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
@@ -634,7 +634,7 @@ mod db_async {
             let mut ids = Vec::new();
             for date in &["2025-01-15", "2025-03-15", "2025-06-15"] {
                 let req = test::TestRequest::post()
-                    .uri("/api/gastos")
+                    .uri("/api/v1/gastos")
                     .insert_header(("Authorization", format!("Bearer {token}")))
                     .set_json(json!({
                         "propiedadId": propiedad_id,
@@ -652,7 +652,7 @@ mod db_async {
 
             let req = test::TestRequest::get()
                 .uri(&format!(
-                    "/api/gastos?propiedadId={propiedad_id}&fechaDesde=2025-02-01&fechaHasta=2025-05-01"
+                    "/api/v1/gastos?propiedadId={propiedad_id}&fechaDesde=2025-02-01&fechaHasta=2025-05-01"
                 ))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
@@ -695,7 +695,7 @@ mod db_async {
             );
 
             let req = test::TestRequest::post()
-                .uri("/api/importar/gastos")
+                .uri("/api/v1/importar/gastos")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .insert_header((
                     "Content-Type",
@@ -740,7 +740,7 @@ mod db_async {
             );
 
             let req = test::TestRequest::post()
-                .uri("/api/importar/gastos")
+                .uri("/api/v1/importar/gastos")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .insert_header((
                     "Content-Type",
@@ -780,7 +780,7 @@ mod db_async {
             );
 
             let req = test::TestRequest::post()
-                .uri("/api/importar/gastos")
+                .uri("/api/v1/importar/gastos")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .insert_header((
                     "Content-Type",
@@ -808,7 +808,7 @@ mod db_async {
             .await;
 
             let req = test::TestRequest::get()
-                .uri("/api/reportes/rentabilidad?mes=4&anio=2025")
+                .uri("/api/v1/reportes/rentabilidad?mes=4&anio=2025")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -838,7 +838,7 @@ mod db_async {
             .await;
 
             let req = test::TestRequest::get()
-                .uri("/api/reportes/rentabilidad/pdf?mes=4&anio=2025")
+                .uri("/api/v1/reportes/rentabilidad/pdf?mes=4&anio=2025")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -863,7 +863,7 @@ mod db_async {
             .await;
 
             let req = test::TestRequest::get()
-                .uri("/api/reportes/rentabilidad/xlsx?mes=4&anio=2025")
+                .uri("/api/v1/reportes/rentabilidad/xlsx?mes=4&anio=2025")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -888,7 +888,7 @@ mod db_async {
             .await;
 
             let req = test::TestRequest::get()
-                .uri("/api/dashboard/stats")
+                .uri("/api/v1/dashboard/stats")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -913,7 +913,7 @@ mod db_async {
             .await;
 
             let req = test::TestRequest::get()
-                .uri("/api/dashboard/gastos-comparacion")
+                .uri("/api/v1/dashboard/gastos-comparacion")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;

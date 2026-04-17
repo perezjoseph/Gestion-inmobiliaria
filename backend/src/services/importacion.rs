@@ -451,6 +451,11 @@ pub async fn importar_gastos(
     };
 
     let data_rows = &rows[1..];
+    if data_rows.is_empty() {
+        return Err(AppError::Validation(
+            "El archivo CSV está vacío o no contiene filas válidas".to_string(),
+        ));
+    }
     let total_filas = data_rows.len();
     let mut exitosos = 0usize;
     let mut fallidos = Vec::new();
