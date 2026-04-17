@@ -23,6 +23,7 @@ DEDUP_CONFIG = {
     "flaky":              {"window_minutes": 15,  "threshold": 5},
     "runner_environment": {"window_minutes": 120, "threshold": 2},
     "test_failure":       {"window_minutes": 60,  "threshold": 3},
+    "build_failure":      {"window_minutes": 60,  "threshold": 3},
     "code_quality":       {"window_minutes": 60,  "threshold": 3},
     "dependency":         {"window_minutes": 180, "threshold": 2},
     "unknown":            {"window_minutes": 60,  "threshold": 3},

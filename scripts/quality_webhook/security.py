@@ -98,6 +98,22 @@ def sanitize_text(value, max_len=MAX_FIELD_LENGTH):
     return value[:max_len]
 
 
+def sanitize_for_prompt(value, max_len=MAX_FIELD_LENGTH):
+    """Sanitize text for safe inclusion in LLM prompts.
+
+    Escapes markdown code fences and common prompt injection patterns
+    in addition to the standard control character removal.
+    """
+    value = sanitize_text(value, max_len)
+    value = value.replace("```", "` ` `")
+    value = re.sub(
+        r"(?i)(ignore\s+(all\s+)?previous|you\s+are\s+now|system\s*:\s*|<\s*/?\s*system\s*>)",
+        "[FILTERED]",
+        value,
+    )
+    return value
+
+
 def validate_name(value):
     if isinstance(value, str) and SAFE_NAME_RE.match(value):
         return value

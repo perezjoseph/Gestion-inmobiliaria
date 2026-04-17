@@ -45,6 +45,26 @@ FLAKY_PATTERNS = [
     "intermittent",
 ]
 
+BUILD_PATTERNS = [
+    "error[e",
+    "cannot find",
+    "linking with",
+    "linker `cc` failed",
+    "aborting due to",
+    "build failed",
+    "compilation error",
+    "trunk build",
+    "trunk.tar.gz",
+    "wasm-pack",
+    "wasm32-unknown-unknown",
+    "cargo build",
+    "assembledebug",
+    "assemblerelease",
+    "build.gradle",
+    "could not compile",
+    "process completed with exit code",
+]
+
 
 def classify_error(error_log):
     lower = error_log.lower()
@@ -59,6 +79,11 @@ def classify_error(error_log):
             return "flaky"
     if "test" in lower and ("failed" in lower or "FAILED" in lower):
         return "test_failure"
-    if "error[E" in error_log or "clippy" in lower or "fmt" in lower:
+    if "clippy" in lower or "fmt" in lower:
         return "code_quality"
+    for pattern in BUILD_PATTERNS:
+        if pattern in lower:
+            return "build_failure"
+    if "error[E" in error_log:
+        return "build_failure"
     return "unknown"

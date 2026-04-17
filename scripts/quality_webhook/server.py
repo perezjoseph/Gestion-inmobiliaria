@@ -38,6 +38,11 @@ _thread_semaphore = threading.Semaphore(THREAD_POOL_SIZE)
 _holds_lock = threading.Lock()
 _pending_holds: dict[str, dict] = {}
 
+_active_fix_count = 0
+_active_fix_count_lock = threading.Lock()
+_active_thread_count = 0
+_active_thread_count_lock = threading.Lock()
+
 
 def _build_timing_stats():
     history = _load_fix_history()
@@ -129,11 +134,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
             timing_info = _build_timing_stats()
 
-            sem_available = _max_concurrent_fixes._value
-            active_fixes = MAX_CONCURRENT_FIXES - sem_available
-
-            tp_available = _thread_semaphore._value
-            active_threads = THREAD_POOL_SIZE - tp_available
+            with _active_fix_count_lock:
+                active_fixes = _active_fix_count
+            with _active_thread_count_lock:
+                active_threads = _active_thread_count
 
             trends = get_all_trends()
             duration_trends = {}
@@ -227,11 +231,16 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 if not _thread_semaphore.acquire(blocking=True, timeout=30):
                     log.warning(f"[{rid}] Thread pool timed out -- deferring {self.path}")
                     return
+                with _active_thread_count_lock:
+                    global _active_thread_count
+                    _active_thread_count += 1
                 try:
                     fn(p)
                 except Exception:
                     log.exception(f"[{rid}] Handler error for {self.path}")
                 finally:
+                    with _active_thread_count_lock:
+                        _active_thread_count -= 1
                     _thread_semaphore.release()
 
             threading.Thread(target=_guarded, args=(handler, payload, request_id), daemon=True).start()
@@ -300,21 +309,20 @@ class WebhookHandler(BaseHTTPRequestHandler):
         if should_hold and commit:
             with _holds_lock:
                 if commit in _pending_holds:
-                    entry = _pending_holds[commit]
+                    entry = _pending_holds.pop(commit)
                     entry["failed_jobs"].append(job)
                     entry["payloads"].append((job, step, error_log, error_class, context))
                     timer = entry.get("timer")
                     if timer is not None:
                         timer.cancel()
-                    del _pending_holds[commit]
 
                     log.info(
                         f"Correlated failure arrived during hold for commit {commit[:8]}: "
                         f"jobs={entry['failed_jobs']}"
                     )
 
-                    all_failed_jobs = entry["failed_jobs"]
-                    all_payloads = entry["payloads"]
+                    all_failed_jobs = list(entry["failed_jobs"])
+                    all_payloads = list(entry["payloads"])
 
                     def _dispatch_correlated():
                         group_id = None

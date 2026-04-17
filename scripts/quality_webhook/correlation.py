@@ -8,6 +8,7 @@ from datetime import datetime
 
 from .config import WIN_PROJECT_DIR, log
 from .history import _load_fix_history, _save_fix_history, _fix_history_lock
+from .security import sanitize_for_prompt
 
 
 @dataclass
@@ -93,7 +94,13 @@ def register_failure(
                 return gid
 
         if len(_groups) >= _MAX_GROUPS:
-            return None
+            _prune_stale_groups()
+            if len(_groups) >= _MAX_GROUPS:
+                log.warning(
+                    f"Correlation group limit reached ({_MAX_GROUPS}), "
+                    f"dropping failure for {job}/{step} on {commit[:8]}"
+                )
+                return None
 
         _group_counter += 1
         gid = f"cg-{_group_counter}"
@@ -161,7 +168,7 @@ def build_correlated_fix_prompt(group: CorrelationGroup) -> str:
     lines.append("")
     for i, failure in enumerate(group.failures, 1):
         lines.append(f"--- Failure {i}: {failure.job}/{failure.step} (class: {failure.error_class}) ---")
-        lines.append(f"Error preview:\n```\n{failure.error_log[:2000]}\n```")
+        lines.append(f"Error preview:\n```\n{sanitize_for_prompt(failure.error_log, 2000)}\n```")
         lines.append("")
 
     lines.append("Fix the shared root cause that affects ALL listed jobs.")

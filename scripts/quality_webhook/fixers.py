@@ -29,6 +29,7 @@ from .trends import record_duration, check_and_alert_trends
 from .vulns import extract_vuln_info, record_vuln_failure
 from .decisions import record_strategy_outcome, get_ranked_strategies
 from .flaky import parse_test_results, record_test_outcomes, are_all_failures_flaky
+from .security import sanitize_for_prompt
 
 
 @dataclass
@@ -154,14 +155,21 @@ def _build_error_notes(error_class):
             "Do NOT change code. Re-run CI instead. "
             "Escalate if same error persists across 3+ runs."
         ),
+        "build_failure": (
+            "\nBUILD FAILURE: read the full compiler output. "
+            "Check for missing imports, type errors, linker failures, "
+            "or WASM target incompatibilities. Fix the source code."
+        ),
     }
     return notes.get(error_class, "")
 
 
-def _diagnose(job, step, error_log, error_class, context, repro=None):
-    """Stage 1: Diagnose using local reproduction + gh CLI for full logs.
+def _diagnose(job, step, error_log, error_class, context, repro=None, deep=False):
+    """Diagnose a CI failure using local reproduction + gh CLI for full logs.
 
-    Returns a short strategy string the executor can use.
+    When deep=True, includes past attempt history, semantic memory, and
+    instructions to research libraries/changelogs. Returns up to 4000 chars.
+    When deep=False (default), returns a short strategy string (~2000 chars).
     """
     run_url = context.get("run_url", "") if context else ""
     ctx = ""
@@ -178,23 +186,56 @@ def _diagnose(job, step, error_log, error_class, context, repro=None):
 
     reproduced = repro and repro.reproduced
     source = "local reproduction output" if reproduced else "gh CLI full logs"
+    error_preview_len = 3000 if deep else 2000
+
+    preamble = (
+        "DEEP RESEARCH MODE -- previous quick-fix attempts have ALL failed.\n"
+        if deep else ""
+    )
 
     prompt = (
+        f"{preamble}"
         f"DIAGNOSE ONLY -- do NOT edit files or run git.\n\n"
         f"CI FAILED: job='{job}', step='{step}'{ctx}, class={effective_class}\n"
         f"{repro_section}"
         f"{_gh_cli_block(run_url)}"
-        f"Error preview:\n```\n{error_log[:2000]}\n```\n\n"
+        f"Error preview:\n```\n{sanitize_for_prompt(error_log, error_preview_len)}\n```\n\n"
         f"Job context: {_JOB_INSTRUCTIONS.get(job, 'Analyze and fix.')}"
         f"{_build_error_notes(effective_class)}\n\n"
-        f"1. Identify root cause from {source}.\n"
-        f"2. List specific files/lines that need changes.\n"
-        f"3. Describe minimal fix strategy in 2-3 sentences."
     )
 
-    result = run_kiro(prompt, f"Diagnose ({job}/{step})")
+    if deep:
+        past = get_past_attempts(job, error_log)
+        semantic = search_relevant_context(job, error_log)
+        if past:
+            prompt += f"{past}\n\n"
+        if semantic:
+            prompt += f"{semantic}\n\n"
+        prompt += (
+            f"INSTRUCTIONS:\n"
+            f"1. Fetch the FULL CI logs using: gh run view <id> --log-failed\n"
+            f"2. Read every file mentioned in the errors. Understand the code, not just the error message.\n"
+            f"3. Check git log for recent changes to those files.\n"
+            f"4. Identify the ROOT CAUSE -- not the symptom. Why did previous fixes fail?\n"
+            f"5. Research: if this involves a library or framework, look up docs or changelogs.\n"
+            f"6. Write a detailed analysis to stdout:\n"
+            f"   - Root cause (1-2 sentences)\n"
+            f"   - Why previous approaches failed\n"
+            f"   - Exact fix plan: which files, which lines, what changes\n"
+            f"   - Any risks or side effects\n"
+        )
+    else:
+        prompt += (
+            f"1. Identify root cause from {source}.\n"
+            f"2. List specific files/lines that need changes.\n"
+            f"3. Describe minimal fix strategy in 2-3 sentences."
+        )
+
+    label = f"Deep research ({job}/{step})" if deep else f"Diagnose ({job}/{step})"
+    result = run_kiro(prompt, label)
     kiro_output = result[1] if isinstance(result, tuple) else ""
-    return kiro_output[-2000:] if kiro_output else "diagnosis unavailable"
+    limit = 4000 if deep else 2000
+    return kiro_output[-limit:] if kiro_output else "diagnosis unavailable"
 
 
 def _log_timing_summary(job, step, cycle_start, all_timings):
@@ -230,7 +271,16 @@ def fix_with_retry(job, step, error_log, context=None):
     _max_concurrent_fixes.acquire()
     cycle_start = time.monotonic()
     all_timings: list[PhaseTiming] = []
+    _fix_count_changed = False
     try:
+        try:
+            from .server import _active_fix_count_lock
+            import scripts.quality_webhook.server as _srv
+            with _active_fix_count_lock:
+                _srv._active_fix_count += 1
+                _fix_count_changed = True
+        except ImportError:
+            pass
         # Gate 1: Time-based dedup
         passed, reason = preflight_dedup(job, error_log)
         if not passed:
@@ -346,7 +396,7 @@ def fix_with_retry(job, step, error_log, context=None):
                 f"class={error_class}, attempt {attempt}\n\n"
                 f"{repro_section}"
                 f"{_gh_cli_block(run_url)}"
-                f"Error preview:\n```\n{error_log[:3000]}\n```\n\n"
+                f"Error preview:\n```\n{sanitize_for_prompt(error_log, 3000)}\n```\n\n"
                 f"Job context: {instruction}{error_note}\n\n"
                 f"{strategies_section}"
                 f"STEP 1 - DIAGNOSE: Identify root cause from {source}. "
@@ -467,6 +517,15 @@ def fix_with_retry(job, step, error_log, context=None):
             last_strategy_summary = f"commit/push failed. {strategy_note}"
 
     finally:
+        wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+        if _fix_count_changed:
+            try:
+                from .server import _active_fix_count_lock
+                import scripts.quality_webhook.server as _srv
+                with _active_fix_count_lock:
+                    _srv._active_fix_count -= 1
+            except ImportError:
+                pass
         _max_concurrent_fixes.release()
         job_lock.release()
 
@@ -475,11 +534,9 @@ def _deep_research_fix(job, step, error_log, context=None):
     """Last-resort research phase when quick fixes keep failing.
 
     Instead of giving up, this:
-    1. Runs a diagnosis-only pass to deeply analyze the root cause
-    2. Searches semantic memory for any successful fixes on similar errors
-    3. Builds a detailed plan with the diagnosis
-    4. Attempts one final fix using the research-informed plan
-    5. Gates the result through revision + verification as usual
+    1. Runs _diagnose(deep=True) to deeply analyze the root cause
+    2. Attempts one final fix using the research-informed diagnosis
+    3. Gates the result through revision + verification as usual
     """
     ctx_str = ""
     if context:
@@ -487,70 +544,32 @@ def _deep_research_fix(job, step, error_log, context=None):
             f" (commit: {context.get('commit', '?')[:8]}, "
             f"branch: {context.get('branch', '?')})"
         )
-    run_url = context.get("run_url", "") if context else ""
 
     error_class = classify_error(error_log)
-    past_attempts_section = get_past_attempts(job, error_log)
-    semantic_context = search_relevant_context(job, error_log)
 
     repro_cache = ReproCache(error_hash=_error_hash(job, error_log))
     repro = reproduce_locally(job, error_class, cache=repro_cache)
     if repro.reproduced and repro.error_class:
         error_class = repro.error_class
 
-    repro_section = ""
-    if repro and repro.reproduced:
-        repro_section = format_errors_for_prompt(repro)
-    elif repro:
-        repro_section = "\nDid NOT reproduce locally -- likely CI-specific.\n"
-
-    reproduced = repro and repro.reproduced
-    source = "local reproduction output" if reproduced else "gh CLI full logs"
-
-    # Phase 1: Deep research — diagnosis only, no file edits
+    # Phase 1: Deep diagnosis via _diagnose(deep=True)
     log.info(f"=== Deep research: diagnosing {job}/{step}{ctx_str} ===")
-    research_prompt = (
-        f"DEEP RESEARCH MODE -- previous quick-fix attempts have ALL failed.\n"
-        f"Do NOT edit any files. Do NOT run git commands.\n\n"
-        f"CI FAILED: job='{job}', step='{step}'{ctx_str}, class={error_class}\n\n"
-        f"{repro_section}"
-        f"{_gh_cli_block(run_url)}"
-        f"Error preview:\n```\n{error_log[:3000]}\n```\n\n"
-        f"Job context: {_JOB_INSTRUCTIONS.get(job, 'Analyze and fix.')}\n\n"
-    )
+    diagnosis = _diagnose(job, step, error_log, error_class, context,
+                          repro=repro, deep=True)
 
-    if past_attempts_section:
-        research_prompt += f"{past_attempts_section}\n\n"
-    if semantic_context:
-        research_prompt += f"{semantic_context}\n\n"
-
-    research_prompt += (
-        f"INSTRUCTIONS:\n"
-        f"1. Fetch the FULL CI logs using: gh run view <id> --log-failed\n"
-        f"2. Read every file mentioned in the errors. Understand the code, not just the error message.\n"
-        f"3. Check git log for recent changes to those files.\n"
-        f"4. Identify the ROOT CAUSE -- not the symptom. Why did previous fixes fail?\n"
-        f"5. Research: if this involves a library or framework, look up docs or changelogs.\n"
-        f"6. Write a detailed analysis to stdout:\n"
-        f"   - Root cause (1-2 sentences)\n"
-        f"   - Why previous approaches failed\n"
-        f"   - Exact fix plan: which files, which lines, what changes\n"
-        f"   - Any risks or side effects\n"
-    )
-
-    research_result = run_kiro(research_prompt, f"Deep research ({job}/{step})")
-    research_output = research_result[1] if isinstance(research_result, tuple) else ""
-
-    if not research_output:
+    if not diagnosis or diagnosis == "diagnosis unavailable":
         log.warning(f"Deep research produced no output for {job}/{step}")
         return False
 
-    diagnosis = research_output[-4000:]
     log.info(f"Deep research complete for {job}/{step}, proceeding to planned fix")
 
     # Phase 2: Execute the researched fix
     log.info(f"=== Deep research fix attempt for {job}/{step}{ctx_str} ===")
     verify_cmd = _JOB_VERIFY.get(job, "")
+
+    repro_section = ""
+    if repro and repro.reproduced:
+        repro_section = format_errors_for_prompt(repro)
 
     fix_prompt = (
         f"RESEARCH-INFORMED FIX for {job}/{step}{ctx_str}\n\n"
@@ -660,7 +679,7 @@ def _write_escalation(job, step, error_log, error_class, context, extra_reason="
             "error_class": error_class,
             "context": context or {},
             "max_retries_exhausted": "unlimited",
-            "error_log_preview": error_log[:3000],
+            "error_log_preview": sanitize_for_prompt(error_log, 3000),
             "local_reproduction": repro_info,
             "recommendation": _escalation_recommendation(error_class, job),
             "strategies_attempted": past or "no history",
@@ -698,6 +717,11 @@ def _escalation_recommendation(error_class, job):
         "dedup_rejected": (
             f"Fix for {job} was rejected by dedup gate. The same error pattern "
             "has failed multiple times recently. This likely requires human investigation."
+        ),
+        "build_failure": (
+            f"Persistent build failure in {job} that auto-fix could not resolve. "
+            "Check compiler output for type errors, missing dependencies, or "
+            "WASM target incompatibilities."
         ),
     }
     return recs.get(error_class, f"Auto-fix could not resolve {job}. Manual investigation required.")
