@@ -34,6 +34,7 @@ jobs:
       DATABASE_URL: postgresql://realestate:realestate_dev_password@localhost:5432/realestate
       SERVER_PORT: "8080"
       CORS_ORIGIN: http://localhost:8080
+      CARGO_BUILD_JOBS: "2"
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       duration: ${{ steps.timing.outputs.duration }}
@@ -76,6 +77,8 @@ jobs:
       - name: Setup Rust toolchain
         id: rust-setup
         uses: ./.github/actions/rust-setup
+        with:
+          components: llvm-tools-preview
 
       - name: Mask database credentials
         run: |
@@ -121,6 +124,7 @@ jobs:
         run: |
           mkdir -p coverage
           cargo tarpaulin --locked -p realestate-backend \
+            --engine llvm \
             --out lcov --output-dir coverage \
             --timeout 300 --skip-clean
 
