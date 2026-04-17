@@ -77,6 +77,8 @@ jobs:
       - name: Setup Rust toolchain
         id: rust-setup
         uses: ./.github/actions/rust-setup
+        with:
+          components: llvm-tools-preview
 
       - name: Mask database credentials
         run: |
@@ -122,6 +124,7 @@ jobs:
         run: |
           mkdir -p coverage
           cargo tarpaulin --locked -p realestate-backend \
+            --engine llvm \
             --out lcov --output-dir coverage \
             --timeout 300 --skip-clean
 
