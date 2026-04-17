@@ -264,6 +264,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
             log.info("No failed conditions found.")
             return
 
+        from .security import sanitize_for_prompt as _sfp
         failures_summary = ", ".join(
             f"{sanitize_text(c.get('metric', '?'), 64)}={sanitize_text(str(c.get('value', '?')), 32)} "
             f"(threshold: {sanitize_text(str(c.get('errorThreshold', '?')), 32)})"
@@ -271,21 +272,70 @@ class WebhookHandler(BaseHTTPRequestHandler):
         )
         log.info(f"Failed conditions: {failures_summary}")
 
-        prompt = (
-            f"The SonarQube quality gate FAILED for project '{project}'. "
-            f"Failed conditions: {failures_summary}. "
-            "Fetch the specific issues, fix them, verify with cargo fmt, clippy, and test. "
-            "Then commit and push: git add -A && git commit -m 'fix: resolve SonarQube failures (auto-fix)' && git push origin main"
-        )
-
+        _PHASE_QUICK_MAX = 3
+        _PHASE_DEEP_MAX = 6
+        last_strategy = ""
         attempt = 0
         while True:
             attempt += 1
-            log.info(f"=== SonarQube fix attempt {attempt} ===")
-            result = run_kiro(prompt, f"SonarQube fix attempt {attempt}")
+
+            if attempt <= _PHASE_QUICK_MAX:
+                phase = "quick"
+            elif attempt <= _PHASE_DEEP_MAX:
+                phase = "deep"
+            else:
+                phase = "investigate"
+
+            log.info(f"=== SonarQube fix attempt {attempt} [{phase}] ===")
+
+            retry_section = ""
+            if last_strategy:
+                retry_section = (
+                    f"\nPREVIOUS ATTEMPT FAILED: {last_strategy}\n"
+                    "You MUST try a DIFFERENT approach.\n"
+                )
+
+            if phase == "investigate":
+                prompt = (
+                    f"INVESTIGATION MODE: The SonarQube quality gate has FAILED for project '{_sfp(project, 128)}' "
+                    f"after {attempt - 1} failed fix attempts.\n\n"
+                    f"Failed conditions: {_sfp(failures_summary, 1000)}\n\n"
+                    "MANDATORY INVESTIGATION STEPS:\n"
+                    "1. Fetch the specific SonarQube issues via the API or web UI\n"
+                    "2. Read EVERY file mentioned + their imports and callers\n"
+                    "3. Check git log -10 for recent changes to affected files\n"
+                    "4. Search the web for the SonarQube rule IDs if unfamiliar\n"
+                    "5. Read .kiro/steering/ for project conventions\n"
+                    "6. Write a 3-sentence plan BEFORE editing any file\n\n"
+                    "THEN fix, verify with cargo fmt, clippy, and test.\n"
+                    f"{retry_section}"
+                    "Stage: git add -A && git commit -m 'fix: resolve SonarQube failures (auto-fix)' && git push origin main"
+                )
+            elif phase == "deep":
+                prompt = (
+                    f"DEEP RESEARCH: The SonarQube quality gate FAILED for project '{_sfp(project, 128)}'. "
+                    f"Quick fixes (attempts 1-{_PHASE_QUICK_MAX}) did not work.\n\n"
+                    f"Failed conditions: {_sfp(failures_summary, 1000)}\n\n"
+                    "Fetch the specific issues, understand the root cause deeply. "
+                    "Read the affected files and their context before making changes. "
+                    "Fix them, verify with cargo fmt, clippy, and test.\n"
+                    f"{retry_section}"
+                    "Then commit and push: git add -A && git commit -m 'fix: resolve SonarQube failures (auto-fix)' && git push origin main"
+                )
+            else:
+                prompt = (
+                    f"The SonarQube quality gate FAILED for project '{_sfp(project, 128)}'. "
+                    f"Failed conditions: {_sfp(failures_summary, 1000)}. "
+                    "Fetch the specific issues, fix them, verify with cargo fmt, clippy, and test. "
+                    f"{retry_section}"
+                    "Then commit and push: git add -A && git commit -m 'fix: resolve SonarQube failures (auto-fix)' && git push origin main"
+                )
+
+            result = run_kiro(prompt, f"SonarQube fix attempt {attempt} [{phase}]")
             success = result[0] if isinstance(result, tuple) else result
             if success:
                 return
+            last_strategy = f"attempt {attempt} [{phase}] failed"
 
     def _handle_ci_failure(self, payload):
         job = validate_name(payload.get("job", "unknown"))

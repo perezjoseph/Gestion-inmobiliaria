@@ -42,7 +42,6 @@ class PhaseTiming:
     total_s: float = 0.0
 
 
-_fix_lock = threading.Lock()  # backward compat: kept for server.py health endpoint
 _sonar_fix_lock = threading.Lock()
 _improve_lock = threading.Lock()
 
@@ -817,7 +816,7 @@ def _parse_sonar_report_by_file(sonar_report):
     return dict(file_groups)
 
 
-def _fix_sonar_file_group(file_group_report, group_label):
+def _fix_sonar_file_group(file_group_report, group_label, attempt=1):
     """Fix sonar issues for a single file group. Returns (success, label)."""
     is_kotlin = any(f.endswith((".kt", ".kts")) for f in group_label.split(","))
     verify_cmd = (
@@ -826,17 +825,50 @@ def _fix_sonar_file_group(file_group_report, group_label):
         "cargo fmt && cargo clippy --locked -- -D warnings && cargo test --locked"
     )
 
-    prompt = (
-        "Fix ONLY the SonarQube issues listed below.\n\n"
-        f"Issues:\n```\n{file_group_report}\n```\n\n"
-        "For each: open file at line, read context, apply minimal fix.\n"
-        "Security hotspots: evaluate if actually vulnerable before changing.\n"
-        f"Verify: {verify_cmd}\n"
-        "Stage: git add -A. Do NOT commit.\n"
-        f"{SCOPE_CONSTRAINTS}"
-    )
+    if attempt <= 3:
+        phase = "quick"
+    elif attempt <= 6:
+        phase = "deep"
+    else:
+        phase = "investigate"
 
-    result = run_kiro(prompt, f"Sonar fix ({group_label})")
+    if phase == "investigate":
+        prompt = (
+            f"INVESTIGATION MODE: SonarQube issues in {group_label} after {attempt - 1} failed attempts.\n\n"
+            f"Issues:\n```\n{sanitize_for_prompt(file_group_report, 3000)}\n```\n\n"
+            "MANDATORY STEPS:\n"
+            "1. Read the ENTIRE file, not just the flagged lines\n"
+            "2. Read imports and callers of the affected functions\n"
+            "3. Check git log for recent changes to this file\n"
+            "4. Search the web for the SonarQube rule ID if unfamiliar\n"
+            "5. Write a plan BEFORE editing\n\n"
+            "THEN apply the fix.\n"
+            f"Verify: {verify_cmd}\n"
+            "Stage: git add -A. Do NOT commit.\n"
+            f"{SCOPE_CONSTRAINTS}"
+        )
+    elif phase == "deep":
+        prompt = (
+            f"DEEP RESEARCH: SonarQube issues in {group_label}. Quick fixes failed.\n\n"
+            f"Issues:\n```\n{sanitize_for_prompt(file_group_report, 3000)}\n```\n\n"
+            "Read the full file and understand the context before fixing.\n"
+            "Security hotspots: evaluate if actually vulnerable before changing.\n"
+            f"Verify: {verify_cmd}\n"
+            "Stage: git add -A. Do NOT commit.\n"
+            f"{SCOPE_CONSTRAINTS}"
+        )
+    else:
+        prompt = (
+            "Fix ONLY the SonarQube issues listed below.\n\n"
+            f"Issues:\n```\n{sanitize_for_prompt(file_group_report, 3000)}\n```\n\n"
+            "For each: open file at line, read context, apply minimal fix.\n"
+            "Security hotspots: evaluate if actually vulnerable before changing.\n"
+            f"Verify: {verify_cmd}\n"
+            "Stage: git add -A. Do NOT commit.\n"
+            f"{SCOPE_CONSTRAINTS}"
+        )
+
+    result = run_kiro(prompt, f"Sonar fix ({group_label}) [{phase}]")
     success = result[0] if isinstance(result, tuple) else result
     return success, group_label
 
@@ -865,7 +897,15 @@ def fix_sonar_issues(sonar_report, run_url):
         attempt = 0
         while True:
             attempt += 1
-            log.info(f"=== SonarQube fix attempt {attempt} ({len(waves)} waves) ===")
+
+            if attempt <= 3:
+                phase = "quick"
+            elif attempt <= 6:
+                phase = "deep"
+            else:
+                phase = "investigate"
+
+            log.info(f"=== SonarQube fix attempt {attempt} [{phase}] ({len(waves)} waves) ===")
 
             all_succeeded = True
             failed_groups = []
@@ -876,7 +916,7 @@ def fix_sonar_issues(sonar_report, run_url):
                 if len(wave) == 1:
                     file_name, issues = wave[0]
                     group_report = "\n".join(issues)
-                    success, label = _fix_sonar_file_group(group_report, file_name)
+                    success, label = _fix_sonar_file_group(group_report, file_name, attempt)
                     if not success:
                         all_succeeded = False
                         failed_groups.append(label)
@@ -886,7 +926,7 @@ def fix_sonar_issues(sonar_report, run_url):
                         for file_name, issues in wave:
                             group_report = "\n".join(issues)
                             future = executor.submit(
-                                _fix_sonar_file_group, group_report, file_name,
+                                _fix_sonar_file_group, group_report, file_name, attempt,
                             )
                             futures[future] = file_name
 
@@ -931,14 +971,25 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
         return False
 
     try:
+        _PHASE_QUICK_MAX = 3
+        _PHASE_DEEP_MAX = 6
+        last_strategy = ""
         attempt = 0
         while True:
             attempt += 1
-            log.info(f"=== Pipeline improvement attempt {attempt} (focus: {focus}) ===")
+
+            if attempt <= _PHASE_QUICK_MAX:
+                phase = "quick"
+            elif attempt <= _PHASE_DEEP_MAX:
+                phase = "deep"
+            else:
+                phase = "investigate"
+
+            log.info(f"=== Pipeline improvement attempt {attempt} [{phase}] (focus: {focus}) ===")
 
             sonar_section = ""
             if sonar_report and "unavailable" not in sonar_report:
-                sonar_section = f"\n\n--- SONARQUBE ISSUES ---\n{sonar_report}\n--- END SONARQUBE ISSUES ---\n"
+                sonar_section = f"\n\n--- SONARQUBE ISSUES ---\n{sanitize_for_prompt(sonar_report, 5000)}\n--- END SONARQUBE ISSUES ---\n"
 
             focus_guidance = {
                 "security": (
@@ -960,30 +1011,84 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
                 if f in focus_guidance:
                     focus_specific += focus_guidance[f]
 
-            prompt = (
-                f"CI/CD pipeline engineer. Rust/WASM + Android project.\n"
-                f"Focus: {focus}\n"
-                f"{_gh_cli_block(run_url)}\n"
-                f"--- PIPELINE REPORT ---\n{pipeline_report}\n--- END ---\n"
-                f"{sonar_section}\n"
-                "Fetch full logs via gh CLI first.\n\n"
-                "CLASSIFY each failure:\n"
-                "  A) RUNNER ENV → document, don't change code\n"
-                "  B) PIPELINE CONFIG → fix in .github/workflows/\n"
-                "  C) DEPENDENCY VULN → fix in Cargo.toml/deny.toml/libs.versions.toml\n"
-                "  D) APP CODE → skip (handled by /ci-failure)\n\n"
-                f"{focus_specific}"
-                "Look for: cache misses, slow jobs, failed jobs, redundant steps.\n"
-                "Read workflow YAML fully before editing. Verify YAML validity after.\n"
-                "Stage: git add -A. Do NOT commit.\n"
-                f"Run URL: {run_url}"
-            )
+            retry_section = ""
+            if last_strategy:
+                retry_section = (
+                    f"\nPREVIOUS ATTEMPT FAILED: {last_strategy}\n"
+                    "You MUST try a DIFFERENT approach.\n"
+                )
 
-            result = run_kiro(prompt, f"Pipeline improve ({focus}) attempt {attempt}")
+            if phase == "investigate":
+                prompt = (
+                    f"INVESTIGATION MODE: CI/CD pipeline improvement after {attempt - 1} failed attempts.\n"
+                    f"Focus: {focus}\n"
+                    f"{_gh_cli_block(run_url)}\n"
+                    f"--- PIPELINE REPORT ---\n{sanitize_for_prompt(pipeline_report, 5000)}\n--- END ---\n"
+                    f"{sonar_section}\n"
+                    "MANDATORY INVESTIGATION STEPS:\n"
+                    "1. Fetch full logs via gh CLI\n"
+                    "2. Read ALL workflow YAML files in .github/workflows/\n"
+                    "3. Check git log -10 for recent CI changes\n"
+                    "4. Search the web for any error messages from CI tools\n"
+                    "5. Read .kiro/steering/ for project conventions\n"
+                    "6. Write a plan BEFORE editing any file\n\n"
+                    "CLASSIFY each failure:\n"
+                    "  A) RUNNER ENV → document, don't change code\n"
+                    "  B) PIPELINE CONFIG → fix in .github/workflows/\n"
+                    "  C) DEPENDENCY VULN → fix in Cargo.toml/deny.toml/libs.versions.toml\n"
+                    "  D) APP CODE → skip (handled by /ci-failure)\n\n"
+                    f"{focus_specific}"
+                    f"{retry_section}"
+                    "Stage: git add -A. Do NOT commit.\n"
+                    f"Run URL: {run_url}"
+                )
+            elif phase == "deep":
+                prompt = (
+                    f"DEEP RESEARCH: CI/CD pipeline improvement. Quick fixes failed.\n"
+                    f"Focus: {focus}\n"
+                    f"{_gh_cli_block(run_url)}\n"
+                    f"--- PIPELINE REPORT ---\n{sanitize_for_prompt(pipeline_report, 5000)}\n--- END ---\n"
+                    f"{sonar_section}\n"
+                    "Fetch full logs via gh CLI first. Read workflow YAML fully before editing.\n\n"
+                    "CLASSIFY each failure:\n"
+                    "  A) RUNNER ENV → document, don't change code\n"
+                    "  B) PIPELINE CONFIG → fix in .github/workflows/\n"
+                    "  C) DEPENDENCY VULN → fix in Cargo.toml/deny.toml/libs.versions.toml\n"
+                    "  D) APP CODE → skip (handled by /ci-failure)\n\n"
+                    f"{focus_specific}"
+                    "Look for: cache misses, slow jobs, failed jobs, redundant steps.\n"
+                    f"{retry_section}"
+                    "Verify YAML validity after editing.\n"
+                    "Stage: git add -A. Do NOT commit.\n"
+                    f"Run URL: {run_url}"
+                )
+            else:
+                prompt = (
+                    f"CI/CD pipeline engineer. Rust/WASM + Android project.\n"
+                    f"Focus: {focus}\n"
+                    f"{_gh_cli_block(run_url)}\n"
+                    f"--- PIPELINE REPORT ---\n{sanitize_for_prompt(pipeline_report, 5000)}\n--- END ---\n"
+                    f"{sonar_section}\n"
+                    "Fetch full logs via gh CLI first.\n\n"
+                    "CLASSIFY each failure:\n"
+                    "  A) RUNNER ENV → document, don't change code\n"
+                    "  B) PIPELINE CONFIG → fix in .github/workflows/\n"
+                    "  C) DEPENDENCY VULN → fix in Cargo.toml/deny.toml/libs.versions.toml\n"
+                    "  D) APP CODE → skip (handled by /ci-failure)\n\n"
+                    f"{focus_specific}"
+                    "Look for: cache misses, slow jobs, failed jobs, redundant steps.\n"
+                    "Read workflow YAML fully before editing. Verify YAML validity after.\n"
+                    f"{retry_section}"
+                    "Stage: git add -A. Do NOT commit.\n"
+                    f"Run URL: {run_url}"
+                )
+
+            result = run_kiro(prompt, f"Pipeline improve ({focus}) attempt {attempt} [{phase}]")
             success = result[0] if isinstance(result, tuple) else result
 
             if not success:
-                log.warning(f"Pipeline improvement attempt {attempt} failed")
+                log.warning(f"Pipeline improvement attempt {attempt} [{phase}] failed")
+                last_strategy = f"attempt {attempt} [{phase}] failed"
                 continue
 
             commit_result = wsl_bash(
@@ -996,10 +1101,11 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
             )
 
             if commit_result.returncode == 0:
-                log.info(f"Pipeline improvement attempt {attempt} completed")
+                log.info(f"Pipeline improvement attempt {attempt} [{phase}] completed")
                 return True
 
-            log.warning(f"Pipeline improvement attempt {attempt} commit/push failed")
+            log.warning(f"Pipeline improvement attempt {attempt} [{phase}] commit/push failed")
+            last_strategy = f"commit/push failed on attempt {attempt}"
 
         return False
     finally:
