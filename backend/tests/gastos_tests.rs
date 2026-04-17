@@ -281,18 +281,31 @@ mod db_async {
     }
 
     async fn setup_db() -> DatabaseConnection {
-        let mut opts = ConnectOptions::new(db_url());
-        opts.max_connections(2)
-            .min_connections(1)
-            .connect_timeout(std::time::Duration::from_secs(30))
-            .idle_timeout(std::time::Duration::from_secs(60));
-        let db = Database::connect(opts)
-            .await
-            .expect("Failed to connect to database");
-        super::migrations::Migrator::up(&db, None)
-            .await
-            .expect("Failed to run migrations");
-        db
+        let mut last_err = None;
+        for attempt in 0..5 {
+            if attempt > 0 {
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            }
+            let mut opts = ConnectOptions::new(db_url());
+            opts.max_connections(2)
+                .min_connections(0)
+                .connect_timeout(std::time::Duration::from_secs(10))
+                .idle_timeout(std::time::Duration::from_secs(60))
+                .acquire_timeout(std::time::Duration::from_secs(10));
+            match Database::connect(opts).await {
+                Ok(db) => {
+                    super::migrations::Migrator::up(&db, None)
+                        .await
+                        .expect("Failed to run migrations");
+                    return db;
+                }
+                Err(e) => last_err = Some(e),
+            }
+        }
+        panic!(
+            "Failed to connect to database after 5 attempts: {:?}",
+            last_err.unwrap()
+        );
     }
 
     fn shared_rt_and_db() -> &'static (tokio::runtime::Runtime, DatabaseConnection) {
