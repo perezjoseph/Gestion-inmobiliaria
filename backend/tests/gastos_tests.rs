@@ -295,16 +295,23 @@ mod db_async {
         db
     }
 
+    fn shared_rt_and_db() -> &'static (tokio::runtime::Runtime, DatabaseConnection) {
+        static SHARED: std::sync::OnceLock<(tokio::runtime::Runtime, DatabaseConnection)> =
+            std::sync::OnceLock::new();
+        SHARED.get_or_init(|| {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            let db = rt.block_on(setup_db());
+            (rt, db)
+        })
+    }
+
     fn with_db<F, Fut>(f: F)
     where
         F: FnOnce(DatabaseConnection) -> Fut,
         Fut: std::future::Future<Output = ()>,
     {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            let db = setup_db().await;
-            f(db).await;
-        });
+        let (rt, db) = shared_rt_and_db();
+        rt.block_on(f(db.clone()));
     }
 
     fn make_config() -> AppConfig {
