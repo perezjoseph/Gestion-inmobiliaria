@@ -180,6 +180,7 @@ jobs:
           POSTGRES_USER: realestate
           POSTGRES_PASSWORD: realestate_dev_password
         options: >-
+          --network ci-shared
           --health-cmd "pg_isready -U realestate"
           --health-interval 10s
           --health-timeout 5s
