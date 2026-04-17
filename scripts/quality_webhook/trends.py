@@ -136,3 +136,30 @@ def check_and_alert_trends() -> list[str]:
                 f"samples={trend.sample_count}"
             )
     return at_risk
+
+
+MAX_OPTIMIZATION_RECORDS = 10
+
+
+def record_optimization(changes_summary: str, pre_durations: dict[str, float], focus: str) -> None:
+    record = {
+        "timestamp": datetime.now().isoformat(),
+        "changes_summary": changes_summary[:500],
+        "pre_durations": pre_durations,
+        "focus": focus,
+    }
+    with _fix_history_lock:
+        history = _load_fix_history()
+        opt_history = history.get("optimization_history", [])
+        opt_history.append(record)
+        if len(opt_history) > MAX_OPTIMIZATION_RECORDS:
+            opt_history = opt_history[-MAX_OPTIMIZATION_RECORDS:]
+        history["optimization_history"] = opt_history
+        _save_fix_history(history)
+
+
+def get_optimization_history(limit: int = 5) -> list[dict]:
+    with _fix_history_lock:
+        history = _load_fix_history()
+    opt_history = history.get("optimization_history", [])
+    return opt_history[-limit:]

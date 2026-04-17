@@ -2,6 +2,7 @@
 
 import dataclasses
 import json
+import random
 import re
 import threading
 import time
@@ -16,7 +17,10 @@ from .config import (
 )
 from .runner import wsl_bash, run_kiro
 from .classifier import classify_error
-from .history import record_fix_attempt, get_past_attempts, _error_hash
+from .history import (
+    record_fix_attempt, get_past_attempts, _error_hash,
+    _fix_history_lock, _load_fix_history,
+)
 from .memory import (
     store_fix_attempt, store_fix_outcome,
     search_relevant_context, extract_outcome_from_output,
@@ -25,7 +29,10 @@ from .gates import (
     preflight_dedup, verification_run, revision_check_diff,
 )
 from .reproducer import reproduce_locally, format_errors_for_prompt, ReproCache
-from .trends import record_duration, check_and_alert_trends
+from .trends import (
+    record_duration, check_and_alert_trends, get_all_trends,
+    record_optimization, get_optimization_history,
+)
 from .vulns import extract_vuln_info, record_vuln_failure
 from .decisions import record_strategy_outcome, get_ranked_strategies
 from .flaky import parse_test_results, record_test_outcomes, are_all_failures_flaky
@@ -58,6 +65,68 @@ def _get_job_lock(job: str) -> threading.Lock:
         if job not in _job_locks:
             _job_locks[job] = threading.Lock()
         return _job_locks[job]
+
+
+_AUTO_FIX_PATTERN = re.compile(r"^[0-9a-f]+ fix: resolve CI failures")
+_MAX_AUTO_FIX_CHAIN = 2
+
+
+def _check_auto_fix_chain(job):
+    with _git_lock:
+        result = wsl_bash("git log --oneline -5 main", timeout=30)
+    if result.returncode != 0:
+        return False
+    lines = [l.strip() for l in result.stdout.strip().splitlines() if l.strip()]
+    if len(lines) < _MAX_AUTO_FIX_CHAIN:
+        return False
+    consecutive = 0
+    for line in lines:
+        if _AUTO_FIX_PATTERN.match(line):
+            consecutive += 1
+        else:
+            break
+    if consecutive < _MAX_AUTO_FIX_CHAIN:
+        return False
+    with _fix_history_lock:
+        history = _load_fix_history()
+    recent_failures = 0
+    for key, entry in history.items():
+        if not isinstance(entry, dict) or entry.get("job") != job:
+            continue
+        for attempt in entry.get("attempts", [])[-consecutive:]:
+            if not attempt.get("success"):
+                recent_failures += 1
+    return recent_failures >= _MAX_AUTO_FIX_CHAIN
+
+
+def _rollback_last_auto_fix(job):
+    log.warning(f"Auto-fix loop detected for {job}. Reverting last auto-fix commit.")
+    with _git_lock:
+        revert_result = wsl_bash(
+            "git revert HEAD --no-edit && "
+            "git push origin main || "
+            "(git pull --rebase origin main && git push origin main)",
+            timeout=120,
+        )
+    revert_ok = revert_result.returncode == 0
+    if revert_ok:
+        log.info(f"Successfully reverted last auto-fix for {job}")
+    else:
+        log.error(f"Failed to revert auto-fix for {job}: {revert_result.stderr[:500]}")
+    record_fix_attempt(job, "auto-fix-loop-revert", 0, revert_ok,
+                       f"rollback: reverted last auto-fix commit for {job}")
+    return revert_ok
+
+
+def _parse_strategies(diagnosis_output):
+    strategies = []
+    m1 = re.search(r"STRATEGY_1:\s*(.+?)\s*\((\d+)%\)", diagnosis_output)
+    m2 = re.search(r"STRATEGY_2:\s*(.+?)\s*\((\d+)%\)", diagnosis_output)
+    if m1:
+        strategies.append((m1.group(1).strip(), int(m1.group(2))))
+    if m2:
+        strategies.append((m2.group(1).strip(), int(m2.group(2))))
+    return strategies
 
 
 def _parse_run_id(run_url):
@@ -227,7 +296,9 @@ def _diagnose(job, step, error_log, error_class, context, repro=None, deep=False
         prompt += (
             f"1. Identify root cause from {source}.\n"
             f"2. List specific files/lines that need changes.\n"
-            f"3. Describe minimal fix strategy in 2-3 sentences."
+            f"3. Describe minimal fix strategy in 2-3 sentences.\n"
+            f"4. Output your top 2 fix strategies with confidence (0-100). "
+            f"Format: STRATEGY_1: <name> (<confidence>%) / STRATEGY_2: <name> (<confidence>%)"
         )
 
     label = f"Deep research ({job}/{step})" if deep else f"Diagnose ({job}/{step})"
@@ -280,6 +351,11 @@ def fix_with_retry(job, step, error_log, context=None):
                 _fix_count_changed = True
         except ImportError:
             pass
+        # Gate 0: Auto-fix loop detection
+        if _check_auto_fix_chain(job):
+            _rollback_last_auto_fix(job)
+            return False
+
         # Gate 1: Time-based dedup
         passed, reason = preflight_dedup(job, error_log)
         if not passed:
@@ -397,6 +473,9 @@ def fix_with_retry(job, step, error_log, context=None):
                 lines = [f"  - {s}: {r:.0%} success rate" for s, r in ranked_strategies]
                 strategies_section = "\nPREFERRED STRATEGIES (by historical success rate):\n" + "\n".join(lines) + "\n"
 
+            exploring = False
+            parsed_strategies = []
+
             # Phase-dependent prompt construction
             if phase == "deep":
                 log.info(f"Phase escalation: running deep diagnosis before attempt {attempt}")
@@ -464,6 +543,18 @@ def fix_with_retry(job, step, error_log, context=None):
                     f"List specific files/lines that need changes.\n"
                     f"STEP 2 - FIX: Apply the minimal fix to resolve the issue.\n"
                 )
+
+                if phase == "quick" and attempt == 1:
+                    diag_for_strats = _diagnose(
+                        job, step, error_log, error_class, context,
+                        repro=repro, deep=False,
+                    )
+                    parsed_strategies = _parse_strategies(diag_for_strats)
+                    if len(parsed_strategies) >= 2 and random.random() < 0.10:
+                        exploring = True
+                        alt_strategy = parsed_strategies[1][0]
+                        prompt += f"\nEXPLORATION: Prefer this alternative approach: {alt_strategy}\n"
+                        log.info(f"Exploration mode: trying alternative strategy '{alt_strategy}' for {job}/{step}")
 
             verify_line = f"STEP 3 - VERIFY: Run: {verify_cmd}\n" if verify_cmd else ""
             prompt += verify_line
@@ -558,6 +649,9 @@ def fix_with_retry(job, step, error_log, context=None):
 
             commit_ok = commit_result.returncode == 0
             record_strategy_outcome(job, error_class, strategy_note or error_class, commit_ok)
+            if exploring and parsed_strategies:
+                unchosen_name = parsed_strategies[0][0]
+                record_strategy_outcome(job, error_class, unchosen_name, None)
             record_fix_attempt(job, error_log, attempt, commit_ok,
                                f"class={error_class}, job={job}, step={step}. {strategy_note}",
                                timing=dataclasses.asdict(timing))
@@ -965,19 +1059,198 @@ def fix_sonar_issues(sonar_report, run_url):
         _sonar_fix_lock.release()
 
 
+def _parse_durations(pipeline_report):
+    """Extract job durations from the pipeline report table."""
+    durations = {}
+    for line in pipeline_report.splitlines():
+        match = re.match(r"\s*(\S+)\s*\|\s*\S+\s*\|\s*(\d+)s?\s*\|", line)
+        if match:
+            job, dur = match.group(1), match.group(2)
+            try:
+                durations[job] = int(dur)
+            except ValueError:
+                pass
+    return durations
+
+
+def _has_failures(focus):
+    """Check if the focus indicates actual job failures vs general optimization."""
+    return focus in ("security", "bugs", "pipeline")
+
+
+_PIPELINE_CACHE_NOTE = (
+    "NOTE: Rust compilation cache uses persistent runner volumes, NOT actions/cache or Swatinem/rust-cache. "
+    "Cache column showing 'volume' is correct. Do NOT add rust-cache or actions/cache for Rust targets.\n"
+)
+
+_MAX_IMPROVE_ATTEMPTS = 8
+
+
+def _build_failure_prompt(focus, pipeline_report, run_url, sonar_section, focus_specific, retry_section, phase):
+    """Build a prompt focused on fixing pipeline failures."""
+    if phase == "investigate":
+        return (
+            f"INVESTIGATION MODE: CI/CD pipeline failure fix after failed attempts.\n"
+            f"Focus: {focus}\n"
+            f"{_gh_cli_block(run_url)}\n"
+            f"--- PIPELINE REPORT ---\n{sanitize_for_prompt(pipeline_report, 5000)}\n--- END ---\n"
+            f"{sonar_section}\n"
+            "MANDATORY INVESTIGATION STEPS:\n"
+            "1. Fetch full logs via gh CLI\n"
+            "2. Read ALL workflow YAML files in .github/workflows/\n"
+            "3. Check git log -10 for recent CI changes\n"
+            "4. Search the web for any error messages from CI tools\n"
+            "5. Read .kiro/steering/ for project conventions\n"
+            "6. Write a plan BEFORE editing any file\n\n"
+            "CLASSIFY each failure:\n"
+            "  A) RUNNER ENV → document, don't change code\n"
+            "  B) PIPELINE CONFIG → fix in .github/workflows/\n"
+            "  C) DEPENDENCY VULN → fix in Cargo.toml/deny.toml/libs.versions.toml\n"
+            "  D) APP CODE → skip (handled by /ci-failure)\n\n"
+            f"{focus_specific}"
+            f"{_PIPELINE_CACHE_NOTE}"
+            f"{retry_section}"
+            "Stage: git add -A. Do NOT commit.\n"
+            f"Run URL: {run_url}"
+        )
+    elif phase == "deep":
+        return (
+            f"DEEP RESEARCH: CI/CD pipeline failure fix. Quick fixes failed.\n"
+            f"Focus: {focus}\n"
+            f"{_gh_cli_block(run_url)}\n"
+            f"--- PIPELINE REPORT ---\n{sanitize_for_prompt(pipeline_report, 5000)}\n--- END ---\n"
+            f"{sonar_section}\n"
+            "Fetch full logs via gh CLI first. Read workflow YAML fully before editing.\n\n"
+            "CLASSIFY each failure:\n"
+            "  A) RUNNER ENV → document, don't change code\n"
+            "  B) PIPELINE CONFIG → fix in .github/workflows/\n"
+            "  C) DEPENDENCY VULN → fix in Cargo.toml/deny.toml/libs.versions.toml\n"
+            "  D) APP CODE → skip (handled by /ci-failure)\n\n"
+            f"{focus_specific}"
+            f"{_PIPELINE_CACHE_NOTE}"
+            f"{retry_section}"
+            "Verify YAML validity after editing.\n"
+            "Stage: git add -A. Do NOT commit.\n"
+            f"Run URL: {run_url}"
+        )
+    else:
+        return (
+            f"CI/CD pipeline engineer. Fix pipeline failures.\n"
+            f"Focus: {focus}\n"
+            f"{_gh_cli_block(run_url)}\n"
+            f"--- PIPELINE REPORT ---\n{sanitize_for_prompt(pipeline_report, 5000)}\n--- END ---\n"
+            f"{sonar_section}\n"
+            "Fetch full logs via gh CLI first.\n\n"
+            "CLASSIFY each failure:\n"
+            "  A) RUNNER ENV → document, don't change code\n"
+            "  B) PIPELINE CONFIG → fix in .github/workflows/\n"
+            "  C) DEPENDENCY VULN → fix in Cargo.toml/deny.toml/libs.versions.toml\n"
+            "  D) APP CODE → skip (handled by /ci-failure)\n\n"
+            f"{focus_specific}"
+            f"{_PIPELINE_CACHE_NOTE}"
+            "Read workflow YAML fully before editing. Verify YAML validity after.\n"
+            f"{retry_section}"
+            "Stage: git add -A. Do NOT commit.\n"
+            f"Run URL: {run_url}"
+        )
+
+
+def _build_optimization_prompt(pipeline_report, run_url, sonar_section, trend_section, optimization_history_section=""):
+    return (
+        "CI/CD pipeline optimization. Rust/WASM + Android project on self-hosted runners with persistent volumes.\n"
+        f"{_gh_cli_block(run_url)}\n"
+        f"--- PIPELINE REPORT ---\n{sanitize_for_prompt(pipeline_report, 5000)}\n--- END ---\n"
+        f"{trend_section}"
+        f"{optimization_history_section}"
+        f"{sonar_section}\n"
+        "RULES:\n"
+        "- If the pipeline is healthy and durations are stable, make NO changes. "
+        "Report 'Pipeline healthy, no optimization needed' and stage nothing.\n"
+        "- Only optimize if you find a concrete, measurable improvement.\n"
+        "- Target: reduce wall-clock time or eliminate redundant work.\n"
+        "- Do NOT add actions/cache or Swatinem/rust-cache. Compilation cache uses persistent runner volumes.\n"
+        "- Do NOT restructure jobs unless you can justify the time savings.\n\n"
+        "LOOK FOR:\n"
+        "- Jobs that could run in parallel but have unnecessary `needs:` dependencies\n"
+        "- Duplicate tool installations across jobs\n"
+        "- Steps that could be skipped with path filters\n"
+        "- Jobs approaching their timeout (see trend data)\n\n"
+        "Read workflow YAML fully before editing. Verify YAML validity after.\n"
+        "Stage: git add -A. Do NOT commit.\n"
+        f"Run URL: {run_url}"
+    )
+
+
+def _build_trend_section():
+    """Build a trend summary from historical duration data."""
+    trends = get_all_trends()
+    if not trends:
+        return ""
+
+    lines = ["--- DURATION TRENDS ---"]
+    for job, trend in sorted(trends.items()):
+        if trend.sample_count < 3:
+            continue
+        risk = " ⚠️ TIMEOUT RISK" if trend.timeout_risk else ""
+        lines.append(
+            f"  {job}: avg={trend.moving_avg_s:.0f}s "
+            f"(samples={trend.sample_count}){risk}"
+        )
+    lines.append("--- END TRENDS ---\n")
+    return "\n".join(lines) if len(lines) > 2 else ""
+
+
 def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
     if not _improve_lock.acquire(blocking=False):
         log.warning("Another pipeline improvement is already running -- skipping")
         return False
 
     try:
+        is_failure = _has_failures(focus)
+
+        if not is_failure:
+            durations = _parse_durations(pipeline_report)
+            total_s = sum(durations.values())
+            if total_s > 0 and total_s < 1200:
+                log.info(
+                    f"Pipeline healthy (total {total_s}s < 1200s threshold, "
+                    f"focus={focus}) -- skipping optimization"
+                )
+                return True
+            if not durations:
+                log.info(
+                    "No duration data in report and no failures -- "
+                    "skipping optimization"
+                )
+                return True
+
+        sonar_section = ""
+        if sonar_report and "unavailable" not in sonar_report:
+            sonar_section = (
+                f"\n\n--- SONARQUBE ISSUES ---\n"
+                f"{sanitize_for_prompt(sonar_report, 5000)}\n"
+                f"--- END SONARQUBE ISSUES ---\n"
+            )
+
+        focus_guidance = {
+            "security": (
+                "SECURITY: Fix in Cargo.toml/deny.toml/libs.versions.toml, NOT pipeline YAML. "
+                "Only modify YAML if the security tool itself is misconfigured.\n"
+            ),
+            "bugs": (
+                "BUGS: /ci-failure webhook handles code fixes. "
+                "Only fix pipeline if failure is from misconfiguration (env, tools, caching).\n"
+            ),
+            "pipeline": (
+                "PIPELINE: Fix build/deploy config (Dockerfile, docker-compose, deploy scripts).\n"
+            ),
+        }
+
         _PHASE_QUICK_MAX = 3
         _PHASE_DEEP_MAX = 6
         last_strategy = ""
-        attempt = 0
-        while True:
-            attempt += 1
 
+        for attempt in range(1, _MAX_IMPROVE_ATTEMPTS + 1):
             if attempt <= _PHASE_QUICK_MAX:
                 phase = "quick"
             elif attempt <= _PHASE_DEEP_MAX:
@@ -985,31 +1258,11 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
             else:
                 phase = "investigate"
 
-            log.info(f"=== Pipeline improvement attempt {attempt} [{phase}] (focus: {focus}) ===")
-
-            sonar_section = ""
-            if sonar_report and "unavailable" not in sonar_report:
-                sonar_section = f"\n\n--- SONARQUBE ISSUES ---\n{sanitize_for_prompt(sonar_report, 5000)}\n--- END SONARQUBE ISSUES ---\n"
-
-            focus_guidance = {
-                "security": (
-                    "SECURITY: Fix in Cargo.toml/deny.toml/libs.versions.toml, NOT pipeline YAML. "
-                    "Only modify YAML if the security tool itself is misconfigured.\n"
-                ),
-                "bugs": (
-                    "BUGS: /ci-failure webhook handles code fixes. "
-                    "Only fix pipeline if failure is from misconfiguration (env, tools, caching).\n"
-                ),
-                "pipeline": (
-                    "PIPELINE: Fix build/deploy config (Dockerfile, docker-compose, deploy scripts).\n"
-                ),
-            }
-
-            focus_specific = ""
-            for f in focus.split(","):
-                f = f.strip()
-                if f in focus_guidance:
-                    focus_specific += focus_guidance[f]
+            log.info(
+                f"=== Pipeline {'fix' if is_failure else 'optimization'} "
+                f"attempt {attempt}/{_MAX_IMPROVE_ATTEMPTS} [{phase}] "
+                f"(focus: {focus}) ==="
+            )
 
             retry_section = ""
             if last_strategy:
@@ -1018,89 +1271,54 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
                     "You MUST try a DIFFERENT approach.\n"
                 )
 
-            if phase == "investigate":
-                prompt = (
-                    f"INVESTIGATION MODE: CI/CD pipeline improvement after {attempt - 1} failed attempts.\n"
-                    f"Focus: {focus}\n"
-                    f"{_gh_cli_block(run_url)}\n"
-                    f"--- PIPELINE REPORT ---\n{sanitize_for_prompt(pipeline_report, 5000)}\n--- END ---\n"
-                    f"{sonar_section}\n"
-                    "MANDATORY INVESTIGATION STEPS:\n"
-                    "1. Fetch full logs via gh CLI\n"
-                    "2. Read ALL workflow YAML files in .github/workflows/\n"
-                    "3. Check git log -10 for recent CI changes\n"
-                    "4. Search the web for any error messages from CI tools\n"
-                    "5. Read .kiro/steering/ for project conventions\n"
-                    "6. Write a plan BEFORE editing any file\n\n"
-                    "CLASSIFY each failure:\n"
-                    "  A) RUNNER ENV → document, don't change code\n"
-                    "  B) PIPELINE CONFIG → fix in .github/workflows/\n"
-                    "  C) DEPENDENCY VULN → fix in Cargo.toml/deny.toml/libs.versions.toml\n"
-                    "  D) APP CODE → skip (handled by /ci-failure)\n\n"
-                    f"{focus_specific}"
-                    "NOTE: Rust compilation cache uses persistent runner volumes, NOT actions/cache or Swatinem/rust-cache. "
-                    "Cache column showing 'volume' is correct. Do NOT add rust-cache or actions/cache for Rust targets.\n"
-                    f"{retry_section}"
-                    "Stage: git add -A. Do NOT commit.\n"
-                    f"Run URL: {run_url}"
-                )
-            elif phase == "deep":
-                prompt = (
-                    f"DEEP RESEARCH: CI/CD pipeline improvement. Quick fixes failed.\n"
-                    f"Focus: {focus}\n"
-                    f"{_gh_cli_block(run_url)}\n"
-                    f"--- PIPELINE REPORT ---\n{sanitize_for_prompt(pipeline_report, 5000)}\n--- END ---\n"
-                    f"{sonar_section}\n"
-                    "Fetch full logs via gh CLI first. Read workflow YAML fully before editing.\n\n"
-                    "CLASSIFY each failure:\n"
-                    "  A) RUNNER ENV → document, don't change code\n"
-                    "  B) PIPELINE CONFIG → fix in .github/workflows/\n"
-                    "  C) DEPENDENCY VULN → fix in Cargo.toml/deny.toml/libs.versions.toml\n"
-                    "  D) APP CODE → skip (handled by /ci-failure)\n\n"
-                    f"{focus_specific}"
-                    "Look for: slow jobs, failed jobs, redundant steps.\n"
-                    "NOTE: Rust compilation cache uses persistent runner volumes, NOT actions/cache or Swatinem/rust-cache. "
-                    "Cache column showing 'volume' is correct. Do NOT add rust-cache or actions/cache for Rust targets.\n"
-                    f"{retry_section}"
-                    "Verify YAML validity after editing.\n"
-                    "Stage: git add -A. Do NOT commit.\n"
-                    f"Run URL: {run_url}"
-                )
-            else:
-                prompt = (
-                    f"CI/CD pipeline engineer. Rust/WASM + Android project.\n"
-                    f"Focus: {focus}\n"
-                    f"{_gh_cli_block(run_url)}\n"
-                    f"--- PIPELINE REPORT ---\n{sanitize_for_prompt(pipeline_report, 5000)}\n--- END ---\n"
-                    f"{sonar_section}\n"
-                    "Fetch full logs via gh CLI first.\n\n"
-                    "CLASSIFY each failure:\n"
-                    "  A) RUNNER ENV → document, don't change code\n"
-                    "  B) PIPELINE CONFIG → fix in .github/workflows/\n"
-                    "  C) DEPENDENCY VULN → fix in Cargo.toml/deny.toml/libs.versions.toml\n"
-                    "  D) APP CODE → skip (handled by /ci-failure)\n\n"
-                    f"{focus_specific}"
-                    "Look for: slow jobs, failed jobs, redundant steps.\n"
-                    "NOTE: Rust compilation cache uses persistent runner volumes, NOT actions/cache or Swatinem/rust-cache. "
-                    "Cache column showing 'volume' is correct. Do NOT add rust-cache or actions/cache for Rust targets.\n"
-                    "Read workflow YAML fully before editing. Verify YAML validity after.\n"
-                    f"{retry_section}"
-                    "Stage: git add -A. Do NOT commit.\n"
-                    f"Run URL: {run_url}"
-                )
+            if is_failure:
+                focus_specific = ""
+                for f in focus.split(","):
+                    f = f.strip()
+                    if f in focus_guidance:
+                        focus_specific += focus_guidance[f]
 
-            result = run_kiro(prompt, f"Pipeline improve ({focus}) attempt {attempt} [{phase}]")
+                prompt = _build_failure_prompt(
+                    focus, pipeline_report, run_url,
+                    sonar_section, focus_specific, retry_section, phase,
+                )
+                label = f"Pipeline fix ({focus}) attempt {attempt} [{phase}]"
+            else:
+                trend_section = _build_trend_section()
+                opt_history = get_optimization_history()
+                optimization_history_section = ""
+                if opt_history:
+                    lines = ["--- PAST OPTIMIZATIONS ---"]
+                    for rec in opt_history:
+                        ts = rec.get("timestamp", "?")[:19]
+                        summary = rec.get("changes_summary", "?")
+                        focus_val = rec.get("focus", "?")
+                        pre_dur = rec.get("pre_durations", {})
+                        dur_str = ", ".join(f"{k}={v:.0f}s" for k, v in pre_dur.items()) if pre_dur else "n/a"
+                        lines.append(f"  [{ts}] focus={focus_val} durations=[{dur_str}] changes: {summary}")
+                    lines.append("--- END PAST OPTIMIZATIONS ---\n")
+                    optimization_history_section = "\n".join(lines) + "\n"
+                prompt = _build_optimization_prompt(
+                    pipeline_report, run_url, sonar_section, trend_section,
+                    optimization_history_section,
+                )
+                label = f"Pipeline optimize attempt {attempt} [{phase}]"
+
+            result = run_kiro(prompt, label)
             success = result[0] if isinstance(result, tuple) else result
 
             if not success:
                 log.warning(f"Pipeline improvement attempt {attempt} [{phase}] failed")
                 last_strategy = f"attempt {attempt} [{phase}] failed"
+                if not is_failure:
+                    log.info("Optimization attempt failed -- not retrying for green builds")
+                    return False
                 continue
 
             commit_result = wsl_bash(
                 "git add -A && "
                 "git diff --cached --quiet && echo 'nothing to commit' || "
-                f"(git commit -m 'ci: improve pipeline ({focus})' && "
+                f"(git commit -m 'ci: {'fix' if is_failure else 'optimize'} pipeline ({focus})' && "
                 "git push origin main || "
                 "(git pull --rebase origin main && git push origin main))",
                 timeout=120,
@@ -1108,11 +1326,22 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
 
             if commit_result.returncode == 0:
                 log.info(f"Pipeline improvement attempt {attempt} [{phase}] completed")
+                if not is_failure:
+                    durations = _parse_durations(pipeline_report)
+                    record_optimization(
+                        f"attempt {attempt} [{phase}] focus={focus}",
+                        durations,
+                        focus,
+                    )
                 return True
 
             log.warning(f"Pipeline improvement attempt {attempt} [{phase}] commit/push failed")
             last_strategy = f"commit/push failed on attempt {attempt}"
 
+        log.error(
+            f"Pipeline improvement exhausted all {_MAX_IMPROVE_ATTEMPTS} attempts "
+            f"(focus: {focus})"
+        )
         return False
     finally:
         _improve_lock.release()

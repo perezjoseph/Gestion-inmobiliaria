@@ -68,14 +68,19 @@ class FixDecision:
     prompt_additions: str = ""
 
 
-def record_strategy_outcome(job: str, error_class: str, strategy: str, success: bool) -> None:
+def record_strategy_outcome(job: str, error_class: str, strategy: str, success: bool | None) -> None:
     key = f"{job}|{error_class}"
     now = datetime.now().isoformat()
     with _fix_history_lock:
         history = _load_fix_history()
         stats = history.setdefault("strategy_stats", {})
         entries = stats.setdefault(key, [])
-        entries.append({"strategy": strategy, "ts": now, "success": success})
+        entry = {"strategy": strategy, "ts": now}
+        if success is not None:
+            entry["success"] = success
+        else:
+            entry["shadow"] = True
+        entries.append(entry)
         stats[key] = entries
         _save_fix_history(history)
 

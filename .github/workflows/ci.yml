@@ -58,11 +58,51 @@ jobs:
           echo "Available disk space on $CHECK_PATH: ${AVAIL_MB}MB"
           echo "Disk space OK (${AVAIL_MB}MB) -- self-hosted runner."
 
+  # ── Stage 0.5: Path-Based Change Detection ──
+
+  changes:
+    name: Detect Changes
+    needs: [runner-cleanup]
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 3
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      android: ${{ steps.filter.outputs.android }}
+      ci: ${{ steps.filter.outputs.ci }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Detect changed paths
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            frontend:
+              - 'frontend/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            android:
+              - 'android/**'
+            ci:
+              - '.github/**'
+
   # ── Stage 1: Quality Checks (parallel) ──
 
   security:
     name: Security
-    needs: [runner-cleanup]
+    needs: [runner-cleanup, changes]
     permissions:
       actions: read
       contents: read
@@ -76,7 +116,12 @@ jobs:
 
   lint:
     name: Lint
-    needs: [runner-cleanup]
+    needs: [runner-cleanup, changes]
+    if: >-
+      github.event_name != 'pull_request' ||
+      needs.changes.outputs.backend == 'true' ||
+      needs.changes.outputs.frontend == 'true' ||
+      needs.changes.outputs.ci == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/lint.yml
@@ -86,7 +131,12 @@ jobs:
 
   tests:
     name: Tests
-    needs: [runner-cleanup]
+    needs: [runner-cleanup, changes]
+    if: >-
+      github.event_name != 'pull_request' ||
+      needs.changes.outputs.backend == 'true' ||
+      needs.changes.outputs.frontend == 'true' ||
+      needs.changes.outputs.ci == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/test.yml
@@ -98,8 +148,16 @@ jobs:
 
   sonarqube:
     name: SonarQube
-    needs: [lint, tests]
-    if: always()
+    needs: [lint, tests, changes]
+    if: >-
+      always() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.outputs.backend == 'true' ||
+        needs.changes.outputs.frontend == 'true' ||
+        needs.changes.outputs.android == 'true' ||
+        needs.lint.result == 'success' ||
+        needs.tests.result == 'success'
+      )
     permissions:
       contents: read
     uses: ./.github/workflows/sonarqube.yml
@@ -115,8 +173,16 @@ jobs:
 
   build:
     name: Build
-    needs: [lint]
-    if: always() && needs.lint.outputs.result == 'success'
+    needs: [lint, changes]
+    if: >-
+      always() && (
+        needs.lint.outputs.result == 'success' || needs.lint.result == 'skipped'
+      ) && (
+        github.event_name != 'pull_request' ||
+        needs.changes.outputs.backend == 'true' ||
+        needs.changes.outputs.frontend == 'true' ||
+        needs.changes.outputs.ci == 'true'
+      )
     permissions:
       contents: read
       id-token: write
@@ -163,7 +229,7 @@ jobs:
 
   pipeline-improve:
     name: Pipeline Improve
-    needs: [security, lint, tests, sonarqube, build, containers, deploy]
+    needs: [security, lint, tests, sonarqube, build, containers, deploy, changes]
     if: always()
     permissions:
       contents: read
