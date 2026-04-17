@@ -280,42 +280,34 @@ mod db_async {
         std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for integration tests")
     }
 
-    async fn setup_db() -> DatabaseConnection {
-        let mut last_err = None;
-        for attempt in 0..5 {
-            if attempt > 0 {
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-            }
-            let mut opts = ConnectOptions::new(db_url());
-            opts.max_connections(2)
-                .min_connections(0)
-                .connect_timeout(std::time::Duration::from_secs(10))
-                .idle_timeout(std::time::Duration::from_secs(60))
-                .acquire_timeout(std::time::Duration::from_secs(10));
-            match Database::connect(opts).await {
-                Ok(db) => {
-                    super::migrations::Migrator::up(&db, None)
-                        .await
-                        .expect("Failed to run migrations");
-                    return db;
-                }
-                Err(e) => last_err = Some(e),
-            }
-        }
-        panic!(
-            "Failed to connect to database after 5 attempts: {:?}",
-            last_err.unwrap()
-        );
+    async fn setup_db() -> Result<DatabaseConnection, String> {
+        let mut opts = ConnectOptions::new(db_url());
+        opts.max_connections(2)
+            .min_connections(1)
+            .connect_timeout(std::time::Duration::from_secs(30))
+            .idle_timeout(std::time::Duration::from_secs(60));
+        let db = Database::connect(opts)
+            .await
+            .map_err(|e| format!("Failed to connect to database: {e}"))?;
+        super::migrations::Migrator::up(&db, None)
+            .await
+            .map_err(|e| format!("Failed to run migrations: {e}"))?;
+        Ok(db)
     }
 
     fn shared_rt_and_db() -> &'static (tokio::runtime::Runtime, DatabaseConnection) {
-        static SHARED: std::sync::OnceLock<(tokio::runtime::Runtime, DatabaseConnection)> =
-            std::sync::OnceLock::new();
-        SHARED.get_or_init(|| {
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            let db = rt.block_on(setup_db());
-            (rt, db)
-        })
+        static SHARED: std::sync::OnceLock<
+            Result<(tokio::runtime::Runtime, DatabaseConnection), String>,
+        > = std::sync::OnceLock::new();
+        SHARED
+            .get_or_init(|| {
+                let rt =
+                    tokio::runtime::Runtime::new().map_err(|e| format!("Runtime error: {e}"))?;
+                let db = rt.block_on(setup_db())?;
+                Ok((rt, db))
+            })
+            .as_ref()
+            .unwrap_or_else(|e| panic!("{e}"))
     }
 
     fn with_db<F, Fut>(f: F)
