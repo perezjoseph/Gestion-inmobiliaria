@@ -101,6 +101,8 @@ def get_ranked_strategies(job: str, error_class: str) -> list[tuple[str, float]]
         return []
     totals: dict[str, list[bool]] = {}
     for e in recent:
+        if "success" not in e:
+            continue
         totals.setdefault(e["strategy"], []).append(e["success"])
     ranked = []
     for strat, outcomes in totals.items():
@@ -115,7 +117,7 @@ def compute_feasibility(job: str, error_class: str) -> FeasibilityResult:
     with _fix_history_lock:
         history = _load_fix_history()
     entries = history.get("strategy_stats", {}).get(key, [])
-    recent = entries[-20:]
+    recent = [e for e in entries[-20:] if "shadow" not in e]
     total = len(recent)
     if total < MIN_ATTEMPTS_FOR_FEASIBILITY:
         return FeasibilityResult(score=1.0, sample_count=total, recommendation="proceed")

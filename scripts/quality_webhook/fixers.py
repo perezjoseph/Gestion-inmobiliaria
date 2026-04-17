@@ -638,6 +638,8 @@ def fix_with_retry(job, step, error_log, context=None):
             timing.total_s = time.monotonic() - attempt_start
             all_timings.append(timing)
             log.info(f"All gates passed for attempt {attempt} ({job}/{step}). Committing.")
+            pre_fix_sha_result = wsl_bash("git rev-parse HEAD", timeout=10)
+            pre_fix_sha = pre_fix_sha_result.stdout.strip()[:12] if pre_fix_sha_result.returncode == 0 else "unknown"
             with _git_lock:
                 commit_result = wsl_bash(
                     "git add -A && "
@@ -653,7 +655,7 @@ def fix_with_retry(job, step, error_log, context=None):
                 unchosen_name = parsed_strategies[0][0]
                 record_strategy_outcome(job, error_class, unchosen_name, None)
             record_fix_attempt(job, error_log, attempt, commit_ok,
-                               f"class={error_class}, job={job}, step={step}. {strategy_note}",
+                               f"class={error_class}, job={job}, step={step}. pre_fix_sha={pre_fix_sha}. {strategy_note}",
                                timing=dataclasses.asdict(timing))
             store_fix_attempt(job, step, error_class, error_log, attempt, commit_ok)
 
@@ -780,6 +782,8 @@ def _deep_research_fix(job, step, error_log, context=None):
 
     # All gates passed — commit
     log.info(f"Deep research fix passed all gates for {job}/{step}. Committing.")
+    pre_fix_sha_result = wsl_bash("git rev-parse HEAD", timeout=10)
+    pre_fix_sha = pre_fix_sha_result.stdout.strip()[:12] if pre_fix_sha_result.returncode == 0 else "unknown"
     with _git_lock:
         commit_result = wsl_bash(
             "git add -A && "
@@ -795,7 +799,7 @@ def _deep_research_fix(job, step, error_log, context=None):
 
     record_strategy_outcome(job, error_class, strategy_note, commit_ok)
     record_fix_attempt(job, error_log, 0, commit_ok,
-                       f"deep_research class={error_class}. {strategy_note}")
+                       f"deep_research class={error_class}. pre_fix_sha={pre_fix_sha}. {strategy_note}")
     store_fix_attempt(job, step, error_class, error_log, 0, commit_ok)
 
     if commit_ok:

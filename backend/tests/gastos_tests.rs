@@ -282,7 +282,10 @@ mod db_async {
 
     async fn setup_db() -> DatabaseConnection {
         let mut opts = ConnectOptions::new(db_url());
-        opts.connect_timeout(std::time::Duration::from_secs(5));
+        opts.max_connections(2)
+            .min_connections(1)
+            .connect_timeout(std::time::Duration::from_secs(30))
+            .idle_timeout(std::time::Duration::from_secs(60));
         let db = Database::connect(opts)
             .await
             .expect("Failed to connect to database");
