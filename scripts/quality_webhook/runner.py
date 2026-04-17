@@ -174,7 +174,7 @@ def run_kiro(prompt, label):
             t_err.start()
 
             try:
-                proc.wait(timeout=KIRO_TIMEOUT)
+                proc.wait(timeout=KIRO_TIMEOUT if KIRO_TIMEOUT > 0 else None)
             except subprocess.TimeoutExpired:
                 timed_out = True
                 proc.kill()

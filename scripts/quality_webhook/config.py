@@ -20,8 +20,8 @@ BIND_ADDRESS = os.environ.get("BIND_ADDRESS", "0.0.0.0")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
 WIN_PROJECT_DIR = pathlib.Path(__file__).resolve().parent.parent.parent
-MAX_RETRIES = 3
-KIRO_TIMEOUT = 900
+MAX_RETRIES = 0
+KIRO_TIMEOUT = 0
 MAX_CONCURRENT_FIXES = 3
 THREAD_POOL_SIZE = 8
 REQUEST_QUEUE_SIZE = 16
@@ -47,6 +47,8 @@ SCOPE_CONSTRAINTS = (
     "- Do NOT add new crate dependencies unless absolutely necessary for the fix.\n"
     "- Do NOT modify CI pipeline YAML files (.github/workflows/) unless the job is specifically about pipeline config.\n"
     "- Do NOT modify scripts/quality-webhook-listener.py.\n"
+    "- NEVER add #[ignore] to tests. NEVER replace test bodies with todo!() or unimplemented!(). Fix the actual failure.\n"
+    "- NEVER delete or skip tests to make the suite pass.\n"
     "- Prefer minimal, targeted edits over broad changes.\n"
 )
 

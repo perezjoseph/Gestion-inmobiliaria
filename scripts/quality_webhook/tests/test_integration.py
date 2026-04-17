@@ -192,11 +192,11 @@ class TestSmokeConfiguration:
     Validates Requirements 3.1, 9.2, 6.1, 1.2, 7.1.
     """
 
-    def test_kiro_timeout_is_900(self):
-        """KIRO_TIMEOUT should be 900 seconds (15 minutes). Requirement 3.1."""
+    def test_kiro_timeout_is_disabled(self):
+        """KIRO_TIMEOUT should be 0 (no timeout). Requirement 3.1."""
         from scripts.quality_webhook.config import KIRO_TIMEOUT
 
-        assert KIRO_TIMEOUT == 900, f"Expected KIRO_TIMEOUT=900, got {KIRO_TIMEOUT}"
+        assert KIRO_TIMEOUT == 0, f"Expected KIRO_TIMEOUT=0, got {KIRO_TIMEOUT}"
 
     def test_thread_semaphore_initial_value_is_8(self):
         """_thread_semaphore should start at 8. Requirement 9.2."""

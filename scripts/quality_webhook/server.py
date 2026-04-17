@@ -7,7 +7,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from .config import (
     PORT, BIND_ADDRESS, WEBHOOK_SECRET, WIN_PROJECT_DIR, PROJECT_DIR,
-    MAX_RETRIES, KIRO_TIMEOUT, MAX_PAYLOAD_BYTES, WSL_DISTRO, WSL_USER,
+    MAX_PAYLOAD_BYTES, WSL_DISTRO, WSL_USER,
     THREAD_POOL_SIZE, REQUEST_QUEUE_SIZE, MAX_CONCURRENT_FIXES,
     log, get_local_ip, to_wsl_path,
 )
@@ -269,14 +269,14 @@ class WebhookHandler(BaseHTTPRequestHandler):
             "Then commit and push: git add -A && git commit -m 'fix: resolve SonarQube failures (auto-fix)' && git push origin main"
         )
 
-        for attempt in range(1, MAX_RETRIES + 1):
-            log.info(f"=== SonarQube fix attempt {attempt}/{MAX_RETRIES} ===")
+        attempt = 0
+        while True:
+            attempt += 1
+            log.info(f"=== SonarQube fix attempt {attempt} ===")
             result = run_kiro(prompt, f"SonarQube fix attempt {attempt}")
             success = result[0] if isinstance(result, tuple) else result
             if success:
                 return
-
-        log.error(f"Failed after {MAX_RETRIES} attempts.")
 
     def _handle_ci_failure(self, payload):
         job = validate_name(payload.get("job", "unknown"))
@@ -489,7 +489,7 @@ def main():
     server.timeout = 30
     server.request_queue_size = REQUEST_QUEUE_SIZE
     log.info(f"Quality webhook listener running on {BIND_ADDRESS}:{PORT}")
-    log.info(f"Max retries: {MAX_RETRIES} | Timeout: {KIRO_TIMEOUT // 60}min | Max payload: {MAX_PAYLOAD_BYTES // 1024}KB")
+    log.info(f"Max concurrent fixes: {MAX_CONCURRENT_FIXES} | Max payload: {MAX_PAYLOAD_BYTES // 1024}KB")
     log.info("Endpoints:")
     log.info(f"  Health:     http://{local_ip}:{PORT}/health")
     log.info(f"  SonarQube:  http://{local_ip}:{PORT}/sonarqube")

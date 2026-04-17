@@ -64,10 +64,10 @@ jobs:
         timeout-minutes: 3
         run: |
           TRUNK_VERSION="0.21.14"
-          TRUNK_SHA256="f2b4680cd239693a646a2795e4633c625328d7b2a044fbe749fa3a2fe9e7036b"
+          TRUNK_SHA256="a67f4054b249fe9acc5fabc25de1aebf19783aca3ad6ff64bf34d7da44d0ea20"
           ARCHIVE="${RUNNER_TEMP}/trunk.tar.gz"
           curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
-            "https://github.com/trunk-rs/trunk/releases/download/v${TRUNK_VERSION}/trunk-x86_64-unknown-linux-gnu.tar.gz"
+            "https://github.com/trunk-rs/trunk/releases/download/v${TRUNK_VERSION}/trunk-x86_64-unknown-linux-musl.tar.gz"
           echo "${TRUNK_SHA256}  ${ARCHIVE}" | sha256sum -c -
           mkdir -p "${HOME}/.local/bin"
           tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" trunk
@@ -279,7 +279,7 @@ jobs:
 
       - name: Scan binary output for secrets
         run: |
-          gitleaks detect --source target/release --verbose --redact --exit-code 1 --no-git
+          gitleaks detect --source target/release --verbose --redact --exit-code 1 --no-git --config .gitleaks.toml
 
       - name: Generate checksum
         run: |

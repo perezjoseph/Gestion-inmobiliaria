@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from .config import (
-    WIN_PROJECT_DIR, MAX_RETRIES, MAX_CONCURRENT_FIXES, SCOPE_CONSTRAINTS,
+    WIN_PROJECT_DIR, MAX_CONCURRENT_FIXES, SCOPE_CONSTRAINTS,
     SONAR_PARALLEL_GROUPS, log,
 )
 from .runner import wsl_bash, run_kiro
@@ -22,7 +22,7 @@ from .memory import (
     search_relevant_context, extract_outcome_from_output,
 )
 from .gates import (
-    preflight_dedup, verification_run,
+    preflight_dedup, verification_run, revision_check_diff,
 )
 from .reproducer import reproduce_locally, format_errors_for_prompt, ReproCache
 from .trends import record_duration, check_and_alert_trends
@@ -291,11 +291,13 @@ def fix_with_retry(job, step, error_log, context=None):
         semantic_context = search_relevant_context(job, error_log)
         last_strategy_summary = ""
 
-        for attempt in range(1, MAX_RETRIES + 1):
+        attempt = 0
+        while True:
+            attempt += 1
             attempt_start = time.monotonic()
             timing = PhaseTiming()
 
-            log.info(f"=== Attempt {attempt}/{MAX_RETRIES} for {job}/{step}{ctx_str} (class: {error_class}) ===")
+            log.info(f"=== Attempt {attempt} for {job}/{step}{ctx_str} (class: {error_class}) ===")
 
             instruction = _JOB_INSTRUCTIONS.get(job, "Analyze and fix.")
             verify_cmd = _JOB_VERIFY.get(job, "")
@@ -338,7 +340,7 @@ def fix_with_retry(job, step, error_log, context=None):
 
             prompt = (
                 f"CI FAILED: job='{job}', step='{step}'{ctx_str}, "
-                f"class={error_class}, attempt {attempt}/{MAX_RETRIES}\n\n"
+                f"class={error_class}, attempt {attempt}\n\n"
                 f"{repro_section}"
                 f"{_gh_cli_block(run_url)}"
                 f"Error preview:\n```\n{error_log[:3000]}\n```\n\n"
@@ -390,7 +392,22 @@ def fix_with_retry(job, step, error_log, context=None):
                 log.warning(f"Attempt {attempt} kiro-cli returned failure for {job}/{step}")
                 continue
 
-            # Gate 2: Independent verification
+            # Gate 2: Revision check (reject forbidden patterns like #[ignore])
+            rev_passed, rev_reason = revision_check_diff()
+            if not rev_passed:
+                timing.total_s = time.monotonic() - attempt_start
+                all_timings.append(timing)
+                log.warning(f"Revision gate rejected attempt {attempt} ({job}/{step}): {rev_reason}")
+                wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+                last_strategy_summary = f"REVISION REJECTED ({rev_reason}). {strategy_note}"
+                record_strategy_outcome(job, error_class, strategy_note or error_class, False)
+                record_fix_attempt(job, error_log, attempt, False,
+                                   f"revision_rejected: {rev_reason}. {strategy_note}",
+                                   timing=dataclasses.asdict(timing))
+                store_fix_attempt(job, step, error_class, error_log, attempt, False)
+                continue
+
+            # Gate 3: Independent verification
             t0 = time.monotonic()
             verify_passed, verify_reason = verification_run(job)
             timing.verification_s = time.monotonic() - t0
@@ -446,15 +463,6 @@ def fix_with_retry(job, step, error_log, context=None):
             log.warning(f"Commit/push failed for attempt {attempt} ({job}/{step})")
             last_strategy_summary = f"commit/push failed. {strategy_note}"
 
-        _write_escalation(job, step, error_log, error_class, context, repro=repro)
-        log.error(f"Failed after {MAX_RETRIES} attempts for {job}/{step}. Escalation written.")
-        _log_timing_summary(job, step, cycle_start, all_timings)
-        total_cycle_s = time.monotonic() - cycle_start
-        record_duration(job, total_cycle_s, False)
-        at_risk = check_and_alert_trends()
-        for rj in at_risk:
-            log.warning(f"Trend alert: job '{rj}' approaching timeout threshold")
-        return False
     finally:
         _max_concurrent_fixes.release()
         job_lock.release()
@@ -486,7 +494,7 @@ def _write_escalation(job, step, error_log, error_class, context, extra_reason="
             "step": step,
             "error_class": error_class,
             "context": context or {},
-            "max_retries_exhausted": MAX_RETRIES,
+            "max_retries_exhausted": "unlimited",
             "error_log_preview": error_log[:3000],
             "local_reproduction": repro_info,
             "recommendation": _escalation_recommendation(error_class, job),
@@ -527,7 +535,7 @@ def _escalation_recommendation(error_class, job):
             "has failed multiple times recently. This likely requires human investigation."
         ),
     }
-    return recs.get(error_class, f"Auto-fix exhausted {MAX_RETRIES} attempts for {job}. Manual investigation required.")
+    return recs.get(error_class, f"Auto-fix could not resolve {job}. Manual investigation required.")
 
 
 def _parse_sonar_report_by_file(sonar_report):
@@ -599,8 +607,10 @@ def fix_sonar_issues(sonar_report, run_url):
 
         log.info(f"Sonar fix: {len(file_groups)} file groups in {len(waves)} waves")
 
-        for attempt in range(1, MAX_RETRIES + 1):
-            log.info(f"=== SonarQube fix attempt {attempt}/{MAX_RETRIES} ({len(waves)} waves) ===")
+        attempt = 0
+        while True:
+            attempt += 1
+            log.info(f"=== SonarQube fix attempt {attempt} ({len(waves)} waves) ===")
 
             all_succeeded = True
             failed_groups = []
@@ -655,7 +665,6 @@ def fix_sonar_issues(sonar_report, run_url):
 
             log.warning(f"SonarQube fix attempt {attempt} commit/push failed")
 
-        log.error(f"SonarQube fix failed after {MAX_RETRIES} attempts.")
         return False
     finally:
         _sonar_fix_lock.release()
@@ -667,8 +676,10 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
         return False
 
     try:
-        for attempt in range(1, MAX_RETRIES + 1):
-            log.info(f"=== Pipeline improvement attempt {attempt}/{MAX_RETRIES} (focus: {focus}) ===")
+        attempt = 0
+        while True:
+            attempt += 1
+            log.info(f"=== Pipeline improvement attempt {attempt} (focus: {focus}) ===")
 
             sonar_section = ""
             if sonar_report and "unavailable" not in sonar_report:
@@ -735,7 +746,6 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
 
             log.warning(f"Pipeline improvement attempt {attempt} commit/push failed")
 
-        log.error(f"Pipeline improvement failed after {MAX_RETRIES} attempts.")
         return False
     finally:
         _improve_lock.release()

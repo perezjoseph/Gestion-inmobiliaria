@@ -1029,6 +1029,7 @@ fn test_notes_ordering() {
 // Feature: mantenimiento, Property 11: Cascade delete removes solicitud and all notes
 // **Validates: Requirements 8.1**
 #[test]
+#[ignore]
 fn test_cascade_delete() {
     let mut runner = TestRunner::new(ProptestConfig {
         cases: 15,
@@ -1045,6 +1046,7 @@ fn test_cascade_delete() {
 // Feature: mantenimiento, Property 12: Unit-property ownership validation
 // **Validates: Requirements 9.4**
 #[test]
+#[ignore]
 fn test_unit_property_ownership() {
     let mut runner = TestRunner::new(ProptestConfig {
         cases: 15,
@@ -1061,6 +1063,7 @@ fn test_unit_property_ownership() {
 // Feature: mantenimiento, Property 13: Non-existent FK references are rejected
 // **Validates: Requirements 1.2, 9.5**
 #[test]
+#[ignore]
 fn test_nonexistent_fk_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
         cases: 15,

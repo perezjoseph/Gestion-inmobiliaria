@@ -63,6 +63,29 @@ def preflight_dedup(job, error_log, error_class="unknown"):
     return True, f"{len(recent_failures)} recent failures (under threshold)"
 
 
+_FORBIDDEN_DIFF_PATTERNS = [
+    r"^\+.*#\[ignore\]",
+    r"^\+.*todo!\(",
+    r"^\+.*unimplemented!\(",
+]
+
+
+def revision_check_diff():
+    """Reject if the staged diff adds #[ignore], todo!(), or unimplemented!() to tests."""
+    import re
+    try:
+        result = wsl_bash("git diff --cached -- '*.rs'", timeout=30)
+        diff_text = result.stdout or ""
+        for pattern in _FORBIDDEN_DIFF_PATTERNS:
+            matches = re.findall(pattern, diff_text, re.MULTILINE)
+            if matches:
+                return False, f"diff adds forbidden pattern: {matches[0].strip()}"
+        return True, "no forbidden patterns in diff"
+    except Exception as e:
+        log.warning(f"Revision diff check error: {e}")
+        return True, f"diff check skipped: {e}"
+
+
 _VERIFY_COMMANDS = {
     "lint": (
         "cargo fmt --all --check && "

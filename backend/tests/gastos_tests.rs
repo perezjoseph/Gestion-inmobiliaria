@@ -932,82 +932,69 @@ mod db_async {
 
 // Task 9.1: DB-backed tests
 #[test]
-#[ignore]
 fn crud_cycle_create_get_update_delete() {
     db_async::crud_cycle();
 }
 
 #[test]
-#[ignore]
 fn pagination_returns_correct_structure() {
     db_async::pagination();
 }
 
 #[test]
-#[ignore]
 fn filter_by_propiedad_id() {
     db_async::filter_propiedad_id();
 }
 
 #[test]
-#[ignore]
 fn filter_by_categoria() {
     db_async::filter_categoria();
 }
 
 #[test]
-#[ignore]
 fn filter_by_date_range() {
     db_async::filter_date_range();
 }
 
 // Task 9.2: CSV import tests
 #[test]
-#[ignore]
 fn csv_import_valid_file() {
     db_async::csv_import_valid();
 }
 
 #[test]
-#[ignore]
 fn csv_import_mixed_valid_invalid_rows() {
     db_async::csv_import_mixed();
 }
 
 #[test]
-#[ignore]
 fn csv_import_empty_returns_422() {
     db_async::csv_import_empty();
 }
 
 // Task 9.3: Profitability report tests
 #[test]
-#[ignore]
 fn profitability_report_json_returns_correct_structure() {
     db_async::profitability_json();
 }
 
 #[test]
-#[ignore]
 fn profitability_report_pdf_returns_bytes() {
     db_async::profitability_pdf();
 }
 
 #[test]
-#[ignore]
 fn profitability_report_xlsx_returns_bytes() {
     db_async::profitability_xlsx();
 }
 
 // Task 9.4: Dashboard tests
 #[test]
-#[ignore]
 fn dashboard_stats_includes_total_gastos_mes() {
     db_async::dashboard_stats_gastos();
 }
 
 #[test]
-#[ignore]
 fn gastos_comparacion_returns_correct_structure() {
     db_async::gastos_comparacion();
 }
