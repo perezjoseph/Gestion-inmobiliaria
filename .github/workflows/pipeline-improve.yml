@@ -23,10 +23,6 @@ on:
         type: string
         required: false
         default: ''
-      coverage-backend-result:
-        type: string
-        required: false
-        default: ''
       quality-gate-result:
         type: string
         required: false
@@ -87,10 +83,6 @@ on:
         type: string
         required: false
         default: ''
-      coverage-backend-duration:
-        type: string
-        required: false
-        default: ''
       test-frontend-duration:
         type: string
         required: false
@@ -108,26 +100,6 @@ on:
         required: false
         default: ''
       build-backend-duration:
-        type: string
-        required: false
-        default: ''
-      lint-cache-hit:
-        type: string
-        required: false
-        default: ''
-      test-backend-cache-hit:
-        type: string
-        required: false
-        default: ''
-      test-frontend-cache-hit:
-        type: string
-        required: false
-        default: ''
-      build-frontend-cache-hit:
-        type: string
-        required: false
-        default: ''
-      build-backend-cache-hit:
         type: string
         required: false
         default: ''
@@ -270,14 +242,13 @@ jobs:
           REPORT="${REPORT}  -------------------|----------|----------|------\n"
           REPORT="${REPORT}  secret-scan        | ${{ inputs.secret-scan-result }} | n/a | n/a\n"
           REPORT="${REPORT}  dependency-review  | ${{ inputs.dependency-review-result }} | n/a | n/a\n"
-          REPORT="${REPORT}  lint               | ${{ inputs.lint-result }} | ${{ inputs.lint-duration || 'n/a' }} | ${{ inputs.lint-cache-hit == 'true' && 'HIT' || 'MISS' }}\n"
-          REPORT="${REPORT}  test-backend       | ${{ inputs.test-backend-result }} | ${{ inputs.test-backend-duration || 'n/a' }} | ${{ inputs.test-backend-cache-hit == 'true' && 'HIT' || 'MISS' }}\n"
-          REPORT="${REPORT}  coverage-backend   | ${{ inputs.coverage-backend-result }} | ${{ inputs.coverage-backend-duration || 'n/a' }} | n/a\n"
-          REPORT="${REPORT}  test-frontend      | ${{ inputs.test-frontend-result }} | ${{ inputs.test-frontend-duration || 'n/a' }} | ${{ inputs.test-frontend-cache-hit == 'true' && 'HIT' || 'MISS' }}\n"
+          REPORT="${REPORT}  lint               | ${{ inputs.lint-result }} | ${{ inputs.lint-duration || 'n/a' }} | volume\n"
+          REPORT="${REPORT}  test-backend       | ${{ inputs.test-backend-result }} | ${{ inputs.test-backend-duration || 'n/a' }} | volume\n"
+          REPORT="${REPORT}  test-frontend      | ${{ inputs.test-frontend-result }} | ${{ inputs.test-frontend-duration || 'n/a' }} | volume\n"
           REPORT="${REPORT}  quality-gate       | ${{ inputs.quality-gate-result }} | ${{ inputs.quality-gate-duration || 'n/a' }} | n/a\n"
           REPORT="${REPORT}  sonarqube          | ${{ inputs.sonarqube-result }} | ${{ inputs.sonarqube-duration || 'n/a' }} | n/a\n"
-          REPORT="${REPORT}  build-frontend     | ${{ inputs.build-frontend-result }} | ${{ inputs.build-frontend-duration || 'n/a' }} | ${{ inputs.build-frontend-cache-hit == 'true' && 'HIT' || 'MISS' }}\n"
-          REPORT="${REPORT}  build-backend      | ${{ inputs.build-backend-result }} | ${{ inputs.build-backend-duration || 'n/a' }} | ${{ inputs.build-backend-cache-hit == 'true' && 'HIT' || 'MISS' }}\n"
+          REPORT="${REPORT}  build-frontend     | ${{ inputs.build-frontend-result }} | ${{ inputs.build-frontend-duration || 'n/a' }} | volume\n"
+          REPORT="${REPORT}  build-backend      | ${{ inputs.build-backend-result }} | ${{ inputs.build-backend-duration || 'n/a' }} | volume\n"
 
           ERRORS=""
           if [ "${{ inputs.lint-result }}" = "failure" ] && [ -n "$LINT_ERRORS" ]; then
@@ -337,13 +308,13 @@ jobs:
             echo "| Job | Result | Duration | Cache |"
             echo "|-----|--------|----------|-------|"
             echo "| secret-scan | ${{ inputs.secret-scan-result }} | -- | -- |"
-            echo "| lint | ${{ inputs.lint-result }} | ${{ inputs.lint-duration || 'n/a' }} | ${{ inputs.lint-cache-hit == 'true' && 'HIT' || 'MISS' }} |"
-            echo "| test-backend | ${{ inputs.test-backend-result }} | ${{ inputs.test-backend-duration || 'n/a' }} | ${{ inputs.test-backend-cache-hit == 'true' && 'HIT' || 'MISS' }} |"
-            echo "| test-frontend | ${{ inputs.test-frontend-result }} | ${{ inputs.test-frontend-duration || 'n/a' }} | ${{ inputs.test-frontend-cache-hit == 'true' && 'HIT' || 'MISS' }} |"
+            echo "| lint | ${{ inputs.lint-result }} | ${{ inputs.lint-duration || 'n/a' }} | volume |"
+            echo "| test-backend | ${{ inputs.test-backend-result }} | ${{ inputs.test-backend-duration || 'n/a' }} | volume |"
+            echo "| test-frontend | ${{ inputs.test-frontend-result }} | ${{ inputs.test-frontend-duration || 'n/a' }} | volume |"
             echo "| quality-gate | ${{ inputs.quality-gate-result }} | ${{ inputs.quality-gate-duration || 'n/a' }} | -- |"
             echo "| sonarqube | ${{ inputs.sonarqube-result }} | ${{ inputs.sonarqube-duration || 'n/a' }} | -- |"
-            echo "| build-frontend | ${{ inputs.build-frontend-result }} | ${{ inputs.build-frontend-duration || 'n/a' }} | ${{ inputs.build-frontend-cache-hit == 'true' && 'HIT' || 'MISS' }} |"
-            echo "| build-backend | ${{ inputs.build-backend-result }} | ${{ inputs.build-backend-duration || 'n/a' }} | ${{ inputs.build-backend-cache-hit == 'true' && 'HIT' || 'MISS' }} |"
+            echo "| build-frontend | ${{ inputs.build-frontend-result }} | ${{ inputs.build-frontend-duration || 'n/a' }} | volume |"
+            echo "| build-backend | ${{ inputs.build-backend-result }} | ${{ inputs.build-backend-duration || 'n/a' }} | volume |"
             echo "| container-backend | ${{ inputs.container-backend-result }} | -- | -- |"
             echo "| container-frontend | ${{ inputs.container-frontend-result }} | -- | -- |"
             echo "| deploy | ${{ inputs.deploy-result }} | -- | -- |"

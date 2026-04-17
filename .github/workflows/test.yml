@@ -13,26 +13,18 @@ on:
         value: ${{ jobs.test-backend.outputs.error_log }}
       test-backend-duration:
         value: ${{ jobs.test-backend.outputs.duration }}
-      test-backend-cache-hit:
-        value: ${{ jobs.test-backend.outputs.cache_hit }}
-      coverage-backend-result:
-        value: ${{ jobs.coverage-backend.result }}
-      coverage-backend-duration:
-        value: ${{ jobs.coverage-backend.outputs.duration }}
       test-frontend-result:
         value: ${{ jobs.test-frontend.result }}
       test-frontend-error-log:
         value: ${{ jobs.test-frontend.outputs.error_log }}
       test-frontend-duration:
         value: ${{ jobs.test-frontend.outputs.duration }}
-      test-frontend-cache-hit:
-        value: ${{ jobs.test-frontend.outputs.cache_hit }}
 
 permissions: {}
 
 jobs:
   test-backend:
-    name: Backend Unit & Integration Tests
+    name: Backend Tests & Coverage
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 45
     if: ${{ !inputs.is-fork-pr }}
@@ -45,7 +37,6 @@ jobs:
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       duration: ${{ steps.timing.outputs.duration }}
-      cache_hit: ${{ steps.rust-setup.outputs.cache-hit }}
     services:
       postgres:
         image: postgres:16@sha256:5a65324fe84dc41709ff914e90b07f3e2f577073ed27bf917d4873aca0c9ec51
@@ -81,11 +72,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Rust toolchain and cache
+      - name: Setup Rust toolchain
         id: rust-setup
         uses: ./.github/actions/rust-setup
-        with:
-          cache-key: test-backend
 
       - name: Mask database credentials
         run: |
@@ -110,6 +99,45 @@ jobs:
             exit 1
           fi
 
+      - name: Install cargo-tarpaulin
+        if: steps.tests.outcome == 'success'
+        run: |
+          TARPAULIN_VERSION="0.32.7"
+          TARPAULIN_SHA256="67a61b2b271488e2d0cb718ccec384d0f296703f3c810f80ea5d46484c5d463b"
+          ARCHIVE="${RUNNER_TEMP}/cargo-tarpaulin.tar.gz"
+          curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            "https://github.com/xd009642/tarpaulin/releases/download/${TARPAULIN_VERSION}/cargo-tarpaulin-x86_64-unknown-linux-musl.tar.gz"
+          echo "${TARPAULIN_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          mkdir -p "${HOME}/.cargo/bin"
+          tar xzf "$ARCHIVE" --no-same-owner -C "${HOME}/.cargo/bin" cargo-tarpaulin
+          rm -f "$ARCHIVE"
+          chmod +x "${HOME}/.cargo/bin/cargo-tarpaulin"
+          cargo tarpaulin --version
+
+      - name: Run coverage with tarpaulin
+        id: coverage
+        if: steps.tests.outcome == 'success'
+        run: |
+          mkdir -p coverage
+          cargo tarpaulin --locked -p realestate-backend \
+            --out lcov --output-dir coverage \
+            --timeout 300 --skip-clean
+
+      - name: Scan coverage output for secrets
+        if: steps.coverage.outcome == 'success'
+        run: |
+          if grep -rqiE '(password|secret|token|key)=' coverage/ 2>/dev/null; then
+            echo "::warning::Potential secrets detected in coverage output"
+          fi
+
+      - name: Upload coverage artifact
+        if: steps.coverage.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: backend-coverage
+          path: coverage/lcov.info
+          retention-days: 7
+
       - name: Write test summary
         if: always()
         run: |
@@ -118,6 +146,7 @@ jobs:
             echo "| Check | Status |"
             echo "|-------|--------|"
             echo "| Unit & Integration Tests | ${{ steps.tests.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| Coverage (tarpaulin) | ${{ steps.coverage.outcome == 'success' && '✅ Pass' || (steps.coverage.outcome == 'skipped' && '⏭️ Skipped' || '⚠️ Failed') }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Record duration
@@ -146,7 +175,7 @@ jobs:
 
       - name: Clean up sensitive temp files
         if: always()
-        run: rm -f "${RUNNER_TEMP}"/*.txt "${RUNNER_TEMP}"/*.log 2>/dev/null || true
+        run: rm -f "${RUNNER_TEMP}"/*.txt "${RUNNER_TEMP}"/*.log coverage/*.tmp 2>/dev/null || true
 
       - name: Notify webhook on failure
         if: failure()
@@ -158,131 +187,6 @@ jobs:
           webhook-secret: ${{ secrets.WEBHOOK_SECRET }}
           webhook-host: ${{ secrets.WEBHOOK_HOST }}
 
-  coverage-backend:
-    name: Backend Test Coverage (LCOV)
-    needs: [test-backend]
-    runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 30
-    if: ${{ !inputs.is-fork-pr }}
-    permissions:
-      contents: read
-    env:
-      DATABASE_URL: postgresql://realestate:realestate_dev_password@postgres:5432/realestate
-      SERVER_PORT: "8080"
-      CORS_ORIGIN: http://localhost:8080
-    outputs:
-      duration: ${{ steps.timing.outputs.duration }}
-    services:
-      postgres:
-        image: postgres:16@sha256:5a65324fe84dc41709ff914e90b07f3e2f577073ed27bf917d4873aca0c9ec51
-        env:
-          POSTGRES_DB: realestate
-          POSTGRES_USER: realestate
-          POSTGRES_PASSWORD: realestate_dev_password
-        options: >-
-          --network ci-shared
-          --health-cmd "pg_isready -U realestate"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-          --health-start-period 60s
-          --security-opt no-new-privileges
-          --pids-limit 256
-          --memory 512m
-          --memory-swap 512m
-          --shm-size 256m
-          --cap-drop ALL
-          --cap-add CHOWN
-          --cap-add DAC_OVERRIDE
-          --cap-add FOWNER
-          --cap-add SETGID
-          --cap-add SETUID
-    steps:
-      - name: Record start time
-        id: start
-        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
-
-      - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - name: Setup Rust toolchain and cache
-        uses: ./.github/actions/rust-setup
-        with:
-          cache-key: test-backend
-
-      - name: Mask database credentials
-        run: |
-          echo "::add-mask::realestate_dev_password"
-          echo "::add-mask::realestate"
-
-      - name: Generate JWT secret for tests
-        run: |
-          JWT_SECRET=$(openssl rand -hex 32)
-          echo "::add-mask::$JWT_SECRET"
-          echo "JWT_SECRET=$JWT_SECRET" >> $GITHUB_ENV
-
-      - name: Install cargo-tarpaulin
-        run: |
-          TARPAULIN_VERSION="0.32.7"
-          TARPAULIN_SHA256="67a61b2b271488e2d0cb718ccec384d0f296703f3c810f80ea5d46484c5d463b"
-          ARCHIVE="${RUNNER_TEMP}/cargo-tarpaulin.tar.gz"
-          curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
-            "https://github.com/xd009642/tarpaulin/releases/download/${TARPAULIN_VERSION}/cargo-tarpaulin-x86_64-unknown-linux-musl.tar.gz"
-          echo "${TARPAULIN_SHA256}  ${ARCHIVE}" | sha256sum -c -
-          mkdir -p "${HOME}/.cargo/bin"
-          tar xzf "$ARCHIVE" --no-same-owner -C "${HOME}/.cargo/bin" cargo-tarpaulin
-          rm -f "$ARCHIVE"
-          chmod +x "${HOME}/.cargo/bin/cargo-tarpaulin"
-          cargo tarpaulin --version
-
-      - name: Run coverage with tarpaulin
-        run: |
-          mkdir -p coverage
-          cargo tarpaulin --locked -p realestate-backend \
-            --out lcov --output-dir coverage \
-            --timeout 300 --skip-clean
-
-      - name: Verify Cargo.lock is up to date
-        run: |
-          if ! git diff --quiet Cargo.lock; then
-            echo "::error::Cargo.lock is out of date. Run 'cargo update' locally and commit the changes."
-            git diff Cargo.lock
-            exit 1
-          fi
-
-      - name: Scan coverage output for secrets
-        run: |
-          if grep -rqiE '(password|secret|token|key)=' coverage/ 2>/dev/null; then
-            echo "::warning::Potential secrets detected in coverage output"
-          fi
-
-      - name: Upload coverage artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: backend-coverage
-          path: coverage/lcov.info
-          retention-days: 7
-
-      - name: Record duration
-        id: timing
-        if: always()
-        uses: ./.github/actions/job-timing
-        with:
-          start-time: ${{ steps.start.outputs.time }}
-
-      - name: Prune cargo target directory
-        if: always()
-        run: |
-          find target -name "*.d" -type f -delete 2>/dev/null || true
-          find target -name "*.fingerprint" -type d -exec rm -rf {} + 2>/dev/null || true
-          find target/debug/deps -name "realestate_backend-*" -not -name "*.d" -type f -delete 2>/dev/null || true
-
-      - name: Clean up sensitive temp files
-        if: always()
-        run: rm -f "${RUNNER_TEMP}"/*.txt "${RUNNER_TEMP}"/*.log coverage/*.tmp 2>/dev/null || true
-
   test-frontend:
     name: Frontend WASM Compilation & Tests
     runs-on: [self-hosted, Linux, X64]
@@ -293,7 +197,6 @@ jobs:
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       duration: ${{ steps.timing.outputs.duration }}
-      cache_hit: ${{ steps.rust-setup.outputs.cache-hit }}
     steps:
       - name: Record start time
         id: start
@@ -304,12 +207,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Rust toolchain and cache
+      - name: Setup Rust toolchain
         id: rust-setup
         uses: ./.github/actions/rust-setup
         with:
           targets: wasm32-unknown-unknown
-          cache-key: frontend-test
 
       - name: Run frontend tests
         id: tests

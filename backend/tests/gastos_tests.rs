@@ -268,7 +268,7 @@ mod db_async {
     use realestate_backend::config::AppConfig;
     use realestate_backend::services::auth::{Claims, encode_jwt};
     use rust_decimal::Decimal;
-    use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, EntityTrait, Set};
+    use sea_orm::{ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, EntityTrait, Set};
     use sea_orm_migration::MigratorTrait;
     use serde_json::{Value, json};
     use uuid::Uuid;
@@ -281,7 +281,9 @@ mod db_async {
     }
 
     async fn setup_db() -> DatabaseConnection {
-        let db = Database::connect(db_url())
+        let mut opts = ConnectOptions::new(db_url());
+        opts.connect_timeout(std::time::Duration::from_secs(5));
+        let db = Database::connect(opts)
             .await
             .expect("Failed to connect to database");
         super::migrations::Migrator::up(&db, None)

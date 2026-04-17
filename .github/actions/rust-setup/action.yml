@@ -1,5 +1,5 @@
 name: 'Rust Setup'
-description: 'Shared setup for Rust CI jobs: OpenSSL headers, disk space, toolchain, and cache. Caller must checkout first.'
+description: 'Shared setup for Rust CI jobs: OpenSSL headers, disk space, and toolchain. Caller must checkout first. Compilation cache lives on the persistent runner volume.'
 
 inputs:
   components:
@@ -10,10 +10,6 @@ inputs:
     description: 'Comma-separated rustup targets (e.g., wasm32-unknown-unknown)'
     required: false
     default: ''
-  cache-key:
-    description: 'Shared cache key prefix for Swatinem/rust-cache'
-    required: false
-    default: 'default'
 
 runs:
   using: composite
@@ -46,9 +42,6 @@ runs:
               rm -rf "$dir" 2>/dev/null || true
             fi
           done
-          rm -rf "${CARGO_HOME:-$HOME/.cargo}"/registry/src 2>/dev/null || true
-          rm -rf "${CARGO_HOME:-$HOME/.cargo}"/registry/cache 2>/dev/null || true
-          rm -rf "${CARGO_HOME:-$HOME/.cargo}"/git/checkouts 2>/dev/null || true
           rm -rf "${RUSTUP_HOME:-$HOME/.rustup}"/downloads 2>/dev/null || true
           rm -rf "${RUSTUP_HOME:-$HOME/.rustup}"/tmp 2>/dev/null || true
           if command -v rustup &>/dev/null; then
@@ -78,9 +71,3 @@ runs:
         toolchain: "1.88.0"
         components: ${{ inputs.components }}
         targets: ${{ inputs.targets }}
-
-    - name: Rust cache
-      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
-      with:
-        shared-key: ${{ inputs.cache-key }}
-        cache-on-failure: true

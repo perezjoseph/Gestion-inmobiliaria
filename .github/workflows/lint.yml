@@ -15,8 +15,6 @@ on:
         value: ${{ jobs.lint.outputs.failed_steps }}
       duration:
         value: ${{ jobs.lint.outputs.duration }}
-      cache_hit:
-        value: ${{ jobs.lint.outputs.cache_hit }}
 
 permissions: {}
 
@@ -32,7 +30,6 @@ jobs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
       duration: ${{ steps.timing.outputs.duration }}
-      cache_hit: ${{ steps.rust-setup.outputs.cache-hit }}
     steps:
       - name: Record start time
         id: start
@@ -49,7 +46,6 @@ jobs:
         with:
           components: rustfmt,clippy
           targets: wasm32-unknown-unknown
-          cache-key: lint
 
       - name: Check formatting (rustfmt)
         id: fmt

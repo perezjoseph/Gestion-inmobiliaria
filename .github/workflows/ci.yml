@@ -108,7 +108,7 @@ jobs:
       lint-result: ${{ needs.lint.outputs.result || needs.lint.result }}
       test-backend-result: ${{ needs.tests.outputs.test-backend-result || needs.tests.result }}
       test-frontend-result: ${{ needs.tests.outputs.test-frontend-result || needs.tests.result }}
-      coverage-backend-result: ${{ needs.tests.outputs.coverage-backend-result || 'skipped' }}
+      coverage-backend-result: ${{ needs.tests.outputs.test-backend-result || 'skipped' }}
     secrets: inherit
 
   # ── Stage 2: Build (after lint passes) ──
@@ -174,7 +174,6 @@ jobs:
       lint-result: ${{ needs.lint.outputs.result || needs.lint.result }}
       test-backend-result: ${{ needs.tests.outputs.test-backend-result || '' }}
       test-frontend-result: ${{ needs.tests.outputs.test-frontend-result || '' }}
-      coverage-backend-result: ${{ needs.tests.outputs.coverage-backend-result || '' }}
       quality-gate-result: ${{ needs.security.outputs.quality-gate-result || '' }}
       sonarqube-result: ${{ needs.sonarqube.outputs.result || needs.sonarqube.result }}
       build-frontend-result: ${{ needs.build.outputs.build-frontend-result || '' }}
@@ -191,15 +190,9 @@ jobs:
       build-backend-error-log: ${{ needs.build.outputs.build-backend-error-log || '' }}
       lint-duration: ${{ needs.lint.outputs.duration || '' }}
       test-backend-duration: ${{ needs.tests.outputs.test-backend-duration || '' }}
-      coverage-backend-duration: ${{ needs.tests.outputs.coverage-backend-duration || '' }}
       test-frontend-duration: ${{ needs.tests.outputs.test-frontend-duration || '' }}
       quality-gate-duration: ${{ needs.security.outputs.quality-gate-duration || '' }}
       sonarqube-duration: ${{ needs.sonarqube.outputs.duration || '' }}
       build-frontend-duration: ${{ needs.build.outputs.build-frontend-duration || '' }}
       build-backend-duration: ${{ needs.build.outputs.build-backend-duration || '' }}
-      lint-cache-hit: ${{ needs.lint.outputs.cache_hit || '' }}
-      test-backend-cache-hit: ${{ needs.tests.outputs.test-backend-cache-hit || '' }}
-      test-frontend-cache-hit: ${{ needs.tests.outputs.test-frontend-cache-hit || '' }}
-      build-frontend-cache-hit: ${{ needs.build.outputs.build-frontend-cache-hit || '' }}
-      build-backend-cache-hit: ${{ needs.build.outputs.build-backend-cache-hit || '' }}
     secrets: inherit

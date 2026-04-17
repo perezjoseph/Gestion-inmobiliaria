@@ -4,7 +4,7 @@ use realestate_backend::app::create_app;
 use realestate_backend::config::AppConfig;
 use realestate_backend::services::auth::{Claims, encode_jwt};
 use rust_decimal::Decimal;
-use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, Set};
+use sea_orm::{ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, Set};
 use sea_orm_migration::MigratorTrait;
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -18,7 +18,9 @@ async fn setup_db() -> DatabaseConnection {
     dotenvy::dotenv().ok();
     let url =
         std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for integration tests");
-    let db = Database::connect(&url)
+    let mut opts = ConnectOptions::new(&url);
+    opts.connect_timeout(std::time::Duration::from_secs(5));
+    let db = Database::connect(opts)
         .await
         .expect("Failed to connect to database");
     migrations::Migrator::up(&db, None)
