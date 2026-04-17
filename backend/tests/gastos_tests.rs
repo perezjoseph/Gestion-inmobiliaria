@@ -315,6 +315,11 @@ mod db_async {
         F: FnOnce(DatabaseConnection) -> Fut,
         Fut: std::future::Future<Output = ()>,
     {
+        dotenvy::dotenv().ok();
+        if std::env::var("DATABASE_URL").is_err() {
+            eprintln!("DATABASE_URL not set -- skipping DB integration test");
+            return;
+        }
         static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
         let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         let (rt, db) = shared_rt_and_db();
