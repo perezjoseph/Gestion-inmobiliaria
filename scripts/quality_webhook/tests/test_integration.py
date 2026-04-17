@@ -227,14 +227,14 @@ class TestSmokeConfiguration:
         )
 
     def test_build_jobs_depend_on_lint(self):
-        """build-frontend and build-backend must include lint in needs. Requirement 7.1."""
+        """Build job must include lint in needs. Requirement 7.1."""
         ci_path = REPO_ROOT / ".github" / "workflows" / "ci.yml"
         with open(ci_path, encoding="utf-8") as f:
             ci = yaml.safe_load(f)
 
         jobs = ci.get("jobs", {})
 
-        for build_job in ("build-frontend", "build-backend"):
+        for build_job in ("build",):
             assert build_job in jobs, f"{build_job} not found in ci.yml jobs"
             needs = jobs[build_job].get("needs", [])
             if isinstance(needs, str):

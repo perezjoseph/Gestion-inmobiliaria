@@ -20,6 +20,7 @@ from .fixers import (
     fix_with_retry, fix_sonar_issues, improve_pipeline,
     _job_locks, _git_lock, _max_concurrent_fixes,
     _sonar_fix_lock, _improve_lock,
+    _pending_fixes, _pending_fixes_lock,
 )
 from .memory import get_memory_stats
 from .history import _load_fix_history
@@ -138,6 +139,8 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 active_fixes = _active_fix_count
             with _active_thread_count_lock:
                 active_threads = _active_thread_count
+            with _pending_fixes_lock:
+                pending_jobs = list(_pending_fixes.keys())
 
             trends = get_all_trends()
             duration_trends = {}
@@ -157,6 +160,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 "concurrent_fixes": {
                     "active": max(0, active_fixes),
                     "max": MAX_CONCURRENT_FIXES,
+                    "pending_queue": pending_jobs,
                 },
                 "thread_pool": {
                     "active": max(0, active_threads),

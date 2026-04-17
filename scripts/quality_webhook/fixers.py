@@ -58,13 +58,30 @@ _job_locks_guard = threading.Lock()
 _git_lock = threading.Lock()
 _max_concurrent_fixes = threading.Semaphore(MAX_CONCURRENT_FIXES)
 
+_pending_fixes_lock = threading.Lock()
+_pending_fixes: dict[str, tuple[str, str, str, dict | None]] = {}
+
 
 def _get_job_lock(job: str) -> threading.Lock:
-    """Lazily create and return a per-job lock."""
     with _job_locks_guard:
         if job not in _job_locks:
             _job_locks[job] = threading.Lock()
         return _job_locks[job]
+
+
+def _queue_pending_fix(job, step, error_log, context):
+    with _pending_fixes_lock:
+        prev = _pending_fixes.get(job)
+        _pending_fixes[job] = (job, step, error_log, context)
+        if prev is not None:
+            log.info(f"Replaced stale pending fix for job '{job}' with newer failure")
+        else:
+            log.info(f"Queued pending fix for job '{job}' (fix already in progress)")
+
+
+def _pop_pending_fix(job):
+    with _pending_fixes_lock:
+        return _pending_fixes.pop(job, None)
 
 
 _AUTO_FIX_PATTERN = re.compile(r"^[0-9a-f]+ fix: resolve CI failures")
@@ -332,10 +349,9 @@ def _log_timing_summary(job, step, cycle_start, all_timings):
 
 
 def fix_with_retry(job, step, error_log, context=None):
-    """GSD-inspired fix pipeline: preflight → diagnose → execute → verify → gate."""
     job_lock = _get_job_lock(job)
     if not job_lock.acquire(blocking=False):
-        log.warning(f"Fix already running for job '{job}' -- skipping {job}/{step}")
+        _queue_pending_fix(job, step, error_log, context)
         return False
 
     _max_concurrent_fixes.acquire()
@@ -689,6 +705,16 @@ def fix_with_retry(job, step, error_log, context=None):
                 pass
         _max_concurrent_fixes.release()
         job_lock.release()
+
+        pending = _pop_pending_fix(job)
+        if pending is not None:
+            p_job, p_step, p_error_log, p_context = pending
+            log.info(f"Draining queued fix for job '{p_job}/{p_step}'")
+            threading.Thread(
+                target=fix_with_retry,
+                args=(p_job, p_step, p_error_log, p_context),
+                daemon=True,
+            ).start()
 
 
 def _deep_research_fix(job, step, error_log, context=None):
