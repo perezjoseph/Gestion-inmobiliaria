@@ -282,11 +282,10 @@ mod db_async {
 
     async fn setup_db() -> Result<DatabaseConnection, String> {
         let mut opts = ConnectOptions::new(db_url());
-        opts.max_connections(20)
+        opts.max_connections(2)
             .min_connections(1)
             .connect_timeout(std::time::Duration::from_secs(30))
-            .idle_timeout(std::time::Duration::from_secs(60))
-            .acquire_timeout(std::time::Duration::from_secs(30));
+            .idle_timeout(std::time::Duration::from_secs(60));
         let db = Database::connect(opts)
             .await
             .map_err(|e| format!("Failed to connect to database: {e}"))?;
@@ -302,10 +301,8 @@ mod db_async {
         > = std::sync::OnceLock::new();
         SHARED
             .get_or_init(|| {
-                let rt = tokio::runtime::Builder::new_multi_thread()
-                    .enable_all()
-                    .build()
-                    .map_err(|e| format!("Runtime error: {e}"))?;
+                let rt =
+                    tokio::runtime::Runtime::new().map_err(|e| format!("Runtime error: {e}"))?;
                 let db = rt.block_on(setup_db())?;
                 Ok((rt, db))
             })
@@ -318,6 +315,8 @@ mod db_async {
         F: FnOnce(DatabaseConnection) -> Fut,
         Fut: std::future::Future<Output = ()>,
     {
+        static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         let (rt, db) = shared_rt_and_db();
         rt.block_on(f(db.clone()));
     }
