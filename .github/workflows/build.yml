@@ -86,14 +86,18 @@ jobs:
             ~/.cargo/registry/cache
             ~/.cargo/git/db
             frontend/target
-          key: frontend-build-${{ runner.os }}-cargo-${{ hashFiles('frontend/Cargo.lock', 'frontend/Cargo.toml') }}
+          key: frontend-build-${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock', 'frontend/Cargo.toml') }}
           restore-keys: |
             frontend-build-${{ runner.os }}-cargo-
 
       - name: Pre-install wasm-bindgen-cli
         run: |
           export PATH="${HOME}/.local/bin:$HOME/.cargo/bin:$PATH"
-          WASM_BINDGEN_VERSION=$(grep -oP 'wasm-bindgen = "\K[^"]+' frontend/Cargo.toml || echo "0.2.100")
+          WASM_BINDGEN_VERSION=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | grep -oP 'version = "\K[^"]+')
+          if [ -z "$WASM_BINDGEN_VERSION" ]; then
+            echo "::error::Could not determine wasm-bindgen version from Cargo.lock"
+            exit 1
+          fi
           if ! wasm-bindgen --version 2>/dev/null | grep -q "$WASM_BINDGEN_VERSION"; then
             cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION" --locked
           fi

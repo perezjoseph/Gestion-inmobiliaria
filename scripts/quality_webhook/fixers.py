@@ -345,18 +345,26 @@ def fix_with_retry(job, step, error_log, context=None):
         last_strategy_summary = ""
 
         attempt = 0
+        _PHASE_QUICK_MAX = 3
+        _PHASE_DEEP_MAX = 6
         while True:
             attempt += 1
             attempt_start = time.monotonic()
             timing = PhaseTiming()
 
-            log.info(f"=== Attempt {attempt} for {job}/{step}{ctx_str} (class: {error_class}) ===")
+            if attempt <= _PHASE_QUICK_MAX:
+                phase = "quick"
+            elif attempt <= _PHASE_DEEP_MAX:
+                phase = "deep"
+            else:
+                phase = "investigate"
+
+            log.info(f"=== Attempt {attempt} [{phase}] for {job}/{step}{ctx_str} (class: {error_class}) ===")
 
             instruction = _JOB_INSTRUCTIONS.get(job, "Analyze and fix.")
             verify_cmd = _JOB_VERIFY.get(job, "")
             error_note = _build_error_notes(error_class)
 
-            # On retry, send a minimal "try different approach" directive
             retry_section = ""
             if last_strategy_summary:
                 retry_section = (
@@ -371,7 +379,6 @@ def fix_with_retry(job, step, error_log, context=None):
                 if repro.reproduced and repro.error_class:
                     error_class = repro.error_class
             else:
-                # First attempt uses the initial reproduction timing
                 timing.reproduction_s = initial_repro_s
 
             run_url = context.get("run_url", "") if context else ""
@@ -391,26 +398,85 @@ def fix_with_retry(job, step, error_log, context=None):
                 lines = [f"  - {s}: {r:.0%} success rate" for s, r in ranked_strategies]
                 strategies_section = "\nPREFERRED STRATEGIES (by historical success rate):\n" + "\n".join(lines) + "\n"
 
-            prompt = (
-                f"CI FAILED: job='{job}', step='{step}'{ctx_str}, "
-                f"class={error_class}, attempt {attempt}\n\n"
-                f"{repro_section}"
-                f"{_gh_cli_block(run_url)}"
-                f"Error preview:\n```\n{sanitize_for_prompt(error_log, 3000)}\n```\n\n"
-                f"Job context: {instruction}{error_note}\n\n"
-                f"{strategies_section}"
-                f"STEP 1 - DIAGNOSE: Identify root cause from {source}. "
-                f"List specific files/lines that need changes.\n"
-                f"STEP 2 - FIX: Apply the minimal fix to resolve the issue.\n"
-            )
+            # Phase-dependent prompt construction
+            if phase == "deep":
+                log.info(f"Phase escalation: running deep diagnosis before attempt {attempt}")
+                t0 = time.monotonic()
+                diagnosis = _diagnose(job, step, error_log, error_class, context,
+                                      repro=repro, deep=True)
+                timing.diagnosis_s = time.monotonic() - t0
+
+                prompt = (
+                    f"RESEARCH-INFORMED FIX for {job}/{step}{ctx_str}, "
+                    f"class={error_class}, attempt {attempt}\n\n"
+                    f"Previous quick-fix attempts (1-{_PHASE_QUICK_MAX}) all failed. "
+                    f"A deep analysis was performed. Here are the findings:\n"
+                    f"```\n{diagnosis}\n```\n\n"
+                    f"{repro_section}"
+                    f"{_gh_cli_block(run_url)}"
+                    f"Error preview:\n```\n{sanitize_for_prompt(error_log, 3000)}\n```\n\n"
+                    f"Job context: {instruction}{error_note}\n\n"
+                    f"{strategies_section}"
+                    f"EXECUTE the fix plan from the analysis above.\n"
+                    f"STEP 1 - FIX: Apply the changes described in the analysis.\n"
+                )
+
+            elif phase == "investigate":
+                log.info(f"Phase escalation: investigation mode for attempt {attempt}")
+                t0 = time.monotonic()
+                diagnosis = _diagnose(job, step, error_log, error_class, context,
+                                      repro=repro, deep=True)
+                timing.diagnosis_s = time.monotonic() - t0
+
+                prompt = (
+                    f"INVESTIGATION MODE for {job}/{step}{ctx_str}, "
+                    f"class={error_class}, attempt {attempt}\n\n"
+                    f"ALL previous attempts ({attempt - 1}) have failed. "
+                    f"Standard fixes and deep research have not worked.\n\n"
+                    f"Previous analysis:\n```\n{diagnosis}\n```\n\n"
+                    f"{repro_section}"
+                    f"{_gh_cli_block(run_url)}"
+                    f"Error preview:\n```\n{sanitize_for_prompt(error_log, 3000)}\n```\n\n"
+                    f"Job context: {instruction}{error_note}\n\n"
+                    f"MANDATORY INVESTIGATION STEPS before writing any fix:\n"
+                    f"1. Fetch FULL CI logs: gh run view <id> --log-failed\n"
+                    f"2. Read EVERY file mentioned in errors + their imports and callers\n"
+                    f"3. Check git log -10 for recent changes to affected files\n"
+                    f"4. Diff Cargo.lock or gradle lockfiles for dependency changes\n"
+                    f"5. Search the web for the exact error message if it involves a library\n"
+                    f"6. Read project steering files in .kiro/steering/ for conventions\n"
+                    f"7. Check if the error exists in files NOT mentioned in the error output\n"
+                    f"8. Write a 3-sentence plan BEFORE editing any file\n\n"
+                    f"THEN apply the fix.\n"
+                    f"STEP 1 - INVESTIGATE: Complete all 8 steps above.\n"
+                    f"STEP 2 - FIX: Apply the minimal fix based on your investigation.\n"
+                )
+
+            else:
+                prompt = (
+                    f"CI FAILED: job='{job}', step='{step}'{ctx_str}, "
+                    f"class={error_class}, attempt {attempt}\n\n"
+                    f"{repro_section}"
+                    f"{_gh_cli_block(run_url)}"
+                    f"Error preview:\n```\n{sanitize_for_prompt(error_log, 3000)}\n```\n\n"
+                    f"Job context: {instruction}{error_note}\n\n"
+                    f"{strategies_section}"
+                    f"STEP 1 - DIAGNOSE: Identify root cause from {source}. "
+                    f"List specific files/lines that need changes.\n"
+                    f"STEP 2 - FIX: Apply the minimal fix to resolve the issue.\n"
+                )
 
             verify_line = f"STEP 3 - VERIFY: Run: {verify_cmd}\n" if verify_cmd else ""
             prompt += verify_line
             prompt += "STEP 4 - STAGE: git add -A\n"
 
-            # Append history/semantic only on first attempt to save tokens
             extras = ""
             if attempt == 1:
+                if past_attempts_section:
+                    extras += f"\n{past_attempts_section}"
+                if semantic_context:
+                    extras += f"\n{semantic_context}"
+            elif phase != "quick":
                 if past_attempts_section:
                     extras += f"\n{past_attempts_section}"
                 if semantic_context:
@@ -424,7 +490,7 @@ def fix_with_retry(job, step, error_log, context=None):
             )
 
             t0 = time.monotonic()
-            result = run_kiro(prompt, f"CI fix ({job}/{step}) attempt {attempt}")
+            result = run_kiro(prompt, f"CI fix ({job}/{step}) attempt {attempt} [{phase}]")
             timing.fix_attempt_s = time.monotonic() - t0
 
             success = result[0] if isinstance(result, tuple) else result
