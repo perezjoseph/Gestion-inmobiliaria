@@ -142,7 +142,7 @@ fn StatsHeader(props: &StatsHeaderProps) -> Html {
         <div class="gi-dashboard-header">
             <div class="gi-dashboard-hero">
                 <div class="gi-occupancy-ring">
-                    <svg viewBox="0 0 36 36">
+                    <svg viewBox="0 0 36 36" role="img" aria-label={format!("Ocupación del portafolio: {:.0}%", s.tasa_ocupacion)}>
                         <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--border-subtle)" stroke-width="3"/>
                         <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--color-success)" stroke-width="3"
                             stroke-dasharray={format!("{:.1} 100", s.tasa_ocupacion)} stroke-linecap="round"/>

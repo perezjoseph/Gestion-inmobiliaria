@@ -1,6 +1,7 @@
 use yew::prelude::*;
 use yew_router::prelude::*;
 
+use crate::components::common::command_palette::CommandPalette;
 use crate::components::common::offline_banner::OfflineBanner;
 use crate::components::common::toast::{ToastContainer, ToastContext, ToastState};
 use crate::components::layout::footer::Footer;
@@ -209,6 +210,7 @@ pub fn ProtectedRoute(props: &ProtectedRouteProps) -> Html {
 
     html! {
         <div class="flex min-h-screen" style="background-color: var(--surface-base);">
+            <a class="gi-skip-link" href="#gi-main-content">{"Ir al contenido principal"}</a>
             if *sidebar_open {
                 <div class="gi-sidebar-overlay open" onclick={on_close_sidebar}></div>
             }
@@ -219,11 +221,12 @@ pub fn ProtectedRoute(props: &ProtectedRouteProps) -> Html {
                     user_role={user_role}
                     on_toggle_sidebar={on_toggle_sidebar}
                 />
-                <main class="flex-1" style="padding: var(--space-5) var(--space-6);">
+                <main id="gi-main-content" class="flex-1" style="padding: var(--space-5) var(--space-6);">
                     {props.children.clone()}
                 </main>
                 <Footer />
                 <OfflineBanner />
+                <CommandPalette />
             </div>
         </div>
     }
