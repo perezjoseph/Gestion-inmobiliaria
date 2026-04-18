@@ -2,7 +2,7 @@ use gloo_net::http::{Request, RequestBuilder};
 use serde::{Serialize, de::DeserializeOwned};
 use web_sys::window;
 
-pub const BASE_URL: &str = "http://localhost:3000/api/v1";
+pub const BASE_URL: &str = "/api/v1";
 const TOKEN_KEY: &str = "jwt_token";
 
 fn get_token() -> Option<String> {

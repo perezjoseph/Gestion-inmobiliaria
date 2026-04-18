@@ -24,6 +24,10 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends \
 
 RUN useradd -r -s /bin/false appuser
 
+WORKDIR /app
+
+RUN mkdir -p /app/uploads && chown appuser:appuser /app/uploads
+
 COPY --from=source /app/realestate-backend /usr/local/bin/realestate-backend
 
 USER appuser
