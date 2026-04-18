@@ -1,3 +1,14 @@
+from .config import DEPLOY_CLASSIFY_PATTERNS
+
+PBT_PATTERNS = [
+    "proptest",
+    "testrunner",
+    "minimal failing input",
+    "test failed: attempt",
+    "shrunk to:",
+    "proptest_config",
+]
+
 RUNNER_ENV_PATTERNS = [
     "command not found",
     "No such file or directory",
@@ -68,6 +79,9 @@ BUILD_PATTERNS = [
 
 def classify_error(error_log):
     lower = error_log.lower()
+    for pattern, category in DEPLOY_CLASSIFY_PATTERNS.items():
+        if pattern.lower() in lower:
+            return category
     for pattern in RUNNER_ENV_PATTERNS:
         if pattern.lower() in lower:
             return "runner_environment"
@@ -77,6 +91,9 @@ def classify_error(error_log):
     for pattern in FLAKY_PATTERNS:
         if pattern.lower() in lower:
             return "flaky"
+    for pattern in PBT_PATTERNS:
+        if pattern.lower() in lower:
+            return "pbt_failure"
     if "test" in lower and ("failed" in lower or "FAILED" in lower):
         return "test_failure"
     if "clippy" in lower or "fmt" in lower:
