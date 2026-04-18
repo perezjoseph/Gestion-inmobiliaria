@@ -2,6 +2,11 @@ name: Build
 
 on:
   workflow_call:
+    secrets:
+      WEBHOOK_SECRET:
+        required: true
+      WEBHOOK_HOST:
+        required: true
     outputs:
       build-frontend-result:
         value: ${{ jobs.build-frontend.result }}
@@ -179,7 +184,7 @@ jobs:
           retention-days: 30
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
           subject-path: frontend/dist/
 
@@ -326,7 +331,7 @@ jobs:
           retention-days: 30
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
           subject-path: target/release/realestate-backend
 

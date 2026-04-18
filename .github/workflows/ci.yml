@@ -27,7 +27,7 @@ permissions: {}
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -147,7 +147,9 @@ jobs:
     with:
       is-pr: ${{ github.event_name == 'pull_request' }}
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
-    secrets: inherit
+    secrets:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
 
   lint:
     name: Lint
@@ -162,7 +164,9 @@ jobs:
     uses: ./.github/workflows/lint.yml
     with:
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
-    secrets: inherit
+    secrets:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
 
   tests:
     name: Tests
@@ -177,7 +181,9 @@ jobs:
     uses: ./.github/workflows/test.yml
     with:
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
-    secrets: inherit
+    secrets:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
 
   # ── Stage 1.5: SonarQube (after lint + tests) ──
 
@@ -202,7 +208,12 @@ jobs:
       test-backend-result: ${{ needs.tests.outputs.test-backend-result || needs.tests.result }}
       test-frontend-result: ${{ needs.tests.outputs.test-frontend-result || needs.tests.result }}
       coverage-backend-result: ${{ needs.tests.outputs.test-backend-result || 'skipped' }}
-    secrets: inherit
+    secrets:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_ADMIN_PASSWORD: ${{ secrets.SONAR_ADMIN_PASSWORD }}
 
   # ── Stage 2: Build (after lint passes) ──
 
@@ -223,7 +234,9 @@ jobs:
       id-token: write
       attestations: write
     uses: ./.github/workflows/build.yml
-    secrets: inherit
+    secrets:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
 
   # ── Stage 3: Container Images (after builds + security + tests pass, main only) ──
 
@@ -243,7 +256,9 @@ jobs:
       id-token: write
       attestations: write
     uses: ./.github/workflows/containers.yml
-    secrets: inherit
+    secrets:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
 
   # ── Stage 4: Deploy (after containers are pushed) ──
 
@@ -259,7 +274,11 @@ jobs:
       backend-digest: ${{ needs.containers.outputs.backend-digest }}
       frontend-digest: ${{ needs.containers.outputs.frontend-digest }}
       ocr-service-digest: ${{ needs.containers.outputs.ocr-service-digest }}
-    secrets: inherit
+    secrets:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
   # ── Stage 5: Pipeline Self-Improvement (after everything) ──
 
@@ -298,4 +317,9 @@ jobs:
       sonarqube-duration: ${{ needs.sonarqube.outputs.duration || '' }}
       build-frontend-duration: ${{ needs.build.outputs.build-frontend-duration || '' }}
       build-backend-duration: ${{ needs.build.outputs.build-backend-duration || '' }}
-    secrets: inherit
+    secrets:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_ADMIN_PASSWORD: ${{ secrets.SONAR_ADMIN_PASSWORD }}
