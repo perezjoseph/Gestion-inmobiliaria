@@ -134,6 +134,10 @@ jobs:
 
       - name: Rollback on failure
         if: failure() && steps.deploy.outcome == 'success'
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          OCR_SERVICE_IMAGE: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ inputs.ocr-service-digest }}
         run: |
           echo "::warning::Deployment health check failed -- rolling back"
           DOCKER_CONTENT_TRUST=0 docker compose -f docker-compose.prod.yml down --timeout 30
