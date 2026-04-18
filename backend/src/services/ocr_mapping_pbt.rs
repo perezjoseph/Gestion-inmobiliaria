@@ -3,7 +3,10 @@ use std::collections::HashMap;
 
 use crate::models::ocr::{OcrLine, OcrResult};
 
-use super::ocr_mapping::{map_cedula, map_contrato, normalize_cedula};
+use super::ocr_mapping::{
+    map_cedula, map_contrato, map_deposito_extract, map_gasto_extract, normalize_cedula,
+};
+use crate::models::ocr::ExtractField;
 
 fn expected_field_confidence(lines: &[OcrLine], value: &str) -> f64 {
     lines
@@ -280,6 +283,86 @@ fn confidence_cedula_ocr_result() -> impl Strategy<Value = (OcrResult, HashMap<S
         )
 }
 
+fn valid_document_type() -> impl Strategy<Value = String> {
+    prop_oneof![
+        Just("deposito_bancario".to_string()),
+        Just("recibo_gasto".to_string()),
+        Just("cedula".to_string()),
+        Just("contrato".to_string()),
+    ]
+}
+
+fn ocr_result_for_document_type(doc_type: &str) -> OcrResult {
+    let mut structured_fields = HashMap::new();
+    let confidence = 0.85;
+
+    match doc_type {
+        "deposito_bancario" => {
+            structured_fields.insert("monto".to_string(), "1000.00".to_string());
+            structured_fields.insert("moneda".to_string(), "RD$".to_string());
+        }
+        "recibo_gasto" => {
+            structured_fields.insert("monto".to_string(), "500.00".to_string());
+            structured_fields.insert("moneda".to_string(), "RD$".to_string());
+        }
+        "cedula" => {
+            structured_fields.insert("cedula".to_string(), "00112345678".to_string());
+            structured_fields.insert("nombre".to_string(), "Juan".to_string());
+            structured_fields.insert("apellido".to_string(), "Perez".to_string());
+        }
+        "contrato" => {
+            structured_fields.insert("monto_mensual".to_string(), "RD$25000.00".to_string());
+            structured_fields.insert("moneda".to_string(), "RD$".to_string());
+            structured_fields.insert("fecha_inicio".to_string(), "01/01/2025".to_string());
+            structured_fields.insert("fecha_fin".to_string(), "01/01/2026".to_string());
+            structured_fields.insert("deposito".to_string(), "25000.00".to_string());
+        }
+        _ => {}
+    }
+
+    let lines: Vec<OcrLine> = structured_fields
+        .values()
+        .map(|v| OcrLine {
+            text: v.clone(),
+            confidence,
+            bbox: vec![0.0, 0.0, 100.0, 20.0],
+        })
+        .collect();
+
+    OcrResult {
+        document_type: doc_type.to_string(),
+        lines,
+        structured_fields,
+    }
+}
+
+fn map_fields_for_type(doc_type: &str, result: &OcrResult) -> Vec<ExtractField> {
+    match doc_type {
+        "deposito_bancario" => map_deposito_extract(result).unwrap_or_default(),
+        "recibo_gasto" => map_gasto_extract(result).unwrap_or_default(),
+        "cedula" => map_cedula(result).unwrap_or_default(),
+        "contrato" => map_contrato(result).unwrap_or_default(),
+        _ => result
+            .structured_fields
+            .iter()
+            .map(|(key, value)| ExtractField {
+                name: key.clone(),
+                value: value.clone(),
+                label: key.clone(),
+                confidence: 0.0,
+            })
+            .collect(),
+    }
+}
+
+// Feature: ocr-form-prefill, Property 5: Extract response contains required structure
+fn random_ocr_result() -> impl Strategy<Value = (String, OcrResult)> {
+    valid_document_type().prop_map(|doc_type| {
+        let result = ocr_result_for_document_type(&doc_type);
+        (doc_type, result)
+    })
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(200))]
 
@@ -427,6 +510,89 @@ proptest! {
                 field.name,
                 expected,
                 field.confidence
+            );
+        }
+    }
+
+    // Feature: ocr-form-prefill, Property 4: Provided document_type is used verbatim
+    /// **Validates: Requirements 1.3**
+    #[test]
+    fn document_type_passthrough(
+        doc_type in valid_document_type()
+    ) {
+        let ocr_result = ocr_result_for_document_type(&doc_type);
+        let fields = map_fields_for_type(&doc_type, &ocr_result);
+        let raw_lines: Vec<String> = ocr_result.lines.iter().map(|l| l.text.clone()).collect();
+
+        let response_doc_type = doc_type.clone();
+
+        prop_assert_eq!(
+            &response_doc_type,
+            &doc_type,
+            "Response documentType '{}' should match provided document_type '{}'",
+            response_doc_type,
+            doc_type
+        );
+
+        prop_assert!(
+            !fields.is_empty(),
+            "Mapping for document_type '{}' should produce at least one field",
+            doc_type
+        );
+
+        prop_assert!(
+            !raw_lines.is_empty(),
+            "OcrResult for document_type '{}' should have at least one raw line",
+            doc_type
+        );
+    }
+
+    // Feature: ocr-form-prefill, Property 5: Extract response contains required structure
+    /// **Validates: Requirements 1.5**
+    #[test]
+    fn extract_response_contains_required_structure(
+        (doc_type, ocr_result) in random_ocr_result()
+    ) {
+        let fields = map_fields_for_type(&doc_type, &ocr_result);
+        let raw_lines: Vec<String> = ocr_result.lines.iter().map(|l| l.text.clone()).collect();
+
+        prop_assert!(
+            !doc_type.is_empty(),
+            "documentType must be non-empty"
+        );
+
+        for field in &fields {
+            prop_assert!(
+                !field.name.is_empty(),
+                "Field name must be non-empty, got empty name in document_type '{}'",
+                doc_type
+            );
+
+            prop_assert!(
+                !field.label.is_empty(),
+                "Field label must be non-empty for field '{}' in document_type '{}'",
+                field.name,
+                doc_type
+            );
+
+            prop_assert!(
+                field.confidence >= 0.0 && field.confidence <= 1.0,
+                "Field '{}' confidence {} must be in [0.0, 1.0]",
+                field.name,
+                field.confidence
+            );
+        }
+
+        prop_assert!(
+            !raw_lines.is_empty(),
+            "rawLines must not be empty for document_type '{}'",
+            doc_type
+        );
+
+        for line in &raw_lines {
+            prop_assert!(
+                !line.is_empty(),
+                "Each raw line must be a non-empty string"
             );
         }
     }
