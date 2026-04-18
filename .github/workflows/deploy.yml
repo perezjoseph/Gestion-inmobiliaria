@@ -50,6 +50,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify backend attestation
+        id: verify-backend
         run: |
           gh attestation verify \
             "oci://ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend@${{ inputs.backend-digest }}" \
@@ -58,6 +59,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify frontend attestation
+        id: verify-frontend
         run: |
           gh attestation verify \
             "oci://ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend@${{ inputs.frontend-digest }}" \
@@ -109,6 +111,35 @@ jobs:
           DOCKER_CONTENT_TRUST=0 docker compose -f docker-compose.prod.yml down --timeout 30
           DOCKER_CONTENT_TRUST=0 docker compose -f docker-compose.prod.yml up -d --remove-orphans --wait 2>/dev/null || true
           echo "::error::Rollback attempted. Manual verification required."
+
+      - name: Collect deploy errors
+        id: collect-errors
+        if: failure()
+        run: |
+          ERROR=""
+          if [ "${{ steps.deploy.outcome }}" = "failure" ]; then
+            ERROR="[deploy] Docker compose up failed."
+          elif [ "${{ steps.health-check.outcome }}" = "failure" ]; then
+            ERROR="[health-check] App health check failed after deployment. /health not responding. Likely an application bug."
+          elif [ "${{ steps.verify-backend.outcome }}" = "failure" ]; then
+            ERROR="[attestation] Backend image attestation verification failed."
+          elif [ "${{ steps.verify-frontend.outcome }}" = "failure" ]; then
+            ERROR="[attestation] Frontend image attestation verification failed."
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Notify webhook on failure
+        if: failure()
+        uses: ./.github/actions/webhook-notify
+        with:
+          job-name: deploy
+          step-name: deploy-or-health-check
+          error-log: ${{ steps.collect-errors.outputs.error_log }}
+          webhook-secret: ${{ secrets.WEBHOOK_SECRET }}
+          webhook-host: ${{ secrets.WEBHOOK_HOST }}
 
       - name: Credential cleanup
         if: always()
