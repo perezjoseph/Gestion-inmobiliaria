@@ -9,6 +9,7 @@ pub mod importacion;
 pub mod inquilinos;
 pub mod mantenimiento;
 pub mod notificaciones;
+pub mod ocr;
 pub mod pagos;
 pub mod perfil;
 pub mod propiedades;

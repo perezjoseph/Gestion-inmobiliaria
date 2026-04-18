@@ -194,7 +194,7 @@ async fn ocr_client_extract_unreachable_returns_error() {
     unsafe { std::env::set_var("OCR_SERVICE_URL", "http://127.0.0.1:19999") };
     let client = OcrClient::new().unwrap();
     let result = client
-        .extract(b"fake image data", "test.jpg", "image/jpeg")
+        .extract(b"fake image data", "test.jpg", "image/jpeg", None)
         .await;
     assert!(result.is_err());
 }

@@ -50,6 +50,41 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Free CI service ports
+        run: |
+          echo "Killing host-level processes on CI service ports..."
+          for PORT in 5432 5433; do
+            if command -v fuser &>/dev/null; then
+              fuser -k "${PORT}/tcp" 2>/dev/null || true
+            else
+              PID=$(ss -tlnp "sport = :${PORT}" 2>/dev/null | awk 'NR>1{match($0,/pid=([0-9]+)/,a); if(a[1]) print a[1]}' | head -1)
+              if [ -n "$PID" ]; then
+                echo "Port ${PORT} held by PID ${PID} -- killing"
+                kill -9 "$PID" 2>/dev/null || true
+              fi
+            fi
+          done
+
+          echo "Stopping stale CI docker containers..."
+          docker ps -q --filter "label=570b44" | xargs -r docker stop --time 5 2>/dev/null || true
+          docker ps -aq --filter "label=570b44" | xargs -r docker rm -f 2>/dev/null || true
+
+          echo "Stopping containers occupying CI service ports..."
+          for PORT in 5432 5433; do
+            CONTAINER_ID=$(docker ps -q --filter "publish=${PORT}" 2>/dev/null || true)
+            if [ -n "$CONTAINER_ID" ]; then
+              echo "Port ${PORT} occupied by container ${CONTAINER_ID} -- stopping"
+              docker stop --time 5 "$CONTAINER_ID" 2>/dev/null || true
+              docker rm -f "$CONTAINER_ID" 2>/dev/null || true
+            fi
+          done
+
+          echo "Pruning stopped CI service containers..."
+          docker container prune -f --filter "until=2h" 2>/dev/null || true
+
+          echo "Pruning dangling networks..."
+          docker network prune -f 2>/dev/null || true
+
       - name: Check disk space
         run: |
           CHECK_PATH="/tmp"

@@ -143,7 +143,7 @@ def run_kiro(prompt, label):
     bash_cmd = (
         f"KIRO_PROMPT=$(cat '{prompt_file_wsl}') && "
         f"[ -n \"$KIRO_PROMPT\" ] && "
-        f"{KIRO_CLI} chat --trust-all-tools --agent sisyphus --no-interactive -- \"$KIRO_PROMPT\""
+        f"{KIRO_CLI} chat --trust-all-tools --no-interactive -- \"$KIRO_PROMPT\""
     )
 
     script_uid = uuid.uuid4().hex[:8]

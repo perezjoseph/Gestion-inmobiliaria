@@ -31,7 +31,6 @@ jobs:
     permissions:
       contents: read
     env:
-      DATABASE_URL: postgresql://realestate:realestate_dev_password@localhost:5432/realestate
       SERVER_PORT: "8080"
       CORS_ORIGIN: http://localhost:8080
       CARGO_BUILD_JOBS: "2"
@@ -46,7 +45,7 @@ jobs:
           POSTGRES_USER: realestate
           POSTGRES_PASSWORD: realestate_dev_password
         ports:
-          - 5432:5432
+          - 0:5432
         options: >-
           --health-cmd "pg_isready -U realestate"
           --health-interval 10s
@@ -84,6 +83,9 @@ jobs:
         run: |
           echo "::add-mask::realestate_dev_password"
           echo "::add-mask::realestate"
+
+      - name: Set database URL
+        run: echo "DATABASE_URL=postgresql://realestate:realestate_dev_password@localhost:${{ job.services.postgres.ports['5432'] }}/realestate" >> $GITHUB_ENV
 
       - name: Generate JWT secret for tests
         run: |

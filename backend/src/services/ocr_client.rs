@@ -23,6 +23,7 @@ impl OcrClient {
         file_data: &[u8],
         filename: &str,
         content_type: &str,
+        document_type: Option<&str>,
     ) -> Result<OcrResult, AppError> {
         let part = reqwest::multipart::Part::bytes(file_data.to_vec())
             .file_name(filename.to_string())
@@ -31,7 +32,11 @@ impl OcrClient {
                 AppError::Internal(anyhow::anyhow!("Error creando parte multipart: {e}"))
             })?;
 
-        let form = reqwest::multipart::Form::new().part("image", part);
+        let mut form = reqwest::multipart::Form::new().part("image", part);
+
+        if let Some(dt) = document_type {
+            form = form.text("document_type", dt.to_string());
+        }
 
         let url = format!("{}/ocr/extract", self.base_url);
 

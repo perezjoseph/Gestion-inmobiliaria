@@ -11,6 +11,10 @@ pub mod mantenimiento;
 pub mod notificaciones;
 pub mod ocr_client;
 pub mod ocr_mapping;
+#[cfg(test)]
+mod ocr_mapping_pbt;
+#[cfg(test)]
+mod ocr_mapping_tests;
 pub mod ocr_preview;
 pub mod pagos;
 pub mod perfil;

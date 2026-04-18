@@ -39,3 +39,20 @@ pub struct ConfirmPreviewRequest {
     pub preview_id: Uuid,
     pub corrections: Option<HashMap<String, String>>,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtractResponse {
+    pub document_type: String,
+    pub fields: Vec<ExtractField>,
+    pub raw_lines: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtractField {
+    pub name: String,
+    pub value: String,
+    pub label: String,
+    pub confidence: f64,
+}

@@ -2,7 +2,7 @@ use crate::app::AuthContext;
 use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::error_banner::ErrorBanner;
-use crate::components::common::loading::Loading;
+use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::pagination::Pagination;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::components::mantenimiento::{estado_badge, prioridad_badge};
@@ -960,7 +960,7 @@ fn render_mantenimiento_view(
     per_page: u64,
 ) -> Html {
     if loading {
-        return html! { <Loading /> };
+        return html! { <TableSkeleton title_width="240px" columns={6} has_filter=true /> };
     }
 
     let prop_label_cb = {

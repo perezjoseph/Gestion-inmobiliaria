@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use gloo_events::EventListener;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
@@ -5,17 +7,20 @@ use yew::prelude::*;
 use yew_router::prelude::*;
 
 use crate::app::{AuthContext, Route};
+use crate::components::common::confidence_input::ConfidenceInput;
 use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::error_banner::ErrorBanner;
-use crate::components::common::loading::Loading;
+use crate::components::common::ocr_scan_button::OcrScanButton;
+use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::pagination::Pagination;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{BASE_URL, api_delete, api_get, api_post, api_put};
 use crate::types::PaginatedResponse;
 use crate::types::contrato::Contrato;
 use crate::types::inquilino::Inquilino;
+use crate::types::ocr::OcrExtractField;
 use crate::types::pago::{CreatePago, Pago, UpdatePago};
 use crate::types::propiedad::Propiedad;
 use crate::utils::{
@@ -131,6 +136,9 @@ struct PagoFormProps {
     submitting: bool,
     on_submit: Callback<SubmitEvent>,
     on_cancel: Callback<MouseEvent>,
+    confidences: HashMap<String, f64>,
+    on_ocr_result: Callback<Vec<OcrExtractField>>,
+    on_confidence_clear: Callback<String>,
 }
 
 #[function_component]
@@ -156,10 +164,40 @@ fn PagoForm(props: &PagoFormProps) -> Html {
         }};
     }
 
+    let confidence_for = |name: &str| -> Option<f64> {
+        props.confidences.get(name).copied()
+    };
+
+    let input_cb_conf = |state: &UseStateHandle<String>, field_name: &str| -> Callback<InputEvent> {
+        let s = state.clone();
+        let clear = props.on_confidence_clear.clone();
+        let name = field_name.to_string();
+        Callback::from(move |e: InputEvent| {
+            let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+            s.set(input.value());
+            clear.emit(name.clone());
+        })
+    };
+
+    let scan_button = if !props.is_editing {
+        html! {
+            <OcrScanButton
+                document_type="deposito_bancario"
+                on_result={props.on_ocr_result.clone()}
+                label={AttrValue::from("📷 Escanear Recibo")}
+            />
+        }
+    } else {
+        html! {}
+    };
+
     html! {
         <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
-            <h2 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
-                {if props.is_editing { "Editar Pago" } else { "Nuevo Pago" }}</h2>
+            <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4);">
+                <h2 class="text-display" style="font-size: var(--text-lg); font-weight: 600; color: var(--text-primary);">
+                    {if props.is_editing { "Editar Pago" } else { "Nuevo Pago" }}</h2>
+                {scan_button}
+            </div>
             <form onsubmit={props.on_submit.clone()} style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
                 <div>
                     <label class="gi-label">{"Contrato *"}</label>
@@ -176,8 +214,13 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                 </div>
                 <div>
                     <label class="gi-label">{"Monto *"}</label>
-                    <input type="number" step="0.01" min="0" value={(*props.monto).clone()} oninput={input_cb!(props.monto)}
-                        class={input_class(fe.monto.is_some())} />
+                    <ConfidenceInput
+                        value={AttrValue::from((*props.monto).clone())}
+                        confidence={confidence_for("monto")}
+                        oninput={input_cb_conf(&props.monto, "monto")}
+                        input_type="number"
+                        class={AttrValue::from(if fe.monto.is_some() { "gi-input-error" } else { "" })}
+                    />
                     {field_error(&fe.monto)}
                 </div>
                 <div>
@@ -195,7 +238,12 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                 </div>
                 <div>
                     <label class="gi-label">{"Fecha de Pago"}</label>
-                    <input type="date" value={(*props.fecha_pago).clone()} oninput={input_cb!(props.fecha_pago)} class="gi-input" />
+                    <ConfidenceInput
+                        value={AttrValue::from((*props.fecha_pago).clone())}
+                        confidence={confidence_for("fecha_pago")}
+                        oninput={input_cb_conf(&props.fecha_pago, "fecha_pago")}
+                        input_type="date"
+                    />
                 </div>
                 <div>
                     <label class="gi-label">{"Método de Pago"}</label>
@@ -218,7 +266,12 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                 }
                 <div style="grid-column: 1 / -1;">
                     <label class="gi-label">{"Notas"}</label>
-                    <input type="text" value={(*props.notas).clone()} oninput={input_cb!(props.notas)} class="gi-input" placeholder="Notas opcionales" />
+                    <ConfidenceInput
+                        value={AttrValue::from((*props.notas).clone())}
+                        confidence={confidence_for("notas")}
+                        oninput={input_cb_conf(&props.notas, "notas")}
+                        placeholder={AttrValue::from("Notas opcionales")}
+                    />
                 </div>
                 <div style="grid-column: 1 / -1; display: flex; gap: var(--space-2); justify-content: flex-end;">
                     <button type="button" onclick={props.on_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
@@ -704,6 +757,8 @@ pub fn Pagos() -> Html {
     let filter_contrato = use_state(String::new);
     let filter_estado = use_state(String::new);
 
+    let confidences = use_state(HashMap::<String, f64>::new);
+
     {
         let items = items.clone();
         let total = total.clone();
@@ -753,6 +808,7 @@ pub fn Pagos() -> Html {
         let editing = editing.clone();
         let show_form = show_form.clone();
         let form_errors = form_errors.clone();
+        let confidences = confidences.clone();
         move || {
             contrato_id.set(String::new());
             monto.set(String::new());
@@ -765,6 +821,7 @@ pub fn Pagos() -> Html {
             editing.set(None);
             show_form.set(false);
             form_errors.set(FormErrors::default());
+            confidences.set(HashMap::new());
         }
     };
 
@@ -785,6 +842,60 @@ pub fn Pagos() -> Html {
             move || drop(listener)
         });
     }
+
+    let on_ocr_result = {
+        let monto = monto.clone();
+        let moneda = moneda.clone();
+        let fecha_pago = fecha_pago.clone();
+        let metodo_pago = metodo_pago.clone();
+        let notas = notas.clone();
+        let confidences = confidences.clone();
+        Callback::from(move |fields: Vec<OcrExtractField>| {
+            let mut conf_map = HashMap::new();
+            let mut referencia = String::new();
+            let mut cuenta = String::new();
+            for field in &fields {
+                match field.name.as_str() {
+                    "monto" => monto.set(field.value.clone()),
+                    "moneda" => moneda.set(field.value.clone()),
+                    "fecha" => fecha_pago.set(field.value.clone()),
+                    "referencia" => referencia = field.value.clone(),
+                    "cuenta" => cuenta = field.value.clone(),
+                    _ => {}
+                }
+                conf_map.insert(field.name.clone(), field.confidence);
+            }
+            metodo_pago.set("transferencia".into());
+            let notas_parts: Vec<&str> = [referencia.as_str(), cuenta.as_str()]
+                .into_iter()
+                .filter(|s| !s.is_empty())
+                .collect();
+            if !notas_parts.is_empty() {
+                notas.set(notas_parts.join(" "));
+                let max_conf = [
+                    conf_map.get("referencia").copied(),
+                    conf_map.get("cuenta").copied(),
+                ]
+                .into_iter()
+                .flatten()
+                .fold(0.0_f64, f64::max);
+                conf_map.insert("notas".to_string(), max_conf);
+            }
+            conf_map.insert("fecha_pago".to_string(),
+                conf_map.get("fecha").copied().unwrap_or(0.0));
+            conf_map.insert("metodo_pago".to_string(), 1.0);
+            confidences.set(conf_map);
+        })
+    };
+
+    let on_confidence_clear = {
+        let confidences = confidences.clone();
+        Callback::from(move |name: String| {
+            let mut c = (*confidences).clone();
+            c.remove(&name);
+            confidences.set(c);
+        })
+    };
 
     let on_new = super::page_helpers::new_cb(reset_form.clone(), &show_form, true);
 
@@ -918,6 +1029,9 @@ pub fn Pagos() -> Html {
         &submitting,
         on_submit,
         on_cancel,
+        &confidences,
+        on_ocr_result,
+        on_confidence_clear,
         &items,
         &total,
         &page,
@@ -958,6 +1072,9 @@ fn render_pagos_view(
     submitting: &UseStateHandle<bool>,
     on_submit: Callback<SubmitEvent>,
     on_cancel: Callback<MouseEvent>,
+    confidences: &UseStateHandle<HashMap<String, f64>>,
+    on_ocr_result: Callback<Vec<OcrExtractField>>,
+    on_confidence_clear: Callback<String>,
     items: &UseStateHandle<Vec<Pago>>,
     total: &UseStateHandle<u64>,
     page: &UseStateHandle<u64>,
@@ -969,7 +1086,7 @@ fn render_pagos_view(
     on_per_page_change: Callback<u64>,
 ) -> Html {
     if **loading {
-        return html! { <Loading /> };
+        return html! { <TableSkeleton title_width="160px" columns={7} has_filter=true /> };
     }
 
     let last_header: String = if can_write(user_rol) {
@@ -1007,6 +1124,9 @@ fn render_pagos_view(
         submitting,
         on_submit,
         on_cancel,
+        confidences,
+        on_ocr_result,
+        on_confidence_clear,
     );
 
     html! {
@@ -1089,6 +1209,9 @@ fn render_pago_form_section(
     submitting: &UseStateHandle<bool>,
     on_submit: Callback<SubmitEvent>,
     on_cancel: Callback<MouseEvent>,
+    confidences: &UseStateHandle<HashMap<String, f64>>,
+    on_ocr_result: Callback<Vec<OcrExtractField>>,
+    on_confidence_clear: Callback<String>,
 ) -> Html {
     if !**show_form {
         return html! {};
@@ -1102,6 +1225,8 @@ fn render_pago_form_section(
             contratos={(**contratos).clone()} contrato_label={contrato_label.clone()}
             form_errors={(**form_errors).clone()} submitting={**submitting}
             on_submit={on_submit} on_cancel={on_cancel}
+            confidences={(**confidences).clone()} on_ocr_result={on_ocr_result}
+            on_confidence_clear={on_confidence_clear}
         />
     }
 }

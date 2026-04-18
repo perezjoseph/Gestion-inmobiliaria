@@ -10,6 +10,7 @@ use crate::components::layout::sidebar::Sidebar;
 use crate::pages::auditoria::Auditoria;
 use crate::pages::contratos::Contratos;
 use crate::pages::dashboard::Dashboard;
+use crate::pages::gastos::Gastos;
 use crate::pages::importar::Importar;
 use crate::pages::inquilinos::Inquilinos;
 use crate::pages::login::Login;
@@ -98,6 +99,8 @@ pub enum Route {
     Contratos,
     #[at("/pagos")]
     Pagos,
+    #[at("/gastos")]
+    Gastos,
     #[at("/registro")]
     Registro,
     #[at("/reportes")]
@@ -126,6 +129,7 @@ fn switch(routes: Route) -> Html {
         Route::Inquilinos => html! { <ProtectedRoute><Inquilinos /></ProtectedRoute> },
         Route::Contratos => html! { <ProtectedRoute><Contratos /></ProtectedRoute> },
         Route::Pagos => html! { <ProtectedRoute><Pagos /></ProtectedRoute> },
+        Route::Gastos => html! { <ProtectedRoute><Gastos /></ProtectedRoute> },
         Route::Reportes => html! { <ProtectedRoute><Reportes /></ProtectedRoute> },
         Route::UsuariosPage => html! { <ProtectedRoute><Usuarios /></ProtectedRoute> },
         Route::Perfil => html! { <ProtectedRoute><Perfil /></ProtectedRoute> },

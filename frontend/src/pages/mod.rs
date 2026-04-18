@@ -1,6 +1,7 @@
 pub mod auditoria;
 pub mod contratos;
 pub mod dashboard;
+pub mod gastos;
 pub mod importar;
 pub mod inquilinos;
 pub mod login;
