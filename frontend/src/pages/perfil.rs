@@ -3,7 +3,7 @@ use yew::prelude::*;
 
 use crate::app::AuthContext;
 use crate::components::common::error_banner::ErrorBanner;
-use crate::components::common::loading::Loading;
+use crate::components::common::skeleton::ProfileSkeleton;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{api_get, api_put};
 use crate::types::usuario::User;
@@ -179,7 +179,7 @@ pub fn Perfil() -> Html {
     }
 
     if *loading {
-        return html! { <Loading /> };
+        return html! { <ProfileSkeleton /> };
     }
 
     let user_rol = auth

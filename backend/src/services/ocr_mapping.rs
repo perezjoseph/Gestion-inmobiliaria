@@ -4,7 +4,7 @@ use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::errors::AppError;
-use crate::models::ocr::{ImportPreview, OcrResult, PreviewField};
+use crate::models::ocr::{ExtractField, ImportPreview, OcrResult, PreviewField};
 
 fn field_confidence(result: &OcrResult, value: &str) -> f64 {
     result
@@ -250,6 +250,173 @@ pub fn parse_dr_currency(text: &str) -> Result<(Decimal, String), String> {
         Decimal::from_str(&amount_str).map_err(|_| format!("Monto no válido: '{text}'"))?;
 
     Ok((amount, currency.to_string()))
+}
+
+pub fn normalize_cedula(raw: &str) -> String {
+    let digits: String = raw.chars().filter(|c| c.is_ascii_digit()).collect();
+    if digits.len() == 11 {
+        format!("{}-{}-{}", &digits[0..3], &digits[3..10], &digits[10..11])
+    } else {
+        digits
+    }
+}
+
+pub fn map_cedula(result: &OcrResult) -> Result<Vec<ExtractField>, AppError> {
+    let fields = &result.structured_fields;
+
+    let cedula_raw = fields.get("cedula").map_or("", |s| s.as_str());
+    let cedula_value = normalize_cedula(cedula_raw);
+
+    let nombre = fields.get("nombre").map_or("", |s| s.as_str());
+    let apellido = fields.get("apellido").map_or("", |s| s.as_str());
+
+    Ok(vec![
+        ExtractField {
+            name: "cedula".to_string(),
+            value: cedula_value,
+            label: "Cédula".to_string(),
+            confidence: field_confidence(result, cedula_raw),
+        },
+        ExtractField {
+            name: "nombre".to_string(),
+            value: nombre.to_string(),
+            label: "Nombre".to_string(),
+            confidence: field_confidence(result, nombre),
+        },
+        ExtractField {
+            name: "apellido".to_string(),
+            value: apellido.to_string(),
+            label: "Apellido".to_string(),
+            confidence: field_confidence(result, apellido),
+        },
+    ])
+}
+
+pub fn map_contrato(result: &OcrResult) -> Result<Vec<ExtractField>, AppError> {
+    let fields = &result.structured_fields;
+
+    let monto_raw = fields.get("monto_mensual").map_or("", |s| s.as_str());
+    let moneda_raw = fields.get("moneda").map_or("", |s| s.as_str());
+
+    let (monto_value, monto_confidence) = if monto_raw.is_empty() {
+        (String::new(), 0.0)
+    } else {
+        let currency_input = if moneda_raw.is_empty() {
+            monto_raw.to_string()
+        } else {
+            format!("{moneda_raw}{monto_raw}")
+        };
+        match parse_dr_currency(&currency_input) {
+            Ok((amount, _)) => (amount.to_string(), field_confidence(result, monto_raw)),
+            Err(_) => (monto_raw.to_string(), field_confidence(result, monto_raw)),
+        }
+    };
+
+    let moneda_value = if !moneda_raw.is_empty() {
+        let currency_input = format!("{moneda_raw}0");
+        match parse_dr_currency(&currency_input) {
+            Ok((_, currency)) => currency,
+            Err(_) => moneda_raw.to_string(),
+        }
+    } else if !monto_raw.is_empty() {
+        match parse_dr_currency(monto_raw) {
+            Ok((_, currency)) => currency,
+            Err(_) => String::new(),
+        }
+    } else {
+        String::new()
+    };
+
+    let fecha_inicio_raw = fields.get("fecha_inicio").map_or("", |s| s.as_str());
+    let fecha_inicio_value = if fecha_inicio_raw.is_empty() {
+        String::new()
+    } else {
+        match parse_dr_date(fecha_inicio_raw) {
+            Ok(date) => date.format("%Y-%m-%d").to_string(),
+            Err(_) => fecha_inicio_raw.to_string(),
+        }
+    };
+
+    let fecha_fin_raw = fields.get("fecha_fin").map_or("", |s| s.as_str());
+    let fecha_fin_value = if fecha_fin_raw.is_empty() {
+        String::new()
+    } else {
+        match parse_dr_date(fecha_fin_raw) {
+            Ok(date) => date.format("%Y-%m-%d").to_string(),
+            Err(_) => fecha_fin_raw.to_string(),
+        }
+    };
+
+    let deposito_raw = fields.get("deposito").map_or("", |s| s.as_str());
+    let deposito_value = if deposito_raw.is_empty() {
+        String::new()
+    } else {
+        match parse_dr_currency(deposito_raw) {
+            Ok((amount, _)) => amount.to_string(),
+            Err(_) => deposito_raw.to_string(),
+        }
+    };
+
+    Ok(vec![
+        ExtractField {
+            name: "monto_mensual".to_string(),
+            value: monto_value,
+            label: "Monto Mensual".to_string(),
+            confidence: monto_confidence,
+        },
+        ExtractField {
+            name: "moneda".to_string(),
+            value: moneda_value,
+            label: "Moneda".to_string(),
+            confidence: field_confidence(result, moneda_raw),
+        },
+        ExtractField {
+            name: "fecha_inicio".to_string(),
+            value: fecha_inicio_value,
+            label: "Fecha de Inicio".to_string(),
+            confidence: field_confidence(result, fecha_inicio_raw),
+        },
+        ExtractField {
+            name: "fecha_fin".to_string(),
+            value: fecha_fin_value,
+            label: "Fecha de Fin".to_string(),
+            confidence: field_confidence(result, fecha_fin_raw),
+        },
+        ExtractField {
+            name: "deposito".to_string(),
+            value: deposito_value,
+            label: "Depósito".to_string(),
+            confidence: field_confidence(result, deposito_raw),
+        },
+    ])
+}
+
+pub fn map_deposito_extract(result: &OcrResult) -> Result<Vec<ExtractField>, AppError> {
+    let preview = map_deposito(result)?;
+    Ok(preview
+        .fields
+        .into_iter()
+        .map(|f| ExtractField {
+            name: f.name,
+            value: f.value,
+            label: f.label,
+            confidence: f.confidence,
+        })
+        .collect())
+}
+
+pub fn map_gasto_extract(result: &OcrResult) -> Result<Vec<ExtractField>, AppError> {
+    let preview = map_gasto(result)?;
+    Ok(preview
+        .fields
+        .into_iter()
+        .map(|f| ExtractField {
+            name: f.name,
+            value: f.value,
+            label: f.label,
+            confidence: f.confidence,
+        })
+        .collect())
 }
 
 #[cfg(test)]

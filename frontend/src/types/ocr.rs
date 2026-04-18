@@ -27,3 +27,20 @@ pub struct ConfirmPreviewRequest {
     pub preview_id: String,
     pub corrections: Option<HashMap<String, String>>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrExtractResponse {
+    pub document_type: String,
+    pub fields: Vec<OcrExtractField>,
+    pub raw_lines: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrExtractField {
+    pub name: String,
+    pub value: String,
+    pub label: String,
+    pub confidence: f64,
+}

@@ -24,10 +24,11 @@ async fn setup_db() -> Option<DatabaseConnection> {
         }
     };
     let mut opts = ConnectOptions::new(&url);
-    opts.max_connections(2)
+    opts.max_connections(5)
         .min_connections(1)
         .connect_timeout(std::time::Duration::from_secs(30))
-        .idle_timeout(std::time::Duration::from_secs(60));
+        .idle_timeout(std::time::Duration::from_secs(60))
+        .acquire_timeout(std::time::Duration::from_secs(30));
     let db = match Database::connect(opts).await {
         Ok(db) => db,
         Err(e) => {

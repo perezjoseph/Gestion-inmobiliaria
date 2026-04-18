@@ -31,7 +31,7 @@ jobs:
     permissions:
       contents: read
     env:
-      DATABASE_URL: postgresql://realestate:realestate_dev_password@localhost:5432/realestate
+      DATABASE_URL: postgresql://realestate:realestate_dev_password@localhost:5433/realestate
       SERVER_PORT: "8080"
       CORS_ORIGIN: http://localhost:8080
       CARGO_BUILD_JOBS: "2"
@@ -46,7 +46,7 @@ jobs:
           POSTGRES_USER: realestate
           POSTGRES_PASSWORD: realestate_dev_password
         ports:
-          - 5432:5432
+          - 5433:5432
         options: >-
           --health-cmd "pg_isready -U realestate"
           --health-interval 10s

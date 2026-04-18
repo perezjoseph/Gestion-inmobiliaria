@@ -9,7 +9,7 @@ use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::document_gallery::DocumentGallery;
 use crate::components::common::error_banner::ErrorBanner;
-use crate::components::common::loading::Loading;
+use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::pagination::Pagination;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{api_delete, api_get, api_post, api_put};
@@ -768,7 +768,7 @@ fn render_propiedades_view(
     on_per_page_change: Callback<u64>,
 ) -> Html {
     if **loading {
-        return html! { <Loading /> };
+        return html! { <TableSkeleton title_width="200px" columns={7} has_filter=true /> };
     }
 
     let last_header = if can_write(user_rol) { "Acciones" } else { "" };
