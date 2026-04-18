@@ -97,7 +97,6 @@ jobs:
 
   changes:
     name: Detect Changes
-    needs: [runner-cleanup]
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 3
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -191,13 +190,14 @@ jobs:
     name: SonarQube
     needs: [lint, tests, changes]
     if: >-
-      always() && (
+      always() &&
+      needs.lint.result == 'success' &&
+      needs.tests.result == 'success' &&
+      (
         github.event_name != 'pull_request' ||
         needs.changes.outputs.backend == 'true' ||
         needs.changes.outputs.frontend == 'true' ||
-        needs.changes.outputs.android == 'true' ||
-        needs.lint.result == 'success' ||
-        needs.tests.result == 'success'
+        needs.changes.outputs.android == 'true'
       )
     permissions:
       contents: read
