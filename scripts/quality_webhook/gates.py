@@ -19,7 +19,6 @@ from .config import (
 from .runner import wsl_bash
 from .history import _error_hash, _load_fix_history, _fix_history_lock
 
-# Per-error-class dedup windows and thresholds (Requirements 4.1-4.5)
 DEDUP_CONFIG = {
     "flaky":              {"window_minutes": 15,  "threshold": 5},
     "runner_environment": {"window_minutes": 120, "threshold": 2},
@@ -32,11 +31,6 @@ DEDUP_CONFIG = {
 
 
 def preflight_dedup(job, error_log, error_class="unknown"):
-    """Reject if the same error hash failed N+ times within the dedup window.
-
-    Uses class-specific window and threshold from DEDUP_CONFIG.
-    Falls back to "unknown" config if error_class is not recognized.
-    """
     cfg = DEDUP_CONFIG.get(error_class, DEDUP_CONFIG["unknown"])
     window_minutes = cfg["window_minutes"]
     threshold = cfg["threshold"]
@@ -74,9 +68,9 @@ _FORBIDDEN_DIFF_PATTERNS = [
 ]
 
 
-def revision_check_diff():
+def revision_check_diff(cwd=None):
     try:
-        result = wsl_bash("git diff --cached -- '*.rs'", timeout=30)
+        result = wsl_bash("git diff --cached -- '*.rs'", timeout=30, cwd=cwd)
         diff_text = result.stdout or ""
         for pattern in _FORBIDDEN_DIFF_PATTERNS:
             matches = re.findall(pattern, diff_text, re.MULTILINE)
@@ -105,13 +99,13 @@ _VERIFY_COMMANDS = {
 }
 
 
-def verification_run(job):
+def verification_run(job, cwd=None):
     cmd = _VERIFY_COMMANDS.get(job)
     if not cmd:
         return True, f"no verification command for job '{job}'"
 
     try:
-        result = wsl_bash(cmd, timeout=300)
+        result = wsl_bash(cmd, timeout=300, cwd=cwd)
         output = (result.stdout + result.stderr)[-2000:].strip()
 
         if result.returncode == 0:
@@ -155,9 +149,9 @@ _BASELINE_STEPS = {
 }
 
 
-def baseline_verification() -> tuple[bool, str]:
+def baseline_verification(cwd=None) -> tuple[bool, str]:
     try:
-        result = wsl_bash(BASELINE_VERIFY, timeout=600)
+        result = wsl_bash(BASELINE_VERIFY, timeout=600, cwd=cwd)
         if result.returncode == 0:
             return True, "baseline passed"
         output = (result.stdout + result.stderr)[-500:]
@@ -167,10 +161,10 @@ def baseline_verification() -> tuple[bool, str]:
         return False, f"baseline error: {e}"
 
 
-def baseline_verification_incremental(job: str) -> tuple[bool, str]:
+def baseline_verification_incremental(job: str, cwd=None) -> tuple[bool, str]:
     if job.startswith("android"):
         try:
-            result = wsl_bash(ANDROID_BASELINE_VERIFY, timeout=600)
+            result = wsl_bash(ANDROID_BASELINE_VERIFY, timeout=600, cwd=cwd)
             if result.returncode == 0:
                 return True, "android baseline passed"
             output = (result.stdout + result.stderr)[-500:]
@@ -189,7 +183,7 @@ def baseline_verification_incremental(job: str) -> tuple[bool, str]:
 
     combined = " && ".join(cmd for _, cmd in steps_to_run)
     try:
-        result = wsl_bash(combined, timeout=600)
+        result = wsl_bash(combined, timeout=600, cwd=cwd)
         if result.returncode == 0:
             skipped = sorted(covered)
             return True, f"incremental baseline passed (skipped: {skipped})"
@@ -222,9 +216,9 @@ def _check_unsafe_blocks(diff_text: str) -> tuple[bool, str]:
     return True, "unsafe blocks ok"
 
 
-def revision_security_check() -> tuple[bool, str]:
+def revision_security_check(cwd=None) -> tuple[bool, str]:
     try:
-        result = wsl_bash("git diff --cached -- '*.rs' '*.toml' '*.yml'", timeout=30)
+        result = wsl_bash("git diff --cached -- '*.rs' '*.toml' '*.yml'", timeout=30, cwd=cwd)
         diff_text = result.stdout or ""
         current_file = ""
         for line in diff_text.splitlines():
@@ -247,9 +241,9 @@ def revision_security_check() -> tuple[bool, str]:
         return True, f"security check skipped: {e}"
 
 
-def revision_audit_check() -> tuple[bool, str]:
+def revision_audit_check(cwd=None) -> tuple[bool, str]:
     try:
-        result = wsl_bash("cargo audit --json 2>/dev/null || true", timeout=120)
+        result = wsl_bash("cargo audit --json 2>/dev/null || true", timeout=120, cwd=cwd)
         output = result.stdout or ""
         vuln_count = output.count('"kind":"vulnerability"')
         if vuln_count > 0:
@@ -260,16 +254,9 @@ def revision_audit_check() -> tuple[bool, str]:
         return True, f"audit check skipped: {e}"
 
 
-_MAINTAINABILITY_DIFF_PATTERNS = [
-    (r'^\+.*\.unwrap\(\)', "unwrap() in non-test code"),
-    (r'^\+.*\.expect\(', "expect() in non-test code"),
-    (r'^\+\s*//\s*(?:TODO|FIXME|HACK|XXX)', "TODO/FIXME/HACK/XXX comment"),
-]
-
-
-def revision_maintainability_check() -> tuple[bool, str]:
+def revision_maintainability_check(cwd=None) -> tuple[bool, str]:
     try:
-        result = wsl_bash("git diff --cached -- '*.rs'", timeout=30)
+        result = wsl_bash("git diff --cached -- '*.rs'", timeout=30, cwd=cwd)
         diff_text = result.stdout or ""
         current_file = ""
         added_lines_in_fn = 0
@@ -325,11 +312,12 @@ _CORRECTNESS_DIFF_PATTERNS = [
 ]
 
 
-def revision_correctness_check() -> tuple[bool, str]:
+def revision_correctness_check(cwd=None) -> tuple[bool, str]:
     try:
         result = wsl_bash(
             "git diff --cached -- 'backend/src/services/*.rs' 'backend/src/handlers/*.rs'",
             timeout=30,
+            cwd=cwd,
         )
         diff_text = result.stdout or ""
         if not diff_text.strip():
@@ -358,16 +346,23 @@ PBT_VERIFY_FRONTEND = (
 )
 
 
-def verification_run_pbt(job: str) -> tuple[bool, str]:
+_MAINTAINABILITY_DIFF_PATTERNS = [
+    (r'^\+.*\.unwrap\(\)', "unwrap() in non-test code"),
+    (r'^\+.*\.expect\(', "expect() in non-test code"),
+    (r'^\+\s*//\s*(?:TODO|FIXME|HACK|XXX)', "TODO/FIXME/HACK/XXX comment"),
+]
+
+
+def verification_run_pbt(job: str, cwd=None) -> tuple[bool, str]:
     if job in ("test-backend", "build-backend"):
         cmd = PBT_VERIFY_BACKEND
     elif job in ("test-frontend", "build-frontend"):
         cmd = PBT_VERIFY_FRONTEND
     else:
-        return verification_run(job)
+        return verification_run(job, cwd=cwd)
 
     try:
-        result = wsl_bash(cmd, timeout=600)
+        result = wsl_bash(cmd, timeout=600, cwd=cwd)
         output = (result.stdout + result.stderr)[-2000:].strip()
         if result.returncode == 0:
             return True, "PBT verification passed (500 cases)"

@@ -371,7 +371,7 @@ def _build_summary(step_results):
     return header + "\n" + "\n".join(lines)
 
 
-def reproduce_locally(job, error_class="", cache: ReproCache | None = None):
+def reproduce_locally(job, error_class="", cache: ReproCache | None = None, cwd=None):
     """Run the CI commands for a job locally and return structured results.
 
     Args:
@@ -421,7 +421,7 @@ def reproduce_locally(job, error_class="", cache: ReproCache | None = None):
 
         log.info(f"  Running: {step_name}")
         try:
-            result = wsl_bash(cmd, timeout=timeout)
+            result = wsl_bash(cmd, timeout=timeout, cwd=cwd)
             output = (result.stdout or "") + (result.stderr or "")
             exit_code = result.returncode
         except Exception as e:

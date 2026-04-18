@@ -21,7 +21,7 @@ pub fn map_deposito(result: &OcrResult) -> Result<ImportPreview, AppError> {
 
     let monto_raw = fields
         .get("monto")
-        .ok_or_else(|| AppError::Internal(anyhow::anyhow!("monto no detectado")))?;
+        .ok_or_else(|| AppError::Validation("Campo 'monto' no detectado en el documento".to_string()))?;
 
     let moneda_raw = fields.get("moneda").map_or("", |s| s.as_str());
     let currency_input = if moneda_raw.is_empty() {
@@ -31,7 +31,7 @@ pub fn map_deposito(result: &OcrResult) -> Result<ImportPreview, AppError> {
     };
 
     let (amount, currency) =
-        parse_dr_currency(&currency_input).map_err(|e| AppError::Internal(anyhow::anyhow!(e)))?;
+        parse_dr_currency(&currency_input).map_err(|e| AppError::Validation(e))?;
 
     let mut preview_fields = vec![
         PreviewField {
@@ -118,7 +118,7 @@ pub fn map_gasto(result: &OcrResult) -> Result<ImportPreview, AppError> {
 
     let monto_raw = fields
         .get("monto")
-        .ok_or_else(|| AppError::Internal(anyhow::anyhow!("monto no detectado")))?;
+        .ok_or_else(|| AppError::Validation("Campo 'monto' no detectado en el documento".to_string()))?;
 
     let moneda_raw = fields.get("moneda").map_or("", |s| s.as_str());
     let currency_input = if moneda_raw.is_empty() {
@@ -128,7 +128,7 @@ pub fn map_gasto(result: &OcrResult) -> Result<ImportPreview, AppError> {
     };
 
     let (amount, currency) =
-        parse_dr_currency(&currency_input).map_err(|e| AppError::Internal(anyhow::anyhow!(e)))?;
+        parse_dr_currency(&currency_input).map_err(|e| AppError::Validation(e))?;
 
     let mut preview_fields = vec![
         PreviewField {
@@ -681,7 +681,7 @@ mod tests {
         ]);
         let result = make_gasto_result(fields);
         let err = map_gasto(&result).unwrap_err();
-        assert!(err.to_string().contains("monto no detectado"));
+        assert!(err.to_string().contains("monto"));
     }
 
     #[test]

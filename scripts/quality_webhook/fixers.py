@@ -16,6 +16,7 @@ from .config import (
     SONAR_PARALLEL_GROUPS, log,
 )
 from .runner import wsl_bash, run_kiro
+from .worktrees import setup_worktree, commit_and_push, cleanup_worktree, discard_changes, get_head_sha
 from .classifier import classify_error
 from .history import (
     record_fix_attempt, get_past_attempts, _error_hash,
@@ -143,9 +144,9 @@ _AUTO_FIX_PATTERN = re.compile(r"^[0-9a-f]+ fix: resolve CI failures")
 _MAX_AUTO_FIX_CHAIN = 2
 
 
-def _check_auto_fix_chain(job):
+def _check_auto_fix_chain(job, branch="main"):
     with _git_lock:
-        result = wsl_bash("git log --oneline -5 main", timeout=30)
+        result = wsl_bash(f"git log --oneline -5 {branch}", timeout=30)
     if result.returncode != 0:
         return False
     lines = [l.strip() for l in result.stdout.strip().splitlines() if l.strip()]
@@ -171,13 +172,13 @@ def _check_auto_fix_chain(job):
     return recent_failures >= _MAX_AUTO_FIX_CHAIN
 
 
-def _rollback_last_auto_fix(job):
+def _rollback_last_auto_fix(job, branch="main"):
     log.warning(f"Auto-fix loop detected for {job}. Reverting last auto-fix commit.")
     with _git_lock:
         revert_result = wsl_bash(
             "git revert HEAD --no-edit && "
-            "git push origin main || "
-            "(git pull --rebase origin main && git push origin main)",
+            f"git push origin {branch} || "
+            f"(git pull --rebase origin {branch} && git push origin {branch})",
             timeout=120,
         )
     revert_ok = revert_result.returncode == 0
@@ -322,7 +323,7 @@ def _build_error_notes(error_class):
     return notes.get(error_class, "")
 
 
-def _diagnose(job, step, error_log, error_class, context, repro=None, deep=False):
+def _diagnose(job, step, error_log, error_class, context, repro=None, deep=False, cwd=None):
     """Diagnose a CI failure using local reproduction + gh CLI for full logs.
 
     When deep=True, includes past attempt history, semantic memory, and
@@ -392,7 +393,7 @@ def _diagnose(job, step, error_log, error_class, context, repro=None, deep=False
         )
 
     label = f"Deep research ({job}/{step})" if deep else f"Diagnose ({job}/{step})"
-    result = run_kiro(prompt, label)
+    result = run_kiro(prompt, label, cwd=cwd)
     kiro_output = result[1] if isinstance(result, tuple) else ""
     limit = 4000 if deep else 2000
     return kiro_output[-limit:] if kiro_output else "diagnosis unavailable"
@@ -474,8 +475,17 @@ def fix_once_and_push(job, step, error_log, context=None):
         if commit:
             tracker.mark_job_fixing(commit, job)
 
-        if _check_auto_fix_chain(job):
-            _rollback_last_auto_fix(job)
+        branch = context.get("branch", "main") if context else "main"
+        wt_path, wt_name = setup_worktree(branch, commit or "HEAD")
+        if not wt_path:
+            log.error(f"Failed to create worktree for {job}/{step}")
+            if commit:
+                pipeline_now = tracker.get_or_create(commit)
+                pipeline_now.job_states[job] = JobState.FAILED
+            return False
+
+        if _check_auto_fix_chain(job, branch):
+            _rollback_last_auto_fix(job, branch)
             if commit:
                 tracker.mark_job_fixing(commit, job)
                 pipeline_now = tracker.get_or_create(commit)
@@ -532,7 +542,7 @@ def fix_once_and_push(job, step, error_log, context=None):
 
         log.info(f"=== Reproducing {job}/{step} locally ===")
         t0 = time.monotonic()
-        repro = reproduce_locally(job, error_class, cache=repro_cache)
+        repro = reproduce_locally(job, error_class, cache=repro_cache, cwd=wt_path)
         timing.reproduction_s = time.monotonic() - t0
         if repro.reproduced:
             log.info(f"Failure REPRODUCED locally: {len(repro.errors)} errors, "
@@ -589,7 +599,7 @@ def fix_once_and_push(job, step, error_log, context=None):
             log.info(f"Phase escalation: running deep diagnosis before round {attempt}")
             t0 = time.monotonic()
             diagnosis = _diagnose(job, step, error_log, error_class, context,
-                                  repro=repro, deep=True)
+                                  repro=repro, deep=True, cwd=wt_path)
             timing.diagnosis_s = time.monotonic() - t0
 
             prompt = (
@@ -611,7 +621,7 @@ def fix_once_and_push(job, step, error_log, context=None):
             log.info(f"Phase escalation: investigation mode for round {attempt}")
             t0 = time.monotonic()
             diagnosis = _diagnose(job, step, error_log, error_class, context,
-                                  repro=repro, deep=True)
+                                  repro=repro, deep=True, cwd=wt_path)
             timing.diagnosis_s = time.monotonic() - t0
 
             prompt = (
@@ -655,7 +665,7 @@ def fix_once_and_push(job, step, error_log, context=None):
             if phase == "quick" and attempt == 1:
                 diag_for_strats = _diagnose(
                     job, step, error_log, error_class, context,
-                    repro=repro, deep=False,
+                    repro=repro, deep=False, cwd=wt_path,
                 )
                 parsed_strategies = _parse_strategies(diag_for_strats)
                 if len(parsed_strategies) >= 2 and random.random() < 0.10:
@@ -694,7 +704,7 @@ def fix_once_and_push(job, step, error_log, context=None):
         )
 
         t0 = time.monotonic()
-        result = run_kiro(prompt, f"CI fix ({job}/{step}) round {attempt} [{phase}]")
+        result = run_kiro(prompt, f"CI fix ({job}/{step}) round {attempt} [{phase}]", cwd=wt_path)
         timing.fix_attempt_s = time.monotonic() - t0
 
         success = result[0] if isinstance(result, tuple) else result
@@ -723,11 +733,11 @@ def fix_once_and_push(job, step, error_log, context=None):
                 pipeline_now.job_states[job] = JobState.FAILED
             return False
 
-        rev_passed, rev_reason = revision_check_diff()
+        rev_passed, rev_reason = revision_check_diff(cwd=wt_path)
         if not rev_passed:
             timing.total_s = time.monotonic() - attempt_start
             log.warning(f"Gate 3a rejected round {attempt} ({job}/{step}): {rev_reason}")
-            wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+            discard_changes(wt_path)
             record_strategy_outcome(job, error_class, strategy_note or error_class, False)
             record_fix_attempt(job, error_log, attempt, False,
                                f"revision_rejected: {rev_reason}. {strategy_note}",
@@ -738,11 +748,11 @@ def fix_once_and_push(job, step, error_log, context=None):
                 pipeline_now.job_states[job] = JobState.FAILED
             return False
 
-        sec_passed, sec_reason = revision_security_check()
+        sec_passed, sec_reason = revision_security_check(cwd=wt_path)
         if not sec_passed:
             timing.total_s = time.monotonic() - attempt_start
             log.warning(f"Gate 3b rejected round {attempt} ({job}/{step}): {sec_reason}")
-            wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+            discard_changes(wt_path)
             record_strategy_outcome(job, error_class, strategy_note or error_class, False)
             record_fix_attempt(job, error_log, attempt, False,
                                f"security_rejected: {sec_reason}. {strategy_note}",
@@ -753,11 +763,11 @@ def fix_once_and_push(job, step, error_log, context=None):
                 pipeline_now.job_states[job] = JobState.FAILED
             return False
 
-        maint_passed, maint_reason = revision_maintainability_check()
+        maint_passed, maint_reason = revision_maintainability_check(cwd=wt_path)
         if not maint_passed:
             timing.total_s = time.monotonic() - attempt_start
             log.warning(f"Gate 3c rejected round {attempt} ({job}/{step}): {maint_reason}")
-            wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+            discard_changes(wt_path)
             record_strategy_outcome(job, error_class, strategy_note or error_class, False)
             record_fix_attempt(job, error_log, attempt, False,
                                f"maintainability_rejected: {maint_reason}. {strategy_note}",
@@ -768,11 +778,11 @@ def fix_once_and_push(job, step, error_log, context=None):
                 pipeline_now.job_states[job] = JobState.FAILED
             return False
 
-        correct_passed, correct_reason = revision_correctness_check()
+        correct_passed, correct_reason = revision_correctness_check(cwd=wt_path)
         if not correct_passed:
             timing.total_s = time.monotonic() - attempt_start
             log.warning(f"Gate 3e rejected round {attempt} ({job}/{step}): {correct_reason}")
-            wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+            discard_changes(wt_path)
             record_strategy_outcome(job, error_class, strategy_note or error_class, False)
             record_fix_attempt(job, error_log, attempt, False,
                                f"correctness_rejected: {correct_reason}. {strategy_note}",
@@ -785,15 +795,15 @@ def fix_once_and_push(job, step, error_log, context=None):
 
         t0 = time.monotonic()
         if error_class == "pbt_failure":
-            verify_passed, verify_reason = verification_run_pbt(job)
+            verify_passed, verify_reason = verification_run_pbt(job, cwd=wt_path)
         else:
-            verify_passed, verify_reason = verification_run(job)
+            verify_passed, verify_reason = verification_run(job, cwd=wt_path)
         timing.verification_s = time.monotonic() - t0
 
         if not verify_passed:
             timing.total_s = time.monotonic() - attempt_start
             log.warning(f"Gate 4 verification failed for round {attempt} ({job}/{step}): {verify_reason}")
-            wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+            discard_changes(wt_path)
             record_strategy_outcome(job, error_class, strategy_note or error_class, False)
             record_fix_attempt(job, error_log, attempt, False,
                                f"verify_failed: {verify_reason[:200]}. {strategy_note}",
@@ -804,11 +814,11 @@ def fix_once_and_push(job, step, error_log, context=None):
                 pipeline_now.job_states[job] = JobState.FAILED
             return False
 
-        baseline_passed, baseline_reason = baseline_verification_incremental(job)
+        baseline_passed, baseline_reason = baseline_verification_incremental(job, cwd=wt_path)
         if not baseline_passed:
             timing.total_s = time.monotonic() - attempt_start
             log.warning(f"Gate 5 baseline failed for round {attempt} ({job}/{step}): {baseline_reason}")
-            wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+            discard_changes(wt_path)
             record_strategy_outcome(job, error_class, strategy_note or error_class, False)
             record_fix_attempt(job, error_log, attempt, False,
                                f"baseline_failed: {baseline_reason[:200]}. {strategy_note}",
@@ -827,18 +837,8 @@ def fix_once_and_push(job, step, error_log, context=None):
             lineage_tag = f" [lineage:{pipeline.lineage_id[:12]}]"
         commit_msg = f"fix: resolve CI failures (auto-fix){lineage_tag}"
 
-        pre_fix_sha_result = wsl_bash("git rev-parse HEAD", timeout=10)
-        pre_fix_sha = pre_fix_sha_result.stdout.strip()[:12] if pre_fix_sha_result.returncode == 0 else "unknown"
-        with _git_lock:
-            commit_result = wsl_bash(
-                "git add -A && "
-                f"git commit -m '{commit_msg}' && "
-                "git push origin main || "
-                "(git pull --rebase origin main && git push origin main)",
-                timeout=120,
-            )
-
-        commit_ok = commit_result.returncode == 0
+        pre_fix_sha = get_head_sha(wt_path)[:12] or "unknown"
+        commit_ok, commit_err = commit_and_push(wt_path, branch, commit_msg)
         record_strategy_outcome(job, error_class, strategy_note or error_class, commit_ok)
         if exploring and parsed_strategies:
             unchosen_name = parsed_strategies[0][0]
@@ -850,8 +850,7 @@ def fix_once_and_push(job, step, error_log, context=None):
         store_fix_attempt(job, step, error_class, error_log, attempt, commit_ok)
 
         if commit_ok:
-            new_sha_result = wsl_bash("git rev-parse HEAD", timeout=10)
-            new_sha = new_sha_result.stdout.strip() if new_sha_result.returncode == 0 else ""
+            new_sha = get_head_sha(wt_path)
             files_changed = [f.strip() for f in outcome.get("files_changed", "").split(",") if f.strip()]
 
             if commit:
@@ -877,7 +876,8 @@ def fix_once_and_push(job, step, error_log, context=None):
         return False
 
     finally:
-        wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+        if wt_name:
+            cleanup_worktree(wt_name)
         if _fix_count_changed:
             try:
                 from .server import _active_fix_count_lock
@@ -920,8 +920,9 @@ def _fix_with_retry_legacy(job, step, error_log, context=None):
         except ImportError:
             pass
         # Gate 0: Auto-fix loop detection
-        if _check_auto_fix_chain(job):
-            _rollback_last_auto_fix(job)
+        branch = context.get("branch", "main") if context else "main"
+        if _check_auto_fix_chain(job, branch):
+            _rollback_last_auto_fix(job, branch)
             return False
 
         # Gate 1: Time-based dedup
@@ -934,6 +935,12 @@ def _fix_with_retry_legacy(job, step, error_log, context=None):
                 _write_escalation(job, step, error_log, "dedup_rejected", context,
                                   extra_reason=reason)
             return research_fix
+
+        commit_sha = context.get("commit", "") if context else ""
+        wt_path, wt_name = setup_worktree(branch, commit_sha or "HEAD")
+        if not wt_path:
+            log.error(f"Failed to create worktree for {job}/{step}")
+            return False
 
         ctx_str = ""
         if context:
@@ -971,7 +978,7 @@ def _fix_with_retry_legacy(job, step, error_log, context=None):
         # Stage 0: Local reproduction (timed)
         log.info(f"=== Reproducing {job}/{step} locally ===")
         t0 = time.monotonic()
-        repro = reproduce_locally(job, error_class, cache=repro_cache)
+        repro = reproduce_locally(job, error_class, cache=repro_cache, cwd=wt_path)
         initial_repro_s = time.monotonic() - t0
         if repro.reproduced:
             log.info(f"Failure REPRODUCED locally: {len(repro.errors)} errors, "
@@ -1017,7 +1024,7 @@ def _fix_with_retry_legacy(job, step, error_log, context=None):
 
                 log.info(f"Re-reproducing {job}/{step} locally after failed attempt")
                 t0 = time.monotonic()
-                repro = reproduce_locally(job, error_class, cache=repro_cache)
+                repro = reproduce_locally(job, error_class, cache=repro_cache, cwd=wt_path)
                 timing.reproduction_s = time.monotonic() - t0
                 if repro.reproduced and repro.error_class:
                     error_class = repro.error_class
@@ -1049,7 +1056,7 @@ def _fix_with_retry_legacy(job, step, error_log, context=None):
                 log.info(f"Phase escalation: running deep diagnosis before attempt {attempt}")
                 t0 = time.monotonic()
                 diagnosis = _diagnose(job, step, error_log, error_class, context,
-                                      repro=repro, deep=True)
+                                      repro=repro, deep=True, cwd=wt_path)
                 timing.diagnosis_s = time.monotonic() - t0
 
                 prompt = (
@@ -1071,7 +1078,7 @@ def _fix_with_retry_legacy(job, step, error_log, context=None):
                 log.info(f"Phase escalation: investigation mode for attempt {attempt}")
                 t0 = time.monotonic()
                 diagnosis = _diagnose(job, step, error_log, error_class, context,
-                                      repro=repro, deep=True)
+                                      repro=repro, deep=True, cwd=wt_path)
                 timing.diagnosis_s = time.monotonic() - t0
 
                 prompt = (
@@ -1115,7 +1122,7 @@ def _fix_with_retry_legacy(job, step, error_log, context=None):
                 if phase == "quick" and attempt == 1:
                     diag_for_strats = _diagnose(
                         job, step, error_log, error_class, context,
-                        repro=repro, deep=False,
+                        repro=repro, deep=False, cwd=wt_path,
                     )
                     parsed_strategies = _parse_strategies(diag_for_strats)
                     if len(parsed_strategies) >= 2 and random.random() < 0.10:
@@ -1148,7 +1155,7 @@ def _fix_with_retry_legacy(job, step, error_log, context=None):
             )
 
             t0 = time.monotonic()
-            result = run_kiro(prompt, f"CI fix ({job}/{step}) attempt {attempt} [{phase}]")
+            result = run_kiro(prompt, f"CI fix ({job}/{step}) attempt {attempt} [{phase}]", cwd=wt_path)
             timing.fix_attempt_s = time.monotonic() - t0
 
             success = result[0] if isinstance(result, tuple) else result
@@ -1170,12 +1177,12 @@ def _fix_with_retry_legacy(job, step, error_log, context=None):
                 continue
 
             # Gate 2: Revision check (reject forbidden patterns like #[ignore])
-            rev_passed, rev_reason = revision_check_diff()
+            rev_passed, rev_reason = revision_check_diff(cwd=wt_path)
             if not rev_passed:
                 timing.total_s = time.monotonic() - attempt_start
                 all_timings.append(timing)
                 log.warning(f"Revision gate rejected attempt {attempt} ({job}/{step}): {rev_reason}")
-                wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+                discard_changes(wt_path)
                 last_strategy_summary = f"REVISION REJECTED ({rev_reason}). {strategy_note}"
                 record_strategy_outcome(job, error_class, strategy_note or error_class, False)
                 record_fix_attempt(job, error_log, attempt, False,
@@ -1186,14 +1193,14 @@ def _fix_with_retry_legacy(job, step, error_log, context=None):
 
             # Gate 3: Independent verification
             t0 = time.monotonic()
-            verify_passed, verify_reason = verification_run(job)
+            verify_passed, verify_reason = verification_run(job, cwd=wt_path)
             timing.verification_s = time.monotonic() - t0
 
             if not verify_passed:
                 timing.total_s = time.monotonic() - attempt_start
                 all_timings.append(timing)
                 log.warning(f"Verification gate failed for attempt {attempt} ({job}/{step}): {verify_reason}")
-                wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+                discard_changes(wt_path)
                 last_strategy_summary = f"VERIFY FAILED ({verify_reason[:200]}). {strategy_note}"
                 record_strategy_outcome(job, error_class, strategy_note or error_class, False)
                 record_fix_attempt(job, error_log, attempt, False,
@@ -1206,18 +1213,8 @@ def _fix_with_retry_legacy(job, step, error_log, context=None):
             timing.total_s = time.monotonic() - attempt_start
             all_timings.append(timing)
             log.info(f"All gates passed for attempt {attempt} ({job}/{step}). Committing.")
-            pre_fix_sha_result = wsl_bash("git rev-parse HEAD", timeout=10)
-            pre_fix_sha = pre_fix_sha_result.stdout.strip()[:12] if pre_fix_sha_result.returncode == 0 else "unknown"
-            with _git_lock:
-                commit_result = wsl_bash(
-                    "git add -A && "
-                    "git commit -m 'fix: resolve CI failures (auto-fix)' && "
-                    "git push origin main || "
-                    "(git pull --rebase origin main && git push origin main)",
-                    timeout=120,
-                )
-
-            commit_ok = commit_result.returncode == 0
+            pre_fix_sha = get_head_sha(wt_path)[:12] or "unknown"
+            commit_ok, commit_err = commit_and_push(wt_path, branch, "fix: resolve CI failures (auto-fix)")
             record_strategy_outcome(job, error_class, strategy_note or error_class, commit_ok)
             if exploring and parsed_strategies:
                 unchosen_name = parsed_strategies[0][0]
@@ -1246,7 +1243,8 @@ def _fix_with_retry_legacy(job, step, error_log, context=None):
             last_strategy_summary = f"commit/push failed. {strategy_note}"
 
     finally:
-        wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
+        if wt_name:
+            cleanup_worktree(wt_name)
         if _fix_count_changed:
             try:
                 from .server import _active_fix_count_lock
@@ -1286,111 +1284,108 @@ def _deep_research_fix(job, step, error_log, context=None):
 
     error_class = classify_error(error_log)
 
-    repro_cache = ReproCache(error_hash=_error_hash(job, error_log))
-    repro = reproduce_locally(job, error_class, cache=repro_cache)
-    if repro.reproduced and repro.error_class:
-        error_class = repro.error_class
-
-    # Phase 1: Deep diagnosis via _diagnose(deep=True)
-    log.info(f"=== Deep research: diagnosing {job}/{step}{ctx_str} ===")
-    diagnosis = _diagnose(job, step, error_log, error_class, context,
-                          repro=repro, deep=True)
-
-    if not diagnosis or diagnosis == "diagnosis unavailable":
-        log.warning(f"Deep research produced no output for {job}/{step}")
+    branch = context.get("branch", "main") if context else "main"
+    commit_sha = context.get("commit", "") if context else ""
+    wt_path, wt_name = setup_worktree(branch, commit_sha or "HEAD")
+    if not wt_path:
+        log.error(f"Failed to create worktree for deep research {job}/{step}")
         return False
 
-    log.info(f"Deep research complete for {job}/{step}, proceeding to planned fix")
+    try:
+        repro_cache = ReproCache(error_hash=_error_hash(job, error_log))
+        repro = reproduce_locally(job, error_class, cache=repro_cache, cwd=wt_path)
+        if repro.reproduced and repro.error_class:
+            error_class = repro.error_class
 
-    # Phase 2: Execute the researched fix
-    log.info(f"=== Deep research fix attempt for {job}/{step}{ctx_str} ===")
-    verify_cmd = _JOB_VERIFY.get(job, "")
+        log.info(f"=== Deep research: diagnosing {job}/{step}{ctx_str} ===")
+        diagnosis = _diagnose(job, step, error_log, error_class, context,
+                              repro=repro, deep=True, cwd=wt_path)
 
-    repro_section = ""
-    if repro and repro.reproduced:
-        repro_section = format_errors_for_prompt(repro)
+        if not diagnosis or diagnosis == "diagnosis unavailable":
+            log.warning(f"Deep research produced no output for {job}/{step}")
+            return False
 
-    fix_prompt = (
-        f"RESEARCH-INFORMED FIX for {job}/{step}{ctx_str}\n\n"
-        f"You previously analyzed this failure in depth. "
-        f"Here is your analysis:\n"
-        f"```\n{diagnosis}\n```\n\n"
-        f"{repro_section}"
-        f"EXECUTE the fix plan from your analysis above.\n"
-        f"STEP 1: Apply the changes described in your analysis.\n"
-    )
-    if verify_cmd:
-        fix_prompt += f"STEP 2: Verify with: {verify_cmd}\n"
-    fix_prompt += (
-        f"STEP 3: git add -A\n"
-        f"{SCOPE_CONSTRAINTS}\n"
-        f"Do NOT commit."
-    )
+        log.info(f"Deep research complete for {job}/{step}, proceeding to planned fix")
 
-    result = run_kiro(fix_prompt, f"Deep research fix ({job}/{step})")
-    success = result[0] if isinstance(result, tuple) else result
-    kiro_output = result[1] if isinstance(result, tuple) else ""
+        log.info(f"=== Deep research fix attempt for {job}/{step}{ctx_str} ===")
+        verify_cmd = _JOB_VERIFY.get(job, "")
 
-    if not success:
-        log.warning(f"Deep research fix attempt failed for {job}/{step}")
-        record_fix_attempt(job, error_log, 0, False,
-                           f"deep_research_fix failed. class={error_class}")
-        store_fix_attempt(job, step, error_class, error_log, 0, False)
-        return False
+        repro_section = ""
+        if repro and repro.reproduced:
+            repro_section = format_errors_for_prompt(repro)
 
-    # Gate: revision check
-    rev_passed, rev_reason = revision_check_diff()
-    if not rev_passed:
-        log.warning(f"Deep research fix rejected by revision gate ({job}/{step}): {rev_reason}")
-        wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
-        record_fix_attempt(job, error_log, 0, False,
-                           f"deep_research revision_rejected: {rev_reason}")
-        store_fix_attempt(job, step, error_class, error_log, 0, False)
-        return False
-
-    # Gate: verification
-    verify_passed, verify_reason = verification_run(job)
-    if not verify_passed:
-        log.warning(f"Deep research fix failed verification ({job}/{step}): {verify_reason}")
-        wsl_bash("git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null", timeout=15)
-        record_fix_attempt(job, error_log, 0, False,
-                           f"deep_research verify_failed: {verify_reason[:200]}")
-        store_fix_attempt(job, step, error_class, error_log, 0, False)
-        return False
-
-    # All gates passed — commit
-    log.info(f"Deep research fix passed all gates for {job}/{step}. Committing.")
-    pre_fix_sha_result = wsl_bash("git rev-parse HEAD", timeout=10)
-    pre_fix_sha = pre_fix_sha_result.stdout.strip()[:12] if pre_fix_sha_result.returncode == 0 else "unknown"
-    with _git_lock:
-        commit_result = wsl_bash(
-            "git add -A && "
-            "git commit -m 'fix: resolve CI failures (deep-research auto-fix)' && "
-            "git push origin main || "
-            "(git pull --rebase origin main && git push origin main)",
-            timeout=120,
+        fix_prompt = (
+            f"RESEARCH-INFORMED FIX for {job}/{step}{ctx_str}\n\n"
+            f"You previously analyzed this failure in depth. "
+            f"Here is your analysis:\n"
+            f"```\n{diagnosis}\n```\n\n"
+            f"{repro_section}"
+            f"EXECUTE the fix plan from your analysis above.\n"
+            f"STEP 1: Apply the changes described in your analysis.\n"
+        )
+        if verify_cmd:
+            fix_prompt += f"STEP 2: Verify with: {verify_cmd}\n"
+        fix_prompt += (
+            f"STEP 3: git add -A\n"
+            f"{SCOPE_CONSTRAINTS}\n"
+            f"Do NOT commit."
         )
 
-    commit_ok = commit_result.returncode == 0
-    outcome = extract_outcome_from_output(kiro_output) if kiro_output else {}
-    strategy_note = outcome.get("strategy", "deep_research")
+        result = run_kiro(fix_prompt, f"Deep research fix ({job}/{step})", cwd=wt_path)
+        success = result[0] if isinstance(result, tuple) else result
+        kiro_output = result[1] if isinstance(result, tuple) else ""
 
-    record_strategy_outcome(job, error_class, strategy_note, commit_ok)
-    record_fix_attempt(job, error_log, 0, commit_ok,
-                       f"deep_research class={error_class}. pre_fix_sha={pre_fix_sha}. {strategy_note}")
-    store_fix_attempt(job, step, error_class, error_log, 0, commit_ok)
+        if not success:
+            log.warning(f"Deep research fix attempt failed for {job}/{step}")
+            record_fix_attempt(job, error_log, 0, False,
+                               f"deep_research_fix failed. class={error_class}")
+            store_fix_attempt(job, step, error_class, error_log, 0, False)
+            return False
 
-    if commit_ok:
-        store_fix_outcome(
-            job, error_class,
-            files_changed=outcome.get("files_changed", ""),
-            strategy=f"deep_research: {strategy_note}",
-        )
-        log.info(f"Deep research fix succeeded for {job}/{step}")
-        return True
+        rev_passed, rev_reason = revision_check_diff(cwd=wt_path)
+        if not rev_passed:
+            log.warning(f"Deep research fix rejected by revision gate ({job}/{step}): {rev_reason}")
+            discard_changes(wt_path)
+            record_fix_attempt(job, error_log, 0, False,
+                               f"deep_research revision_rejected: {rev_reason}")
+            store_fix_attempt(job, step, error_class, error_log, 0, False)
+            return False
 
-    log.warning(f"Deep research fix commit/push failed for {job}/{step}")
-    return False
+        verify_passed, verify_reason = verification_run(job, cwd=wt_path)
+        if not verify_passed:
+            log.warning(f"Deep research fix failed verification ({job}/{step}): {verify_reason}")
+            discard_changes(wt_path)
+            record_fix_attempt(job, error_log, 0, False,
+                               f"deep_research verify_failed: {verify_reason[:200]}")
+            store_fix_attempt(job, step, error_class, error_log, 0, False)
+            return False
+
+        log.info(f"Deep research fix passed all gates for {job}/{step}. Committing.")
+        pre_fix_sha = get_head_sha(wt_path)[:12] or "unknown"
+        commit_ok, commit_err = commit_and_push(wt_path, branch, "fix: resolve CI failures (deep-research auto-fix)")
+
+        outcome = extract_outcome_from_output(kiro_output) if kiro_output else {}
+        strategy_note = outcome.get("strategy", "deep_research")
+
+        record_strategy_outcome(job, error_class, strategy_note, commit_ok)
+        record_fix_attempt(job, error_log, 0, commit_ok,
+                           f"deep_research class={error_class}. pre_fix_sha={pre_fix_sha}. {strategy_note}")
+        store_fix_attempt(job, step, error_class, error_log, 0, commit_ok)
+
+        if commit_ok:
+            store_fix_outcome(
+                job, error_class,
+                files_changed=outcome.get("files_changed", ""),
+                strategy=f"deep_research: {strategy_note}",
+            )
+            log.info(f"Deep research fix succeeded for {job}/{step}")
+            return True
+
+        log.warning(f"Deep research fix commit/push failed for {job}/{step}")
+        return False
+    finally:
+        if wt_name:
+            cleanup_worktree(wt_name)
 
 
 def _write_escalation(job, step, error_log, error_class, context, extra_reason="", repro=None):
@@ -1571,7 +1566,7 @@ def _parse_sonar_report_by_file(sonar_report):
     return dict(file_groups)
 
 
-def _fix_sonar_file_group(file_group_report, group_label, attempt=1):
+def _fix_sonar_file_group(file_group_report, group_label, attempt=1, cwd=None):
     """Fix sonar issues for a single file group. Returns (success, label)."""
     is_kotlin = any(f.endswith((".kt", ".kts")) for f in group_label.split(","))
     verify_cmd = (
@@ -1623,7 +1618,7 @@ def _fix_sonar_file_group(file_group_report, group_label, attempt=1):
             f"{SCOPE_CONSTRAINTS}"
         )
 
-    result = run_kiro(prompt, f"Sonar fix ({group_label}) [{phase}]")
+    result = run_kiro(prompt, f"Sonar fix ({group_label}) [{phase}]", cwd=cwd)
     success = result[0] if isinstance(result, tuple) else result
     return success, group_label
 
@@ -1653,80 +1648,83 @@ def fix_sonar_issues(sonar_report, run_url):
         return False
 
     try:
-        file_groups = _parse_sonar_report_by_file(sonar_report)
+        branch = "main"
+        wt_path, wt_name = setup_worktree(branch, commit or "HEAD")
+        if not wt_path:
+            log.error("Failed to create worktree for SonarQube fix")
+            return False
 
-        if not file_groups:
-            log.warning("No parseable issues in sonar report, falling back to single prompt")
-            file_groups = {"all": sonar_report.splitlines()}
+        try:
+            file_groups = _parse_sonar_report_by_file(sonar_report)
 
-        group_items = list(file_groups.items())
-        waves = []
-        for i in range(0, len(group_items), SONAR_PARALLEL_GROUPS):
-            waves.append(group_items[i:i + SONAR_PARALLEL_GROUPS])
+            if not file_groups:
+                log.warning("No parseable issues in sonar report, falling back to single prompt")
+                file_groups = {"all": sonar_report.splitlines()}
 
-        attempt = pipeline.round_number if pipeline else 1
+            group_items = list(file_groups.items())
+            waves = []
+            for i in range(0, len(group_items), SONAR_PARALLEL_GROUPS):
+                waves.append(group_items[i:i + SONAR_PARALLEL_GROUPS])
 
-        if attempt <= 3:
-            phase = "quick"
-        elif attempt <= 6:
-            phase = "deep"
-        else:
-            phase = "investigate"
+            attempt = pipeline.round_number if pipeline else 1
 
-        log.info(f"Sonar fix: {len(file_groups)} file groups in {len(waves)} waves (round {attempt}) [{phase}]")
-
-        all_succeeded = True
-        failed_groups = []
-
-        for wave_idx, wave in enumerate(waves):
-            log.info(f"  Wave {wave_idx + 1}/{len(waves)}: {len(wave)} groups")
-
-            if len(wave) == 1:
-                file_name, issues = wave[0]
-                group_report = "\n".join(issues)
-                success, label = _fix_sonar_file_group(group_report, file_name, attempt)
-                if not success:
-                    all_succeeded = False
-                    failed_groups.append(label)
+            if attempt <= 3:
+                phase = "quick"
+            elif attempt <= 6:
+                phase = "deep"
             else:
-                with ThreadPoolExecutor(max_workers=SONAR_PARALLEL_GROUPS) as executor:
-                    futures = {}
-                    for file_name, issues in wave:
-                        group_report = "\n".join(issues)
-                        future = executor.submit(
-                            _fix_sonar_file_group, group_report, file_name, attempt,
-                        )
-                        futures[future] = file_name
+                phase = "investigate"
 
-                    for future in as_completed(futures):
-                        try:
-                            success, label = future.result(timeout=600)
-                            if not success:
+            log.info(f"Sonar fix: {len(file_groups)} file groups in {len(waves)} waves (round {attempt}) [{phase}]")
+
+            all_succeeded = True
+            failed_groups = []
+
+            for wave_idx, wave in enumerate(waves):
+                log.info(f"  Wave {wave_idx + 1}/{len(waves)}: {len(wave)} groups")
+
+                if len(wave) == 1:
+                    file_name, issues = wave[0]
+                    group_report = "\n".join(issues)
+                    success, label = _fix_sonar_file_group(group_report, file_name, attempt, cwd=wt_path)
+                    if not success:
+                        all_succeeded = False
+                        failed_groups.append(label)
+                else:
+                    with ThreadPoolExecutor(max_workers=SONAR_PARALLEL_GROUPS) as executor:
+                        futures = {}
+                        for file_name, issues in wave:
+                            group_report = "\n".join(issues)
+                            future = executor.submit(
+                                _fix_sonar_file_group, group_report, file_name, attempt, cwd=wt_path,
+                            )
+                            futures[future] = file_name
+
+                        for future in as_completed(futures):
+                            try:
+                                success, label = future.result(timeout=600)
+                                if not success:
+                                    all_succeeded = False
+                                    failed_groups.append(label)
+                            except Exception as e:
                                 all_succeeded = False
-                                failed_groups.append(label)
-                        except Exception as e:
-                            all_succeeded = False
-                            failed_groups.append(futures[future])
-                            log.warning(f"Sonar fix group failed: {e}")
+                                failed_groups.append(futures[future])
+                                log.warning(f"Sonar fix group failed: {e}")
 
-        commit_result = wsl_bash(
-            "git add -A && "
-            "git diff --cached --quiet && echo 'nothing to commit' || "
-            "(git commit -m 'fix: resolve SonarQube issues (auto-fix)' && "
-            "git push origin main || "
-            "(git pull --rebase origin main && git push origin main))",
-            timeout=120,
-        )
+            commit_ok, commit_err = commit_and_push(wt_path, branch, "fix: resolve SonarQube issues (auto-fix)")
 
-        if commit_result.returncode == 0:
-            if failed_groups:
-                log.warning(f"Sonar fix partial success (round {attempt}). Failed groups: {failed_groups}")
-            else:
-                log.info(f"SonarQube fix (round {attempt}) [{phase}] completed (all groups)")
-            return True
+            if commit_ok:
+                if failed_groups:
+                    log.warning(f"Sonar fix partial success (round {attempt}). Failed groups: {failed_groups}")
+                else:
+                    log.info(f"SonarQube fix (round {attempt}) [{phase}] completed (all groups)")
+                return True
 
-        log.warning(f"SonarQube fix (round {attempt}) [{phase}] commit/push failed")
-        return False
+            log.warning(f"SonarQube fix (round {attempt}) [{phase}] commit/push failed")
+            return False
+        finally:
+            if wt_name:
+                cleanup_worktree(wt_name)
     finally:
         _sonar_fix_lock.release()
 
@@ -1896,124 +1894,128 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
                 )
                 return True
 
-        sonar_section = ""
-        if sonar_report and "unavailable" not in sonar_report:
-            sonar_section = (
-                f"\n\n--- SONARQUBE ISSUES ---\n"
-                f"{sanitize_for_prompt(sonar_report, 5000)}\n"
-                f"--- END SONARQUBE ISSUES ---\n"
-            )
+        branch = "main"
+        wt_path, wt_name = setup_worktree(branch, "HEAD")
+        if not wt_path:
+            log.error("Failed to create worktree for pipeline improvement")
+            return False
 
-        focus_guidance = {
-            "security": (
-                "SECURITY: Fix in Cargo.toml/deny.toml/libs.versions.toml, NOT pipeline YAML. "
-                "Only modify YAML if the security tool itself is misconfigured.\n"
-            ),
-            "bugs": (
-                "BUGS: /ci-failure webhook handles code fixes. "
-                "Only fix pipeline if failure is from misconfiguration (env, tools, caching).\n"
-            ),
-            "pipeline": (
-                "PIPELINE: Fix build/deploy config (Dockerfile, docker-compose, deploy scripts).\n"
-            ),
-        }
-
-        _PHASE_QUICK_MAX = 3
-        _PHASE_DEEP_MAX = 6
-        last_strategy = ""
-
-        for attempt in range(1, _MAX_IMPROVE_ATTEMPTS + 1):
-            if attempt <= _PHASE_QUICK_MAX:
-                phase = "quick"
-            elif attempt <= _PHASE_DEEP_MAX:
-                phase = "deep"
-            else:
-                phase = "investigate"
-
-            log.info(
-                f"=== Pipeline {'fix' if is_failure else 'optimization'} "
-                f"attempt {attempt}/{_MAX_IMPROVE_ATTEMPTS} [{phase}] "
-                f"(focus: {focus}) ==="
-            )
-
-            retry_section = ""
-            if last_strategy:
-                retry_section = (
-                    f"\nPREVIOUS ATTEMPT FAILED: {last_strategy}\n"
-                    "You MUST try a DIFFERENT approach.\n"
+        try:
+            sonar_section = ""
+            if sonar_report and "unavailable" not in sonar_report:
+                sonar_section = (
+                    f"\n\n--- SONARQUBE ISSUES ---\n"
+                    f"{sanitize_for_prompt(sonar_report, 5000)}\n"
+                    f"--- END SONARQUBE ISSUES ---\n"
                 )
 
-            if is_failure:
-                focus_specific = ""
-                for f in focus.split(","):
-                    f = f.strip()
-                    if f in focus_guidance:
-                        focus_specific += focus_guidance[f]
+            focus_guidance = {
+                "security": (
+                    "SECURITY: Fix in Cargo.toml/deny.toml/libs.versions.toml, NOT pipeline YAML. "
+                    "Only modify YAML if the security tool itself is misconfigured.\n"
+                ),
+                "bugs": (
+                    "BUGS: /ci-failure webhook handles code fixes. "
+                    "Only fix pipeline if failure is from misconfiguration (env, tools, caching).\n"
+                ),
+                "pipeline": (
+                    "PIPELINE: Fix build/deploy config (Dockerfile, docker-compose, deploy scripts).\n"
+                ),
+            }
 
-                prompt = _build_failure_prompt(
-                    focus, pipeline_report, run_url,
-                    sonar_section, focus_specific, retry_section, phase,
+            _PHASE_QUICK_MAX = 3
+            _PHASE_DEEP_MAX = 6
+            last_strategy = ""
+
+            for attempt in range(1, _MAX_IMPROVE_ATTEMPTS + 1):
+                if attempt <= _PHASE_QUICK_MAX:
+                    phase = "quick"
+                elif attempt <= _PHASE_DEEP_MAX:
+                    phase = "deep"
+                else:
+                    phase = "investigate"
+
+                log.info(
+                    f"=== Pipeline {'fix' if is_failure else 'optimization'} "
+                    f"attempt {attempt}/{_MAX_IMPROVE_ATTEMPTS} [{phase}] "
+                    f"(focus: {focus}) ==="
                 )
-                label = f"Pipeline fix ({focus}) attempt {attempt} [{phase}]"
-            else:
-                trend_section = _build_trend_section()
-                opt_history = get_optimization_history()
-                optimization_history_section = ""
-                if opt_history:
-                    lines = ["--- PAST OPTIMIZATIONS ---"]
-                    for rec in opt_history:
-                        ts = rec.get("timestamp", "?")[:19]
-                        summary = rec.get("changes_summary", "?")
-                        focus_val = rec.get("focus", "?")
-                        pre_dur = rec.get("pre_durations", {})
-                        dur_str = ", ".join(f"{k}={v:.0f}s" for k, v in pre_dur.items()) if pre_dur else "n/a"
-                        lines.append(f"  [{ts}] focus={focus_val} durations=[{dur_str}] changes: {summary}")
-                    lines.append("--- END PAST OPTIMIZATIONS ---\n")
-                    optimization_history_section = "\n".join(lines) + "\n"
-                prompt = _build_optimization_prompt(
-                    pipeline_report, run_url, sonar_section, trend_section,
-                    optimization_history_section,
-                )
-                label = f"Pipeline optimize attempt {attempt} [{phase}]"
 
-            result = run_kiro(prompt, label)
-            success = result[0] if isinstance(result, tuple) else result
-
-            if not success:
-                log.warning(f"Pipeline improvement attempt {attempt} [{phase}] failed")
-                last_strategy = f"attempt {attempt} [{phase}] failed"
-                if not is_failure:
-                    log.info("Optimization attempt failed -- not retrying for green builds")
-                    return False
-                continue
-
-            commit_result = wsl_bash(
-                "git add -A && "
-                "git diff --cached --quiet && echo 'nothing to commit' || "
-                f"(git commit -m 'ci: {'fix' if is_failure else 'optimize'} pipeline ({focus})' && "
-                "git push origin main || "
-                "(git pull --rebase origin main && git push origin main))",
-                timeout=120,
-            )
-
-            if commit_result.returncode == 0:
-                log.info(f"Pipeline improvement attempt {attempt} [{phase}] completed")
-                if not is_failure:
-                    durations = _parse_durations(pipeline_report)
-                    record_optimization(
-                        f"attempt {attempt} [{phase}] focus={focus}",
-                        durations,
-                        focus,
+                retry_section = ""
+                if last_strategy:
+                    retry_section = (
+                        f"\nPREVIOUS ATTEMPT FAILED: {last_strategy}\n"
+                        "You MUST try a DIFFERENT approach.\n"
                     )
-                return True
 
-            log.warning(f"Pipeline improvement attempt {attempt} [{phase}] commit/push failed")
-            last_strategy = f"commit/push failed on attempt {attempt}"
+                if is_failure:
+                    focus_specific = ""
+                    for f in focus.split(","):
+                        f = f.strip()
+                        if f in focus_guidance:
+                            focus_specific += focus_guidance[f]
 
-        log.error(
-            f"Pipeline improvement exhausted all {_MAX_IMPROVE_ATTEMPTS} attempts "
-            f"(focus: {focus})"
-        )
-        return False
+                    prompt = _build_failure_prompt(
+                        focus, pipeline_report, run_url,
+                        sonar_section, focus_specific, retry_section, phase,
+                    )
+                    label = f"Pipeline fix ({focus}) attempt {attempt} [{phase}]"
+                else:
+                    trend_section = _build_trend_section()
+                    opt_history = get_optimization_history()
+                    optimization_history_section = ""
+                    if opt_history:
+                        lines = ["--- PAST OPTIMIZATIONS ---"]
+                        for rec in opt_history:
+                            ts = rec.get("timestamp", "?")[:19]
+                            summary = rec.get("changes_summary", "?")
+                            focus_val = rec.get("focus", "?")
+                            pre_dur = rec.get("pre_durations", {})
+                            dur_str = ", ".join(f"{k}={v:.0f}s" for k, v in pre_dur.items()) if pre_dur else "n/a"
+                            lines.append(f"  [{ts}] focus={focus_val} durations=[{dur_str}] changes: {summary}")
+                        lines.append("--- END PAST OPTIMIZATIONS ---\n")
+                        optimization_history_section = "\n".join(lines) + "\n"
+                    prompt = _build_optimization_prompt(
+                        pipeline_report, run_url, sonar_section, trend_section,
+                        optimization_history_section,
+                    )
+                    label = f"Pipeline optimize attempt {attempt} [{phase}]"
+
+                result = run_kiro(prompt, label, cwd=wt_path)
+                success = result[0] if isinstance(result, tuple) else result
+
+                if not success:
+                    log.warning(f"Pipeline improvement attempt {attempt} [{phase}] failed")
+                    last_strategy = f"attempt {attempt} [{phase}] failed"
+                    if not is_failure:
+                        log.info("Optimization attempt failed -- not retrying for green builds")
+                        return False
+                    continue
+
+                msg = f"ci: {'fix' if is_failure else 'optimize'} pipeline ({focus})"
+                commit_ok, commit_err = commit_and_push(wt_path, branch, msg)
+
+                if commit_ok:
+                    log.info(f"Pipeline improvement attempt {attempt} [{phase}] completed")
+                    if not is_failure:
+                        durations = _parse_durations(pipeline_report)
+                        record_optimization(
+                            f"attempt {attempt} [{phase}] focus={focus}",
+                            durations,
+                            focus,
+                        )
+                    return True
+
+                log.warning(f"Pipeline improvement attempt {attempt} [{phase}] commit/push failed")
+                last_strategy = f"commit/push failed on attempt {attempt}"
+
+            log.error(
+                f"Pipeline improvement exhausted all {_MAX_IMPROVE_ATTEMPTS} attempts "
+                f"(focus: {focus})"
+            )
+            return False
+        finally:
+            if wt_name:
+                cleanup_worktree(wt_name)
     finally:
         _improve_lock.release()
