@@ -179,7 +179,7 @@ fn map_gasto_missing_monto_error() {
     let fields = HashMap::from([("proveedor".to_string(), "FERRETERIA".to_string())]);
     let result = make_ocr_result("recibo_gasto", fields);
     let err = map_gasto(&result).unwrap_err();
-    assert!(err.to_string().contains("monto no detectado"));
+    assert!(err.to_string().contains("monto' no detectado"));
 }
 
 #[test]

@@ -133,7 +133,7 @@
       "current_commit": "76cf914a7688be467b652e03ff4a7792d4538826",
       "round_number": 1,
       "job_states": {
-        "lint": "failed",
+        "lint": "fixing",
         "test-backend": "fixing"
       },
       "deployed": false,
@@ -145,7 +145,7 @@
       "quality_snapshots": {},
       "last_run_url": "",
       "created_at": "2026-04-18T12:27:34.309536",
-      "last_updated": "2026-04-18T12:45:56.879288"
+      "last_updated": "2026-04-18T13:17:22.401942"
     }
   }
 }
