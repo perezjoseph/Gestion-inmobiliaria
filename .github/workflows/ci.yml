@@ -238,14 +238,13 @@ jobs:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
       WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
 
-  # ── Stage 3: Container Images (after builds + security + tests pass, main only) ──
+  # ── Stage 3: Container Images (after builds + security + tests pass) ──
 
   containers:
     name: Containers
     needs: [build, security, tests]
     if: |
       always() &&
-      github.ref == 'refs/heads/main' && github.event_name == 'push' &&
       needs.build.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.tests.result == 'success'
@@ -256,6 +255,8 @@ jobs:
       id-token: write
       attestations: write
     uses: ./.github/workflows/containers.yml
+    with:
+      is-production: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
     secrets:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
       WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
