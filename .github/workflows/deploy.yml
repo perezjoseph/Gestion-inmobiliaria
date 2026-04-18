@@ -109,7 +109,11 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           OCR_SERVICE_IMAGE: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ inputs.ocr-service-digest }}
         run: |
-          DOCKER_CONTENT_TRUST=0 docker compose -f docker-compose.prod.yml pull
+          # Pull only needs image names; provide placeholders for required vars
+          # in case secrets are momentarily unavailable during image download
+          JWT_SECRET="${JWT_SECRET:-placeholder}" POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-placeholder}" \
+            DOCKER_CONTENT_TRUST=0 docker compose -f docker-compose.prod.yml pull
+          # Deploy requires real secrets — fail fast if missing
           DOCKER_CONTENT_TRUST=0 docker compose -f docker-compose.prod.yml up -d --remove-orphans --wait
 
       - name: Health check

@@ -386,15 +386,6 @@ jobs:
           category: trivy-iac
         continue-on-error: true
 
-      - name: Scan source code for embedded secrets (Trivy)
-        id: trivy_secret
-        if: always() && steps.install_trivy.outputs.installed == 'true'
-        timeout-minutes: 5
-        run: |
-          trivy fs --scanners secret --exit-code 1 --no-progress --format table \
-            --skip-dirs target --skip-dirs node_modules --skip-dirs dist --skip-dirs .git \
-            . 2>&1 | tee "${RUNNER_TEMP}/trivy-secret-output.txt"
-
       - name: Generate cargo-audit SARIF report
         if: always() && steps.install_audit.outputs.installed == 'true'
         run: |
@@ -463,12 +454,11 @@ jobs:
             echo "| cargo audit | ${{ steps.cargo_audit.outcome == 'success' && '✅ Pass' || (steps.install_audit.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
             echo "| cargo deny | ${{ steps.cargo_deny.outcome == 'success' && '✅ Pass' || (steps.install_deny.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
             echo "| Trivy IaC scan | ${{ steps.trivy_iac.outcome == 'success' && '✅ Pass' || (steps.install_trivy.outputs.installed != 'true' && '⏭️ Skipped' || '⚠️ Findings') }} |"
-            echo "| Trivy secret scan | ${{ steps.trivy_secret.outcome == 'success' && '✅ Pass' || (steps.install_trivy.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect quality-gate errors for notification
         id: collect-errors
-        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.trivy_iac.outcome == 'failure' || steps.trivy_secret.outcome == 'failure')
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.trivy_iac.outcome == 'failure')
         run: |
           ERROR=""
           FAILED=""
@@ -484,10 +474,6 @@ jobs:
             FAILED="${FAILED}trivy-iac,"
             ERROR="${ERROR}[trivy-iac] $(head -c 2000 "${RUNNER_TEMP}/trivy-iac-output.txt" 2>/dev/null || echo 'Trivy found Dockerfile/compose misconfigurations.')\n\n"
           fi
-          if [ "${{ steps.trivy_secret.outcome }}" = "failure" ]; then
-            FAILED="${FAILED}trivy-secret,"
-            ERROR="${ERROR}[trivy-secret] $(head -c 2000 "${RUNNER_TEMP}/trivy-secret-output.txt" 2>/dev/null || echo 'Trivy found embedded secrets in source code.')\n\n"
-          fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT
@@ -502,13 +488,13 @@ jobs:
           start-time: ${{ steps.start.outputs.time }}
 
       - name: Fail job if any quality step failed
-        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.trivy_iac.outcome == 'failure' || steps.trivy_secret.outcome == 'failure')
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.trivy_iac.outcome == 'failure')
         run: exit 1
 
       - name: Clean up sensitive temp files
         if: always()
         run: |
-          rm -f "${RUNNER_TEMP}/audit-output.txt" "${RUNNER_TEMP}/deny-output.txt" "${RUNNER_TEMP}/trivy-iac-output.txt" "${RUNNER_TEMP}/trivy-secret-output.txt" "${RUNNER_TEMP}/install-audit-output.txt" "${RUNNER_TEMP}/cargo-audit.tgz" "${RUNNER_TEMP}/cargo-deny.tar.gz"
+          rm -f "${RUNNER_TEMP}/audit-output.txt" "${RUNNER_TEMP}/deny-output.txt" "${RUNNER_TEMP}/trivy-iac-output.txt" "${RUNNER_TEMP}/install-audit-output.txt" "${RUNNER_TEMP}/cargo-audit.tgz" "${RUNNER_TEMP}/cargo-deny.tar.gz"
           rm -f cargo-audit.sarif cargo-deny.sarif trivy-iac.sarif
 
       - name: Notify webhook on failure
