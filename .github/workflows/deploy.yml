@@ -81,8 +81,8 @@ jobs:
 
       - name: Mask secrets
         run: |
-          if [ -n "${{ secrets.DATABASE_URL }}" ]; then
-            echo "::add-mask::${{ secrets.DATABASE_URL }}"
+          if [ -n "${{ secrets.POSTGRES_PASSWORD }}" ]; then
+            echo "::add-mask::${{ secrets.POSTGRES_PASSWORD }}"
           fi
           if [ -n "${{ secrets.JWT_SECRET }}" ]; then
             echo "::add-mask::${{ secrets.JWT_SECRET }}"
@@ -96,6 +96,8 @@ jobs:
         env:
           BACKEND_IMAGE: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend@${{ inputs.backend-digest }}
           FRONTEND_IMAGE: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend@${{ inputs.frontend-digest }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
           OCR_SERVICE_IMAGE: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ inputs.ocr-service-digest }}
         run: |
           DOCKER_CONTENT_TRUST=0 docker compose -f docker-compose.prod.yml pull
