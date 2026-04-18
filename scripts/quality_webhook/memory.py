@@ -65,6 +65,32 @@ def _get_components():
     return _embedder, _table
 
 
+def _rebuild_table():
+    """Recreate the LanceDB table when data files are corrupted."""
+    global _table, _db
+    try:
+        import lancedb
+        import pyarrow as pa
+
+        log.warning("SimpleMem: rebuilding corrupted LanceDB table")
+        if _db is None:
+            _db = lancedb.connect(LANCEDB_PATH)
+        _db.drop_table(TABLE_NAME, ignore_missing=True)
+        schema = pa.schema([
+            pa.field("vector", pa.list_(pa.float32(), 1024)),
+            pa.field("text", pa.string()),
+            pa.field("job", pa.string()),
+            pa.field("error_class", pa.string()),
+            pa.field("success", pa.bool_()),
+            pa.field("timestamp", pa.string()),
+        ])
+        _table = _db.create_table(TABLE_NAME, schema=schema)
+        log.info("SimpleMem: table rebuilt successfully")
+    except Exception as e:
+        log.warning(f"SimpleMem: rebuild failed: {e}")
+        _table = None
+
+
 def store_fix_attempt(job, step, error_class, error_log, attempt, success):
     """Store a fix attempt with its embedding for semantic search."""
     embedder, table = _get_components()
@@ -96,6 +122,8 @@ def store_fix_attempt(job, step, error_class, error_log, attempt, success):
         log.debug(f"SimpleMem: stored fix attempt ({job}/{step}, {status})")
     except Exception as e:
         log.warning(f"SimpleMem store failed: {e}")
+        if "Not found" in str(e) and ".lance" in str(e):
+            _rebuild_table()
 
 
 def store_fix_outcome(job, error_class, files_changed="", strategy=""):
@@ -165,6 +193,8 @@ def search_relevant_context(job, error_log, max_results=5):
 
     except Exception as e:
         log.warning(f"SimpleMem search failed: {e}")
+        if "Not found" in str(e) and ".lance" in str(e):
+            _rebuild_table()
         return ""
 
 

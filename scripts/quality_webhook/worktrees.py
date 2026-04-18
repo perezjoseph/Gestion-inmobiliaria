@@ -11,6 +11,7 @@ from .runner import wsl_bash
 
 _worktree_lock = threading.Lock()
 _active_worktrees: dict[str, float] = {}
+_worktree_usage_locks: dict[str, threading.Lock] = {}
 
 _SAFE_BRANCH_RE = re.compile(r"[^a-zA-Z0-9_\-]")
 
@@ -46,26 +47,51 @@ def setup_worktree(branch: str, commit: str) -> tuple[str, str]:
 
     with _worktree_lock:
         if name in _active_worktrees:
-            log.info(f"Reusing existing worktree: {name}")
-            _pull_in_worktree(wsl_path, branch)
-            return wsl_path, name
+            usage_lock = _worktree_usage_locks.get(name)
+            if usage_lock and usage_lock.locked():
+                log.warning(f"Worktree {name} is in use by another fix, creating fresh")
+            else:
+                log.info(f"Reusing existing worktree: {name}")
+                _pull_in_worktree(wsl_path, branch)
+                if name not in _worktree_usage_locks:
+                    _worktree_usage_locks[name] = threading.Lock()
+                return wsl_path, name
 
         _enforce_max_count()
 
     log.info(f"Creating worktree: {name} for branch={branch} commit={commit[:12]}")
 
-    wsl_bash(f"git fetch origin {branch} --no-tags", timeout=60)
+    fetch_ref = branch
+    checkout_ref = f"origin/{branch}"
+    is_pr_ref = "/" in branch and branch.split("/")[0].isdigit()
+    if is_pr_ref:
+        pr_number = branch.split("/")[0]
+        fetch_ref = f"pull/{pr_number}/head:pr-{pr_number}"
+        checkout_ref = f"pr-{pr_number}"
+
+    wsl_bash(f"git fetch origin {fetch_ref} --no-tags", timeout=60)
 
     result = wsl_bash(
-        f"git worktree add '{wsl_path}' 'origin/{branch}'",
+        f"git worktree add '{wsl_path}' '{checkout_ref}'",
         timeout=60,
     )
 
     if result.returncode != 0:
         stderr = result.stderr or ""
-        if "already checked out" in stderr or "is already used by" in stderr:
+        if "already exists" in stderr:
+            log.info(f"Stale worktree path exists, removing and retrying: {name}")
+            wsl_bash(f"git worktree remove --force '{wsl_path}'", timeout=30)
+            wsl_bash(f"rm -rf '{wsl_path}'", timeout=15)
+            result = wsl_bash(
+                f"git worktree add '{wsl_path}' '{checkout_ref}'",
+                timeout=60,
+            )
+            if result.returncode != 0:
+                stderr = result.stderr or ""
+
+        if result.returncode != 0 and ("already checked out" in stderr or "is already used by" in stderr):
             log.info(f"Branch '{branch}' already checked out, using detached HEAD")
-            target = commit if commit else f"origin/{branch}"
+            target = commit if commit and commit != "HEAD" else checkout_ref
             result = wsl_bash(
                 f"git worktree add --detach '{wsl_path}' '{target}'",
                 timeout=60,
@@ -74,21 +100,24 @@ def setup_worktree(branch: str, commit: str) -> tuple[str, str]:
                 log.error(f"Failed to create detached worktree: {result.stderr}")
                 return "", ""
 
-            checkout_result = wsl_bash(
-                f"git -C '{wsl_path}' checkout -B '{branch}' 'origin/{branch}'",
-                timeout=30,
-            )
-            if checkout_result.returncode != 0:
-                log.warning(
-                    f"Could not reassign branch in worktree, "
-                    f"will push from detached HEAD: {checkout_result.stderr}"
+            if not is_pr_ref:
+                checkout_result = wsl_bash(
+                    f"git -C '{wsl_path}' checkout -B '{branch}' 'origin/{branch}'",
+                    timeout=30,
                 )
-        else:
+                if checkout_result.returncode != 0:
+                    log.warning(
+                        f"Could not reassign branch in worktree, "
+                        f"will push from detached HEAD: {checkout_result.stderr}"
+                    )
+        elif result.returncode != 0:
             log.error(f"Failed to create worktree: {stderr}")
             return "", ""
 
     with _worktree_lock:
         _active_worktrees[name] = time.monotonic()
+        if name not in _worktree_usage_locks:
+            _worktree_usage_locks[name] = threading.Lock()
 
     log.info(f"Worktree ready: {wsl_path}")
     return wsl_path, name
@@ -131,16 +160,31 @@ def commit_and_push(wsl_path: str, branch: str, message: str) -> tuple[bool, str
     if push_result.returncode == 0:
         return True, ""
 
-    log.info(f"Push failed, attempting pull --rebase: {push_result.stderr}")
-    rebase_push = wsl_bash(
-        f"git -C '{wsl_path}' pull --rebase origin '{branch}' && "
+    log.info(f"Push failed, attempting fetch + rebase: {push_result.stderr}")
+    fetch_result = wsl_bash(
+        f"git -C '{wsl_path}' fetch origin '{branch}' --no-tags",
+        timeout=60,
+    )
+    if fetch_result.returncode != 0:
+        return False, f"fetch before rebase failed: {fetch_result.stderr}"
+
+    rebase_result = wsl_bash(
+        f"git -C '{wsl_path}' rebase 'origin/{branch}'",
+        timeout=120,
+    )
+    if rebase_result.returncode != 0:
+        log.warning(f"Rebase failed (likely conflicts), aborting: {rebase_result.stderr}")
+        wsl_bash(f"git -C '{wsl_path}' rebase --abort", timeout=15)
+        return False, f"rebase conflicts: {rebase_result.stderr}"
+
+    retry_push = wsl_bash(
         f"git -C '{wsl_path}' push origin '{branch}'",
         timeout=120,
     )
-    if rebase_push.returncode == 0:
+    if retry_push.returncode == 0:
         return True, ""
 
-    return False, f"push failed after rebase: {rebase_push.stderr}"
+    return False, f"push failed after rebase: {retry_push.stderr}"
 
 
 def cleanup_worktree(name: str) -> None:
@@ -152,11 +196,13 @@ def cleanup_worktree(name: str) -> None:
 
     with _worktree_lock:
         _active_worktrees.pop(name, None)
+        _worktree_usage_locks.pop(name, None)
 
 
 def discard_changes(wsl_path: str) -> None:
-    """Reset all changes in a worktree without removing it."""
+    """Reset staged and unstaged changes in a worktree without removing it."""
     wsl_bash(
+        f"git -C '{wsl_path}' reset HEAD -- . 2>/dev/null; "
         f"git -C '{wsl_path}' checkout -- . 2>/dev/null; "
         f"git -C '{wsl_path}' clean -fd 2>/dev/null",
         timeout=15,

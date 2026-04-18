@@ -15,6 +15,7 @@ frontend/dist/
 kiro-debug.log
 kiro-debug.log
 .kiro-prompt-*
+.webhook-queue.db*
 .fix-history.json
 .simplemem-data/
 escalations/

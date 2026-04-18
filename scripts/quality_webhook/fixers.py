@@ -12,8 +12,8 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from .config import (
-    WIN_PROJECT_DIR, MAX_CONCURRENT_FIXES, SCOPE_CONSTRAINTS,
-    SONAR_PARALLEL_GROUPS, log,
+    WIN_PROJECT_DIR, MAX_CONCURRENT_FIXES, FIX_PIPELINE_TIMEOUT,
+    SCOPE_CONSTRAINTS, SONAR_PARALLEL_GROUPS, log,
 )
 from .runner import wsl_bash, run_kiro
 from .worktrees import setup_worktree, commit_and_push, cleanup_worktree, discard_changes, get_head_sha
@@ -484,6 +484,19 @@ def fix_once_and_push(job, step, error_log, context=None):
                 pipeline_now.job_states[job] = JobState.FAILED
             return False
 
+        if commit and len(commit) >= 7:
+            wt_head = get_head_sha(wt_path)
+            if wt_head and not wt_head.startswith(commit[:7]):
+                log.warning(
+                    f"Worktree HEAD {wt_head[:12]} does not match webhook commit {commit[:12]}. "
+                    f"Branch may have moved. Resetting to origin/{branch}."
+                )
+                wsl_bash(
+                    f"git -C '{wt_path}' fetch origin {branch} --no-tags && "
+                    f"git -C '{wt_path}' reset --hard 'origin/{branch}'",
+                    timeout=60,
+                )
+
         if _check_auto_fix_chain(job, branch):
             _rollback_last_auto_fix(job, branch)
             if commit:
@@ -539,6 +552,18 @@ def fix_once_and_push(job, step, error_log, context=None):
                 record_vuln_failure(crate, advisories)
 
         repro_cache = ReproCache(error_hash=_error_hash(job, error_log))
+
+        def _pipeline_timed_out():
+            if FIX_PIPELINE_TIMEOUT <= 0:
+                return False
+            elapsed = time.monotonic() - cycle_start
+            if elapsed > FIX_PIPELINE_TIMEOUT:
+                log.error(
+                    f"Fix pipeline timeout ({FIX_PIPELINE_TIMEOUT}s) exceeded for {job}/{step} "
+                    f"after {elapsed:.0f}s"
+                )
+                return True
+            return False
 
         log.info(f"=== Reproducing {job}/{step} locally ===")
         t0 = time.monotonic()
@@ -703,6 +728,16 @@ def fix_once_and_push(job, step, error_log, context=None):
             "Do NOT commit."
         )
 
+        if _pipeline_timed_out():
+            record_fix_attempt(job, error_log, attempt, False,
+                               f"pipeline_timeout: exceeded {FIX_PIPELINE_TIMEOUT}s",
+                               timing=dataclasses.asdict(timing))
+            store_fix_attempt(job, step, error_class, error_log, attempt, False)
+            if commit:
+                pipeline_now = tracker.get_or_create(commit)
+                pipeline_now.job_states[job] = JobState.FAILED
+            return False
+
         t0 = time.monotonic()
         result = run_kiro(prompt, f"CI fix ({job}/{step}) round {attempt} [{phase}]", cwd=wt_path)
         timing.fix_attempt_s = time.monotonic() - t0
@@ -726,6 +761,22 @@ def fix_once_and_push(job, step, error_log, context=None):
             record_strategy_outcome(job, error_class, strategy_note or error_class, False)
             record_fix_attempt(job, error_log, attempt, False,
                                f"class={error_class}, job={job}, step={step}. {strategy_note}",
+                               timing=dataclasses.asdict(timing))
+            store_fix_attempt(job, step, error_class, error_log, attempt, False)
+            if commit:
+                pipeline_now = tracker.get_or_create(commit)
+                pipeline_now.job_states[job] = JobState.FAILED
+            return False
+
+        wsl_bash(f"git -C '{wt_path}' add -A", timeout=30)
+
+        nothing_check = wsl_bash(f"git -C '{wt_path}' diff --cached --quiet", timeout=15)
+        if nothing_check.returncode == 0:
+            timing.total_s = time.monotonic() - attempt_start
+            log.warning(f"Round {attempt} kiro-cli produced no changes for {job}/{step}")
+            record_strategy_outcome(job, error_class, strategy_note or error_class, False)
+            record_fix_attempt(job, error_log, attempt, False,
+                               f"no_changes: kiro-cli reported success but no files modified. {strategy_note}",
                                timing=dataclasses.asdict(timing))
             store_fix_attempt(job, step, error_class, error_log, attempt, False)
             if commit:
@@ -1176,6 +1227,21 @@ def _fix_with_retry_legacy(job, step, error_log, context=None):
                 log.warning(f"Attempt {attempt} kiro-cli returned failure for {job}/{step}")
                 continue
 
+            wsl_bash(f"git -C '{wt_path}' add -A", timeout=30)
+
+            nothing_check = wsl_bash(f"git -C '{wt_path}' diff --cached --quiet", timeout=15)
+            if nothing_check.returncode == 0:
+                timing.total_s = time.monotonic() - attempt_start
+                all_timings.append(timing)
+                log.warning(f"Attempt {attempt} kiro-cli produced no changes for {job}/{step}")
+                last_strategy_summary = "no_changes"
+                record_strategy_outcome(job, error_class, strategy_note or error_class, False)
+                record_fix_attempt(job, error_log, attempt, False,
+                                   f"no_changes: kiro-cli reported success but no files modified. {strategy_note}",
+                                   timing=dataclasses.asdict(timing))
+                store_fix_attempt(job, step, error_class, error_log, attempt, False)
+                continue
+
             # Gate 2: Revision check (reject forbidden patterns like #[ignore])
             rev_passed, rev_reason = revision_check_diff(cwd=wt_path)
             if not rev_passed:
@@ -1339,6 +1405,16 @@ def _deep_research_fix(job, step, error_log, context=None):
             log.warning(f"Deep research fix attempt failed for {job}/{step}")
             record_fix_attempt(job, error_log, 0, False,
                                f"deep_research_fix failed. class={error_class}")
+            store_fix_attempt(job, step, error_class, error_log, 0, False)
+            return False
+
+        wsl_bash(f"git -C '{wt_path}' add -A", timeout=30)
+
+        nothing_check = wsl_bash(f"git -C '{wt_path}' diff --cached --quiet", timeout=15)
+        if nothing_check.returncode == 0:
+            log.warning(f"Deep research fix produced no changes for {job}/{step}")
+            record_fix_attempt(job, error_log, 0, False,
+                               f"deep_research no_changes: kiro-cli reported success but no files modified")
             store_fix_attempt(job, step, error_class, error_log, 0, False)
             return False
 

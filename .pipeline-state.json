@@ -146,6 +146,43 @@
       "last_run_url": "",
       "created_at": "2026-04-18T12:27:34.309536",
       "last_updated": "2026-04-18T13:17:22.401942"
+    },
+    "2eaa7de293df": {
+      "lineage_id": "2eaa7de293df",
+      "current_commit": "2eaa7de293df71216c6ba8278a1898ed22d09150",
+      "round_number": 1,
+      "job_states": {
+        "secret-scan": "failed",
+        "container-image-frontend": "fixing"
+      },
+      "deployed": false,
+      "sonarqube_passed": false,
+      "budget_total": 10,
+      "budget_remaining": 10,
+      "files_changed": {},
+      "pending_strategies": {},
+      "quality_snapshots": {},
+      "last_run_url": "",
+      "created_at": "2026-04-18T13:55:41.538445",
+      "last_updated": "2026-04-18T14:58:13.259493"
+    },
+    "9fe16d2345cc": {
+      "lineage_id": "9fe16d2345cc",
+      "current_commit": "9fe16d2345cc5b085e86b1c5b23aac25b77ee0e1",
+      "round_number": 1,
+      "job_states": {
+        "test-backend": "failed"
+      },
+      "deployed": false,
+      "sonarqube_passed": false,
+      "budget_total": 10,
+      "budget_remaining": 10,
+      "files_changed": {},
+      "pending_strategies": {},
+      "quality_snapshots": {},
+      "last_run_url": "",
+      "created_at": "2026-04-18T14:14:47.204463",
+      "last_updated": "2026-04-18T14:14:49.494696"
     }
   }
 }
