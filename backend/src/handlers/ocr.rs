@@ -124,7 +124,10 @@ pub async fn ocr_extract(
         Ok(result) => result,
         Err(e) => {
             let msg = e.to_string();
-            if msg.contains("Servicio OCR no disponible") {
+            if msg.contains("Servicio OCR no disponible")
+                || msg.contains("Error del servicio OCR")
+                || msg.contains("Error procesando respuesta OCR")
+            {
                 return Ok(HttpResponse::ServiceUnavailable().json(json!({
                     "error": "service_unavailable",
                     "message": "Servicio OCR no disponible"
@@ -139,12 +142,13 @@ pub async fn ocr_extract(
         .unwrap_or(&ocr_result.document_type);
 
     let fields = match doc_type {
-        "deposito_bancario" => ocr_mapping::map_deposito_extract(&ocr_result)?,
-        "recibo_gasto" => ocr_mapping::map_gasto_extract(&ocr_result)?,
-        "cedula" => ocr_mapping::map_cedula(&ocr_result)?,
-        "contrato" => ocr_mapping::map_contrato(&ocr_result)?,
-        _ => raw_fields_from_result(&ocr_result),
-    };
+        "deposito_bancario" => ocr_mapping::map_deposito_extract(&ocr_result),
+        "recibo_gasto" => ocr_mapping::map_gasto_extract(&ocr_result),
+        "cedula" => ocr_mapping::map_cedula(&ocr_result),
+        "contrato" => ocr_mapping::map_contrato(&ocr_result),
+        _ => Ok(raw_fields_from_result(&ocr_result)),
+    }
+    .unwrap_or_else(|_| raw_fields_from_result(&ocr_result));
 
     let raw_lines = ocr_result.lines.iter().map(|l| l.text.clone()).collect();
 

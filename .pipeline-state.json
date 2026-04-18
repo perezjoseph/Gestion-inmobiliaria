@@ -89,6 +89,25 @@
       "last_run_url": "",
       "created_at": "2026-04-17T23:05:41.932116",
       "last_updated": "2026-04-17T23:12:20.020176"
+    },
+    "fb1ec234784d": {
+      "lineage_id": "fb1ec234784d",
+      "current_commit": "fb1ec234784d940ae28596b3c9604a9bb40d1d65",
+      "round_number": 1,
+      "job_states": {
+        "container-image-frontend": "failed",
+        "container-image-backend": "fixing"
+      },
+      "deployed": false,
+      "sonarqube_passed": false,
+      "budget_total": 10,
+      "budget_remaining": 10,
+      "files_changed": {},
+      "pending_strategies": {},
+      "quality_snapshots": {},
+      "last_run_url": "",
+      "created_at": "2026-04-18T01:57:25.296342",
+      "last_updated": "2026-04-18T01:59:43.664884"
     }
   }
 }

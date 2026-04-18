@@ -8,6 +8,7 @@ node_modules/
 .claude/
 .vscode/
 .playwright/
+.worktrees/
 .playwright-cli/
 frontend/dist/
 

@@ -135,23 +135,17 @@ jobs:
 
       - name: Push backend container image
         id: push
-        env:
-          DOCKER_CONTENT_TRUST: "0"
-        run: |
-          IMAGE="ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }}"
-          docker push "$IMAGE"
-          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" | grep -oP 'sha256:[a-f0-9]{64}')
-          if [ -z "$DIGEST" ]; then
-            echo "::error::Failed to resolve registry digest from RepoDigests"
-            exit 1
-          fi
-          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
-          echo "Resolved registry digest: ${DIGEST}"
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
+        with:
+          context: .
+          file: Dockerfile.backend
+          push: true
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }}
+          build-args: MODE=prebuilt
+          cache-from: type=gha,scope=backend
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
-        env:
-          DOCKER_CONTENT_TRUST: "0"
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
           subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend
           subject-digest: ${{ steps.push.outputs.digest }}
@@ -315,23 +309,17 @@ jobs:
 
       - name: Push frontend container image
         id: push
-        env:
-          DOCKER_CONTENT_TRUST: "0"
-        run: |
-          IMAGE="ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }}"
-          docker push "$IMAGE"
-          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" | grep -oP 'sha256:[a-f0-9]{64}')
-          if [ -z "$DIGEST" ]; then
-            echo "::error::Failed to resolve registry digest from RepoDigests"
-            exit 1
-          fi
-          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
-          echo "Resolved registry digest: ${DIGEST}"
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
+        with:
+          context: .
+          file: Dockerfile.frontend
+          push: true
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }}
+          build-args: MODE=prebuilt
+          cache-from: type=gha,scope=frontend
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
-        env:
-          DOCKER_CONTENT_TRUST: "0"
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
           subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend
           subject-digest: ${{ steps.push.outputs.digest }}
@@ -485,23 +473,16 @@ jobs:
 
       - name: Push OCR service container image
         id: push
-        env:
-          DOCKER_CONTENT_TRUST: "0"
-        run: |
-          IMAGE="ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service:${{ env.IMAGE_TAG }}"
-          docker push "$IMAGE"
-          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" | grep -oP 'sha256:[a-f0-9]{64}')
-          if [ -z "$DIGEST" ]; then
-            echo "::error::Failed to resolve registry digest from RepoDigests"
-            exit 1
-          fi
-          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
-          echo "Resolved registry digest: ${DIGEST}"
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
+        with:
+          context: ./ocr-service
+          file: ./ocr-service/Dockerfile
+          push: true
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service:${{ env.IMAGE_TAG }}
+          cache-from: type=gha,scope=ocr-service
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
-        env:
-          DOCKER_CONTENT_TRUST: "0"
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
           subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service
           subject-digest: ${{ steps.push.outputs.digest }}

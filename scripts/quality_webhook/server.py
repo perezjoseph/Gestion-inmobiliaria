@@ -389,7 +389,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 "5. Read .kiro/steering/ for project conventions\n"
                 "6. Write a 3-sentence plan BEFORE editing any file\n\n"
                 "THEN fix, verify with cargo fmt, clippy, and test.\n"
-                "Stage: git add -A && git commit -m 'fix: resolve SonarQube failures (auto-fix)' && git push origin main"
+                "Stage: git add -A. Do NOT commit."
             )
         elif phase == "deep":
             prompt = (
@@ -399,22 +399,36 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 "Fetch the specific issues, understand the root cause deeply. "
                 "Read the affected files and their context before making changes. "
                 "Fix them, verify with cargo fmt, clippy, and test.\n"
-                "Then commit and push: git add -A && git commit -m 'fix: resolve SonarQube failures (auto-fix)' && git push origin main"
+                "Stage: git add -A. Do NOT commit."
             )
         else:
             prompt = (
                 f"The SonarQube quality gate FAILED for project '{_sfp(project, 128)}'. "
                 f"Failed conditions: {_sfp(failures_summary, 1000)}. "
                 "Fetch the specific issues, fix them, verify with cargo fmt, clippy, and test. "
-                "Then commit and push: git add -A && git commit -m 'fix: resolve SonarQube failures (auto-fix)' && git push origin main"
+                "Stage: git add -A. Do NOT commit."
             )
 
-        result = run_kiro(prompt, f"SonarQube fix (round {attempt}) [{phase}]")
-        success = result[0] if isinstance(result, tuple) else result
-        if success:
-            log.info(f"SonarQube fix (round {attempt}) [{phase}] succeeded")
-        else:
-            log.warning(f"SonarQube fix (round {attempt}) [{phase}] failed")
+        from .worktrees import setup_worktree, commit_and_push, cleanup_worktree
+        wt_path, wt_name = setup_worktree("main", commit or "HEAD")
+        if not wt_path:
+            log.error("Failed to create worktree for SonarQube fix")
+            return
+
+        try:
+            result = run_kiro(prompt, f"SonarQube fix (round {attempt}) [{phase}]", cwd=wt_path)
+            success = result[0] if isinstance(result, tuple) else result
+            if success:
+                commit_ok, _ = commit_and_push(wt_path, "main", "fix: resolve SonarQube failures (auto-fix)")
+                if commit_ok:
+                    log.info(f"SonarQube fix (round {attempt}) [{phase}] succeeded")
+                else:
+                    log.warning(f"SonarQube fix (round {attempt}) [{phase}] commit/push failed")
+            else:
+                log.warning(f"SonarQube fix (round {attempt}) [{phase}] failed")
+        finally:
+            if wt_name:
+                cleanup_worktree(wt_name)
 
     def _handle_ci_failure(self, payload):
         job = validate_name(payload.get("job", "unknown"))

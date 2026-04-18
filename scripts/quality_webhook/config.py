@@ -36,6 +36,10 @@ PIPELINE_BUDGET = 10
 PIPELINE_STATE_TTL_HOURS = 24
 BACKOFF_SCHEDULE = [0, 0, 120, 300, 600]
 
+WORKTREE_BASE = ".worktrees"
+WORKTREE_MAX_AGE_H = 4
+WORKTREE_MAX_COUNT = 3
+
 DEPLOY_CLASSIFY_PATTERNS = {
     "health-check": "app_bug",
     "health check": "app_bug",
