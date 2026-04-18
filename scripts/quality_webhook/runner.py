@@ -13,6 +13,31 @@ from .config import (
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|\x1b\][^\x07]*\x07|\x1b\(B")
 
+_cached_branch = None
+_branch_lock = threading.Lock()
+
+
+def current_branch():
+    global _cached_branch
+    with _branch_lock:
+        if _cached_branch:
+            return _cached_branch
+    result = wsl_bash("git rev-parse --abbrev-ref HEAD", timeout=10)
+    branch = result.stdout.strip() if result.returncode == 0 else "main"
+    if not branch or branch == "HEAD":
+        branch = "main"
+    with _branch_lock:
+        _cached_branch = branch
+    return branch
+
+
+def git_push_cmd():
+    branch = current_branch()
+    return (
+        f"git push origin {branch} || "
+        f"(git pull --rebase origin {branch} && git push origin {branch})"
+    )
+
 
 def wsl_bash(bash_command, timeout=60):
     uid = uuid.uuid4().hex[:8]

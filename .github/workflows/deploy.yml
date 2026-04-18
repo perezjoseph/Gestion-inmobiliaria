@@ -9,6 +9,9 @@ on:
       frontend-digest:
         type: string
         required: true
+      ocr-service-digest:
+        type: string
+        required: true
 
 permissions: {}
 
@@ -67,10 +70,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Verify OCR service attestation
+        id: verify-ocr-service
+        run: |
+          gh attestation verify \
+            "oci://ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ inputs.ocr-service-digest }}" \
+            --owner "${{ env.IMAGE_OWNER }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Mask secrets
         run: |
-          if [ -n "${{ secrets.DATABASE_URL }}" ]; then
-            echo "::add-mask::${{ secrets.DATABASE_URL }}"
+          if [ -n "${{ secrets.POSTGRES_PASSWORD }}" ]; then
+            echo "::add-mask::${{ secrets.POSTGRES_PASSWORD }}"
           fi
           if [ -n "${{ secrets.JWT_SECRET }}" ]; then
             echo "::add-mask::${{ secrets.JWT_SECRET }}"
@@ -84,6 +96,9 @@ jobs:
         env:
           BACKEND_IMAGE: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend@${{ inputs.backend-digest }}
           FRONTEND_IMAGE: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend@${{ inputs.frontend-digest }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          OCR_SERVICE_IMAGE: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ inputs.ocr-service-digest }}
         run: |
           DOCKER_CONTENT_TRUST=0 docker compose -f docker-compose.prod.yml pull
           DOCKER_CONTENT_TRUST=0 docker compose -f docker-compose.prod.yml up -d --remove-orphans --wait
@@ -125,6 +140,8 @@ jobs:
             ERROR="[attestation] Backend image attestation verification failed."
           elif [ "${{ steps.verify-frontend.outcome }}" = "failure" ]; then
             ERROR="[attestation] Frontend image attestation verification failed."
+          elif [ "${{ steps.verify-ocr-service.outcome }}" = "failure" ]; then
+            ERROR="[attestation] OCR service image attestation verification failed."
           fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT

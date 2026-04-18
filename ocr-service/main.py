@@ -10,7 +10,7 @@ from PIL import Image
 
 app = FastAPI(title="OCR Service")
 
-ocr_engine = PaddleOCR(use_angle_cls=True, lang="es", use_gpu=False)
+ocr_engine = PaddleOCR(use_textline_orientation=True, lang="es", device="cpu")
 
 
 @app.get("/health")

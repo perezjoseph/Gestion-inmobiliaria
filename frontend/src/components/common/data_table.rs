@@ -22,7 +22,7 @@ pub fn DataTable(props: &DataTableProps) -> Html {
     let has_sort = props.on_sort.is_some() && !props.sortable_fields.is_empty();
 
     html! {
-        <div class="gi-table-wrap" style="border-radius: 12px; border: 1px solid var(--border-subtle); overflow: hidden;">
+        <div class="gi-table-wrap" aria-live="polite" style="border-radius: 12px; border: 1px solid var(--border-subtle); overflow: hidden;">
             <table class="gi-table">
                 <thead>
                     <tr>

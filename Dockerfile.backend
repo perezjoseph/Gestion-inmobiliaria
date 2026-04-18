@@ -1,11 +1,19 @@
-FROM rust:1.88-bookworm AS builder
+ARG MODE=compile
 
+FROM rust:1.88-bookworm AS compile
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY backend/ backend/
 COPY frontend/ frontend/
-
 RUN cargo build --locked -p realestate-backend --release
+RUN cp target/release/realestate-backend /app/realestate-backend
+
+FROM debian:bookworm-slim AS prebuilt
+WORKDIR /app
+COPY realestate-backend /app/realestate-backend
+RUN chmod +x /app/realestate-backend
+
+FROM ${MODE} AS source
 
 FROM debian:bookworm-slim
 
@@ -15,9 +23,14 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -r -s /bin/false appuser
-USER appuser
 
-COPY --from=builder /app/target/release/realestate-backend /usr/local/bin/
+WORKDIR /app
+
+RUN mkdir -p /app/uploads && chown appuser:appuser /app/uploads
+
+COPY --from=source /app/realestate-backend /usr/local/bin/realestate-backend
+
+USER appuser
 
 EXPOSE 8080
 

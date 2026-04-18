@@ -69,6 +69,7 @@ fn NavbarSearch() -> Html {
                 </svg>
                 <span style="font-size: var(--text-xs); font-weight: 500;">{"Ir a…"}</span>
             </button>
+            <kbd class="gi-kbd" title="Abrir paleta de comandos">{"\u{2318}K"}</kbd>
         </>
     }
 }

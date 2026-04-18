@@ -124,7 +124,7 @@
   --surface-base: oklch(15% 0.01 185);
   --surface-raised: oklch(19% 0.012 185);
   --surface-overlay: oklch(23% 0.014 185);
-  --surface-sidebar: oklch(12% 0.012 185);
+  --surface-sidebar: oklch(10% 0.015 185);
   --surface-sidebar-hover: oklch(18% 0.014 185);
   --surface-sidebar-active: oklch(24% 0.016 185);
 
@@ -1821,4 +1821,251 @@ h1, h2, h3, h4, h5, h6,
   font-size: var(--text-sm);
   color: var(--text-secondary);
   margin-top: var(--space-4);
+}
+
+/* ============================================
+   Skip to content link (accessibility)
+   ============================================ */
+.gi-skip-link {
+  position: absolute;
+  top: -100%;
+  left: var(--space-4);
+  z-index: 200;
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--color-primary-500);
+  color: var(--text-on-primary);
+  border-radius: 0 0 8px 8px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+  transition: top var(--duration-fast) var(--ease-out);
+}
+
+.gi-skip-link:focus {
+  top: 0;
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* ============================================
+   Form error summary
+   ============================================ */
+.gi-form-error-summary {
+  background-color: var(--color-error-light);
+  border: 1px solid var(--color-error);
+  border-radius: 8px;
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  grid-column: 1 / -1;
+}
+
+.gi-form-error-summary-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-error-dark);
+  margin-bottom: var(--space-2);
+}
+
+.gi-form-error-summary-list {
+  list-style: disc;
+  padding-left: var(--space-5);
+  font-size: var(--text-xs);
+  color: var(--color-error-dark);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+[data-theme="dark"] .gi-form-error-summary {
+  background-color: oklch(20% 0.04 25);
+  border-color: oklch(45% 0.10 25);
+}
+
+[data-theme="dark"] .gi-form-error-summary-title,
+[data-theme="dark"] .gi-form-error-summary-list {
+  color: oklch(85% 0.10 25);
+}
+
+/* ============================================
+   Command Palette
+   ============================================ */
+.gi-palette-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: oklch(15% 0.01 80 / 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 20vh;
+  z-index: 200;
+  animation: gi-palette-fade-in 0.15s var(--ease-out);
+}
+
+[data-theme="dark"] .gi-palette-overlay {
+  background-color: oklch(5% 0.01 185 / 0.6);
+}
+
+.gi-palette {
+  background-color: var(--surface-overlay);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 480px;
+  overflow: hidden;
+  animation: gi-palette-slide-in 0.2s var(--ease-out);
+}
+
+.gi-palette-input {
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.gi-palette-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.gi-palette-list {
+  list-style: none;
+  padding: var(--space-2);
+  margin: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.gi-palette-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.gi-palette-item:hover,
+.gi-palette-item-active {
+  background-color: var(--color-primary-50);
+}
+
+[data-theme="dark"] .gi-palette-item:hover,
+[data-theme="dark"] .gi-palette-item-active {
+  background-color: oklch(22% 0.015 185);
+}
+
+.gi-palette-icon {
+  width: 24px;
+  text-align: center;
+  font-size: var(--text-base);
+  flex-shrink: 0;
+}
+
+.gi-palette-icon-action {
+  color: var(--color-primary-500);
+  font-weight: 700;
+}
+
+.gi-palette-empty {
+  padding: var(--space-4);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.gi-palette-footer {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+@keyframes gi-palette-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes gi-palette-slide-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 768px) {
+  .gi-palette-overlay {
+    padding-top: var(--space-4);
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
+  }
+
+  .gi-palette {
+    max-width: 100%;
+  }
+}
+
+/* ============================================
+   Page entrance animations
+   ============================================ */
+.gi-page-header,
+.gi-filter-bar,
+.gi-card,
+.gi-card-section,
+.gi-dashboard-hero,
+.gi-dashboard-secondary,
+.gi-welcome-card {
+  animation: gi-fade-up 0.3s var(--ease-out) both;
+}
+
+.gi-dashboard-secondary:nth-child(2) { animation-delay: 0.05s; }
+.gi-dashboard-secondary:nth-child(3) { animation-delay: 0.1s; }
+
+.gi-table tbody tr {
+  animation: gi-fade-in 0.2s var(--ease-out) both;
+}
+
+.gi-table tbody tr:nth-child(1) { animation-delay: 0.02s; }
+.gi-table tbody tr:nth-child(2) { animation-delay: 0.04s; }
+.gi-table tbody tr:nth-child(3) { animation-delay: 0.06s; }
+.gi-table tbody tr:nth-child(4) { animation-delay: 0.08s; }
+.gi-table tbody tr:nth-child(5) { animation-delay: 0.10s; }
+
+@keyframes gi-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes gi-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ============================================
+   Keyboard shortcut hint
+   ============================================ */
+.gi-kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-family: var(--font-body);
+  color: var(--text-tertiary);
+  background-color: var(--surface-base);
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .gi-kbd {
+    display: none;
+  }
 }
