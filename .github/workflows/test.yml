@@ -6,6 +6,11 @@ on:
       is-fork-pr:
         type: boolean
         required: true
+    secrets:
+      WEBHOOK_SECRET:
+        required: true
+      WEBHOOK_HOST:
+        required: true
     outputs:
       test-backend-result:
         value: ${{ jobs.test-backend.result }}

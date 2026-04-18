@@ -23,6 +23,17 @@ on:
         description: Result of the coverage-backend job
         type: string
         required: true
+    secrets:
+      WEBHOOK_SECRET:
+        required: true
+      WEBHOOK_HOST:
+        required: true
+      SONAR_HOST_URL:
+        required: true
+      SONAR_TOKEN:
+        required: false
+      SONAR_ADMIN_PASSWORD:
+        required: false
     outputs:
       result:
         description: Job result

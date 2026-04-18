@@ -224,7 +224,7 @@ def revision_security_check(cwd=None) -> tuple[bool, str]:
         for line in diff_text.splitlines():
             if line.startswith("+++ b/"):
                 current_file = line[6:]
-            is_test = "test" in current_file.lower()
+            is_test = "test" in current_file.lower() or "_pbt.rs" in current_file
             for pattern, description in _SECURITY_DIFF_PATTERNS:
                 if is_test and "unwrap" in description:
                     continue
@@ -268,7 +268,7 @@ def revision_maintainability_check(cwd=None) -> tuple[bool, str]:
                 added_lines_in_fn = 0
                 continue
 
-            is_test = "test" in current_file.lower()
+            is_test = "test" in current_file.lower() or "_pbt.rs" in current_file
 
             if line.startswith("+") and not line.startswith("+++"):
                 content = line[1:]

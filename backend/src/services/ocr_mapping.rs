@@ -31,7 +31,7 @@ pub fn map_deposito(result: &OcrResult) -> Result<ImportPreview, AppError> {
     };
 
     let (amount, currency) =
-        parse_dr_currency(&currency_input).map_err(|e| AppError::Validation(e))?;
+        parse_dr_currency(&currency_input).map_err(AppError::Validation)?;
 
     let mut preview_fields = vec![
         PreviewField {
@@ -128,7 +128,7 @@ pub fn map_gasto(result: &OcrResult) -> Result<ImportPreview, AppError> {
     };
 
     let (amount, currency) =
-        parse_dr_currency(&currency_input).map_err(|e| AppError::Validation(e))?;
+        parse_dr_currency(&currency_input).map_err(AppError::Validation)?;
 
     let mut preview_fields = vec![
         PreviewField {

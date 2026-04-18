@@ -12,6 +12,15 @@ on:
       ocr-service-digest:
         type: string
         required: true
+    secrets:
+      WEBHOOK_SECRET:
+        required: true
+      WEBHOOK_HOST:
+        required: true
+      POSTGRES_PASSWORD:
+        required: true
+      JWT_SECRET:
+        required: true
 
 permissions: {}
 
