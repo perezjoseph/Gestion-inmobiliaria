@@ -32,8 +32,11 @@ COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY --from=source /app/dist/ /srv/
 
-RUN mkdir -p /data /config && \
-    chown -R app:app /srv /data /config
+RUN mkdir -p /data /config /home/app && \
+    chown -R app:app /srv /data /config /home/app
+
+ENV XDG_DATA_HOME=/data
+ENV XDG_CONFIG_HOME=/config
 
 USER app
 
