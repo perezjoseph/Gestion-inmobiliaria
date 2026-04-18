@@ -88,6 +88,7 @@ _VERIFY_COMMANDS = {
         "cargo clippy --locked -p realestate-backend -- -D warnings && "
         "cargo clippy --locked -p realestate-frontend --target wasm32-unknown-unknown -- -D warnings"
     ),
+    "secret-scan": "gitleaks detect --source . --no-banner",
     "test-backend": "cargo test --locked -p realestate-backend --all-targets",
     "test-frontend": "cargo test --locked -p realestate-frontend --all-targets",
     "build-frontend": "trunk build --release",
@@ -131,6 +132,7 @@ ANDROID_BASELINE_VERIFY = "(cd android && ./gradlew lint detekt testDebugUnitTes
 
 _JOB_COVERS_BASELINE = {
     "lint": {"fmt", "clippy-backend", "clippy-frontend"},
+    "secret-scan": {"fmt", "clippy-backend", "clippy-frontend", "test-backend", "test-frontend"},
     "test-backend": {"test-backend"},
     "test-frontend": {"test-frontend"},
     "android-lint": {"android-lint"},

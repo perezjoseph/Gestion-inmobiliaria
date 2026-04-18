@@ -1,60 +1,57 @@
-# Agent Rules
 
-## The Loop
+# AGENTS.md
 
-You are a while loop, not a chatbot. Every iteration: read state, plan, act, verify, check done, loop. Never self-report "done" — prove it by running the project's build and test commands.
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
-When context gets long, delegate to sub-agents. Each gets full cognitive budget on a focused task. A fresh context outperforms a degraded one.
+Tradeoff: These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
-## Verification
+1. Think Before Coding
+Don't assume. Don't hide confusion. Surface tradeoffs.
 
-Every task ends with proof, not claims. Run the project's linter, type checker, formatter, and tests. If you cannot run verification, state what you checked and what you could not.
+Before implementing:
 
-## Escalation
+State your assumptions explicitly. If uncertain, ask.
+If multiple interpretations exist, present them - don't pick silently.
+If a simpler approach exists, say so. Push back when warranted.
+If something is unclear, stop. Name what's confusing. Ask.
+2. Simplicity First
+Minimum code that solves the problem. Nothing speculative.
 
-- Two failures on the same approach: stop patching. Explain the root cause, try a fundamentally different approach.
-- Ambiguous requirements with 2x+ effort difference between interpretations: ask.
-- Design seems flawed: raise the concern before implementing.
-- Planning loop (reading files, writing TODOs, no edits after 8+ tool calls): force a write action.
+No features beyond what was asked.
+No abstractions for single-use code.
+No "flexibility" or "configurability" that wasn't requested.
+No error handling for impossible scenarios.
+If you write 200 lines and it could be 50, rewrite it.
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
 
-## Memory
+3. Surgical Changes
+Touch only what you must. Clean up only your own mess.
 
-The filesystem is your memory, not the conversation. Read existing code and conventions before writing. When you discover a non-obvious fix, dependency gotcha, or framework quirk, persist it to the project's lessons file. Agent confusion is a diagnostic signal — fix the context, not just the output.
+When editing existing code:
 
-## Code
+Don't "improve" adjacent code, comments, or formatting.
+Don't refactor things that aren't broken.
+Match existing style, even if you'd do it differently.
+If you notice unrelated dead code, mention it - don't delete it.
+When your changes create orphans:
 
-No comments. Code must be self-documenting through clear naming, small functions, and obvious structure. If code needs a comment to be understood, rename or restructure it instead. The only exception is `unsafe` blocks, which must explain why safety invariants hold.
+Remove imports/variables/functions that YOUR changes made unused.
+Don't remove pre-existing dead code unless asked.
+The test: Every changed line should trace directly to the user's request.
 
-## Delegation
+4. Goal-Driven Execution
+Define success criteria. Loop until verified.
 
-Route work to specialized sub-agents in `.kiro/agents/`. Never do a job a sub-agent is built for.
+Transform tasks into verifiable goals:
 
-| Agent | When to use | Writes files? |
-|---|---|---|
-| `code-planner` | Multi-file changes, new features, refactors, bug fixes needing diagnosis | `.kiro/plans/` only |
-| `rust-coder` | Implementing Rust backend or frontend changes from a plan | source code |
-| `kotlin-coder` | Implementing Kotlin/Android changes from a plan | source code |
-| `code-reviewer` | Verifying implemented code after a coder finishes | `.kiro/plans/` only |
-| `librarian` | Docs lookup, API research, version checks, "how does X work" | never |
+"Add validation" → "Write tests for invalid inputs, then make them pass"
+"Fix the bug" → "Write a test that reproduces it, then make it pass"
+"Refactor X" → "Ensure tests pass before and after"
+For multi-step tasks, state a brief plan:
 
-### Plan → Code → Verify Loop
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
-For any change touching multiple files or requiring design decisions:
-
-1. Invoke `code-planner` with requirements → writes `.kiro/plans/{task}-plan.md`
-2. Invoke `rust-coder` or `kotlin-coder` → reads plan, implements, runs fmt/clippy/tests
-3. Invoke `code-reviewer` → reads plan + code, runs verification, writes `.kiro/plans/{task}-review.md`
-4. If FAIL → invoke `code-planner` with review findings → revised plan → back to step 2
-5. If PASS → done
-
-Skip the loop for trivial single-file edits (typo fix, one-line change). Use judgment.
-
-### Research Path
-
-For "how does", "what is", "which library" questions: invoke `librarian`. Do not guess from training data when docs are available.
-
-## Guardrails
-
-Prefer deterministic checks over instructions. A linter catching a violation in 20ms is better than a rule saying "don't do X." Checks are model-independent and don't compete for context window attention.
-
-When a constraint matters: encode it as a check. When it's a preference: put it in a steering file. When it's a one-time instruction: say it in chat.
+These guidelines are working if: fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.

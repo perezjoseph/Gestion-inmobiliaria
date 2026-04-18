@@ -37,6 +37,7 @@ from .correlation import (
 from .decisions import should_hold_for_correlation, record_co_failure_event, CO_FAILURE_HOLD_S, get_decision_cache_summary
 from .classifier import classify_error
 from .tracker import get_tracker, JobState
+from .queue import enqueue, dequeue, mark_done, mark_failed, requeue_stale, pending_count, cleanup_old, get_stats as get_queue_stats
 
 _thread_semaphore = threading.Semaphore(THREAD_POOL_SIZE)
 _holds_lock = threading.Lock()
@@ -241,6 +242,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 "vuln_patterns": get_vuln_summary(),
                 "correlations": get_correlation_summary(),
                 "pipeline_tracker": get_tracker().get_summary(),
+                "webhook_queue": get_queue_stats(),
                 **get_decision_cache_summary(),
             }).encode(), "application/json")
             return
@@ -300,9 +302,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
         handler = handlers.get(self.path)
         if handler:
+            queue_id = enqueue(self.path, payload)
             self._send(200, b"OK", request_id=request_id)
 
-            def _guarded(fn, p, rid):
+            def _guarded(fn, p, rid, qid):
                 if not _thread_semaphore.acquire(blocking=True, timeout=30):
                     log.warning(f"[{rid}] Thread pool timed out -- deferring {self.path}")
                     return
@@ -311,14 +314,16 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     _active_thread_count += 1
                 try:
                     fn(p)
-                except Exception:
+                    mark_done(qid)
+                except Exception as exc:
                     log.exception(f"[{rid}] Handler error for {self.path}")
+                    mark_failed(qid, str(exc))
                 finally:
                     with _active_thread_count_lock:
                         _active_thread_count -= 1
                     _thread_semaphore.release()
 
-            threading.Thread(target=_guarded, args=(handler, payload, request_id), daemon=True).start()
+            threading.Thread(target=_guarded, args=(handler, payload, request_id, queue_id), daemon=True).start()
         else:
             log.warning(f"[{request_id}] Unknown endpoint: {self.path}")
             self._send(404, b"Not found", request_id=request_id)
@@ -449,6 +454,20 @@ class WebhookHandler(BaseHTTPRequestHandler):
         tracker = get_tracker()
         if commit:
             pipeline = tracker.get_or_create(commit)
+
+            prev_state = pipeline.job_states.get(job)
+            if prev_state == JobState.PASSED:
+                log.warning(
+                    f"FIX REGRESSION: job {job} was marked PASSED but failed again "
+                    f"(commit {commit[:8]}, lineage {pipeline.lineage_id}). "
+                    f"Previous auto-fix did not resolve the issue."
+                )
+                round_files = pipeline.files_changed.get(pipeline.round_number, [])
+                _record_regression_event(
+                    commit, pipeline.lineage_id, pipeline.round_number,
+                    job, [job], round_files,
+                )
+
             if pipeline.deployed:
                 log.info(
                     f"Pipeline {pipeline.lineage_id} already deployed, "
@@ -518,14 +537,13 @@ class WebhookHandler(BaseHTTPRequestHandler):
                             if group is not None and should_dispatch_correlated_fix(group_id):
                                 if not group.dispatched:
                                     group.dispatched = True
-                                    prompt = build_correlated_fix_prompt(group)
                                     log.info(
                                         f"Dispatching correlated fix for commit {commit[:8]} "
                                         f"({len(all_failed_jobs)} failures)"
                                     )
-                                    from .runner import run_kiro as _run_kiro
-                                    _run_kiro(prompt, f"Correlated fix (hold-batch, {commit[:8]})")
                                     record_co_failure_event(commit, all_failed_jobs)
+                                    for j, s, el, ec, ctx in all_payloads:
+                                        fix_once_and_push(j, s, el, ctx)
                                     return
 
                         record_co_failure_event(commit, all_failed_jobs)
@@ -596,13 +614,11 @@ class WebhookHandler(BaseHTTPRequestHandler):
                             )
                             return
                     group.dispatched = True
-                    prompt = build_correlated_fix_prompt(group)
                     log.info(
                         f"Dispatching correlated fix for group {group_id} "
                         f"({len(group.failures)} failures, commit {group.commit[:8]})"
                     )
-                    from .runner import run_kiro as _run_kiro
-                    _run_kiro(prompt, f"Correlated fix ({group_id})")
+                    fix_once_and_push(job, step, error_log, context)
                     return
                 log.info(f"Correlated fix already dispatched for group {group_id}")
                 return
@@ -747,6 +763,44 @@ class WebhookHandler(BaseHTTPRequestHandler):
         pass
 
 
+_REPLAY_HANDLERS = {
+    "/ci-failure": "_handle_ci_failure",
+    "/ci-improve": "_handle_ci_improve",
+    "/sonarqube": "_handle_sonarqube",
+    "/sonar-fix": "_handle_sonar_fix",
+}
+
+
+def _replay_pending_queue():
+    handler_instance = WebhookHandler.__new__(WebhookHandler)
+
+    while True:
+        item = dequeue()
+        if item is None:
+            break
+        row_id, endpoint, payload = item
+        method_name = _REPLAY_HANDLERS.get(endpoint)
+        if not method_name:
+            mark_failed(row_id, f"unknown endpoint: {endpoint}")
+            continue
+
+        log.info(f"Replaying queued webhook: {endpoint} (queue_id={row_id})")
+
+        def _run_replay(mid, p, rid):
+            try:
+                getattr(handler_instance, mid)(p)
+                mark_done(rid)
+            except Exception as exc:
+                log.exception(f"Replay failed for queue_id={rid}: {exc}")
+                mark_failed(rid, str(exc))
+
+        threading.Thread(
+            target=_run_replay,
+            args=(method_name, payload, row_id),
+            daemon=True,
+        ).start()
+
+
 def main():
     from .config import KIRO_CLI
 
@@ -814,6 +868,14 @@ def main():
     log.info("  kiro-cli prompt delivery: ✓")
 
     log.info("Startup checks passed")
+
+    wsl_bash("git worktree prune", timeout=15)
+    requeued = requeue_stale()
+    cleanup_old()
+    pending = pending_count()
+    if pending > 0:
+        log.info(f"Replaying {pending} pending webhook(s) from queue")
+        _replay_pending_queue()
 
     server = TimeoutHTTPServer((BIND_ADDRESS, PORT), WebhookHandler)
     server.timeout = 30
