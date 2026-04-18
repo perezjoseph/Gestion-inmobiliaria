@@ -223,6 +223,7 @@ jobs:
     with:
       backend-digest: ${{ needs.containers.outputs.backend-digest }}
       frontend-digest: ${{ needs.containers.outputs.frontend-digest }}
+      ocr-service-digest: ${{ needs.containers.outputs.ocr-service-digest }}
     secrets: inherit
 
   # ── Stage 5: Pipeline Self-Improvement (after everything) ──
@@ -246,6 +247,7 @@ jobs:
       build-backend-result: ${{ needs.build.outputs.build-backend-result || '' }}
       container-backend-result: ${{ needs.containers.result || '' }}
       container-frontend-result: ${{ needs.containers.result || '' }}
+      container-ocr-service-result: ${{ needs.containers.result || '' }}
       deploy-result: ${{ needs.deploy.result || '' }}
       lint-error-log: ${{ needs.lint.outputs.error_log || '' }}
       test-backend-error-log: ${{ needs.tests.outputs.test-backend-error-log || '' }}

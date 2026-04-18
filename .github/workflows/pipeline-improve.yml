@@ -47,6 +47,10 @@ on:
         type: string
         required: false
         default: ''
+      container-ocr-service-result:
+        type: string
+        required: false
+        default: ''
       deploy-result:
         type: string
         required: false
@@ -317,6 +321,7 @@ jobs:
             echo "| build-backend | ${{ inputs.build-backend-result }} | ${{ inputs.build-backend-duration || 'n/a' }} | volume |"
             echo "| container-backend | ${{ inputs.container-backend-result }} | -- | -- |"
             echo "| container-frontend | ${{ inputs.container-frontend-result }} | -- | -- |"
+            echo "| container-ocr-service | ${{ inputs.container-ocr-service-result }} | -- | -- |"
             echo "| deploy | ${{ inputs.deploy-result }} | -- | -- |"
             echo ""
             if [ -n "${{ inputs.deprecation-report }}" ] && ! echo "${{ inputs.deprecation-report }}" | grep -q "No deprecations"; then
