@@ -122,12 +122,24 @@ jobs:
       - name: Push backend container image
         id: push
         run: |
-          DOCKER_CONTENT_TRUST=0 docker push ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }}
-          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }} 2>/dev/null | cut -d@ -f2)
+          PUSH_OUTPUT=$(DOCKER_CONTENT_TRUST=0 docker push ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }} 2>&1)
+          echo "$PUSH_OUTPUT"
+          DIGEST=$(echo "$PUSH_OUTPUT" | grep -oP 'digest: \Ksha256:[a-f0-9]+' | tail -1)
+          if [ -z "$DIGEST" ]; then
+            echo "Push output did not contain digest, falling back to inspect"
+            DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }} 2>/dev/null | cut -d@ -f2)
+          fi
+          if [ -z "$DIGEST" ]; then
+            echo "::error::Failed to resolve image digest after push"
+            exit 1
+          fi
           echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+          echo "Resolved digest: ${DIGEST}"
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        env:
+          DOCKER_CONTENT_TRUST: "0"
         with:
           subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend
           subject-digest: ${{ steps.push.outputs.digest }}
@@ -281,12 +293,24 @@ jobs:
       - name: Push frontend container image
         id: push
         run: |
-          DOCKER_CONTENT_TRUST=0 docker push ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }}
-          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }} 2>/dev/null | cut -d@ -f2)
+          PUSH_OUTPUT=$(DOCKER_CONTENT_TRUST=0 docker push ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }} 2>&1)
+          echo "$PUSH_OUTPUT"
+          DIGEST=$(echo "$PUSH_OUTPUT" | grep -oP 'digest: \Ksha256:[a-f0-9]+' | tail -1)
+          if [ -z "$DIGEST" ]; then
+            echo "Push output did not contain digest, falling back to inspect"
+            DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }} 2>/dev/null | cut -d@ -f2)
+          fi
+          if [ -z "$DIGEST" ]; then
+            echo "::error::Failed to resolve image digest after push"
+            exit 1
+          fi
           echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+          echo "Resolved digest: ${DIGEST}"
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        env:
+          DOCKER_CONTENT_TRUST: "0"
         with:
           subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend
           subject-digest: ${{ steps.push.outputs.digest }}
