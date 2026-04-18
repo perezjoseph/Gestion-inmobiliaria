@@ -50,6 +50,28 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Clean up stale Docker containers
+        run: |
+          echo "Stopping stale CI postgres containers..."
+          docker ps -q --filter "label=570b44" | xargs -r docker stop --time 5 2>/dev/null || true
+          docker ps -aq --filter "label=570b44" | xargs -r docker rm -f 2>/dev/null || true
+
+          echo "Stopping containers occupying CI service ports..."
+          for PORT in 5432 5433; do
+            CONTAINER_ID=$(docker ps -q --filter "publish=${PORT}" 2>/dev/null || true)
+            if [ -n "$CONTAINER_ID" ]; then
+              echo "Port ${PORT} occupied by container ${CONTAINER_ID} -- stopping"
+              docker stop --time 5 "$CONTAINER_ID" 2>/dev/null || true
+              docker rm -f "$CONTAINER_ID" 2>/dev/null || true
+            fi
+          done
+
+          echo "Pruning stopped CI service containers..."
+          docker container prune -f --filter "until=2h" 2>/dev/null || true
+
+          echo "Pruning dangling networks..."
+          docker network prune -f 2>/dev/null || true
+
       - name: Check disk space
         run: |
           CHECK_PATH="/tmp"
