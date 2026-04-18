@@ -50,9 +50,22 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Clean up stale Docker containers
+      - name: Free CI service ports
         run: |
-          echo "Stopping stale CI postgres containers..."
+          echo "Killing host-level processes on CI service ports..."
+          for PORT in 5432 5433; do
+            if command -v fuser &>/dev/null; then
+              fuser -k "${PORT}/tcp" 2>/dev/null || true
+            else
+              PID=$(ss -tlnp "sport = :${PORT}" 2>/dev/null | awk 'NR>1{match($0,/pid=([0-9]+)/,a); if(a[1]) print a[1]}' | head -1)
+              if [ -n "$PID" ]; then
+                echo "Port ${PORT} held by PID ${PID} -- killing"
+                kill -9 "$PID" 2>/dev/null || true
+              fi
+            fi
+          done
+
+          echo "Stopping stale CI docker containers..."
           docker ps -q --filter "label=570b44" | xargs -r docker stop --time 5 2>/dev/null || true
           docker ps -aq --filter "label=570b44" | xargs -r docker rm -f 2>/dev/null || true
 

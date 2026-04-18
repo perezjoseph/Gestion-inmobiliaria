@@ -59,7 +59,7 @@
       "current_commit": "a2c7326f2cc5e765f24cf8aaaac5a222b9fd9f0b",
       "round_number": 1,
       "job_states": {
-        "test-backend": "fixing"
+        "test-backend": "failed"
       },
       "deployed": false,
       "sonarqube_passed": false,
@@ -70,13 +70,15 @@
       "quality_snapshots": {},
       "last_run_url": "",
       "created_at": "2026-04-17T22:43:53.786357",
-      "last_updated": "2026-04-17T22:43:53.800914"
+      "last_updated": "2026-04-17T23:12:14.186157"
     },
     "e26b44f104ad": {
       "lineage_id": "e26b44f104ad",
       "current_commit": "e26b44f104ad479207c205b2ec1f2918c400b5ca",
       "round_number": 1,
-      "job_states": {},
+      "job_states": {
+        "test-backend": "fixing"
+      },
       "deployed": false,
       "sonarqube_passed": false,
       "budget_total": 10,
@@ -86,7 +88,7 @@
       "quality_snapshots": {},
       "last_run_url": "",
       "created_at": "2026-04-17T23:05:41.932116",
-      "last_updated": "2026-04-17T23:05:41.934483"
+      "last_updated": "2026-04-17T23:12:20.020176"
     }
   }
 }
