@@ -1,0 +1,39 @@
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: arc-runner-dind
+  namespace: arc-systems
+spec:
+  template:
+    spec:
+      repository: perezjoseph/Gestion-inmobiliaria
+      labels:
+        - arc-runner-dind
+      dockerEnabled: true
+      nodeSelector:
+        role: desktop
+      resources:
+        requests:
+          cpu: "1"
+          memory: 2Gi
+        limits:
+          cpu: "3"
+          memory: 6Gi
+---
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: HorizontalRunnerAutoscaler
+metadata:
+  name: arc-runner-dind
+  namespace: arc-systems
+spec:
+  scaleTargetRef:
+    kind: RunnerDeployment
+    name: arc-runner-dind
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: PercentageRunnersBusy
+      scaleUpThreshold: "0.75"
+      scaleDownThreshold: "0.25"
+      scaleUpFactor: "2"
+      scaleDownFactor: "0.5"
