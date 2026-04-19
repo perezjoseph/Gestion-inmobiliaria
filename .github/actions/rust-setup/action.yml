@@ -33,6 +33,21 @@ runs:
           echo "Build tools and OpenSSL headers already available (cc: $(cc --version | head -1), openssl: $(pkg-config --modversion openssl))"
         fi
 
+    - name: Ensure CARGO_HOME directories are writable
+      shell: bash
+      run: |
+        # Pre-create directories so rustup doesn't fail with "Permission denied".
+        # Also fix ownership in case a cache restore created them as a different user.
+        for dir in "$HOME/.cargo/bin" "$HOME/.cargo/registry" "$HOME/.rustup"; do
+          mkdir -p "$dir" 2>/dev/null || sudo mkdir -p "$dir"
+          if [ ! -w "$dir" ]; then
+            echo "Fixing ownership on $dir"
+            sudo chown -R "$(id -u):$(id -g)" "$(dirname "$dir")"
+          fi
+        done
+        echo "CARGO_HOME=$HOME/.cargo" >> "$GITHUB_ENV"
+        echo "RUSTUP_HOME=$HOME/.rustup" >> "$GITHUB_ENV"
+
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       with:

@@ -15,6 +15,10 @@ _GIT_WORKTREE_PRUNE = "git worktree prune"
 _worktree_lock = threading.Lock()
 _active_worktrees: dict[str, float] = {}
 _worktree_usage_locks: dict[str, threading.Lock] = {}
+# Per-name locks that serialise setup/cleanup for the same worktree name
+# so two threads targeting the same (branch, commit) don't race through
+# git operations on the same path.
+_name_locks: dict[str, threading.Lock] = {}
 
 _SAFE_BRANCH_RE = re.compile(r"[^a-zA-Z0-9_\-]")
 _SHELL_SAFE_REF_RE = re.compile(r"^[a-zA-Z0-9_./@\-]+$")
@@ -34,6 +38,18 @@ def _validate_branch_for_shell(branch: str) -> str:
             f"branch name contains unsafe characters: {branch!r}"
         )
     return branch
+
+
+def _get_name_lock(name: str) -> threading.Lock:
+    """Return (and lazily create) a per-worktree-name lock.
+
+    Must be called while ``_worktree_lock`` is held.
+    """
+    lock = _name_locks.get(name)
+    if lock is None:
+        lock = threading.Lock()
+        _name_locks[name] = lock
+    return lock
 
 
 def _retry_wsl_bash(cmd: str, *, timeout: int, max_attempts: int,
@@ -89,21 +105,20 @@ def _resolve_fetch_refs(branch: str) -> tuple[str, str, bool]:
     return f"pull/{pr_number}/head:pr-{pr_number}", f"pr-{pr_number}", True
 
 
-def _try_reuse_worktree(
-    name: str, wsl_path: str, branch: str,
-) -> tuple[str, str] | None:
-    """If the worktree already exists and is free, refresh and return it."""
+def _try_reuse_worktree(name: str) -> bool:
+    """Check whether the worktree already exists and is free.
+
+    Must be called while ``_worktree_lock`` is held.
+    Returns True if the worktree can be reused (caller must still refresh
+    it *after* releasing the global lock), False otherwise.
+    """
     if name not in _active_worktrees:
-        return None
+        return False
     usage_lock = _worktree_usage_locks.get(name)
     if usage_lock and usage_lock.locked():
         log.warning(f"Worktree {name} is in use by another fix, creating fresh")
-        return None
-    log.info(f"Reusing existing worktree: {name}")
-    _pull_in_worktree(wsl_path, branch)
-    _active_worktrees[name] = time.monotonic()
-    _worktree_usage_locks.setdefault(name, threading.Lock())
-    return wsl_path, name
+        return False
+    return True
 
 
 def _remove_stale_lock(name: str) -> None:
@@ -113,12 +128,10 @@ def _remove_stale_lock(name: str) -> None:
     causing subsequent adds to fail with "File exists".
     """
     lock_path = WIN_PROJECT_DIR / ".git" / "worktrees" / name / "index.lock"
-    if lock_path.exists():
-        log.info(f"Removing stale index.lock for worktree {name}")
-        try:
-            lock_path.unlink()
-        except OSError as exc:
-            log.warning(f"Could not remove {lock_path}: {exc}")
+    try:
+        lock_path.unlink(missing_ok=True)
+    except OSError as exc:
+        log.warning(f"Could not remove {lock_path}: {exc}")
 
 
 def _ensure_worktree_base() -> None:
@@ -206,6 +219,11 @@ def setup_worktree(branch: str, commit: str) -> tuple[str, str]:
     Returns (wsl_path, name) on success, ("", "") on failure.
     Handles the case where the branch is already checked out in the
     main worktree by using detached HEAD + branch reassignment.
+
+    Thread-safety: a per-name lock serialises all git operations for a
+    given worktree name so two concurrent requests for the same
+    (branch, commit) don't race.  The global ``_worktree_lock`` is only
+    held briefly for bookkeeping (never during I/O).
     """
     try:
         _validate_branch_for_shell(branch)
@@ -216,64 +234,83 @@ def setup_worktree(branch: str, commit: str) -> tuple[str, str]:
     name = _worktree_name(branch, commit)
     wsl_path = _wsl_worktree_path(name)
 
+    # --- bookkeeping under global lock (fast, no I/O) ---
     with _worktree_lock:
-        reused = _try_reuse_worktree(name, wsl_path, branch)
-        if reused is not None:
-            return reused
-        _enforce_max_count()
+        name_lock = _get_name_lock(name)
+        can_reuse = _try_reuse_worktree(name)
+        if can_reuse:
+            # Mark reuse intent so _enforce_max_count won't evict it.
+            _active_worktrees[name] = time.monotonic()
+            _worktree_usage_locks.setdefault(name, threading.Lock())
 
-    log.info(f"Creating worktree: {name} for branch={branch} commit={commit[:12] if len(commit) > 12 else commit}")
+    # --- per-name lock: serialises git I/O for this worktree name ---
+    with name_lock:
+        if can_reuse:
+            log.info(f"Reusing existing worktree: {name}")
+            _pull_in_worktree(wsl_path, branch)
+            return wsl_path, name
 
-    # Ensure the worktree base directory exists on disk so git can create
-    # the checkout inside it (git worktree add does not create parents).
-    _ensure_worktree_base()
+        # Evict oldest worktrees if at the limit.  We hold only the
+        # global lock while mutating the dict, then release it for the
+        # slow disk removal.
+        with _worktree_lock:
+            _enforce_max_count()
 
-    # Remove any stale index.lock left by a previous timed-out add.
-    _remove_stale_lock(name)
+        log.info(f"Creating worktree: {name} for branch={branch} "
+                 f"commit={commit[:12] if len(commit) > 12 else commit}")
 
-    # Prune stale worktree bookkeeping before attempting to add, so git
-    # doesn't reject the add due to a leftover entry from a previous timeout.
-    try:
-        wsl_bash(_GIT_WORKTREE_PRUNE, timeout=15)
-    except subprocess.TimeoutExpired:
-        log.warning("git worktree prune timed out, continuing anyway")
+        # Ensure the worktree base directory exists on disk so git can
+        # create the checkout inside it (git worktree add doesn't create
+        # parents).
+        _ensure_worktree_base()
 
-    fetch_ref, checkout_ref, is_pr_ref = _resolve_fetch_refs(branch)
+        # Remove any stale index.lock left by a previous timed-out add.
+        _remove_stale_lock(name)
 
-    result = _retry_wsl_bash(
-        f"git fetch origin {fetch_ref} --no-tags",
-        timeout=90, max_attempts=3,
-        label=f"fetching {fetch_ref} for worktree {name}",
-    )
-    if result is None:
-        return "", ""
+        # Prune stale worktree bookkeeping before attempting to add, so
+        # git doesn't reject the add due to a leftover entry.
+        try:
+            wsl_bash(_GIT_WORKTREE_PRUNE, timeout=15)
+        except subprocess.TimeoutExpired:
+            log.warning("git worktree prune timed out, continuing anyway")
 
-    result = _retry_wsl_bash(
-        f"git worktree add '{wsl_path}' '{checkout_ref}'",
-        timeout=120, max_attempts=2,
-        label=f"creating worktree {name}",
-    )
-    if result is None:
-        _cleanup_partial_worktree(wsl_path, name)
-        return "", ""
+        fetch_ref, checkout_ref, is_pr_ref = _resolve_fetch_refs(branch)
 
-    try:
-        failure = _handle_worktree_add_failure(
-            result, wsl_path, name, branch, commit, checkout_ref, is_pr_ref,
+        result = _retry_wsl_bash(
+            f"git fetch origin {fetch_ref} --no-tags",
+            timeout=90, max_attempts=3,
+            label=f"fetching {fetch_ref} for worktree {name}",
         )
-        if failure is not None:
-            return failure
-    except subprocess.TimeoutExpired:
-        log.error(f"Timeout during worktree recovery for {name}")
-        _cleanup_partial_worktree(wsl_path, name)
-        return "", ""
+        if result is None:
+            return "", ""
 
-    with _worktree_lock:
-        _active_worktrees[name] = time.monotonic()
-        _worktree_usage_locks.setdefault(name, threading.Lock())
+        result = _retry_wsl_bash(
+            f"git worktree add '{wsl_path}' '{checkout_ref}'",
+            timeout=120, max_attempts=2,
+            label=f"creating worktree {name}",
+        )
+        if result is None:
+            _cleanup_partial_worktree(wsl_path, name)
+            return "", ""
 
-    log.info(f"Worktree ready: {wsl_path}")
-    return wsl_path, name
+        try:
+            failure = _handle_worktree_add_failure(
+                result, wsl_path, name, branch, commit,
+                checkout_ref, is_pr_ref,
+            )
+            if failure is not None:
+                return failure
+        except subprocess.TimeoutExpired:
+            log.error(f"Timeout during worktree recovery for {name}")
+            _cleanup_partial_worktree(wsl_path, name)
+            return "", ""
+
+        with _worktree_lock:
+            _active_worktrees[name] = time.monotonic()
+            _worktree_usage_locks.setdefault(name, threading.Lock())
+
+        log.info(f"Worktree ready: {wsl_path}")
+        return wsl_path, name
 
 
 def _pull_in_worktree(wsl_path: str, branch: str) -> None:
@@ -356,9 +393,15 @@ def _remove_worktree_on_disk(name: str) -> None:
 def cleanup_worktree(name: str) -> None:
     """Remove a worktree and clean up tracking.
 
-    Safe to call when ``_worktree_lock`` is **not** held.
+    Acquires the per-name lock to avoid racing with a concurrent
+    ``setup_worktree`` for the same name, then updates bookkeeping
+    under the global lock.
     """
-    _remove_worktree_on_disk(name)
+    with _worktree_lock:
+        name_lock = _get_name_lock(name)
+
+    with name_lock:
+        _remove_worktree_on_disk(name)
 
     with _worktree_lock:
         _active_worktrees.pop(name, None)
@@ -384,15 +427,26 @@ def prune_stale_worktrees() -> None:
     """Remove worktrees older than WORKTREE_MAX_AGE_H."""
     max_age_s = WORKTREE_MAX_AGE_H * 3600
     now = time.monotonic()
-    to_remove = []
 
     with _worktree_lock:
-        for name, created_at in _active_worktrees.items():
-            if now - created_at > max_age_s:
-                to_remove.append(name)
+        to_remove = [
+            name for name, created_at in _active_worktrees.items()
+            if now - created_at > max_age_s
+        ]
+        # Remove from tracking while still holding the lock so no other
+        # thread can hand out a worktree we're about to delete.
+        for name in to_remove:
+            _active_worktrees.pop(name, None)
+            _worktree_usage_locks.pop(name, None)
 
     for name in to_remove:
-        cleanup_worktree(name)
+        with _worktree_lock:
+            name_lock = _get_name_lock(name)
+        with name_lock:
+            try:
+                _remove_worktree_on_disk(name)
+            except Exception:
+                log.warning(f"Failed to remove stale worktree {name}", exc_info=True)
         log.info(f"Pruned stale worktree: {name}")
 
     wsl_bash(_GIT_WORKTREE_PRUNE, timeout=15)

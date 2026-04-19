@@ -107,7 +107,25 @@
       "quality_snapshots": {},
       "last_run_url": "",
       "created_at": "2026-04-19T18:18:23.431150",
-      "last_updated": "2026-04-19T18:31:20.869786"
+      "last_updated": "2026-04-19T18:33:16.378139"
+    },
+    "73037921a828": {
+      "lineage_id": "73037921a828",
+      "current_commit": "73037921a828374f3f85951271938ba4cce04dae",
+      "round_number": 1,
+      "job_states": {
+        "lint": "fixing"
+      },
+      "deployed": false,
+      "sonarqube_passed": false,
+      "budget_total": 10,
+      "budget_remaining": 10,
+      "files_changed": {},
+      "pending_strategies": {},
+      "quality_snapshots": {},
+      "last_run_url": "",
+      "created_at": "2026-04-19T18:33:58.479956",
+      "last_updated": "2026-04-19T18:37:42.435662"
     }
   }
 }
