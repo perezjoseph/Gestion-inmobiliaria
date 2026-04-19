@@ -32,6 +32,17 @@ def _retry_wsl_bash(cmd: str, *, timeout: int, max_attempts: int,
     return None
 
 
+def _cleanup_partial_worktree(wsl_path: str, name: str) -> None:
+    """Best-effort removal of a worktree left behind by a timed-out add."""
+    log.info(f"Cleaning up partial worktree after timeout: {name}")
+    try:
+        wsl_bash(f"git worktree remove --force '{wsl_path}' 2>/dev/null; "
+                 f"rm -rf '{wsl_path}' 2>/dev/null; "
+                 f"git worktree prune", timeout=30)
+    except subprocess.TimeoutExpired:
+        log.warning(f"Cleanup of partial worktree {name} also timed out")
+
+
 def _sanitize_branch_name(branch: str) -> str:
     return _SAFE_BRANCH_RE.sub("-", branch)[:64]
 
@@ -78,9 +89,11 @@ def _try_reuse_worktree(
 def _recover_stale_path(wsl_path: str, name: str, checkout_ref: str) -> subprocess.CompletedProcess:
     """Remove a stale worktree path and retry the add."""
     log.info(f"Stale worktree path exists, removing and retrying: {name}")
-    wsl_bash(f"git worktree remove --force '{wsl_path}'", timeout=30)
+    # Prune git's internal bookkeeping first so stale entries are cleared
+    wsl_bash("git worktree prune", timeout=15)
+    wsl_bash(f"git worktree remove --force '{wsl_path}' 2>/dev/null || true", timeout=30)
     wsl_bash(f"rm -rf '{wsl_path}'", timeout=15)
-    return wsl_bash(f"git worktree add '{wsl_path}' '{checkout_ref}'", timeout=60)
+    return wsl_bash(f"git worktree add '{wsl_path}' '{checkout_ref}'", timeout=120)
 
 
 def _add_detached_worktree(
@@ -163,11 +176,18 @@ def setup_worktree(branch: str, commit: str) -> tuple[str, str]:
 
     log.info(f"Creating worktree: {name} for branch={branch} commit={commit[:12] if len(commit) > 12 else commit}")
 
+    # Prune stale worktree bookkeeping before attempting to add, so git
+    # doesn't reject the add due to a leftover entry from a previous timeout.
+    try:
+        wsl_bash("git worktree prune", timeout=15)
+    except subprocess.TimeoutExpired:
+        log.warning("git worktree prune timed out, continuing anyway")
+
     fetch_ref, checkout_ref, is_pr_ref = _resolve_fetch_refs(branch)
 
     result = _retry_wsl_bash(
         f"git fetch origin {fetch_ref} --no-tags",
-        timeout=60, max_attempts=3,
+        timeout=90, max_attempts=3,
         label=f"fetching {fetch_ref} for worktree {name}",
     )
     if result is None:
@@ -175,10 +195,11 @@ def setup_worktree(branch: str, commit: str) -> tuple[str, str]:
 
     result = _retry_wsl_bash(
         f"git worktree add '{wsl_path}' '{checkout_ref}'",
-        timeout=60, max_attempts=2,
+        timeout=120, max_attempts=2,
         label=f"creating worktree {name}",
     )
     if result is None:
+        _cleanup_partial_worktree(wsl_path, name)
         return "", ""
 
     try:
@@ -189,6 +210,7 @@ def setup_worktree(branch: str, commit: str) -> tuple[str, str]:
             return failure
     except subprocess.TimeoutExpired:
         log.error(f"Timeout during worktree recovery for {name}")
+        _cleanup_partial_worktree(wsl_path, name)
         return "", ""
 
     with _worktree_lock:
@@ -318,16 +340,23 @@ def prune_stale_worktrees() -> None:
 def _enforce_max_count() -> None:
     """Remove oldest worktrees if we're at the limit.
 
-    MUST be called while ``_worktree_lock`` is held.  Releases the lock
-    temporarily for the (slow) disk removal, then re-acquires it.
+    MUST be called while ``_worktree_lock`` is held.  Collects eviction
+    targets and removes them from tracking while holding the lock, then
+    releases the lock for the slow disk removal and re-acquires it.
+    This prevents other threads from seeing stale counts.
     """
+    to_evict: list[str] = []
     while len(_active_worktrees) >= WORKTREE_MAX_COUNT:
         oldest_name = min(_active_worktrees, key=_active_worktrees.get)
         log.info(f"Evicting oldest worktree to make room: {oldest_name}")
         _active_worktrees.pop(oldest_name, None)
         _worktree_usage_locks.pop(oldest_name, None)
+        to_evict.append(oldest_name)
+
+    if to_evict:
         _worktree_lock.release()
         try:
-            _remove_worktree_on_disk(oldest_name)
+            for name in to_evict:
+                _remove_worktree_on_disk(name)
         finally:
             _worktree_lock.acquire()

@@ -378,7 +378,9 @@ jobs:
             --arg pipeline_report "$REPORT" \
             --arg sonar_report "$SONAR_REPORT" \
             --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
-            '{focus: $focus, pipeline_report: $pipeline_report, sonar_report: $sonar_report, run_url: $run_url}')
+            --arg commit "$GH_SHA" \
+            --arg branch "$GH_REF_NAME" \
+            '{focus: $focus, pipeline_report: $pipeline_report, sonar_report: $sonar_report, run_url: $run_url, commit: $commit, branch: $branch}')
 
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-improve \
@@ -404,7 +406,9 @@ jobs:
           PAYLOAD=$(jq -n \
             --arg sonar_report "$SONAR_REPORT" \
             --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
-            '{sonar_report: $sonar_report, run_url: $run_url}')
+            --arg commit "$GH_SHA" \
+            --arg branch "$GH_REF_NAME" \
+            '{sonar_report: $sonar_report, run_url: $run_url, commit: $commit, branch: $branch}')
 
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
           curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/sonar-fix \

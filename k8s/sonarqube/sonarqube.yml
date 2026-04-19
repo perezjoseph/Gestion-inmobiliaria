@@ -47,12 +47,22 @@ spec:
     spec:
       nodeSelector:
         role: desktop
+      automountServiceAccountToken: false
       initContainers:
         - name: init-sysctl
           image: busybox:1.37
           command: ["sh", "-c", "sysctl -w vm.max_map_count=262144 || true"]
           securityContext:
             privileged: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+              ephemeral-storage: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+              ephemeral-storage: 32Mi
       securityContext:
         fsGroup: 1000
       containers:
@@ -82,9 +92,11 @@ spec:
             requests:
               cpu: 200m
               memory: 1Gi
+              ephemeral-storage: 256Mi
             limits:
               cpu: "2"
               memory: 2Gi
+              ephemeral-storage: 1Gi
           startupProbe:
             httpGet:
               path: /api/system/status

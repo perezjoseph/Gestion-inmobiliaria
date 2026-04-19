@@ -268,7 +268,7 @@ def _detect_regressions(failed_jobs, pipeline, tracker, commit):
 
 
 def _dispatch_failed_job_fixes(failed_jobs, regression_jobs, commit, run_url,
-                               pipeline, sonar_report, sonar_result):
+                               pipeline, sonar_report, sonar_result, branch="main"):
     """Dispatch fix threads for failed jobs and optionally a sonar fix."""
     log.info(f"Dispatching fixes for {len(failed_jobs)} failed jobs: {failed_jobs}")
     for job in failed_jobs:
@@ -283,7 +283,7 @@ def _dispatch_failed_job_fixes(failed_jobs, regression_jobs, commit, run_url,
             )
         threading.Thread(
             target=fix_once_and_push,
-            args=(job, "ci-improve", error_context, {"commit": commit, "run_url": run_url}),
+            args=(job, "ci-improve", error_context, {"commit": commit, "run_url": run_url, "branch": branch}),
             daemon=True,
         ).start()
 
@@ -295,6 +295,7 @@ def _dispatch_failed_job_fixes(failed_jobs, regression_jobs, commit, run_url,
             threading.Thread(
                 target=fix_sonar_issues,
                 args=(sonar_report, run_url),
+                kwargs={"commit": commit, "branch": branch},
                 daemon=True,
             ).start()
 
@@ -394,6 +395,27 @@ def _build_timing_stats():
             "phases": last_fix["phases"],
         }
     return result
+
+
+def _process_deprecation_report(deprecation_report: str, run_url: str, commit: str, branch: str):
+    """Write a deprecation report to a JSON file for later review."""
+    try:
+        dest_dir = WIN_PROJECT_DIR / "deprecations"
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{timestamp}_{commit[:8] or 'unknown'}.json"
+        filepath = dest_dir / filename
+        filepath.write_text(json.dumps({
+            "timestamp": datetime.now().isoformat(),
+            "commit": commit,
+            "branch": branch,
+            "run_url": run_url,
+            "deprecation_report": deprecation_report,
+            "status": "pending_review",
+        }, indent=2, ensure_ascii=False), encoding="utf-8")
+        log.info(f"Deprecation report written to {filepath}")
+    except OSError as exc:
+        log.warning(f"Failed to write deprecation report: {exc}")
 
 
 class TimeoutHTTPServer(HTTPServer):
@@ -539,6 +561,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
             "/ci-failure": self._handle_ci_failure,
             "/ci-improve": self._handle_ci_improve,
             "/sonar-fix": self._handle_sonar_fix,
+            "/ci-deprecations": self._handle_ci_deprecations,
         }
 
         handler = handlers.get(self.path)
@@ -554,6 +577,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
         def _guarded():
             if not _thread_semaphore.acquire(blocking=True, timeout=30):
                 log.warning(f"[{request_id}] Thread pool timed out -- deferring {self.path}")
+                mark_failed(queue_id, "thread pool timeout")
                 return
             with _active_thread_count_lock:
                 global _active_thread_count
@@ -582,6 +606,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
             return
 
         commit = sanitize_text(payload.get("revision", ""), 64)
+        branch = sanitize_text(payload.get("branch", {}).get("name", ""), 128) or "main"
         pipeline = None
         if commit:
             tracker = get_tracker()
@@ -607,11 +632,11 @@ class WebhookHandler(BaseHTTPRequestHandler):
         log.info(f"=== SonarQube fix attempt (round {attempt}) [{phase}] ===")
 
         prompt = _build_sonar_prompt(phase, project, failures_summary, attempt)
-        self._run_sonar_worktree_fix(prompt, commit, attempt, phase)
+        self._run_sonar_worktree_fix(prompt, commit, attempt, phase, branch)
 
-    def _run_sonar_worktree_fix(self, prompt, commit, attempt, phase):
+    def _run_sonar_worktree_fix(self, prompt, commit, attempt, phase, branch="main"):
         from .worktrees import setup_worktree, commit_and_push, cleanup_worktree
-        wt_path, wt_name = setup_worktree("main", commit or "HEAD")
+        wt_path, wt_name = setup_worktree(branch, commit or "HEAD")
         if not wt_path:
             log.error("Failed to create worktree for SonarQube fix")
             return
@@ -620,7 +645,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
             result = run_kiro(prompt, f"SonarQube fix (round {attempt}) [{phase}]", cwd=wt_path)
             success = result[0] if isinstance(result, tuple) else result
             if success:
-                commit_ok, _ = commit_and_push(wt_path, "main", "fix: resolve SonarQube failures (auto-fix)")
+                commit_ok, _ = commit_and_push(wt_path, branch, "fix: resolve SonarQube failures (auto-fix)")
                 if commit_ok:
                     log.info(f"SonarQube fix (round {attempt}) [{phase}] succeeded")
                 else:
@@ -730,9 +755,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
         pipeline_report = sanitize_text(payload.get("pipeline_report", ""))
         sonar_report = sanitize_text(payload.get("sonar_report", ""))
         run_url = validate_url(payload.get("run_url", ""))
+        branch = sanitize_text(payload.get("branch", ""), 128) or "main"
 
         job_results = _parse_job_results(pipeline_report)
-        commit = _extract_commit_from_report(pipeline_report)
+        commit = sanitize_text(payload.get("commit", ""), 64) or _extract_commit_from_report(pipeline_report)
 
         log.info(
             f"CI improve webhook: focus={focus}, "
@@ -746,7 +772,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
         elif commit:
             pipeline = tracker.get_or_create(commit)
         else:
-            improve_pipeline(focus, pipeline_report, run_url, sonar_report)
+            improve_pipeline(focus, pipeline_report, run_url, sonar_report, branch=branch)
             return
 
         if self._ci_improve_deploy_success(pipeline, job_results, tracker, commit):
@@ -778,10 +804,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
             regression_jobs = _detect_regressions(failed_jobs, pipeline, tracker, commit)
             _dispatch_failed_job_fixes(
                 failed_jobs, regression_jobs, commit, run_url,
-                pipeline, sonar_report, sonar_result,
+                pipeline, sonar_report, sonar_result, branch,
             )
         else:
-            improve_pipeline(focus, pipeline_report, run_url, sonar_report)
+            improve_pipeline(focus, pipeline_report, run_url, sonar_report, commit=commit, branch=branch)
 
     @staticmethod
     def _ci_improve_deploy_success(pipeline, job_results, tracker, commit):
@@ -800,9 +826,25 @@ class WebhookHandler(BaseHTTPRequestHandler):
     def _handle_sonar_fix(self, payload):
         sonar_report = sanitize_text(payload.get("sonar_report", ""))
         run_url = validate_url(payload.get("run_url", ""))
+        commit = sanitize_text(payload.get("commit", ""), 64)
+        branch = sanitize_text(payload.get("branch", ""), 128) or "main"
 
-        log.info("SonarQube fix webhook received")
-        fix_sonar_issues(sonar_report, run_url)
+        log.info(f"SonarQube fix webhook received (commit={commit[:8] if commit else 'unknown'})")
+        fix_sonar_issues(sonar_report, run_url, branch=branch, commit=commit)
+
+    def _handle_ci_deprecations(self, payload):
+        deprecation_report = sanitize_text(payload.get("deprecation_report", ""))
+        run_url = validate_url(payload.get("run_url", ""))
+        commit = sanitize_text(payload.get("commit", ""), 64)
+        branch = sanitize_text(payload.get("branch", ""), 128)
+
+        log.info(f"CI deprecations webhook: commit={commit[:8]}, branch={branch}")
+
+        if not deprecation_report or "unavailable" in deprecation_report or "No deprecations" in deprecation_report:
+            log.info("No actionable deprecations found, skipping")
+            return
+
+        _process_deprecation_report(deprecation_report, run_url, commit, branch)
 
     def _reject_method(self):
         self._send(405, b"Method not allowed")
@@ -820,6 +862,7 @@ _REPLAY_HANDLERS = {
     "/ci-improve": "_handle_ci_improve",
     "/sonarqube": "_handle_sonarqube",
     "/sonar-fix": "_handle_sonar_fix",
+    "/ci-deprecations": "_handle_ci_deprecations",
 }
 
 

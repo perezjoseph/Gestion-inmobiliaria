@@ -1048,8 +1048,19 @@ def _fix_with_retry_legacy(job, step, error_log, context=None):
         attempt = 0
         _PHASE_QUICK_MAX = 3
         _PHASE_DEEP_MAX = 6
+        _MAX_LEGACY_ATTEMPTS = 10
         while True:
             attempt += 1
+            if attempt > _MAX_LEGACY_ATTEMPTS:
+                log.error(
+                    f"Max legacy retry attempts ({_MAX_LEGACY_ATTEMPTS}) exhausted "
+                    f"for {job}/{step}. Escalating."
+                )
+                _write_escalation(job, step, error_log, error_class, context,
+                                  extra_reason=f"exhausted {_MAX_LEGACY_ATTEMPTS} legacy retry attempts")
+                total_cycle_s = time.monotonic() - cycle_start
+                record_duration(job, total_cycle_s, False)
+                return False
             attempt_start = time.monotonic()
             timing = PhaseTiming()
 
@@ -1059,6 +1070,14 @@ def _fix_with_retry_legacy(job, step, error_log, context=None):
                 phase = "deep"
             else:
                 phase = "investigate"
+
+            if FIX_PIPELINE_TIMEOUT > 0 and (time.monotonic() - cycle_start) > FIX_PIPELINE_TIMEOUT:
+                log.error(
+                    f"Fix pipeline timeout ({FIX_PIPELINE_TIMEOUT}s) exceeded for {job}/{step} "
+                    f"after {time.monotonic() - cycle_start:.0f}s (attempt {attempt})"
+                )
+                _log_timing_summary(job, step, cycle_start, all_timings)
+                return False
 
             log.info(f"=== Attempt {attempt} [{phase}] for {job}/{step}{ctx_str} (class: {error_class}) ===")
 
@@ -1699,13 +1718,13 @@ def _fix_sonar_file_group(file_group_report, group_label, attempt=1, cwd=None):
     return success, group_label
 
 
-def fix_sonar_issues(sonar_report, run_url):
+def fix_sonar_issues(sonar_report, run_url, branch="main", commit=""):
     tracker = get_tracker()
-    commit = ""
     pipeline = None
-    result = wsl_bash("git rev-parse HEAD", timeout=10)
-    if result.returncode == 0:
-        commit = result.stdout.strip()
+    if not commit:
+        result = wsl_bash("git rev-parse HEAD", timeout=10)
+        if result.returncode == 0:
+            commit = result.stdout.strip()
     if commit:
         pipeline = tracker.get_or_create(commit)
         if pipeline.deployed:
@@ -1724,7 +1743,6 @@ def fix_sonar_issues(sonar_report, run_url):
         return False
 
     try:
-        branch = "main"
         wt_path, wt_name = setup_worktree(branch, commit or "HEAD")
         if not wt_path:
             log.error("Failed to create worktree for SonarQube fix")
@@ -1946,7 +1964,7 @@ def _build_trend_section():
     return "\n".join(lines) if len(lines) > 2 else ""
 
 
-def improve_pipeline(focus, pipeline_report, run_url, sonar_report="", commit=""):
+def improve_pipeline(focus, pipeline_report, run_url, sonar_report="", commit="", branch="main"):
     if not _improve_lock.acquire(blocking=False):
         log.warning("Another pipeline improvement is already running -- skipping")
         return False
@@ -1970,7 +1988,6 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report="", commit=""
                 )
                 return True
 
-        branch = "main"
         wt_path, wt_name = setup_worktree(branch, commit or "HEAD")
         if not wt_path:
             log.error("Failed to create worktree for pipeline improvement")
