@@ -55,9 +55,7 @@ impl AppConfig {
             .parse::<u16>()
             .map_err(|_| anyhow::anyhow!("SERVER_PORT debe ser un número válido"))?;
 
-        let cors_origin = std::env::var("CORS_ORIGIN")
-            .ok()
-            .filter(|s| !s.is_empty());
+        let cors_origin = std::env::var("CORS_ORIGIN").ok().filter(|s| !s.is_empty());
 
         let pool = Self::parse_pool_config()?;
 

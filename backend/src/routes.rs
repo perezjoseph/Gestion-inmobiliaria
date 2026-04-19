@@ -227,8 +227,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     ),
             )
             .service(
-                web::scope("/ocr")
-                    .route("/extract", web::post().to(handlers::ocr::ocr_extract)),
+                web::scope("/ocr").route("/extract", web::post().to(handlers::ocr::ocr_extract)),
             ),
     );
 }

@@ -34,6 +34,8 @@ spec:
         app.kubernetes.io/component: database
         app.kubernetes.io/part-of: sonarqube
     spec:
+      nodeSelector:
+        role: desktop
       securityContext:
         fsGroup: 999
       containers:

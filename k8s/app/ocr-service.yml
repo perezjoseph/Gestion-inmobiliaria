@@ -19,6 +19,12 @@ spec:
         app.kubernetes.io/component: ocr
         app.kubernetes.io/part-of: realestate
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: coreos
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
       containers:
         - name: ocr-service
           image: ghcr.io/perezjoseph/realestate-ocr-service:latest

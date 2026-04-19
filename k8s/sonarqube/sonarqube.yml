@@ -45,9 +45,8 @@ spec:
         app.kubernetes.io/component: server
         app.kubernetes.io/part-of: sonarqube
     spec:
-      # SonarQube requires vm.max_map_count >= 262144.
-      # Set on the k3s node: sudo sysctl -w vm.max_map_count=262144
-      # Persist: echo "vm.max_map_count=262144" | sudo tee /etc/sysctl.d/99-sonarqube.conf
+      nodeSelector:
+        role: desktop
       initContainers:
         - name: init-sysctl
           image: busybox:1.37
@@ -122,7 +121,7 @@ spec:
     - port: 9000
       targetPort: 9000
 ---
-# k3s Traefik IngressRoute for SonarQube
+# Access via: http://sonar.local
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -132,7 +131,7 @@ spec:
   entryPoints:
     - web
   routes:
-    - match: PathPrefix(`/`)
+    - match: Host(`sonar.local`)
       kind: Rule
       services:
         - name: sonarqube

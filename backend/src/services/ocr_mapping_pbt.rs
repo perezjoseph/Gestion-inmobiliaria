@@ -30,7 +30,10 @@ fn is_cedula_format(s: &str) -> bool {
 
 fn eleven_digits() -> impl Strategy<Value = String> {
     prop::collection::vec(0u8..10, 11).prop_map(|digits| {
-        digits.iter().map(|d| char::from(b'0' + d)).collect::<String>()
+        digits
+            .iter()
+            .map(|d| char::from(b'0' + d))
+            .collect::<String>()
     })
 }
 
@@ -45,7 +48,9 @@ fn eleven_digits_with_optional_dashes() -> impl Strategy<Value = String> {
 }
 
 fn non_empty_alpha_string() -> impl Strategy<Value = String> {
-    "[A-Za-z ]{1,30}".prop_map(|s| s.trim().to_string()).prop_filter("must be non-empty", |s| !s.is_empty())
+    "[A-Za-z ]{1,30}"
+        .prop_map(|s| s.trim().to_string())
+        .prop_filter("must be non-empty", |s| !s.is_empty())
 }
 
 // Feature: ocr-form-prefill, Property 6: map_cedula produces exactly the required fields
@@ -93,15 +98,12 @@ fn currency_prefix() -> impl Strategy<Value = String> {
 }
 
 fn monetary_amount() -> impl Strategy<Value = String> {
-    (1u32..999_999, 0u32..100).prop_map(|(whole, cents)| {
-        format!("{whole}.{cents:02}")
-    })
+    (1u32..999_999, 0u32..100).prop_map(|(whole, cents)| format!("{whole}.{cents:02}"))
 }
 
 fn dr_date() -> impl Strategy<Value = String> {
-    (1u32..=28, 1u32..=12, 2020u32..=2035).prop_map(|(day, month, year)| {
-        format!("{day:02}/{month:02}/{year}")
-    })
+    (1u32..=28, 1u32..=12, 2020u32..=2035)
+        .prop_map(|(day, month, year)| format!("{day:02}/{month:02}/{year}"))
 }
 
 // Feature: ocr-form-prefill, Property 7: map_contrato produces the required fields with graceful degradation
@@ -114,50 +116,52 @@ fn contrato_ocr_result_full() -> impl Strategy<Value = OcrResult> {
         monetary_amount(),
         0.5f64..1.0f64,
     )
-        .prop_map(|(monto, moneda, fecha_inicio, fecha_fin, deposito, confidence)| {
-            let monto_with_prefix = format!("{moneda}{monto}");
+        .prop_map(
+            |(monto, moneda, fecha_inicio, fecha_fin, deposito, confidence)| {
+                let monto_with_prefix = format!("{moneda}{monto}");
 
-            let mut structured_fields = HashMap::new();
-            structured_fields.insert("monto_mensual".to_string(), monto_with_prefix.clone());
-            structured_fields.insert("moneda".to_string(), moneda.clone());
-            structured_fields.insert("fecha_inicio".to_string(), fecha_inicio.clone());
-            structured_fields.insert("fecha_fin".to_string(), fecha_fin.clone());
-            structured_fields.insert("deposito".to_string(), deposito.clone());
+                let mut structured_fields = HashMap::new();
+                structured_fields.insert("monto_mensual".to_string(), monto_with_prefix.clone());
+                structured_fields.insert("moneda".to_string(), moneda.clone());
+                structured_fields.insert("fecha_inicio".to_string(), fecha_inicio.clone());
+                structured_fields.insert("fecha_fin".to_string(), fecha_fin.clone());
+                structured_fields.insert("deposito".to_string(), deposito.clone());
 
-            let lines = vec![
-                OcrLine {
-                    text: monto_with_prefix,
-                    confidence,
-                    bbox: vec![0.0, 0.0, 100.0, 20.0],
-                },
-                OcrLine {
-                    text: moneda,
-                    confidence,
-                    bbox: vec![0.0, 20.0, 100.0, 40.0],
-                },
-                OcrLine {
-                    text: fecha_inicio,
-                    confidence,
-                    bbox: vec![0.0, 40.0, 100.0, 60.0],
-                },
-                OcrLine {
-                    text: fecha_fin,
-                    confidence,
-                    bbox: vec![0.0, 60.0, 100.0, 80.0],
-                },
-                OcrLine {
-                    text: deposito,
-                    confidence,
-                    bbox: vec![0.0, 80.0, 100.0, 100.0],
-                },
-            ];
+                let lines = vec![
+                    OcrLine {
+                        text: monto_with_prefix,
+                        confidence,
+                        bbox: vec![0.0, 0.0, 100.0, 20.0],
+                    },
+                    OcrLine {
+                        text: moneda,
+                        confidence,
+                        bbox: vec![0.0, 20.0, 100.0, 40.0],
+                    },
+                    OcrLine {
+                        text: fecha_inicio,
+                        confidence,
+                        bbox: vec![0.0, 40.0, 100.0, 60.0],
+                    },
+                    OcrLine {
+                        text: fecha_fin,
+                        confidence,
+                        bbox: vec![0.0, 60.0, 100.0, 80.0],
+                    },
+                    OcrLine {
+                        text: deposito,
+                        confidence,
+                        bbox: vec![0.0, 80.0, 100.0, 100.0],
+                    },
+                ];
 
-            OcrResult {
-                document_type: "contrato".to_string(),
-                lines,
-                structured_fields,
-            }
-        })
+                OcrResult {
+                    document_type: "contrato".to_string(),
+                    lines,
+                    structured_fields,
+                }
+            },
+        )
 }
 
 fn contrato_ocr_result_without_monto() -> impl Strategy<Value = OcrResult> {
@@ -218,7 +222,15 @@ fn confidence_cedula_ocr_result() -> impl Strategy<Value = (OcrResult, HashMap<S
         prop::collection::vec(0.0f64..=1.0f64, 0..=3),
     )
         .prop_map(
-            |(cedula, nombre, apellido, cedula_confs, nombre_confs, apellido_confs, noise_confs)| {
+            |(
+                cedula,
+                nombre,
+                apellido,
+                cedula_confs,
+                nombre_confs,
+                apellido_confs,
+                noise_confs,
+            )| {
                 let mut structured_fields = HashMap::new();
                 structured_fields.insert("cedula".to_string(), cedula.clone());
                 structured_fields.insert("nombre".to_string(), nombre.clone());
