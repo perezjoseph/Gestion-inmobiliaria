@@ -9,8 +9,6 @@ spec:
     spec:
       repository: perezjoseph/Gestion-inmobiliaria
       labels:
-        - arc-runner
-        - arc-runner-dind
         - arc-deploy
       nodeSelector:
         role: server

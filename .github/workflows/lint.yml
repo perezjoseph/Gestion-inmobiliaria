@@ -61,7 +61,7 @@ jobs:
       - name: Clippy backend
         id: clippy_backend
         if: always() && steps.rust-setup.outcome == 'success'
-        timeout-minutes: 15
+        timeout-minutes: 20
         run: |
           umask 077
           set +e

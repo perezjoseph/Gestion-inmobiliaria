@@ -27,6 +27,8 @@ spec:
           subPath: git
         - name: sccache
           mountPath: /home/runner/.sccache
+        - name: cargo-target
+          mountPath: /home/runner/_work/_target
       volumes:
         - name: cargo-cache
           hostPath:
@@ -35,6 +37,10 @@ spec:
         - name: sccache
           hostPath:
             path: /opt/sccache
+            type: DirectoryOrCreate
+        - name: cargo-target
+          hostPath:
+            path: /opt/cargo-target
             type: DirectoryOrCreate
 ---
 apiVersion: actions.summerwind.dev/v1alpha1

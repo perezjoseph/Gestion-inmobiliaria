@@ -48,6 +48,12 @@ runs:
         echo "CARGO_HOME=$HOME/.cargo" >> "$GITHUB_ENV"
         echo "RUSTUP_HOME=$HOME/.rustup" >> "$GITHUB_ENV"
 
+        # Use a persistent target dir when the hostPath mount is available
+        if [ -d "/home/runner/_work/_target" ] && [ -w "/home/runner/_work/_target" ]; then
+          echo "CARGO_TARGET_DIR=/home/runner/_work/_target" >> "$GITHUB_ENV"
+          echo "Using persistent CARGO_TARGET_DIR=/home/runner/_work/_target"
+        fi
+
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       with:
