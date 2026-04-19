@@ -1,134 +1,5 @@
 {
   "pipelines": {
-    "674ad1cba006": {
-      "lineage_id": "674ad1cba006",
-      "current_commit": "674ad1cba0065302e7c9c8339710b4ef843bd097",
-      "round_number": 1,
-      "job_states": {
-        "deploy": "fixing"
-      },
-      "deployed": false,
-      "sonarqube_passed": false,
-      "budget_total": 10,
-      "budget_remaining": 10,
-      "files_changed": {},
-      "pending_strategies": {},
-      "quality_snapshots": {},
-      "last_run_url": "",
-      "created_at": "2026-04-17T21:04:45.502475",
-      "last_updated": "2026-04-17T21:07:03.918884"
-    },
-    "5f0dedda2965": {
-      "lineage_id": "5f0dedda2965",
-      "current_commit": "5f0dedda2965939c12a14117a762ed219cf6d0be",
-      "round_number": 1,
-      "job_states": {
-        "test-backend": "failed"
-      },
-      "deployed": false,
-      "sonarqube_passed": false,
-      "budget_total": 10,
-      "budget_remaining": 10,
-      "files_changed": {},
-      "pending_strategies": {},
-      "quality_snapshots": {},
-      "last_run_url": "",
-      "created_at": "2026-04-17T21:49:12.340040",
-      "last_updated": "2026-04-17T22:27:09.010858"
-    },
-    "a2c7326f2cc5": {
-      "lineage_id": "a2c7326f2cc5",
-      "current_commit": "a2c7326f2cc5e765f24cf8aaaac5a222b9fd9f0b",
-      "round_number": 1,
-      "job_states": {
-        "test-backend": "failed"
-      },
-      "deployed": false,
-      "sonarqube_passed": false,
-      "budget_total": 10,
-      "budget_remaining": 10,
-      "files_changed": {},
-      "pending_strategies": {},
-      "quality_snapshots": {},
-      "last_run_url": "",
-      "created_at": "2026-04-17T22:43:53.786357",
-      "last_updated": "2026-04-17T23:12:14.186157"
-    },
-    "e26b44f104ad": {
-      "lineage_id": "e26b44f104ad",
-      "current_commit": "e26b44f104ad479207c205b2ec1f2918c400b5ca",
-      "round_number": 1,
-      "job_states": {
-        "test-backend": "fixing"
-      },
-      "deployed": false,
-      "sonarqube_passed": false,
-      "budget_total": 10,
-      "budget_remaining": 10,
-      "files_changed": {},
-      "pending_strategies": {},
-      "quality_snapshots": {},
-      "last_run_url": "",
-      "created_at": "2026-04-17T23:05:41.932116",
-      "last_updated": "2026-04-17T23:12:20.020176"
-    },
-    "fb1ec234784d": {
-      "lineage_id": "fb1ec234784d",
-      "current_commit": "fb1ec234784d940ae28596b3c9604a9bb40d1d65",
-      "round_number": 1,
-      "job_states": {
-        "container-image-frontend": "failed",
-        "container-image-backend": "fixing"
-      },
-      "deployed": false,
-      "sonarqube_passed": false,
-      "budget_total": 10,
-      "budget_remaining": 10,
-      "files_changed": {},
-      "pending_strategies": {},
-      "quality_snapshots": {},
-      "last_run_url": "",
-      "created_at": "2026-04-18T01:57:25.296342",
-      "last_updated": "2026-04-18T01:59:43.664884"
-    },
-    "37b26d1c2ac8": {
-      "lineage_id": "37b26d1c2ac8",
-      "current_commit": "37b26d1c2ac827f0e622185ef31184e143f585c7",
-      "round_number": 1,
-      "job_states": {
-        "lint": "failed",
-        "test-backend": "failed"
-      },
-      "deployed": false,
-      "sonarqube_passed": false,
-      "budget_total": 10,
-      "budget_remaining": 10,
-      "files_changed": {},
-      "pending_strategies": {},
-      "quality_snapshots": {},
-      "last_run_url": "",
-      "created_at": "2026-04-18T12:22:38.644222",
-      "last_updated": "2026-04-18T12:31:57.760510"
-    },
-    "76cf914a7688": {
-      "lineage_id": "76cf914a7688",
-      "current_commit": "76cf914a7688be467b652e03ff4a7792d4538826",
-      "round_number": 1,
-      "job_states": {
-        "lint": "fixing",
-        "test-backend": "fixing"
-      },
-      "deployed": false,
-      "sonarqube_passed": false,
-      "budget_total": 10,
-      "budget_remaining": 10,
-      "files_changed": {},
-      "pending_strategies": {},
-      "quality_snapshots": {},
-      "last_run_url": "",
-      "created_at": "2026-04-18T12:27:34.309536",
-      "last_updated": "2026-04-18T13:17:22.401942"
-    },
     "2eaa7de293df": {
       "lineage_id": "2eaa7de293df",
       "current_commit": "2eaa7de293df71216c6ba8278a1898ed22d09150",
@@ -147,24 +18,6 @@
       "last_run_url": "",
       "created_at": "2026-04-18T13:55:41.538445",
       "last_updated": "2026-04-18T15:11:50.623251"
-    },
-    "9fe16d2345cc": {
-      "lineage_id": "9fe16d2345cc",
-      "current_commit": "9fe16d2345cc5b085e86b1c5b23aac25b77ee0e1",
-      "round_number": 1,
-      "job_states": {
-        "test-backend": "failed"
-      },
-      "deployed": false,
-      "sonarqube_passed": false,
-      "budget_total": 10,
-      "budget_remaining": 10,
-      "files_changed": {},
-      "pending_strategies": {},
-      "quality_snapshots": {},
-      "last_run_url": "",
-      "created_at": "2026-04-18T14:14:47.204463",
-      "last_updated": "2026-04-18T14:14:49.494696"
     },
     "6964f14625c5": {
       "lineage_id": "6964f14625c5",
@@ -221,6 +74,24 @@
       "last_run_url": "",
       "created_at": "2026-04-18T23:59:44.689228",
       "last_updated": "2026-04-19T00:08:55.237974"
+    },
+    "2f9cb669609a": {
+      "lineage_id": "2f9cb669609a",
+      "current_commit": "2f9cb669609a6153658ab2376384348ae90d3d4f",
+      "round_number": 1,
+      "job_states": {
+        "test-backend": "fixing"
+      },
+      "deployed": false,
+      "sonarqube_passed": false,
+      "budget_total": 10,
+      "budget_remaining": 10,
+      "files_changed": {},
+      "pending_strategies": {},
+      "quality_snapshots": {},
+      "last_run_url": "",
+      "created_at": "2026-04-19T14:23:59.503241",
+      "last_updated": "2026-04-19T14:44:07.103140"
     }
   }
 }

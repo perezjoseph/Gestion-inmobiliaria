@@ -166,7 +166,7 @@ jobs:
         run: |
           SONAR_URL="${SONAR_HOST_URL}"
           TOKEN="${{ secrets.SONAR_TOKEN }}"
-          PROJECT_KEY="gestion-inmobiliaria"
+          PROJECT_KEY="Gestion-inmobiliaria"
 
           if [ -z "$TOKEN" ]; then
             ADMIN_PASS="${{ secrets.SONAR_ADMIN_PASSWORD }}"

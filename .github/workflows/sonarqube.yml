@@ -226,7 +226,7 @@ jobs:
           fi
 
           curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
-            "$SONAR_URL/api/projects/create?name=Gestion+Inmobiliaria&project=gestion-inmobiliaria" \
+            "$SONAR_URL/api/projects/create?name=Gestion+Inmobiliaria&project=Gestion-inmobiliaria" \
             2>/dev/null || echo "Project already exists."
 
           DEFAULT_QG=$(curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" \
@@ -235,7 +235,7 @@ jobs:
           if [ -z "$DEFAULT_QG" ]; then DEFAULT_QG="Sonar way"; fi
           if [ -n "$DEFAULT_QG" ]; then
             curl -sf --connect-timeout 10 --max-time 30 -u "admin:${ADMIN_PASS}" -X POST \
-              "$SONAR_URL/api/qualitygates/select?projectKey=gestion-inmobiliaria&gateName=$(echo "$DEFAULT_QG" | jq -sRr @uri)" \
+              "$SONAR_URL/api/qualitygates/select?projectKey=Gestion-inmobiliaria&gateName=$(echo "$DEFAULT_QG" | jq -sRr @uri)" \
               2>/dev/null || echo "Quality gate already assigned."
           fi
 
@@ -407,7 +407,7 @@ jobs:
           if [ "$GATE_STATUS" = "UNKNOWN" ]; then
             for i in $(seq 1 30); do
               GATE=$(curl -sf --connect-timeout 10 --max-time 30 -u "$SONAR_TOKEN:" \
-                "$SONAR_URL/api/qualitygates/project_status?projectKey=gestion-inmobiliaria" 2>/dev/null || echo '{}')
+                "$SONAR_URL/api/qualitygates/project_status?projectKey=Gestion-inmobiliaria" 2>/dev/null || echo '{}')
               GATE_STATUS=$(echo "$GATE" | jq -r '.projectStatus.status // "UNKNOWN"')
               if [ "$GATE_STATUS" != "UNKNOWN" ] && [ "$GATE_STATUS" != "NONE" ]; then
                 break
@@ -428,7 +428,7 @@ jobs:
           echo "Final quality gate status: $GATE_STATUS"
 
           ISSUES=$(curl -sf --connect-timeout 10 --max-time 30 -u "$SONAR_TOKEN:" \
-            "$SONAR_URL/api/issues/search?projectKeys=gestion-inmobiliaria&resolved=false&ps=50&s=SEVERITY&asc=false" 2>/dev/null || echo '{}')
+            "$SONAR_URL/api/issues/search?projectKeys=Gestion-inmobiliaria&resolved=false&ps=50&s=SEVERITY&asc=false" 2>/dev/null || echo '{}')
           TOTAL=$(echo "$ISSUES" | jq -r '.total // 0')
           SUMMARY=$(echo "$ISSUES" | jq -r '
             [.issues // [] | group_by(.severity) | .[] |
@@ -436,7 +436,7 @@ jobs:
             map("\(.count) \(.severity)") | join(", ")' 2>/dev/null || echo "Could not parse issues")
 
           MEASURES=$(curl -sf --connect-timeout 10 --max-time 30 -u "$SONAR_TOKEN:" \
-            "$SONAR_URL/api/measures/component?component=gestion-inmobiliaria&metricKeys=coverage,lines_to_cover,uncovered_lines,duplicated_lines_density,ncloc" 2>/dev/null || echo '{}')
+            "$SONAR_URL/api/measures/component?component=Gestion-inmobiliaria&metricKeys=coverage,lines_to_cover,uncovered_lines,duplicated_lines_density,ncloc" 2>/dev/null || echo '{}')
           COVERAGE=$(echo "$MEASURES" | jq -r '.component.measures[]? | select(.metric=="coverage") | .value // "N/A"' 2>/dev/null || echo "N/A")
           NCLOC=$(echo "$MEASURES" | jq -r '.component.measures[]? | select(.metric=="ncloc") | .value // "N/A"' 2>/dev/null || echo "N/A")
           DUPLICATION=$(echo "$MEASURES" | jq -r '.component.measures[]? | select(.metric=="duplicated_lines_density") | .value // "N/A"' 2>/dev/null || echo "N/A")
@@ -454,7 +454,7 @@ jobs:
             if [ "$DUPLICATION" != "N/A" ]; then
               echo "- Duplication: **${DUPLICATION}%**"
             fi
-            echo "- [View Dashboard](${SONAR_HOST_URL}/dashboard?id=gestion-inmobiliaria)"
+            echo "- [View Dashboard](${SONAR_HOST_URL}/dashboard?id=Gestion-inmobiliaria)"
             if [ "$GATE_STATUS" = "ERROR" ]; then
               echo ""
               echo "### Top Issues"

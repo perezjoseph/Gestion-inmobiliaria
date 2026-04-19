@@ -17,6 +17,21 @@ _worktree_usage_locks: dict[str, threading.Lock] = {}
 _SAFE_BRANCH_RE = re.compile(r"[^a-zA-Z0-9_\-]")
 
 
+def _retry_wsl_bash(cmd: str, *, timeout: int, max_attempts: int,
+                     label: str) -> subprocess.CompletedProcess | None:
+    """Run a wsl_bash command with retries on timeout. Return None if all attempts fail."""
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return wsl_bash(cmd, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            if attempt < max_attempts:
+                log.warning(f"Timeout {label} (attempt {attempt}/{max_attempts}, retrying in 5s)")
+                time.sleep(5)
+            else:
+                log.error(f"Timeout {label} after {max_attempts} attempts")
+    return None
+
+
 def _sanitize_branch_name(branch: str) -> str:
     return _SAFE_BRANCH_RE.sub("-", branch)[:64]
 
@@ -146,23 +161,24 @@ def setup_worktree(branch: str, commit: str) -> tuple[str, str]:
             return reused
         _enforce_max_count()
 
-    log.info(f"Creating worktree: {name} for branch={branch} commit={commit[:12]}")
+    log.info(f"Creating worktree: {name} for branch={branch} commit={commit[:12] if len(commit) > 12 else commit}")
 
     fetch_ref, checkout_ref, is_pr_ref = _resolve_fetch_refs(branch)
 
-    try:
-        wsl_bash(f"git fetch origin {fetch_ref} --no-tags", timeout=60)
-    except subprocess.TimeoutExpired:
-        log.error(f"Timeout fetching {fetch_ref} for worktree {name}")
+    result = _retry_wsl_bash(
+        f"git fetch origin {fetch_ref} --no-tags",
+        timeout=60, max_attempts=3,
+        label=f"fetching {fetch_ref} for worktree {name}",
+    )
+    if result is None:
         return "", ""
 
-    try:
-        result = wsl_bash(
-            f"git worktree add '{wsl_path}' '{checkout_ref}'",
-            timeout=60,
-        )
-    except subprocess.TimeoutExpired:
-        log.error(f"Timeout creating worktree {name}")
+    result = _retry_wsl_bash(
+        f"git worktree add '{wsl_path}' '{checkout_ref}'",
+        timeout=60, max_attempts=2,
+        label=f"creating worktree {name}",
+    )
+    if result is None:
         return "", ""
 
     try:

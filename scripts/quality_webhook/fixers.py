@@ -1946,7 +1946,7 @@ def _build_trend_section():
     return "\n".join(lines) if len(lines) > 2 else ""
 
 
-def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
+def improve_pipeline(focus, pipeline_report, run_url, sonar_report="", commit=""):
     if not _improve_lock.acquire(blocking=False):
         log.warning("Another pipeline improvement is already running -- skipping")
         return False
@@ -1971,7 +1971,7 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report=""):
                 return True
 
         branch = "main"
-        wt_path, wt_name = setup_worktree(branch, "HEAD")
+        wt_path, wt_name = setup_worktree(branch, commit or "HEAD")
         if not wt_path:
             log.error("Failed to create worktree for pipeline improvement")
             return False
