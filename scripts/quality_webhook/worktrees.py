@@ -35,6 +35,101 @@ def _wsl_worktree_path(name: str) -> str:
     return to_wsl_path(_win_worktree_path(name))
 
 
+def _resolve_fetch_refs(branch: str) -> tuple[str, str, bool]:
+    """Return (fetch_ref, checkout_ref, is_pr_ref) for the given branch."""
+    is_pr_ref = "/" in branch and branch.split("/")[0].isdigit()
+    if not is_pr_ref:
+        return branch, f"origin/{branch}", False
+    pr_number = branch.split("/")[0]
+    return f"pull/{pr_number}/head:pr-{pr_number}", f"pr-{pr_number}", True
+
+
+def _try_reuse_worktree(
+    name: str, wsl_path: str, branch: str,
+) -> tuple[str, str] | None:
+    """If the worktree already exists and is free, refresh and return it."""
+    if name not in _active_worktrees:
+        return None
+    usage_lock = _worktree_usage_locks.get(name)
+    if usage_lock and usage_lock.locked():
+        log.warning(f"Worktree {name} is in use by another fix, creating fresh")
+        return None
+    log.info(f"Reusing existing worktree: {name}")
+    _pull_in_worktree(wsl_path, branch)
+    _worktree_usage_locks.setdefault(name, threading.Lock())
+    return wsl_path, name
+
+
+def _recover_stale_path(wsl_path: str, name: str, checkout_ref: str) -> subprocess.CompletedProcess:
+    """Remove a stale worktree path and retry the add."""
+    log.info(f"Stale worktree path exists, removing and retrying: {name}")
+    wsl_bash(f"git worktree remove --force '{wsl_path}'", timeout=30)
+    wsl_bash(f"rm -rf '{wsl_path}'", timeout=15)
+    return wsl_bash(f"git worktree add '{wsl_path}' '{checkout_ref}'", timeout=60)
+
+
+def _add_detached_worktree(
+    wsl_path: str, branch: str, commit: str,
+    checkout_ref: str, is_pr_ref: bool,
+) -> subprocess.CompletedProcess | None:
+    """Create a detached-HEAD worktree and optionally reassign the branch.
+
+    Returns the final result, or None on failure.
+    """
+    log.info(f"Branch '{branch}' already checked out, using detached HEAD")
+    target = commit if commit and commit != "HEAD" else checkout_ref
+    result = wsl_bash(f"git worktree add --detach '{wsl_path}' '{target}'", timeout=60)
+    if result.returncode != 0:
+        log.error(f"Failed to create detached worktree: {result.stderr}")
+        return None
+
+    if not is_pr_ref:
+        checkout_result = wsl_bash(
+            f"git -C '{wsl_path}' checkout -B '{branch}' 'origin/{branch}'",
+            timeout=30,
+        )
+        if checkout_result.returncode != 0:
+            log.warning(
+                f"Could not reassign branch in worktree, "
+                f"will push from detached HEAD: {checkout_result.stderr}"
+            )
+    return result
+
+
+def _handle_worktree_add_failure(
+    result: subprocess.CompletedProcess,
+    wsl_path: str, name: str, branch: str, commit: str,
+    checkout_ref: str, is_pr_ref: bool,
+) -> tuple[str, str] | None:
+    """Attempt recovery when ``git worktree add`` fails.
+
+    Returns (wsl_path, name) on success, ("", "") on unrecoverable failure,
+    or None when the initial add actually succeeded (returncode == 0).
+    """
+    if result.returncode == 0:
+        return None
+
+    stderr = result.stderr or ""
+
+    if "already exists" in stderr:
+        result = _recover_stale_path(wsl_path, name, checkout_ref)
+        stderr = result.stderr or ""
+
+    if result.returncode == 0:
+        return None
+
+    if "already checked out" in stderr or "is already used by" in stderr:
+        detach_result = _add_detached_worktree(
+            wsl_path, branch, commit, checkout_ref, is_pr_ref,
+        )
+        if detach_result is None:
+            return "", ""
+        return None
+
+    log.error(f"Failed to create worktree: {stderr}")
+    return "", ""
+
+
 def setup_worktree(branch: str, commit: str) -> tuple[str, str]:
     """Create an ephemeral worktree for the given branch/commit.
 
@@ -44,31 +139,16 @@ def setup_worktree(branch: str, commit: str) -> tuple[str, str]:
     """
     name = _worktree_name(branch, commit)
     wsl_path = _wsl_worktree_path(name)
-    win_path = _win_worktree_path(name)
 
     with _worktree_lock:
-        if name in _active_worktrees:
-            usage_lock = _worktree_usage_locks.get(name)
-            if usage_lock and usage_lock.locked():
-                log.warning(f"Worktree {name} is in use by another fix, creating fresh")
-            else:
-                log.info(f"Reusing existing worktree: {name}")
-                _pull_in_worktree(wsl_path, branch)
-                if name not in _worktree_usage_locks:
-                    _worktree_usage_locks[name] = threading.Lock()
-                return wsl_path, name
-
+        reused = _try_reuse_worktree(name, wsl_path, branch)
+        if reused is not None:
+            return reused
         _enforce_max_count()
 
     log.info(f"Creating worktree: {name} for branch={branch} commit={commit[:12]}")
 
-    fetch_ref = branch
-    checkout_ref = f"origin/{branch}"
-    is_pr_ref = "/" in branch and branch.split("/")[0].isdigit()
-    if is_pr_ref:
-        pr_number = branch.split("/")[0]
-        fetch_ref = f"pull/{pr_number}/head:pr-{pr_number}"
-        checkout_ref = f"pr-{pr_number}"
+    fetch_ref, checkout_ref, is_pr_ref = _resolve_fetch_refs(branch)
 
     try:
         wsl_bash(f"git fetch origin {fetch_ref} --no-tags", timeout=60)
@@ -85,52 +165,19 @@ def setup_worktree(branch: str, commit: str) -> tuple[str, str]:
         log.error(f"Timeout creating worktree {name}")
         return "", ""
 
-    if result.returncode != 0:
-        stderr = result.stderr or ""
-        try:
-            if "already exists" in stderr:
-                log.info(f"Stale worktree path exists, removing and retrying: {name}")
-                wsl_bash(f"git worktree remove --force '{wsl_path}'", timeout=30)
-                wsl_bash(f"rm -rf '{wsl_path}'", timeout=15)
-                result = wsl_bash(
-                    f"git worktree add '{wsl_path}' '{checkout_ref}'",
-                    timeout=60,
-                )
-                if result.returncode != 0:
-                    stderr = result.stderr or ""
-
-            if result.returncode != 0 and ("already checked out" in stderr or "is already used by" in stderr):
-                log.info(f"Branch '{branch}' already checked out, using detached HEAD")
-                target = commit if commit and commit != "HEAD" else checkout_ref
-                result = wsl_bash(
-                    f"git worktree add --detach '{wsl_path}' '{target}'",
-                    timeout=60,
-                )
-                if result.returncode != 0:
-                    log.error(f"Failed to create detached worktree: {result.stderr}")
-                    return "", ""
-
-                if not is_pr_ref:
-                    checkout_result = wsl_bash(
-                        f"git -C '{wsl_path}' checkout -B '{branch}' 'origin/{branch}'",
-                        timeout=30,
-                    )
-                    if checkout_result.returncode != 0:
-                        log.warning(
-                            f"Could not reassign branch in worktree, "
-                            f"will push from detached HEAD: {checkout_result.stderr}"
-                        )
-            elif result.returncode != 0:
-                log.error(f"Failed to create worktree: {stderr}")
-                return "", ""
-        except subprocess.TimeoutExpired:
-            log.error(f"Timeout during worktree recovery for {name}")
-            return "", ""
+    try:
+        failure = _handle_worktree_add_failure(
+            result, wsl_path, name, branch, commit, checkout_ref, is_pr_ref,
+        )
+        if failure is not None:
+            return failure
+    except subprocess.TimeoutExpired:
+        log.error(f"Timeout during worktree recovery for {name}")
+        return "", ""
 
     with _worktree_lock:
         _active_worktrees[name] = time.monotonic()
-        if name not in _worktree_usage_locks:
-            _worktree_usage_locks[name] = threading.Lock()
+        _worktree_usage_locks.setdefault(name, threading.Lock())
 
     log.info(f"Worktree ready: {wsl_path}")
     return wsl_path, name
@@ -234,7 +281,7 @@ def prune_stale_worktrees() -> None:
     to_remove = []
 
     with _worktree_lock:
-        for name, created_at in list(_active_worktrees.items()):
+        for name, created_at in _active_worktrees.items():
             if now - created_at > max_age_s:
                 to_remove.append(name)
 
