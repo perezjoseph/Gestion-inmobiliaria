@@ -1,23 +1,5 @@
 {
   "pipelines": {
-    "8cfed65549c7": {
-      "lineage_id": "8cfed65549c7",
-      "current_commit": "8cfed65549c7d674082fea45794f6e7c79a651a6",
-      "round_number": 1,
-      "job_states": {
-        "container-image-frontend": "failed"
-      },
-      "deployed": false,
-      "sonarqube_passed": false,
-      "budget_total": 10,
-      "budget_remaining": 10,
-      "files_changed": {},
-      "pending_strategies": {},
-      "quality_snapshots": {},
-      "last_run_url": "",
-      "created_at": "2026-04-17T20:22:21.622966",
-      "last_updated": "2026-04-17T20:49:11.010909"
-    },
     "674ad1cba006": {
       "lineage_id": "674ad1cba006",
       "current_commit": "674ad1cba0065302e7c9c8339710b4ef843bd097",
@@ -201,6 +183,44 @@
       "last_run_url": "",
       "created_at": "2026-04-18T16:01:16.518209",
       "last_updated": "2026-04-18T16:04:54.371292"
+    },
+    "4a818e1af675": {
+      "lineage_id": "4a818e1af675",
+      "current_commit": "4a818e1af6752bb1304906fe64c917b5ec0a2e48",
+      "round_number": 1,
+      "job_states": {
+        "lint": "failed",
+        "test-frontend": "failed",
+        "test-backend": "failed"
+      },
+      "deployed": false,
+      "sonarqube_passed": false,
+      "budget_total": 10,
+      "budget_remaining": 10,
+      "files_changed": {},
+      "pending_strategies": {},
+      "quality_snapshots": {},
+      "last_run_url": "",
+      "created_at": "2026-04-18T20:57:39.914419",
+      "last_updated": "2026-04-18T21:30:01.011140"
+    },
+    "175a5b62e606": {
+      "lineage_id": "175a5b62e606",
+      "current_commit": "175a5b62e6066f637da5e71c2e61bd9f1d16d87a",
+      "round_number": 1,
+      "job_states": {
+        "lint": "fixing"
+      },
+      "deployed": false,
+      "sonarqube_passed": false,
+      "budget_total": 10,
+      "budget_remaining": 10,
+      "files_changed": {},
+      "pending_strategies": {},
+      "quality_snapshots": {},
+      "last_run_url": "",
+      "created_at": "2026-04-18T23:59:44.689228",
+      "last_updated": "2026-04-19T00:08:55.237974"
     }
   }
 }

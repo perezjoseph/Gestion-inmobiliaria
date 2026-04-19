@@ -50,7 +50,7 @@ permissions: {}
 jobs:
   sonarqube:
     name: SonarQube Code Quality & Coverage Analysis
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner-dind
     timeout-minutes: 20
     permissions:
       contents: read
@@ -68,14 +68,6 @@ jobs:
       - name: Record start time
         id: start
         run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
-
-      - name: Clean workspace
-        run: |
-          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
-            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
-            exit 1
-          fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository with full history for blame analysis
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -145,6 +137,29 @@ jobs:
         run: |
           umask 077
           ./gradlew detekt --no-daemon --stacktrace 2>/dev/null || true
+        continue-on-error: true
+
+      - name: Cache SonarQube packages
+        if: steps.setup-java.outcome == 'success'
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Run Android SonarQube Gradle analysis
+        id: android-sonar
+        if: steps.setup-java.outcome == 'success'
+        timeout-minutes: 15
+        working-directory: android
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PROJECT_KEY: "Gestion-inmobiliaria"
+          SONAR_PROJECT_NAME: "Gestion-inmobiliaria"
+        run: |
+          umask 077
+          ./gradlew sonar --no-daemon --stacktrace 2>/dev/null || true
         continue-on-error: true
 
       - name: Validate SONAR_HOST_URL format
@@ -282,9 +297,9 @@ jobs:
             --memory-swap 1g \
             --cpus 2 \
             --pids-limit 256 \
-            --tmpfs /tmp:rw,nosuid,nodev,size=256m \
-            --tmpfs /opt/sonar-scanner/.sonar:rw,nosuid,nodev,size=512m \
-            --tmpfs /home/scanner:rw,noexec,nosuid,nodev,size=64m \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m,uid=1000,gid=1000 \
+            --tmpfs /opt/sonar-scanner/.sonar:rw,nosuid,nodev,size=512m,uid=1000,gid=1000 \
+            --tmpfs /home/scanner:rw,noexec,nosuid,nodev,size=64m,uid=1000,gid=1000 \
             -e SONAR_TOKEN="${SONAR_ANALYSIS_TOKEN}" \
             -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
             -e HOME=/home/scanner \

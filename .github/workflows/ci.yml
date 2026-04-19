@@ -40,64 +40,11 @@ env:
   RUSTFLAGS: "-D warnings"
 
 jobs:
-  # ── Stage 0: Runner Disk Cleanup ──
-
-  runner-cleanup:
-    name: Runner Disk Cleanup
-    runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 5
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    permissions:
-      contents: read
-    steps:
-      - name: Free CI service ports
-        run: |
-          echo "Killing host-level processes on CI service ports..."
-          for PORT in 5432 5433; do
-            if command -v fuser &>/dev/null; then
-              fuser -k "${PORT}/tcp" 2>/dev/null || true
-            else
-              PID=$(ss -tlnp "sport = :${PORT}" 2>/dev/null | awk 'NR>1{match($0,/pid=([0-9]+)/,a); if(a[1]) print a[1]}' | head -1)
-              if [ -n "$PID" ]; then
-                echo "Port ${PORT} held by PID ${PID} -- killing"
-                kill -9 "$PID" 2>/dev/null || true
-              fi
-            fi
-          done
-
-          echo "Stopping stale CI docker containers..."
-          docker ps -q --filter "label=570b44" | xargs -r docker stop --time 5 2>/dev/null || true
-          docker ps -aq --filter "label=570b44" | xargs -r docker rm -f 2>/dev/null || true
-
-          echo "Stopping containers occupying CI service ports..."
-          for PORT in 5432 5433; do
-            CONTAINER_ID=$(docker ps -q --filter "publish=${PORT}" 2>/dev/null || true)
-            if [ -n "$CONTAINER_ID" ]; then
-              echo "Port ${PORT} occupied by container ${CONTAINER_ID} -- stopping"
-              docker stop --time 5 "$CONTAINER_ID" 2>/dev/null || true
-              docker rm -f "$CONTAINER_ID" 2>/dev/null || true
-            fi
-          done
-
-          echo "Pruning stopped CI service containers..."
-          docker container prune -f --filter "until=2h" 2>/dev/null || true
-
-          echo "Pruning dangling networks..."
-          docker network prune -f 2>/dev/null || true
-
-      - name: Check disk space
-        run: |
-          CHECK_PATH="/tmp"
-          AVAIL_KB=$(df -k "$CHECK_PATH" | awk 'NR==2 {print $4}')
-          AVAIL_MB=$((AVAIL_KB / 1024))
-          echo "Available disk space on $CHECK_PATH: ${AVAIL_MB}MB"
-          echo "Disk space OK (${AVAIL_MB}MB) -- self-hosted runner."
-
-  # ── Stage 0.5: Path-Based Change Detection ──
+  # ── Stage 0: Path-Based Change Detection ──
 
   changes:
     name: Detect Changes
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner
     timeout-minutes: 3
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -136,7 +83,7 @@ jobs:
 
   security:
     name: Security
-    needs: [runner-cleanup, changes]
+    needs: [changes]
     permissions:
       actions: read
       contents: read
@@ -152,7 +99,7 @@ jobs:
 
   lint:
     name: Lint
-    needs: [runner-cleanup, changes]
+    needs: [changes]
     if: >-
       github.event_name != 'pull_request' ||
       needs.changes.outputs.backend == 'true' ||
@@ -169,7 +116,7 @@ jobs:
 
   tests:
     name: Tests
-    needs: [runner-cleanup, changes]
+    needs: [changes]
     if: >-
       github.event_name != 'pull_request' ||
       needs.changes.outputs.backend == 'true' ||
@@ -238,14 +185,13 @@ jobs:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
       WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
 
-  # ── Stage 3: Container Images (after builds + security + tests pass, main only) ──
+  # ── Stage 3: Container Images (after builds + security + tests pass) ──
 
   containers:
     name: Containers
     needs: [build, security, tests]
     if: |
       always() &&
-      github.ref == 'refs/heads/main' && github.event_name == 'push' &&
       needs.build.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.tests.result == 'success'
@@ -256,6 +202,8 @@ jobs:
       id-token: write
       attestations: write
     uses: ./.github/workflows/containers.yml
+    with:
+      is-production: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
     secrets:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
       WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}

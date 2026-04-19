@@ -1,0 +1,36 @@
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: arc-runner
+  namespace: arc-systems
+spec:
+  template:
+    spec:
+      repository: perezjoseph/Gestion-inmobiliaria
+      labels:
+        - arc-runner
+      nodeSelector:
+        role: desktop
+      resources:
+        requests:
+          cpu: "1"
+          memory: 2Gi
+        limits:
+          cpu: "2"
+          memory: 4Gi
+---
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: HorizontalRunnerAutoscaler
+metadata:
+  name: arc-runner
+  namespace: arc-systems
+spec:
+  scaleTargetRef:
+    kind: RunnerDeployment
+    name: arc-runner
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: TotalNumberOfQueuedAndInProgressWorkflowRuns
+      repositoryNames:
+        - Gestion-inmobiliaria

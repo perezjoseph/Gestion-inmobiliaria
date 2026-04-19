@@ -2,6 +2,11 @@ name: Container Images
 
 on:
   workflow_call:
+    inputs:
+      is-production:
+        description: "Whether this is a production build (main push). Controls tagging and latest."
+        type: boolean
+        required: true
     secrets:
       WEBHOOK_SECRET:
         required: true
@@ -20,9 +25,8 @@ permissions: {}
 jobs:
   container-image-backend:
     name: Container Image (Backend)
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner-dind
     timeout-minutes: 45
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: read
       packages: write
@@ -34,16 +38,8 @@ jobs:
     env:
       DOCKER_CONTENT_TRUST: "1"
       IMAGE_OWNER: ${{ github.repository_owner }}
-      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_TAG: ${{ inputs.is-production && github.sha || format('preprod-{0}', github.sha) }}
     steps:
-      - name: Clean workspace
-        run: |
-          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
-            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
-            exit 1
-          fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -147,7 +143,7 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }}
-            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:latest
+            ${{ inputs.is-production && format('ghcr.io/{0}/realestate-backend:latest', github.repository_owner) || '' }}
           build-args: MODE=prebuilt
           cache-from: type=gha,scope=backend
 
@@ -198,9 +194,8 @@ jobs:
 
   container-image-frontend:
     name: Container Image (Frontend)
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner-dind
     timeout-minutes: 45
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: read
       packages: write
@@ -212,16 +207,8 @@ jobs:
     env:
       DOCKER_CONTENT_TRUST: "1"
       IMAGE_OWNER: ${{ github.repository_owner }}
-      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_TAG: ${{ inputs.is-production && github.sha || format('preprod-{0}', github.sha) }}
     steps:
-      - name: Clean workspace
-        run: |
-          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
-            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
-            exit 1
-          fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -323,7 +310,7 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }}
-            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:latest
+            ${{ inputs.is-production && format('ghcr.io/{0}/realestate-frontend:latest', github.repository_owner) || '' }}
           build-args: MODE=prebuilt
           cache-from: type=gha,scope=frontend
 
@@ -375,9 +362,8 @@ jobs:
 
   container-image-ocr-service:
     name: Container Image (OCR Service)
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner-dind
     timeout-minutes: 45
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: read
       packages: write
@@ -389,16 +375,8 @@ jobs:
     env:
       DOCKER_CONTENT_TRUST: "1"
       IMAGE_OWNER: ${{ github.repository_owner }}
-      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_TAG: ${{ inputs.is-production && github.sha || format('preprod-{0}', github.sha) }}
     steps:
-      - name: Clean workspace
-        run: |
-          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
-            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
-            exit 1
-          fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -489,7 +467,7 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service:${{ env.IMAGE_TAG }}
-            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service:latest
+            ${{ inputs.is-production && format('ghcr.io/{0}/realestate-ocr-service:latest', github.repository_owner) || '' }}
           cache-from: type=gha,scope=ocr-service
 
       - name: Attest build provenance

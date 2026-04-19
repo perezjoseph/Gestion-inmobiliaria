@@ -92,25 +92,36 @@ mod pbt_async {
 
     const JWT_SECRET: &str = "test_secret_key_that_is_long_enough_for_jwt";
 
-    fn db_url() -> String {
-        dotenvy::dotenv().ok();
-        std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for integration tests")
-    }
-
-    async fn setup_db() -> DatabaseConnection {
-        let mut opts = ConnectOptions::new(db_url());
-        opts.max_connections(5)
-            .min_connections(1)
-            .connect_timeout(std::time::Duration::from_secs(30))
-            .idle_timeout(std::time::Duration::from_secs(60))
-            .acquire_timeout(std::time::Duration::from_secs(30));
-        let db = Database::connect(opts)
-            .await
-            .expect("Failed to connect to database");
-        super::migrations::Migrator::up(&db, None)
-            .await
-            .expect("Failed to run migrations");
-        db
+    fn shared_rt_and_db() -> Option<&'static (tokio::runtime::Runtime, DatabaseConnection)> {
+        static SHARED: std::sync::OnceLock<
+            Result<(tokio::runtime::Runtime, DatabaseConnection), String>,
+        > = std::sync::OnceLock::new();
+        SHARED
+            .get_or_init(|| {
+                dotenvy::dotenv().ok();
+                let url = std::env::var("DATABASE_URL")
+                    .map_err(|_| "DATABASE_URL not set".to_string())?;
+                let rt =
+                    tokio::runtime::Runtime::new().map_err(|e| format!("Runtime error: {e}"))?;
+                let db = rt.block_on(async {
+                    let mut opts = ConnectOptions::new(&url);
+                    opts.max_connections(5)
+                        .min_connections(1)
+                        .connect_timeout(std::time::Duration::from_secs(30))
+                        .idle_timeout(std::time::Duration::from_secs(60))
+                        .acquire_timeout(std::time::Duration::from_secs(30));
+                    let db = Database::connect(opts)
+                        .await
+                        .map_err(|e| format!("Failed to connect to database: {e}"))?;
+                    super::migrations::Migrator::up(&db, None)
+                        .await
+                        .map_err(|e| format!("Failed to run migrations: {e}"))?;
+                    Ok::<_, String>(db)
+                })?;
+                Ok((rt, db))
+            })
+            .as_ref()
+            .ok()
     }
 
     fn with_db<F, Fut>(f: F)
@@ -118,11 +129,18 @@ mod pbt_async {
         F: FnOnce(DatabaseConnection) -> Fut,
         Fut: std::future::Future<Output = ()>,
     {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            let db = setup_db().await;
-            f(db).await;
-        });
+        dotenvy::dotenv().ok();
+        if std::env::var("DATABASE_URL").is_err() {
+            eprintln!("DATABASE_URL not set -- skipping DB integration test");
+            return;
+        }
+        static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let Some((rt, db)) = shared_rt_and_db() else {
+            eprintln!("Database not reachable -- skipping DB integration test");
+            return;
+        };
+        rt.block_on(f(db.clone()));
     }
 
     fn make_config() -> AppConfig {

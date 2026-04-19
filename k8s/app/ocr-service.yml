@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocr-service
+  namespace: realestate
+  labels:
+    app.kubernetes.io/name: ocr-service
+    app.kubernetes.io/component: ocr
+    app.kubernetes.io/part-of: realestate
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ocr-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ocr-service
+        app.kubernetes.io/component: ocr
+        app.kubernetes.io/part-of: realestate
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: coreos
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: ocr-service
+          image: ghcr.io/perezjoseph/realestate-ocr-service:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: PADDLE_PDX_CACHE_HOME
+              value: /app/.paddleocr
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ocr-service
+  namespace: realestate
+spec:
+  selector:
+    app.kubernetes.io/name: ocr-service
+  ports:
+    - port: 8000
+      targetPort: 8000

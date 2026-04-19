@@ -94,14 +94,10 @@ pub async fn ocr_extract(
         AppError::Validation("No se encontró archivo en la solicitud".to_string())
     })?;
 
-    let fname = filename
-        .as_deref()
-        .unwrap_or("upload.bin");
+    let fname = filename.as_deref().unwrap_or("upload.bin");
 
     let content_type = content_type_from_filename(fname).ok_or_else(|| {
-        AppError::Validation(
-            "Formato no soportado. Use archivos JPEG, PNG o PDF".to_string(),
-        )
+        AppError::Validation("Formato no soportado. Use archivos JPEG, PNG o PDF".to_string())
     })?;
 
     if !is_valid_content_type(content_type) {

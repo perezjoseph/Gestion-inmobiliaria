@@ -1,0 +1,16 @@
+# Pin Traefik to the coreos node so all ingress traffic stays local
+# and is reachable via coreos.local mDNS.
+# Apply: kubectl apply -f k8s/traefik-config.yml
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    nodeSelector:
+      kubernetes.io/hostname: coreos
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule

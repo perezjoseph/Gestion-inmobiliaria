@@ -19,9 +19,9 @@ fn field_confidence(result: &OcrResult, value: &str) -> f64 {
 pub fn map_deposito(result: &OcrResult) -> Result<ImportPreview, AppError> {
     let fields = &result.structured_fields;
 
-    let monto_raw = fields
-        .get("monto")
-        .ok_or_else(|| AppError::Validation("Campo 'monto' no detectado en el documento".to_string()))?;
+    let monto_raw = fields.get("monto").ok_or_else(|| {
+        AppError::Validation("Campo 'monto' no detectado en el documento".to_string())
+    })?;
 
     let moneda_raw = fields.get("moneda").map_or("", |s| s.as_str());
     let currency_input = if moneda_raw.is_empty() {
@@ -30,8 +30,7 @@ pub fn map_deposito(result: &OcrResult) -> Result<ImportPreview, AppError> {
         format!("{moneda_raw}{monto_raw}")
     };
 
-    let (amount, currency) =
-        parse_dr_currency(&currency_input).map_err(AppError::Validation)?;
+    let (amount, currency) = parse_dr_currency(&currency_input).map_err(AppError::Validation)?;
 
     let mut preview_fields = vec![
         PreviewField {
@@ -116,9 +115,9 @@ pub fn map_deposito(result: &OcrResult) -> Result<ImportPreview, AppError> {
 pub fn map_gasto(result: &OcrResult) -> Result<ImportPreview, AppError> {
     let fields = &result.structured_fields;
 
-    let monto_raw = fields
-        .get("monto")
-        .ok_or_else(|| AppError::Validation("Campo 'monto' no detectado en el documento".to_string()))?;
+    let monto_raw = fields.get("monto").ok_or_else(|| {
+        AppError::Validation("Campo 'monto' no detectado en el documento".to_string())
+    })?;
 
     let moneda_raw = fields.get("moneda").map_or("", |s| s.as_str());
     let currency_input = if moneda_raw.is_empty() {
@@ -127,8 +126,7 @@ pub fn map_gasto(result: &OcrResult) -> Result<ImportPreview, AppError> {
         format!("{moneda_raw}{monto_raw}")
     };
 
-    let (amount, currency) =
-        parse_dr_currency(&currency_input).map_err(AppError::Validation)?;
+    let (amount, currency) = parse_dr_currency(&currency_input).map_err(AppError::Validation)?;
 
     let mut preview_fields = vec![
         PreviewField {

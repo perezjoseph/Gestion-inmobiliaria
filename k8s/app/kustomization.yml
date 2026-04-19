@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: realestate
+
+resources:
+  - postgres.yml
+  - ocr-service.yml
+  - backend.yml
+  - frontend.yml
+  - ingress.yml
+
+# Image tags are overridden by the CI/CD pipeline via:
+#   kubectl set image deployment/backend backend=ghcr.io/perezjoseph/realestate-backend@<digest>
+# or via kustomize edit set image.
+images:
+  - name: ghcr.io/perezjoseph/realestate-backend
+    newTag: latest
+  - name: ghcr.io/perezjoseph/realestate-frontend
+    newTag: latest
+  - name: ghcr.io/perezjoseph/realestate-ocr-service
+    newTag: latest

@@ -1,0 +1,113 @@
+# Pure mDNS responder that publishes sonar.local and gestion.local
+# as A records pointing to the host IP. No Avahi daemon required.
+# Uses zeroconf Python library for raw multicast DNS.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: mdns-publisher
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: mdns-publisher
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mdns-publisher
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mdns-publisher
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: coreos
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: mdns
+          image: python:3.12-slim
+          command: ["python3", "-u", "/app/publish.py"]
+          volumeMounts:
+            - name: script
+              mountPath: /app
+              readOnly: true
+          resources:
+            requests:
+              cpu: 5m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+      volumes:
+        - name: script
+          configMap:
+            name: mdns-publisher-script
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mdns-publisher-script
+  namespace: kube-system
+data:
+  publish.py: |
+    """Publish additional .local mDNS A records using zeroconf."""
+    import subprocess, socket, signal, sys, time
+
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", "zeroconf==0.146.1"])
+
+    from zeroconf import Zeroconf, ServiceInfo
+
+    NAMES = ["sonar.local.", "gestion.local."]
+
+    def get_host_ip():
+        """Get the primary LAN IP address."""
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("192.168.88.1", 80))
+            return s.getsockname()[0]
+        except Exception:
+            return "192.168.88.112"
+        finally:
+            s.close()
+
+    def main():
+        ip = get_host_ip()
+        ip_bytes = socket.inet_aton(ip)
+        print(f"Publishing mDNS records for IP {ip}")
+
+        zc = Zeroconf()
+        infos = []
+
+        for name in NAMES:
+            short = name.rstrip(".")
+            info = ServiceInfo(
+                type_="_http._tcp.local.",
+                name=f"{short}._http._tcp.local.",
+                addresses=[ip_bytes],
+                port=80,
+                server=name,
+            )
+            zc.register_service(info)
+            infos.append(info)
+            print(f"  Registered: {short} -> {ip}")
+
+        def shutdown(sig, frame):
+            print("Shutting down mDNS publisher...")
+            for info in infos:
+                zc.unregister_service(info)
+            zc.close()
+            sys.exit(0)
+
+        signal.signal(signal.SIGTERM, shutdown)
+        signal.signal(signal.SIGINT, shutdown)
+
+        print("mDNS publisher running. Press Ctrl+C to stop.")
+        while True:
+            time.sleep(60)
+
+    if __name__ == "__main__":
+        main()
