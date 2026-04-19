@@ -25,7 +25,7 @@ async fn shared_db() -> Option<&'static DatabaseConnection> {
                 Err(_) => return Err("DATABASE_URL not set".to_string()),
             };
             let mut opts = ConnectOptions::new(&url);
-            opts.max_connections(5)
+            opts.max_connections(20)
                 .min_connections(1)
                 .connect_timeout(std::time::Duration::from_secs(30))
                 .idle_timeout(std::time::Duration::from_secs(60))
@@ -852,7 +852,7 @@ async fn test_auditoria_entries() {
 
     let req = test::TestRequest::get()
         .uri(&format!(
-            "/api/v1/auditoria?entity_type=solicitud_mantenimiento&entity_id={solicitud_id}"
+            "/api/v1/auditoria?entityType=solicitud_mantenimiento&entityId={solicitud_id}"
         ))
         .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
@@ -888,7 +888,7 @@ async fn test_auditoria_entries() {
 
     let req = test::TestRequest::get()
         .uri(&format!(
-            "/api/v1/auditoria?entity_type=solicitud_mantenimiento&entity_id={solicitud_id}"
+            "/api/v1/auditoria?entityType=solicitud_mantenimiento&entityId={solicitud_id}"
         ))
         .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
@@ -908,7 +908,7 @@ async fn test_auditoria_entries() {
 
     let req = test::TestRequest::get()
         .uri(&format!(
-            "/api/v1/auditoria?entity_type=solicitud_mantenimiento&entity_id={solicitud_id}"
+            "/api/v1/auditoria?entityType=solicitud_mantenimiento&entityId={solicitud_id}"
         ))
         .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
