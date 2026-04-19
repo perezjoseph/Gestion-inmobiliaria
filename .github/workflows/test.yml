@@ -38,7 +38,6 @@ jobs:
     env:
       SERVER_PORT: "8080"
       CORS_ORIGIN: http://localhost:8080
-      CARGO_BUILD_JOBS: "2"
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       duration: ${{ steps.timing.outputs.duration }}

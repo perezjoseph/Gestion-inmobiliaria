@@ -8,6 +8,15 @@ opt-level = "z"
 codegen-units = 1
 strip = true
 
+# CI release profile: faster builds, still optimized enough for integration tests
+# Use with: cargo build --profile ci-release
+[profile.ci-release]
+inherits = "release"
+lto = "thin"
+opt-level = 2
+codegen-units = 16
+strip = true
+
 [profile.dev]
 debug = "line-tables-only"
 

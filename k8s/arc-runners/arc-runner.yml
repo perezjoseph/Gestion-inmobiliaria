@@ -13,11 +13,23 @@ spec:
         role: desktop
       resources:
         requests:
-          cpu: "1"
-          memory: 2Gi
+          cpu: "4"
+          memory: 6Gi
         limits:
-          cpu: "2"
-          memory: 4Gi
+          cpu: "4"
+          memory: 10Gi
+      volumeMounts:
+        - name: cargo-cache
+          mountPath: /home/runner/.cargo/registry
+          subPath: registry
+        - name: cargo-cache
+          mountPath: /home/runner/.cargo/git
+          subPath: git
+      volumes:
+        - name: cargo-cache
+          hostPath:
+            path: /opt/cargo-cache
+            type: DirectoryOrCreate
 ---
 apiVersion: actions.summerwind.dev/v1alpha1
 kind: HorizontalRunnerAutoscaler
@@ -29,7 +41,7 @@ spec:
     kind: RunnerDeployment
     name: arc-runner
   minReplicas: 1
-  maxReplicas: 10
+  maxReplicas: 6
   metrics:
     - type: TotalNumberOfQueuedAndInProgressWorkflowRuns
       repositoryNames:

@@ -10,11 +10,30 @@ from .config import (
 )
 from .runner import wsl_bash
 
+_GIT_WORKTREE_PRUNE = "git worktree prune"
+
 _worktree_lock = threading.Lock()
 _active_worktrees: dict[str, float] = {}
 _worktree_usage_locks: dict[str, threading.Lock] = {}
 
 _SAFE_BRANCH_RE = re.compile(r"[^a-zA-Z0-9_\-]")
+_SHELL_SAFE_REF_RE = re.compile(r"^[a-zA-Z0-9_./@\-]+$")
+
+
+def _validate_branch_for_shell(branch: str) -> str:
+    """Validate that *branch* is safe to interpolate into shell commands.
+
+    Raises ``ValueError`` for empty strings or strings containing shell
+    metacharacters (quotes, backticks, semicolons, spaces, etc.).
+    Returns the branch unchanged when valid.
+    """
+    if not branch:
+        raise ValueError("branch name must not be empty")
+    if not _SHELL_SAFE_REF_RE.match(branch):
+        raise ValueError(
+            f"branch name contains unsafe characters: {branch!r}"
+        )
+    return branch
 
 
 def _retry_wsl_bash(cmd: str, *, timeout: int, max_attempts: int,
@@ -38,7 +57,7 @@ def _cleanup_partial_worktree(wsl_path: str, name: str) -> None:
     try:
         wsl_bash(f"git worktree remove --force '{wsl_path}' 2>/dev/null; "
                  f"rm -rf '{wsl_path}' 2>/dev/null; "
-                 f"git worktree prune", timeout=30)
+                 f"{_GIT_WORKTREE_PRUNE}", timeout=30)
     except subprocess.TimeoutExpired:
         log.warning(f"Cleanup of partial worktree {name} also timed out")
 
@@ -82,15 +101,38 @@ def _try_reuse_worktree(
         return None
     log.info(f"Reusing existing worktree: {name}")
     _pull_in_worktree(wsl_path, branch)
+    _active_worktrees[name] = time.monotonic()
     _worktree_usage_locks.setdefault(name, threading.Lock())
     return wsl_path, name
+
+
+def _remove_stale_lock(name: str) -> None:
+    """Remove a leftover index.lock inside .git/worktrees/<name>/.
+
+    A timed-out or crashed ``git worktree add`` can leave this lock behind,
+    causing subsequent adds to fail with "File exists".
+    """
+    lock_path = WIN_PROJECT_DIR / ".git" / "worktrees" / name / "index.lock"
+    if lock_path.exists():
+        log.info(f"Removing stale index.lock for worktree {name}")
+        try:
+            lock_path.unlink()
+        except OSError as exc:
+            log.warning(f"Could not remove {lock_path}: {exc}")
+
+
+def _ensure_worktree_base() -> None:
+    """Create the worktree base directory if it doesn't exist."""
+    base = WIN_PROJECT_DIR / WORKTREE_BASE
+    base.mkdir(parents=True, exist_ok=True)
 
 
 def _recover_stale_path(wsl_path: str, name: str, checkout_ref: str) -> subprocess.CompletedProcess:
     """Remove a stale worktree path and retry the add."""
     log.info(f"Stale worktree path exists, removing and retrying: {name}")
+    _remove_stale_lock(name)
     # Prune git's internal bookkeeping first so stale entries are cleared
-    wsl_bash("git worktree prune", timeout=15)
+    wsl_bash(_GIT_WORKTREE_PRUNE, timeout=15)
     wsl_bash(f"git worktree remove --force '{wsl_path}' 2>/dev/null || true", timeout=30)
     wsl_bash(f"rm -rf '{wsl_path}'", timeout=15)
     return wsl_bash(f"git worktree add '{wsl_path}' '{checkout_ref}'", timeout=120)
@@ -139,7 +181,7 @@ def _handle_worktree_add_failure(
 
     stderr = result.stderr or ""
 
-    if "already exists" in stderr:
+    if "already exists" in stderr or "File exists" in stderr:
         result = _recover_stale_path(wsl_path, name, checkout_ref)
         stderr = result.stderr or ""
 
@@ -165,6 +207,12 @@ def setup_worktree(branch: str, commit: str) -> tuple[str, str]:
     Handles the case where the branch is already checked out in the
     main worktree by using detached HEAD + branch reassignment.
     """
+    try:
+        _validate_branch_for_shell(branch)
+    except ValueError as exc:
+        log.error(f"Rejecting worktree setup: {exc}")
+        return "", ""
+
     name = _worktree_name(branch, commit)
     wsl_path = _wsl_worktree_path(name)
 
@@ -176,10 +224,17 @@ def setup_worktree(branch: str, commit: str) -> tuple[str, str]:
 
     log.info(f"Creating worktree: {name} for branch={branch} commit={commit[:12] if len(commit) > 12 else commit}")
 
+    # Ensure the worktree base directory exists on disk so git can create
+    # the checkout inside it (git worktree add does not create parents).
+    _ensure_worktree_base()
+
+    # Remove any stale index.lock left by a previous timed-out add.
+    _remove_stale_lock(name)
+
     # Prune stale worktree bookkeeping before attempting to add, so git
     # doesn't reject the add due to a leftover entry from a previous timeout.
     try:
-        wsl_bash("git worktree prune", timeout=15)
+        wsl_bash(_GIT_WORKTREE_PRUNE, timeout=15)
     except subprocess.TimeoutExpired:
         log.warning("git worktree prune timed out, continuing anyway")
 
@@ -222,6 +277,7 @@ def setup_worktree(branch: str, commit: str) -> tuple[str, str]:
 
 
 def _pull_in_worktree(wsl_path: str, branch: str) -> None:
+    _validate_branch_for_shell(branch)
     wsl_bash(
         f"git -C '{wsl_path}' fetch origin {branch} --no-tags && "
         f"git -C '{wsl_path}' reset --hard 'origin/{branch}'",
@@ -231,6 +287,11 @@ def _pull_in_worktree(wsl_path: str, branch: str) -> None:
 
 def commit_and_push(wsl_path: str, branch: str, message: str) -> tuple[bool, str]:
     """Stage, commit, and push from a worktree. Returns (success, stderr)."""
+    try:
+        _validate_branch_for_shell(branch)
+    except ValueError as exc:
+        return False, f"unsafe branch name: {exc}"
+
     add_result = wsl_bash(f"git -C '{wsl_path}' add -A", timeout=30)
     if add_result.returncode != 0:
         return False, f"git add failed: {add_result.stderr}"
@@ -334,7 +395,7 @@ def prune_stale_worktrees() -> None:
         cleanup_worktree(name)
         log.info(f"Pruned stale worktree: {name}")
 
-    wsl_bash("git worktree prune", timeout=15)
+    wsl_bash(_GIT_WORKTREE_PRUNE, timeout=15)
 
 
 def _enforce_max_count() -> None:
