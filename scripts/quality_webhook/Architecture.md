@@ -103,7 +103,7 @@ flowchart TD
     KIRO_RUN -->|Success| STAGE[git add -A]
 
     STAGE --> DIFF{Files changed?}
-    DIFF -->|No| FAIL
+    DIFF -->|No| RETRY_CHK{Local retries left?}
     DIFF -->|Yes| GATES
 
     subgraph GATES [Quality Gates]
@@ -119,7 +119,10 @@ flowchart TD
         G3A --> G3B --> G3C --> G3E --> G4 --> G4P --> G5
     end
 
-    GATES -->|Any gate fails| DISCARD[discard_changes<br/>+ record failure + store memory]
+    GATES -->|Any gate fails| RETRY_CHK
+    RETRY_CHK -->|Yes| DISCARD_RETRY[discard_changes<br/>+ feed rejection into prompt]
+    RETRY_CHK -->|No| DISCARD[discard_changes<br/>+ record failure + store memory]
+    DISCARD_RETRY --> KIRO_RUN
     GATES -->|All pass| COMMIT[commit_and_push<br/>via worktrees module]
 
     COMMIT --> OUTCOME[Store fix outcome in memory]
@@ -393,6 +396,7 @@ flowchart TD
 | `MAX_CONCURRENT_FIXES` | 3 | Semaphore for parallel fix threads |
 | `THREAD_POOL_SIZE` | 8 | Background thread pool |
 | `PIPELINE_BUDGET` | 10 | Max fix rounds per pipeline lineage |
+| `LOCAL_RETRY_MAX` | 3 | Max local retries per round (gate feedback loop) |
 | `BACKOFF_SCHEDULE` | [0, 0, 120, 300, 600] | Seconds between retry rounds |
 | `WORKTREE_MAX_COUNT` | 3 | Max simultaneous worktrees |
 | `WORKTREE_MAX_AGE_H` | 4 | Auto-prune worktrees older than 4h |

@@ -1,14 +1,21 @@
-spec:
-  template:
-    spec:
-      containers:
-        - name: manager
-          livenessProbe:
-            httpGet:
-              path: /readyz
-              port: 9443
-              scheme: HTTPS
-            initialDelaySeconds: 30
-            periodSeconds: 30
-            failureThreshold: 3
-            timeoutSeconds: 5
+# Liveness probe removed — the /readyz endpoint returns 404 on ARC v0.27.6,
+# causing CrashLoopBackOff under API-server latency on the 8 GB control-plane node.
+# To re-add a probe in the future, use:
+#
+#   kubectl patch deployment arc-actions-runner-controller -n arc-systems \
+#     --type strategic -p "$(cat k8s/arc-runners/arc-controller-liveness-patch.yml)"
+#
+# spec:
+#   template:
+#     spec:
+#       containers:
+#         - name: manager
+#           livenessProbe:
+#             httpGet:
+#               path: /readyz
+#               port: 9443
+#               scheme: HTTPS
+#             initialDelaySeconds: 30
+#             periodSeconds: 30
+#             failureThreshold: 3
+#             timeoutSeconds: 5

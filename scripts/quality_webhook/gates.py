@@ -70,7 +70,7 @@ _FORBIDDEN_DIFF_PATTERNS = [
 
 def revision_check_diff(cwd=None):
     try:
-        result = wsl_bash("git diff --cached -- '*.rs'", timeout=30, cwd=cwd)
+        result = wsl_bash("git diff --cached -- '*.rs' ':!Cargo.lock'", timeout=30, cwd=cwd)
         diff_text = result.stdout or ""
         for pattern in _FORBIDDEN_DIFF_PATTERNS:
             matches = re.findall(pattern, diff_text, re.MULTILINE)
@@ -220,7 +220,7 @@ def _check_unsafe_blocks(diff_text: str) -> tuple[bool, str]:
 
 def revision_security_check(cwd=None) -> tuple[bool, str]:
     try:
-        result = wsl_bash("git diff --cached -- '*.rs' '*.toml' '*.yml'", timeout=30, cwd=cwd)
+        result = wsl_bash("git diff --cached -- '*.rs' '*.toml' '*.yml' ':!Cargo.lock'", timeout=30, cwd=cwd)
         diff_text = result.stdout or ""
         current_file = ""
         for line in diff_text.splitlines():
@@ -258,7 +258,7 @@ def revision_audit_check(cwd=None) -> tuple[bool, str]:
 
 def revision_maintainability_check(cwd=None) -> tuple[bool, str]:
     try:
-        result = wsl_bash("git diff --cached -- '*.rs'", timeout=30, cwd=cwd)
+        result = wsl_bash("git diff --cached -- '*.rs' ':!Cargo.lock'", timeout=30, cwd=cwd)
         diff_text = result.stdout or ""
         current_file = ""
         added_lines_in_fn = 0

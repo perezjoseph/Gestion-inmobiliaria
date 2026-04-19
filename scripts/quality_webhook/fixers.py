@@ -13,7 +13,7 @@ from datetime import datetime
 
 from .config import (
     WIN_PROJECT_DIR, MAX_CONCURRENT_FIXES, FIX_PIPELINE_TIMEOUT,
-    SCOPE_CONSTRAINTS, SONAR_PARALLEL_GROUPS, log,
+    LOCAL_RETRY_MAX, SCOPE_CONSTRAINTS, SONAR_PARALLEL_GROUPS, log,
 )
 from .runner import wsl_bash, run_kiro
 from .worktrees import setup_worktree, commit_and_push, cleanup_worktree, discard_changes, get_head_sha
@@ -738,150 +738,147 @@ def fix_once_and_push(job, step, error_log, context=None):
                 pipeline_now.job_states[job] = JobState.FAILED
             return False
 
-        t0 = time.monotonic()
-        result = run_kiro(prompt, f"CI fix ({job}/{step}) round {attempt} [{phase}]", cwd=wt_path)
-        timing.fix_attempt_s = time.monotonic() - t0
+        # --- Local retry loop: up to LOCAL_RETRY_MAX attempts within the same worktree ---
+        gate_feedback = ""
+        local_attempt = 0
+        fix_succeeded = False
 
-        success = result[0] if isinstance(result, tuple) else result
-        kiro_output = result[1] if isinstance(result, tuple) else ""
+        while local_attempt < LOCAL_RETRY_MAX:
+            local_attempt += 1
 
-        outcome = extract_outcome_from_output(kiro_output) if kiro_output else {}
-        strategy_note = outcome.get("strategy", "")
+            if local_attempt > 1:
+                if _pipeline_timed_out():
+                    record_fix_attempt(job, error_log, attempt, False,
+                                       f"pipeline_timeout: exceeded {FIX_PIPELINE_TIMEOUT}s during local retry {local_attempt}",
+                                       timing=dataclasses.asdict(timing))
+                    store_fix_attempt(job, step, error_class, error_log, attempt, False)
+                    if commit:
+                        pipeline_now = tracker.get_or_create(commit)
+                        pipeline_now.job_states[job] = JobState.FAILED
+                    return False
 
-        pbt_seed_note = ""
-        if error_class == "pbt_failure" and repro and repro.raw_output:
-            from .reproducer import _parse_pbt_failures as _ppf
-            pbt_errs = _ppf(repro.raw_output)
-            if pbt_errs:
-                pbt_seed_note = "; ".join(str(e) for e in pbt_errs[:3])
+            current_prompt = prompt
+            if gate_feedback:
+                current_prompt = (
+                    f"RETRY (local attempt {local_attempt}/{LOCAL_RETRY_MAX}): "
+                    f"Your previous fix was REJECTED by the quality gate.\n"
+                    f"Rejection reason: {gate_feedback}\n"
+                    f"You MUST address this specific issue while still fixing the original error.\n"
+                    f"The worktree has been reset to the clean state.\n\n"
+                    f"{prompt}"
+                )
 
-        if not success:
-            timing.total_s = time.monotonic() - attempt_start
-            log.warning(f"Round {attempt} kiro-cli returned failure for {job}/{step}")
-            record_strategy_outcome(job, error_class, strategy_note or error_class, False)
-            record_fix_attempt(job, error_log, attempt, False,
-                               f"class={error_class}, job={job}, step={step}. {strategy_note}",
-                               timing=dataclasses.asdict(timing))
-            store_fix_attempt(job, step, error_class, error_log, attempt, False)
-            if commit:
-                pipeline_now = tracker.get_or_create(commit)
-                pipeline_now.job_states[job] = JobState.FAILED
-            return False
+            log.info(f"=== kiro-cli attempt {local_attempt}/{LOCAL_RETRY_MAX} for round {attempt} ({job}/{step}) ===")
 
-        wsl_bash(f"git -C '{wt_path}' add -A", timeout=30)
+            t0 = time.monotonic()
+            result = run_kiro(current_prompt, f"CI fix ({job}/{step}) round {attempt} [{phase}] attempt {local_attempt}", cwd=wt_path)
+            timing.fix_attempt_s += time.monotonic() - t0
 
-        nothing_check = wsl_bash(f"git -C '{wt_path}' diff --cached --quiet", timeout=15)
-        if nothing_check.returncode == 0:
-            timing.total_s = time.monotonic() - attempt_start
-            log.warning(f"Round {attempt} kiro-cli produced no changes for {job}/{step}")
-            record_strategy_outcome(job, error_class, strategy_note or error_class, False)
-            record_fix_attempt(job, error_log, attempt, False,
-                               f"no_changes: kiro-cli reported success but no files modified. {strategy_note}",
-                               timing=dataclasses.asdict(timing))
-            store_fix_attempt(job, step, error_class, error_log, attempt, False)
-            if commit:
-                pipeline_now = tracker.get_or_create(commit)
-                pipeline_now.job_states[job] = JobState.FAILED
-            return False
+            success = result[0] if isinstance(result, tuple) else result
+            kiro_output = result[1] if isinstance(result, tuple) else ""
 
-        rev_passed, rev_reason = revision_check_diff(cwd=wt_path)
-        if not rev_passed:
-            timing.total_s = time.monotonic() - attempt_start
-            log.warning(f"Gate 3a rejected round {attempt} ({job}/{step}): {rev_reason}")
-            discard_changes(wt_path)
-            record_strategy_outcome(job, error_class, strategy_note or error_class, False)
-            record_fix_attempt(job, error_log, attempt, False,
-                               f"revision_rejected: {rev_reason}. {strategy_note}",
-                               timing=dataclasses.asdict(timing))
-            store_fix_attempt(job, step, error_class, error_log, attempt, False)
-            if commit:
-                pipeline_now = tracker.get_or_create(commit)
-                pipeline_now.job_states[job] = JobState.FAILED
-            return False
+            outcome = extract_outcome_from_output(kiro_output) if kiro_output else {}
+            strategy_note = outcome.get("strategy", "")
 
-        sec_passed, sec_reason = revision_security_check(cwd=wt_path)
-        if not sec_passed:
-            timing.total_s = time.monotonic() - attempt_start
-            log.warning(f"Gate 3b rejected round {attempt} ({job}/{step}): {sec_reason}")
-            discard_changes(wt_path)
-            record_strategy_outcome(job, error_class, strategy_note or error_class, False)
-            record_fix_attempt(job, error_log, attempt, False,
-                               f"security_rejected: {sec_reason}. {strategy_note}",
-                               timing=dataclasses.asdict(timing))
-            store_fix_attempt(job, step, error_class, error_log, attempt, False)
-            if commit:
-                pipeline_now = tracker.get_or_create(commit)
-                pipeline_now.job_states[job] = JobState.FAILED
-            return False
+            pbt_seed_note = ""
+            if error_class == "pbt_failure" and repro and repro.raw_output:
+                from .reproducer import _parse_pbt_failures as _ppf
+                pbt_errs = _ppf(repro.raw_output)
+                if pbt_errs:
+                    pbt_seed_note = "; ".join(str(e) for e in pbt_errs[:3])
 
-        maint_passed, maint_reason = revision_maintainability_check(cwd=wt_path)
-        if not maint_passed:
-            timing.total_s = time.monotonic() - attempt_start
-            log.warning(f"Gate 3c rejected round {attempt} ({job}/{step}): {maint_reason}")
-            discard_changes(wt_path)
-            record_strategy_outcome(job, error_class, strategy_note or error_class, False)
-            record_fix_attempt(job, error_log, attempt, False,
-                               f"maintainability_rejected: {maint_reason}. {strategy_note}",
-                               timing=dataclasses.asdict(timing))
-            store_fix_attempt(job, step, error_class, error_log, attempt, False)
-            if commit:
-                pipeline_now = tracker.get_or_create(commit)
-                pipeline_now.job_states[job] = JobState.FAILED
-            return False
+            if not success:
+                log.warning(f"Attempt {local_attempt} kiro-cli returned failure for {job}/{step}")
+                gate_feedback = "kiro-cli reported failure (non-zero exit or tool error)"
+                continue
 
-        correct_passed, correct_reason = revision_correctness_check(cwd=wt_path)
-        if not correct_passed:
-            timing.total_s = time.monotonic() - attempt_start
-            log.warning(f"Gate 3e rejected round {attempt} ({job}/{step}): {correct_reason}")
-            discard_changes(wt_path)
-            record_strategy_outcome(job, error_class, strategy_note or error_class, False)
-            record_fix_attempt(job, error_log, attempt, False,
-                               f"correctness_rejected: {correct_reason}. {strategy_note}",
-                               timing=dataclasses.asdict(timing))
-            store_fix_attempt(job, step, error_class, error_log, attempt, False)
-            if commit:
-                pipeline_now = tracker.get_or_create(commit)
-                pipeline_now.job_states[job] = JobState.FAILED
-            return False
+            wsl_bash(f"git -C '{wt_path}' add -A", timeout=30)
 
-        t0 = time.monotonic()
-        if error_class == "pbt_failure":
-            verify_passed, verify_reason = verification_run_pbt(job, cwd=wt_path)
-        else:
-            verify_passed, verify_reason = verification_run(job, cwd=wt_path)
-        timing.verification_s = time.monotonic() - t0
+            nothing_check = wsl_bash(f"git -C '{wt_path}' diff --cached --quiet", timeout=15)
+            if nothing_check.returncode == 0:
+                log.warning(f"Attempt {local_attempt} kiro-cli produced no changes for {job}/{step}")
+                gate_feedback = "kiro-cli reported success but no files were modified"
+                continue
 
-        if not verify_passed:
-            timing.total_s = time.monotonic() - attempt_start
-            log.warning(f"Gate 4 verification failed for round {attempt} ({job}/{step}): {verify_reason}")
-            discard_changes(wt_path)
-            record_strategy_outcome(job, error_class, strategy_note or error_class, False)
-            record_fix_attempt(job, error_log, attempt, False,
-                               f"verify_failed: {verify_reason[:200]}. {strategy_note}",
-                               timing=dataclasses.asdict(timing))
-            store_fix_attempt(job, step, error_class, error_log, attempt, False)
-            if commit:
-                pipeline_now = tracker.get_or_create(commit)
-                pipeline_now.job_states[job] = JobState.FAILED
-            return False
+            # --- Gate 3a: Forbidden patterns ---
+            rev_passed, rev_reason = revision_check_diff(cwd=wt_path)
+            if not rev_passed:
+                log.warning(f"Gate 3a rejected attempt {local_attempt} ({job}/{step}): {rev_reason}")
+                discard_changes(wt_path)
+                gate_feedback = f"forbidden pattern in diff: {rev_reason}"
+                continue
 
-        baseline_passed, baseline_reason = baseline_verification_incremental(job, cwd=wt_path)
-        if not baseline_passed:
-            timing.total_s = time.monotonic() - attempt_start
-            log.warning(f"Gate 5 baseline failed for round {attempt} ({job}/{step}): {baseline_reason}")
-            discard_changes(wt_path)
-            record_strategy_outcome(job, error_class, strategy_note or error_class, False)
-            record_fix_attempt(job, error_log, attempt, False,
-                               f"baseline_failed: {baseline_reason[:200]}. {strategy_note}",
-                               timing=dataclasses.asdict(timing))
-            store_fix_attempt(job, step, error_class, error_log, attempt, False)
-            if commit:
-                pipeline_now = tracker.get_or_create(commit)
-                pipeline_now.job_states[job] = JobState.FAILED
-            return False
+            # --- Gate 3b: Security ---
+            sec_passed, sec_reason = revision_security_check(cwd=wt_path)
+            if not sec_passed:
+                log.warning(f"Gate 3b rejected attempt {local_attempt} ({job}/{step}): {sec_reason}")
+                discard_changes(wt_path)
+                gate_feedback = f"security violation: {sec_reason}"
+                continue
+
+            # --- Gate 3c: Maintainability ---
+            maint_passed, maint_reason = revision_maintainability_check(cwd=wt_path)
+            if not maint_passed:
+                log.warning(f"Gate 3c rejected attempt {local_attempt} ({job}/{step}): {maint_reason}")
+                discard_changes(wt_path)
+                gate_feedback = f"maintainability issue: {maint_reason}"
+                continue
+
+            # --- Gate 3e: Correctness ---
+            correct_passed, correct_reason = revision_correctness_check(cwd=wt_path)
+            if not correct_passed:
+                log.warning(f"Gate 3e rejected attempt {local_attempt} ({job}/{step}): {correct_reason}")
+                discard_changes(wt_path)
+                gate_feedback = f"correctness regression: {correct_reason}"
+                continue
+
+            # --- Gate 4: Verification ---
+            t0 = time.monotonic()
+            if error_class == "pbt_failure":
+                verify_passed, verify_reason = verification_run_pbt(job, cwd=wt_path)
+            else:
+                verify_passed, verify_reason = verification_run(job, cwd=wt_path)
+            timing.verification_s += time.monotonic() - t0
+
+            if not verify_passed:
+                log.warning(f"Gate 4 verification failed attempt {local_attempt} ({job}/{step}): {verify_reason}")
+                discard_changes(wt_path)
+                gate_feedback = f"verification failed: {verify_reason[:300]}"
+                continue
+
+            # --- Gate 5: Baseline ---
+            baseline_passed, baseline_reason = baseline_verification_incremental(job, cwd=wt_path)
+            if not baseline_passed:
+                log.warning(f"Gate 5 baseline failed attempt {local_attempt} ({job}/{step}): {baseline_reason}")
+                discard_changes(wt_path)
+                gate_feedback = f"baseline regression: {baseline_reason[:300]}"
+                continue
+
+            # All gates passed
+            fix_succeeded = True
+            break
+
+        # --- End of local retry loop ---
 
         timing.total_s = time.monotonic() - attempt_start
-        log.info(f"All gates passed for round {attempt} ({job}/{step}). Committing.")
+
+        if not fix_succeeded:
+            log.warning(
+                f"All {LOCAL_RETRY_MAX} local attempts failed for round {attempt} ({job}/{step}). "
+                f"Last rejection: {gate_feedback}"
+            )
+            record_strategy_outcome(job, error_class, strategy_note or error_class, False)
+            record_fix_attempt(job, error_log, attempt, False,
+                               f"all_local_retries_failed ({LOCAL_RETRY_MAX} attempts). "
+                               f"last_rejection: {gate_feedback}. {strategy_note}",
+                               timing=dataclasses.asdict(timing))
+            store_fix_attempt(job, step, error_class, error_log, attempt, False)
+            if commit:
+                pipeline_now = tracker.get_or_create(commit)
+                pipeline_now.job_states[job] = JobState.FAILED
+            return False
+
+        log.info(f"All gates passed for round {attempt} ({job}/{step}) on attempt {local_attempt}. Committing.")
 
         lineage_tag = ""
         if pipeline:

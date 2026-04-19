@@ -111,7 +111,10 @@ jobs:
 
       - name: Run backend tests
         id: tests
-        run: cargo test --locked -p realestate-backend --all-targets
+        run: |
+          set +e
+          cargo test --locked -p realestate-backend --all-targets 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
+          exit ${PIPESTATUS[0]}
 
       - name: Verify Cargo.lock is up to date
         run: |
@@ -183,7 +186,14 @@ jobs:
         id: collect-errors
         if: always() && steps.tests.outcome == 'failure'
         run: |
-          ERROR="Backend tests failed. Check the workflow run for details."
+          if [ -s "${RUNNER_TEMP}/test-backend-output.txt" ]; then
+            ERROR=$(grep -E '(FAILED|error\[|panicked|failures:)' "${RUNNER_TEMP}/test-backend-output.txt" | head -c 2000 || true)
+            if [ -z "$ERROR" ]; then
+              ERROR=$(tail -c 3000 "${RUNNER_TEMP}/test-backend-output.txt")
+            fi
+          else
+            ERROR="Backend tests failed. No captured output."
+          fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT
           echo "$ERROR" >> $GITHUB_OUTPUT
@@ -227,7 +237,10 @@ jobs:
 
       - name: Run frontend tests
         id: tests
-        run: cargo test --locked -p realestate-frontend --all-targets
+        run: |
+          set +e
+          cargo test --locked -p realestate-frontend --all-targets 2>&1 | tee "${RUNNER_TEMP}/test-frontend-output.txt"
+          exit ${PIPESTATUS[0]}
 
       - name: Write test summary
         if: always()
@@ -250,7 +263,14 @@ jobs:
         id: collect-errors
         if: always() && steps.tests.outcome == 'failure'
         run: |
-          ERROR="Frontend tests failed. Check the workflow run for details."
+          if [ -s "${RUNNER_TEMP}/test-frontend-output.txt" ]; then
+            ERROR=$(grep -E '(FAILED|error\[|panicked|failures:)' "${RUNNER_TEMP}/test-frontend-output.txt" | head -c 2000 || true)
+            if [ -z "$ERROR" ]; then
+              ERROR=$(tail -c 3000 "${RUNNER_TEMP}/test-frontend-output.txt")
+            fi
+          else
+            ERROR="Frontend tests failed. No captured output."
+          fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT
           echo "$ERROR" >> $GITHUB_OUTPUT
