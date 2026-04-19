@@ -8,6 +8,14 @@ use crate::models::documento::DocumentoResponse;
 
 const MAX_FILE_SIZE: i64 = 10 * 1024 * 1024;
 const ALLOWED_MIME_TYPES: &[&str] = &["image/jpeg", "image/png", "application/pdf"];
+const ALLOWED_ENTITY_TYPES: &[&str] = &[
+    "propiedad",
+    "inquilino",
+    "contrato",
+    "pago",
+    "gasto",
+    "mantenimiento",
+];
 
 fn validate_file_size(size: i64) -> Result<(), AppError> {
     if size > MAX_FILE_SIZE {
@@ -27,6 +35,29 @@ fn validate_mime_type(mime_type: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+fn validate_entity_type(entity_type: &str) -> Result<(), AppError> {
+    if !ALLOWED_ENTITY_TYPES.contains(&entity_type) {
+        return Err(AppError::Validation(format!(
+            "Tipo de entidad no válido: {entity_type}"
+        )));
+    }
+    Ok(())
+}
+
+/// Sanitize a filename by stripping path separators and directory traversal sequences.
+fn sanitize_filename(name: &str) -> Result<String, AppError> {
+    let sanitized: String = name.replace(['/', '\\'], "_").replace("..", "_");
+
+    // After sanitization the name must still be non-empty
+    let trimmed = sanitized.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::Validation(
+            "Nombre de archivo inválido".to_string(),
+        ));
+    }
+    Ok(trimmed.to_string())
+}
+
 fn get_upload_dir() -> String {
     std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string())
 }
@@ -43,18 +74,34 @@ pub async fn upload(
     let file_size = file_data.len() as i64;
     validate_file_size(file_size)?;
     validate_mime_type(mime_type)?;
+    validate_entity_type(entity_type)?;
+    let safe_filename = sanitize_filename(filename)?;
 
     let upload_dir = get_upload_dir();
+    // entity_type is validated against an allowlist; entity_id is a Uuid (no traversal possible)
     let dir_path = format!("{upload_dir}/{entity_type}/{entity_id}");
     std::fs::create_dir_all(&dir_path)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error creando directorio: {e}")))?;
 
     let file_uuid = Uuid::new_v4();
-    let stored_filename = format!("{file_uuid}-{filename}");
+    let stored_filename = format!("{file_uuid}-{safe_filename}");
     let full_path = format!("{dir_path}/{stored_filename}");
 
+    // Verify the resolved path stays within the upload directory
+    let canonical_dir = std::fs::canonicalize(&upload_dir)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error resolviendo directorio: {e}")))?;
+    // Write the file first so canonicalize can resolve it
     std::fs::write(&full_path, file_data)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error escribiendo archivo: {e}")))?;
+    let canonical_file = std::fs::canonicalize(&full_path)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error resolviendo ruta: {e}")))?;
+    if !canonical_file.starts_with(&canonical_dir) {
+        // Remove the file that escaped the upload directory
+        let _ = std::fs::remove_file(&full_path);
+        return Err(AppError::Validation(
+            "Ruta de archivo fuera del directorio permitido".to_string(),
+        ));
+    }
 
     let relative_path = format!("{entity_type}/{entity_id}/{stored_filename}");
     let id = Uuid::new_v4();
@@ -64,7 +111,7 @@ pub async fn upload(
         id: Set(id),
         entity_type: Set(entity_type.to_string()),
         entity_id: Set(entity_id),
-        filename: Set(filename.to_string()),
+        filename: Set(safe_filename),
         file_path: Set(relative_path.clone()),
         mime_type: Set(mime_type.to_string()),
         file_size: Set(file_size),
@@ -180,6 +227,47 @@ mod tests {
     #[test]
     fn validate_mime_type_rejects_empty() {
         assert!(validate_mime_type("").is_err());
+    }
+
+    #[test]
+    fn validate_entity_type_accepts_allowed() {
+        for t in ALLOWED_ENTITY_TYPES {
+            assert!(validate_entity_type(t).is_ok(), "should accept {t}");
+        }
+    }
+
+    #[test]
+    fn validate_entity_type_rejects_unknown() {
+        assert!(validate_entity_type("unknown").is_err());
+    }
+
+    #[test]
+    fn validate_entity_type_rejects_traversal() {
+        assert!(validate_entity_type("../etc").is_err());
+    }
+
+    #[test]
+    fn sanitize_filename_strips_path_separators() {
+        let result = sanitize_filename("../../etc/passwd").unwrap();
+        assert!(!result.contains('/'));
+        assert!(!result.contains(".."));
+    }
+
+    #[test]
+    fn sanitize_filename_strips_backslashes() {
+        let result = sanitize_filename("..\\..\\windows\\system32").unwrap();
+        assert!(!result.contains('\\'));
+        assert!(!result.contains(".."));
+    }
+
+    #[test]
+    fn sanitize_filename_preserves_normal_name() {
+        assert_eq!(sanitize_filename("photo.jpg").unwrap(), "photo.jpg");
+    }
+
+    #[test]
+    fn sanitize_filename_rejects_empty() {
+        assert!(sanitize_filename("").is_err());
     }
 
     static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());

@@ -645,8 +645,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
             result = run_kiro(prompt, f"SonarQube fix (round {attempt}) [{phase}]", cwd=wt_path)
             success = result[0] if isinstance(result, tuple) else result
             if success:
-                commit_ok, _ = commit_and_push(wt_path, branch, "fix: resolve SonarQube failures (auto-fix)")
-                if commit_ok:
+                commit_ok, commit_err = commit_and_push(wt_path, branch, "fix: resolve SonarQube failures (auto-fix)")
+                if commit_ok and commit_err == "nothing to commit":
+                    log.warning(f"SonarQube fix (round {attempt}) [{phase}] produced no changes")
+                elif commit_ok:
                     log.info(f"SonarQube fix (round {attempt}) [{phase}] succeeded")
                 else:
                     log.warning(f"SonarQube fix (round {attempt}) [{phase}] commit/push failed")

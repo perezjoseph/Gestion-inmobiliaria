@@ -55,3 +55,4 @@ k3s/
 *.orig
 *.log
 *.cache
+.pipeline_state.json

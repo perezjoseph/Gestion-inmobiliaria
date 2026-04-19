@@ -1804,6 +1804,13 @@ def fix_sonar_issues(sonar_report, run_url, branch="main", commit=""):
 
             commit_ok, commit_err = commit_and_push(wt_path, branch, "fix: resolve SonarQube issues (auto-fix)")
 
+            if commit_ok and commit_err == "nothing to commit":
+                log.warning(
+                    f"SonarQube fix (round {attempt}) [{phase}] produced no changes "
+                    f"-- treating as failure"
+                )
+                return False
+
             if commit_ok:
                 if failed_groups:
                     log.warning(f"Sonar fix partial success (round {attempt}). Failed groups: {failed_groups}")
@@ -2084,6 +2091,17 @@ def improve_pipeline(focus, pipeline_report, run_url, sonar_report="", commit=""
 
                 msg = f"ci: {'fix' if is_failure else 'optimize'} pipeline ({focus})"
                 commit_ok, commit_err = commit_and_push(wt_path, branch, msg)
+
+                if commit_ok and commit_err == "nothing to commit":
+                    log.warning(
+                        f"Pipeline improvement attempt {attempt} [{phase}] "
+                        f"produced no changes -- treating as failure"
+                    )
+                    last_strategy = f"no_changes on attempt {attempt} [{phase}]"
+                    if not is_failure:
+                        log.info("Optimization produced no changes -- not retrying for green builds")
+                        return False
+                    continue
 
                 if commit_ok:
                     log.info(f"Pipeline improvement attempt {attempt} [{phase}] completed")
