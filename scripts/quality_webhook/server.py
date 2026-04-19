@@ -828,17 +828,15 @@ def main():
         log.error("WSL timed out — is the distro running?")
         raise SystemExit(1)
 
-    result = wsl_bash("test -d .", timeout=10)
+    try:
+        result = wsl_bash("test -d .", timeout=10)
+    except subprocess.TimeoutExpired:
+        log.error(f"WSL timed out checking project dir: {PROJECT_DIR}")
+        raise SystemExit(1)
     if result.returncode != 0:
         log.error(f"Project dir not accessible from WSL: {PROJECT_DIR}")
         raise SystemExit(1)
     log.info(f"  Project dir: {PROJECT_DIR} ✓")
-
-    result = wsl_bash(f"{KIRO_CLI} chat --help", timeout=30)
-    if result.returncode != 0:
-        log.error(f"kiro-cli chat --help failed (exit {result.returncode}): {result.stderr.strip()}")
-        raise SystemExit(1)
-    log.info("  kiro-cli chat args: ✓")
 
     test_prompt = (
         "--- TEST ---\n"
@@ -852,20 +850,30 @@ def main():
         result = wsl_bash(
             f"KIRO_PROMPT=$(cat '{test_file_wsl}') && "
             f"[ -n \"$KIRO_PROMPT\" ] && "
-            f"{KIRO_CLI} chat --no-interactive -- \"$KIRO_PROMPT\"",
-            timeout=120,
+            f"echo \"$KIRO_PROMPT\"",
+            timeout=15,
         )
+    except subprocess.TimeoutExpired:
+        log.error("Prompt file delivery test timed out")
+        raise SystemExit(1)
     finally:
         test_file.unlink(missing_ok=True)
 
-    if result.returncode not in (0, 1):
+    if result.returncode != 0:
         log.error(
-            f"kiro-cli prompt delivery test failed (exit {result.returncode}).\n"
+            f"Prompt file delivery test failed (exit {result.returncode}).\n"
             f"  stderr: {result.stderr.strip()[:500]}\n"
-            f"  This means the prompt file is not being delivered correctly."
+            f"  The cat-to-variable pipeline is broken."
         )
         raise SystemExit(1)
-    log.info("  kiro-cli prompt delivery: ✓")
+    delivered = result.stdout.strip()
+    if "--- TEST ---" not in delivered or "--- END ---" not in delivered:
+        log.error(
+            f"Prompt content was mangled during delivery.\n"
+            f"  Got: {delivered[:300]}"
+        )
+        raise SystemExit(1)
+    log.info("  Prompt file delivery: ✓")
 
     log.info("Startup checks passed")
 

@@ -247,12 +247,19 @@ def commit_and_push(wsl_path: str, branch: str, message: str) -> tuple[bool, str
     return False, f"push failed after rebase: {retry_push.stderr}"
 
 
-def cleanup_worktree(name: str) -> None:
-    """Remove a worktree and clean up tracking."""
+def _remove_worktree_on_disk(name: str) -> None:
+    """Run ``git worktree remove`` without touching in-memory tracking."""
     wsl_path = _wsl_worktree_path(name)
     log.info(f"Cleaning up worktree: {name}")
-
     wsl_bash(f"git worktree remove --force '{wsl_path}'", timeout=30)
+
+
+def cleanup_worktree(name: str) -> None:
+    """Remove a worktree and clean up tracking.
+
+    Safe to call when ``_worktree_lock`` is **not** held.
+    """
+    _remove_worktree_on_disk(name)
 
     with _worktree_lock:
         _active_worktrees.pop(name, None)
@@ -293,8 +300,18 @@ def prune_stale_worktrees() -> None:
 
 
 def _enforce_max_count() -> None:
-    """Remove oldest worktrees if we're at the limit."""
+    """Remove oldest worktrees if we're at the limit.
+
+    MUST be called while ``_worktree_lock`` is held.  Releases the lock
+    temporarily for the (slow) disk removal, then re-acquires it.
+    """
     while len(_active_worktrees) >= WORKTREE_MAX_COUNT:
         oldest_name = min(_active_worktrees, key=_active_worktrees.get)
         log.info(f"Evicting oldest worktree to make room: {oldest_name}")
-        cleanup_worktree(oldest_name)
+        _active_worktrees.pop(oldest_name, None)
+        _worktree_usage_locks.pop(oldest_name, None)
+        _worktree_lock.release()
+        try:
+            _remove_worktree_on_disk(oldest_name)
+        finally:
+            _worktree_lock.acquire()
