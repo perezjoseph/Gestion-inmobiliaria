@@ -31,3 +31,6 @@ android/local.properties
 # Python
 __pycache__/
 *.pyc
+
+# K3s deployment manifests (local cluster config)
+k3s/

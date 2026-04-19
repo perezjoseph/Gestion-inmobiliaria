@@ -50,7 +50,7 @@ permissions: {}
 jobs:
   sonarqube:
     name: SonarQube Code Quality & Coverage Analysis
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner-dind
     timeout-minutes: 20
     permissions:
       contents: read
@@ -68,14 +68,6 @@ jobs:
       - name: Record start time
         id: start
         run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
-
-      - name: Clean workspace
-        run: |
-          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
-            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
-            exit 1
-          fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository with full history for blame analysis
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

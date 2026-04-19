@@ -128,7 +128,7 @@ permissions: {}
 jobs:
   pipeline-improve:
     name: CI/CD Pipeline Self-Improvement
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner
     timeout-minutes: 10
     permissions:
       contents: read

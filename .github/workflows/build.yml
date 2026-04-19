@@ -26,7 +26,7 @@ permissions: {}
 jobs:
   build-frontend:
     name: Build Frontend (Trunk + WASM)
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner
     timeout-minutes: 30
     permissions:
       contents: read
@@ -39,14 +39,6 @@ jobs:
       - name: Record start time
         id: start
         run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
-
-      - name: Clean workspace
-        run: |
-          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
-            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
-            exit 1
-          fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
 
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -80,7 +72,7 @@ jobs:
       - name: Pre-install wasm-bindgen-cli
         run: |
           export PATH="${HOME}/.local/bin:$HOME/.cargo/bin:$PATH"
-          WASM_BINDGEN_VERSION=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | grep -oP 'version = "\K[^"]+')
+          WASM_BINDGEN_VERSION=$(grep -A1 '^name = "wasm-bindgen"' Cargo.lock | grep -oP 'version = "\K[^"]+')
           if [ -z "$WASM_BINDGEN_VERSION" ]; then
             echo "::error::Could not determine wasm-bindgen version from Cargo.lock"
             exit 1
@@ -220,7 +212,7 @@ jobs:
 
   build-backend:
     name: Build Backend (Cargo)
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner
     timeout-minutes: 30
     permissions:
       contents: read

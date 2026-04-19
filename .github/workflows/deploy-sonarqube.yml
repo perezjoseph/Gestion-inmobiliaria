@@ -14,8 +14,8 @@ concurrency:
 
 jobs:
   deploy:
-    name: Ensure SonarQube is Running
-    runs-on: [self-hosted, Linux, X64, sonarqube]
+    name: Ensure SonarQube is Running (k3s)
+    runs-on: arc-deploy
     timeout-minutes: 10
     permissions:
       contents: read
@@ -26,29 +26,48 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-          sparse-checkout: .github/docker-compose.sonarqube.yml
+          sparse-checkout: k8s/sonarqube
           sparse-checkout-cone-mode: false
 
-      - name: Set vm.max_map_count for Elasticsearch
+      - name: Ensure namespace exists
+        run: kubectl get namespace sonarqube || kubectl create namespace sonarqube
+
+      - name: Ensure SonarQube DB secret exists
         run: |
+          if ! kubectl get secret sonarqube-db-secret -n sonarqube > /dev/null 2>&1; then
+            echo "::error::sonarqube-db-secret not found in sonarqube namespace. Create it first:"
+            echo "  kubectl create secret generic sonarqube-db-secret --namespace sonarqube --from-literal=username=sonar --from-literal=password=<password>"
+            exit 1
+          fi
+
+      - name: Set vm.max_map_count on k3s node
+        run: |
+          # Required for Elasticsearch inside SonarQube.
+          # The init container in the pod also attempts this, but setting it
+          # on the node ensures it persists across pod restarts.
           CURRENT=$(sysctl -n vm.max_map_count 2>/dev/null || echo 0)
           if [ "$CURRENT" -lt 262144 ]; then
             echo "Setting vm.max_map_count=262144 (current: $CURRENT)"
-            sudo sysctl -w vm.max_map_count=262144
+            sudo sysctl -w vm.max_map_count=262144 || true
           else
             echo "vm.max_map_count already sufficient ($CURRENT)"
           fi
 
-      - name: Start SonarQube via docker compose
+      - name: Apply SonarQube manifests
+        run: kubectl apply -k k8s/sonarqube/
+
+      - name: Wait for SonarQube rollout
         run: |
-          docker compose -f .github/docker-compose.sonarqube.yml up -d --wait --remove-orphans
+          kubectl rollout status deployment/sonarqube-db --namespace sonarqube --timeout=120s
+          kubectl rollout status deployment/sonarqube --namespace sonarqube --timeout=300s
 
       - name: Wait for SonarQube to become healthy
         timeout-minutes: 5
         run: |
           echo "Waiting for SonarQube API to respond..."
+          SONAR_POD=$(kubectl get pod -n sonarqube -l app.kubernetes.io/name=sonarqube -o jsonpath='{.items[0].metadata.name}')
           for i in $(seq 1 60); do
-            RESPONSE=$(curl -sf --connect-timeout 5 --max-time 10 "${SONAR_HOST_URL%/}/api/system/status" 2>/dev/null) || RESPONSE=""
+            RESPONSE=$(kubectl exec -n sonarqube "$SONAR_POD" -- curl -sf --connect-timeout 5 --max-time 10 "http://localhost:9000/api/system/status" 2>/dev/null) || RESPONSE=""
             if [ -n "$RESPONSE" ]; then
               STATUS=$(echo "$RESPONSE" | jq -r '.status // "UNKNOWN"' 2>/dev/null) || STATUS="UNKNOWN"
             else
@@ -62,16 +81,17 @@ jobs:
             sleep 5
           done
           echo "::error::SonarQube did not become healthy within 5 minutes"
-          docker compose -f .github/docker-compose.sonarqube.yml logs --tail=50
+          kubectl logs -n sonarqube "$SONAR_POD" --tail=50
           exit 1
 
       - name: Report SonarQube status
         run: |
-          VERSION=$(curl -sf "${SONAR_HOST_URL%/}/api/system/status" | jq -r '.version // "unknown"')
+          SONAR_POD=$(kubectl get pod -n sonarqube -l app.kubernetes.io/name=sonarqube -o jsonpath='{.items[0].metadata.name}')
+          VERSION=$(kubectl exec -n sonarqube "$SONAR_POD" -- curl -sf "http://localhost:9000/api/system/status" | jq -r '.version // "unknown"')
           {
-            echo "## SonarQube Deployment"
+            echo "## SonarQube Deployment (k3s)"
             echo "- Status: ✅ Running"
             echo "- Version: $VERSION"
-            echo "- URL: ${SONAR_HOST_URL}"
-            echo "- Runner: $(hostname)"
+            echo "- Namespace: sonarqube"
+            echo "- Pod: $SONAR_POD"
           } >> "$GITHUB_STEP_SUMMARY"

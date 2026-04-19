@@ -25,7 +25,7 @@ permissions: {}
 jobs:
   container-image-backend:
     name: Container Image (Backend)
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner-dind
     timeout-minutes: 45
     permissions:
       contents: read
@@ -40,14 +40,6 @@ jobs:
       IMAGE_OWNER: ${{ github.repository_owner }}
       IMAGE_TAG: ${{ inputs.is-production && github.sha || format('preprod-{0}', github.sha) }}
     steps:
-      - name: Clean workspace
-        run: |
-          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
-            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
-            exit 1
-          fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -202,7 +194,7 @@ jobs:
 
   container-image-frontend:
     name: Container Image (Frontend)
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner-dind
     timeout-minutes: 45
     permissions:
       contents: read
@@ -217,14 +209,6 @@ jobs:
       IMAGE_OWNER: ${{ github.repository_owner }}
       IMAGE_TAG: ${{ inputs.is-production && github.sha || format('preprod-{0}', github.sha) }}
     steps:
-      - name: Clean workspace
-        run: |
-          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
-            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
-            exit 1
-          fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -378,7 +362,7 @@ jobs:
 
   container-image-ocr-service:
     name: Container Image (OCR Service)
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner-dind
     timeout-minutes: 45
     permissions:
       contents: read
@@ -393,14 +377,6 @@ jobs:
       IMAGE_OWNER: ${{ github.repository_owner }}
       IMAGE_TAG: ${{ inputs.is-production && github.sha || format('preprod-{0}', github.sha) }}
     steps:
-      - name: Clean workspace
-        run: |
-          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
-            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
-            exit 1
-          fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
