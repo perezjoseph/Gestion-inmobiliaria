@@ -85,20 +85,28 @@ spec:
             limits:
               cpu: "2"
               memory: 2Gi
+          startupProbe:
+            httpGet:
+              path: /api/system/status
+              port: 9000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /api/system/status
               port: 9000
-            initialDelaySeconds: 60
             periodSeconds: 15
             timeoutSeconds: 5
+            failureThreshold: 3
           livenessProbe:
             httpGet:
               path: /api/system/status
               port: 9000
-            initialDelaySeconds: 120
             periodSeconds: 30
             timeoutSeconds: 10
+            failureThreshold: 5
           securityContext:
             allowPrivilegeEscalation: false
       volumes:

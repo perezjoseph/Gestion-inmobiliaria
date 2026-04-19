@@ -14,15 +14,23 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Ensure OpenSSL development headers are available
+    - name: Ensure build tools and OpenSSL development headers are available
       shell: bash
       run: |
-        if pkg-config --exists openssl 2>/dev/null; then
-          echo "OpenSSL development headers already available ($(pkg-config --modversion openssl))"
-        else
-          echo "OpenSSL headers missing -- installing via apt"
+        NEED_INSTALL=false
+        if ! command -v cc >/dev/null 2>&1; then
+          echo "C linker (cc) missing -- will install build-essential"
+          NEED_INSTALL=true
+        fi
+        if ! pkg-config --exists openssl 2>/dev/null; then
+          echo "OpenSSL headers missing -- will install libssl-dev"
+          NEED_INSTALL=true
+        fi
+        if [ "$NEED_INSTALL" = true ]; then
           sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends pkg-config libssl-dev
+          sudo apt-get install -y -qq --no-install-recommends build-essential pkg-config libssl-dev
+        else
+          echo "Build tools and OpenSSL headers already available (cc: $(cc --version | head -1), openssl: $(pkg-config --modversion openssl))"
         fi
 
     - name: Install Rust toolchain
