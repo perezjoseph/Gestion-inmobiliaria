@@ -1,0 +1,23 @@
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: arc-deploy
+  namespace: arc-systems
+spec:
+  replicas: 1
+  template:
+    spec:
+      repository: perezjoseph/Gestion-inmobiliaria
+      labels:
+        - arc-runner
+        - arc-runner-dind
+        - arc-deploy
+      nodeSelector:
+        role: server
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          cpu: 250m
+          memory: 1Gi

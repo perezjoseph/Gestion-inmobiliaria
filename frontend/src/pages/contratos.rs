@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use gloo_events::EventListener;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
@@ -5,17 +7,20 @@ use yew::prelude::*;
 use yew_router::prelude::*;
 
 use crate::app::{AuthContext, Route};
+use crate::components::common::confidence_input::ConfidenceInput;
 use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::error_banner::ErrorBanner;
-use crate::components::common::loading::Loading;
+use crate::components::common::ocr_scan_button::OcrScanButton;
+use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::pagination::Pagination;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{api_delete, api_get, api_post, api_put};
 use crate::types::PaginatedResponse;
 use crate::types::contrato::{Contrato, CreateContrato, UpdateContrato};
 use crate::types::inquilino::Inquilino;
+use crate::types::ocr::OcrExtractField;
 use crate::types::propiedad::Propiedad;
 use crate::utils::{
     EscapeHandler, can_delete, can_write, field_error, format_date_display, input_class,
@@ -78,21 +83,15 @@ struct ContratoFormProps {
     submitting: bool,
     on_submit: Callback<SubmitEvent>,
     on_cancel: Callback<MouseEvent>,
+    confidences: HashMap<String, f64>,
+    on_ocr_result: Callback<Vec<OcrExtractField>>,
+    on_confidence_clear: Callback<String>,
 }
 
 #[function_component]
 fn ContratoForm(props: &ContratoFormProps) -> Html {
     let fe = props.form_errors.clone();
 
-    macro_rules! input_cb {
-        ($state:expr) => {{
-            let s = $state.clone();
-            Callback::from(move |e: InputEvent| {
-                let input: web_sys::HtmlInputElement = e.target_unchecked_into();
-                s.set(input.value());
-            })
-        }};
-    }
     macro_rules! select_cb {
         ($state:expr) => {{
             let s = $state.clone();
@@ -103,10 +102,40 @@ fn ContratoForm(props: &ContratoFormProps) -> Html {
         }};
     }
 
+    let confidence_for = |name: &str| -> Option<f64> {
+        props.confidences.get(name).copied()
+    };
+
+    let input_cb_conf = |state: &UseStateHandle<String>, field_name: &str| -> Callback<InputEvent> {
+        let s = state.clone();
+        let clear = props.on_confidence_clear.clone();
+        let name = field_name.to_string();
+        Callback::from(move |e: InputEvent| {
+            let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+            s.set(input.value());
+            clear.emit(name.clone());
+        })
+    };
+
+    let scan_button = if !props.is_editing {
+        html! {
+            <OcrScanButton
+                document_type="contrato"
+                on_result={props.on_ocr_result.clone()}
+                label={AttrValue::from("📷 Escanear Contrato")}
+            />
+        }
+    } else {
+        html! {}
+    };
+
     html! {
         <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
-            <h2 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
-                {if props.is_editing { "Editar Contrato" } else { "Nuevo Contrato" }}</h2>
+            <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4);">
+                <h2 class="text-display" style="font-size: var(--text-lg); font-weight: 600; color: var(--text-primary);">
+                    {if props.is_editing { "Editar Contrato" } else { "Nuevo Contrato" }}</h2>
+                {scan_button}
+            </div>
             <form onsubmit={props.on_submit.clone()} style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
                 <div>
                     <label class="gi-label">{"Propiedad *"}</label>
@@ -134,25 +163,45 @@ fn ContratoForm(props: &ContratoFormProps) -> Html {
                 </div>
                 <div>
                     <label class="gi-label" title="No puede solaparse con otro contrato activo de la misma propiedad">{"Fecha Inicio *"}</label>
-                    <input type="date" value={(*props.fecha_inicio).clone()} oninput={input_cb!(props.fecha_inicio)} disabled={props.is_editing}
-                        class={input_class(fe.fecha_inicio.is_some())} />
+                    <ConfidenceInput
+                        value={AttrValue::from((*props.fecha_inicio).clone())}
+                        confidence={confidence_for("fecha_inicio")}
+                        oninput={input_cb_conf(&props.fecha_inicio, "fecha_inicio")}
+                        input_type="date"
+                        class={AttrValue::from(if fe.fecha_inicio.is_some() { "gi-input-error" } else { "" })}
+                    />
                     {field_error(&fe.fecha_inicio)}
                 </div>
                 <div>
                     <label class="gi-label" title="Debe ser posterior a la fecha de inicio. No puede solaparse con otro contrato activo">{"Fecha Fin *"}</label>
-                    <input type="date" value={(*props.fecha_fin).clone()} oninput={input_cb!(props.fecha_fin)}
-                        class={input_class(fe.fecha_fin.is_some())} />
+                    <ConfidenceInput
+                        value={AttrValue::from((*props.fecha_fin).clone())}
+                        confidence={confidence_for("fecha_fin")}
+                        oninput={input_cb_conf(&props.fecha_fin, "fecha_fin")}
+                        input_type="date"
+                        class={AttrValue::from(if fe.fecha_fin.is_some() { "gi-input-error" } else { "" })}
+                    />
                     {field_error(&fe.fecha_fin)}
                 </div>
                 <div>
                     <label class="gi-label">{"Monto Mensual *"}</label>
-                    <input type="number" step="0.01" min="0" value={(*props.monto_mensual).clone()} oninput={input_cb!(props.monto_mensual)}
-                        class={input_class(fe.monto_mensual.is_some())} />
+                    <ConfidenceInput
+                        value={AttrValue::from((*props.monto_mensual).clone())}
+                        confidence={confidence_for("monto_mensual")}
+                        oninput={input_cb_conf(&props.monto_mensual, "monto_mensual")}
+                        input_type="number"
+                        class={AttrValue::from(if fe.monto_mensual.is_some() { "gi-input-error" } else { "" })}
+                    />
                     {field_error(&fe.monto_mensual)}
                 </div>
                 <div>
                     <label class="gi-label">{"Depósito"}</label>
-                    <input type="number" step="0.01" min="0" value={(*props.deposito).clone()} oninput={input_cb!(props.deposito)} class="gi-input" />
+                    <ConfidenceInput
+                        value={AttrValue::from((*props.deposito).clone())}
+                        confidence={confidence_for("deposito")}
+                        oninput={input_cb_conf(&props.deposito, "deposito")}
+                        input_type="number"
+                    />
                 </div>
                 <div>
                     <label class="gi-label">{"Moneda"}</label>
@@ -797,9 +846,12 @@ fn render_contratos_view(
     on_terminate_click: Callback<Contrato>,
     on_page_change: Callback<u64>,
     on_per_page_change: Callback<u64>,
+    confidences: &UseStateHandle<HashMap<String, f64>>,
+    on_ocr_result: Callback<Vec<OcrExtractField>>,
+    on_confidence_clear: Callback<String>,
 ) -> Html {
     if loading {
-        return html! { <Loading /> };
+        return html! { <TableSkeleton title_width="180px" columns={7} /> };
     }
 
     let last_header: String = if can_write(user_rol) {
@@ -854,6 +906,9 @@ fn render_contratos_view(
         submitting,
         on_submit,
         on_cancel,
+        confidences,
+        on_ocr_result,
+        on_confidence_clear,
     );
 
     html! {
@@ -959,6 +1014,9 @@ fn render_contrato_form_section(
     submitting: bool,
     on_submit: Callback<SubmitEvent>,
     on_cancel: Callback<MouseEvent>,
+    confidences: &UseStateHandle<HashMap<String, f64>>,
+    on_ocr_result: Callback<Vec<OcrExtractField>>,
+    on_confidence_clear: Callback<String>,
 ) -> Html {
     if !show_form {
         return html! {};
@@ -973,6 +1031,8 @@ fn render_contrato_form_section(
             propiedades={(**propiedades).clone()} inquilinos={(**inquilinos).clone()}
             form_errors={(**form_errors).clone()} submitting={submitting}
             on_submit={on_submit} on_cancel={on_cancel}
+            confidences={(**confidences).clone()} on_ocr_result={on_ocr_result}
+            on_confidence_clear={on_confidence_clear}
         />
     }
 }
@@ -1016,6 +1076,8 @@ pub fn Contratos() -> Html {
     let renew_monto = use_state(String::new);
     let terminate_target = use_state(|| Option::<Contrato>::None);
     let terminate_fecha = use_state(String::new);
+
+    let confidences = use_state(HashMap::<String, f64>::new);
 
     {
         let items = items.clone();
@@ -1078,6 +1140,7 @@ pub fn Contratos() -> Html {
         let editing = editing.clone();
         let show_form = show_form.clone();
         let form_errors = form_errors.clone();
+        let confidences = confidences.clone();
         move || {
             propiedad_id.set(String::new());
             inquilino_id.set(String::new());
@@ -1090,6 +1153,7 @@ pub fn Contratos() -> Html {
             editing.set(None);
             show_form.set(false);
             form_errors.set(FormErrors::default());
+            confidences.set(HashMap::new());
         }
     };
 
@@ -1207,6 +1271,39 @@ pub fn Contratos() -> Html {
 
     let on_cancel = super::page_helpers::cancel_cb(reset_form.clone());
 
+    let on_ocr_result = {
+        let monto_mensual = monto_mensual.clone();
+        let moneda = moneda.clone();
+        let fecha_inicio = fecha_inicio.clone();
+        let fecha_fin = fecha_fin.clone();
+        let deposito = deposito.clone();
+        let confidences = confidences.clone();
+        Callback::from(move |fields: Vec<OcrExtractField>| {
+            let mut conf_map = HashMap::new();
+            for field in &fields {
+                match field.name.as_str() {
+                    "monto_mensual" => monto_mensual.set(field.value.clone()),
+                    "moneda" => moneda.set(field.value.clone()),
+                    "fecha_inicio" => fecha_inicio.set(field.value.clone()),
+                    "fecha_fin" => fecha_fin.set(field.value.clone()),
+                    "deposito" => deposito.set(field.value.clone()),
+                    _ => {}
+                }
+                conf_map.insert(field.name.clone(), field.confidence);
+            }
+            confidences.set(conf_map);
+        })
+    };
+
+    let on_confidence_clear = {
+        let confidences = confidences.clone();
+        Callback::from(move |name: String| {
+            let mut c = (*confidences).clone();
+            c.remove(&name);
+            confidences.set(c);
+        })
+    };
+
     let on_renew_click = {
         let renew_target = renew_target.clone();
         let renew_monto = renew_monto.clone();
@@ -1311,5 +1408,8 @@ pub fn Contratos() -> Html {
         on_terminate_click,
         on_page_change,
         on_per_page_change,
+        &confidences,
+        on_ocr_result,
+        on_confidence_clear,
     )
 }

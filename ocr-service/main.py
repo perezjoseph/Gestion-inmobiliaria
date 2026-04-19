@@ -3,14 +3,16 @@ import re
 
 import fitz
 import numpy as np
-from fastapi import FastAPI, File, UploadFile
+from typing import Optional
+
+from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import JSONResponse
 from paddleocr import PaddleOCR
 from PIL import Image
 
 app = FastAPI(title="OCR Service")
 
-ocr_engine = PaddleOCR(use_angle_cls=True, lang="es", use_gpu=False)
+ocr_engine = PaddleOCR(use_textline_orientation=True, lang="es", device="cpu")
 
 
 @app.get("/health")
@@ -42,6 +44,10 @@ def _classify_document(lines: list[dict]) -> str:
     """Classify document type based on keyword heuristics in extracted text."""
     combined = " ".join(line["text"] for line in lines).upper()
 
+    if any(kw in combined for kw in ("CEDULA", "IDENTIDAD", "ELECTORAL", "REPUBLICA DOMINICANA")):
+        return "cedula"
+    if any(kw in combined for kw in ("CONTRATO", "ARRENDAMIENTO", "ALQUILER")):
+        return "contrato"
     if any(kw in combined for kw in ("DEPOSITO", "AHORROS", "BANCO")):
         return "deposito_bancario"
     if any(kw in combined for kw in ("FACTURA", "RECIBO", "COMPROBANTE")):
@@ -154,6 +160,90 @@ def _extract_structured_fields(lines: list[dict], document_type: str) -> dict:
                     fields["numero_factura"] = line_texts[i + 1].strip()
                 break
 
+    elif document_type == "cedula":
+        cedula_match = re.search(r'\d{3}-?\d{7}-?\d', combined)
+        if cedula_match:
+            raw = re.sub(r'[^0-9]', '', cedula_match.group())
+            fields["cedula"] = f"{raw[:3]}-{raw[3:10]}-{raw[10]}"
+
+        header_indices = []
+        for i, upper in enumerate(line_texts_upper):
+            if any(kw in upper for kw in ("CEDULA", "IDENTIDAD", "ELECTORAL", "REPUBLICA DOMINICANA")):
+                header_indices.append(i)
+
+        if header_indices:
+            start = max(header_indices) + 1
+            remaining = [t.strip() for t in line_texts[start:] if t.strip()]
+            alpha_lines = [
+                t for t in remaining
+                if re.search(r'[A-Za-zÁÉÍÓÚáéíóúÑñ]', t) and not re.match(r'^[\d\s.,$/-]+$', t)
+            ]
+            if len(alpha_lines) >= 2:
+                fields["nombre"] = alpha_lines[0]
+                fields["apellido"] = alpha_lines[1]
+            elif len(alpha_lines) == 1:
+                fields["nombre"] = alpha_lines[0]
+
+    elif document_type == "contrato":
+        moneda_match = re.search(r'(RD\$|US\$)', combined)
+        fields["moneda"] = moneda_match.group(1) if moneda_match else "RD$"
+
+        for i, upper in enumerate(line_texts_upper):
+            if any(kw in upper for kw in ("CANON", "RENTA", "MENSUAL", "ALQUILER")):
+                monto_match = re.search(r'(?:RD\$|US\$)?\s*[\d,]+\.\d{2}', line_texts[i])
+                if monto_match:
+                    fields["monto_mensual"] = monto_match.group().strip()
+                    break
+                for j in range(max(0, i - 1), min(len(line_texts), i + 3)):
+                    monto_match = re.search(r'(?:RD\$|US\$)?\s*[\d,]+\.\d{2}', line_texts[j])
+                    if monto_match:
+                        fields["monto_mensual"] = monto_match.group().strip()
+                        break
+                if "monto_mensual" in fields:
+                    break
+
+        for i, upper in enumerate(line_texts_upper):
+            if any(kw in upper for kw in ("DESDE", "INICIO", "VIGENCIA")):
+                fecha_match = re.search(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}', line_texts[i])
+                if fecha_match:
+                    fields["fecha_inicio"] = fecha_match.group()
+                    break
+                for j in range(i, min(len(line_texts), i + 3)):
+                    fecha_match = re.search(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}', line_texts[j])
+                    if fecha_match:
+                        fields["fecha_inicio"] = fecha_match.group()
+                        break
+                if "fecha_inicio" in fields:
+                    break
+
+        for i, upper in enumerate(line_texts_upper):
+            if any(kw in upper for kw in ("HASTA", "FIN", "VENCIMIENTO")):
+                fecha_match = re.search(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}', line_texts[i])
+                if fecha_match:
+                    fields["fecha_fin"] = fecha_match.group()
+                    break
+                for j in range(i, min(len(line_texts), i + 3)):
+                    fecha_match = re.search(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}', line_texts[j])
+                    if fecha_match:
+                        fields["fecha_fin"] = fecha_match.group()
+                        break
+                if "fecha_fin" in fields:
+                    break
+
+        for i, upper in enumerate(line_texts_upper):
+            if any(kw in upper for kw in ("DEPOSITO", "GARANTIA")):
+                dep_match = re.search(r'(?:RD\$|US\$)?\s*[\d,]+\.\d{2}', line_texts[i])
+                if dep_match:
+                    fields["deposito"] = dep_match.group().strip()
+                    break
+                for j in range(max(0, i - 1), min(len(line_texts), i + 3)):
+                    dep_match = re.search(r'(?:RD\$|US\$)?\s*[\d,]+\.\d{2}', line_texts[j])
+                    if dep_match:
+                        fields["deposito"] = dep_match.group().strip()
+                        break
+                if "deposito" in fields:
+                    break
+
     return fields
 
 
@@ -177,7 +267,10 @@ def _run_ocr(img_array: np.ndarray) -> list[dict]:
 
 
 @app.post("/ocr/extract")
-async def ocr_extract(image: UploadFile = File(...)):
+async def ocr_extract(
+    image: UploadFile = File(...),
+    document_type: Optional[str] = Form(None),
+):
     if image.content_type not in ALLOWED_CONTENT_TYPES:
         return JSONResponse(
             status_code=422,
@@ -199,12 +292,15 @@ async def ocr_extract(image: UploadFile = File(...)):
 
     lines = _run_ocr(img_array)
 
-    document_type = _classify_document(lines)
+    if document_type:
+        doc_type = document_type
+    else:
+        doc_type = _classify_document(lines)
 
-    structured_fields = _extract_structured_fields(lines, document_type)
+    structured_fields = _extract_structured_fields(lines, doc_type)
 
     return JSONResponse(content={
-        "document_type": document_type,
+        "document_type": doc_type,
         "lines": lines,
         "structured_fields": structured_fields,
     })

@@ -9,6 +9,11 @@ on:
       is-fork-pr:
         type: boolean
         required: true
+    secrets:
+      WEBHOOK_SECRET:
+        required: true
+      WEBHOOK_HOST:
+        required: true
     outputs:
       secret-scan-result:
         value: ${{ jobs.secret-scan.result }}
@@ -30,20 +35,12 @@ permissions: {}
 jobs:
   secret-scan:
     name: Secret Scanning (Gitleaks)
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner
     timeout-minutes: 10
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read
     steps:
-      - name: Clean workspace
-        run: |
-          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
-            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
-            exit 1
-          fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -81,7 +78,7 @@ jobs:
 
   dependency-review:
     name: Dependency Review (PR)
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner
     timeout-minutes: 10
     if: ${{ inputs.is-pr }}
     permissions:
@@ -102,7 +99,7 @@ jobs:
 
   quality-gate:
     name: Dependency Security & Health Check
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner
     timeout-minutes: 30
     if: ${{ !inputs.is-fork-pr }}
     permissions:
@@ -119,22 +116,13 @@ jobs:
         id: start
         run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
 
-      - name: Clean workspace
-        run: |
-          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
-            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
-            exit 1
-          fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-          clean: false
 
-      - name: Install Rust stable toolchain
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      - name: Setup Rust toolchain and cache
+        uses: ./.github/actions/rust-setup
 
       - name: Install cargo-audit for CVE scanning
         id: install_audit
@@ -381,15 +369,6 @@ jobs:
           category: trivy-iac
         continue-on-error: true
 
-      - name: Scan source code for embedded secrets (Trivy)
-        id: trivy_secret
-        if: always() && steps.install_trivy.outputs.installed == 'true'
-        timeout-minutes: 5
-        run: |
-          trivy fs --scanners secret --exit-code 1 --no-progress --format table \
-            --skip-dirs target --skip-dirs node_modules --skip-dirs dist --skip-dirs .git \
-            . 2>&1 | tee "${RUNNER_TEMP}/trivy-secret-output.txt"
-
       - name: Generate cargo-audit SARIF report
         if: always() && steps.install_audit.outputs.installed == 'true'
         run: |
@@ -458,12 +437,11 @@ jobs:
             echo "| cargo audit | ${{ steps.cargo_audit.outcome == 'success' && '✅ Pass' || (steps.install_audit.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
             echo "| cargo deny | ${{ steps.cargo_deny.outcome == 'success' && '✅ Pass' || (steps.install_deny.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
             echo "| Trivy IaC scan | ${{ steps.trivy_iac.outcome == 'success' && '✅ Pass' || (steps.install_trivy.outputs.installed != 'true' && '⏭️ Skipped' || '⚠️ Findings') }} |"
-            echo "| Trivy secret scan | ${{ steps.trivy_secret.outcome == 'success' && '✅ Pass' || (steps.install_trivy.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect quality-gate errors for notification
         id: collect-errors
-        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.trivy_iac.outcome == 'failure' || steps.trivy_secret.outcome == 'failure')
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.trivy_iac.outcome == 'failure')
         run: |
           ERROR=""
           FAILED=""
@@ -479,10 +457,6 @@ jobs:
             FAILED="${FAILED}trivy-iac,"
             ERROR="${ERROR}[trivy-iac] $(head -c 2000 "${RUNNER_TEMP}/trivy-iac-output.txt" 2>/dev/null || echo 'Trivy found Dockerfile/compose misconfigurations.')\n\n"
           fi
-          if [ "${{ steps.trivy_secret.outcome }}" = "failure" ]; then
-            FAILED="${FAILED}trivy-secret,"
-            ERROR="${ERROR}[trivy-secret] $(head -c 2000 "${RUNNER_TEMP}/trivy-secret-output.txt" 2>/dev/null || echo 'Trivy found embedded secrets in source code.')\n\n"
-          fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT
@@ -497,14 +471,8 @@ jobs:
           start-time: ${{ steps.start.outputs.time }}
 
       - name: Fail job if any quality step failed
-        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.trivy_iac.outcome == 'failure' || steps.trivy_secret.outcome == 'failure')
+        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.trivy_iac.outcome == 'failure')
         run: exit 1
-
-      - name: Clean up sensitive temp files
-        if: always()
-        run: |
-          rm -f "${RUNNER_TEMP}/audit-output.txt" "${RUNNER_TEMP}/deny-output.txt" "${RUNNER_TEMP}/trivy-iac-output.txt" "${RUNNER_TEMP}/trivy-secret-output.txt" "${RUNNER_TEMP}/install-audit-output.txt" "${RUNNER_TEMP}/cargo-audit.tgz" "${RUNNER_TEMP}/cargo-deny.tar.gz"
-          rm -f cargo-audit.sarif cargo-deny.sarif trivy-iac.sarif
 
       - name: Notify webhook on failure
         if: failure()

@@ -3,7 +3,7 @@ use yew::prelude::*;
 
 use crate::components::common::data_table::DataTable;
 use crate::components::common::error_banner::ErrorBanner;
-use crate::components::common::loading::Loading;
+use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::pagination::Pagination;
 use crate::services::api::api_get;
 use crate::types::PaginatedResponse;
@@ -83,7 +83,7 @@ pub fn Auditoria() -> Html {
     };
 
     if *loading {
-        return html! { <Loading /> };
+        return html! { <TableSkeleton title_width="260px" columns={5} has_filter=true /> };
     }
 
     let headers = vec![

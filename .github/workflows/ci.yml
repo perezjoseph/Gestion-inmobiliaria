@@ -27,7 +27,7 @@ permissions: {}
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -40,30 +40,11 @@ env:
   RUSTFLAGS: "-D warnings"
 
 jobs:
-  # ── Stage 0: Runner Disk Cleanup ──
-
-  runner-cleanup:
-    name: Runner Disk Cleanup
-    runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 5
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    permissions:
-      contents: read
-    steps:
-      - name: Check disk space
-        run: |
-          CHECK_PATH="/tmp"
-          AVAIL_KB=$(df -k "$CHECK_PATH" | awk 'NR==2 {print $4}')
-          AVAIL_MB=$((AVAIL_KB / 1024))
-          echo "Available disk space on $CHECK_PATH: ${AVAIL_MB}MB"
-          echo "Disk space OK (${AVAIL_MB}MB) -- self-hosted runner."
-
-  # ── Stage 0.5: Path-Based Change Detection ──
+  # ── Stage 0: Path-Based Change Detection ──
 
   changes:
     name: Detect Changes
-    needs: [runner-cleanup]
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner
     timeout-minutes: 3
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -102,7 +83,7 @@ jobs:
 
   security:
     name: Security
-    needs: [runner-cleanup, changes]
+    needs: [changes]
     permissions:
       actions: read
       contents: read
@@ -112,11 +93,13 @@ jobs:
     with:
       is-pr: ${{ github.event_name == 'pull_request' }}
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
-    secrets: inherit
+    secrets:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
 
   lint:
     name: Lint
-    needs: [runner-cleanup, changes]
+    needs: [changes]
     if: >-
       github.event_name != 'pull_request' ||
       needs.changes.outputs.backend == 'true' ||
@@ -127,11 +110,13 @@ jobs:
     uses: ./.github/workflows/lint.yml
     with:
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
-    secrets: inherit
+    secrets:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
 
   tests:
     name: Tests
-    needs: [runner-cleanup, changes]
+    needs: [changes]
     if: >-
       github.event_name != 'pull_request' ||
       needs.changes.outputs.backend == 'true' ||
@@ -142,7 +127,9 @@ jobs:
     uses: ./.github/workflows/test.yml
     with:
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
-    secrets: inherit
+    secrets:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
 
   # ── Stage 1.5: SonarQube (after lint + tests) ──
 
@@ -150,13 +137,14 @@ jobs:
     name: SonarQube
     needs: [lint, tests, changes]
     if: >-
-      always() && (
+      always() &&
+      needs.lint.result == 'success' &&
+      needs.tests.result == 'success' &&
+      (
         github.event_name != 'pull_request' ||
         needs.changes.outputs.backend == 'true' ||
         needs.changes.outputs.frontend == 'true' ||
-        needs.changes.outputs.android == 'true' ||
-        needs.lint.result == 'success' ||
-        needs.tests.result == 'success'
+        needs.changes.outputs.android == 'true'
       )
     permissions:
       contents: read
@@ -167,7 +155,12 @@ jobs:
       test-backend-result: ${{ needs.tests.outputs.test-backend-result || needs.tests.result }}
       test-frontend-result: ${{ needs.tests.outputs.test-frontend-result || needs.tests.result }}
       coverage-backend-result: ${{ needs.tests.outputs.test-backend-result || 'skipped' }}
-    secrets: inherit
+    secrets:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_ADMIN_PASSWORD: ${{ secrets.SONAR_ADMIN_PASSWORD }}
 
   # ── Stage 2: Build (after lint passes) ──
 
@@ -188,16 +181,17 @@ jobs:
       id-token: write
       attestations: write
     uses: ./.github/workflows/build.yml
-    secrets: inherit
+    secrets:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
 
-  # ── Stage 3: Container Images (after builds + security + tests pass, main only) ──
+  # ── Stage 3: Container Images (after builds + security + tests pass) ──
 
   containers:
     name: Containers
     needs: [build, security, tests]
     if: |
       always() &&
-      github.ref == 'refs/heads/main' && github.event_name == 'push' &&
       needs.build.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.tests.result == 'success'
@@ -208,7 +202,11 @@ jobs:
       id-token: write
       attestations: write
     uses: ./.github/workflows/containers.yml
-    secrets: inherit
+    with:
+      is-production: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    secrets:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
 
   # ── Stage 4: Deploy (after containers are pushed) ──
 
@@ -223,7 +221,12 @@ jobs:
     with:
       backend-digest: ${{ needs.containers.outputs.backend-digest }}
       frontend-digest: ${{ needs.containers.outputs.frontend-digest }}
-    secrets: inherit
+      ocr-service-digest: ${{ needs.containers.outputs.ocr-service-digest }}
+    secrets:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
   # ── Stage 5: Pipeline Self-Improvement (after everything) ──
 
@@ -246,6 +249,7 @@ jobs:
       build-backend-result: ${{ needs.build.outputs.build-backend-result || '' }}
       container-backend-result: ${{ needs.containers.result || '' }}
       container-frontend-result: ${{ needs.containers.result || '' }}
+      container-ocr-service-result: ${{ needs.containers.result || '' }}
       deploy-result: ${{ needs.deploy.result || '' }}
       lint-error-log: ${{ needs.lint.outputs.error_log || '' }}
       test-backend-error-log: ${{ needs.tests.outputs.test-backend-error-log || '' }}
@@ -261,4 +265,9 @@ jobs:
       sonarqube-duration: ${{ needs.sonarqube.outputs.duration || '' }}
       build-frontend-duration: ${{ needs.build.outputs.build-frontend-duration || '' }}
       build-backend-duration: ${{ needs.build.outputs.build-backend-duration || '' }}
-    secrets: inherit
+    secrets:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_ADMIN_PASSWORD: ${{ secrets.SONAR_ADMIN_PASSWORD }}

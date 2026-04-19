@@ -3,7 +3,7 @@ use yew::prelude::*;
 
 use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::error_banner::ErrorBanner;
-use crate::components::common::loading::Loading;
+use crate::components::common::skeleton::ReportSkeleton;
 use crate::services::api::{BASE_URL, api_get};
 use crate::types::reporte::IngresoReportSummary;
 
@@ -127,7 +127,7 @@ pub fn Reportes() -> Html {
             </div>
 
             if *loading {
-                <Loading />
+                <ReportSkeleton />
             }
 
             if let Some(ref r) = *report {

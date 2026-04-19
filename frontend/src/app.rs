@@ -1,6 +1,7 @@
 use yew::prelude::*;
 use yew_router::prelude::*;
 
+use crate::components::common::command_palette::CommandPalette;
 use crate::components::common::offline_banner::OfflineBanner;
 use crate::components::common::toast::{ToastContainer, ToastContext, ToastState};
 use crate::components::layout::footer::Footer;
@@ -9,6 +10,7 @@ use crate::components::layout::sidebar::Sidebar;
 use crate::pages::auditoria::Auditoria;
 use crate::pages::contratos::Contratos;
 use crate::pages::dashboard::Dashboard;
+use crate::pages::gastos::Gastos;
 use crate::pages::importar::Importar;
 use crate::pages::inquilinos::Inquilinos;
 use crate::pages::login::Login;
@@ -97,6 +99,8 @@ pub enum Route {
     Contratos,
     #[at("/pagos")]
     Pagos,
+    #[at("/gastos")]
+    Gastos,
     #[at("/registro")]
     Registro,
     #[at("/reportes")]
@@ -125,6 +129,7 @@ fn switch(routes: Route) -> Html {
         Route::Inquilinos => html! { <ProtectedRoute><Inquilinos /></ProtectedRoute> },
         Route::Contratos => html! { <ProtectedRoute><Contratos /></ProtectedRoute> },
         Route::Pagos => html! { <ProtectedRoute><Pagos /></ProtectedRoute> },
+        Route::Gastos => html! { <ProtectedRoute><Gastos /></ProtectedRoute> },
         Route::Reportes => html! { <ProtectedRoute><Reportes /></ProtectedRoute> },
         Route::UsuariosPage => html! { <ProtectedRoute><Usuarios /></ProtectedRoute> },
         Route::Perfil => html! { <ProtectedRoute><Perfil /></ProtectedRoute> },
@@ -209,6 +214,7 @@ pub fn ProtectedRoute(props: &ProtectedRouteProps) -> Html {
 
     html! {
         <div class="flex min-h-screen" style="background-color: var(--surface-base);">
+            <a class="gi-skip-link" href="#gi-main-content">{"Ir al contenido principal"}</a>
             if *sidebar_open {
                 <div class="gi-sidebar-overlay open" onclick={on_close_sidebar}></div>
             }
@@ -219,11 +225,12 @@ pub fn ProtectedRoute(props: &ProtectedRouteProps) -> Html {
                     user_role={user_role}
                     on_toggle_sidebar={on_toggle_sidebar}
                 />
-                <main class="flex-1" style="padding: var(--space-5) var(--space-6);">
+                <main id="gi-main-content" class="flex-1" style="padding: var(--space-5) var(--space-6);">
                     {props.children.clone()}
                 </main>
                 <Footer />
                 <OfflineBanner />
+                <CommandPalette />
             </div>
         </div>
     }

@@ -58,7 +58,7 @@ fn format_with_commas(amount: &Decimal) -> String {
     let digits: Vec<char> = integer.chars().collect();
     let mut result = String::new();
     for (i, ch) in digits.iter().enumerate() {
-        if i > 0 && (digits.len() - i) % 3 == 0 {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
             result.push(',');
         }
         result.push(*ch);

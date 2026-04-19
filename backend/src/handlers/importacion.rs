@@ -119,7 +119,7 @@ pub async fn importar_pagos(
         ImportFormat::Image => {
             let client = OcrClient::new()?;
             let ct = content_type_from_filename(&filename);
-            let ocr_result = client.extract(&file_data, &filename, ct).await?;
+            let ocr_result = client.extract(&file_data, &filename, ct, None).await?;
             let preview = ocr_mapping::map_deposito(&ocr_result)?;
             preview_store.insert(preview.clone());
             Ok(HttpResponse::Ok().json(preview))
@@ -144,7 +144,7 @@ pub async fn importar_gastos(
         ImportFormat::Image => {
             let client = OcrClient::new()?;
             let ct = content_type_from_filename(&filename);
-            let ocr_result = client.extract(&file_data, &filename, ct).await?;
+            let ocr_result = client.extract(&file_data, &filename, ct, None).await?;
             let preview = ocr_mapping::map_gasto(&ocr_result)?;
             preview_store.insert(preview.clone());
             Ok(HttpResponse::Ok().json(preview))

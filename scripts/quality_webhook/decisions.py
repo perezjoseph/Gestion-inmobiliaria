@@ -68,7 +68,10 @@ class FixDecision:
     prompt_additions: str = ""
 
 
-def record_strategy_outcome(job: str, error_class: str, strategy: str, success: bool | None) -> None:
+def record_strategy_outcome(
+    job: str, error_class: str, strategy: str,
+    success: bool | None, confirmed: bool | None = None,
+) -> None:
     key = f"{job}|{error_class}"
     now = datetime.now().isoformat()
     with _fix_history_lock:
@@ -80,6 +83,8 @@ def record_strategy_outcome(job: str, error_class: str, strategy: str, success: 
             entry["success"] = success
         else:
             entry["shadow"] = True
+        if confirmed is not None:
+            entry["confirmed"] = confirmed
         entries.append(entry)
         stats[key] = entries
         _save_fix_history(history)
@@ -99,14 +104,22 @@ def get_ranked_strategies(job: str, error_class: str) -> list[tuple[str, float]]
     if not recent:
         log.info("no strategy history for %s", key)
         return []
-    totals: dict[str, list[bool]] = {}
+    totals: dict[str, list[float]] = {}
     for e in recent:
         if "success" not in e:
             continue
-        totals.setdefault(e["strategy"], []).append(e["success"])
+        confirmed = e.get("confirmed")
+        success = e["success"]
+        if confirmed is True and success:
+            weight = 1.0
+        elif confirmed is None and success:
+            weight = 0.5
+        else:
+            weight = 0.0
+        totals.setdefault(e["strategy"], []).append(weight)
     ranked = []
-    for strat, outcomes in totals.items():
-        rate = sum(outcomes) / len(outcomes)
+    for strat, weights in totals.items():
+        rate = sum(weights) / len(weights) if weights else 0.0
         ranked.append((strat, rate))
     ranked.sort(key=lambda x: x[1], reverse=True)
     return ranked[:MAX_STRATEGIES_IN_PROMPT]

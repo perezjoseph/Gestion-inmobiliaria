@@ -2,20 +2,31 @@ name: Container Images
 
 on:
   workflow_call:
+    inputs:
+      is-production:
+        description: "Whether this is a production build (main push). Controls tagging and latest."
+        type: boolean
+        required: true
+    secrets:
+      WEBHOOK_SECRET:
+        required: true
+      WEBHOOK_HOST:
+        required: true
     outputs:
       backend-digest:
         value: ${{ jobs.container-image-backend.outputs.digest }}
       frontend-digest:
         value: ${{ jobs.container-image-frontend.outputs.digest }}
+      ocr-service-digest:
+        value: ${{ jobs.container-image-ocr-service.outputs.digest }}
 
 permissions: {}
 
 jobs:
   container-image-backend:
     name: Container Image (Backend)
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner-dind
     timeout-minutes: 45
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: read
       packages: write
@@ -27,16 +38,8 @@ jobs:
     env:
       DOCKER_CONTENT_TRUST: "1"
       IMAGE_OWNER: ${{ github.repository_owner }}
-      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_TAG: ${{ inputs.is-production && github.sha || format('preprod-{0}', github.sha) }}
     steps:
-      - name: Clean workspace
-        run: |
-          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
-            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
-            exit 1
-          fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -52,6 +55,17 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
+      - name: Download backend binary artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: backend-binary
+          path: ${{ runner.temp }}/backend-artifact
+
+      - name: Prepare backend build context
+        run: |
+          chmod +x "${{ runner.temp }}/backend-artifact/realestate-backend"
+          cp "${{ runner.temp }}/backend-artifact/realestate-backend" realestate-backend
+
       - name: Build backend container image
         id: docker-build
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
@@ -60,6 +74,7 @@ jobs:
           file: Dockerfile.backend
           load: true
           tags: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }}
+          build-args: MODE=prebuilt
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
@@ -121,13 +136,19 @@ jobs:
 
       - name: Push backend container image
         id: push
-        run: |
-          DOCKER_CONTENT_TRUST=0 docker push ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }}
-          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }} 2>/dev/null | cut -d@ -f2)
-          echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
+        with:
+          context: .
+          file: Dockerfile.backend
+          push: true
+          tags: |
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }}
+            ${{ inputs.is-production && format('ghcr.io/{0}/realestate-backend:latest', github.repository_owner) || '' }}
+          build-args: MODE=prebuilt
+          cache-from: type=gha,scope=backend
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
           subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend
           subject-digest: ${{ steps.push.outputs.digest }}
@@ -169,13 +190,12 @@ jobs:
         run: |
           docker logout ghcr.io 2>/dev/null || true
           rm -f "${HOME}/.docker/config.json" 2>/dev/null || true
-          rm -f backend-image.sarif backend-container-sbom.cdx.json 2>/dev/null || true
+          rm -f backend-image.sarif backend-container-sbom.cdx.json realestate-backend 2>/dev/null || true
 
   container-image-frontend:
     name: Container Image (Frontend)
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner-dind
     timeout-minutes: 45
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: read
       packages: write
@@ -187,16 +207,8 @@ jobs:
     env:
       DOCKER_CONTENT_TRUST: "1"
       IMAGE_OWNER: ${{ github.repository_owner }}
-      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_TAG: ${{ inputs.is-production && github.sha || format('preprod-{0}', github.sha) }}
     steps:
-      - name: Clean workspace
-        run: |
-          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
-            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
-            exit 1
-          fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -212,6 +224,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
+      - name: Download frontend dist artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: frontend-dist
+          path: ${{ runner.temp }}/frontend-artifact
+
+      - name: Prepare frontend build context
+        run: |
+          cp -r "${{ runner.temp }}/frontend-artifact" dist
+
       - name: Build frontend container image
         id: docker-build
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
@@ -220,6 +242,7 @@ jobs:
           file: Dockerfile.frontend
           load: true
           tags: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }}
+          build-args: MODE=prebuilt
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
@@ -280,13 +303,19 @@ jobs:
 
       - name: Push frontend container image
         id: push
-        run: |
-          DOCKER_CONTENT_TRUST=0 docker push ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }}
-          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }} 2>/dev/null | cut -d@ -f2)
-          echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
+        with:
+          context: .
+          file: Dockerfile.frontend
+          push: true
+          tags: |
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }}
+            ${{ inputs.is-production && format('ghcr.io/{0}/realestate-frontend:latest', github.repository_owner) || '' }}
+          build-args: MODE=prebuilt
+          cache-from: type=gha,scope=frontend
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
           subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend
           subject-digest: ${{ steps.push.outputs.digest }}
@@ -329,3 +358,159 @@ jobs:
           docker logout ghcr.io 2>/dev/null || true
           rm -f "${HOME}/.docker/config.json" 2>/dev/null || true
           rm -f frontend-image.sarif frontend-container-sbom.cdx.json 2>/dev/null || true
+          rm -rf dist 2>/dev/null || true
+
+  container-image-ocr-service:
+    name: Container Image (OCR Service)
+    runs-on: arc-runner-dind
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      id-token: write
+      attestations: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    env:
+      DOCKER_CONTENT_TRUST: "1"
+      IMAGE_OWNER: ${{ github.repository_owner }}
+      IMAGE_TAG: ${{ inputs.is-production && github.sha || format('preprod-{0}', github.sha) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+      - name: Build OCR service container image
+        id: docker-build
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
+        with:
+          context: ./ocr-service
+          file: ./ocr-service/Dockerfile
+          load: true
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service:${{ env.IMAGE_TAG }}
+          cache-from: type=gha,scope=ocr-service
+          cache-to: type=gha,mode=max,scope=ocr-service
+
+      - name: Install Trivy
+        timeout-minutes: 3
+        run: |
+          TRIVY_VERSION="0.69.3"
+          TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
+          if command -v trivy &>/dev/null && [ "$(trivy --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" = "$TRIVY_VERSION" ]; then
+            exit 0
+          fi
+          ARCHIVE="${RUNNER_TEMP}/trivy.tar.gz"
+          curl -sSfL --proto =https --retry 3 --retry-delay 5 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          mkdir -p "${HOME}/.local/bin"
+          tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" trivy
+          rm -f "$ARCHIVE"
+          export PATH="${HOME}/.local/bin:$PATH"
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Scan container image for vulnerabilities
+        id: trivy-scan
+        run: |
+          trivy image --exit-code 1 --severity CRITICAL,HIGH \
+            --no-progress --format table \
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service:${{ env.IMAGE_TAG }} \
+            2>&1 | tee "${RUNNER_TEMP}/trivy-ocr-service-image.txt"
+
+      - name: Generate SARIF report
+        if: always()
+        run: |
+          umask 077
+          trivy image --severity CRITICAL,HIGH,MEDIUM \
+            --no-progress --format sarif --output ocr-service-image.sarif \
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service:${{ env.IMAGE_TAG }} || true
+
+      - name: Generate container SBOM
+        run: |
+          umask 077
+          trivy image --format cyclonedx --output ocr-service-container-sbom.cdx.json \
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service:${{ env.IMAGE_TAG }}
+
+      - name: Upload OCR service container SBOM
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: ocr-service-container-sbom
+          path: ocr-service-container-sbom.cdx.json
+          retention-days: 30
+
+      - name: Upload SARIF to GitHub Security
+        if: always() && hashFiles('ocr-service-image.sarif') != ''
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+        with:
+          sarif_file: ocr-service-image.sarif
+          category: trivy-ocr-service-image
+        continue-on-error: true
+
+      - name: Push OCR service container image
+        id: push
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
+        with:
+          context: ./ocr-service
+          file: ./ocr-service/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service:${{ env.IMAGE_TAG }}
+            ${{ inputs.is-production && format('ghcr.io/{0}/realestate-ocr-service:latest', github.repository_owner) || '' }}
+          cache-from: type=gha,scope=ocr-service
+
+      - name: Attest build provenance
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Collect errors
+        id: collect-errors
+        if: always() && failure()
+        run: |
+          ERROR=""
+          if [ "${{ steps.docker-build.outcome }}" = "failure" ]; then
+            ERROR="[docker-build] OCR service container image build failed."
+          elif [ "${{ steps.trivy-scan.outcome }}" = "failure" ]; then
+            ERROR="[trivy-scan] $(head -c 3000 "${RUNNER_TEMP}/trivy-ocr-service-image.txt" 2>/dev/null || echo 'Trivy found vulnerabilities in OCR service image.')"
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Notify webhook on failure
+        if: failure()
+        uses: ./.github/actions/webhook-notify
+        with:
+          job-name: container-image-ocr-service
+          step-name: docker-build-or-scan
+          error-log: ${{ steps.collect-errors.outputs.error_log }}
+          webhook-secret: ${{ secrets.WEBHOOK_SECRET }}
+          webhook-host: ${{ secrets.WEBHOOK_HOST }}
+
+      - name: Docker cleanup
+        if: always()
+        run: |
+          docker rmi ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service:${{ env.IMAGE_TAG }} 2>/dev/null || true
+          docker builder prune -f 2>/dev/null || true
+
+      - name: Credential cleanup
+        if: always()
+        run: |
+          docker logout ghcr.io 2>/dev/null || true
+          rm -f "${HOME}/.docker/config.json" 2>/dev/null || true
+          rm -f ocr-service-image.sarif ocr-service-container-sbom.cdx.json 2>/dev/null || true

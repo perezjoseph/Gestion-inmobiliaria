@@ -9,6 +9,60 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U realestate"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  ocr-service:
+    build:
+      context: ./ocr-service
+      dockerfile: Dockerfile
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    environment:
+      - PADDLE_PDX_CACHE_HOME=/app/.paddleocr
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    depends_on:
+      db:
+        condition: service_healthy
+      ocr-service:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://realestate:realestate_dev_password@db:5432/realestate
+      JWT_SECRET: local_dev_secret_key_change_in_production_32chars!
+      SERVER_PORT: "8080"
+      CORS_ORIGIN: http://localhost:8080
+      OCR_SERVICE_URL: http://ocr-service:8000
+    volumes:
+      - uploads:/app/uploads
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./Caddyfile.dev:/etc/caddy/Caddyfile
+    environment:
+      - CADDY_DEV=true
 
 volumes:
   postgres_data:
+  uploads:
+  caddy_data:
+  caddy_config:

@@ -6,6 +6,11 @@ on:
       is-fork-pr:
         type: boolean
         required: true
+    secrets:
+      WEBHOOK_SECRET:
+        required: true
+      WEBHOOK_HOST:
+        required: true
     outputs:
       test-backend-result:
         value: ${{ jobs.test-backend.result }}
@@ -25,18 +30,20 @@ permissions: {}
 jobs:
   test-backend:
     name: Backend Tests & Coverage
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner
     timeout-minutes: 45
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read
     env:
-      DATABASE_URL: postgresql://realestate:realestate_dev_password@localhost:5432/realestate
       SERVER_PORT: "8080"
       CORS_ORIGIN: http://localhost:8080
+      CARGO_BUILD_JOBS: "2"
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       duration: ${{ steps.timing.outputs.duration }}
+    # ARC k3s: services run as sidecar containers in the pod.
+    # The postgres container is accessible at localhost within the pod network.
     services:
       postgres:
         image: postgres:16@sha256:5a65324fe84dc41709ff914e90b07f3e2f577073ed27bf917d4873aca0c9ec51
@@ -52,17 +59,6 @@ jobs:
           --health-timeout 5s
           --health-retries 10
           --health-start-period 60s
-          --security-opt no-new-privileges
-          --pids-limit 256
-          --memory 512m
-          --memory-swap 512m
-          --shm-size 256m
-          --cap-drop ALL
-          --cap-add CHOWN
-          --cap-add DAC_OVERRIDE
-          --cap-add FOWNER
-          --cap-add SETGID
-          --cap-add SETUID
     steps:
       - name: Record start time
         id: start
@@ -76,11 +72,37 @@ jobs:
       - name: Setup Rust toolchain
         id: rust-setup
         uses: ./.github/actions/rust-setup
+        with:
+          components: llvm-tools-preview
 
       - name: Mask database credentials
         run: |
           echo "::add-mask::realestate_dev_password"
           echo "::add-mask::realestate"
+
+      - name: Set database URL
+        run: echo "DATABASE_URL=postgresql://realestate:realestate_dev_password@localhost:5432/realestate" >> $GITHUB_ENV
+
+      - name: Install PostgreSQL client
+        run: |
+          if ! command -v pg_isready >/dev/null 2>&1; then
+            echo "pg_isready not found -- installing postgresql-client"
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends postgresql-client
+          fi
+
+      - name: Wait for Postgres to be ready
+        run: |
+          for i in $(seq 1 60); do
+            if pg_isready -h localhost -p 5432 -U realestate 2>/dev/null; then
+              echo "Postgres is ready"
+              exit 0
+            fi
+            echo "Waiting for Postgres... attempt $i/60"
+            sleep 2
+          done
+          echo "::error::Postgres did not become ready in time"
+          exit 1
 
       - name: Generate JWT secret for tests
         run: |
@@ -121,6 +143,7 @@ jobs:
         run: |
           mkdir -p coverage
           cargo tarpaulin --locked -p realestate-backend \
+            --engine llvm \
             --out lcov --output-dir coverage \
             --timeout 300 --skip-clean
 
@@ -167,17 +190,6 @@ jobs:
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
 
-      - name: Prune cargo target directory
-        if: always()
-        run: |
-          find target -name "*.d" -type f -delete 2>/dev/null || true
-          find target -name "*.fingerprint" -type d -exec rm -rf {} + 2>/dev/null || true
-          find target/debug/deps -name "realestate_backend-*" -not -name "*.d" -type f -delete 2>/dev/null || true
-
-      - name: Clean up sensitive temp files
-        if: always()
-        run: rm -f "${RUNNER_TEMP}"/*.txt "${RUNNER_TEMP}"/*.log coverage/*.tmp 2>/dev/null || true
-
       - name: Notify webhook on failure
         if: failure()
         uses: ./.github/actions/webhook-notify
@@ -190,7 +202,7 @@ jobs:
 
   test-frontend:
     name: Frontend WASM Compilation & Tests
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner
     timeout-minutes: 20
     if: ${{ !inputs.is-fork-pr }}
     permissions:
@@ -218,14 +230,6 @@ jobs:
         id: tests
         run: cargo test --locked -p realestate-frontend --all-targets
 
-      - name: Verify Cargo.lock is up to date
-        run: |
-          if ! git diff --quiet Cargo.lock; then
-            echo "::error::Cargo.lock is out of date. Run 'cargo update' locally and commit the changes."
-            git diff Cargo.lock
-            exit 1
-          fi
-
       - name: Write test summary
         if: always()
         run: |
@@ -252,17 +256,6 @@ jobs:
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
-
-      - name: Prune cargo target directory
-        if: always()
-        run: |
-          find target -name "*.d" -type f -delete 2>/dev/null || true
-          find target -name "*.fingerprint" -type d -exec rm -rf {} + 2>/dev/null || true
-          find target/debug/deps -name "realestate_frontend-*" -not -name "*.d" -type f -delete 2>/dev/null || true
-
-      - name: Clean up sensitive temp files
-        if: always()
-        run: rm -f "${RUNNER_TEMP}"/*.txt "${RUNNER_TEMP}"/*.log 2>/dev/null || true
 
       - name: Notify webhook on failure
         if: failure()

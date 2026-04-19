@@ -47,6 +47,10 @@ on:
         type: string
         required: false
         default: ''
+      container-ocr-service-result:
+        type: string
+        required: false
+        default: ''
       deploy-result:
         type: string
         required: false
@@ -107,13 +111,24 @@ on:
         type: string
         required: false
         default: ''
+    secrets:
+      WEBHOOK_SECRET:
+        required: true
+      WEBHOOK_HOST:
+        required: true
+      SONAR_HOST_URL:
+        required: true
+      SONAR_TOKEN:
+        required: false
+      SONAR_ADMIN_PASSWORD:
+        required: false
 
 permissions: {}
 
 jobs:
   pipeline-improve:
     name: CI/CD Pipeline Self-Improvement
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner
     timeout-minutes: 10
     permissions:
       contents: read
@@ -317,6 +332,7 @@ jobs:
             echo "| build-backend | ${{ inputs.build-backend-result }} | ${{ inputs.build-backend-duration || 'n/a' }} | volume |"
             echo "| container-backend | ${{ inputs.container-backend-result }} | -- | -- |"
             echo "| container-frontend | ${{ inputs.container-frontend-result }} | -- | -- |"
+            echo "| container-ocr-service | ${{ inputs.container-ocr-service-result }} | -- | -- |"
             echo "| deploy | ${{ inputs.deploy-result }} | -- | -- |"
             echo ""
             if [ -n "${{ inputs.deprecation-report }}" ] && ! echo "${{ inputs.deprecation-report }}" | grep -q "No deprecations"; then

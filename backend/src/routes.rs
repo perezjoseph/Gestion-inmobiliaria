@@ -225,6 +225,9 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                                 web::delete().to(handlers::importacion::descartar_preview),
                             ),
                     ),
+            )
+            .service(
+                web::scope("/ocr").route("/extract", web::post().to(handlers::ocr::ocr_extract)),
             ),
     );
 }

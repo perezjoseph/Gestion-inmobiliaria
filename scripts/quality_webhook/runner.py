@@ -14,13 +14,14 @@ from .config import (
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|\x1b\][^\x07]*\x07|\x1b\(B")
 
 
-def wsl_bash(bash_command, timeout=60):
+def wsl_bash(bash_command, timeout=60, cwd=None):
     uid = uuid.uuid4().hex[:8]
     script_file = WIN_PROJECT_DIR / f".kiro-wsl-cmd-{uid}.sh"
     script_file_wsl = to_wsl_path(script_file)
+    work_dir = cwd if cwd else PROJECT_DIR
     try:
         script_file.write_text(
-            f"#!/bin/bash\nexport LANG=C.UTF-8 LC_ALL=C.UTF-8\ncd {PROJECT_DIR} && {bash_command}\n",
+            f"#!/bin/bash\nexport LANG=C.UTF-8 LC_ALL=C.UTF-8\ncd {work_dir} && {bash_command}\n",
             encoding="utf-8",
             newline="\n",
         )
@@ -87,7 +88,7 @@ def _stream_to_log(pipe, log_handle, collected, lock):
                 line_start = False
 
 
-def run_kiro(prompt, label):
+def run_kiro(prompt, label, cwd=None):
     log.info(f"Triggering kiro-cli for: {label}")
 
     if not prompt or not prompt.strip():
@@ -115,10 +116,12 @@ def run_kiro(prompt, label):
         log.error(f"Failed to write prompt file {prompt_file_win}: {e}")
         return False, ""
 
+    work_dir = cwd if cwd else PROJECT_DIR
     bash_cmd = (
         f"KIRO_PROMPT=$(cat '{prompt_file_wsl}') && "
         f"[ -n \"$KIRO_PROMPT\" ] && "
-        f"{KIRO_CLI} chat --trust-all-tools --agent sisyphus --no-interactive -- \"$KIRO_PROMPT\""
+        f"cd {work_dir} && "
+        f"{KIRO_CLI} chat --trust-all-tools --no-interactive -- \"$KIRO_PROMPT\""
     )
 
     script_uid = uuid.uuid4().hex[:8]

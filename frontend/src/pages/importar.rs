@@ -169,6 +169,8 @@ pub fn Importar() -> Html {
                         <select onchange={on_entity_change} class="gi-input">
                             <option value="propiedades" selected={*entity_type == "propiedades"}>{"Propiedades"}</option>
                             <option value="inquilinos" selected={*entity_type == "inquilinos"}>{"Inquilinos"}</option>
+                            <option value="pagos" selected={*entity_type == "pagos"}>{"Pagos"}</option>
+                            <option value="gastos" selected={*entity_type == "gastos"}>{"Gastos"}</option>
                         </select>
                     </div>
                     <div>

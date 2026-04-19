@@ -55,9 +55,7 @@ services:
       - caddy_config:/config
 
   ocr-service:
-    build:
-      context: ./ocr-service
-      dockerfile: Dockerfile
+    image: ${OCR_SERVICE_IMAGE:-ghcr.io/perezjoseph/realestate-ocr-service:latest}
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -71,7 +69,7 @@ services:
       retries: 3
       start_period: 60s
     environment:
-      - PADDLEOCR_HOME=/app/.paddleocr
+      - PADDLE_PDX_CACHE_HOME=/app/.paddleocr
 
 volumes:
   postgres_data:

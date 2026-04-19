@@ -1,0 +1,53 @@
+# Access via: https://gestion.local
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: realestate
+  namespace: realestate
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`gestion.local`)
+      kind: Rule
+      services:
+        - name: frontend
+          port: 8443
+          scheme: https
+          serversTransport: frontend-transport
+---
+# HTTP -> HTTPS redirect
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: realestate-http
+  namespace: realestate
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`gestion.local`)
+      kind: Rule
+      middlewares:
+        - name: redirect-https
+      services:
+        - name: frontend
+          port: 8443
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-https
+  namespace: realestate
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+---
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: frontend-transport
+  namespace: realestate
+spec:
+  insecureSkipVerify: true

@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 import threading
 import uuid
@@ -17,10 +18,11 @@ from .security import (
     sanitize_text, validate_name, validate_url,
 )
 from .fixers import (
-    fix_with_retry, fix_sonar_issues, improve_pipeline,
+    fix_once_and_push, fix_sonar_issues, improve_pipeline,
     _job_locks, _git_lock, _max_concurrent_fixes,
     _sonar_fix_lock, _improve_lock,
     _pending_fixes, _pending_fixes_lock,
+    _write_pipeline_escalation,
 )
 from .memory import get_memory_stats
 from .history import _load_fix_history
@@ -34,6 +36,8 @@ from .correlation import (
 )
 from .decisions import should_hold_for_correlation, record_co_failure_event, CO_FAILURE_HOLD_S, get_decision_cache_summary
 from .classifier import classify_error
+from .tracker import get_tracker, JobState
+from .queue import enqueue, dequeue, mark_done, mark_failed, requeue_stale, pending_count, cleanup_old, get_stats as get_queue_stats
 
 _thread_semaphore = threading.Semaphore(THREAD_POOL_SIZE)
 _holds_lock = threading.Lock()
@@ -43,6 +47,73 @@ _active_fix_count = 0
 _active_fix_count_lock = threading.Lock()
 _active_thread_count = 0
 _active_thread_count_lock = threading.Lock()
+
+_JOB_RESULT_ROW_RE = re.compile(
+    r"^\|\s*(?P<job>[^|]+?)\s*\|\s*(?P<status>success|failure|skipped|cancelled)\s*\|",
+    re.IGNORECASE,
+)
+_COMMIT_SHA_RE = re.compile(r"\b([0-9a-f]{7,40})\b")
+_COMMIT_LABEL_RE = re.compile(
+    r"(?:commit|sha|ref)[:\s]+([0-9a-f]{7,40})", re.IGNORECASE,
+)
+
+
+def _record_regression_event(
+    commit: str, lineage_id: str, round_number: int,
+    failed_job: str, regressed_from: list[str], overlapping_files: list[str],
+) -> None:
+    from .history import _fix_history_lock, _load_fix_history, _save_fix_history
+    event = {
+        "ts": datetime.now().isoformat(),
+        "commit": commit[:12],
+        "lineage_id": lineage_id,
+        "round": round_number,
+        "failed_job": failed_job,
+        "regressed_from_jobs": regressed_from,
+        "overlapping_files": overlapping_files,
+    }
+    with _fix_history_lock:
+        history = _load_fix_history()
+        regressions = history.setdefault("regression_events", [])
+        regressions.append(event)
+        regressions[:] = regressions[-50:]
+        _save_fix_history(history)
+    log.warning(
+        f"Regression event recorded: {failed_job} regressed from "
+        f"{regressed_from} in round {round_number} (lineage {lineage_id})"
+    )
+
+
+def _parse_job_results(report: str) -> dict[str, str]:
+    results: dict[str, str] = {}
+    if not report:
+        return results
+    for line in report.splitlines():
+        m = _JOB_RESULT_ROW_RE.match(line.strip())
+        if m:
+            job = m.group("job").strip().lower().replace(" ", "-")
+            status = m.group("status").strip().lower()
+            if job and job not in ("job", "---", ""):
+                results[job] = status
+    return results
+
+
+def _extract_commit_from_report(report: str) -> str:
+    if not report:
+        return ""
+    m = _COMMIT_LABEL_RE.search(report)
+    if m:
+        return m.group(1)
+    for line in report.splitlines():
+        line = line.strip()
+        if line.startswith("|") or line.startswith("---"):
+            continue
+        sha_match = _COMMIT_SHA_RE.search(line)
+        if sha_match:
+            candidate = sha_match.group(1)
+            if len(candidate) >= 7:
+                return candidate
+    return ""
 
 
 def _build_timing_stats():
@@ -170,6 +241,8 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 "flaky_tests": get_flaky_test_summary(),
                 "vuln_patterns": get_vuln_summary(),
                 "correlations": get_correlation_summary(),
+                "pipeline_tracker": get_tracker().get_summary(),
+                "webhook_queue": get_queue_stats(),
                 **get_decision_cache_summary(),
             }).encode(), "application/json")
             return
@@ -229,9 +302,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
         handler = handlers.get(self.path)
         if handler:
+            queue_id = enqueue(self.path, payload)
             self._send(200, b"OK", request_id=request_id)
 
-            def _guarded(fn, p, rid):
+            def _guarded(fn, p, rid, qid):
                 if not _thread_semaphore.acquire(blocking=True, timeout=30):
                     log.warning(f"[{rid}] Thread pool timed out -- deferring {self.path}")
                     return
@@ -240,14 +314,16 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     _active_thread_count += 1
                 try:
                     fn(p)
-                except Exception:
+                    mark_done(qid)
+                except Exception as exc:
                     log.exception(f"[{rid}] Handler error for {self.path}")
+                    mark_failed(qid, str(exc))
                 finally:
                     with _active_thread_count_lock:
                         _active_thread_count -= 1
                     _thread_semaphore.release()
 
-            threading.Thread(target=_guarded, args=(handler, payload, request_id), daemon=True).start()
+            threading.Thread(target=_guarded, args=(handler, payload, request_id, queue_id), daemon=True).start()
         else:
             log.warning(f"[{request_id}] Unknown endpoint: {self.path}")
             self._send(404, b"Not found", request_id=request_id)
@@ -261,6 +337,22 @@ class WebhookHandler(BaseHTTPRequestHandler):
         if gate_status == "OK":
             log.info("Quality gate passed. No action needed.")
             return
+
+        tracker = get_tracker()
+        commit = sanitize_text(payload.get("revision", ""), 64)
+        pipeline = None
+        if commit:
+            pipeline = tracker.get_or_create(commit)
+            if pipeline.deployed:
+                log.info(f"Pipeline {pipeline.lineage_id} already deployed, skipping SonarQube fix")
+                return
+            if tracker.is_budget_exhausted(commit):
+                log.error(
+                    f"Pipeline budget exhausted for lineage {pipeline.lineage_id} "
+                    f"(round {pipeline.round_number}/{pipeline.budget_total}). "
+                    f"Skipping SonarQube fix."
+                )
+                return
 
         conditions = payload.get("qualityGate", {}).get("conditions", [])
         failed = [c for c in conditions if c.get("status") == "ERROR"]
@@ -278,68 +370,70 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
         _PHASE_QUICK_MAX = 3
         _PHASE_DEEP_MAX = 6
-        last_strategy = ""
-        attempt = 0
-        while True:
-            attempt += 1
+        attempt = pipeline.round_number if commit and pipeline else 1
 
-            if attempt <= _PHASE_QUICK_MAX:
-                phase = "quick"
-            elif attempt <= _PHASE_DEEP_MAX:
-                phase = "deep"
-            else:
-                phase = "investigate"
+        if attempt <= _PHASE_QUICK_MAX:
+            phase = "quick"
+        elif attempt <= _PHASE_DEEP_MAX:
+            phase = "deep"
+        else:
+            phase = "investigate"
 
-            log.info(f"=== SonarQube fix attempt {attempt} [{phase}] ===")
+        log.info(f"=== SonarQube fix attempt (round {attempt}) [{phase}] ===")
 
-            retry_section = ""
-            if last_strategy:
-                retry_section = (
-                    f"\nPREVIOUS ATTEMPT FAILED: {last_strategy}\n"
-                    "You MUST try a DIFFERENT approach.\n"
-                )
+        if phase == "investigate":
+            prompt = (
+                f"INVESTIGATION MODE: The SonarQube quality gate has FAILED for project '{_sfp(project, 128)}' "
+                f"after multiple failed fix attempts (round {attempt}).\n\n"
+                f"Failed conditions: {_sfp(failures_summary, 1000)}\n\n"
+                "MANDATORY INVESTIGATION STEPS:\n"
+                "1. Fetch the specific SonarQube issues via the API or web UI\n"
+                "2. Read EVERY file mentioned + their imports and callers\n"
+                "3. Check git log -10 for recent changes to affected files\n"
+                "4. Search the web for the SonarQube rule IDs if unfamiliar\n"
+                "5. Read .kiro/steering/ for project conventions\n"
+                "6. Write a 3-sentence plan BEFORE editing any file\n\n"
+                "THEN fix, verify with cargo fmt, clippy, and test.\n"
+                "Stage: git add -A. Do NOT commit."
+            )
+        elif phase == "deep":
+            prompt = (
+                f"DEEP RESEARCH: The SonarQube quality gate FAILED for project '{_sfp(project, 128)}'. "
+                f"Quick fixes did not work (round {attempt}).\n\n"
+                f"Failed conditions: {_sfp(failures_summary, 1000)}\n\n"
+                "Fetch the specific issues, understand the root cause deeply. "
+                "Read the affected files and their context before making changes. "
+                "Fix them, verify with cargo fmt, clippy, and test.\n"
+                "Stage: git add -A. Do NOT commit."
+            )
+        else:
+            prompt = (
+                f"The SonarQube quality gate FAILED for project '{_sfp(project, 128)}'. "
+                f"Failed conditions: {_sfp(failures_summary, 1000)}. "
+                "Fetch the specific issues, fix them, verify with cargo fmt, clippy, and test. "
+                "Stage: git add -A. Do NOT commit."
+            )
 
-            if phase == "investigate":
-                prompt = (
-                    f"INVESTIGATION MODE: The SonarQube quality gate has FAILED for project '{_sfp(project, 128)}' "
-                    f"after {attempt - 1} failed fix attempts.\n\n"
-                    f"Failed conditions: {_sfp(failures_summary, 1000)}\n\n"
-                    "MANDATORY INVESTIGATION STEPS:\n"
-                    "1. Fetch the specific SonarQube issues via the API or web UI\n"
-                    "2. Read EVERY file mentioned + their imports and callers\n"
-                    "3. Check git log -10 for recent changes to affected files\n"
-                    "4. Search the web for the SonarQube rule IDs if unfamiliar\n"
-                    "5. Read .kiro/steering/ for project conventions\n"
-                    "6. Write a 3-sentence plan BEFORE editing any file\n\n"
-                    "THEN fix, verify with cargo fmt, clippy, and test.\n"
-                    f"{retry_section}"
-                    "Stage: git add -A && git commit -m 'fix: resolve SonarQube failures (auto-fix)' && git push origin main"
-                )
-            elif phase == "deep":
-                prompt = (
-                    f"DEEP RESEARCH: The SonarQube quality gate FAILED for project '{_sfp(project, 128)}'. "
-                    f"Quick fixes (attempts 1-{_PHASE_QUICK_MAX}) did not work.\n\n"
-                    f"Failed conditions: {_sfp(failures_summary, 1000)}\n\n"
-                    "Fetch the specific issues, understand the root cause deeply. "
-                    "Read the affected files and their context before making changes. "
-                    "Fix them, verify with cargo fmt, clippy, and test.\n"
-                    f"{retry_section}"
-                    "Then commit and push: git add -A && git commit -m 'fix: resolve SonarQube failures (auto-fix)' && git push origin main"
-                )
-            else:
-                prompt = (
-                    f"The SonarQube quality gate FAILED for project '{_sfp(project, 128)}'. "
-                    f"Failed conditions: {_sfp(failures_summary, 1000)}. "
-                    "Fetch the specific issues, fix them, verify with cargo fmt, clippy, and test. "
-                    f"{retry_section}"
-                    "Then commit and push: git add -A && git commit -m 'fix: resolve SonarQube failures (auto-fix)' && git push origin main"
-                )
+        from .worktrees import setup_worktree, commit_and_push, cleanup_worktree
+        wt_path, wt_name = setup_worktree("main", commit or "HEAD")
+        if not wt_path:
+            log.error("Failed to create worktree for SonarQube fix")
+            return
 
-            result = run_kiro(prompt, f"SonarQube fix attempt {attempt} [{phase}]")
+        try:
+            result = run_kiro(prompt, f"SonarQube fix (round {attempt}) [{phase}]", cwd=wt_path)
             success = result[0] if isinstance(result, tuple) else result
             if success:
-                return
-            last_strategy = f"attempt {attempt} [{phase}] failed"
+                commit_ok, _ = commit_and_push(wt_path, "main", "fix: resolve SonarQube failures (auto-fix)")
+                if commit_ok:
+                    log.info(f"SonarQube fix (round {attempt}) [{phase}] succeeded")
+                else:
+                    log.warning(f"SonarQube fix (round {attempt}) [{phase}] commit/push failed")
+            else:
+                log.warning(f"SonarQube fix (round {attempt}) [{phase}] failed")
+        finally:
+            if wt_name:
+                cleanup_worktree(wt_name)
 
     def _handle_ci_failure(self, payload):
         job = validate_name(payload.get("job", "unknown"))
@@ -355,9 +449,47 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
         log.info(f"CI failure webhook: job={job}, step={step}, commit={context['commit'][:8]}, branch={context['branch']}")
 
+        commit = context["commit"]
+
+        tracker = get_tracker()
+        if commit:
+            pipeline = tracker.get_or_create(commit)
+
+            prev_state = pipeline.job_states.get(job)
+            if prev_state == JobState.PASSED:
+                log.warning(
+                    f"FIX REGRESSION: job {job} was marked PASSED but failed again "
+                    f"(commit {commit[:8]}, lineage {pipeline.lineage_id}). "
+                    f"Previous auto-fix did not resolve the issue."
+                )
+                round_files = pipeline.files_changed.get(pipeline.round_number, [])
+                _record_regression_event(
+                    commit, pipeline.lineage_id, pipeline.round_number,
+                    job, [job], round_files,
+                )
+
+            if pipeline.deployed:
+                log.info(
+                    f"Pipeline {pipeline.lineage_id} already deployed, "
+                    f"skipping ci-failure for {job}/{step}"
+                )
+                return
+            if tracker.is_budget_exhausted(commit):
+                log.error(
+                    f"Pipeline budget exhausted for lineage {pipeline.lineage_id} "
+                    f"(round {pipeline.round_number}/{pipeline.budget_total}). "
+                    f"Skipping ci-failure for {job}/{step}."
+                )
+                return
+            if pipeline.job_states.get(job) == JobState.FIXING:
+                log.info(
+                    f"Job {job} already being fixed for lineage {pipeline.lineage_id}, "
+                    f"skipping duplicate ci-failure dispatch"
+                )
+                return
+
         error_class = classify_error(error_log)
 
-        commit = context["commit"]
         should_hold, correlated_jobs, hold_seconds = should_hold_for_correlation(job)
 
         if should_hold and commit:
@@ -379,6 +511,21 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     all_payloads = list(entry["payloads"])
 
                     def _dispatch_correlated():
+                        _tracker = get_tracker()
+                        _pipeline = _tracker.get_or_create(commit)
+                        if _pipeline.deployed:
+                            log.info(
+                                f"Pipeline {_pipeline.lineage_id} deployed during hold, "
+                                f"skipping correlated dispatch for {commit[:8]}"
+                            )
+                            return
+                        if _tracker.is_budget_exhausted(commit):
+                            log.error(
+                                f"Pipeline budget exhausted for lineage {_pipeline.lineage_id} "
+                                f"during correlated dispatch, skipping"
+                            )
+                            return
+
                         group_id = None
                         for j, s, el, ec, _ in all_payloads:
                             gid = register_failure(j, s, el, commit, ec)
@@ -390,19 +537,18 @@ class WebhookHandler(BaseHTTPRequestHandler):
                             if group is not None and should_dispatch_correlated_fix(group_id):
                                 if not group.dispatched:
                                     group.dispatched = True
-                                    prompt = build_correlated_fix_prompt(group)
                                     log.info(
                                         f"Dispatching correlated fix for commit {commit[:8]} "
                                         f"({len(all_failed_jobs)} failures)"
                                     )
-                                    from .runner import run_kiro as _run_kiro
-                                    _run_kiro(prompt, f"Correlated fix (hold-batch, {commit[:8]})")
                                     record_co_failure_event(commit, all_failed_jobs)
+                                    for j, s, el, ec, ctx in all_payloads:
+                                        fix_once_and_push(j, s, el, ctx)
                                     return
 
                         record_co_failure_event(commit, all_failed_jobs)
                         for j, s, el, ec, ctx in all_payloads:
-                            fix_with_retry(j, s, el, ctx)
+                            fix_once_and_push(j, s, el, ctx)
 
                     threading.Thread(target=_dispatch_correlated, daemon=True).start()
                     return
@@ -412,11 +558,27 @@ class WebhookHandler(BaseHTTPRequestHandler):
                         entry = _pending_holds.pop(commit, None)
                     if entry is None:
                         return
+
+                    _tracker = get_tracker()
+                    _pipeline = _tracker.get_or_create(commit)
+                    if _pipeline.deployed:
+                        log.info(
+                            f"Pipeline {_pipeline.lineage_id} deployed during hold, "
+                            f"skipping expired hold dispatch for {commit[:8]}"
+                        )
+                        return
+                    if _tracker.is_budget_exhausted(commit):
+                        log.error(
+                            f"Pipeline budget exhausted for lineage {_pipeline.lineage_id} "
+                            f"during hold expiry, skipping dispatch"
+                        )
+                        return
+
                     log.info(f"Hold expired for commit {commit[:8]}, dispatching independent fix")
                     failed_jobs = entry["failed_jobs"]
                     record_co_failure_event(commit, failed_jobs)
                     for j, s, el, ec, ctx in entry["payloads"]:
-                        fix_with_retry(j, s, el, ctx)
+                        fix_once_and_push(j, s, el, ctx)
 
                 timer = threading.Timer(hold_seconds, _hold_expired)
                 _pending_holds[commit] = {
@@ -437,19 +599,31 @@ class WebhookHandler(BaseHTTPRequestHandler):
             group = check_correlation(group_id)
             if group is not None and should_dispatch_correlated_fix(group_id):
                 if not group.dispatched:
+                    if commit:
+                        _pipeline = tracker.get_or_create(commit)
+                        if _pipeline.deployed:
+                            log.info(
+                                f"Pipeline {_pipeline.lineage_id} deployed, "
+                                f"skipping correlated fix for group {group_id}"
+                            )
+                            return
+                        if tracker.is_budget_exhausted(commit):
+                            log.error(
+                                f"Pipeline budget exhausted for lineage {_pipeline.lineage_id}, "
+                                f"skipping correlated fix for group {group_id}"
+                            )
+                            return
                     group.dispatched = True
-                    prompt = build_correlated_fix_prompt(group)
                     log.info(
                         f"Dispatching correlated fix for group {group_id} "
                         f"({len(group.failures)} failures, commit {group.commit[:8]})"
                     )
-                    from .runner import run_kiro as _run_kiro
-                    _run_kiro(prompt, f"Correlated fix ({group_id})")
+                    fix_once_and_push(job, step, error_log, context)
                     return
                 log.info(f"Correlated fix already dispatched for group {group_id}")
                 return
 
-        fix_with_retry(job, step, error_log, context)
+        fix_once_and_push(job, step, error_log, context)
 
     def _handle_ci_improve(self, payload):
         raw_focus = sanitize_text(payload.get("focus", "general"), 128)
@@ -460,8 +634,118 @@ class WebhookHandler(BaseHTTPRequestHandler):
         sonar_report = sanitize_text(payload.get("sonar_report", ""))
         run_url = validate_url(payload.get("run_url", ""))
 
-        log.info(f"CI improve webhook: focus={focus}")
-        improve_pipeline(focus, pipeline_report, run_url, sonar_report)
+        job_results = _parse_job_results(pipeline_report)
+        commit = _extract_commit_from_report(pipeline_report)
+
+        log.info(
+            f"CI improve webhook: focus={focus}, "
+            f"jobs={len(job_results)}, commit={commit[:8] if commit else 'unknown'}"
+        )
+
+        tracker = get_tracker()
+
+        if commit and job_results:
+            pipeline = tracker.update_from_report(commit, job_results)
+        elif commit:
+            pipeline = tracker.get_or_create(commit)
+        else:
+            improve_pipeline(focus, pipeline_report, run_url, sonar_report)
+            return
+
+        if job_results.get("deploy") == "success":
+            tracker.mark_deployed(commit)
+            for job in list(pipeline.pending_strategies.keys()):
+                tracker.confirm_strategy(commit, job, True)
+            log.info(
+                f"Deploy SUCCESS for lineage {pipeline.lineage_id}. "
+                f"Pipeline complete — no further fixes needed."
+            )
+            return
+
+        if tracker.is_budget_exhausted(commit):
+            _write_pipeline_escalation(pipeline)
+            log.error(
+                f"Pipeline budget exhausted for lineage {pipeline.lineage_id} "
+                f"(round {pipeline.round_number}/{pipeline.budget_total}). "
+                f"No more fixes will be dispatched."
+            )
+            return
+
+        for job, result in job_results.items():
+            if job in pipeline.pending_strategies:
+                if result == "success":
+                    tracker.confirm_strategy(commit, job, True)
+                elif result == "failure":
+                    tracker.confirm_strategy(commit, job, False)
+
+        sonar_result = job_results.get("sonarqube", job_results.get("sonar", "unknown"))
+        if sonar_result == "success":
+            pipeline.sonarqube_passed = True
+        elif sonar_result == "failure":
+            pipeline.sonarqube_passed = False
+
+        if job_results.get("deploy") == "success" and not pipeline.sonarqube_passed:
+            log.warning(
+                f"Lineage {pipeline.lineage_id}: deployed but SonarQube failing. "
+                f"Dispatching sonar fix for quality improvement."
+            )
+            threading.Thread(
+                target=fix_sonar_issues,
+                args=(sonar_report, run_url),
+                daemon=True,
+            ).start()
+
+        failed_jobs = [
+            j for j, r in job_results.items()
+            if r == "failure" and pipeline.job_states.get(j) != JobState.FIXING
+        ]
+
+        regression_jobs = set()
+        if failed_jobs:
+            prev_round = pipeline.round_number - 1
+            prev_files = set(pipeline.files_changed.get(prev_round, []))
+            for job in failed_jobs:
+                if prev_files:
+                    regressed_from = tracker.detect_regression(commit, job, prev_files)
+                    if regressed_from:
+                        regression_jobs.add(job)
+                        _record_regression_event(
+                            commit, pipeline.lineage_id, pipeline.round_number,
+                            job, regressed_from, sorted(prev_files),
+                        )
+
+        if failed_jobs:
+            log.info(
+                f"Dispatching fixes for {len(failed_jobs)} failed jobs: {failed_jobs}"
+            )
+            for job in failed_jobs:
+                error_context = ""
+                if job in regression_jobs:
+                    error_context = (
+                        f"REGRESSION DETECTED: This failure may be caused by fixes "
+                        f"applied in the previous round. Files changed in the prior "
+                        f"round overlap with this job's scope. Review the previous "
+                        f"fix carefully and address both the original issue and the "
+                        f"regression it introduced."
+                    )
+                threading.Thread(
+                    target=fix_once_and_push,
+                    args=(job, "ci-improve", error_context, {"commit": commit, "run_url": run_url}),
+                    daemon=True,
+                ).start()
+
+            if not pipeline.sonarqube_passed and sonar_result == "failure":
+                if not _sonar_fix_lock.locked():
+                    log.info(
+                        f"Lineage {pipeline.lineage_id}: dispatching sonar fix alongside job fixes"
+                    )
+                    threading.Thread(
+                        target=fix_sonar_issues,
+                        args=(sonar_report, run_url),
+                        daemon=True,
+                    ).start()
+        else:
+            improve_pipeline(focus, pipeline_report, run_url, sonar_report)
 
     def _handle_sonar_fix(self, payload):
         sonar_report = sanitize_text(payload.get("sonar_report", ""))
@@ -477,6 +761,44 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):
         pass
+
+
+_REPLAY_HANDLERS = {
+    "/ci-failure": "_handle_ci_failure",
+    "/ci-improve": "_handle_ci_improve",
+    "/sonarqube": "_handle_sonarqube",
+    "/sonar-fix": "_handle_sonar_fix",
+}
+
+
+def _replay_pending_queue():
+    handler_instance = WebhookHandler.__new__(WebhookHandler)
+
+    while True:
+        item = dequeue()
+        if item is None:
+            break
+        row_id, endpoint, payload = item
+        method_name = _REPLAY_HANDLERS.get(endpoint)
+        if not method_name:
+            mark_failed(row_id, f"unknown endpoint: {endpoint}")
+            continue
+
+        log.info(f"Replaying queued webhook: {endpoint} (queue_id={row_id})")
+
+        def _run_replay(mid, p, rid):
+            try:
+                getattr(handler_instance, mid)(p)
+                mark_done(rid)
+            except Exception as exc:
+                log.exception(f"Replay failed for queue_id={rid}: {exc}")
+                mark_failed(rid, str(exc))
+
+        threading.Thread(
+            target=_run_replay,
+            args=(method_name, payload, row_id),
+            daemon=True,
+        ).start()
 
 
 def main():
@@ -546,6 +868,14 @@ def main():
     log.info("  kiro-cli prompt delivery: ✓")
 
     log.info("Startup checks passed")
+
+    wsl_bash("git worktree prune", timeout=15)
+    requeued = requeue_stale()
+    cleanup_old()
+    pending = pending_count()
+    if pending > 0:
+        log.info(f"Replaying {pending} pending webhook(s) from queue")
+        _replay_pending_queue()
 
     server = TimeoutHTTPServer((BIND_ADDRESS, PORT), WebhookHandler)
     server.timeout = 30

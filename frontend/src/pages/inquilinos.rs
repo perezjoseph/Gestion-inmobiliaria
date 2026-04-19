@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use gloo_events::EventListener;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
@@ -5,16 +7,19 @@ use yew::prelude::*;
 use yew_router::prelude::*;
 
 use crate::app::{AuthContext, Route};
+use crate::components::common::confidence_input::ConfidenceInput;
 use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::error_banner::ErrorBanner;
-use crate::components::common::loading::Loading;
+use crate::components::common::ocr_scan_button::OcrScanButton;
+use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::pagination::Pagination;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{api_delete, api_get, api_post, api_put};
 use crate::types::PaginatedResponse;
 use crate::types::inquilino::{CreateInquilino, Inquilino, UpdateInquilino};
-use crate::utils::{EscapeHandler, can_delete, can_write, field_error, input_class};
+use crate::types::ocr::OcrExtractField;
+use crate::utils::{EscapeHandler, can_delete, can_write, field_error};
 
 fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
     if let Some(t) = toasts {
@@ -80,6 +85,9 @@ struct InquilinoFormProps {
     submitting: bool,
     on_submit: Callback<SubmitEvent>,
     on_cancel: Callback<MouseEvent>,
+    confidences: HashMap<String, f64>,
+    on_ocr_result: Callback<Vec<OcrExtractField>>,
+    on_confidence_clear: Callback<String>,
 }
 
 #[function_component]
@@ -97,6 +105,33 @@ fn InquilinoForm(props: &InquilinoFormProps) -> Html {
         }};
     }
 
+    let confidence_for = |name: &str| -> Option<f64> {
+        props.confidences.get(name).copied()
+    };
+
+    let input_cb_conf = |state: &UseStateHandle<String>, field_name: &str| -> Callback<InputEvent> {
+        let s = state.clone();
+        let clear = props.on_confidence_clear.clone();
+        let name = field_name.to_string();
+        Callback::from(move |e: InputEvent| {
+            let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+            s.set(input.value());
+            clear.emit(name.clone());
+        })
+    };
+
+    let scan_button = if !props.is_editing {
+        html! {
+            <OcrScanButton
+                document_type="cedula"
+                on_result={props.on_ocr_result.clone()}
+                label={AttrValue::from("📷 Escanear Cédula")}
+            />
+        }
+    } else {
+        html! {}
+    };
+
     let toggle_optional = {
         let show_optional = show_optional.clone();
         Callback::from(move |_: MouseEvent| {
@@ -107,25 +142,40 @@ fn InquilinoForm(props: &InquilinoFormProps) -> Html {
 
     html! {
         <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
-            <h2 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
-                {if props.is_editing { "Editar Inquilino" } else { "Nuevo Inquilino" }}</h2>
+            <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4);">
+                <h2 class="text-display" style="font-size: var(--text-lg); font-weight: 600; color: var(--text-primary);">
+                    {if props.is_editing { "Editar Inquilino" } else { "Nuevo Inquilino" }}</h2>
+                {scan_button}
+            </div>
             <form onsubmit={props.on_submit.clone()} style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
                 <div>
                     <label class="gi-label">{"Nombre *"}</label>
-                    <input type="text" value={(*props.nombre).clone()} oninput={input_cb!(props.nombre)}
-                        class={input_class(fe.nombre.is_some())} />
+                    <ConfidenceInput
+                        value={AttrValue::from((*props.nombre).clone())}
+                        confidence={confidence_for("nombre")}
+                        oninput={input_cb_conf(&props.nombre, "nombre")}
+                        class={AttrValue::from(if fe.nombre.is_some() { "gi-input-error" } else { "" })}
+                    />
                     {field_error(&fe.nombre)}
                 </div>
                 <div>
                     <label class="gi-label">{"Apellido *"}</label>
-                    <input type="text" value={(*props.apellido).clone()} oninput={input_cb!(props.apellido)}
-                        class={input_class(fe.apellido.is_some())} />
+                    <ConfidenceInput
+                        value={AttrValue::from((*props.apellido).clone())}
+                        confidence={confidence_for("apellido")}
+                        oninput={input_cb_conf(&props.apellido, "apellido")}
+                        class={AttrValue::from(if fe.apellido.is_some() { "gi-input-error" } else { "" })}
+                    />
                     {field_error(&fe.apellido)}
                 </div>
                 <div>
                     <label class="gi-label" title="Documento de identidad dominicano. Formato: XXX-XXXXXXX-X">{"Cédula *"}</label>
-                    <input type="text" value={(*props.cedula).clone()} oninput={input_cb!(props.cedula)}
-                        class={input_class(fe.cedula.is_some())} />
+                    <ConfidenceInput
+                        value={AttrValue::from((*props.cedula).clone())}
+                        confidence={confidence_for("cedula")}
+                        oninput={input_cb_conf(&props.cedula, "cedula")}
+                        class={AttrValue::from(if fe.cedula.is_some() { "gi-input-error" } else { "" })}
+                    />
                     {field_error(&fe.cedula)}
                 </div>
                 <div style="grid-column: 1 / -1;">
@@ -540,6 +590,9 @@ fn render_inquilinos_view(
     submitting: &UseStateHandle<bool>,
     on_submit: Callback<SubmitEvent>,
     on_cancel: Callback<MouseEvent>,
+    confidences: &UseStateHandle<HashMap<String, f64>>,
+    on_ocr_result: Callback<Vec<OcrExtractField>>,
+    on_confidence_clear: Callback<String>,
     items: &UseStateHandle<Vec<Inquilino>>,
     total: u64,
     page: u64,
@@ -551,7 +604,7 @@ fn render_inquilinos_view(
     on_per_page_change: Callback<u64>,
 ) -> Html {
     if **loading {
-        return html! { <Loading /> };
+        return html! { <TableSkeleton title_width="180px" columns={5} /> };
     }
 
     let headers = vec![
@@ -611,6 +664,9 @@ fn render_inquilinos_view(
                     submitting={**submitting}
                     on_submit={on_submit}
                     on_cancel={on_cancel}
+                    confidences={(**confidences).clone()}
+                    on_ocr_result={on_ocr_result}
+                    on_confidence_clear={on_confidence_clear}
                 />
             }
 
@@ -662,6 +718,8 @@ pub fn Inquilinos() -> Html {
     let search = use_state(String::new);
     let applied_search = use_state(String::new);
 
+    let confidences = use_state(HashMap::<String, f64>::new);
+
     {
         let items = items.clone();
         let total = total.clone();
@@ -687,6 +745,7 @@ pub fn Inquilinos() -> Html {
         let editing = editing.clone();
         let show_form = show_form.clone();
         let form_errors = form_errors.clone();
+        let confidences = confidences.clone();
         move || {
             nombre.set(String::new());
             apellido.set(String::new());
@@ -698,6 +757,7 @@ pub fn Inquilinos() -> Html {
             editing.set(None);
             show_form.set(false);
             form_errors.set(FormErrors::default());
+            confidences.set(HashMap::new());
         }
     };
 
@@ -718,6 +778,35 @@ pub fn Inquilinos() -> Html {
             move || drop(listener)
         });
     }
+
+    let on_ocr_result = {
+        let nombre = nombre.clone();
+        let apellido = apellido.clone();
+        let cedula = cedula.clone();
+        let confidences = confidences.clone();
+        Callback::from(move |fields: Vec<OcrExtractField>| {
+            let mut conf_map = HashMap::new();
+            for field in &fields {
+                match field.name.as_str() {
+                    "nombre" => nombre.set(field.value.clone()),
+                    "apellido" => apellido.set(field.value.clone()),
+                    "cedula" => cedula.set(field.value.clone()),
+                    _ => {}
+                }
+                conf_map.insert(field.name.clone(), field.confidence);
+            }
+            confidences.set(conf_map);
+        })
+    };
+
+    let on_confidence_clear = {
+        let confidences = confidences.clone();
+        Callback::from(move |name: String| {
+            let mut c = (*confidences).clone();
+            c.remove(&name);
+            confidences.set(c);
+        })
+    };
 
     let on_new = super::page_helpers::new_cb(reset_form.clone(), &show_form, true);
 
@@ -851,6 +940,9 @@ pub fn Inquilinos() -> Html {
         &submitting,
         on_submit,
         on_cancel,
+        &confidences,
+        on_ocr_result,
+        on_confidence_clear,
         &items,
         *total,
         *page,

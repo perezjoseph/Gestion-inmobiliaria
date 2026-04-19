@@ -179,7 +179,7 @@ fn map_gasto_missing_monto_error() {
     let fields = HashMap::from([("proveedor".to_string(), "FERRETERIA".to_string())]);
     let result = make_ocr_result("recibo_gasto", fields);
     let err = map_gasto(&result).unwrap_err();
-    assert!(err.to_string().contains("monto no detectado"));
+    assert!(err.to_string().contains("monto' no detectado"));
 }
 
 #[test]
@@ -194,7 +194,7 @@ async fn ocr_client_extract_unreachable_returns_error() {
     unsafe { std::env::set_var("OCR_SERVICE_URL", "http://127.0.0.1:19999") };
     let client = OcrClient::new().unwrap();
     let result = client
-        .extract(b"fake image data", "test.jpg", "image/jpeg")
+        .extract(b"fake image data", "test.jpg", "image/jpeg", None)
         .await;
     assert!(result.is_err());
 }

@@ -9,13 +9,25 @@ on:
       frontend-digest:
         type: string
         required: true
+      ocr-service-digest:
+        type: string
+        required: true
+    secrets:
+      WEBHOOK_SECRET:
+        required: true
+      WEBHOOK_HOST:
+        required: true
+      POSTGRES_PASSWORD:
+        required: true
+      JWT_SECRET:
+        required: true
 
 permissions: {}
 
 jobs:
   deploy:
-    name: Deploy to Production
-    runs-on: [self-hosted, Linux, X64]
+    name: Deploy to Production (k3s)
+    runs-on: arc-deploy
     timeout-minutes: 10
     environment: production
     concurrency:
@@ -26,30 +38,15 @@ jobs:
       packages: read
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     env:
-      DOCKER_CONTENT_TRUST: "1"
       IMAGE_OWNER: ${{ github.repository_owner }}
     steps:
-      - name: Clean workspace
-        run: |
-          if [ -z "$GITHUB_WORKSPACE" ] || [ "$GITHUB_WORKSPACE" = "/" ]; then
-            echo "::error::GITHUB_WORKSPACE is empty or root -- aborting cleanup"
-            exit 1
-          fi
-          rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.* 2>/dev/null || true
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v3.4.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Verify backend attestation
+        id: verify-backend
         run: |
           gh attestation verify \
             "oci://ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend@${{ inputs.backend-digest }}" \
@@ -58,6 +55,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify frontend attestation
+        id: verify-frontend
         run: |
           gh attestation verify \
             "oci://ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend@${{ inputs.frontend-digest }}" \
@@ -65,34 +63,76 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Verify OCR service attestation
+        id: verify-ocr-service
+        run: |
+          gh attestation verify \
+            "oci://ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ inputs.ocr-service-digest }}" \
+            --owner "${{ env.IMAGE_OWNER }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Mask secrets
         run: |
-          if [ -n "${{ secrets.DATABASE_URL }}" ]; then
-            echo "::add-mask::${{ secrets.DATABASE_URL }}"
-          fi
-          if [ -n "${{ secrets.JWT_SECRET }}" ]; then
-            echo "::add-mask::${{ secrets.JWT_SECRET }}"
-          fi
-          if [ -n "${{ secrets.WEBHOOK_SECRET }}" ]; then
-            echo "::add-mask::${{ secrets.WEBHOOK_SECRET }}"
-          fi
+          echo "::add-mask::${{ secrets.POSTGRES_PASSWORD }}"
+          echo "::add-mask::${{ secrets.JWT_SECRET }}"
+          echo "::add-mask::${{ secrets.WEBHOOK_SECRET }}"
 
-      - name: Pull and deploy
-        id: deploy
-        env:
-          BACKEND_IMAGE: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend@${{ inputs.backend-digest }}
-          FRONTEND_IMAGE: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend@${{ inputs.frontend-digest }}
+      - name: Ensure namespace exists
+        run: kubectl get namespace realestate || kubectl create namespace realestate
+
+      - name: Update secrets
         run: |
-          DOCKER_CONTENT_TRUST=0 docker compose -f docker-compose.prod.yml pull
-          DOCKER_CONTENT_TRUST=0 docker compose -f docker-compose.prod.yml up -d --remove-orphans --wait
+          kubectl create secret generic realestate-db-secret \
+            --namespace realestate \
+            --from-literal=username=realestate \
+            --from-literal=password="${{ secrets.POSTGRES_PASSWORD }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic realestate-db-url \
+            --namespace realestate \
+            --from-literal=DATABASE_URL="postgresql://realestate:${{ secrets.POSTGRES_PASSWORD }}@db:5432/realestate" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic realestate-app-secret \
+            --namespace realestate \
+            --from-literal=jwt-secret="${{ secrets.JWT_SECRET }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy application manifests
+        run: kubectl apply -k k8s/app/
+
+      - name: Update container images by digest
+        id: deploy
+        run: |
+          kubectl set image deployment/backend \
+            backend=ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend@${{ inputs.backend-digest }} \
+            --namespace realestate
+
+          kubectl set image deployment/frontend \
+            frontend=ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend@${{ inputs.frontend-digest }} \
+            --namespace realestate
+
+          kubectl set image deployment/ocr-service \
+            ocr-service=ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ inputs.ocr-service-digest }} \
+            --namespace realestate
+
+      - name: Wait for rollout
+        id: rollout
+        run: |
+          kubectl rollout status deployment/backend --namespace realestate --timeout=120s
+          kubectl rollout status deployment/frontend --namespace realestate --timeout=120s
+          kubectl rollout status deployment/ocr-service --namespace realestate --timeout=180s
 
       - name: Health check
         id: health-check
         run: |
-          MAX_RETRIES=30
+          # Get the backend pod and check health via kubectl exec
+          BACKEND_POD=$(kubectl get pod -n realestate -l app.kubernetes.io/name=backend -o jsonpath='{.items[0].metadata.name}')
+          MAX_RETRIES=15
           INTERVAL=5
           for i in $(seq 1 $MAX_RETRIES); do
-            if curl -sf --connect-timeout 5 --max-time 10 http://localhost:8080/health > /dev/null 2>&1; then
+            if kubectl exec -n realestate "$BACKEND_POD" -- curl -sf --connect-timeout 3 --max-time 5 http://localhost:8080/health > /dev/null 2>&1; then
               echo "Health check passed on attempt $i"
               exit 0
             fi
@@ -106,12 +146,41 @@ jobs:
         if: failure() && steps.deploy.outcome == 'success'
         run: |
           echo "::warning::Deployment health check failed -- rolling back"
-          DOCKER_CONTENT_TRUST=0 docker compose -f docker-compose.prod.yml down --timeout 30
-          DOCKER_CONTENT_TRUST=0 docker compose -f docker-compose.prod.yml up -d --remove-orphans --wait 2>/dev/null || true
+          kubectl rollout undo deployment/backend --namespace realestate
+          kubectl rollout undo deployment/frontend --namespace realestate
+          kubectl rollout undo deployment/ocr-service --namespace realestate
+          kubectl rollout status deployment/backend --namespace realestate --timeout=120s || true
           echo "::error::Rollback attempted. Manual verification required."
 
-      - name: Credential cleanup
-        if: always()
+      - name: Collect deploy errors
+        id: collect-errors
+        if: failure()
         run: |
-          docker logout ghcr.io 2>/dev/null || true
-          rm -f "${HOME}/.docker/config.json" 2>/dev/null || true
+          ERROR=""
+          if [ "${{ steps.deploy.outcome }}" = "failure" ]; then
+            ERROR="[deploy] kubectl set image failed."
+          elif [ "${{ steps.rollout.outcome }}" = "failure" ]; then
+            ERROR="[rollout] Deployment rollout timed out. $(kubectl get pods -n realestate -o wide 2>/dev/null | head -20)"
+          elif [ "${{ steps.health-check.outcome }}" = "failure" ]; then
+            ERROR="[health-check] App health check failed after deployment. $(kubectl logs -n realestate -l app.kubernetes.io/name=backend --tail=20 2>/dev/null)"
+          elif [ "${{ steps.verify-backend.outcome }}" = "failure" ]; then
+            ERROR="[attestation] Backend image attestation verification failed."
+          elif [ "${{ steps.verify-frontend.outcome }}" = "failure" ]; then
+            ERROR="[attestation] Frontend image attestation verification failed."
+          elif [ "${{ steps.verify-ocr-service.outcome }}" = "failure" ]; then
+            ERROR="[attestation] OCR service image attestation verification failed."
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+      - name: Notify webhook on failure
+        if: failure()
+        uses: ./.github/actions/webhook-notify
+        with:
+          job-name: deploy
+          step-name: deploy-or-health-check
+          error-log: ${{ steps.collect-errors.outputs.error_log }}
+          webhook-secret: ${{ secrets.WEBHOOK_SECRET }}
+          webhook-host: ${{ secrets.WEBHOOK_HOST }}

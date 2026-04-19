@@ -1,5 +1,5 @@
 name: 'Rust Setup'
-description: 'Shared setup for Rust CI jobs: OpenSSL headers, disk space, and toolchain. Caller must checkout first. Compilation cache lives on the persistent runner volume.'
+description: 'Shared setup for Rust CI jobs: OpenSSL headers and toolchain installation for ARC ephemeral runners.'
 
 inputs:
   components:
@@ -14,55 +14,23 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Ensure OpenSSL development headers are available
+    - name: Ensure build tools and OpenSSL development headers are available
       shell: bash
       run: |
-        if pkg-config --exists openssl 2>/dev/null; then
-          echo "OpenSSL development headers already available ($(pkg-config --modversion openssl))"
-        else
-          echo "OpenSSL headers missing -- installing via apt"
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends pkg-config libssl-dev
+        NEED_INSTALL=false
+        if ! command -v cc >/dev/null 2>&1; then
+          echo "C linker (cc) missing -- will install build-essential"
+          NEED_INSTALL=true
         fi
-
-    - name: Free disk space for Rust compilation
-      shell: bash
-      run: |
-        AVAIL_MB=$(df -m "${GITHUB_WORKSPACE}" | awk 'NR==2 {print $4}')
-        echo "Available disk space: ${AVAIL_MB}MB"
-        if [ "$AVAIL_MB" -lt 12288 ]; then
-          echo "::warning::Low disk (${AVAIL_MB}MB < 12288MB). Cleaning to prevent ENOSPC during compilation."
-          docker image prune -af 2>/dev/null || true
-          docker builder prune -af 2>/dev/null || true
-          rm -rf /tmp/runner-*/Gestion-inmobiliaria/*/target 2>/dev/null || true
-          CURRENT_RUNNER_DIR=$(echo "${GITHUB_WORKSPACE}" | grep -oP '/tmp/runner-\d+' || true)
-          for dir in /tmp/runner-*/Gestion-inmobiliaria; do
-            RUNNER_DIR=$(echo "$dir" | grep -oP '/tmp/runner-\d+' || true)
-            if [ -d "$dir" ] && [ -n "$RUNNER_DIR" ] && [ "$RUNNER_DIR" != "$CURRENT_RUNNER_DIR" ]; then
-              rm -rf "$dir" 2>/dev/null || true
-            fi
-          done
-          rm -rf "${RUSTUP_HOME:-$HOME/.rustup}"/downloads 2>/dev/null || true
-          rm -rf "${RUSTUP_HOME:-$HOME/.rustup}"/tmp 2>/dev/null || true
-          if command -v rustup &>/dev/null; then
-            rustup toolchain list 2>/dev/null | grep -v '1\.88\.0' | grep -v '^$' | while read -r tc; do
-              rustup toolchain uninstall "$tc" 2>/dev/null || true
-            done
-          fi
-          rm -rf /tmp/rustc* /tmp/cargo-install* 2>/dev/null || true
-          find "${RUNNER_TEMP:-/tmp}" -maxdepth 1 -name '*.sh' -mmin +60 -delete 2>/dev/null || true
-          sudo apt-get clean 2>/dev/null || true
-          sudo rm -rf /var/cache/apt/archives/*.deb /var/lib/apt/lists/* 2>/dev/null || true
-          sudo journalctl --vacuum-size=10M 2>/dev/null || true
-          sudo find /var/log -type f -name '*.gz' -delete 2>/dev/null || true
-          sudo find /var/log -type f -name '*.1' -delete 2>/dev/null || true
-          rm -rf /var/tmp/* 2>/dev/null || true
-          AFTER_MB=$(df -m "${GITHUB_WORKSPACE}" | awk 'NR==2 {print $4}')
-          echo "Disk after cleanup: ${AFTER_MB}MB (freed $((AFTER_MB - AVAIL_MB))MB)"
-          if [ "$AFTER_MB" -lt 2048 ]; then
-            echo "::error::Disk critically low (${AFTER_MB}MB) after cleanup. Runner needs manual intervention."
-            exit 1
-          fi
+        if ! pkg-config --exists openssl 2>/dev/null; then
+          echo "OpenSSL headers missing -- will install libssl-dev"
+          NEED_INSTALL=true
+        fi
+        if [ "$NEED_INSTALL" = true ]; then
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends build-essential pkg-config libssl-dev
+        else
+          echo "Build tools and OpenSSL headers already available (cc: $(cc --version | head -1), openssl: $(pkg-config --modversion openssl))"
         fi
 
     - name: Install Rust toolchain

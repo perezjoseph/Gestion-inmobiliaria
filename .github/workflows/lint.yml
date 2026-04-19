@@ -6,6 +6,11 @@ on:
       is-fork-pr:
         type: boolean
         required: true
+    secrets:
+      WEBHOOK_SECRET:
+        required: true
+      WEBHOOK_HOST:
+        required: true
     outputs:
       result:
         value: ${{ jobs.lint.result }}
@@ -21,7 +26,7 @@ permissions: {}
 jobs:
   lint:
     name: Lint & Format
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: arc-runner
     timeout-minutes: 35
     if: ${{ !inputs.is-fork-pr }}
     permissions:
@@ -161,14 +166,6 @@ jobs:
           name: clippy-report
           path: clippy-report.json
           retention-days: 1
-
-      - name: Clean up temp files
-        if: always()
-        run: |
-          rm -f "${RUNNER_TEMP}/fmt-output.txt"
-          rm -f "${RUNNER_TEMP}/clippy-backend.json" "${RUNNER_TEMP}/clippy-backend-stderr.txt" "${RUNNER_TEMP}/clippy-backend-output.txt"
-          rm -f "${RUNNER_TEMP}/clippy-frontend.json" "${RUNNER_TEMP}/clippy-frontend-stderr.txt" "${RUNNER_TEMP}/clippy-frontend-output.txt"
-          rm -f clippy-report.json
 
       - name: Notify webhook on failure
         if: failure()

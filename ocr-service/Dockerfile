@@ -16,7 +16,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY main.py .
 
-RUN python -c "from paddleocr import PaddleOCR; PaddleOCR(use_angle_cls=True, lang='es', use_gpu=False)"
+ENV PADDLE_PDX_CACHE_HOME=/app/.paddleocr
+RUN python -c "from paddleocr import PaddleOCR; PaddleOCR(use_textline_orientation=True, lang='es', device='cpu')"
 
 FROM python:3.11-slim
 
@@ -37,9 +38,9 @@ RUN groupadd -r ocruser && useradd -r -g ocruser -d /app -s /sbin/nologin ocruse
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /app/main.py .
-COPY --from=builder /root/.paddleocr /app/.paddleocr
+COPY --from=builder /app/.paddleocr /app/.paddleocr
 
-ENV PADDLEOCR_HOME=/app/.paddleocr
+ENV PADDLE_PDX_CACHE_HOME=/app/.paddleocr
 
 RUN chown -R ocruser:ocruser /app
 

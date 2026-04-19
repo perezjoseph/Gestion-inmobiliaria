@@ -145,6 +145,14 @@ _FMT_DIFF_RE = re.compile(
     re.MULTILINE,
 )
 
+_PROPTEST_SEED_RE = re.compile(
+    r"PROPTEST_SEED\s*=\s*(\d+)|seed:\s*(\d+)"
+)
+
+_PROPTEST_INPUT_RE = re.compile(
+    r"minimal failing input:\s*(.+?)(?:\n|$)"
+)
+
 
 def _parse_rust_errors(output):
     """Extract structured errors from plain-text rustc/clippy output."""
@@ -262,7 +270,6 @@ def _parse_audit_output(output):
 
 
 def _parse_android_errors(output):
-    """Extract Kotlin/Gradle compilation errors."""
     errors = []
     for m in _ANDROID_ERROR_RE.finditer(output):
         errors.append(ParsedError(
@@ -270,6 +277,23 @@ def _parse_android_errors(output):
             line=int(m.group("line")),
             column=int(m.group("col")),
             message=m.group("message").strip(),
+            severity="error",
+        ))
+    return errors
+
+
+def _parse_pbt_failures(output):
+    errors = []
+    for m in _PROPTEST_SEED_RE.finditer(output):
+        seed = m.group(1) or m.group(2)
+        errors.append(ParsedError(
+            code=f"seed:{seed}",
+            message=f"proptest failure (seed={seed})",
+            severity="error",
+        ))
+    for m in _PROPTEST_INPUT_RE.finditer(output):
+        errors.append(ParsedError(
+            message=f"minimal failing input: {m.group(1).strip()[:200]}",
             severity="error",
         ))
     return errors
@@ -347,7 +371,7 @@ def _build_summary(step_results):
     return header + "\n" + "\n".join(lines)
 
 
-def reproduce_locally(job, error_class="", cache: ReproCache | None = None):
+def reproduce_locally(job, error_class="", cache: ReproCache | None = None, cwd=None):
     """Run the CI commands for a job locally and return structured results.
 
     Args:
@@ -397,7 +421,7 @@ def reproduce_locally(job, error_class="", cache: ReproCache | None = None):
 
         log.info(f"  Running: {step_name}")
         try:
-            result = wsl_bash(cmd, timeout=timeout)
+            result = wsl_bash(cmd, timeout=timeout, cwd=cwd)
             output = (result.stdout or "") + (result.stderr or "")
             exit_code = result.returncode
         except Exception as e:
