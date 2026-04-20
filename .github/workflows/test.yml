@@ -26,7 +26,7 @@ jobs:
   test-backend:
     name: Backend Tests & Coverage
     runs-on: arc-runner
-    timeout-minutes: 45
+    timeout-minutes: 30
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read
@@ -49,10 +49,10 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U realestate"
-          --health-interval 10s
-          --health-timeout 5s
+          --health-interval 5s
+          --health-timeout 3s
           --health-retries 10
-          --health-start-period 60s
+          --health-start-period 15s
     steps:
       - name: Record start time
         id: start
@@ -87,12 +87,12 @@ jobs:
 
       - name: Wait for Postgres to be ready
         run: |
-          for i in $(seq 1 60); do
+          for i in $(seq 1 30); do
             if pg_isready -h localhost -p 5432 -U realestate 2>/dev/null; then
               echo "Postgres is ready"
               exit 0
             fi
-            echo "Waiting for Postgres... attempt $i/60"
+            echo "Waiting for Postgres... attempt $i/30"
             sleep 2
           done
           echo "::error::Postgres did not become ready in time"
@@ -104,23 +104,8 @@ jobs:
           echo "::add-mask::$JWT_SECRET"
           echo "JWT_SECRET=$JWT_SECRET" >> $GITHUB_ENV
 
-      - name: Run backend tests
-        id: tests
-        run: |
-          set +e
-          cargo test --locked -p realestate-backend --all-targets 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
-          exit ${PIPESTATUS[0]}
-
-      - name: Verify Cargo.lock is up to date
-        run: |
-          if ! git diff --quiet Cargo.lock; then
-            echo "::error::Cargo.lock is out of date. Run 'cargo update' locally and commit the changes."
-            git diff Cargo.lock
-            exit 1
-          fi
-
       - name: Install cargo-tarpaulin
-        if: steps.tests.outcome == 'success'
+        id: install-tarpaulin
         run: |
           TARPAULIN_VERSION="0.32.7"
           TARPAULIN_SHA256="67a61b2b271488e2d0cb718ccec384d0f296703f3c810f80ea5d46484c5d463b"
@@ -134,25 +119,34 @@ jobs:
           chmod +x "${HOME}/.cargo/bin/cargo-tarpaulin"
           cargo tarpaulin --version
 
-      - name: Run coverage with tarpaulin
-        id: coverage
-        if: steps.tests.outcome == 'success'
+      - name: Run tests with coverage (tarpaulin)
+        id: tests
         run: |
           mkdir -p coverage
+          set +e
           cargo tarpaulin --locked -p realestate-backend \
             --engine llvm \
             --out lcov --output-dir coverage \
-            --timeout 300 --skip-clean
+            --timeout 300 --skip-clean 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
+          exit ${PIPESTATUS[0]}
+
+      - name: Verify Cargo.lock is up to date
+        run: |
+          if ! git diff --quiet Cargo.lock; then
+            echo "::error::Cargo.lock is out of date. Run 'cargo update' locally and commit the changes."
+            git diff Cargo.lock
+            exit 1
+          fi
 
       - name: Scan coverage output for secrets
-        if: steps.coverage.outcome == 'success'
+        if: steps.tests.outcome == 'success'
         run: |
           if grep -rqiE '(password|secret|token|key)=' coverage/ 2>/dev/null; then
             echo "::warning::Potential secrets detected in coverage output"
           fi
 
       - name: Upload coverage artifact
-        if: steps.coverage.outcome == 'success'
+        if: steps.tests.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: backend-coverage
@@ -166,8 +160,7 @@ jobs:
             echo "## Backend Test Results"
             echo "| Check | Status |"
             echo "|-------|--------|"
-            echo "| Unit & Integration Tests | ${{ steps.tests.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
-            echo "| Coverage (tarpaulin) | ${{ steps.coverage.outcome == 'success' && '✅ Pass' || (steps.coverage.outcome == 'skipped' && '⏭️ Skipped' || '⚠️ Failed') }} |"
+            echo "| Tests & Coverage (tarpaulin) | ${{ steps.tests.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Record duration
@@ -260,5 +253,3 @@ jobs:
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
-
-

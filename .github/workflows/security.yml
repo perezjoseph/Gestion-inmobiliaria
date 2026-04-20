@@ -23,7 +23,7 @@ on:
       quality-gate-duration:
         value: ${{ jobs.quality-gate.outputs.duration }}
       deprecation-report:
-        value: ${{ jobs.quality-gate.outputs.deprecation_report }}
+        value: ${{ jobs.cargo-audit.outputs.deprecation_report }}
 
 permissions: {}
 
@@ -42,21 +42,10 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Install Gitleaks (with checksum verification)
-        timeout-minutes: 3
-        run: |
-          GITLEAKS_VERSION="8.24.3"
-          GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
-          ARCHIVE="${RUNNER_TEMP}/gitleaks.tar.gz"
-          curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
-            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
-          mkdir -p "${HOME}/.local/bin"
-          tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" gitleaks
-          rm -f "$ARCHIVE"
-          export PATH="${HOME}/.local/bin:$PATH"
-          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
-          gitleaks version
+      - name: Install security tools
+        uses: ./.github/actions/install-security-tools
+        with:
+          gitleaks: 'true'
 
       - name: Run Gitleaks secret detection
         run: gitleaks detect --source . --verbose --redact --exit-code 1
@@ -82,25 +71,18 @@ jobs:
           deny-licenses: AGPL-3.0, GPL-3.0, GPL-2.0
           comment-summary-in-pr: on-failure
 
-  quality-gate:
-    name: Dependency Security & Health Check
+  cargo-audit:
+    name: CVE Scanning (cargo-audit)
     runs-on: arc-runner
-    timeout-minutes: 30
+    timeout-minutes: 15
     if: ${{ !inputs.is-fork-pr }}
     permissions:
-      actions: read
       contents: read
       security-events: write
     outputs:
-      error_log: ${{ steps.collect-errors.outputs.error_log }}
-      failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
-      duration: ${{ steps.timing.outputs.duration }}
       deprecation_report: ${{ steps.collect-deprecations.outputs.deprecation_report }}
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
     steps:
-      - name: Record start time
-        id: start
-        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -109,7 +91,7 @@ jobs:
       - name: Setup Rust toolchain and cache
         uses: ./.github/actions/rust-setup
 
-      - name: Install cargo-audit for CVE scanning
+      - name: Install cargo-audit
         id: install_audit
         timeout-minutes: 5
         run: |
@@ -159,7 +141,7 @@ jobs:
 
       - name: Scan Rust dependencies for known vulnerabilities (CVEs)
         id: cargo_audit
-        if: always() && steps.install_audit.outputs.installed == 'true'
+        if: steps.install_audit.outputs.installed == 'true'
         timeout-minutes: 5
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
@@ -266,94 +248,6 @@ jobs:
           echo "$REPORT" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
 
-      - name: Install cargo-deny for supply chain policy checks
-        id: install_deny
-        if: always()
-        timeout-minutes: 5
-        run: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          if command -v cargo-deny &>/dev/null; then
-            echo "cargo-deny already installed: $(cargo-deny --version)"
-            echo "installed=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          DENY_VERSION="0.16.4"
-          DENY_SHA256="28b7f8e12df46a9ce186547e38278c851905fc4bda59a0cc57d2aade9fdf6962"
-          URL="https://github.com/EmbarkStudios/cargo-deny/releases/download/${DENY_VERSION}/cargo-deny-${DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz"
-          if curl -sSfL --proto =https --retry 3 --connect-timeout 15 --max-time 120 -o "${RUNNER_TEMP}/cargo-deny.tar.gz" "$URL"; then
-            echo "${DENY_SHA256}  ${RUNNER_TEMP}/cargo-deny.tar.gz" | sha256sum -c -
-            tar xzf "${RUNNER_TEMP}/cargo-deny.tar.gz" --no-same-owner --strip-components=1 -C "$HOME/.cargo/bin/" 2>/dev/null
-            chmod +x "$HOME/.cargo/bin/cargo-deny"
-            rm -f "${RUNNER_TEMP}/cargo-deny.tar.gz"
-          fi
-          if command -v cargo-deny &>/dev/null; then
-            cargo-deny --version
-            echo "installed=true" >> $GITHUB_OUTPUT
-          else
-            cargo install cargo-deny --locked 2>/dev/null && echo "installed=true" >> $GITHUB_OUTPUT || echo "installed=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Run cargo-deny supply chain checks (advisories, licenses, bans, sources)
-        id: cargo_deny
-        if: always() && steps.install_deny.outputs.installed == 'true'
-        timeout-minutes: 5
-        run: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          cargo deny check 2>&1 | tee "${RUNNER_TEMP}/deny-output.txt"
-
-      - name: Install Trivy for IaC scanning
-        id: install_trivy
-        if: always()
-        timeout-minutes: 3
-        run: |
-          TRIVY_VERSION="0.69.3"
-          TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
-          if command -v trivy &>/dev/null && [ "$(trivy --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" = "$TRIVY_VERSION" ]; then
-            echo "installed=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          ARCHIVE="${RUNNER_TEMP}/trivy.tar.gz"
-          if curl -sSfL --proto =https --retry 3 --retry-delay 5 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
-            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"; then
-            echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
-            mkdir -p "${HOME}/.local/bin"
-            tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" trivy
-            rm -f "$ARCHIVE"
-            export PATH="${HOME}/.local/bin:$PATH"
-            echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
-            echo "installed=true" >> $GITHUB_OUTPUT
-          else
-            echo "::warning::Trivy download failed -- IaC and secret scans will be skipped (non-blocking)"
-            rm -f "$ARCHIVE"
-            echo "installed=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Scan Dockerfiles and docker-compose for misconfigurations (Trivy)
-        id: trivy_iac
-        if: always() && steps.install_trivy.outputs.installed == 'true'
-        timeout-minutes: 5
-        run: |
-          trivy fs --scanners misconfig --exit-code 1 --severity CRITICAL,HIGH \
-            --no-progress --format table \
-            --include-non-failures \
-            Dockerfile.backend Dockerfile.frontend docker-compose.prod.yml docker-compose.dev.yml 2>&1 | tee "${RUNNER_TEMP}/trivy-iac-output.txt"
-
-      - name: Generate Trivy IaC SARIF report
-        if: always() && steps.install_trivy.outputs.installed == 'true'
-        run: |
-          umask 077
-          trivy fs --scanners misconfig --severity CRITICAL,HIGH,MEDIUM \
-            --no-progress --format sarif --output trivy-iac.sarif \
-            Dockerfile.backend Dockerfile.frontend docker-compose.prod.yml docker-compose.dev.yml || true
-
-      - name: Upload Trivy IaC SARIF to GitHub Security
-        if: always() && steps.install_trivy.outputs.installed == 'true' && hashFiles('trivy-iac.sarif') != ''
-        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
-        with:
-          sarif_file: trivy-iac.sarif
-          category: trivy-iac
-        continue-on-error: true
-
       - name: Generate cargo-audit SARIF report
         if: always() && steps.install_audit.outputs.installed == 'true'
         run: |
@@ -387,6 +281,69 @@ jobs:
           category: cargo-audit
         continue-on-error: true
 
+      - name: Collect errors
+        id: collect-errors
+        if: always() && steps.cargo_audit.outcome == 'failure'
+        run: |
+          ERROR="[cargo-audit] $(head -c 2000 "${RUNNER_TEMP}/audit-output.txt" 2>/dev/null || echo 'cargo audit found vulnerabilities.')"
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+  cargo-deny:
+    name: Supply Chain Policy (cargo-deny)
+    runs-on: arc-runner
+    timeout-minutes: 15
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+      security-events: write
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Rust toolchain and cache
+        uses: ./.github/actions/rust-setup
+
+      - name: Install cargo-deny
+        id: install_deny
+        timeout-minutes: 5
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if command -v cargo-deny &>/dev/null; then
+            echo "cargo-deny already installed: $(cargo-deny --version)"
+            echo "installed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          DENY_VERSION="0.16.4"
+          DENY_SHA256="28b7f8e12df46a9ce186547e38278c851905fc4bda59a0cc57d2aade9fdf6962"
+          URL="https://github.com/EmbarkStudios/cargo-deny/releases/download/${DENY_VERSION}/cargo-deny-${DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          if curl -sSfL --proto =https --retry 3 --connect-timeout 15 --max-time 120 -o "${RUNNER_TEMP}/cargo-deny.tar.gz" "$URL"; then
+            echo "${DENY_SHA256}  ${RUNNER_TEMP}/cargo-deny.tar.gz" | sha256sum -c -
+            tar xzf "${RUNNER_TEMP}/cargo-deny.tar.gz" --no-same-owner --strip-components=1 -C "$HOME/.cargo/bin/" 2>/dev/null
+            chmod +x "$HOME/.cargo/bin/cargo-deny"
+            rm -f "${RUNNER_TEMP}/cargo-deny.tar.gz"
+          fi
+          if command -v cargo-deny &>/dev/null; then
+            cargo-deny --version
+            echo "installed=true" >> $GITHUB_OUTPUT
+          else
+            cargo install cargo-deny --locked 2>/dev/null && echo "installed=true" >> $GITHUB_OUTPUT || echo "installed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run cargo-deny supply chain checks
+        id: cargo_deny
+        if: steps.install_deny.outputs.installed == 'true'
+        timeout-minutes: 5
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo deny check 2>&1 | tee "${RUNNER_TEMP}/deny-output.txt"
+
       - name: Generate cargo-deny SARIF report
         if: always() && steps.install_deny.outputs.installed == 'true'
         run: |
@@ -412,6 +369,99 @@ jobs:
           category: cargo-deny
         continue-on-error: true
 
+      - name: Collect errors
+        id: collect-errors
+        if: always() && steps.cargo_deny.outcome == 'failure'
+        run: |
+          ERROR="[cargo-deny] $(head -c 2000 "${RUNNER_TEMP}/deny-output.txt" 2>/dev/null || echo 'cargo deny found policy violations.')"
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+  trivy-iac:
+    name: IaC Scanning (Trivy)
+    runs-on: arc-runner
+    timeout-minutes: 10
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+      security-events: write
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Trivy
+        id: install_trivy
+        uses: ./.github/actions/install-security-tools
+        with:
+          trivy: 'true'
+
+      - name: Scan Dockerfiles and docker-compose for misconfigurations
+        id: trivy_iac
+        if: steps.install_trivy.outputs.trivy-installed == 'true'
+        timeout-minutes: 5
+        run: |
+          trivy fs --scanners misconfig --exit-code 1 --severity CRITICAL,HIGH \
+            --no-progress --format table \
+            --include-non-failures \
+            Dockerfile.backend Dockerfile.frontend docker-compose.prod.yml docker-compose.dev.yml 2>&1 | tee "${RUNNER_TEMP}/trivy-iac-output.txt"
+
+      - name: Generate Trivy IaC SARIF report
+        if: always() && steps.install_trivy.outputs.trivy-installed == 'true'
+        run: |
+          umask 077
+          trivy fs --scanners misconfig --severity CRITICAL,HIGH,MEDIUM \
+            --no-progress --format sarif --output trivy-iac.sarif \
+            Dockerfile.backend Dockerfile.frontend docker-compose.prod.yml docker-compose.dev.yml || true
+
+      - name: Upload Trivy IaC SARIF to GitHub Security
+        if: always() && steps.install_trivy.outputs.trivy-installed == 'true' && hashFiles('trivy-iac.sarif') != ''
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+        with:
+          sarif_file: trivy-iac.sarif
+          category: trivy-iac
+        continue-on-error: true
+
+      - name: Collect errors
+        id: collect-errors
+        if: always() && steps.trivy_iac.outcome == 'failure'
+        run: |
+          ERROR="[trivy-iac] $(head -c 2000 "${RUNNER_TEMP}/trivy-iac-output.txt" 2>/dev/null || echo 'Trivy found Dockerfile/compose misconfigurations.')"
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+  # Gate job: merges results from parallel security jobs
+  quality-gate:
+    name: Security Gate
+    runs-on: arc-runner
+    timeout-minutes: 5
+    if: always() && !inputs.is-fork-pr
+    needs: [cargo-audit, cargo-deny, trivy-iac]
+    permissions:
+      contents: read
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
+      failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
+      duration: ${{ steps.timing.outputs.duration }}
+    steps:
+      - name: Record start time
+        id: start
+        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          sparse-checkout: .github
+          sparse-checkout-cone-mode: true
+
       - name: Write quality gate summary
         if: always()
         run: |
@@ -419,28 +469,31 @@ jobs:
             echo "## Dependency Security Results"
             echo "| Check | Status |"
             echo "|-------|--------|"
-            echo "| cargo audit | ${{ steps.cargo_audit.outcome == 'success' && '✅ Pass' || (steps.install_audit.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
-            echo "| cargo deny | ${{ steps.cargo_deny.outcome == 'success' && '✅ Pass' || (steps.install_deny.outputs.installed != 'true' && '⏭️ Skipped' || '❌ Fail') }} |"
-            echo "| Trivy IaC scan | ${{ steps.trivy_iac.outcome == 'success' && '✅ Pass' || (steps.install_trivy.outputs.installed != 'true' && '⏭️ Skipped' || '⚠️ Findings') }} |"
+            echo "| cargo audit | ${{ needs.cargo-audit.result == 'success' && '✅ Pass' || (needs.cargo-audit.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
+            echo "| cargo deny | ${{ needs.cargo-deny.result == 'success' && '✅ Pass' || (needs.cargo-deny.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
+            echo "| Trivy IaC scan | ${{ needs.trivy-iac.result == 'success' && '✅ Pass' || (needs.trivy-iac.result == 'skipped' && '⏭️ Skipped' || '⚠️ Findings') }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Collect quality-gate errors for notification
+      - name: Collect errors
         id: collect-errors
-        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.trivy_iac.outcome == 'failure')
+        if: always() && (needs.cargo-audit.result == 'failure' || needs.cargo-deny.result == 'failure' || needs.trivy-iac.result == 'failure')
         run: |
           ERROR=""
           FAILED=""
-          if [ "${{ steps.cargo_audit.outcome }}" = "failure" ]; then
+          if [ "${{ needs.cargo-audit.result }}" = "failure" ]; then
             FAILED="${FAILED}cargo-audit,"
-            ERROR="${ERROR}[cargo-audit] $(head -c 2000 "${RUNNER_TEMP}/audit-output.txt" 2>/dev/null || echo 'cargo audit found vulnerabilities.')\n\n"
+            AUDIT_ERR='${{ needs.cargo-audit.outputs.error_log }}'
+            ERROR="${ERROR}${AUDIT_ERR:-[cargo-audit] cargo audit found vulnerabilities.}\n\n"
           fi
-          if [ "${{ steps.cargo_deny.outcome }}" = "failure" ]; then
+          if [ "${{ needs.cargo-deny.result }}" = "failure" ]; then
             FAILED="${FAILED}cargo-deny,"
-            ERROR="${ERROR}[cargo-deny] $(head -c 2000 "${RUNNER_TEMP}/deny-output.txt" 2>/dev/null || echo 'cargo deny found policy violations.')\n\n"
+            DENY_ERR='${{ needs.cargo-deny.outputs.error_log }}'
+            ERROR="${ERROR}${DENY_ERR:-[cargo-deny] cargo deny found policy violations.}\n\n"
           fi
-          if [ "${{ steps.trivy_iac.outcome }}" = "failure" ]; then
+          if [ "${{ needs.trivy-iac.result }}" = "failure" ]; then
             FAILED="${FAILED}trivy-iac,"
-            ERROR="${ERROR}[trivy-iac] $(head -c 2000 "${RUNNER_TEMP}/trivy-iac-output.txt" 2>/dev/null || echo 'Trivy found Dockerfile/compose misconfigurations.')\n\n"
+            TRIVY_ERR='${{ needs.trivy-iac.outputs.error_log }}'
+            ERROR="${ERROR}${TRIVY_ERR:-[trivy-iac] Trivy found Dockerfile/compose misconfigurations.}\n\n"
           fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
@@ -455,6 +508,6 @@ jobs:
         with:
           start-time: ${{ steps.start.outputs.time }}
 
-      - name: Fail job if any quality step failed
-        if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.trivy_iac.outcome == 'failure')
+      - name: Fail if any security job failed
+        if: always() && (needs.cargo-audit.result == 'failure' || needs.cargo-deny.result == 'failure' || needs.trivy-iac.result == 'failure')
         run: exit 1

@@ -8,33 +8,27 @@ on:
         required: true
     outputs:
       result:
-        value: ${{ jobs.lint.result }}
+        value: ${{ jobs.gate.result }}
       error_log:
-        value: ${{ jobs.lint.outputs.error_log }}
+        value: ${{ jobs.gate.outputs.error_log }}
       failed_steps:
-        value: ${{ jobs.lint.outputs.failed_steps }}
+        value: ${{ jobs.gate.outputs.failed_steps }}
       duration:
-        value: ${{ jobs.lint.outputs.duration }}
+        value: ${{ jobs.gate.outputs.duration }}
 
 permissions: {}
 
 jobs:
-  lint:
-    name: Lint & Format
+  fmt:
+    name: Format (rustfmt)
     runs-on: arc-runner
-    timeout-minutes: 35
+    timeout-minutes: 10
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
-      failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
-      duration: ${{ steps.timing.outputs.duration }}
     steps:
-      - name: Record start time
-        id: start
-        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -44,18 +38,46 @@ jobs:
         id: rust-setup
         uses: ./.github/actions/rust-setup
         with:
-          components: rustfmt,clippy
-          targets: wasm32-unknown-unknown
+          components: rustfmt
 
       - name: Check formatting (rustfmt)
         id: fmt
-        if: always() && steps.rust-setup.outcome == 'success'
         timeout-minutes: 5
         run: cargo fmt --all -- --check 2>&1 | tee "${RUNNER_TEMP}/fmt-output.txt"
 
+      - name: Collect errors
+        id: collect-errors
+        if: always() && steps.fmt.outcome == 'failure'
+        run: |
+          ERROR="[rustfmt] $(head -c 1500 "${RUNNER_TEMP}/fmt-output.txt" 2>/dev/null || echo 'rustfmt found formatting issues.')"
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+  clippy-backend:
+    name: Clippy (Backend)
+    runs-on: arc-runner
+    timeout-minutes: 20
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Rust setup
+        id: rust-setup
+        uses: ./.github/actions/rust-setup
+        with:
+          components: clippy
+
       - name: Clippy backend
-        id: clippy_backend
-        if: always() && steps.rust-setup.outcome == 'success'
+        id: clippy
         timeout-minutes: 20
         run: |
           umask 077
@@ -77,9 +99,48 @@ jobs:
             exit 1
           fi
 
+      - name: Upload clippy backend report
+        if: always() && hashFiles(format('{0}/clippy-backend.json', runner.temp)) != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: clippy-backend-report
+          path: ${{ runner.temp }}/clippy-backend.json
+          retention-days: 1
+
+      - name: Collect errors
+        id: collect-errors
+        if: always() && steps.clippy.outcome == 'failure'
+        run: |
+          ERROR="[clippy-backend] $(head -c 1500 "${RUNNER_TEMP}/clippy-backend-output.txt" 2>/dev/null || echo 'Backend clippy found warnings/errors.')"
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+  clippy-frontend:
+    name: Clippy (Frontend)
+    runs-on: arc-runner
+    timeout-minutes: 15
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Rust setup
+        id: rust-setup
+        uses: ./.github/actions/rust-setup
+        with:
+          components: clippy
+          targets: wasm32-unknown-unknown
+
       - name: Clippy frontend
-        id: clippy_frontend
-        if: always() && steps.rust-setup.outcome == 'success'
+        id: clippy
         timeout-minutes: 15
         run: |
           umask 077
@@ -101,11 +162,69 @@ jobs:
             exit 1
           fi
 
-      - name: Assemble clippy JSON report
-        if: always() && steps.rust-setup.outcome == 'success'
+      - name: Upload clippy frontend report
+        if: always() && hashFiles(format('{0}/clippy-frontend.json', runner.temp)) != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: clippy-frontend-report
+          path: ${{ runner.temp }}/clippy-frontend.json
+          retention-days: 1
+
+      - name: Collect errors
+        id: collect-errors
+        if: always() && steps.clippy.outcome == 'failure'
         run: |
-          cat "${RUNNER_TEMP}/clippy-backend.json" "${RUNNER_TEMP}/clippy-frontend.json" \
-            > clippy-report.json 2>/dev/null || true
+          ERROR="[clippy-frontend] $(head -c 1500 "${RUNNER_TEMP}/clippy-frontend-output.txt" 2>/dev/null || echo 'Frontend clippy found warnings/errors.')"
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+  # Gate job: merges results from parallel lint jobs, assembles clippy report,
+  # and produces the unified outputs that ci.yml consumes.
+  gate:
+    name: Lint Gate
+    runs-on: arc-runner
+    timeout-minutes: 5
+    if: always() && !inputs.is-fork-pr
+    needs: [fmt, clippy-backend, clippy-frontend]
+    permissions:
+      contents: read
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
+      failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
+      duration: ${{ steps.timing.outputs.duration }}
+    steps:
+      - name: Record start time
+        id: start
+        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          sparse-checkout: .github
+          sparse-checkout-cone-mode: true
+
+      - name: Download clippy reports
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: clippy-*-report
+          path: ${{ runner.temp }}/clippy-parts
+          merge-multiple: false
+        continue-on-error: true
+
+      - name: Assemble clippy JSON report
+        run: |
+          cat "${{ runner.temp }}"/clippy-parts/*/clippy-*.json > clippy-report.json 2>/dev/null || echo '{}' > clippy-report.json
+
+      - name: Upload merged clippy report
+        if: hashFiles('clippy-report.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: clippy-report
+          path: clippy-report.json
+          retention-days: 1
 
       - name: Write lint summary
         if: always()
@@ -114,28 +233,31 @@ jobs:
             echo "## Lint & Format Results"
             echo "| Check | Status |"
             echo "|-------|--------|"
-            echo "| rustfmt | ${{ steps.fmt.outcome == 'success' && '✅ Pass' || (steps.fmt.outcome == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
-            echo "| clippy backend | ${{ steps.clippy_backend.outcome == 'success' && '✅ Pass' || (steps.clippy_backend.outcome == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
-            echo "| clippy frontend | ${{ steps.clippy_frontend.outcome == 'success' && '✅ Pass' || (steps.clippy_frontend.outcome == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
+            echo "| rustfmt | ${{ needs.fmt.result == 'success' && '✅ Pass' || (needs.fmt.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
+            echo "| clippy backend | ${{ needs.clippy-backend.result == 'success' && '✅ Pass' || (needs.clippy-backend.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
+            echo "| clippy frontend | ${{ needs.clippy-frontend.result == 'success' && '✅ Pass' || (needs.clippy-frontend.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect errors for notification
         id: collect-errors
-        if: always() && (steps.fmt.outcome == 'failure' || steps.clippy_backend.outcome == 'failure' || steps.clippy_frontend.outcome == 'failure')
+        if: always() && (needs.fmt.result == 'failure' || needs.clippy-backend.result == 'failure' || needs.clippy-frontend.result == 'failure')
         run: |
           ERROR=""
           FAILED=""
-          if [ "${{ steps.fmt.outcome }}" = "failure" ]; then
+          if [ "${{ needs.fmt.result }}" = "failure" ]; then
             FAILED="${FAILED}rustfmt,"
-            ERROR="${ERROR}[rustfmt] $(head -c 1500 "${RUNNER_TEMP}/fmt-output.txt" 2>/dev/null || echo 'rustfmt found formatting issues.')\n\n"
+            FMT_ERR='${{ needs.fmt.outputs.error_log }}'
+            ERROR="${ERROR}${FMT_ERR:-[rustfmt] formatting issues found.}\n\n"
           fi
-          if [ "${{ steps.clippy_backend.outcome }}" = "failure" ]; then
+          if [ "${{ needs.clippy-backend.result }}" = "failure" ]; then
             FAILED="${FAILED}clippy-backend,"
-            ERROR="${ERROR}[clippy-backend] $(head -c 1500 "${RUNNER_TEMP}/clippy-backend-output.txt" 2>/dev/null || echo 'Backend clippy found warnings/errors.')\n\n"
+            BE_ERR='${{ needs.clippy-backend.outputs.error_log }}'
+            ERROR="${ERROR}${BE_ERR:-[clippy-backend] Backend clippy found warnings/errors.}\n\n"
           fi
-          if [ "${{ steps.clippy_frontend.outcome }}" = "failure" ]; then
+          if [ "${{ needs.clippy-frontend.result }}" = "failure" ]; then
             FAILED="${FAILED}clippy-frontend,"
-            ERROR="${ERROR}[clippy-frontend] $(head -c 1500 "${RUNNER_TEMP}/clippy-frontend-output.txt" 2>/dev/null || echo 'Frontend clippy found warnings/errors.')\n\n"
+            FE_ERR='${{ needs.clippy-frontend.outputs.error_log }}'
+            ERROR="${ERROR}${FE_ERR:-[clippy-frontend] Frontend clippy found warnings/errors.}\n\n"
           fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
@@ -150,14 +272,6 @@ jobs:
         with:
           start-time: ${{ steps.start.outputs.time }}
 
-      - name: Fail job if any lint step failed
-        if: always() && (steps.fmt.outcome == 'failure' || steps.clippy_backend.outcome == 'failure' || steps.clippy_frontend.outcome == 'failure')
+      - name: Fail if any lint job failed
+        if: always() && (needs.fmt.result == 'failure' || needs.clippy-backend.result == 'failure' || needs.clippy-frontend.result == 'failure')
         run: exit 1
-
-      - name: Upload clippy report
-        if: always() && hashFiles('clippy-report.json') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: clippy-report
-          path: clippy-report.json
-          retention-days: 1

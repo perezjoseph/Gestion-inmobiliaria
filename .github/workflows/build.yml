@@ -2,6 +2,12 @@ name: Build
 
 on:
   workflow_call:
+    inputs:
+      is-production:
+        description: "Whether this is a production build (main push). Controls SBOM generation."
+        type: boolean
+        required: false
+        default: false
     outputs:
       build-frontend-result:
         value: ${{ jobs.build-frontend.result }}
@@ -89,24 +95,11 @@ jobs:
             exit 1
           fi
 
-      - name: Install Gitleaks (with checksum verification)
-        id: install-gitleaks
-        timeout-minutes: 3
-        run: |
-          GITLEAKS_VERSION="8.24.3"
-          GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
-          if command -v gitleaks &>/dev/null && [ "$(gitleaks version 2>/dev/null)" = "$GITLEAKS_VERSION" ]; then
-            exit 0
-          fi
-          ARCHIVE="${RUNNER_TEMP}/gitleaks.tar.gz"
-          curl -sSfL --proto =https --retry 3 --retry-delay 5 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
-            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
-          mkdir -p "${HOME}/.local/bin"
-          tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" gitleaks
-          rm -f "$ARCHIVE"
-          export PATH="${HOME}/.local/bin:$PATH"
-          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+      - name: Install security tools
+        uses: ./.github/actions/install-security-tools
+        with:
+          gitleaks: 'true'
+          trivy: 'true'
 
       - name: Scan dist for secrets
         run: |
@@ -118,26 +111,8 @@ jobs:
           find . -type f -exec sha256sum {} \; | sort -k2 > "${RUNNER_TEMP}/frontend-checksums.sha256"
           echo "Generated checksums for $(wc -l < "${RUNNER_TEMP}/frontend-checksums.sha256") files"
 
-      - name: Install Trivy
-        id: install-trivy
-        timeout-minutes: 3
-        run: |
-          TRIVY_VERSION="0.69.3"
-          TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
-          if command -v trivy &>/dev/null && [ "$(trivy --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" = "$TRIVY_VERSION" ]; then
-            exit 0
-          fi
-          ARCHIVE="${RUNNER_TEMP}/trivy.tar.gz"
-          curl -sSfL --proto =https --retry 3 --retry-delay 5 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
-            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
-          echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
-          mkdir -p "${HOME}/.local/bin"
-          tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" trivy
-          rm -f "$ARCHIVE"
-          export PATH="${HOME}/.local/bin:$PATH"
-          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
-
       - name: Generate SBOM
+        if: inputs.is-production
         run: |
           umask 077
           trivy fs --format cyclonedx --output frontend-sbom.cdx.json frontend/
@@ -163,6 +138,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload frontend SBOM
+        if: inputs.is-production
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
         with:
           name: frontend-sbom
@@ -223,23 +199,11 @@ jobs:
         run: |
           cargo build --locked -p realestate-backend --release 2>&1 | tee "${RUNNER_TEMP}/build-backend-output.txt"
 
-      - name: Install Gitleaks (with checksum verification)
-        timeout-minutes: 3
-        run: |
-          GITLEAKS_VERSION="8.24.3"
-          GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
-          if command -v gitleaks &>/dev/null && [ "$(gitleaks version 2>/dev/null)" = "$GITLEAKS_VERSION" ]; then
-            exit 0
-          fi
-          ARCHIVE="${RUNNER_TEMP}/gitleaks.tar.gz"
-          curl -sSfL --proto =https --retry 3 --retry-delay 5 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
-            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
-          mkdir -p "${HOME}/.local/bin"
-          tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" gitleaks
-          rm -f "$ARCHIVE"
-          export PATH="${HOME}/.local/bin:$PATH"
-          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+      - name: Install security tools
+        uses: ./.github/actions/install-security-tools
+        with:
+          gitleaks: 'true'
+          trivy: 'true'
 
       - name: Scan binary output for secrets
         run: |
@@ -250,25 +214,8 @@ jobs:
           sha256sum target/release/realestate-backend > "${RUNNER_TEMP}/backend-checksum.sha256"
           cat "${RUNNER_TEMP}/backend-checksum.sha256"
 
-      - name: Install Trivy
-        timeout-minutes: 3
-        run: |
-          TRIVY_VERSION="0.69.3"
-          TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
-          if command -v trivy &>/dev/null && [ "$(trivy --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" = "$TRIVY_VERSION" ]; then
-            exit 0
-          fi
-          ARCHIVE="${RUNNER_TEMP}/trivy.tar.gz"
-          curl -sSfL --proto =https --retry 3 --retry-delay 5 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
-            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
-          echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
-          mkdir -p "${HOME}/.local/bin"
-          tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" trivy
-          rm -f "$ARCHIVE"
-          export PATH="${HOME}/.local/bin:$PATH"
-          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
-
       - name: Generate SBOM
+        if: inputs.is-production
         run: |
           umask 077
           trivy fs --format cyclonedx --output backend-sbom.cdx.json .
@@ -300,6 +247,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload backend SBOM
+        if: inputs.is-production
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
         with:
           name: backend-sbom

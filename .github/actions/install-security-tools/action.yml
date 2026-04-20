@@ -1,0 +1,72 @@
+name: 'Install Security Tools'
+description: 'Install Gitleaks and/or Trivy with checksum verification. Skips if already present at the correct version.'
+
+inputs:
+  gitleaks:
+    description: 'Install Gitleaks (true/false)'
+    required: false
+    default: 'false'
+  trivy:
+    description: 'Install Trivy (true/false)'
+    required: false
+    default: 'false'
+
+outputs:
+  gitleaks-installed:
+    description: 'Whether Gitleaks was installed successfully'
+    value: ${{ steps.gitleaks.outputs.installed }}
+  trivy-installed:
+    description: 'Whether Trivy was installed successfully'
+    value: ${{ steps.trivy.outputs.installed }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install Gitleaks
+      id: gitleaks
+      if: inputs.gitleaks == 'true'
+      shell: bash
+      run: |
+        GITLEAKS_VERSION="8.24.3"
+        GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
+        if command -v gitleaks &>/dev/null && [ "$(gitleaks version 2>/dev/null)" = "$GITLEAKS_VERSION" ]; then
+          echo "Gitleaks $GITLEAKS_VERSION already installed"
+          echo "installed=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        ARCHIVE="${RUNNER_TEMP}/gitleaks.tar.gz"
+        curl -sSfL --proto =https --retry 3 --retry-delay 5 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+          "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+        echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
+        mkdir -p "${HOME}/.local/bin"
+        tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" gitleaks
+        rm -f "$ARCHIVE"
+        echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+        echo "installed=true" >> $GITHUB_OUTPUT
+
+    - name: Install Trivy
+      id: trivy
+      if: inputs.trivy == 'true'
+      shell: bash
+      run: |
+        TRIVY_VERSION="0.69.3"
+        TRIVY_SHA256="1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
+        if command -v trivy &>/dev/null && [ "$(trivy --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" = "$TRIVY_VERSION" ]; then
+          echo "Trivy $TRIVY_VERSION already installed"
+          echo "installed=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        ARCHIVE="${RUNNER_TEMP}/trivy.tar.gz"
+        if curl -sSfL --proto =https --retry 3 --retry-delay 5 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+          "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"; then
+          echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          mkdir -p "${HOME}/.local/bin"
+          tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" trivy
+          rm -f "$ARCHIVE"
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+          echo "installed=true" >> $GITHUB_OUTPUT
+        else
+          echo "::warning::Trivy download failed"
+          rm -f "$ARCHIVE"
+          echo "installed=false" >> $GITHUB_OUTPUT
+        fi
