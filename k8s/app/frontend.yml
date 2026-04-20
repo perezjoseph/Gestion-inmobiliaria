@@ -28,6 +28,7 @@ spec:
       containers:
         - name: frontend
           image: ghcr.io/perezjoseph/realestate-frontend:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8443
           volumeMounts:

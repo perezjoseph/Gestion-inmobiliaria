@@ -51,6 +51,7 @@ spec:
       initContainers:
         - name: init-sysctl
           image: busybox:1.37
+          imagePullPolicy: IfNotPresent
           command: ["sh", "-c", "sysctl -w vm.max_map_count=262144 || true"]
           securityContext:
             privileged: true
@@ -68,6 +69,7 @@ spec:
       containers:
         - name: sonarqube
           image: sonarqube:26.4.0.121862-community
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9000
           env:

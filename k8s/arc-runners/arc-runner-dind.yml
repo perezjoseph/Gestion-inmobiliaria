@@ -10,11 +10,12 @@ spec:
       labels:
         - arc-runner-dind
       dockerEnabled: true
+      imagePullPolicy: IfNotPresent
       nodeSelector:
         role: desktop
       resources:
         requests:
-          cpu: "1"
+          cpu: "3"
           memory: 2Gi
         limits:
           cpu: "3"
@@ -54,7 +55,7 @@ spec:
     kind: RunnerDeployment
     name: arc-runner-dind
   minReplicas: 1
-  maxReplicas: 6
+  maxReplicas: 4
   metrics:
     - type: TotalNumberOfQueuedAndInProgressWorkflowRuns
       repositoryNames:

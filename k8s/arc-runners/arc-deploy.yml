@@ -8,6 +8,8 @@ spec:
   template:
     spec:
       repository: perezjoseph/Gestion-inmobiliaria
+      dockerEnabled: false
+      imagePullPolicy: IfNotPresent
       labels:
         - arc-deploy
       nodeSelector:

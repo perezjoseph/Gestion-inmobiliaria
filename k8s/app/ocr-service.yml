@@ -28,6 +28,7 @@ spec:
       containers:
         - name: ocr-service
           image: ghcr.io/perezjoseph/realestate-ocr-service:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
           env:
