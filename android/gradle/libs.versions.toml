@@ -2,7 +2,7 @@
 activityCompose = "1.11.0"
 agp = "8.9.1"
 androidxSecurityCrypto = "1.1.0-alpha07"
-coreKtx = "1.17.0"
+coreKtx = "1.18.0"
 compileSdk = "36"
 compose-bom = "2025.10.01"
 coroutines = "1.10.2"
