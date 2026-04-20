@@ -13,10 +13,6 @@ on:
         type: string
         required: true
     secrets:
-      WEBHOOK_SECRET:
-        required: true
-      WEBHOOK_HOST:
-        required: true
       POSTGRES_PASSWORD:
         required: true
       JWT_SECRET:
@@ -76,7 +72,6 @@ jobs:
         run: |
           echo "::add-mask::${{ secrets.POSTGRES_PASSWORD }}"
           echo "::add-mask::${{ secrets.JWT_SECRET }}"
-          echo "::add-mask::${{ secrets.WEBHOOK_SECRET }}"
 
       - name: Ensure namespace exists
         run: kubectl get namespace realestate || kubectl create namespace realestate
@@ -174,13 +169,3 @@ jobs:
           echo "error_log<<$EOF" >> $GITHUB_OUTPUT
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
-
-      - name: Notify webhook on failure
-        if: failure()
-        uses: ./.github/actions/webhook-notify
-        with:
-          job-name: deploy
-          step-name: deploy-or-health-check
-          error-log: ${{ steps.collect-errors.outputs.error_log }}
-          webhook-secret: ${{ secrets.WEBHOOK_SECRET }}
-          webhook-host: ${{ secrets.WEBHOOK_HOST }}

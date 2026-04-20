@@ -14,11 +14,6 @@ frontend/dist/
 
 kiro-debug.log
 kiro-debug.log
-.kiro-prompt-*
-.webhook-queue.db*
-.fix-history.json
-.simplemem-data/
-escalations/
 
 # Android build artifacts
 android/.gradle/
@@ -34,8 +29,6 @@ __pycache__/
 *.pyo
 .hypothesis/
 .pytest_cache/
-.pipeline-state.json
-.webhook*
 # K3s deployment manifests (local cluster config)
 k3s/
 
@@ -55,4 +48,3 @@ k3s/
 *.orig
 *.log
 *.cache
-.pipeline_state.json

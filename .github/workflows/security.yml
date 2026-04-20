@@ -9,11 +9,6 @@ on:
       is-fork-pr:
         type: boolean
         required: true
-    secrets:
-      WEBHOOK_SECRET:
-        required: true
-      WEBHOOK_HOST:
-        required: true
     outputs:
       secret-scan-result:
         value: ${{ jobs.secret-scan.result }}
@@ -65,16 +60,6 @@ jobs:
 
       - name: Run Gitleaks secret detection
         run: gitleaks detect --source . --verbose --redact --exit-code 1
-
-      - name: Notify webhook on failure
-        if: failure()
-        uses: ./.github/actions/webhook-notify
-        with:
-          job-name: secret-scan
-          step-name: gitleaks
-          error-log: 'Gitleaks detected secrets in the repository.'
-          webhook-secret: ${{ secrets.WEBHOOK_SECRET }}
-          webhook-host: ${{ secrets.WEBHOOK_HOST }}
 
   dependency-review:
     name: Dependency Review (PR)
@@ -473,13 +458,3 @@ jobs:
       - name: Fail job if any quality step failed
         if: always() && (steps.cargo_audit.outcome == 'failure' || steps.cargo_deny.outcome == 'failure' || steps.trivy_iac.outcome == 'failure')
         run: exit 1
-
-      - name: Notify webhook on failure
-        if: failure()
-        uses: ./.github/actions/webhook-notify
-        with:
-          job-name: quality-gate
-          step-name: audit-or-deny
-          error-log: ${{ steps.collect-errors.outputs.error_log }}
-          webhook-secret: ${{ secrets.WEBHOOK_SECRET }}
-          webhook-host: ${{ secrets.WEBHOOK_HOST }}

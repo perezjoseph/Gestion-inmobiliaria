@@ -24,10 +24,6 @@ on:
         type: string
         required: true
     secrets:
-      WEBHOOK_SECRET:
-        required: true
-      WEBHOOK_HOST:
-        required: true
       SONAR_HOST_URL:
         required: true
       SONAR_TOKEN:
@@ -360,8 +356,6 @@ jobs:
         env:
           SONAR_TOKEN: ${{ env.SONAR_ANALYSIS_TOKEN }}
           SCAN_OUTCOME: ${{ steps.sonar-scan.outcome }}
-          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
-          WEBHOOK_HOST: ${{ secrets.WEBHOOK_HOST }}
           GH_SERVER_URL: ${{ github.server_url }}
           GH_REPOSITORY: ${{ github.repository }}
           GH_RUN_ID: ${{ github.run_id }}
@@ -465,28 +459,6 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "$GATE_STATUS" = "ERROR" ]; then
-            TOP_ISSUES=$(echo "$ISSUES" | jq -r '
-              [.issues[:20] | .[] |
-                "\(.severity) | \(.component | split(":") | last):\(.line // "?") | \(.message)"] |
-              join("\n")' 2>/dev/null || echo "")
-            ERROR_LOG="Quality Gate: ${GATE_STATUS}\nTotal open issues: ${TOTAL}\nBreakdown: ${SUMMARY}\n\nTop issues:\n${TOP_ISSUES}"
-
-            PAYLOAD=$(jq -n \
-              --arg job "sonarqube" \
-              --arg step "quality-gate-${GATE_STATUS}" \
-              --arg error_log "$ERROR_LOG" \
-              --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
-              --arg commit "$GH_SHA" \
-              --arg branch "$GH_REF_NAME" \
-              --arg actor "$GH_ACTOR" \
-              '{job: $job, step: $step, error_log: $error_log, run_url: $run_url, commit: $commit, branch: $branch, actor: $actor}')
-
-            SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | awk '{print $NF}')
-            curl -s --connect-timeout 5 --max-time 10 -X POST http://${WEBHOOK_HOST}:9090/ci-failure \
-              -H "Content-Type: application/json" \
-              -H "X-Signature-256: sha256=$SIGNATURE" \
-              -d "$PAYLOAD" || echo "Webhook unreachable -- skipping notification"
-
             echo "::error::SonarQube quality gate failed"
             exit 1
           fi

@@ -6,11 +6,6 @@ on:
       is-fork-pr:
         type: boolean
         required: true
-    secrets:
-      WEBHOOK_SECRET:
-        required: true
-      WEBHOOK_HOST:
-        required: true
     outputs:
       result:
         value: ${{ jobs.lint.result }}
@@ -166,13 +161,3 @@ jobs:
           name: clippy-report
           path: clippy-report.json
           retention-days: 1
-
-      - name: Notify webhook on failure
-        if: failure()
-        uses: ./.github/actions/webhook-notify
-        with:
-          job-name: lint
-          step-name: clippy-or-fmt
-          error-log: ${{ steps.collect-errors.outputs.error_log }}
-          webhook-secret: ${{ secrets.WEBHOOK_SECRET }}
-          webhook-host: ${{ secrets.WEBHOOK_HOST }}
