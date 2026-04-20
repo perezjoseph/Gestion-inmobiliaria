@@ -1,6 +1,6 @@
 ARG MODE=compile
 
-FROM rust:1.88-bookworm AS compile
+FROM rust:1.95-bookworm AS compile
 RUN rustup target add wasm32-unknown-unknown \
     && cargo install trunk --locked
 WORKDIR /app

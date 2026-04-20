@@ -1,6 +1,6 @@
 ARG MODE=compile
 
-FROM rust:1.88-bookworm AS compile
+FROM rust:1.95-bookworm AS compile
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY backend/ backend/
