@@ -117,6 +117,33 @@ jobs:
     with:
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
+  # ── Stage 1.5: SonarQube (after lint + tests) ──
+
+  sonarqube:
+    name: SonarQube
+    needs: [lint, tests, changes]
+    if: >-
+      always() && (
+        needs.lint.result == 'success' || needs.tests.result == 'success'
+      ) && (
+        github.event_name != 'pull_request' ||
+        needs.changes.outputs.backend == 'true' ||
+        needs.changes.outputs.frontend == 'true' ||
+        needs.changes.outputs.ci == 'true'
+      )
+    permissions:
+      contents: read
+    uses: ./.github/workflows/sonarqube.yml
+    with:
+      lint-result: ${{ needs.lint.outputs.result || needs.lint.result }}
+      test-backend-result: ${{ needs.tests.outputs.test-backend-result || needs.tests.result }}
+      test-frontend-result: ${{ needs.tests.outputs.test-frontend-result || needs.tests.result }}
+      coverage-backend-result: ${{ needs.tests.outputs.test-backend-result || needs.tests.result }}
+    secrets:
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_ADMIN_PASSWORD: ${{ secrets.SONAR_ADMIN_PASSWORD }}
+
   # ── Stage 2: Build (after lint passes) ──
 
   build:

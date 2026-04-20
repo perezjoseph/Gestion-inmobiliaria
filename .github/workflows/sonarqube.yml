@@ -100,64 +100,6 @@ jobs:
             echo "valid=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Set up JDK 17 for Android analysis
-        id: setup-java
-        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
-        with:
-          java-version: "17"
-          distribution: "temurin"
-        continue-on-error: true
-
-      - name: Setup Gradle
-        if: steps.setup-java.outcome == 'success'
-        uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
-        with:
-          cache-read-only: true
-        continue-on-error: true
-
-      - name: Generate Android Lint XML report
-        id: android-lint-xml
-        if: steps.setup-java.outcome == 'success'
-        timeout-minutes: 15
-        working-directory: android
-        run: |
-          umask 077
-          ./gradlew :app:lintDebug --no-daemon --stacktrace 2>/dev/null || true
-        continue-on-error: true
-
-      - name: Generate detekt XML report
-        id: detekt-xml
-        if: steps.setup-java.outcome == 'success'
-        timeout-minutes: 10
-        working-directory: android
-        run: |
-          umask 077
-          ./gradlew detekt --no-daemon --stacktrace 2>/dev/null || true
-        continue-on-error: true
-
-      - name: Cache SonarQube packages
-        if: steps.setup-java.outcome == 'success'
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
-
-      - name: Run Android SonarQube Gradle analysis
-        id: android-sonar
-        if: steps.setup-java.outcome == 'success'
-        timeout-minutes: 15
-        working-directory: android
-        env:
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_PROJECT_KEY: "Gestion-inmobiliaria"
-          SONAR_PROJECT_NAME: "Gestion-inmobiliaria"
-        run: |
-          umask 077
-          ./gradlew sonar --no-daemon --stacktrace 2>/dev/null || true
-        continue-on-error: true
-
       - name: Validate SONAR_HOST_URL format
         id: sonar-url-check
         run: |
@@ -270,17 +212,6 @@ jobs:
             echo "Clippy report found -- including in SonarQube analysis"
             SCAN_ARGS+=("-Dsonar.rust.clippy.reportPaths=/usr/src/clippy-report.json")
           fi
-          if [ -f android/app/build/reports/lint-results-debug.xml ]; then
-            echo "Android Lint XML report found -- including in SonarQube analysis"
-            SCAN_ARGS+=("-Dsonar.androidLint.reportPaths=/usr/src/android/app/build/reports/lint-results-debug.xml")
-          else
-            echo "::notice::Android Lint XML report not found -- clearing default path to avoid import warning"
-            SCAN_ARGS+=("-Dsonar.androidLint.reportPaths=")
-          fi
-          if [ -f android/build/reports/detekt/detekt.xml ]; then
-            echo "Detekt report found -- including in SonarQube analysis"
-            SCAN_ARGS+=("-Dsonar.kotlin.detekt.reportPaths=/usr/src/android/build/reports/detekt/detekt.xml")
-          fi
           umask 077
           set +e
           DOCKER_CONTENT_TRUST=0 docker run --rm \
@@ -334,16 +265,6 @@ jobs:
             else
               echo "| Clippy report | ⚠️ Missing | lint ($LINT_RESULT) |"
               MISSING=$((MISSING + 1))
-            fi
-            if [ -f android/app/build/reports/lint-results-debug.xml ]; then
-              echo "| Android Lint | ✅ Imported | sonarqube (local) |"
-            else
-              echo "| Android Lint | ⏭️ Not generated | sonarqube (local) |"
-            fi
-            if [ -f android/build/reports/detekt/detekt.xml ]; then
-              echo "| Detekt | ✅ Imported | sonarqube (local) |"
-            else
-              echo "| Detekt | ⏭️ Not generated | sonarqube (local) |"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
           if [ "$MISSING" -gt 0 ]; then

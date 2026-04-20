@@ -92,12 +92,12 @@ spec:
               mountPath: /opt/sonarqube/extensions
           resources:
             requests:
-              cpu: 200m
-              memory: 1Gi
+              cpu: "2"
+              memory: 4Gi
               ephemeral-storage: 256Mi
             limits:
-              cpu: "2"
-              memory: 2Gi
+              cpu: "4"
+              memory: 6Gi
               ephemeral-storage: 1Gi
           startupProbe:
             httpGet:
