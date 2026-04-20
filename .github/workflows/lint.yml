@@ -22,7 +22,7 @@ jobs:
   fmt:
     name: Format (rustfmt)
     runs-on: arc-runner
-    timeout-minutes: 10
+    timeout-minutes: 40
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read
@@ -120,7 +120,7 @@ jobs:
   clippy-frontend:
     name: Clippy (Frontend)
     runs-on: arc-runner
-    timeout-minutes: 15
+    timeout-minutes: 40
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read

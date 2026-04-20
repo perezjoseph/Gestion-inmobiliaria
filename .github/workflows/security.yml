@@ -74,7 +74,7 @@ jobs:
   cargo-audit:
     name: CVE Scanning (cargo-audit)
     runs-on: arc-runner
-    timeout-minutes: 15
+    timeout-minutes: 40
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read
@@ -294,7 +294,7 @@ jobs:
   cargo-deny:
     name: Supply Chain Policy (cargo-deny)
     runs-on: arc-runner
-    timeout-minutes: 15
+    timeout-minutes: 40
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read

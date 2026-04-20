@@ -54,7 +54,7 @@ spec:
     kind: RunnerDeployment
     name: arc-runner-dind
   minReplicas: 1
-  maxReplicas: 10
+  maxReplicas: 6
   metrics:
     - type: TotalNumberOfQueuedAndInProgressWorkflowRuns
       repositoryNames:
