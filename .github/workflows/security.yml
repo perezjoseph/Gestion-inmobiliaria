@@ -275,7 +275,7 @@ jobs:
 
       - name: Upload cargo-audit SARIF to GitHub Security
         if: always() && steps.install_audit.outputs.installed == 'true' && hashFiles('cargo-audit.sarif') != ''
-        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+        uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4.35.2
         with:
           sarif_file: cargo-audit.sarif
           category: cargo-audit
@@ -363,7 +363,7 @@ jobs:
 
       - name: Upload cargo-deny SARIF to GitHub Security
         if: always() && steps.install_deny.outputs.installed == 'true' && hashFiles('cargo-deny.sarif') != ''
-        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+        uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4.35.2
         with:
           sarif_file: cargo-deny.sarif
           category: cargo-deny
@@ -421,7 +421,7 @@ jobs:
 
       - name: Upload Trivy IaC SARIF to GitHub Security
         if: always() && steps.install_trivy.outputs.trivy-installed == 'true' && hashFiles('trivy-iac.sarif') != ''
-        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+        uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4.35.2
         with:
           sarif_file: trivy-iac.sarif
           category: trivy-iac
