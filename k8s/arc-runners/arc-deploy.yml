@@ -8,10 +8,12 @@ spec:
   template:
     spec:
       repository: perezjoseph/Gestion-inmobiliaria
-      dockerEnabled: false
+      dockerEnabled: true
       imagePullPolicy: IfNotPresent
       labels:
         - arc-deploy
+        - arc-runner
+        - arc-runner-dind
       nodeSelector:
         role: server
       resources:

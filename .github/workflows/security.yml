@@ -88,7 +88,12 @@ jobs:
       - name: Install cargo-audit
         id: install_audit
         run: |
-          mkdir -p "$HOME/.cargo/bin"
+          for dir in "$HOME/.cargo" "$HOME/.cargo/bin"; do
+            mkdir -p "$dir" 2>/dev/null || sudo mkdir -p "$dir"
+            if [ ! -w "$dir" ]; then
+              sudo chown -R "$(id -u):$(id -g)" "$HOME/.cargo"
+            fi
+          done
           export PATH="$HOME/.cargo/bin:$PATH"
           if command -v cargo-audit &>/dev/null && cargo audit --version &>/dev/null; then
             echo "cargo-audit already installed: $(cargo audit --version)"
@@ -295,7 +300,12 @@ jobs:
       - name: Install cargo-deny
         id: install_deny
         run: |
-          mkdir -p "$HOME/.cargo/bin"
+          for dir in "$HOME/.cargo" "$HOME/.cargo/bin"; do
+            mkdir -p "$dir" 2>/dev/null || sudo mkdir -p "$dir"
+            if [ ! -w "$dir" ]; then
+              sudo chown -R "$(id -u):$(id -g)" "$HOME/.cargo"
+            fi
+          done
           export PATH="$HOME/.cargo/bin:$PATH"
           if command -v cargo-deny &>/dev/null; then
             echo "cargo-deny already installed: $(cargo-deny --version)"
