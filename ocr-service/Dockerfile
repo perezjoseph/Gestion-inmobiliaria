@@ -17,6 +17,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY main.py .
 
 ENV PADDLE_PDX_CACHE_HOME=/app/.paddleocr
+# Use Baidu Object Storage as download source (better availability outside China)
+ENV PADDLE_PDX_MODEL_SOURCE=BOS
+
 RUN python -c "from paddleocr import PaddleOCR; PaddleOCR(use_textline_orientation=True, lang='es', device='cpu')"
 
 FROM python:3.11-slim
