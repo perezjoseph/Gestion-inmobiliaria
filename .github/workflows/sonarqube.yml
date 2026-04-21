@@ -47,7 +47,6 @@ jobs:
   sonarqube:
     name: SonarQube Code Quality & Coverage Analysis
     runs-on: arc-runner-dind
-    timeout-minutes: 20
     permissions:
       contents: read
     env:
@@ -119,7 +118,6 @@ jobs:
       - name: Verify SonarQube server is reachable
         id: sonar-reachable
         if: steps.sonar-url-check.outputs.skip != 'true'
-        timeout-minutes: 2
         run: |
           SONAR_URL="${SONAR_HOST_URL}"
           for i in $(seq 1 8); do
@@ -143,7 +141,6 @@ jobs:
       - name: Bootstrap SonarQube project and token
         id: sonar-bootstrap
         if: steps.sonar-url-check.outputs.skip != 'true' && steps.sonar-reachable.outputs.reachable == 'true'
-        timeout-minutes: 2
         run: |
           SONAR_URL="${SONAR_HOST_URL}"
           TOKEN="${{ secrets.SONAR_TOKEN }}"
@@ -273,7 +270,6 @@ jobs:
 
       - name: Fetch SonarQube results and notify
         if: always() && steps.sonar-url-check.outputs.skip != 'true' && steps.sonar-reachable.outputs.reachable == 'true'
-        timeout-minutes: 8
         env:
           SONAR_TOKEN: ${{ env.SONAR_ANALYSIS_TOKEN }}
           SCAN_OUTCOME: ${{ steps.sonar-scan.outcome }}

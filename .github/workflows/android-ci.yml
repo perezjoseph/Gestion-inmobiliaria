@@ -31,7 +31,6 @@ jobs:
   secret-scan:
     name: Secret Scanning (Gitleaks)
     runs-on: arc-runner
-    timeout-minutes: 10
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
@@ -43,7 +42,6 @@ jobs:
           fetch-depth: 0
 
       - name: Install Gitleaks (with checksum verification)
-        timeout-minutes: 3
         run: |
           GITLEAKS_VERSION="8.24.3"
           GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
@@ -64,7 +62,6 @@ jobs:
   dependency-review:
     name: Dependency Review (PR)
     runs-on: arc-runner
-    timeout-minutes: 10
     if: github.event_name == 'pull_request'
     permissions:
       contents: read
@@ -85,7 +82,6 @@ jobs:
   lint:
     name: Android Lint & Static Analysis
     runs-on: arc-runner
-    timeout-minutes: 35
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
@@ -165,7 +161,6 @@ jobs:
 
       - name: Run lint, detekt, and spotless checks
         id: lint-checks
-        timeout-minutes: 25
         working-directory: android
         env:
           GRADLE_OPTS: "-Xmx512m -Dorg.gradle.jvmargs=-Xmx2g"

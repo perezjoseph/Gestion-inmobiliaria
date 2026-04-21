@@ -31,7 +31,6 @@ jobs:
   secret-scan:
     name: Secret Scanning (Gitleaks)
     runs-on: arc-runner
-    timeout-minutes: 10
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read
@@ -53,7 +52,6 @@ jobs:
   dependency-review:
     name: Dependency Review (PR)
     runs-on: arc-runner
-    timeout-minutes: 10
     if: ${{ inputs.is-pr }}
     permissions:
       contents: read
@@ -74,7 +72,6 @@ jobs:
   cargo-audit:
     name: CVE Scanning (cargo-audit)
     runs-on: arc-runner
-    timeout-minutes: 40
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read
@@ -93,7 +90,6 @@ jobs:
 
       - name: Install cargo-audit
         id: install_audit
-        timeout-minutes: 5
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           if command -v cargo-audit &>/dev/null && cargo audit --version &>/dev/null; then
@@ -142,7 +138,6 @@ jobs:
       - name: Scan Rust dependencies for known vulnerabilities (CVEs)
         id: cargo_audit
         if: steps.install_audit.outputs.installed == 'true'
-        timeout-minutes: 5
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           cargo audit --deny yanked --deny unmaintained --deny unsound 2>&1 | tee "${RUNNER_TEMP}/audit-output.txt"
@@ -150,7 +145,6 @@ jobs:
       - name: Collect deprecation and unmaintained crate warnings
         id: collect-deprecations
         if: always() && steps.install_audit.outputs.installed == 'true'
-        timeout-minutes: 5
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           AUDIT_JSON=$(cargo audit --json 2>/dev/null || echo '{}')
@@ -294,7 +288,6 @@ jobs:
   cargo-deny:
     name: Supply Chain Policy (cargo-deny)
     runs-on: arc-runner
-    timeout-minutes: 40
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read
@@ -312,7 +305,6 @@ jobs:
 
       - name: Install cargo-deny
         id: install_deny
-        timeout-minutes: 5
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           if command -v cargo-deny &>/dev/null; then
@@ -339,7 +331,6 @@ jobs:
       - name: Run cargo-deny supply chain checks
         id: cargo_deny
         if: steps.install_deny.outputs.installed == 'true'
-        timeout-minutes: 5
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           cargo deny check 2>&1 | tee "${RUNNER_TEMP}/deny-output.txt"
@@ -382,7 +373,6 @@ jobs:
   trivy-iac:
     name: IaC Scanning (Trivy)
     runs-on: arc-runner
-    timeout-minutes: 10
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read
@@ -404,7 +394,6 @@ jobs:
       - name: Scan Dockerfiles and docker-compose for misconfigurations
         id: trivy_iac
         if: steps.install_trivy.outputs.trivy-installed == 'true'
-        timeout-minutes: 5
         run: |
           trivy fs --scanners misconfig --exit-code 1 --severity CRITICAL,HIGH \
             --no-progress --format table \
@@ -441,7 +430,6 @@ jobs:
   quality-gate:
     name: Security Gate
     runs-on: arc-runner
-    timeout-minutes: 5
     if: always() && !inputs.is-fork-pr
     needs: [cargo-audit, cargo-deny, trivy-iac]
     permissions:

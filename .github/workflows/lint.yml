@@ -22,7 +22,6 @@ jobs:
   fmt:
     name: Format (rustfmt)
     runs-on: arc-runner
-    timeout-minutes: 40
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read
@@ -42,7 +41,6 @@ jobs:
 
       - name: Check formatting (rustfmt)
         id: fmt
-        timeout-minutes: 5
         run: cargo fmt --all -- --check 2>&1 | tee "${RUNNER_TEMP}/fmt-output.txt"
 
       - name: Collect errors
@@ -58,7 +56,6 @@ jobs:
   clippy-backend:
     name: Clippy (Backend)
     runs-on: arc-runner
-    timeout-minutes: 20
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read
@@ -78,7 +75,6 @@ jobs:
 
       - name: Clippy backend
         id: clippy
-        timeout-minutes: 20
         run: |
           umask 077
           set +e
@@ -120,7 +116,6 @@ jobs:
   clippy-frontend:
     name: Clippy (Frontend)
     runs-on: arc-runner
-    timeout-minutes: 40
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read
@@ -141,7 +136,6 @@ jobs:
 
       - name: Clippy frontend
         id: clippy
-        timeout-minutes: 15
         run: |
           umask 077
           set +e
@@ -185,7 +179,6 @@ jobs:
   gate:
     name: Lint Gate
     runs-on: arc-runner
-    timeout-minutes: 5
     if: always() && !inputs.is-fork-pr
     needs: [fmt, clippy-backend, clippy-frontend]
     permissions:

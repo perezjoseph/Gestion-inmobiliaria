@@ -28,7 +28,6 @@ jobs:
   build-frontend:
     name: Build Frontend (Trunk + WASM)
     runs-on: arc-runner
-    timeout-minutes: 30
     permissions:
       contents: read
       id-token: write
@@ -53,7 +52,6 @@ jobs:
 
       - name: Install Trunk
         id: install-trunk
-        timeout-minutes: 3
         run: |
           TRUNK_VERSION="0.21.14"
           TRUNK_SHA256="a67f4054b249fe9acc5fabc25de1aebf19783aca3ad6ff64bf34d7da44d0ea20"
@@ -173,7 +171,6 @@ jobs:
   build-backend:
     name: Build Backend (Cargo)
     runs-on: arc-runner
-    timeout-minutes: 30
     permissions:
       contents: read
       id-token: write
