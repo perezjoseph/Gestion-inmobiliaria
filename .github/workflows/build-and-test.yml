@@ -172,7 +172,12 @@ jobs:
           curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
             "https://github.com/xd009642/tarpaulin/releases/download/${TARPAULIN_VERSION}/cargo-tarpaulin-x86_64-unknown-linux-musl.tar.gz"
           echo "${TARPAULIN_SHA256}  ${ARCHIVE}" | sha256sum -c -
-          mkdir -p "${HOME}/.cargo/bin"
+          for dir in "${HOME}/.cargo" "${HOME}/.cargo/bin"; do
+            mkdir -p "$dir" 2>/dev/null || sudo mkdir -p "$dir"
+            if [ ! -w "$dir" ]; then
+              sudo chown -R "$(id -u):$(id -g)" "${HOME}/.cargo"
+            fi
+          done
           tar xzf "$ARCHIVE" --no-same-owner -C "${HOME}/.cargo/bin" cargo-tarpaulin
           rm -f "$ARCHIVE"
           chmod +x "${HOME}/.cargo/bin/cargo-tarpaulin"
