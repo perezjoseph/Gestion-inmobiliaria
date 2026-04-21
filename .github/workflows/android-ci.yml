@@ -1,4 +1,4 @@
-name: Android CI
+﻿name: Android CI
 run-name: "Android CI [${{ github.event_name }}] ${{ github.ref_name }} @ ${{ github.sha }}"
 
 on:
@@ -30,7 +30,7 @@ jobs:
 
   secret-scan:
     name: Secret Scanning (Gitleaks)
-    runs-on: arc-runner
+    runs-on: arc-runner-dind
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
@@ -61,7 +61,7 @@ jobs:
 
   dependency-review:
     name: Dependency Review (PR)
-    runs-on: arc-runner
+    runs-on: arc-runner-dind
     if: github.event_name == 'pull_request'
     permissions:
       contents: read
@@ -81,7 +81,7 @@ jobs:
 
   lint:
     name: Android Lint & Static Analysis
-    runs-on: arc-runner
+    runs-on: arc-runner-dind
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read

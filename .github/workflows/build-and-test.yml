@@ -1,4 +1,4 @@
-name: Build & Test
+﻿name: Build & Test
 
 on:
   workflow_call:
@@ -323,7 +323,7 @@ jobs:
   # Single Rust compilation warms sccache; subsequent steps are near-instant.
   frontend:
     name: Frontend (Clippy + Test + Build)
-    runs-on: arc-runner
+    runs-on: arc-runner-dind
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read
@@ -532,7 +532,7 @@ jobs:
   # ── Clippy report assembly (for SonarQube) ──
   clippy-report:
     name: Assemble Clippy Report
-    runs-on: arc-runner
+    runs-on: arc-runner-dind
     if: always() && !inputs.is-fork-pr
     needs: [backend, frontend]
     permissions:

@@ -1,4 +1,4 @@
-name: Lint & Format
+﻿name: Lint & Format
 
 on:
   workflow_call:
@@ -21,7 +21,7 @@ permissions: {}
 jobs:
   fmt:
     name: Format (rustfmt)
-    runs-on: arc-runner
+    runs-on: arc-runner-dind
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read
@@ -55,7 +55,7 @@ jobs:
 
   gate:
     name: Lint Gate
-    runs-on: arc-runner
+    runs-on: arc-runner-dind
     if: always() && !inputs.is-fork-pr
     needs: [fmt]
     permissions:

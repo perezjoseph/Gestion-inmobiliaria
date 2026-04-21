@@ -8,6 +8,7 @@ spec:
     spec:
       repository: perezjoseph/Gestion-inmobiliaria
       labels:
+        - arc-runner
         - arc-runner-dind
       dockerEnabled: true
       imagePullPolicy: IfNotPresent
@@ -16,10 +17,10 @@ spec:
       resources:
         requests:
           cpu: "3"
-          memory: 2Gi
+          memory: 6Gi
         limits:
           cpu: "3"
-          memory: 6Gi
+          memory: 10Gi
       volumeMounts:
         - name: cargo-cache
           mountPath: /home/runner/.cargo/registry
