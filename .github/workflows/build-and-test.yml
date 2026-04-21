@@ -1,0 +1,559 @@
+name: Build & Test
+
+on:
+  workflow_call:
+    inputs:
+      is-fork-pr:
+        type: boolean
+        required: true
+      is-production:
+        description: "Whether this is a production build (main push). Controls SBOM generation."
+        type: boolean
+        required: false
+        default: false
+    outputs:
+      # Build outputs (consumed by containers workflow)
+      build-frontend-result:
+        value: ${{ jobs.backend.result == 'success' && jobs.frontend.result == 'success' && 'success' || 'failure' }}
+      build-frontend-error-log:
+        value: ${{ jobs.frontend.outputs.error_log }}
+      build-frontend-duration:
+        value: ${{ jobs.frontend.outputs.duration }}
+      build-backend-result:
+        value: ${{ jobs.backend.result }}
+      build-backend-error-log:
+        value: ${{ jobs.backend.outputs.error_log }}
+      build-backend-duration:
+        value: ${{ jobs.backend.outputs.duration }}
+      # Test outputs (consumed by ci.yml and sonarqube)
+      test-backend-result:
+        value: ${{ jobs.backend.result }}
+      test-backend-error-log:
+        value: ${{ jobs.backend.outputs.error_log }}
+      test-backend-duration:
+        value: ${{ jobs.backend.outputs.duration }}
+      test-frontend-result:
+        value: ${{ jobs.frontend.result }}
+      test-frontend-error-log:
+        value: ${{ jobs.frontend.outputs.error_log }}
+      test-frontend-duration:
+        value: ${{ jobs.frontend.outputs.duration }}
+      # Clippy outputs (consumed by sonarqube)
+      clippy-backend-result:
+        value: ${{ jobs.backend.outputs.clippy_result }}
+      clippy-frontend-result:
+        value: ${{ jobs.frontend.outputs.clippy_result }}
+
+permissions: {}
+
+jobs:
+  # ── Backend: clippy → test (with coverage) → release build ──
+  # Single Rust compilation warms sccache; subsequent steps are near-instant.
+  # Runs on dind runner because tests need a postgres service container.
+  backend:
+    name: Backend (Clippy + Test + Build)
+    runs-on: arc-runner-dind
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      SERVER_PORT: "8080"
+      CORS_ORIGIN: http://localhost:8080
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
+      duration: ${{ steps.timing.outputs.duration }}
+      clippy_result: ${{ steps.clippy.outcome }}
+    services:
+      postgres:
+        image: postgres:16@sha256:5a65324fe84dc41709ff914e90b07f3e2f577073ed27bf917d4873aca0c9ec51
+        env:
+          POSTGRES_DB: realestate
+          POSTGRES_USER: realestate
+          POSTGRES_PASSWORD: realestate_dev_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U realestate"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+          --health-start-period 15s
+    steps:
+      - name: Record start time
+        id: start
+        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Rust setup
+        id: rust-setup
+        uses: ./.github/actions/rust-setup
+        with:
+          components: clippy,llvm-tools-preview
+
+      # ── Phase 1: Clippy (compiles everything, warms sccache) ──
+      - name: Clippy backend
+        id: clippy
+        run: |
+          umask 077
+          set +e
+          cargo clippy --locked -p realestate-backend --message-format=json -- -D warnings \
+            > "${RUNNER_TEMP}/clippy-backend.json" 2>"${RUNNER_TEMP}/clippy-backend-stderr.txt"
+          RESULT=$?
+          set -e
+          jq -r 'select(.reason == "compiler-message") | .message.rendered // empty' \
+            "${RUNNER_TEMP}/clippy-backend.json" > "${RUNNER_TEMP}/clippy-backend-output.txt" 2>/dev/null || true
+          if [ $RESULT -ne 0 ]; then
+            if [ -s "${RUNNER_TEMP}/clippy-backend-output.txt" ]; then
+              cat "${RUNNER_TEMP}/clippy-backend-output.txt"
+            else
+              echo "--- stderr (no clippy JSON output -- likely a cargo-level error) ---"
+              cat "${RUNNER_TEMP}/clippy-backend-stderr.txt" 2>/dev/null || true
+            fi
+            echo "::error::backend clippy found warnings/errors."
+            exit 1
+          fi
+
+      - name: Upload clippy backend report
+        if: always() && hashFiles(format('{0}/clippy-backend.json', runner.temp)) != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: clippy-backend-report
+          path: ${{ runner.temp }}/clippy-backend.json
+          retention-days: 1
+
+      # ── Phase 2: Tests with coverage ──
+      - name: Mask database credentials
+        run: |
+          echo "::add-mask::realestate_dev_password"
+          echo "::add-mask::realestate"
+
+      - name: Set database URL
+        run: echo "DATABASE_URL=postgresql://realestate:realestate_dev_password@localhost:5432/realestate" >> $GITHUB_ENV
+
+      - name: Install PostgreSQL client
+        run: |
+          if ! command -v pg_isready >/dev/null 2>&1; then
+            echo "pg_isready not found -- installing postgresql-client"
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends postgresql-client
+          fi
+
+      - name: Wait for Postgres to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U realestate 2>/dev/null; then
+              echo "Postgres is ready"
+              exit 0
+            fi
+            echo "Waiting for Postgres... attempt $i/30"
+            sleep 2
+          done
+          echo "::error::Postgres did not become ready in time"
+          exit 1
+
+      - name: Generate JWT secret for tests
+        run: |
+          JWT_SECRET=$(openssl rand -hex 32)
+          echo "::add-mask::$JWT_SECRET"
+          echo "JWT_SECRET=$JWT_SECRET" >> $GITHUB_ENV
+
+      - name: Install cargo-tarpaulin
+        id: install-tarpaulin
+        run: |
+          TARPAULIN_VERSION="0.32.7"
+          TARPAULIN_SHA256="67a61b2b271488e2d0cb718ccec384d0f296703f3c810f80ea5d46484c5d463b"
+          ARCHIVE="${RUNNER_TEMP}/cargo-tarpaulin.tar.gz"
+          curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            "https://github.com/xd009642/tarpaulin/releases/download/${TARPAULIN_VERSION}/cargo-tarpaulin-x86_64-unknown-linux-musl.tar.gz"
+          echo "${TARPAULIN_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          mkdir -p "${HOME}/.cargo/bin"
+          tar xzf "$ARCHIVE" --no-same-owner -C "${HOME}/.cargo/bin" cargo-tarpaulin
+          rm -f "$ARCHIVE"
+          chmod +x "${HOME}/.cargo/bin/cargo-tarpaulin"
+          cargo tarpaulin --version
+
+      - name: Run tests with coverage (tarpaulin)
+        id: tests
+        run: |
+          mkdir -p coverage
+          set +e
+          cargo tarpaulin --locked -p realestate-backend \
+            --engine llvm \
+            --out lcov --output-dir coverage \
+            --timeout 300 --skip-clean 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
+          exit ${PIPESTATUS[0]}
+
+      - name: Scan coverage output for secrets
+        if: steps.tests.outcome == 'success'
+        run: |
+          if grep -rqiE '(password|secret|token|key)=' coverage/ 2>/dev/null; then
+            echo "::warning::Potential secrets detected in coverage output"
+          fi
+
+      - name: Upload coverage artifact
+        if: steps.tests.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: backend-coverage
+          path: coverage/lcov.info
+          retention-days: 7
+
+      # ── Phase 3: Release build (sccache makes this fast after clippy+test) ──
+      - name: Build backend release binary
+        id: build
+        run: |
+          cargo build --locked -p realestate-backend --release 2>&1 | tee "${RUNNER_TEMP}/build-backend-output.txt"
+
+      - name: Verify Cargo.lock is up to date
+        run: |
+          if ! git diff --quiet Cargo.lock; then
+            echo "::error::Cargo.lock is out of date. Run 'cargo update' locally and commit the changes."
+            git diff Cargo.lock
+            exit 1
+          fi
+
+      - name: Install security tools
+        uses: ./.github/actions/install-security-tools
+        with:
+          gitleaks: 'true'
+          trivy: 'true'
+
+      - name: Scan binary output for secrets
+        run: |
+          gitleaks detect --source target/release --verbose --redact --exit-code 1 --no-git --config .gitleaks.toml
+
+      - name: Generate checksum
+        run: |
+          sha256sum target/release/realestate-backend > "${RUNNER_TEMP}/backend-checksum.sha256"
+          cat "${RUNNER_TEMP}/backend-checksum.sha256"
+
+      - name: Generate SBOM
+        if: inputs.is-production
+        run: |
+          umask 077
+          trivy fs --format cyclonedx --output backend-sbom.cdx.json .
+
+      - name: Scan binary for vulnerabilities
+        run: |
+          trivy fs --scanners vuln --exit-code 0 --severity CRITICAL,HIGH \
+            --no-progress --format table \
+            target/release/realestate-backend
+
+      - name: Check for sensitive files in release output
+        run: |
+          SENSITIVE_PATTERNS=("*.pem" "*.key" "*.env" "*.secret" "*.p12" "*.pfx" "id_rsa" "id_ed25519")
+          FOUND=0
+          for pattern in "${SENSITIVE_PATTERNS[@]}"; do
+            if find target/release -maxdepth 1 -name "$pattern" -type f 2>/dev/null | grep -q .; then
+              echo "::error::Sensitive file pattern '$pattern' found in release output"
+              FOUND=1
+            fi
+          done
+          if [ "$FOUND" -eq 1 ]; then exit 1; fi
+
+      - name: Upload backend binary artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: backend-binary
+          path: target/release/realestate-backend
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload backend SBOM
+        if: inputs.is-production
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: backend-sbom
+          path: backend-sbom.cdx.json
+          retention-days: 30
+
+      - name: Attest build provenance
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: target/release/realestate-backend
+
+      # ── Summary & error collection ──
+      - name: Write backend summary
+        if: always()
+        run: |
+          {
+            echo "## Backend Results"
+            echo "| Check | Status |"
+            echo "|-------|--------|"
+            echo "| Clippy | ${{ steps.clippy.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| Tests & Coverage | ${{ steps.tests.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| Release Build | ${{ steps.build.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Record duration
+        id: timing
+        if: always()
+        uses: ./.github/actions/job-timing
+        with:
+          start-time: ${{ steps.start.outputs.time }}
+
+      - name: Collect errors
+        id: collect-errors
+        if: always() && failure()
+        run: |
+          ERROR=""
+          if [ "${{ steps.clippy.outcome }}" = "failure" ]; then
+            ERROR="[clippy-backend] $(head -c 1500 "${RUNNER_TEMP}/clippy-backend-output.txt" 2>/dev/null || echo 'Backend clippy found warnings/errors.')"
+          elif [ "${{ steps.tests.outcome }}" = "failure" ]; then
+            TERR=$(grep -E '(FAILED|error\[|panicked|failures:)' "${RUNNER_TEMP}/test-backend-output.txt" 2>/dev/null | head -c 2000 || true)
+            if [ -z "$TERR" ]; then
+              TERR=$(tail -c 3000 "${RUNNER_TEMP}/test-backend-output.txt" 2>/dev/null || echo 'Backend tests failed.')
+            fi
+            ERROR="[test-backend] $TERR"
+          elif [ "${{ steps.build.outcome }}" = "failure" ]; then
+            ERROR="[build-backend] $(head -c 3000 "${RUNNER_TEMP}/build-backend-output.txt" 2>/dev/null || echo 'Backend build failed.')"
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+  # ── Frontend: clippy → test → trunk release build ──
+  # Single Rust compilation warms sccache; subsequent steps are near-instant.
+  frontend:
+    name: Frontend (Clippy + Test + Build)
+    runs-on: arc-runner
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    outputs:
+      error_log: ${{ steps.collect-errors.outputs.error_log }}
+      duration: ${{ steps.timing.outputs.duration }}
+      clippy_result: ${{ steps.clippy.outcome }}
+    steps:
+      - name: Record start time
+        id: start
+        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Rust setup
+        id: rust-setup
+        uses: ./.github/actions/rust-setup
+        with:
+          components: clippy
+          targets: wasm32-unknown-unknown
+
+      # ── Phase 1: Clippy (compiles everything, warms sccache) ──
+      - name: Clippy frontend
+        id: clippy
+        run: |
+          umask 077
+          set +e
+          cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend --message-format=json -- -D warnings \
+            > "${RUNNER_TEMP}/clippy-frontend.json" 2>"${RUNNER_TEMP}/clippy-frontend-stderr.txt"
+          RESULT=$?
+          set -e
+          jq -r 'select(.reason == "compiler-message") | .message.rendered // empty' \
+            "${RUNNER_TEMP}/clippy-frontend.json" > "${RUNNER_TEMP}/clippy-frontend-output.txt" 2>/dev/null || true
+          if [ $RESULT -ne 0 ]; then
+            if [ -s "${RUNNER_TEMP}/clippy-frontend-output.txt" ]; then
+              cat "${RUNNER_TEMP}/clippy-frontend-output.txt"
+            else
+              echo "--- stderr (no clippy JSON output -- likely a cargo-level error) ---"
+              cat "${RUNNER_TEMP}/clippy-frontend-stderr.txt" 2>/dev/null || true
+            fi
+            echo "::error::frontend clippy found warnings/errors."
+            exit 1
+          fi
+
+      - name: Upload clippy frontend report
+        if: always() && hashFiles(format('{0}/clippy-frontend.json', runner.temp)) != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: clippy-frontend-report
+          path: ${{ runner.temp }}/clippy-frontend.json
+          retention-days: 1
+
+      # ── Phase 2: Tests ──
+      - name: Run frontend tests
+        id: tests
+        run: |
+          set +e
+          cargo test --locked -p realestate-frontend --all-targets 2>&1 | tee "${RUNNER_TEMP}/test-frontend-output.txt"
+          exit ${PIPESTATUS[0]}
+
+      # ── Phase 3: Trunk release build (sccache makes this fast) ──
+      - name: Install Trunk
+        id: install-trunk
+        run: |
+          TRUNK_VERSION="0.21.14"
+          TRUNK_SHA256="a67f4054b249fe9acc5fabc25de1aebf19783aca3ad6ff64bf34d7da44d0ea20"
+          ARCHIVE="${RUNNER_TEMP}/trunk.tar.gz"
+          curl -sSfL --proto =https --retry 3 --retry-delay 5 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            "https://github.com/trunk-rs/trunk/releases/download/v${TRUNK_VERSION}/trunk-x86_64-unknown-linux-musl.tar.gz"
+          echo "${TRUNK_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          mkdir -p "${HOME}/.local/bin"
+          tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" trunk
+          rm -f "$ARCHIVE"
+          chmod +x "${HOME}/.local/bin/trunk"
+          export PATH="${HOME}/.local/bin:$PATH"
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+          trunk --version
+
+      - name: Pre-install wasm-bindgen-cli
+        run: |
+          export PATH="${HOME}/.local/bin:$HOME/.cargo/bin:$PATH"
+          WASM_BINDGEN_VERSION=$(grep -A1 '^name = "wasm-bindgen"' Cargo.lock | grep -oP 'version = "\K[^"]+')
+          if [ -z "$WASM_BINDGEN_VERSION" ]; then
+            echo "::error::Could not determine wasm-bindgen version from Cargo.lock"
+            exit 1
+          fi
+          if ! wasm-bindgen --version 2>/dev/null | grep -q "$WASM_BINDGEN_VERSION"; then
+            cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION" --locked
+          fi
+
+      - name: Build frontend with Trunk
+        id: build
+        run: |
+          export PATH="${HOME}/.local/bin:$HOME/.cargo/bin:$PATH"
+          trunk build --release 2>&1 | tee "${RUNNER_TEMP}/build-frontend-output.txt"
+        working-directory: frontend/
+
+      - name: Verify Cargo.lock is up to date
+        run: |
+          if ! git diff --quiet -- frontend/Cargo.lock; then
+            echo "::error::Cargo.lock changed during build -- commit the updated lockfile"
+            exit 1
+          fi
+
+      - name: Install security tools
+        uses: ./.github/actions/install-security-tools
+        with:
+          gitleaks: 'true'
+          trivy: 'true'
+
+      - name: Scan dist for secrets
+        run: |
+          gitleaks detect --source frontend/dist --verbose --redact --exit-code 1 --no-git
+
+      - name: Generate checksums
+        run: |
+          cd frontend/dist
+          find . -type f -exec sha256sum {} \; | sort -k2 > "${RUNNER_TEMP}/frontend-checksums.sha256"
+          echo "Generated checksums for $(wc -l < "${RUNNER_TEMP}/frontend-checksums.sha256") files"
+
+      - name: Generate SBOM
+        if: inputs.is-production
+        run: |
+          umask 077
+          trivy fs --format cyclonedx --output frontend-sbom.cdx.json frontend/
+
+      - name: Check for sensitive files in dist
+        run: |
+          SENSITIVE_PATTERNS=("*.pem" "*.key" "*.env" "*.secret" "*.p12" "*.pfx" "id_rsa" "id_ed25519")
+          FOUND=0
+          for pattern in "${SENSITIVE_PATTERNS[@]}"; do
+            if find frontend/dist -name "$pattern" -type f 2>/dev/null | grep -q .; then
+              echo "::error::Sensitive file pattern '$pattern' found in dist output"
+              FOUND=1
+            fi
+          done
+          if [ "$FOUND" -eq 1 ]; then exit 1; fi
+
+      - name: Upload frontend dist artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload frontend SBOM
+        if: inputs.is-production
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: frontend-sbom
+          path: frontend-sbom.cdx.json
+          retention-days: 30
+
+      - name: Attest build provenance
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: frontend/dist/
+
+      # ── Summary & error collection ──
+      - name: Write frontend summary
+        if: always()
+        run: |
+          {
+            echo "## Frontend Results"
+            echo "| Check | Status |"
+            echo "|-------|--------|"
+            echo "| Clippy | ${{ steps.clippy.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| Tests | ${{ steps.tests.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| Trunk Build | ${{ steps.build.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Record duration
+        id: timing
+        if: always()
+        uses: ./.github/actions/job-timing
+        with:
+          start-time: ${{ steps.start.outputs.time }}
+
+      - name: Collect errors
+        id: collect-errors
+        if: always() && failure()
+        run: |
+          ERROR=""
+          if [ "${{ steps.clippy.outcome }}" = "failure" ]; then
+            ERROR="[clippy-frontend] $(head -c 1500 "${RUNNER_TEMP}/clippy-frontend-output.txt" 2>/dev/null || echo 'Frontend clippy found warnings/errors.')"
+          elif [ "${{ steps.tests.outcome }}" = "failure" ]; then
+            TERR=$(grep -E '(FAILED|error\[|panicked|failures:)' "${RUNNER_TEMP}/test-frontend-output.txt" 2>/dev/null | head -c 2000 || true)
+            if [ -z "$TERR" ]; then
+              TERR=$(tail -c 3000 "${RUNNER_TEMP}/test-frontend-output.txt" 2>/dev/null || echo 'Frontend tests failed.')
+            fi
+            ERROR="[test-frontend] $TERR"
+          elif [ "${{ steps.build.outcome }}" = "failure" ]; then
+            ERROR="[build-frontend] $(head -c 3000 "${RUNNER_TEMP}/build-frontend-output.txt" 2>/dev/null || echo 'Frontend build failed.')"
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+  # ── Clippy report assembly (for SonarQube) ──
+  clippy-report:
+    name: Assemble Clippy Report
+    runs-on: arc-runner
+    if: always() && !inputs.is-fork-pr
+    needs: [backend, frontend]
+    permissions:
+      contents: read
+    steps:
+      - name: Download clippy reports
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: clippy-*-report
+          path: ${{ runner.temp }}/clippy-parts
+          merge-multiple: false
+        continue-on-error: true
+
+      - name: Assemble clippy JSON report
+        run: |
+          cat "${{ runner.temp }}"/clippy-parts/*/clippy-*.json > clippy-report.json 2>/dev/null || echo '{}' > clippy-report.json
+
+      - name: Upload merged clippy report
+        if: hashFiles('clippy-report.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: clippy-report
+          path: clippy-report.json
+          retention-days: 1

@@ -53,134 +53,11 @@ jobs:
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
 
-  clippy-backend:
-    name: Clippy (Backend)
-    runs-on: arc-runner
-    if: ${{ !inputs.is-fork-pr }}
-    permissions:
-      contents: read
-    outputs:
-      error_log: ${{ steps.collect-errors.outputs.error_log }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - name: Rust setup
-        id: rust-setup
-        uses: ./.github/actions/rust-setup
-        with:
-          components: clippy
-
-      - name: Clippy backend
-        id: clippy
-        run: |
-          umask 077
-          set +e
-          cargo clippy --locked -p realestate-backend --message-format=json -- -D warnings \
-            > "${RUNNER_TEMP}/clippy-backend.json" 2>"${RUNNER_TEMP}/clippy-backend-stderr.txt"
-          RESULT=$?
-          set -e
-          jq -r 'select(.reason == "compiler-message") | .message.rendered // empty' \
-            "${RUNNER_TEMP}/clippy-backend.json" > "${RUNNER_TEMP}/clippy-backend-output.txt" 2>/dev/null || true
-          if [ $RESULT -ne 0 ]; then
-            if [ -s "${RUNNER_TEMP}/clippy-backend-output.txt" ]; then
-              cat "${RUNNER_TEMP}/clippy-backend-output.txt"
-            else
-              echo "--- stderr (no clippy JSON output -- likely a cargo-level error) ---"
-              cat "${RUNNER_TEMP}/clippy-backend-stderr.txt" 2>/dev/null || true
-            fi
-            echo "::error::backend clippy found warnings/errors."
-            exit 1
-          fi
-
-      - name: Upload clippy backend report
-        if: always() && hashFiles(format('{0}/clippy-backend.json', runner.temp)) != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: clippy-backend-report
-          path: ${{ runner.temp }}/clippy-backend.json
-          retention-days: 1
-
-      - name: Collect errors
-        id: collect-errors
-        if: always() && steps.clippy.outcome == 'failure'
-        run: |
-          ERROR="[clippy-backend] $(head -c 1500 "${RUNNER_TEMP}/clippy-backend-output.txt" 2>/dev/null || echo 'Backend clippy found warnings/errors.')"
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
-          echo "$ERROR" >> $GITHUB_OUTPUT
-          echo "$EOF" >> $GITHUB_OUTPUT
-
-  clippy-frontend:
-    name: Clippy (Frontend)
-    runs-on: arc-runner
-    if: ${{ !inputs.is-fork-pr }}
-    permissions:
-      contents: read
-    outputs:
-      error_log: ${{ steps.collect-errors.outputs.error_log }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - name: Rust setup
-        id: rust-setup
-        uses: ./.github/actions/rust-setup
-        with:
-          components: clippy
-          targets: wasm32-unknown-unknown
-
-      - name: Clippy frontend
-        id: clippy
-        run: |
-          umask 077
-          set +e
-          cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend --message-format=json -- -D warnings \
-            > "${RUNNER_TEMP}/clippy-frontend.json" 2>"${RUNNER_TEMP}/clippy-frontend-stderr.txt"
-          RESULT=$?
-          set -e
-          jq -r 'select(.reason == "compiler-message") | .message.rendered // empty' \
-            "${RUNNER_TEMP}/clippy-frontend.json" > "${RUNNER_TEMP}/clippy-frontend-output.txt" 2>/dev/null || true
-          if [ $RESULT -ne 0 ]; then
-            if [ -s "${RUNNER_TEMP}/clippy-frontend-output.txt" ]; then
-              cat "${RUNNER_TEMP}/clippy-frontend-output.txt"
-            else
-              echo "--- stderr (no clippy JSON output -- likely a cargo-level error) ---"
-              cat "${RUNNER_TEMP}/clippy-frontend-stderr.txt" 2>/dev/null || true
-            fi
-            echo "::error::frontend clippy found warnings/errors."
-            exit 1
-          fi
-
-      - name: Upload clippy frontend report
-        if: always() && hashFiles(format('{0}/clippy-frontend.json', runner.temp)) != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: clippy-frontend-report
-          path: ${{ runner.temp }}/clippy-frontend.json
-          retention-days: 1
-
-      - name: Collect errors
-        id: collect-errors
-        if: always() && steps.clippy.outcome == 'failure'
-        run: |
-          ERROR="[clippy-frontend] $(head -c 1500 "${RUNNER_TEMP}/clippy-frontend-output.txt" 2>/dev/null || echo 'Frontend clippy found warnings/errors.')"
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
-          echo "$ERROR" >> $GITHUB_OUTPUT
-          echo "$EOF" >> $GITHUB_OUTPUT
-
-  # Gate job: merges results from parallel lint jobs, assembles clippy report,
-  # and produces the unified outputs that ci.yml consumes.
   gate:
     name: Lint Gate
     runs-on: arc-runner
     if: always() && !inputs.is-fork-pr
-    needs: [fmt, clippy-backend, clippy-frontend]
+    needs: [fmt]
     permissions:
       contents: read
     outputs:
@@ -199,26 +76,6 @@ jobs:
           sparse-checkout: .github
           sparse-checkout-cone-mode: true
 
-      - name: Download clippy reports
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          pattern: clippy-*-report
-          path: ${{ runner.temp }}/clippy-parts
-          merge-multiple: false
-        continue-on-error: true
-
-      - name: Assemble clippy JSON report
-        run: |
-          cat "${{ runner.temp }}"/clippy-parts/*/clippy-*.json > clippy-report.json 2>/dev/null || echo '{}' > clippy-report.json
-
-      - name: Upload merged clippy report
-        if: hashFiles('clippy-report.json') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: clippy-report
-          path: clippy-report.json
-          retention-days: 1
-
       - name: Write lint summary
         if: always()
         run: |
@@ -227,13 +84,11 @@ jobs:
             echo "| Check | Status |"
             echo "|-------|--------|"
             echo "| rustfmt | ${{ needs.fmt.result == 'success' && '✅ Pass' || (needs.fmt.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
-            echo "| clippy backend | ${{ needs.clippy-backend.result == 'success' && '✅ Pass' || (needs.clippy-backend.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
-            echo "| clippy frontend | ${{ needs.clippy-frontend.result == 'success' && '✅ Pass' || (needs.clippy-frontend.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect errors for notification
         id: collect-errors
-        if: always() && (needs.fmt.result == 'failure' || needs.clippy-backend.result == 'failure' || needs.clippy-frontend.result == 'failure')
+        if: always() && needs.fmt.result == 'failure'
         run: |
           ERROR=""
           FAILED=""
@@ -241,16 +96,6 @@ jobs:
             FAILED="${FAILED}rustfmt,"
             FMT_ERR='${{ needs.fmt.outputs.error_log }}'
             ERROR="${ERROR}${FMT_ERR:-[rustfmt] formatting issues found.}\n\n"
-          fi
-          if [ "${{ needs.clippy-backend.result }}" = "failure" ]; then
-            FAILED="${FAILED}clippy-backend,"
-            BE_ERR='${{ needs.clippy-backend.outputs.error_log }}'
-            ERROR="${ERROR}${BE_ERR:-[clippy-backend] Backend clippy found warnings/errors.}\n\n"
-          fi
-          if [ "${{ needs.clippy-frontend.result }}" = "failure" ]; then
-            FAILED="${FAILED}clippy-frontend,"
-            FE_ERR='${{ needs.clippy-frontend.outputs.error_log }}'
-            ERROR="${ERROR}${FE_ERR:-[clippy-frontend] Frontend clippy found warnings/errors.}\n\n"
           fi
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
@@ -266,5 +111,5 @@ jobs:
           start-time: ${{ steps.start.outputs.time }}
 
       - name: Fail if any lint job failed
-        if: always() && (needs.fmt.result == 'failure' || needs.clippy-backend.result == 'failure' || needs.clippy-frontend.result == 'failure')
+        if: always() && needs.fmt.result == 'failure'
         run: exit 1

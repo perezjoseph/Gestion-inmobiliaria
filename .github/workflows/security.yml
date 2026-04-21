@@ -85,12 +85,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Rust toolchain and cache
-        uses: ./.github/actions/rust-setup
-
       - name: Install cargo-audit
         id: install_audit
         run: |
+          mkdir -p "$HOME/.cargo/bin"
           export PATH="$HOME/.cargo/bin:$PATH"
           if command -v cargo-audit &>/dev/null && cargo audit --version &>/dev/null; then
             echo "cargo-audit already installed: $(cargo audit --version)"
@@ -98,7 +96,6 @@ jobs:
             exit 0
           fi
           rm -f "$HOME/.cargo/bin/cargo-audit"
-          mkdir -p "$HOME/.cargo/bin"
           AUDIT_VERSION="0.22.1"
           AUDIT_SHA256_musl="c32506f338bdcdaef5a17fb9f33abb6ecf9561324cfd34237fd335f9283a1eab"
           AUDIT_SHA256_gnu="1890badd5f15831a9af4b074399fcd21e6f7c0fe42c84e9254cdffc9f813765c"
@@ -122,11 +119,6 @@ jobs:
               fi
             fi
           done
-          if [ "$INSTALLED" = "false" ]; then
-            if cargo install cargo-audit --locked 2>&1 | tee -a "${RUNNER_TEMP}/install-audit-output.txt"; then
-              INSTALLED=true
-            fi
-          fi
           if [ "$INSTALLED" = "true" ] && command -v cargo-audit &>/dev/null; then
             cargo audit --version
             echo "installed=true" >> $GITHUB_OUTPUT
@@ -300,12 +292,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Rust toolchain and cache
-        uses: ./.github/actions/rust-setup
-
       - name: Install cargo-deny
         id: install_deny
         run: |
+          mkdir -p "$HOME/.cargo/bin"
           export PATH="$HOME/.cargo/bin:$PATH"
           if command -v cargo-deny &>/dev/null; then
             echo "cargo-deny already installed: $(cargo-deny --version)"
@@ -325,7 +315,8 @@ jobs:
             cargo-deny --version
             echo "installed=true" >> $GITHUB_OUTPUT
           else
-            cargo install cargo-deny --locked 2>/dev/null && echo "installed=true" >> $GITHUB_OUTPUT || echo "installed=false" >> $GITHUB_OUTPUT
+            echo "::warning::cargo-deny installation failed -- skipping supply chain checks"
+            echo "installed=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Run cargo-deny supply chain checks

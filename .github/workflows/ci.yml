@@ -73,7 +73,7 @@ jobs:
             ci:
               - '.github/**'
 
-  # ── Stage 1: Quality Checks (parallel) ──
+  # ── Stage 1: All quality checks in parallel ──
 
   security:
     name: Security
@@ -102,8 +102,10 @@ jobs:
     with:
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
-  tests:
-    name: Tests
+  # Build & Test runs clippy + tests + release build in unified jobs
+  # (one Rust compilation per target instead of three separate ones)
+  build-and-test:
+    name: Build & Test
     needs: [changes]
     if: >-
       github.event_name != 'pull_request' ||
@@ -112,18 +114,21 @@ jobs:
       needs.changes.outputs.ci == 'true'
     permissions:
       contents: read
-    uses: ./.github/workflows/test.yml
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/build-and-test.yml
     with:
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+      is-production: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
 
-  # ── Stage 1.5: SonarQube (after lint + tests) ──
+  # ── Stage 1.5: SonarQube (after build-and-test) ──
 
   sonarqube:
     name: SonarQube
-    needs: [lint, tests, changes]
+    needs: [lint, build-and-test, changes]
     if: >-
       always() && (
-        needs.lint.result == 'success' || needs.tests.result == 'success'
+        needs.lint.result == 'success' || needs.build-and-test.result == 'success'
       ) && (
         github.event_name != 'pull_request' ||
         needs.changes.outputs.backend == 'true' ||
@@ -135,46 +140,24 @@ jobs:
     uses: ./.github/workflows/sonarqube.yml
     with:
       lint-result: ${{ needs.lint.outputs.result || needs.lint.result }}
-      test-backend-result: ${{ needs.tests.outputs.test-backend-result || needs.tests.result }}
-      test-frontend-result: ${{ needs.tests.outputs.test-frontend-result || needs.tests.result }}
-      coverage-backend-result: ${{ needs.tests.outputs.test-backend-result || needs.tests.result }}
+      test-backend-result: ${{ needs.build-and-test.outputs.test-backend-result || needs.build-and-test.result }}
+      test-frontend-result: ${{ needs.build-and-test.outputs.test-frontend-result || needs.build-and-test.result }}
+      coverage-backend-result: ${{ needs.build-and-test.outputs.test-backend-result || needs.build-and-test.result }}
     secrets:
       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_ADMIN_PASSWORD: ${{ secrets.SONAR_ADMIN_PASSWORD }}
 
-  # ── Stage 2: Build (after lint passes) ──
-
-  build:
-    name: Build
-    needs: [lint, changes]
-    if: >-
-      always() && (
-        needs.lint.outputs.result == 'success' || needs.lint.result == 'skipped'
-      ) && (
-        github.event_name != 'pull_request' ||
-        needs.changes.outputs.backend == 'true' ||
-        needs.changes.outputs.frontend == 'true' ||
-        needs.changes.outputs.ci == 'true'
-      )
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
-    uses: ./.github/workflows/build.yml
-    with:
-      is-production: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-
-  # ── Stage 3: Container Images (after builds + security + tests pass) ──
+  # ── Stage 2: Container Images (after build-and-test + security + lint pass) ──
 
   containers:
     name: Containers
-    needs: [build, security, tests]
+    needs: [build-and-test, security, lint]
     if: |
       always() &&
-      needs.build.result == 'success' &&
+      needs.build-and-test.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
-      needs.tests.result == 'success'
+      (needs.lint.result == 'success' || needs.lint.result == 'skipped')
     permissions:
       contents: read
       packages: write
@@ -185,7 +168,7 @@ jobs:
     with:
       is-production: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
 
-  # ── Stage 4: Deploy (after containers are pushed) ──
+  # ── Stage 3: Deploy (after containers are pushed) ──
 
   deploy:
     name: Deploy
