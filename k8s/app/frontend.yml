@@ -19,8 +19,6 @@ spec:
         app.kubernetes.io/component: web
         app.kubernetes.io/part-of: realestate
     spec:
-      nodeSelector:
-        kubernetes.io/hostname: coreos
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists

@@ -19,8 +19,6 @@ spec:
         app.kubernetes.io/component: ocr
         app.kubernetes.io/part-of: realestate
     spec:
-      nodeSelector:
-        kubernetes.io/hostname: coreos
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
@@ -36,11 +34,11 @@ spec:
               value: /app/.paddleocr
           resources:
             requests:
-              cpu: 200m
-              memory: 512Mi
+              cpu: 100m
+              memory: 256Mi
             limits:
-              cpu: "2"
-              memory: 2Gi
+              cpu: 500m
+              memory: 512Mi
           readinessProbe:
             httpGet:
               path: /health

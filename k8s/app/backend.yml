@@ -31,8 +31,6 @@ spec:
         app.kubernetes.io/component: api
         app.kubernetes.io/part-of: realestate
     spec:
-      nodeSelector:
-        kubernetes.io/hostname: coreos
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
@@ -68,8 +66,8 @@ spec:
               cpu: 100m
               memory: 128Mi
             limits:
-              cpu: "1"
-              memory: 512Mi
+              cpu: 500m
+              memory: 384Mi
           readinessProbe:
             httpGet:
               path: /health

@@ -33,8 +33,6 @@ spec:
         app.kubernetes.io/component: database
         app.kubernetes.io/part-of: realestate
     spec:
-      nodeSelector:
-        kubernetes.io/hostname: coreos
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
@@ -70,8 +68,8 @@ spec:
               cpu: 100m
               memory: 256Mi
             limits:
-              cpu: "1"
-              memory: 1Gi
+              cpu: 500m
+              memory: 512Mi
           readinessProbe:
             exec:
               command: ["pg_isready", "-U", "realestate"]

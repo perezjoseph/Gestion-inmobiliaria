@@ -45,8 +45,6 @@ spec:
         app.kubernetes.io/component: server
         app.kubernetes.io/part-of: sonarqube
     spec:
-      nodeSelector:
-        role: desktop
       automountServiceAccountToken: false
       initContainers:
         - name: init-sysctl
@@ -92,12 +90,12 @@ spec:
               mountPath: /opt/sonarqube/extensions
           resources:
             requests:
-              cpu: "2"
-              memory: 4Gi
+              cpu: 500m
+              memory: 2Gi
               ephemeral-storage: 256Mi
             limits:
-              cpu: "4"
-              memory: 6Gi
+              cpu: "2"
+              memory: 3Gi
               ephemeral-storage: 1Gi
           startupProbe:
             httpGet:

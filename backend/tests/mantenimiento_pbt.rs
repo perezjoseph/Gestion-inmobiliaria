@@ -1,4 +1,4 @@
-#![allow(clippy::needless_return)]
+#[allow(clippy::needless_return)]
 
 use proptest::prelude::*;
 use proptest::test_runner::{Config as ProptestConfig, TestRunner};
@@ -72,8 +72,7 @@ fn invalid_transition_pair() -> impl Strategy<Value = (String, String)> {
     proptest::sample::select(invalid_pairs)
 }
 
-#[path = "../migrations/mod.rs"]
-mod migrations;
+use super::migrations;
 
 // All async test logic lives in a separate module so that calling async fns
 // from sync #[test] functions (Rust 2024 edition restriction) is avoided.

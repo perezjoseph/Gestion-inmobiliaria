@@ -105,10 +105,10 @@ runs:
           mkdir -p "$SCCACHE_DIR"
         fi
 
-        # 10 GB local disk cache
+        # 30 GB local disk cache
         {
           echo "SCCACHE_DIR=$SCCACHE_DIR"
-          echo "SCCACHE_CACHE_SIZE=10G"
+          echo "SCCACHE_CACHE_SIZE=30G"
           echo "RUSTC_WRAPPER=sccache"
         } >> "$GITHUB_ENV"
 

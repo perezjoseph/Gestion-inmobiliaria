@@ -1,7 +1,6 @@
-#![allow(clippy::needless_return)]
+#[allow(clippy::needless_return)]
 
-#[path = "../migrations/mod.rs"]
-mod migrations;
+use super::migrations;
 
 #[cfg(test)]
 mod gastos_rbac_tests {

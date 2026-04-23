@@ -10,17 +10,25 @@ spec:
       labels:
         - arc-runner
         - arc-runner-dind
+        - arc-deploy
       dockerEnabled: true
       imagePullPolicy: IfNotPresent
-      nodeSelector:
-        role: server
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    actions-runner: ""
+                topologyKey: kubernetes.io/hostname
       resources:
         requests:
           cpu: "1"
-          memory: 1.5Gi
+          memory: 2Gi
         limits:
           cpu: "2"
-          memory: 2Gi
+          memory: 3Gi
       volumeMounts:
         - name: cargo-cache
           mountPath: /home/runner/.cargo/registry
@@ -56,7 +64,7 @@ spec:
     kind: RunnerDeployment
     name: arc-runner-dind
   minReplicas: 1
-  maxReplicas: 3
+  maxReplicas: 5
   metrics:
     - type: TotalNumberOfQueuedAndInProgressWorkflowRuns
       repositoryNames:
