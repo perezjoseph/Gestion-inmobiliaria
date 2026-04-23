@@ -7,26 +7,26 @@ publish = false
 [dependencies]
 actix-web = "4"
 actix-cors = "0.7"
-tokio = { version = "1", features = ["full"] }
-sea-orm = { version = "1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros"] }
-sea-orm-migration = { version = "1", features = ["sqlx-postgres", "runtime-tokio-rustls"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+tokio.workspace = true
+sea-orm.workspace = true
+sea-orm-migration.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 argon2 = "0.5"
 dotenvy = "0.15"
-anyhow = "1"
-thiserror = "1"
-chrono = { version = "0.4", features = ["serde"] }
-rust_decimal = { version = "1", features = ["serde-with-str"] }
-uuid = { version = "1", features = ["v4", "serde"] }
-tracing = "0.1"
+anyhow.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+rust_decimal.workspace = true
+uuid.workspace = true
+tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-actix-web = "0.7"
 actix-governor = "0.6"
 actix-multipart = "0.7"
 actix-files = "0.6"
-futures-util = "0.3"
+futures-util.workspace = true
 numaelis-rckive-genpdf = "0.4"
 rust_xlsxwriter = "0.94"
 csv = "1"
@@ -35,4 +35,4 @@ reqwest = { version = "0.12", default-features = false, features = ["charset", "
 dashmap = "6"
 
 [dev-dependencies]
-proptest = "1"
+proptest.workspace = true
