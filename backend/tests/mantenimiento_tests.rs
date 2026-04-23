@@ -8,7 +8,7 @@ use sea_orm_migration::MigratorTrait;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use super::migrations;
+use crate::migrations;
 
 const JWT_SECRET: &str = "test_secret_key_that_is_long_enough_for_jwt";
 

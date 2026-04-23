@@ -1,6 +1,6 @@
 #[allow(clippy::needless_return)]
 
-use super::migrations;
+use crate::migrations;
 
 #[cfg(test)]
 mod gastos_rbac_tests {

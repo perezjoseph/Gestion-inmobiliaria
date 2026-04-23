@@ -72,7 +72,7 @@ fn invalid_transition_pair() -> impl Strategy<Value = (String, String)> {
     proptest::sample::select(invalid_pairs)
 }
 
-use super::migrations;
+use crate::migrations;
 
 // All async test logic lives in a separate module so that calling async fns
 // from sync #[test] functions (Rust 2024 edition restriction) is avoided.
