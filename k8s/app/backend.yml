@@ -31,13 +31,14 @@ spec:
         app.kubernetes.io/component: api
         app.kubernetes.io/part-of: realestate
     spec:
+      automountServiceAccountToken: false
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
           effect: NoSchedule
       containers:
         - name: backend
-          image: ghcr.io/perezjoseph/realestate-backend:latest
+          image: ghcr.io/perezjoseph/realestate-backend:latest # NOSONAR — deploy.yml overrides with pinned digest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
@@ -65,9 +66,11 @@ spec:
             requests:
               cpu: 100m
               memory: 128Mi
+              ephemeral-storage: 64Mi
             limits:
               cpu: 500m
               memory: 384Mi
+              ephemeral-storage: 256Mi
           readinessProbe:
             httpGet:
               path: /health
@@ -81,6 +84,7 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 15
           securityContext:
+            runAsNonRoot: true
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
       volumes:

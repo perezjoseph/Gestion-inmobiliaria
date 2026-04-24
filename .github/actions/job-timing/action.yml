@@ -17,10 +17,11 @@ runs:
     - name: Record duration
       id: timing
       shell: bash
+      env:
+        START_TIME: ${{ inputs.start-time }}
       run: |
-        START="${{ inputs.start-time }}"
-        if [ -n "$START" ]; then
-          echo "duration=$(( $(date +%s) - $START ))s" >> $GITHUB_OUTPUT
+        if [ -n "$START_TIME" ]; then
+          echo "duration=$(( $(date +%s) - $START_TIME ))s" >> $GITHUB_OUTPUT
         else
           echo "duration=n/a" >> $GITHUB_OUTPUT
         fi

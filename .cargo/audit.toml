@@ -30,3 +30,14 @@ ignore = [
     "RUSTSEC-2025-0141",
     "RUSTSEC-2026-0097",
 ]
+
+# Workaround: cargo-audit 0.22.x does not support CVSS v4.0 strings.
+# RUSTSEC-2026-0066 (astral-tokio-tar) uses CVSS:4.0 which causes a parse
+# error that aborts the entire audit. Ignoring it does NOT suppress the
+# parse failure because the DB loader crashes before reaching the ignore
+# list. The real fix is deleting the cached advisory DB so it re-fetches,
+# combined with the yanked-advisory workaround below.
+#
+# If the parse error persists after clearing the cache, upgrade cargo-audit
+# once a CVSS 4.0-compatible release ships:
+#   cargo install cargo-audit --force

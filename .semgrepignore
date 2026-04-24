@@ -1,0 +1,5 @@
+# Auto-generated test framework cache (Hypothesis/Starlette)
+ocr-service/.hypothesis/
+
+# Local development environment
+.env

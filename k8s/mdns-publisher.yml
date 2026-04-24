@@ -17,13 +17,14 @@ spec:
       labels:
         app.kubernetes.io/name: mdns-publisher
     spec:
+      automountServiceAccountToken: false
       nodeSelector:
         kubernetes.io/hostname: coreos
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
           effect: NoSchedule
-      hostNetwork: true
+      hostNetwork: true # nosemgrep: yaml.kubernetes.security.hostnetwork-pod.hostnetwork-pod — required for mDNS multicast on host NIC
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: mdns
@@ -37,10 +38,13 @@ spec:
             requests:
               cpu: 5m
               memory: 64Mi
+              ephemeral-storage: 32Mi
             limits:
               cpu: 100m
               memory: 256Mi
+              ephemeral-storage: 128Mi
           securityContext:
+            runAsNonRoot: true
             allowPrivilegeEscalation: false
       volumes:
         - name: script

@@ -19,13 +19,14 @@ spec:
         app.kubernetes.io/component: ocr
         app.kubernetes.io/part-of: realestate
     spec:
+      automountServiceAccountToken: false
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
           effect: NoSchedule
       containers:
         - name: ocr-service
-          image: ghcr.io/perezjoseph/realestate-ocr-service:latest
+          image: ghcr.io/perezjoseph/realestate-ocr-service:latest # NOSONAR — deploy.yml overrides with pinned digest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
@@ -36,9 +37,11 @@ spec:
             requests:
               cpu: 100m
               memory: 256Mi
+              ephemeral-storage: 64Mi
             limits:
               cpu: 500m
               memory: 512Mi
+              ephemeral-storage: 256Mi
           readinessProbe:
             httpGet:
               path: /health
@@ -54,6 +57,7 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 10
           securityContext:
+            runAsNonRoot: true
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
           volumeMounts:

@@ -44,28 +44,31 @@ jobs:
         id: verify-backend
         run: |
           gh attestation verify \
-            "oci://ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend@${{ inputs.backend-digest }}" \
-            --owner "${{ env.IMAGE_OWNER }}"
+            "oci://ghcr.io/${IMAGE_OWNER}/realestate-backend@${BACKEND_DIGEST}" \
+            --owner "${IMAGE_OWNER}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BACKEND_DIGEST: ${{ inputs.backend-digest }}
 
       - name: Verify frontend attestation
         id: verify-frontend
         run: |
           gh attestation verify \
-            "oci://ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend@${{ inputs.frontend-digest }}" \
-            --owner "${{ env.IMAGE_OWNER }}"
+            "oci://ghcr.io/${IMAGE_OWNER}/realestate-frontend@${FRONTEND_DIGEST}" \
+            --owner "${IMAGE_OWNER}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FRONTEND_DIGEST: ${{ inputs.frontend-digest }}
 
       - name: Verify OCR service attestation
         id: verify-ocr-service
         run: |
           gh attestation verify \
-            "oci://ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ inputs.ocr-service-digest }}" \
-            --owner "${{ env.IMAGE_OWNER }}"
+            "oci://ghcr.io/${IMAGE_OWNER}/realestate-ocr-service@${OCR_DIGEST}" \
+            --owner "${IMAGE_OWNER}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OCR_DIGEST: ${{ inputs.ocr-service-digest }}
 
       - name: Mask secrets
         run: |
@@ -98,17 +101,21 @@ jobs:
 
       - name: Update container images by digest
         id: deploy
+        env:
+          BACKEND_DIGEST: ${{ inputs.backend-digest }}
+          FRONTEND_DIGEST: ${{ inputs.frontend-digest }}
+          OCR_DIGEST: ${{ inputs.ocr-service-digest }}
         run: |
           kubectl set image deployment/backend \
-            backend=ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend@${{ inputs.backend-digest }} \
+            "backend=ghcr.io/${IMAGE_OWNER}/realestate-backend@${BACKEND_DIGEST}" \
             --namespace realestate
 
           kubectl set image deployment/frontend \
-            frontend=ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend@${{ inputs.frontend-digest }} \
+            "frontend=ghcr.io/${IMAGE_OWNER}/realestate-frontend@${FRONTEND_DIGEST}" \
             --namespace realestate
 
           kubectl set image deployment/ocr-service \
-            ocr-service=ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ inputs.ocr-service-digest }} \
+            "ocr-service=ghcr.io/${IMAGE_OWNER}/realestate-ocr-service@${OCR_DIGEST}" \
             --namespace realestate
 
       - name: Wait for rollout
