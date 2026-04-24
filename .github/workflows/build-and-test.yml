@@ -161,7 +161,6 @@ jobs:
           command: |
             mkdir -p coverage
             cargo tarpaulin --locked -p realestate-backend \
-              --engine llvm \
               --out lcov --output-dir coverage \
               --timeout 300 --skip-clean 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
             exit ${PIPESTATUS[0]}

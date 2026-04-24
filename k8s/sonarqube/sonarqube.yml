@@ -83,6 +83,12 @@ spec:
                 secretKeyRef:
                   name: sonarqube-db-secret
                   key: password
+            - name: SONAR_WEB_JAVAOPTS
+              value: "-Xmx512m -Xms256m"
+            - name: SONAR_CE_JAVAOPTS
+              value: "-Xmx512m -Xms128m"
+            - name: SONAR_SEARCH_JAVAOPTS
+              value: "-Xmx512m -Xms256m"
           volumeMounts:
             - name: data
               mountPath: /opt/sonarqube/data
@@ -91,11 +97,11 @@ spec:
           resources:
             requests:
               cpu: 500m
-              memory: 2Gi
+              memory: 1536Mi
               ephemeral-storage: 256Mi
             limits:
               cpu: "2"
-              memory: 3Gi
+              memory: 2Gi
               ephemeral-storage: 1Gi
           startupProbe:
             httpGet:
