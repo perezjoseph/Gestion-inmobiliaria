@@ -1,6 +1,6 @@
 ARG MODE=compile
 
-FROM rust:1.95-bookworm AS compile
+FROM rust:1.88-bookworm AS compile
 RUN rustup target add wasm32-unknown-unknown \
     && cargo install trunk --locked
 WORKDIR /app
@@ -16,19 +16,15 @@ COPY dist/ /app/dist/
 
 FROM ${MODE} AS source
 
-FROM golang:1.26.2-alpine AS caddy-builder
-RUN apk add --no-cache git && \
-    go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
-RUN xcaddy build v2.11.2 --output /usr/bin/caddy
+FROM caddy:2.11.2-alpine AS caddy-image
 
 FROM alpine:3.23
 
 RUN apk upgrade --no-cache && \
-    apk add --no-cache ca-certificates mailcap wget
+    apk add --no-cache ca-certificates mailcap wget && \
+    addgroup -S app && adduser -S app -G app
 
-RUN addgroup -S app && adduser -S app -G app
-
-COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
+COPY --from=caddy-image /usr/bin/caddy /usr/bin/caddy
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY --from=source /app/dist/ /srv/
 

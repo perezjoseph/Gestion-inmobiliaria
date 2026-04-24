@@ -1,6 +1,6 @@
 ARG MODE=compile
 
-FROM rust:1.95-bookworm AS compile
+FROM rust:1.88-bookworm AS compile
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY backend/ backend/
@@ -20,13 +20,11 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends \
     ca-certificates libssl3 libpq5 curl \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN useradd -r -s /bin/false appuser
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -r -s /bin/false appuser \
+    && mkdir -p /app/uploads && chown appuser:appuser /app/uploads
 
 WORKDIR /app
-
-RUN mkdir -p /app/uploads && chown appuser:appuser /app/uploads
 
 COPY --from=source /app/realestate-backend /usr/local/bin/realestate-backend
 
