@@ -84,11 +84,11 @@ spec:
                   name: sonarqube-db-secret
                   key: password
             - name: SONAR_WEB_JAVAOPTS
-              value: "-Xmx512m -Xms256m"
+              value: "-Xmx384m -Xms384m"
             - name: SONAR_CE_JAVAOPTS
-              value: "-Xmx512m -Xms128m"
+              value: "-Xmx384m -Xms384m"
             - name: SONAR_SEARCH_JAVAOPTS
-              value: "-Xmx512m -Xms256m"
+              value: "-Xmx768m -Xms768m"
           volumeMounts:
             - name: data
               mountPath: /opt/sonarqube/data
