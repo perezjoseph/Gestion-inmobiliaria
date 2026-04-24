@@ -113,28 +113,35 @@ jobs:
 
       - name: Wait for rollout
         id: rollout
-        run: |
-          kubectl rollout status deployment/backend --namespace realestate --timeout=120s
-          kubectl rollout status deployment/frontend --namespace realestate --timeout=120s
-          kubectl rollout status deployment/ocr-service --namespace realestate --timeout=180s
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 10
+          max_attempts: 2
+          command: |
+            kubectl rollout status deployment/backend --namespace realestate --timeout=120s
+            kubectl rollout status deployment/frontend --namespace realestate --timeout=120s
+            kubectl rollout status deployment/ocr-service --namespace realestate --timeout=180s
 
       - name: Health check
         id: health-check
-        run: |
-          # Get the backend pod and check health via kubectl exec
-          BACKEND_POD=$(kubectl get pod -n realestate -l app.kubernetes.io/name=backend -o jsonpath='{.items[0].metadata.name}')
-          MAX_RETRIES=15
-          INTERVAL=5
-          for i in $(seq 1 $MAX_RETRIES); do
-            if kubectl exec -n realestate "$BACKEND_POD" -- curl -sf --connect-timeout 3 --max-time 5 http://localhost:8080/health > /dev/null 2>&1; then
-              echo "Health check passed on attempt $i"
-              exit 0
-            fi
-            echo "Attempt $i/$MAX_RETRIES failed -- retrying in ${INTERVAL}s"
-            sleep $INTERVAL
-          done
-          echo "::error::Health check failed after $MAX_RETRIES attempts"
-          exit 1
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 5
+          max_attempts: 2
+          command: |
+            BACKEND_POD=$(kubectl get pod -n realestate -l app.kubernetes.io/name=backend -o jsonpath='{.items[0].metadata.name}')
+            MAX_RETRIES=15
+            INTERVAL=5
+            for i in $(seq 1 $MAX_RETRIES); do
+              if kubectl exec -n realestate "$BACKEND_POD" -- curl -sf --connect-timeout 3 --max-time 5 http://localhost:8080/health > /dev/null 2>&1; then
+                echo "Health check passed on attempt $i"
+                exit 0
+              fi
+              echo "Attempt $i/$MAX_RETRIES failed -- retrying in ${INTERVAL}s"
+              sleep $INTERVAL
+            done
+            echo "::error::Health check failed after $MAX_RETRIES attempts"
+            exit 1
 
       - name: Rollback on failure
         if: failure() && steps.deploy.outcome == 'success'

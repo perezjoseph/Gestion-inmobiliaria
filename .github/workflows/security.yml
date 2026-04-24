@@ -135,9 +135,14 @@ jobs:
       - name: Scan Rust dependencies for known vulnerabilities (CVEs)
         id: cargo_audit
         if: steps.install_audit.outputs.installed == 'true'
-        run: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          cargo audit --deny yanked --deny unmaintained --deny unsound 2>&1 | tee "${RUNNER_TEMP}/audit-output.txt"
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 10
+          max_attempts: 2
+          command: |
+            export PATH="$HOME/.cargo/bin:$PATH"
+            cargo audit --deny yanked --deny unmaintained --deny unsound 2>&1 | tee "${RUNNER_TEMP}/audit-output.txt"
+            exit ${PIPESTATUS[0]}
 
       - name: Collect deprecation and unmaintained crate warnings
         id: collect-deprecations
@@ -332,9 +337,14 @@ jobs:
       - name: Run cargo-deny supply chain checks
         id: cargo_deny
         if: steps.install_deny.outputs.installed == 'true'
-        run: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          cargo deny check 2>&1 | tee "${RUNNER_TEMP}/deny-output.txt"
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 10
+          max_attempts: 2
+          command: |
+            export PATH="$HOME/.cargo/bin:$PATH"
+            cargo deny check 2>&1 | tee "${RUNNER_TEMP}/deny-output.txt"
+            exit ${PIPESTATUS[0]}
 
       - name: Generate cargo-deny SARIF report
         if: always() && steps.install_deny.outputs.installed == 'true'

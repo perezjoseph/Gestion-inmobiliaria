@@ -194,49 +194,52 @@ jobs:
       - name: Run SonarQube static analysis scan
         id: sonar-scan
         if: steps.sonar-url-check.outputs.skip != 'true' && steps.sonar-reachable.outputs.reachable == 'true'
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         env:
           HAS_COVERAGE: ${{ steps.download-coverage.outcome == 'success' }}
-        run: |
-          SCAN_ARGS=()
-          SCAN_ARGS+=("-Dsonar.projectBaseDir=/usr/src")
-          SCAN_ARGS+=("-Dsonar.qualitygate.wait=true")
-          SCAN_ARGS+=("-Dsonar.qualitygate.timeout=300")
-          if [ "$HAS_COVERAGE" = "true" ] && [ -f coverage/lcov.info ]; then
-            echo "Coverage report found -- including in SonarQube analysis"
-            SCAN_ARGS+=("-Dsonar.rust.lcov.reportPaths=/usr/src/coverage/lcov.info")
-          fi
-          if [ -f clippy-report.json ]; then
-            echo "Clippy report found -- including in SonarQube analysis"
-            SCAN_ARGS+=("-Dsonar.rust.clippy.reportPaths=/usr/src/clippy-report.json")
-          fi
-          umask 077
-          set +e
-          DOCKER_CONTENT_TRUST=0 docker run --rm \
-            --network host \
-            --security-opt no-new-privileges \
-            --cap-drop ALL \
-            --read-only \
-            --user 1000:1000 \
-            --memory 1g \
-            --memory-swap 1g \
-            --cpus 2 \
-            --pids-limit 256 \
-            --tmpfs /tmp:rw,nosuid,nodev,size=256m,uid=1000,gid=1000 \
-            --tmpfs /opt/sonar-scanner/.sonar:rw,nosuid,nodev,size=512m,uid=1000,gid=1000 \
-            --tmpfs /home/scanner:rw,noexec,nosuid,nodev,size=64m,uid=1000,gid=1000 \
-            -e SONAR_TOKEN="${SONAR_ANALYSIS_TOKEN}" \
-            -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
-            -e HOME=/home/scanner \
-            -v "${GITHUB_WORKSPACE}:/usr/src" \
-            sonarsource/sonar-scanner-cli:11.3@sha256:7462f132388135e32b948f8f18ff0db9ae28a87c6777f1df5b2207e04a6d7c5c \
-            "${SCAN_ARGS[@]}" 2>&1 | tee "${RUNNER_TEMP}/sonar-scan-output.txt"
-          SCAN_EXIT=$?
-          set -e
-          if [ $SCAN_EXIT -ne 0 ]; then
-            echo "::warning::SonarQube scanner exited with code $SCAN_EXIT"
-            tail -30 "${RUNNER_TEMP}/sonar-scan-output.txt" || true
-            exit $SCAN_EXIT
-          fi
+        with:
+          timeout_minutes: 30
+          max_attempts: 2
+          retry_wait_seconds: 30
+          command: |
+            SCAN_ARGS=()
+            SCAN_ARGS+=("-Dsonar.projectBaseDir=/usr/src")
+            SCAN_ARGS+=("-Dsonar.qualitygate.wait=true")
+            SCAN_ARGS+=("-Dsonar.qualitygate.timeout=300")
+            if [ "$HAS_COVERAGE" = "true" ] && [ -f coverage/lcov.info ]; then
+              echo "Coverage report found -- including in SonarQube analysis"
+              SCAN_ARGS+=("-Dsonar.rust.lcov.reportPaths=/usr/src/coverage/lcov.info")
+            fi
+            if [ -f clippy-report.json ]; then
+              echo "Clippy report found -- including in SonarQube analysis"
+              SCAN_ARGS+=("-Dsonar.rust.clippy.reportPaths=/usr/src/clippy-report.json")
+            fi
+            umask 077
+            DOCKER_CONTENT_TRUST=0 docker run --rm \
+              --network host \
+              --security-opt no-new-privileges \
+              --cap-drop ALL \
+              --read-only \
+              --user 1000:1000 \
+              --memory 1g \
+              --memory-swap 1g \
+              --cpus 2 \
+              --pids-limit 256 \
+              --tmpfs /tmp:rw,nosuid,nodev,size=256m,uid=1000,gid=1000 \
+              --tmpfs /opt/sonar-scanner/.sonar:rw,nosuid,nodev,size=512m,uid=1000,gid=1000 \
+              --tmpfs /home/scanner:rw,noexec,nosuid,nodev,size=64m,uid=1000,gid=1000 \
+              -e SONAR_TOKEN="${SONAR_ANALYSIS_TOKEN}" \
+              -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
+              -e HOME=/home/scanner \
+              -v "${GITHUB_WORKSPACE}:/usr/src" \
+              sonarsource/sonar-scanner-cli:11.3@sha256:7462f132388135e32b948f8f18ff0db9ae28a87c6777f1df5b2207e04a6d7c5c \
+              "${SCAN_ARGS[@]}" 2>&1 | tee "${RUNNER_TEMP}/sonar-scan-output.txt"
+            SCAN_EXIT=${PIPESTATUS[0]}
+            if [ $SCAN_EXIT -ne 0 ]; then
+              echo "::warning::SonarQube scanner exited with code $SCAN_EXIT"
+              tail -30 "${RUNNER_TEMP}/sonar-scan-output.txt" || true
+              exit $SCAN_EXIT
+            fi
 
       - name: Report SonarQube analysis completeness
         if: always() && steps.sonar-url-check.outputs.skip != 'true' && steps.sonar-reachable.outputs.reachable == 'true'

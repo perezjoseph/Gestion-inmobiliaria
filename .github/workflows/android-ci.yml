@@ -161,27 +161,31 @@ jobs:
 
       - name: Run lint, detekt, and spotless checks
         id: lint-checks
-        working-directory: android
         env:
           GRADLE_OPTS: "-Xmx512m -Dorg.gradle.jvmargs=-Xmx2g"
-        run: |
-          umask 077
-          set -o pipefail
-          set +e
-          ./gradlew lint detekt spotlessCheck --parallel --max-workers=4 --continue --stacktrace 2>&1 | tee "${RUNNER_TEMP}/lint-all-output.txt"
-          GRADLE_EXIT=$?
-          set -e
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 30
+          max_attempts: 2
+          command: |
+            cd android
+            umask 077
+            set -o pipefail
+            set +e
+            ./gradlew lint detekt spotlessCheck --parallel --max-workers=4 --continue --stacktrace 2>&1 | tee "${RUNNER_TEMP}/lint-all-output.txt"
+            GRADLE_EXIT=$?
+            set -e
 
-          LINT_OK="true"; DETEKT_OK="true"; KTFMT_OK="true"
-          if grep -qE "> Task .*:lint[A-Z].* FAILED" "${RUNNER_TEMP}/lint-all-output.txt"; then LINT_OK="false"; fi
-          if grep -qE "> Task .*:detekt.* FAILED" "${RUNNER_TEMP}/lint-all-output.txt"; then DETEKT_OK="false"; fi
-          if grep -qE "> Task .*[Ss]potless.* FAILED" "${RUNNER_TEMP}/lint-all-output.txt"; then KTFMT_OK="false"; fi
+            LINT_OK="true"; DETEKT_OK="true"; KTFMT_OK="true"
+            if grep -qE "> Task .*:lint[A-Z].* FAILED" "${RUNNER_TEMP}/lint-all-output.txt"; then LINT_OK="false"; fi
+            if grep -qE "> Task .*:detekt.* FAILED" "${RUNNER_TEMP}/lint-all-output.txt"; then DETEKT_OK="false"; fi
+            if grep -qE "> Task .*[Ss]potless.* FAILED" "${RUNNER_TEMP}/lint-all-output.txt"; then KTFMT_OK="false"; fi
 
-          echo "lint_ok=$LINT_OK" >> $GITHUB_OUTPUT
-          echo "detekt_ok=$DETEKT_OK" >> $GITHUB_OUTPUT
-          echo "ktfmt_ok=$KTFMT_OK" >> $GITHUB_OUTPUT
+            echo "lint_ok=$LINT_OK" >> $GITHUB_OUTPUT
+            echo "detekt_ok=$DETEKT_OK" >> $GITHUB_OUTPUT
+            echo "ktfmt_ok=$KTFMT_OK" >> $GITHUB_OUTPUT
 
-          exit $GRADLE_EXIT
+            exit $GRADLE_EXIT
 
       - name: Upload lint XML report for SonarQube
         if: always()

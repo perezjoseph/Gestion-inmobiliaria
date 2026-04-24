@@ -81,11 +81,16 @@ jobs:
 
       - name: Scan container image for vulnerabilities
         id: trivy-scan
-        run: |
-          trivy image --exit-code 1 --severity CRITICAL,HIGH \
-            --no-progress --format table \
-            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend@${{ steps.push.outputs.digest }} \
-            2>&1 | tee "${RUNNER_TEMP}/trivy-backend-image.txt"
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 20
+          max_attempts: 2
+          command: |
+            trivy image --exit-code 1 --severity CRITICAL,HIGH \
+              --no-progress --format table \
+              ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend@${{ steps.push.outputs.digest }} \
+              2>&1 | tee "${RUNNER_TEMP}/trivy-backend-image.txt"
+            exit ${PIPESTATUS[0]}
 
       - name: Generate SARIF report
         if: always()
@@ -209,11 +214,16 @@ jobs:
 
       - name: Scan container image for vulnerabilities
         id: trivy-scan
-        run: |
-          trivy image --exit-code 1 --severity CRITICAL,HIGH \
-            --no-progress --format table \
-            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend@${{ steps.push.outputs.digest }} \
-            2>&1 | tee "${RUNNER_TEMP}/trivy-frontend-image.txt"
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 20
+          max_attempts: 2
+          command: |
+            trivy image --exit-code 1 --severity CRITICAL,HIGH \
+              --no-progress --format table \
+              ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend@${{ steps.push.outputs.digest }} \
+              2>&1 | tee "${RUNNER_TEMP}/trivy-frontend-image.txt"
+            exit ${PIPESTATUS[0]}
 
       - name: Generate SARIF report
         if: always()
@@ -327,11 +337,16 @@ jobs:
 
       - name: Scan container image for vulnerabilities
         id: trivy-scan
-        run: |
-          trivy image --exit-code 1 --severity CRITICAL,HIGH \
-            --no-progress --format table \
-            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ steps.push.outputs.digest }} \
-            2>&1 | tee "${RUNNER_TEMP}/trivy-ocr-service-image.txt"
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 20
+          max_attempts: 2
+          command: |
+            trivy image --exit-code 1 --severity CRITICAL,HIGH \
+              --no-progress --format table \
+              ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ steps.push.outputs.digest }} \
+              2>&1 | tee "${RUNNER_TEMP}/trivy-ocr-service-image.txt"
+            exit ${PIPESTATUS[0]}
 
       - name: Generate SARIF report
         if: always()
