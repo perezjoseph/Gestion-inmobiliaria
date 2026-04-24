@@ -11,6 +11,7 @@ on:
   # random HH:MM to avoid a load spike on GitHub Actions at 00:00
   - cron: 9 6 * * *
 name: Semgrep
+permissions: {}
 jobs:
   semgrep:
     name: semgrep/ci
@@ -22,5 +23,40 @@ jobs:
     container:
       image: semgrep/semgrep
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: false
     - run: semgrep ci
+
+  semgrep-community:
+    name: semgrep/community-rules
+    runs-on: self-hosted
+    permissions:
+      contents: read
+    container:
+      image: semgrep/semgrep
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: false
+    - name: Run Rust and Kotlin community rules
+      run: |
+        semgrep scan \
+          --config "p/rust" \
+          --config "p/kotlin" \
+          --config "p/trailofbits" \
+          --config "p/owasp-top-ten" \
+          --config "p/secrets" \
+          --config "p/security-audit" \
+          --error \
+          --json \
+          --output semgrep-community-results.json \
+          . || true
+        semgrep scan \
+          --config "p/rust" \
+          --config "p/kotlin" \
+          --config "p/trailofbits" \
+          --config "p/owasp-top-ten" \
+          --config "p/secrets" \
+          --config "p/security-audit" \
+          .
