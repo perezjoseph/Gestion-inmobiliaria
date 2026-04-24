@@ -187,24 +187,6 @@ jobs:
 
             exit $GRADLE_EXIT
 
-      - name: Upload lint XML report for SonarQube
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: android-lint-xml
-          path: android/app/build/reports/lint-results-debug.xml
-          retention-days: 1
-          if-no-files-found: warn
-
-      - name: Upload detekt XML report for SonarQube
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: android-detekt-xml
-          path: android/build/reports/detekt/detekt.xml
-          retention-days: 1
-          if-no-files-found: warn
-
       - name: Upload lint reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -30,16 +30,6 @@ on:
         required: false
       SONAR_ADMIN_PASSWORD:
         required: false
-    outputs:
-      result:
-        description: Job result
-        value: ${{ jobs.sonarqube.result }}
-      error_log:
-        description: Error log from SonarQube analysis
-        value: ${{ jobs.sonarqube.outputs.error_log }}
-      duration:
-        description: Job duration
-        value: ${{ jobs.sonarqube.outputs.duration }}
 
 permissions: {}
 
@@ -276,12 +266,6 @@ jobs:
         env:
           SONAR_TOKEN: ${{ env.SONAR_ANALYSIS_TOKEN }}
           SCAN_OUTCOME: ${{ steps.sonar-scan.outcome }}
-          GH_SERVER_URL: ${{ github.server_url }}
-          GH_REPOSITORY: ${{ github.repository }}
-          GH_RUN_ID: ${{ github.run_id }}
-          GH_SHA: ${{ github.sha }}
-          GH_REF_NAME: ${{ github.ref_name }}
-          GH_ACTOR: ${{ github.actor }}
         run: |
           SONAR_URL="${SONAR_HOST_URL}"
           GATE_STATUS="UNKNOWN"

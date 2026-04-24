@@ -9,12 +9,6 @@ on:
     outputs:
       result:
         value: ${{ jobs.gate.result }}
-      error_log:
-        value: ${{ jobs.gate.outputs.error_log }}
-      failed_steps:
-        value: ${{ jobs.gate.outputs.failed_steps }}
-      duration:
-        value: ${{ jobs.gate.outputs.duration }}
 
 permissions: {}
 

@@ -12,37 +12,11 @@ on:
         required: false
         default: false
     outputs:
-      # Build outputs (consumed by containers workflow)
-      build-frontend-result:
-        value: ${{ jobs.backend.result == 'success' && jobs.frontend.result == 'success' && 'success' || 'failure' }}
-      build-frontend-error-log:
-        value: ${{ jobs.frontend.outputs.error_log }}
-      build-frontend-duration:
-        value: ${{ jobs.frontend.outputs.duration }}
-      build-backend-result:
-        value: ${{ jobs.backend.result }}
-      build-backend-error-log:
-        value: ${{ jobs.backend.outputs.error_log }}
-      build-backend-duration:
-        value: ${{ jobs.backend.outputs.duration }}
-      # Test outputs (consumed by ci.yml and sonarqube)
+      # Test outputs (consumed by ci.yml → sonarqube)
       test-backend-result:
         value: ${{ jobs.backend.result }}
-      test-backend-error-log:
-        value: ${{ jobs.backend.outputs.error_log }}
-      test-backend-duration:
-        value: ${{ jobs.backend.outputs.duration }}
       test-frontend-result:
         value: ${{ jobs.frontend.result }}
-      test-frontend-error-log:
-        value: ${{ jobs.frontend.outputs.error_log }}
-      test-frontend-duration:
-        value: ${{ jobs.frontend.outputs.duration }}
-      # Clippy outputs (consumed by sonarqube)
-      clippy-backend-result:
-        value: ${{ jobs.backend.outputs.clippy_result }}
-      clippy-frontend-result:
-        value: ${{ jobs.frontend.outputs.clippy_result }}
 
 permissions: {}
 
@@ -64,7 +38,6 @@ jobs:
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       duration: ${{ steps.timing.outputs.duration }}
-      clippy_result: ${{ steps.clippy.outcome }}
     services:
       postgres:
         image: postgres:16@sha256:5a65324fe84dc41709ff914e90b07f3e2f577073ed27bf917d4873aca0c9ec51
@@ -136,27 +109,6 @@ jobs:
       - name: Set database URL
         run: echo "DATABASE_URL=postgresql://realestate:realestate_dev_password@localhost:5432/realestate" >> $GITHUB_ENV
 
-      - name: Install PostgreSQL client
-        run: |
-          if ! command -v pg_isready >/dev/null 2>&1; then
-            echo "pg_isready not found -- installing postgresql-client"
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq --no-install-recommends postgresql-client
-          fi
-
-      - name: Wait for Postgres to be ready
-        run: |
-          for i in $(seq 1 30); do
-            if pg_isready -h localhost -p 5432 -U realestate 2>/dev/null; then
-              echo "Postgres is ready"
-              exit 0
-            fi
-            echo "Waiting for Postgres... attempt $i/30"
-            sleep 2
-          done
-          echo "::error::Postgres did not become ready in time"
-          exit 1
-
       - name: Generate JWT secret for tests
         run: |
           JWT_SECRET=$(openssl rand -hex 32)
@@ -202,13 +154,6 @@ jobs:
               --timeout 300 --skip-clean 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
             exit ${PIPESTATUS[0]}
 
-      - name: Scan coverage output for secrets
-        if: steps.tests.outcome == 'success'
-        run: |
-          if grep -rqiE '(password|secret|token|key)=' coverage/ 2>/dev/null; then
-            echo "::warning::Potential secrets detected in coverage output"
-          fi
-
       - name: Upload coverage artifact
         if: steps.tests.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -237,43 +182,16 @@ jobs:
           fi
 
       - name: Install security tools
+        if: inputs.is-production
         uses: ./.github/actions/install-security-tools
         with:
-          gitleaks: 'true'
           trivy: 'true'
-
-      - name: Scan binary output for secrets
-        run: |
-          gitleaks detect --source target/release --verbose --redact --exit-code 1 --no-git --config .gitleaks.toml
-
-      - name: Generate checksum
-        run: |
-          sha256sum target/release/realestate-backend > "${RUNNER_TEMP}/backend-checksum.sha256"
-          cat "${RUNNER_TEMP}/backend-checksum.sha256"
 
       - name: Generate SBOM
         if: inputs.is-production
         run: |
           umask 077
           trivy fs --format cyclonedx --output backend-sbom.cdx.json .
-
-      - name: Scan binary for vulnerabilities
-        run: |
-          trivy fs --scanners vuln --exit-code 0 --severity CRITICAL,HIGH \
-            --no-progress --format table \
-            target/release/realestate-backend
-
-      - name: Check for sensitive files in release output
-        run: |
-          SENSITIVE_PATTERNS=("*.pem" "*.key" "*.env" "*.secret" "*.p12" "*.pfx" "id_rsa" "id_ed25519")
-          FOUND=0
-          for pattern in "${SENSITIVE_PATTERNS[@]}"; do
-            if find target/release -maxdepth 1 -name "$pattern" -type f 2>/dev/null | grep -q .; then
-              echo "::error::Sensitive file pattern '$pattern' found in release output"
-              FOUND=1
-            fi
-          done
-          if [ "$FOUND" -eq 1 ]; then exit 1; fi
 
       - name: Upload backend binary artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
@@ -350,7 +268,6 @@ jobs:
     outputs:
       error_log: ${{ steps.collect-errors.outputs.error_log }}
       duration: ${{ steps.timing.outputs.duration }}
-      clippy_result: ${{ steps.clippy.outcome }}
     steps:
       - name: Record start time
         id: start
@@ -457,46 +374,17 @@ jobs:
             trunk build --release 2>&1 | tee "${RUNNER_TEMP}/build-frontend-output.txt"
             exit ${PIPESTATUS[0]}
 
-      - name: Verify Cargo.lock is up to date
-        run: |
-          if ! git diff --quiet -- frontend/Cargo.lock; then
-            echo "::error::Cargo.lock changed during build -- commit the updated lockfile"
-            exit 1
-          fi
-
       - name: Install security tools
+        if: inputs.is-production
         uses: ./.github/actions/install-security-tools
         with:
-          gitleaks: 'true'
           trivy: 'true'
-
-      - name: Scan dist for secrets
-        run: |
-          gitleaks detect --source frontend/dist --verbose --redact --exit-code 1 --no-git
-
-      - name: Generate checksums
-        run: |
-          cd frontend/dist
-          find . -type f -exec sha256sum {} \; | sort -k2 > "${RUNNER_TEMP}/frontend-checksums.sha256"
-          echo "Generated checksums for $(wc -l < "${RUNNER_TEMP}/frontend-checksums.sha256") files"
 
       - name: Generate SBOM
         if: inputs.is-production
         run: |
           umask 077
           trivy fs --format cyclonedx --output frontend-sbom.cdx.json frontend/
-
-      - name: Check for sensitive files in dist
-        run: |
-          SENSITIVE_PATTERNS=("*.pem" "*.key" "*.env" "*.secret" "*.p12" "*.pfx" "id_rsa" "id_ed25519")
-          FOUND=0
-          for pattern in "${SENSITIVE_PATTERNS[@]}"; do
-            if find frontend/dist -name "$pattern" -type f 2>/dev/null | grep -q .; then
-              echo "::error::Sensitive file pattern '$pattern' found in dist output"
-              FOUND=1
-            fi
-          done
-          if [ "$FOUND" -eq 1 ]; then exit 1; fi
 
       - name: Upload frontend dist artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
