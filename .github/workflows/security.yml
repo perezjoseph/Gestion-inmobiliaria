@@ -118,6 +118,27 @@ jobs:
             echo "installed=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Patch advisory DB for CVSS 4.0 compatibility
+        if: steps.install_audit.outputs.installed == 'true'
+        run: |
+          # cargo-audit 0.22.x cannot parse CVSS v4.0 strings (only v2/v3.x).
+          # Advisories using CVSS:4.0 crash the DB loader before the ignore list
+          # is evaluated, aborting the entire audit.
+          # Workaround: strip the cvss line from affected advisories after fetch.
+          # Remove this step once cargo-audit ships CVSS 4.0 support.
+          export PATH="$HOME/.cargo/bin:$PATH"
+          DB_DIR="$HOME/.cargo/advisory-db"
+          if [ ! -d "$DB_DIR" ]; then
+            # Also check the legacy plural path used by some versions
+            DB_DIR="$HOME/.cargo/advisory-dbs/github.com-a946fc29ac602819"
+          fi
+          if [ -d "$DB_DIR" ]; then
+            find "$DB_DIR" -name '*.md' -exec grep -l 'CVSS:4\.0' {} + 2>/dev/null | while read -r f; do
+              echo "Stripping CVSS 4.0 line from: $f"
+              sed -i '/^cvss = "CVSS:4\.0/d' "$f"
+            done
+          fi
+
       - name: Scan Rust dependencies for known vulnerabilities (CVEs)
         id: cargo_audit
         if: steps.install_audit.outputs.installed == 'true'

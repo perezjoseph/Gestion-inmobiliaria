@@ -35,9 +35,11 @@ ignore = [
 # RUSTSEC-2026-0066 (astral-tokio-tar) uses CVSS:4.0 which causes a parse
 # error that aborts the entire audit. Ignoring it does NOT suppress the
 # parse failure because the DB loader crashes before reaching the ignore
-# list. The real fix is deleting the cached advisory DB so it re-fetches,
-# combined with the yanked-advisory workaround below.
+# list.
 #
-# If the parse error persists after clearing the cache, upgrade cargo-audit
-# once a CVSS 4.0-compatible release ships:
+# CI fix: security.yml has a "Patch advisory DB for CVSS 4.0 compatibility"
+# step that strips CVSS:4.0 lines from advisory .md files after DB fetch.
+# This lets the audit proceed while still reporting the advisory itself.
+#
+# Permanent fix: upgrade cargo-audit once a CVSS 4.0-compatible release ships:
 #   cargo install cargo-audit --force
