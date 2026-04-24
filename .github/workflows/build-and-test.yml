@@ -67,7 +67,7 @@ jobs:
         id: rust-setup
         uses: ./.github/actions/rust-setup
         with:
-          components: clippy
+          components: clippy,llvm-tools-preview
 
       # ── Phase 1: Clippy (compiles everything, warms sccache) ──
       - name: Clippy backend
@@ -127,32 +127,30 @@ jobs:
           echo "::error::Postgres port not reachable"
           exit 1
 
-      - name: Install cargo-tarpaulin
-        id: install-tarpaulin
+      - name: Install cargo-llvm-cov
+        id: install-llvm-cov
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 10
           max_attempts: 3
           retry_wait_seconds: 10
           command: |
-            TARPAULIN_VERSION="0.32.7"
-            TARPAULIN_SHA256="67a61b2b271488e2d0cb718ccec384d0f296703f3c810f80ea5d46484c5d463b"
-            ARCHIVE="${RUNNER_TEMP}/cargo-tarpaulin.tar.gz"
+            LLVM_COV_VERSION="0.8.4"
+            ARCHIVE="${RUNNER_TEMP}/cargo-llvm-cov.tar.gz"
             curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
-              "https://github.com/xd009642/tarpaulin/releases/download/${TARPAULIN_VERSION}/cargo-tarpaulin-x86_64-unknown-linux-musl.tar.gz"
-            echo "${TARPAULIN_SHA256}  ${ARCHIVE}" | sha256sum -c -
+              "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v${LLVM_COV_VERSION}/cargo-llvm-cov-x86_64-unknown-linux-musl.tar.gz"
             for dir in "${HOME}/.cargo" "${HOME}/.cargo/bin"; do
               mkdir -p "$dir" 2>/dev/null || sudo mkdir -p "$dir"
               if [ ! -w "$dir" ]; then
                 sudo chown -R "$(id -u):$(id -g)" "${HOME}/.cargo"
               fi
             done
-            tar xzf "$ARCHIVE" --no-same-owner -C "${HOME}/.cargo/bin" cargo-tarpaulin
+            tar xzf "$ARCHIVE" --no-same-owner -C "${HOME}/.cargo/bin" cargo-llvm-cov
             rm -f "$ARCHIVE"
-            chmod +x "${HOME}/.cargo/bin/cargo-tarpaulin"
-            cargo tarpaulin --version
+            chmod +x "${HOME}/.cargo/bin/cargo-llvm-cov"
+            cargo llvm-cov --version
 
-      - name: Run tests with coverage (tarpaulin)
+      - name: Run tests with coverage (llvm-cov)
         id: tests
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
@@ -160,9 +158,8 @@ jobs:
           max_attempts: 2
           command: |
             mkdir -p coverage
-            cargo tarpaulin --locked -p realestate-backend \
-              --out lcov --output-dir coverage \
-              --timeout 300 --skip-clean 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
+            cargo llvm-cov test --locked -p realestate-backend \
+              --lcov --output-path coverage/lcov.info 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
             exit ${PIPESTATUS[0]}
 
       - name: Upload coverage artifact
