@@ -1,6 +1,6 @@
 # Kubernetes Manifests (k3s)
 
-Manifests for deploying the application and SonarQube to a two-node k3s cluster.
+Manifests for deploying the application to a two-node k3s cluster.
 
 ## Cluster Architecture
 
@@ -17,16 +17,12 @@ graph TB
             subgraph ns_ks["kube-system"]
                 coredns[CoreDNS]
                 traefik[Traefik]
-                mdns[mDNS publisher<br/>sonar.local · gestion.local]
+                mdns[mDNS publisher<br/>gestion.local]
             end
             arc_deploy[arc-deploy<br/>fixed ×1]
         end
 
         subgraph pc1["pc1 (worker) — WSL2 bridged<br/>Ubuntu 22.04 · DHCP<br/>18 CPU / 64 GB · role=desktop"]
-            subgraph ns_sq["sonarqube namespace"]
-                sonar[sonarqube]
-                sonar_db[(sonarqube-db)]
-            end
             subgraph ns_arc["arc-systems"]
                 arc_ctrl[ARC controller]
                 arc_runner[arc-runner<br/>×1–10]
@@ -39,7 +35,6 @@ graph TB
 
     gh([GitHub Actions]) -.->|"webhook polling"| arc_ctrl
     arc_ctrl -->|"schedules jobs"| arc_runner & arc_dind & arc_deploy
-    traefik -->|"sonar.local"| sonar
     traefik -->|"gestion.local"| backend
 ```
 
@@ -47,10 +42,9 @@ graph TB
 
 ```mermaid
 flowchart LR
-    client([LAN client]) -->|"sonar.local<br/>gestion.local"| mdns_pub[mDNS publisher<br/>on coreos]
+    client([LAN client]) -->|"gestion.local"| mdns_pub[mDNS publisher<br/>on coreos]
     mdns_pub -->|"A record →<br/>192.168.88.112"| client
     client -->|"HTTP :80"| traefik[Traefik]
-    traefik -->|"Host: sonar.local"| sonar[SonarQube :9000]
     traefik -->|"Host: gestion.local"| backend[Backend :8080]
 
     wsl([WSL2 / pc1]) -->|"coreos.local"| resolved[systemd-resolved<br/>+ avahi mDNS]
@@ -62,15 +56,14 @@ flowchart LR
 - k3s cluster with Traefik ingress (default)
 - `kubectl` configured to access the cluster
 - GHCR image pull secret in the `realestate` namespace
-- `vm.max_map_count >= 262144` on the desktop node (for SonarQube/Elasticsearch)
 - WSL2 Hyper-V switch bridged to physical Ethernet (see Networking section)
 
 ## Structure
 
 ```
 k8s/
-├── namespace.yml              # realestate + sonarqube namespaces
-├── mdns-publisher.yml         # mDNS responder for sonar.local / gestion.local
+├── namespace.yml              # realestate namespace
+├── mdns-publisher.yml         # mDNS responder for gestion.local
 ├── traefik-config.yml         # Traefik middleware and config
 ├── app/
 │   ├── kustomization.yml      # kustomize entry point
@@ -81,11 +74,6 @@ k8s/
 │   ├── frontend.yml           # Frontend (Caddy) deployment
 │   ├── ocr-service.yml        # OCR service deployment
 │   └── ingress.yml            # Traefik IngressRoute
-├── sonarqube/
-│   ├── kustomization.yml      # kustomize entry point
-│   ├── secret.yml             # secret template
-│   ├── postgres.yml           # SonarQube PostgreSQL
-│   └── sonarqube.yml          # SonarQube server + IngressRoute (startup probe)
 └── arc-runners/
     ├── arc-runner.yml          # General runner (desktop, autoscaled 1-10)
     ├── arc-runner-dind.yml     # Docker-in-Docker runner (desktop, autoscaled 1-10)
@@ -126,19 +114,6 @@ kubectl create secret generic realestate-app-secret \
 
 # 4. Deploy application
 kubectl apply -k k8s/app/
-
-# 5. Create SonarQube secrets
-kubectl create secret generic sonarqube-db-secret \
-  --namespace sonarqube \
-  --from-literal=username=sonar \
-  --from-literal=password=<sonar-db-password>
-
-# 6. Set vm.max_map_count (required for SonarQube)
-sudo sysctl -w vm.max_map_count=262144
-echo "vm.max_map_count=262144" | sudo tee /etc/sysctl.d/99-sonarqube.conf
-
-# 7. Deploy SonarQube
-kubectl apply -k k8s/sonarqube/
 ```
 
 ## CI/CD
@@ -155,7 +130,7 @@ The deploy workflow (`deploy.yml`) runs automatically after container images are
 
 ## Storage
 
-All PVCs use `local-path` (k3s default). Data lives on the node's local disk. SonarQube PVCs are on pc1 (desktop node). Moving SonarQube between nodes requires deleting and recreating PVCs (data loss).
+All PVCs use `local-path` (k3s default). Data lives on the node's local disk.
 
 ## Networking
 

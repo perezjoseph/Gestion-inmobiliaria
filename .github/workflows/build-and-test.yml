@@ -12,7 +12,7 @@ on:
         required: false
         default: false
     outputs:
-      # Test outputs (consumed by ci.yml → sonarqube)
+      # Test outputs
       test-backend-result:
         value: ${{ jobs.backend.result }}
       test-frontend-result:
@@ -456,31 +456,4 @@ jobs:
           echo "$ERROR" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
 
-  # ── Clippy report assembly (for SonarQube) ──
-  clippy-report:
-    name: Assemble Clippy Report
-    runs-on: arc-runner-dind
-    if: always() && !inputs.is-fork-pr
-    needs: [backend, frontend]
-    permissions:
-      contents: read
-    steps:
-      - name: Download clippy reports
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          pattern: clippy-*-report
-          path: ${{ runner.temp }}/clippy-parts
-          merge-multiple: false
-        continue-on-error: true
 
-      - name: Assemble clippy JSON report
-        run: |
-          cat "${{ runner.temp }}"/clippy-parts/*/clippy-*.json > clippy-report.json 2>/dev/null || echo '{}' > clippy-report.json
-
-      - name: Upload merged clippy report
-        if: hashFiles('clippy-report.json') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: clippy-report
-          path: clippy-report.json
-          retention-days: 1

@@ -118,33 +118,6 @@ jobs:
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
       is-production: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
 
-  # ── Stage 1.5: SonarQube (after build-and-test) ──
-
-  sonarqube:
-    name: SonarQube
-    needs: [lint, build-and-test, changes]
-    if: >-
-      always() && (
-        needs.lint.result == 'success' || needs.build-and-test.result == 'success'
-      ) && (
-        github.event_name != 'pull_request' ||
-        needs.changes.outputs.backend == 'true' ||
-        needs.changes.outputs.frontend == 'true' ||
-        needs.changes.outputs.ci == 'true'
-      )
-    permissions:
-      contents: read
-    uses: ./.github/workflows/sonarqube.yml
-    with:
-      lint-result: ${{ needs.lint.outputs.result || needs.lint.result }}
-      test-backend-result: ${{ needs.build-and-test.outputs.test-backend-result || needs.build-and-test.result }}
-      test-frontend-result: ${{ needs.build-and-test.outputs.test-frontend-result || needs.build-and-test.result }}
-      coverage-backend-result: ${{ needs.build-and-test.outputs.test-backend-result || needs.build-and-test.result }}
-    secrets:
-      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_ADMIN_PASSWORD: ${{ secrets.SONAR_ADMIN_PASSWORD }}
-
   # ── Stage 2: Container Images (after build-and-test + security + lint pass) ──
 
   containers:

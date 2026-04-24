@@ -10,7 +10,6 @@ plugins {
     alias(libs.plugins.androidx.room) apply false
     alias(libs.plugins.detekt)
     alias(libs.plugins.spotless)
-    alias(libs.plugins.sonarqube)
 }
 
 detekt {
@@ -62,19 +61,5 @@ spotless {
         target("**/*.kts")
         targetExclude("**/build/**")
         ktfmt().kotlinlangStyle()
-    }
-}
-
-sonar {
-    properties {
-        property("sonar.projectKey", System.getenv("SONAR_PROJECT_KEY") ?: "Gestion-inmobiliaria")
-        property("sonar.projectName", System.getenv("SONAR_PROJECT_NAME") ?: "Gestion-inmobiliaria")
-        property("sonar.host.url", System.getenv("SONAR_HOST_URL") ?: "http://sonar.local")
-        property("sonar.token", System.getenv("SONAR_TOKEN") ?: "")
-        property("sonar.sourceEncoding", "UTF-8")
-        property("sonar.sources", "app/src/main,core,feature")
-        property("sonar.tests", "app/src/test,app/src/androidTest")
-        property("sonar.android.lint.reportPaths", "app/build/reports/lint-results-debug.xml")
-        property("sonar.kotlin.detekt.reportPaths", "build/reports/detekt/detekt.xml")
     }
 }

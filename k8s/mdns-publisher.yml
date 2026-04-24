@@ -1,4 +1,4 @@
-# Pure mDNS responder that publishes sonar.local and gestion.local
+# Pure mDNS responder that publishes gestion.local
 # as A records pointing to the host IP. No Avahi daemon required.
 # Uses zeroconf Python library for raw multicast DNS.
 apiVersion: apps/v1
@@ -61,7 +61,7 @@ data:
 
     from zeroconf import Zeroconf, ServiceInfo
 
-    NAMES = ["sonar.local.", "gestion.local."]
+    NAMES = ["gestion.local."]
 
     def get_host_ip():
         """Get the primary LAN IP address."""
