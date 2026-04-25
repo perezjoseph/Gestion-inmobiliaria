@@ -92,8 +92,7 @@ impl AppConfig {
         };
 
         let sqlx_logging = std::env::var("DB_SQLX_LOGGING")
-            .map(|v| v == "true" || v == "1")
-            .unwrap_or(defaults.sqlx_logging);
+            .map_or(defaults.sqlx_logging, |v| v == "true" || v == "1");
 
         Ok(PoolConfig {
             max_connections: parse_u32("DB_MAX_CONNECTIONS", defaults.max_connections)?,
