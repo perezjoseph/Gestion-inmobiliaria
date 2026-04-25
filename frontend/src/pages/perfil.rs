@@ -21,7 +21,7 @@ fn PasswordChangeForm() -> Html {
         let password_nuevo = password_nuevo.clone();
         let password_confirmar = password_confirmar.clone();
         let pwd_error = pwd_error.clone();
-        let toasts = toasts.clone();
+        let toasts = toasts;
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
             if *password_nuevo != *password_confirmar {
@@ -121,7 +121,7 @@ pub fn Perfil() -> Html {
         let email = email.clone();
         let error = error.clone();
         let loading = loading.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             spawn_local(async move {
                 match api_get::<User>("/perfil").await {
                     Ok(u) => {
@@ -140,8 +140,8 @@ pub fn Perfil() -> Html {
         let nombre = nombre.clone();
         let email = email.clone();
         let error = error.clone();
-        let user = user.clone();
-        let toasts = toasts.clone();
+        let user = user;
+        let toasts = toasts;
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
             let body = serde_json::json!({

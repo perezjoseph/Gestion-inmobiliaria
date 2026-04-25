@@ -57,7 +57,7 @@ mod tests {
             sub: Uuid::new_v4(),
             email: "test@example.com".to_string(),
             rol: rol.to_string(),
-            exp: 9999999999,
+            exp: 9_999_999_999,
         }
     }
 

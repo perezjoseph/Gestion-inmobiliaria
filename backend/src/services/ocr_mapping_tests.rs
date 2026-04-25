@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::float_cmp)]
 mod tests {
     use crate::models::ocr::{OcrLine, OcrResult};
     use crate::services::ocr_mapping::{

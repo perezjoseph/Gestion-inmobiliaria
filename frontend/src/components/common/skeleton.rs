@@ -1,6 +1,6 @@
 use yew::prelude::*;
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct SkeletonProps {
     #[prop_or("100%".to_string())]
     pub width: String,
@@ -20,7 +20,7 @@ pub fn Skeleton(props: &SkeletonProps) -> Html {
     }
 }
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct TableSkeletonProps {
     pub title_width: AttrValue,
     #[prop_or(5)]

@@ -15,7 +15,8 @@ pub fn Reportes() -> Html {
     });
     let anio = use_state(|| {
         let d = js_sys::Date::new_0();
-        d.get_full_year() as i32
+        #[allow(clippy::cast_possible_wrap)]
+        { d.get_full_year() as i32 }
     });
     let report = use_state(|| Option::<IngresoReportSummary>::None);
     let error = use_state(|| Option::<String>::None);
@@ -207,7 +208,7 @@ pub fn Reportes() -> Html {
     }
 }
 
-fn mes_label(m: u32) -> &'static str {
+const fn mes_label(m: u32) -> &'static str {
     match m {
         1 => "Enero",
         2 => "Febrero",

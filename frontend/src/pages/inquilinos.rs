@@ -21,7 +21,7 @@ use crate::types::inquilino::{CreateInquilino, Inquilino, UpdateInquilino};
 use crate::types::ocr::OcrExtractField;
 use crate::utils::{EscapeHandler, can_delete, can_write, field_error};
 
-fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
+fn push_toast(toasts: Option<&ToastContext>, msg: &str, kind: ToastKind) {
     if let Some(t) = toasts {
         t.dispatch(ToastAction::Push(msg.into(), kind));
     }
@@ -66,7 +66,7 @@ struct FormErrors {
 }
 
 impl FormErrors {
-    fn has_errors(&self) -> bool {
+    const fn has_errors(&self) -> bool {
         self.nombre.is_some() || self.apellido.is_some() || self.cedula.is_some()
     }
 }
@@ -120,7 +120,9 @@ fn InquilinoForm(props: &InquilinoFormProps) -> Html {
         })
     };
 
-    let scan_button = if !props.is_editing {
+    let scan_button = if props.is_editing {
+        html! {}
+    } else {
         html! {
             <OcrScanButton
                 document_type="cedula"
@@ -128,8 +130,6 @@ fn InquilinoForm(props: &InquilinoFormProps) -> Html {
                 label={AttrValue::from("📷 Escanear Cédula")}
             />
         }
-    } else {
-        html! {}
     };
 
     let toggle_optional = {
@@ -370,7 +370,7 @@ fn do_save_inquilino(
             Ok(()) => {
                 reset_form();
                 reload.set(*reload + 1);
-                push_toast(&toasts, "Inquilino guardado", ToastKind::Success);
+                push_toast(toasts.as_ref(), "Inquilino guardado", ToastKind::Success);
             }
             Err(err) => error.set(Some(err)),
         }
@@ -415,11 +415,12 @@ fn do_delete_inquilino(
 fn register_escape_listener_i(escape_handler: EscapeHandler) -> Option<EventListener> {
     web_sys::window().and_then(|w| w.document()).map(|doc| {
         EventListener::new(&doc, "keydown", move |event| {
-            let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
-            if event.key() == "Escape"
-                && let Some(ref cb) = *escape_handler.borrow()
-            {
-                cb();
+            if let Some(event) = event.dyn_ref::<web_sys::KeyboardEvent>() {
+                if event.key() == "Escape"
+                    && let Some(ref cb) = *escape_handler.borrow()
+                {
+                    cb();
+                }
             }
         })
     })
@@ -773,7 +774,7 @@ pub fn Inquilinos() -> Html {
     }
     {
         let escape_handler = escape_handler.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             let listener = register_escape_listener_i(escape_handler);
             move || drop(listener)
         });
@@ -867,8 +868,6 @@ pub fn Inquilinos() -> Html {
         let error = error.clone();
         let reload = reload.clone();
         let reset_form = reset_form.clone();
-        let validate_form = validate_form.clone();
-        let toasts = toasts.clone();
         let submitting = submitting.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
@@ -891,7 +890,7 @@ pub fn Inquilinos() -> Html {
         })
     };
 
-    let on_cancel = super::page_helpers::cancel_cb(reset_form.clone());
+    let on_cancel = super::page_helpers::cancel_cb(reset_form);
 
     let on_search_apply = {
         let search = search.clone();
@@ -904,7 +903,6 @@ pub fn Inquilinos() -> Html {
     };
     let on_search_clear = {
         let search = search.clone();
-        let applied_search = applied_search.clone();
         super::page_helpers::filter_clear_cb(
             move || {
                 search.set(String::new());

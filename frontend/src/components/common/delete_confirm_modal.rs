@@ -15,7 +15,7 @@ pub fn DeleteConfirmModal(props: &DeleteConfirmModalProps) -> Html {
 
     {
         let cancel_ref = cancel_ref.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             if let Some(el) = cancel_ref.cast::<web_sys::HtmlElement>() {
                 let _ = el.focus();
             }
@@ -24,7 +24,7 @@ pub fn DeleteConfirmModal(props: &DeleteConfirmModalProps) -> Html {
 
     {
         let on_cancel = props.on_cancel.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             let listener = web_sys::window().and_then(|w| w.document()).map(|doc| {
                 EventListener::new(&doc, "keydown", move |event| {
                     if let Some(ke) = event.dyn_ref::<web_sys::KeyboardEvent>()
@@ -47,8 +47,7 @@ pub fn DeleteConfirmModal(props: &DeleteConfirmModalProps) -> Html {
                 .and_then(|t| t.dyn_into::<web_sys::HtmlElement>().ok())
                 && target
                     .get_attribute("class")
-                    .map(|c| c.contains("gi-modal-overlay"))
-                    .unwrap_or(false)
+                    .is_some_and(|c| c.contains("gi-modal-overlay"))
             {
                 on_cancel.emit(e);
             }

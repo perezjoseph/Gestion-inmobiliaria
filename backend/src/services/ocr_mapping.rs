@@ -23,7 +23,7 @@ pub fn map_deposito(result: &OcrResult) -> Result<ImportPreview, AppError> {
         AppError::Validation("Campo 'monto' no detectado en el documento".to_string())
     })?;
 
-    let moneda_raw = fields.get("moneda").map_or("", |s| s.as_str());
+    let moneda_raw = fields.get("moneda").map_or("", String::as_str);
     let currency_input = if moneda_raw.is_empty() {
         monto_raw.clone()
     } else {
@@ -73,8 +73,8 @@ pub fn map_deposito(result: &OcrResult) -> Result<ImportPreview, AppError> {
         });
     }
 
-    let cuenta = fields.get("cuenta").map_or("", |s| s.as_str());
-    let referencia = fields.get("referencia").map_or("", |s| s.as_str());
+    let cuenta = fields.get("cuenta").map_or("", String::as_str);
+    let referencia = fields.get("referencia").map_or("", String::as_str);
     let notas = format!("{cuenta} {referencia}").trim().to_string();
     if !notas.is_empty() {
         let notas_confidence = [cuenta, referencia]
@@ -119,7 +119,7 @@ pub fn map_gasto(result: &OcrResult) -> Result<ImportPreview, AppError> {
         AppError::Validation("Campo 'monto' no detectado en el documento".to_string())
     })?;
 
-    let moneda_raw = fields.get("moneda").map_or("", |s| s.as_str());
+    let moneda_raw = fields.get("moneda").map_or("", String::as_str);
     let currency_input = if moneda_raw.is_empty() {
         monto_raw.clone()
     } else {
@@ -231,6 +231,7 @@ fn parse_two_digit_year(text: &str) -> Option<NaiveDate> {
     NaiveDate::from_ymd_opt(year, month, day)
 }
 
+#[allow(clippy::option_if_let_else)]
 pub fn parse_dr_currency(text: &str) -> Result<(Decimal, String), String> {
     let text = text.trim();
 
@@ -251,7 +252,7 @@ pub fn parse_dr_currency(text: &str) -> Result<(Decimal, String), String> {
 }
 
 pub fn normalize_cedula(raw: &str) -> String {
-    let digits: String = raw.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = raw.chars().filter(char::is_ascii_digit).collect();
     if digits.len() == 11 {
         format!("{}-{}-{}", &digits[0..3], &digits[3..10], &digits[10..11])
     } else {
@@ -262,11 +263,11 @@ pub fn normalize_cedula(raw: &str) -> String {
 pub fn map_cedula(result: &OcrResult) -> Result<Vec<ExtractField>, AppError> {
     let fields = &result.structured_fields;
 
-    let cedula_raw = fields.get("cedula").map_or("", |s| s.as_str());
+    let cedula_raw = fields.get("cedula").map_or("", String::as_str);
     let cedula_value = normalize_cedula(cedula_raw);
 
-    let nombre = fields.get("nombre").map_or("", |s| s.as_str());
-    let apellido = fields.get("apellido").map_or("", |s| s.as_str());
+    let nombre = fields.get("nombre").map_or("", String::as_str);
+    let apellido = fields.get("apellido").map_or("", String::as_str);
 
     Ok(vec![
         ExtractField {
@@ -290,11 +291,12 @@ pub fn map_cedula(result: &OcrResult) -> Result<Vec<ExtractField>, AppError> {
     ])
 }
 
+#[allow(clippy::option_if_let_else)]
 pub fn map_contrato(result: &OcrResult) -> Result<Vec<ExtractField>, AppError> {
     let fields = &result.structured_fields;
 
-    let monto_raw = fields.get("monto_mensual").map_or("", |s| s.as_str());
-    let moneda_raw = fields.get("moneda").map_or("", |s| s.as_str());
+    let monto_raw = fields.get("monto_mensual").map_or("", String::as_str);
+    let moneda_raw = fields.get("moneda").map_or("", String::as_str);
 
     let (monto_value, monto_confidence) = if monto_raw.is_empty() {
         (String::new(), 0.0)
@@ -325,7 +327,7 @@ pub fn map_contrato(result: &OcrResult) -> Result<Vec<ExtractField>, AppError> {
         String::new()
     };
 
-    let fecha_inicio_raw = fields.get("fecha_inicio").map_or("", |s| s.as_str());
+    let fecha_inicio_raw = fields.get("fecha_inicio").map_or("", String::as_str);
     let fecha_inicio_value = if fecha_inicio_raw.is_empty() {
         String::new()
     } else {
@@ -335,7 +337,7 @@ pub fn map_contrato(result: &OcrResult) -> Result<Vec<ExtractField>, AppError> {
         }
     };
 
-    let fecha_fin_raw = fields.get("fecha_fin").map_or("", |s| s.as_str());
+    let fecha_fin_raw = fields.get("fecha_fin").map_or("", String::as_str);
     let fecha_fin_value = if fecha_fin_raw.is_empty() {
         String::new()
     } else {
@@ -345,7 +347,7 @@ pub fn map_contrato(result: &OcrResult) -> Result<Vec<ExtractField>, AppError> {
         }
     };
 
-    let deposito_raw = fields.get("deposito").map_or("", |s| s.as_str());
+    let deposito_raw = fields.get("deposito").map_or("", String::as_str);
     let deposito_value = if deposito_raw.is_empty() {
         String::new()
     } else {
@@ -418,6 +420,7 @@ pub fn map_gasto_extract(result: &OcrResult) -> Result<Vec<ExtractField>, AppErr
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use std::collections::HashMap;

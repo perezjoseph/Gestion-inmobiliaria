@@ -82,6 +82,7 @@ pub struct ResumenCategoriaRow {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use chrono::TimeZone;
@@ -101,7 +102,7 @@ mod tests {
         }"#;
         let req: CreateGastoRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.categoria, "mantenimiento");
-        assert_eq!(req.monto, Decimal::new(1500050, 2));
+        assert_eq!(req.monto, Decimal::new(1_500_050, 2));
         assert_eq!(
             req.fecha_gasto,
             NaiveDate::from_ymd_opt(2025, 4, 1).unwrap()

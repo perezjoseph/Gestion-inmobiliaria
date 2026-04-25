@@ -9,7 +9,7 @@ use crate::types::documento::DocumentoResponse;
 const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024;
 const ALLOWED_TYPES: &[&str] = &["image/jpeg", "image/png", "application/pdf"];
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct DocumentGalleryProps {
     pub entity_type: String,
     pub entity_id: String,
@@ -86,7 +86,7 @@ pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
 
             spawn_local(async move {
                 match upload_document(&entity_type, &entity_id, &token, file).await {
-                    Ok(_) => match fetch_documents(&entity_type, &entity_id, &token).await {
+                    Ok(()) => match fetch_documents(&entity_type, &entity_id, &token).await {
                         Ok(docs) => documents.set(docs),
                         Err(err) => error.set(Some(err)),
                     },
@@ -198,6 +198,7 @@ fn format_file_size(bytes: i64) -> String {
     }
 }
 
+#[allow(clippy::future_not_send)]
 async fn fetch_documents(
     entity_type: &str,
     entity_id: &str,
@@ -224,6 +225,7 @@ async fn fetch_documents(
         .map_err(|e| format!("Error al procesar respuesta: {e}"))
 }
 
+#[allow(clippy::future_not_send)]
 async fn upload_document(
     entity_type: &str,
     entity_id: &str,

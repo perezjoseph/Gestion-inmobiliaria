@@ -96,8 +96,9 @@ pub async fn generar_reporte_ingresos(
 
     for p in &pagos {
         let contrato_model = contratos.iter().find(|c| c.id == p.contrato_id);
-        let (prop_titulo, inq_nombre) = match contrato_model {
-            Some(c) => {
+        let (prop_titulo, inq_nombre) = contrato_model.map_or_else(
+            || (String::new(), String::new()),
+            |c| {
                 let prop = propiedades
                     .iter()
                     .find(|pr| pr.id == c.propiedad_id)
@@ -109,9 +110,8 @@ pub async fn generar_reporte_ingresos(
                     .map(|i| format!("{} {}", i.nombre, i.apellido))
                     .unwrap_or_default();
                 (prop, inq)
-            }
-            None => (String::new(), String::new()),
-        };
+            },
+        );
 
         match p.estado.as_str() {
             "pagado" => total_pagado += p.monto,
@@ -804,6 +804,7 @@ pub fn exportar_rentabilidad_xlsx(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::float_cmp)]
 mod tests {
     use super::*;
     use chrono::TimeZone;

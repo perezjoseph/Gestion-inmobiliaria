@@ -25,6 +25,7 @@ enum UploadResult {
     Preview(ImportPreview),
 }
 
+#[allow(clippy::future_not_send)]
 async fn handle_upload_response(resp: gloo_net::http::Response) -> Result<UploadResult, String> {
     if resp.ok() {
         let text = resp
@@ -50,6 +51,7 @@ async fn handle_upload_response(resp: gloo_net::http::Response) -> Result<Upload
     }
 }
 
+#[allow(clippy::future_not_send)]
 async fn perform_upload(file: web_sys::File, entity_type: String) -> Result<UploadResult, String> {
     let form_data =
         web_sys::FormData::new().map_err(|_| "Error al crear formulario".to_string())?;
@@ -140,7 +142,7 @@ pub fn Importar() -> Html {
     let on_discarded = {
         let preview = preview.clone();
         let selected_filename = selected_filename.clone();
-        Callback::from(move |_: ()| {
+        Callback::from(move |()| {
             preview.set(None);
             selected_filename.set(None);
         })

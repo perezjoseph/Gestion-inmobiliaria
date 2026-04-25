@@ -58,13 +58,15 @@ pub async fn cambiar_password(
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)]
 mod tests {
     use super::*;
 
     #[test]
     fn actualizar_perfil_request_deserializes_camel_case() {
         let json = r#"{"nombre": "Juan", "email": "juan@example.com"}"#;
-        let req: ActualizarPerfilRequest = serde_json::from_str(json).unwrap();
+        let req: ActualizarPerfilRequest =
+            serde_json::from_str(json).expect("deserialize camelCase perfil request");
         assert_eq!(req.nombre.as_deref(), Some("Juan"));
         assert_eq!(req.email.as_deref(), Some("juan@example.com"));
     }
@@ -72,15 +74,17 @@ mod tests {
     #[test]
     fn actualizar_perfil_request_allows_partial_fields() {
         let json = r#"{"nombre": "Juan"}"#;
-        let req: ActualizarPerfilRequest = serde_json::from_str(json).unwrap();
+        let req: ActualizarPerfilRequest =
+            serde_json::from_str(json).expect("deserialize partial perfil request");
         assert_eq!(req.nombre.as_deref(), Some("Juan"));
         assert!(req.email.is_none());
     }
 
     #[test]
     fn actualizar_perfil_request_allows_empty_object() {
-        let json = r#"{}"#;
-        let req: ActualizarPerfilRequest = serde_json::from_str(json).unwrap();
+        let json = r"{}";
+        let req: ActualizarPerfilRequest =
+            serde_json::from_str(json).expect("deserialize empty perfil request");
         assert!(req.nombre.is_none());
         assert!(req.email.is_none());
     }
@@ -88,7 +92,8 @@ mod tests {
     #[test]
     fn cambiar_password_request_deserializes_camel_case() {
         let json = r#"{"passwordActual": "old123", "passwordNuevo": "new456"}"#;
-        let req: CambiarPasswordRequest = serde_json::from_str(json).unwrap();
+        let req: CambiarPasswordRequest =
+            serde_json::from_str(json).expect("deserialize camelCase password request");
         assert_eq!(req.password_actual, "old123");
         assert_eq!(req.password_nuevo, "new456");
     }
@@ -102,7 +107,7 @@ mod tests {
 
     #[test]
     fn cambiar_password_request_rejects_empty_object() {
-        let json = r#"{}"#;
+        let json = r"{}";
         let result = serde_json::from_str::<CambiarPasswordRequest>(json);
         assert!(result.is_err());
     }

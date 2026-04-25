@@ -1,3 +1,5 @@
+#![allow(clippy::derive_partial_eq_without_eq)]
+
 #[allow(dead_code)]
 pub mod configuracion;
 pub mod contrato;

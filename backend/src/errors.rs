@@ -23,25 +23,25 @@ pub enum AppError {
 impl actix_web::error::ResponseError for AppError {
     fn status_code(&self) -> StatusCode {
         match self {
-            AppError::NotFound(_) => StatusCode::NOT_FOUND,
-            AppError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
-            AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
-            AppError::Forbidden => StatusCode::FORBIDDEN,
-            AppError::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
-            AppError::Conflict(_) => StatusCode::CONFLICT,
-            AppError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::NotFound(_) => StatusCode::NOT_FOUND,
+            Self::Unauthorized(_) => StatusCode::UNAUTHORIZED,
+            Self::BadRequest(_) => StatusCode::BAD_REQUEST,
+            Self::Forbidden => StatusCode::FORBIDDEN,
+            Self::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            Self::Conflict(_) => StatusCode::CONFLICT,
+            Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
     fn error_response(&self) -> HttpResponse {
         let (error_type, message) = match self {
-            AppError::NotFound(msg) => ("not_found", msg.clone()),
-            AppError::Unauthorized(_) => ("unauthorized", self.to_string()),
-            AppError::BadRequest(msg) => ("bad_request", msg.clone()),
-            AppError::Forbidden => ("forbidden", self.to_string()),
-            AppError::Validation(msg) => ("validation", msg.clone()),
-            AppError::Conflict(msg) => ("conflict", msg.clone()),
-            AppError::Internal(_) => ("internal", "Error interno del servidor".to_string()),
+            Self::NotFound(msg) => ("not_found", msg.clone()),
+            Self::Unauthorized(_) => ("unauthorized", self.to_string()),
+            Self::BadRequest(msg) => ("bad_request", msg.clone()),
+            Self::Forbidden => ("forbidden", self.to_string()),
+            Self::Validation(msg) => ("validation", msg.clone()),
+            Self::Conflict(msg) => ("conflict", msg.clone()),
+            Self::Internal(_) => ("internal", "Error interno del servidor".to_string()),
         };
 
         HttpResponse::build(self.status_code()).json(json!({
@@ -53,7 +53,7 @@ impl actix_web::error::ResponseError for AppError {
 
 impl From<sea_orm::DbErr> for AppError {
     fn from(err: sea_orm::DbErr) -> Self {
-        AppError::Internal(anyhow::anyhow!(err))
+        Self::Internal(anyhow::anyhow!(err))
     }
 }
 

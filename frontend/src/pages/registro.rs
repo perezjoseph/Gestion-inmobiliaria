@@ -8,12 +8,16 @@ use crate::types::usuario::LoginResponse;
 
 #[function_component]
 pub fn Registro() -> Html {
-    let navigator = use_navigator().unwrap();
-    let auth = use_context::<AuthContext>().unwrap();
+    let Some(navigator) = use_navigator() else {
+        return html! {};
+    };
+    let Some(auth) = use_context::<AuthContext>() else {
+        return html! {};
+    };
 
     {
         let navigator = navigator.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             if is_authenticated() {
                 navigator.push(&Route::Dashboard);
             }
@@ -21,8 +25,8 @@ pub fn Registro() -> Html {
     }
 
     let on_success = {
-        let auth = auth.clone();
-        let navigator = navigator.clone();
+        let auth = auth;
+        let navigator = navigator;
         Callback::from(move |response: LoginResponse| {
             auth.dispatch(AuthAction::Login {
                 token: response.token,

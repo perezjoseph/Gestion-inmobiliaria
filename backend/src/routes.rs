@@ -4,6 +4,7 @@ use actix_web::web;
 use crate::handlers;
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
+    #[allow(clippy::unwrap_used)]
     let auth_governor_conf = GovernorConfigBuilder::default()
         .seconds_per_request(6)
         .burst_size(10)

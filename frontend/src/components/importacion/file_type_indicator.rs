@@ -1,16 +1,16 @@
 use yew::prelude::*;
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct FileTypeIndicatorProps {
     pub filename: String,
 }
 
 fn is_image_file(name: &str) -> bool {
-    let lower = name.to_lowercase();
-    lower.ends_with(".jpg")
-        || lower.ends_with(".jpeg")
-        || lower.ends_with(".png")
-        || lower.ends_with(".pdf")
+    let ext = name.rsplit('.').next().unwrap_or("");
+    ext.eq_ignore_ascii_case("jpg")
+        || ext.eq_ignore_ascii_case("jpeg")
+        || ext.eq_ignore_ascii_case("png")
+        || ext.eq_ignore_ascii_case("pdf")
 }
 
 #[function_component]

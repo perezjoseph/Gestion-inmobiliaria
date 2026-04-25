@@ -10,7 +10,7 @@ use crate::services::api::{api_get, api_put};
 use crate::types::PaginatedResponse;
 use crate::types::usuario::User;
 
-fn push_toast(toasts: &Option<ToastContext>, msg: &str) {
+fn push_toast(toasts: Option<&ToastContext>, msg: &str) {
     if let Some(t) = toasts {
         t.dispatch(ToastAction::Push(msg.into(), ToastKind::Success));
     }
@@ -134,7 +134,7 @@ pub fn Usuarios() -> Html {
                 match api_put::<User, _>(&format!("/usuarios/{id}/rol"), &body).await {
                     Ok(_) => {
                         reload.set(*reload + 1);
-                        push_toast(&toasts, "Rol actualizado");
+                        push_toast(toasts.as_ref(), "Rol actualizado");
                     }
                     Err(err) => error.set(Some(err)),
                 }
@@ -144,8 +144,8 @@ pub fn Usuarios() -> Html {
 
     let on_toggle_active = {
         let error = error.clone();
-        let reload = reload.clone();
-        let toasts = toasts.clone();
+        let reload = reload;
+        let toasts = toasts;
         Callback::from(move |(id, activo): (String, bool)| {
             let error = error.clone();
             let reload = reload.clone();
@@ -161,7 +161,7 @@ pub fn Usuarios() -> Html {
                         } else {
                             "Usuario activado"
                         };
-                        push_toast(&toasts, msg);
+                        push_toast(toasts.as_ref(), msg);
                     }
                     Err(err) => error.set(Some(err)),
                 }

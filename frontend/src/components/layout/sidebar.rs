@@ -133,8 +133,7 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
     let user_rol = auth
         .as_ref()
         .and_then(|a| a.user.as_ref())
-        .map(|u| u.rol.as_str())
-        .unwrap_or("");
+        .map_or("", |u| u.rol.as_str());
     let is_admin = user_rol == "admin";
     let can_write = user_rol == "admin" || user_rol == "gerente";
 

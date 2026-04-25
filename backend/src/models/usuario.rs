@@ -55,6 +55,7 @@ pub struct CambiarRolRequest {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
@@ -67,7 +68,7 @@ mod tests {
 
     #[test]
     fn cambiar_rol_request_rejects_missing_field() {
-        let json = r#"{}"#;
+        let json = r"{}";
         let result = serde_json::from_str::<CambiarRolRequest>(json);
         assert!(result.is_err());
     }

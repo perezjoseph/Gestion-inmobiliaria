@@ -72,21 +72,23 @@ impl AppConfig {
         let defaults = PoolConfig::default();
 
         let parse_u32 = |key: &str, default: u32| -> Result<u32, anyhow::Error> {
-            match std::env::var(key) {
-                Ok(val) => val
-                    .parse::<u32>()
-                    .map_err(|_| anyhow::anyhow!("{key} debe ser un número válido")),
-                Err(_) => Ok(default),
-            }
+            std::env::var(key).map_or_else(
+                |_| Ok(default),
+                |val| {
+                    val.parse::<u32>()
+                        .map_err(|_| anyhow::anyhow!("{key} debe ser un número válido"))
+                },
+            )
         };
 
         let parse_u64 = |key: &str, default: u64| -> Result<u64, anyhow::Error> {
-            match std::env::var(key) {
-                Ok(val) => val
-                    .parse::<u64>()
-                    .map_err(|_| anyhow::anyhow!("{key} debe ser un número válido")),
-                Err(_) => Ok(default),
-            }
+            std::env::var(key).map_or_else(
+                |_| Ok(default),
+                |val| {
+                    val.parse::<u64>()
+                        .map_err(|_| anyhow::anyhow!("{key} debe ser un número válido"))
+                },
+            )
         };
 
         let sqlx_logging = std::env::var("DB_SQLX_LOGGING")
@@ -119,6 +121,7 @@ impl AppConfig {
 }
 
 #[cfg(test)]
+#[allow(unsafe_code, clippy::unwrap_used)]
 mod tests {
     use super::*;
     use std::env;
@@ -126,6 +129,7 @@ mod tests {
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
+    #[allow(unsafe_code)]
     unsafe fn clear_env_vars() {
         unsafe {
             env::remove_var("DATABASE_URL");
@@ -143,7 +147,7 @@ mod tests {
 
     #[test]
     fn from_env_with_all_vars() {
-        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = ENV_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             clear_env_vars();
             env::set_var("DATABASE_URL", "postgres://localhost/test");
@@ -163,7 +167,7 @@ mod tests {
 
     #[test]
     fn from_env_defaults_port_when_not_set() {
-        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = ENV_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             clear_env_vars();
             env::set_var("DATABASE_URL", "postgres://localhost/test");
@@ -179,7 +183,7 @@ mod tests {
 
     #[test]
     fn from_env_fails_with_invalid_port() {
-        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = ENV_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             clear_env_vars();
             env::set_var("DATABASE_URL", "postgres://localhost/test");
@@ -195,7 +199,7 @@ mod tests {
 
     #[test]
     fn pool_config_uses_defaults_when_not_set() {
-        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = ENV_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             clear_env_vars();
             env::set_var("DATABASE_URL", "postgres://localhost/test");
@@ -215,7 +219,7 @@ mod tests {
 
     #[test]
     fn pool_config_reads_custom_values() {
-        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = ENV_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             clear_env_vars();
             env::set_var("DATABASE_URL", "postgres://localhost/test");
@@ -241,7 +245,7 @@ mod tests {
 
     #[test]
     fn pool_config_fails_with_invalid_max_connections() {
-        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = ENV_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             clear_env_vars();
             env::set_var("DATABASE_URL", "postgres://localhost/test");

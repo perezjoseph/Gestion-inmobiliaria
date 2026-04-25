@@ -88,8 +88,7 @@ fn find_column_index(headers: &[String], name: &str) -> Option<usize> {
 
 fn get_field(row: &[String], idx: Option<usize>) -> &str {
     idx.and_then(|i| row.get(i))
-        .map(|s| s.as_str())
-        .unwrap_or("")
+        .map_or("", String::as_str)
 }
 
 fn validate_required_fields<'a>(fields: &[(&str, &'a str)]) -> Vec<&'a str> {
@@ -495,6 +494,7 @@ pub async fn importar_gastos(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
@@ -572,7 +572,7 @@ mod tests {
         let mut errores = Vec::new();
         for (field, val) in required.iter().zip(values.iter()) {
             if val.is_empty() {
-                errores.push(format!("{} es requerido", field));
+                errores.push(format!("{field} es requerido"));
             }
         }
         assert_eq!(errores.len(), 1);
@@ -586,7 +586,7 @@ mod tests {
         let mut errores = Vec::new();
         for (field, val) in required.iter().zip(values.iter()) {
             if val.is_empty() {
-                errores.push(format!("{} es requerido", field));
+                errores.push(format!("{field} es requerido"));
             }
         }
         assert_eq!(errores.len(), 1);
@@ -597,7 +597,7 @@ mod tests {
     fn precio_parsing_valid() {
         let result = Decimal::from_str("50000.50");
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Decimal::new(5000050, 2));
+        assert_eq!(result.unwrap(), Decimal::new(5_000_050, 2));
     }
 
     #[test]
@@ -678,7 +678,7 @@ mod tests {
         let mut errores = Vec::new();
         for (field, val) in required.iter().zip(values.iter()) {
             if val.is_empty() {
-                errores.push(format!("{} es requerido", field));
+                errores.push(format!("{field} es requerido"));
             }
         }
         assert_eq!(errores.len(), 6);
@@ -705,7 +705,7 @@ mod tests {
         let mut errores = Vec::new();
         for (field, val) in required.iter().zip(values.iter()) {
             if val.is_empty() {
-                errores.push(format!("{} es requerido", field));
+                errores.push(format!("{field} es requerido"));
             }
         }
         assert_eq!(errores.len(), 2);
@@ -717,7 +717,7 @@ mod tests {
     fn gastos_monto_parsing_valid() {
         let result = Decimal::from_str("15000.50");
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Decimal::new(1500050, 2));
+        assert_eq!(result.unwrap(), Decimal::new(1_500_050, 2));
     }
 
     #[test]

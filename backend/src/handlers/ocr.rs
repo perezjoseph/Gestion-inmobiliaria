@@ -14,12 +14,12 @@ const MAX_FILE_SIZE: usize = 10 * 1024 * 1024;
 const ALLOWED_CONTENT_TYPES: &[&str] = &["image/jpeg", "image/png", "application/pdf"];
 
 fn content_type_from_filename(filename: &str) -> Option<&'static str> {
-    let lower = filename.to_lowercase();
-    if lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
+    let ext = std::path::Path::new(filename).extension()?;
+    if ext.eq_ignore_ascii_case("jpg") || ext.eq_ignore_ascii_case("jpeg") {
         Some("image/jpeg")
-    } else if lower.ends_with(".png") {
+    } else if ext.eq_ignore_ascii_case("png") {
         Some("image/png")
-    } else if lower.ends_with(".pdf") {
+    } else if ext.eq_ignore_ascii_case("pdf") {
         Some("application/pdf")
     } else {
         None
@@ -30,6 +30,7 @@ fn is_valid_content_type(ct: &str) -> bool {
     ALLOWED_CONTENT_TYPES.contains(&ct)
 }
 
+#[allow(clippy::future_not_send)]
 pub async fn ocr_extract(
     _access: WriteAccess,
     mut payload: Multipart,
@@ -54,7 +55,7 @@ pub async fn ocr_extract(
                 filename = disposition
                     .as_ref()
                     .and_then(|d| d.get_filename())
-                    .map(|f| f.to_string());
+                    .map(ToString::to_string);
 
                 let mut data = Vec::new();
                 while let Some(chunk) = field.next().await {

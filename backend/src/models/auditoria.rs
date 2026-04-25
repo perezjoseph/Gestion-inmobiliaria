@@ -27,6 +27,7 @@ pub struct AuditoriaResponse {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use serde_json::json;
@@ -38,14 +39,13 @@ mod tests {
         let raw = format!(
             r#"{{
                 "entityType": "propiedad",
-                "entityId": "{}",
-                "usuarioId": "{}",
+                "entityId": "{id}",
+                "usuarioId": "{uid}",
                 "fechaDesde": "2025-01-01",
                 "fechaHasta": "2025-12-31",
                 "page": 2,
                 "perPage": 50
-            }}"#,
-            id, uid
+            }}"#
         );
         let q: AuditoriaQuery = serde_json::from_str(&raw).unwrap();
         assert_eq!(q.entity_type.as_deref(), Some("propiedad"));
@@ -65,7 +65,7 @@ mod tests {
 
     #[test]
     fn auditoria_query_deserializes_empty_filters() {
-        let raw = r#"{}"#;
+        let raw = r"{}";
         let q: AuditoriaQuery = serde_json::from_str(raw).unwrap();
         assert!(q.entity_type.is_none());
         assert!(q.entity_id.is_none());

@@ -14,8 +14,7 @@ pub fn SortableHeader(props: &SortableHeaderProps) -> Html {
     let is_active = props
         .current_sort
         .as_ref()
-        .map(|s| s == &props.field)
-        .unwrap_or(false);
+        .is_some_and(|s| s == &props.field);
 
     let current_order = if is_active {
         props.current_order.as_deref().unwrap_or("asc").to_string()

@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used, clippy::unwrap_used)]
+
 use proptest::prelude::*;
 use std::collections::HashMap;
 
@@ -534,7 +536,6 @@ proptest! {
     ) {
         let ocr_result = ocr_result_for_document_type(&doc_type);
         let fields = map_fields_for_type(&doc_type, &ocr_result);
-        let raw_lines: Vec<String> = ocr_result.lines.iter().map(|l| l.text.clone()).collect();
 
         let response_doc_type = doc_type.clone();
 
@@ -553,7 +554,7 @@ proptest! {
         );
 
         prop_assert!(
-            !raw_lines.is_empty(),
+            !ocr_result.lines.is_empty(),
             "OcrResult for document_type '{}' should have at least one raw line",
             doc_type
         );
@@ -566,7 +567,6 @@ proptest! {
         (doc_type, ocr_result) in random_ocr_result()
     ) {
         let fields = map_fields_for_type(&doc_type, &ocr_result);
-        let raw_lines: Vec<String> = ocr_result.lines.iter().map(|l| l.text.clone()).collect();
 
         prop_assert!(
             !doc_type.is_empty(),
@@ -596,14 +596,14 @@ proptest! {
         }
 
         prop_assert!(
-            !raw_lines.is_empty(),
+            !ocr_result.lines.is_empty(),
             "rawLines must not be empty for document_type '{}'",
             doc_type
         );
 
-        for line in &raw_lines {
+        for line in &ocr_result.lines {
             prop_assert!(
-                !line.is_empty(),
+                !line.text.is_empty(),
                 "Each raw line must be a non-empty string"
             );
         }

@@ -341,7 +341,7 @@ pub async fn resumen_categorias(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{FixedOffset, NaiveDate};
+    use chrono::NaiveDate;
 
     fn make_model(categoria: &str, estado: &str) -> gasto::Model {
         gasto::Model {
@@ -352,13 +352,13 @@ mod tests {
             descripcion: "Test gasto".to_string(),
             monto: Decimal::new(10000, 2),
             moneda: "DOP".to_string(),
-            fecha_gasto: NaiveDate::from_ymd_opt(2025, 4, 1).unwrap(),
+            fecha_gasto: NaiveDate::from_ymd_opt(2025, 4, 1).unwrap_or_default(),
             estado: estado.to_string(),
             proveedor: Some("Proveedor ABC".to_string()),
             numero_factura: Some("FAC-001".to_string()),
             notas: Some("Nota de prueba".to_string()),
-            created_at: Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap()),
-            updated_at: Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap()),
+            created_at: Utc::now().fixed_offset(),
+            updated_at: Utc::now().fixed_offset(),
         }
     }
 
@@ -378,7 +378,7 @@ mod tests {
         assert_eq!(resp.moneda, "DOP");
         assert_eq!(
             resp.fecha_gasto,
-            NaiveDate::from_ymd_opt(2025, 4, 1).unwrap()
+            NaiveDate::from_ymd_opt(2025, 4, 1).unwrap_or_default()
         );
         assert_eq!(resp.estado, "pendiente");
         assert_eq!(resp.proveedor.as_deref(), Some("Proveedor ABC"));

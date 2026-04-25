@@ -17,7 +17,7 @@ use crate::types::PaginatedResponse;
 use crate::types::propiedad::{CreatePropiedad, Propiedad, UpdatePropiedad};
 use crate::utils::{EscapeHandler, can_delete, can_write, field_error, input_class};
 
-fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
+fn push_toast(toasts: Option<&ToastContext>, msg: &str, kind: ToastKind) {
     if let Some(t) = toasts {
         t.dispatch(ToastAction::Push(msg.into(), kind));
     }
@@ -105,7 +105,7 @@ struct FormErrors {
 }
 
 impl FormErrors {
-    fn has_errors(&self) -> bool {
+    const fn has_errors(&self) -> bool {
         self.titulo.is_some()
             || self.direccion.is_some()
             || self.ciudad.is_some()
@@ -510,7 +510,7 @@ fn do_save_propiedad(
             Ok(()) => {
                 reset_form();
                 reload.set(*reload + 1);
-                push_toast(&toasts, "Propiedad guardada", ToastKind::Success);
+                push_toast(toasts.as_ref(), "Propiedad guardada", ToastKind::Success);
             }
             Err(err) => error.set(Some(err)),
         }
@@ -555,7 +555,9 @@ fn do_delete_propiedad(
 fn register_escape_listener_p(escape_handler: EscapeHandler) -> Option<EventListener> {
     web_sys::window().and_then(|w| w.document()).map(|doc| {
         EventListener::new(&doc, "keydown", move |event| {
-            let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
+            let Some(event) = event.dyn_ref::<web_sys::KeyboardEvent>() else {
+                return;
+            };
             if event.key() == "Escape"
                 && let Some(ref cb) = *escape_handler.borrow()
             {
@@ -571,8 +573,8 @@ fn build_propiedades_url(
     fc: &str,
     ft: &str,
     fe: &str,
-    sf: &Option<String>,
-    so: &Option<String>,
+    sf: Option<&String>,
+    so: Option<&String>,
 ) -> String {
     let mut params = vec![format!("page={pg}"), format!("perPage={pp}")];
     if !fc.is_empty() {
@@ -785,10 +787,10 @@ fn render_propiedades_view(
         "titulo".into(),
         "direccion".into(),
         "ciudad".into(),
-        "".into(),
+        String::new(),
         "precio".into(),
         "estado".into(),
-        "".into(),
+        String::new(),
     ];
 
     html! {
@@ -934,7 +936,7 @@ pub fn Propiedades() -> Html {
                 so.clone(),
             ),
             move |_| {
-                let url = build_propiedades_url(pg, pp, &fc, &ft, &fe, &sf, &so);
+                let url = build_propiedades_url(pg, pp, &fc, &ft, &fe, sf.as_ref(), so.as_ref());
                 load_propiedades_data(items, total, error, loading, url);
             },
         );
@@ -987,7 +989,7 @@ pub fn Propiedades() -> Html {
     }
     {
         let escape_handler = escape_handler.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             let listener = register_escape_listener_p(escape_handler);
             move || drop(listener)
         });
@@ -1047,6 +1049,7 @@ pub fn Propiedades() -> Html {
         }
     };
 
+    #[allow(clippy::redundant_clone)]
     let on_submit = {
         let titulo = titulo.clone();
         let descripcion = descripcion.clone();
@@ -1065,7 +1068,6 @@ pub fn Propiedades() -> Html {
         let reload = reload.clone();
         let reset_form = reset_form.clone();
         let validate_form = validate_form.clone();
-        let toasts = toasts.clone();
         let submitting = submitting.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
@@ -1094,7 +1096,7 @@ pub fn Propiedades() -> Html {
         })
     };
 
-    let on_cancel = super::page_helpers::cancel_cb(reset_form.clone());
+    let on_cancel = super::page_helpers::cancel_cb(reset_form);
 
     let on_filter_apply = super::page_helpers::filter_apply_cb(&page, &reload);
     let on_filter_clear = {
@@ -1116,8 +1118,11 @@ pub fn Propiedades() -> Html {
         super::page_helpers::pagination_cbs(&page, &per_page, &reload);
 
     let on_sort = {
+        #[allow(clippy::redundant_clone)]
         let sort_field = sort_field.clone();
+        #[allow(clippy::redundant_clone)]
         let sort_order = sort_order.clone();
+        #[allow(clippy::redundant_clone)]
         let reload = reload.clone();
         let page = page.clone();
         Callback::from(move |(field, order): (String, String)| {

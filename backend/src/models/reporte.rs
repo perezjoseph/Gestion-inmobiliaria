@@ -85,6 +85,7 @@ pub struct RentabilidadReportSummary {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use chrono::TimeZone;
@@ -239,9 +240,9 @@ mod tests {
     fn rentabilidad_report_summary_serializes_to_camel_case() {
         let summary = RentabilidadReportSummary {
             rows: vec![],
-            total_ingresos: Decimal::new(100000, 0),
-            total_gastos: Decimal::new(30000, 0),
-            total_neto: Decimal::new(70000, 0),
+            total_ingresos: Decimal::new(100_000, 0),
+            total_gastos: Decimal::new(30_000, 0),
+            total_neto: Decimal::new(70_000, 0),
             mes: 4,
             anio: 2025,
             generated_at: Utc.with_ymd_and_hms(2025, 4, 10, 12, 0, 0).unwrap(),

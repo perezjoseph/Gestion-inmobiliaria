@@ -2,7 +2,7 @@ use gloo_timers::callback::Timeout;
 use std::rc::Rc;
 use yew::prelude::*;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum ToastKind {
     Success,
@@ -26,7 +26,7 @@ impl std::fmt::Debug for ToastMessage {
             .field("text", &self.text)
             .field("kind", &self.kind)
             .field("action_label", &self.action_label)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -175,7 +175,7 @@ fn ToastItem(props: &ToastItemProps) -> Html {
     }
 }
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct ToastContainerProps;
 
 #[function_component]

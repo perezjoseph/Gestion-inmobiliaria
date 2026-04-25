@@ -67,6 +67,7 @@ pub struct ContratoResponse {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use std::str::FromStr;
@@ -101,7 +102,7 @@ mod tests {
 
     #[test]
     fn por_vencer_query_deserializes_without_dias() {
-        let json = r#"{}"#;
+        let json = r"{}";
         let q: PorVencerQuery = serde_json::from_str(json).unwrap();
         assert_eq!(q.dias, None);
     }

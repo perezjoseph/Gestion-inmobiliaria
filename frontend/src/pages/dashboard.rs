@@ -25,7 +25,7 @@ pub fn Dashboard() -> Html {
         let ingreso_comp = ingreso_comp.clone();
         let error = error.clone();
         let loading = loading.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             spawn_local(async move {
                 match api_get::<DashboardStats>("/dashboard/stats").await {
                     Ok(data) => stats.set(Some(data)),
@@ -44,7 +44,6 @@ pub fn Dashboard() -> Html {
                 });
             }
             {
-                let ingreso_comp = ingreso_comp.clone();
                 spawn_local(async move {
                     if let Ok(data) =
                         api_get::<IngresoComparacion>("/dashboard/ingresos-comparacion").await
@@ -75,13 +74,13 @@ pub fn Dashboard() -> Html {
             if let Some(err) = (*error).as_ref() {
                 <ErrorBanner message={err.clone()} onclose={on_close_error.clone()} />
             }
-            if !has_data {
-                <WelcomeCard />
-            } else {
+            if has_data {
                 if let Some(s) = (*stats).as_ref() {
                     <StatsHeader stats={s.clone()} ingreso_comp={(*ingreso_comp).clone()} />
                 }
                 <OverdueSection pagos={(*overdue_pagos).clone()} />
+            } else {
+                <WelcomeCard />
             }
         </div>
     }

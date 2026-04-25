@@ -163,6 +163,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn hash_and_verify_password_succeeds() {
         let password = test_password("valid");
         let hash = hash_password(&password).unwrap();
@@ -170,6 +171,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn verify_wrong_password_fails() {
         let correct = test_password("correct");
         let wrong = test_password("wrong");
@@ -178,6 +180,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn encode_decode_jwt_roundtrip() {
         install_crypto_provider();
         let secret = test_secret("roundtrip");
@@ -197,6 +200,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn decode_jwt_with_wrong_secret_fails() {
         install_crypto_provider();
         let secret_a = test_secret("a");
@@ -214,6 +218,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn decode_expired_jwt_fails() {
         install_crypto_provider();
         let secret = test_secret("expired");

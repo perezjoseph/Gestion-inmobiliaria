@@ -4,6 +4,7 @@ use crate::types::{deserialize_f64_from_any, deserialize_option_f64_from_any};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_field_names)]
 pub struct Propiedad {
     pub id: String,
     pub titulo: String,

@@ -28,7 +28,7 @@ use crate::utils::{
     input_class,
 };
 
-fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
+fn push_toast(toasts: Option<&ToastContext>, msg: &str, kind: ToastKind) {
     if let Some(t) = toasts {
         t.dispatch(ToastAction::Push(msg.into(), kind));
     }
@@ -114,7 +114,7 @@ struct FormErrors {
 }
 
 impl FormErrors {
-    fn has_errors(&self) -> bool {
+    const fn has_errors(&self) -> bool {
         self.contrato_id.is_some() || self.monto.is_some() || self.fecha_vencimiento.is_some()
     }
 }
@@ -179,7 +179,9 @@ fn PagoForm(props: &PagoFormProps) -> Html {
         })
     };
 
-    let scan_button = if !props.is_editing {
+    let scan_button = if props.is_editing {
+        html! {}
+    } else {
         html! {
             <OcrScanButton
                 document_type="deposito_bancario"
@@ -187,8 +189,6 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                 label={AttrValue::from("📷 Escanear Recibo")}
             />
         }
-    } else {
-        html! {}
     };
 
     html! {
@@ -319,10 +319,10 @@ fn render_pago_row(
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{c_label}</td>
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={p.monto} moneda={p.moneda.clone()} /></td>
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
-                {p.fecha_pago.as_deref().map(format_date_display).unwrap_or_else(|| "—".into())}</td>
+                {p.fecha_pago.as_deref().map_or_else(|| "—".into(), format_date_display)}</td>
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&p.fecha_vencimiento)}</td>
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
-                {p.metodo_pago.as_deref().map(metodo_label).unwrap_or("—")}</td>
+                {p.metodo_pago.as_deref().map_or("—", metodo_label)}</td>
             <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
             {actions}
         </tr>
@@ -483,11 +483,12 @@ fn load_pago_refs(
 fn register_escape_listener(escape_handler: EscapeHandler) -> Option<EventListener> {
     web_sys::window().and_then(|w| w.document()).map(|doc| {
         EventListener::new(&doc, "keydown", move |event| {
-            let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
-            if event.key() == "Escape"
-                && let Some(ref cb) = *escape_handler.borrow()
-            {
-                cb();
+            if let Some(event) = event.dyn_ref::<web_sys::KeyboardEvent>() {
+                if event.key() == "Escape"
+                    && let Some(ref cb) = *escape_handler.borrow()
+                {
+                    cb();
+                }
             }
         })
     })
@@ -526,27 +527,27 @@ fn format_contrato_label(
     contratos
         .iter()
         .find(|c| c.id == id)
-        .map(|c| {
-            let prop_name = propiedades
-                .iter()
-                .find(|p| p.id == c.propiedad_id)
-                .map(|p| p.titulo.as_str())
-                .unwrap_or("—");
-            let tenant_name = inquilinos
-                .iter()
-                .find(|i| i.id == c.inquilino_id)
-                .map(|i| format!("{} {}", i.nombre, i.apellido))
-                .unwrap_or_default();
-            if tenant_name.is_empty() {
-                format!("{} — {} {}", prop_name, c.moneda, c.monto_mensual)
-            } else {
-                format!(
-                    "{} ({}) — {} {}",
-                    prop_name, tenant_name, c.moneda, c.monto_mensual
-                )
-            }
-        })
-        .unwrap_or_else(|| id.to_string())
+        .map_or_else(
+            || id.to_string(),
+            |c| {
+                let prop_name = propiedades
+                    .iter()
+                    .find(|p| p.id == c.propiedad_id)
+                    .map_or("—", |p| p.titulo.as_str());
+                let tenant_name = inquilinos
+                    .iter()
+                    .find(|i| i.id == c.inquilino_id)
+                    .map_or_else(String::new, |i| format!("{} {}", i.nombre, i.apellido));
+                if tenant_name.is_empty() {
+                    format!("{} — {} {}", prop_name, c.moneda, c.monto_mensual)
+                } else {
+                    format!(
+                        "{} ({}) — {} {}",
+                        prop_name, tenant_name, c.moneda, c.monto_mensual
+                    )
+                }
+            },
+        )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -571,7 +572,7 @@ fn do_save_pago(
             Ok(()) => {
                 reset_form();
                 reload.set(*reload + 1);
-                push_toast(&toasts, "Pago guardado", ToastKind::Success);
+                push_toast(toasts.as_ref(), "Pago guardado", ToastKind::Success);
             }
             Err(err) => error.set(Some(err)),
         }
@@ -770,9 +771,9 @@ pub fn Pagos() -> Html {
         let f_contrato = (*filter_contrato).clone();
         let f_estado = (*filter_estado).clone();
         use_effect_with(
-            (reload_val, pg, f_contrato.clone(), f_estado.clone()),
-            move |_| {
-                let url = build_pagos_url(pg, pp, &f_contrato, &f_estado);
+            (reload_val, pg, f_contrato, f_estado),
+            move |(_, _, f_contrato, f_estado)| {
+                let url = build_pagos_url(pg, pp, f_contrato, f_estado);
                 load_pagos_data(items, total, error, loading, url);
             },
         );
@@ -782,15 +783,13 @@ pub fn Pagos() -> Html {
         let contratos = contratos.clone();
         let propiedades = propiedades.clone();
         let inquilinos_list = inquilinos_list.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             load_pago_refs(contratos, propiedades, inquilinos_list);
         });
     }
 
     let contrato_label = {
         let contratos = contratos.clone();
-        let propiedades = propiedades.clone();
-        let inquilinos_list = inquilinos_list.clone();
         Callback::from(move |id: String| -> String {
             format_contrato_label(&id, &contratos, &propiedades, &inquilinos_list)
         })
@@ -837,7 +836,7 @@ pub fn Pagos() -> Html {
     }
     {
         let escape_handler = escape_handler.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             let listener = register_escape_listener(escape_handler);
             move || drop(listener)
         });
@@ -859,8 +858,8 @@ pub fn Pagos() -> Html {
                     "monto" => monto.set(field.value.clone()),
                     "moneda" => moneda.set(field.value.clone()),
                     "fecha" => fecha_pago.set(field.value.clone()),
-                    "referencia" => referencia = field.value.clone(),
-                    "cuenta" => cuenta = field.value.clone(),
+                    "referencia" => referencia.clone_from(&field.value),
+                    "cuenta" => cuenta.clone_from(&field.value),
                     _ => {}
                 }
                 conf_map.insert(field.name.clone(), field.confidence);
@@ -958,8 +957,6 @@ pub fn Pagos() -> Html {
         let error = error.clone();
         let reload = reload.clone();
         let reset_form = reset_form.clone();
-        let validate_form = validate_form.clone();
-        let toasts = toasts.clone();
         let submitting = submitting.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
@@ -983,7 +980,7 @@ pub fn Pagos() -> Html {
         })
     };
 
-    let on_cancel = super::page_helpers::cancel_cb(reset_form.clone());
+    let on_cancel = super::page_helpers::cancel_cb(reset_form);
 
     let on_filter_apply = super::page_helpers::filter_apply_cb(&page, &reload);
     let on_filter_clear = {
@@ -1166,13 +1163,13 @@ fn render_opt_error_pago(
     error: &UseStateHandle<Option<String>>,
     _on_cancel: &Callback<MouseEvent>,
 ) -> Html {
-    match (**error).as_ref() {
-        Some(err) => {
+    (**error).as_ref().map_or_else(
+        || html! {},
+        |err| {
             let error = error.clone();
             html! { <ErrorBanner message={err.clone()} onclose={Callback::from(move |_: MouseEvent| error.set(None))} /> }
-        }
-        None => html! {},
-    }
+        },
+    )
 }
 
 fn render_delete_confirm_pago(
@@ -1180,15 +1177,15 @@ fn render_delete_confirm_pago(
     on_confirm: &Callback<MouseEvent>,
     on_cancel: &Callback<MouseEvent>,
 ) -> Html {
-    match (**target).as_ref() {
-        Some(p) => html! {
+    (**target).as_ref().map_or_else(
+        || html! {},
+        |p| html! {
             <DeleteConfirmModal
                 message={format!("¿Está seguro de que desea eliminar el pago de {}? Esta acción no se puede deshacer.", format_currency(&p.moneda, p.monto))}
                 on_confirm={on_confirm.clone()} on_cancel={on_cancel.clone()}
             />
         },
-        None => html! {},
-    }
+    )
 }
 
 #[allow(clippy::too_many_arguments)]

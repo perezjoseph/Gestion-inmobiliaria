@@ -52,7 +52,7 @@ fn format_currency_dr(monto: rust_decimal::Decimal, moneda: &str) -> String {
     let negative = integer_part.starts_with('-');
     let digits: String = integer_part
         .chars()
-        .filter(|c| c.is_ascii_digit())
+        .filter(char::is_ascii_digit)
         .collect();
 
     let mut formatted = String::new();
@@ -178,6 +178,7 @@ pub async fn generar_recibo(db: &DatabaseConnection, pago_id: Uuid) -> Result<Ve
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
@@ -195,13 +196,13 @@ mod tests {
 
     #[test]
     fn format_currency_dr_dop() {
-        let monto = rust_decimal::Decimal::new(2500000, 2);
+        let monto = rust_decimal::Decimal::new(2_500_000, 2);
         assert_eq!(format_currency_dr(monto, "DOP"), "DOP 25.000,00");
     }
 
     #[test]
     fn format_currency_dr_usd() {
-        let monto = rust_decimal::Decimal::new(150000, 2);
+        let monto = rust_decimal::Decimal::new(150_000, 2);
         assert_eq!(format_currency_dr(monto, "USD"), "USD 1.500,00");
     }
 
@@ -219,7 +220,7 @@ mod tests {
 
     #[test]
     fn format_currency_dr_large_amount() {
-        let monto = rust_decimal::Decimal::new(123456789, 2);
+        let monto = rust_decimal::Decimal::new(123_456_789, 2);
         assert_eq!(format_currency_dr(monto, "DOP"), "DOP 1.234.567,89");
     }
 }

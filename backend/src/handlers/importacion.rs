@@ -15,15 +15,17 @@ use crate::services::ocr_mapping;
 use crate::services::ocr_preview::PreviewStore;
 
 fn detect_format(filename: &str) -> Result<ImportFormat, AppError> {
-    let lower = filename.to_lowercase();
-    if lower.ends_with(".csv") {
+    let ext = std::path::Path::new(filename)
+        .extension()
+        .unwrap_or_default();
+    if ext.eq_ignore_ascii_case("csv") {
         Ok(ImportFormat::Csv)
-    } else if lower.ends_with(".xlsx") {
+    } else if ext.eq_ignore_ascii_case("xlsx") {
         Ok(ImportFormat::Xlsx)
-    } else if lower.ends_with(".jpg")
-        || lower.ends_with(".jpeg")
-        || lower.ends_with(".png")
-        || lower.ends_with(".pdf")
+    } else if ext.eq_ignore_ascii_case("jpg")
+        || ext.eq_ignore_ascii_case("jpeg")
+        || ext.eq_ignore_ascii_case("png")
+        || ext.eq_ignore_ascii_case("pdf")
     {
         Ok(ImportFormat::Image)
     } else {
@@ -33,6 +35,7 @@ fn detect_format(filename: &str) -> Result<ImportFormat, AppError> {
     }
 }
 
+#[allow(clippy::future_not_send)]
 async fn extract_file(mut payload: Multipart) -> Result<(Vec<u8>, String), AppError> {
     let mut file_data: Option<Vec<u8>> = None;
     let mut filename: Option<String> = None;
@@ -52,7 +55,7 @@ async fn extract_file(mut payload: Multipart) -> Result<(Vec<u8>, String), AppEr
             filename = disposition
                 .as_ref()
                 .and_then(|d| d.get_filename())
-                .map(|f| f.to_string());
+                .map(ToString::to_string);
 
             let mut data = Vec::new();
             while let Some(chunk) = field.next().await {
@@ -73,6 +76,7 @@ async fn extract_file(mut payload: Multipart) -> Result<(Vec<u8>, String), AppEr
     Ok((file_data, filename))
 }
 
+#[allow(clippy::future_not_send)]
 pub async fn importar_propiedades(
     db: web::Data<DatabaseConnection>,
     _access: WriteAccess,
@@ -84,6 +88,7 @@ pub async fn importar_propiedades(
     Ok(HttpResponse::Ok().json(result))
 }
 
+#[allow(clippy::future_not_send)]
 pub async fn importar_inquilinos(
     db: web::Data<DatabaseConnection>,
     _access: WriteAccess,
@@ -96,16 +101,19 @@ pub async fn importar_inquilinos(
 }
 
 fn content_type_from_filename(filename: &str) -> &'static str {
-    let lower = filename.to_lowercase();
-    if lower.ends_with(".png") {
+    let ext = std::path::Path::new(filename)
+        .extension()
+        .unwrap_or_default();
+    if ext.eq_ignore_ascii_case("png") {
         "image/png"
-    } else if lower.ends_with(".pdf") {
+    } else if ext.eq_ignore_ascii_case("pdf") {
         "application/pdf"
     } else {
         "image/jpeg"
     }
 }
 
+#[allow(clippy::future_not_send)]
 pub async fn importar_pagos(
     _db: web::Data<DatabaseConnection>,
     preview_store: web::Data<PreviewStore>,
@@ -131,6 +139,7 @@ pub async fn importar_pagos(
     }
 }
 
+#[allow(clippy::future_not_send)]
 pub async fn importar_gastos(
     db: web::Data<DatabaseConnection>,
     preview_store: web::Data<PreviewStore>,
@@ -140,21 +149,18 @@ pub async fn importar_gastos(
     let (file_data, filename) = extract_file(payload).await?;
     let formato = detect_format(&filename)?;
 
-    match formato {
-        ImportFormat::Image => {
-            let client = OcrClient::new()?;
-            let ct = content_type_from_filename(&filename);
-            let ocr_result = client.extract(&file_data, &filename, ct, None).await?;
-            let preview = ocr_mapping::map_gasto(&ocr_result)?;
-            preview_store.insert(preview.clone());
-            Ok(HttpResponse::Ok().json(preview))
-        }
-        _ => {
-            let result =
-                importacion::importar_gastos(db.get_ref(), &file_data, formato, access.0.sub)
-                    .await?;
-            Ok(HttpResponse::Ok().json(result))
-        }
+    if formato == ImportFormat::Image {
+        let client = OcrClient::new()?;
+        let ct = content_type_from_filename(&filename);
+        let ocr_result = client.extract(&file_data, &filename, ct, None).await?;
+        let preview = ocr_mapping::map_gasto(&ocr_result)?;
+        preview_store.insert(preview.clone());
+        Ok(HttpResponse::Ok().json(preview))
+    } else {
+        let result =
+            importacion::importar_gastos(db.get_ref(), &file_data, formato, access.0.sub)
+                .await?;
+        Ok(HttpResponse::Ok().json(result))
     }
 }
 

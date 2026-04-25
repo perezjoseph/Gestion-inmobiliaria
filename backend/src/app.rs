@@ -13,14 +13,13 @@ use crate::routes;
 use crate::services::ocr_preview::PreviewStore;
 
 fn build_cors(config: &AppConfig) -> Cors {
-    match config.cors_origin.as_deref() {
-        Some(origin) => Cors::default()
+    config.cors_origin.as_deref().map_or_else(Cors::permissive, |origin| {
+        Cors::default()
             .allowed_origin(origin)
             .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
             .allowed_headers(vec![header::AUTHORIZATION, header::CONTENT_TYPE])
-            .max_age(3600),
-        None => Cors::permissive(),
-    }
+            .max_age(3600)
+    })
 }
 
 pub fn create_app(

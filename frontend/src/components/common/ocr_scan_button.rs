@@ -25,6 +25,7 @@ pub struct OcrScanButtonProps {
     pub disabled: bool,
 }
 
+#[allow(clippy::future_not_send)]
 async fn perform_ocr_extract(
     file: web_sys::File,
     document_type: String,

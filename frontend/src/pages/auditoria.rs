@@ -73,7 +73,7 @@ pub fn Auditoria() -> Html {
     let on_filter_change = {
         let filter_entity_type = filter_entity_type.clone();
         let page = page.clone();
-        let reload = reload.clone();
+        let reload = reload;
         Callback::from(move |e: Event| {
             let el: web_sys::HtmlSelectElement = e.target_unchecked_into();
             filter_entity_type.set(el.value());

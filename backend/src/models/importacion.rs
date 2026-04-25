@@ -15,7 +15,7 @@ pub struct ImportError {
     pub error: String,
 }
 
-#[derive(Debug, Deserialize, Clone, Copy, PartialEq)]
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
 pub enum ImportFormat {
     Csv,
     Xlsx,

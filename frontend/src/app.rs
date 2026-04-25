@@ -25,7 +25,7 @@ use crate::services::api::api_get;
 use crate::services::auth::{clear_token, get_token, set_token};
 use crate::types::usuario::User;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AuthState {
     pub token: Option<String>,
     pub user: Option<User>,
@@ -85,7 +85,7 @@ pub type AuthContext = UseReducerHandle<AuthState>;
 
 pub type ThemeContext = UseStateHandle<bool>;
 
-#[derive(Clone, Debug, Routable, PartialEq)]
+#[derive(Clone, Debug, Routable, PartialEq, Eq)]
 pub enum Route {
     #[at("/")]
     Login,
@@ -160,18 +160,20 @@ pub struct ProtectedRouteProps {
 
 #[function_component]
 pub fn ProtectedRoute(props: &ProtectedRouteProps) -> Html {
-    let navigator = use_navigator().unwrap();
+    let Some(navigator) = use_navigator() else {
+        return html! {};
+    };
     let auth = use_context::<AuthContext>();
     let sidebar_open = use_state(|| false);
 
-    let is_authed = auth.as_ref().map(|a| a.token.is_some()).unwrap_or(false);
+    let is_authed = auth.as_ref().is_some_and(|a| a.token.is_some());
 
     {
-        let navigator = navigator.clone();
         use_effect_with(is_authed, move |authed| {
             if !*authed {
                 navigator.push(&Route::Login);
             }
+        
         });
     }
 
@@ -207,7 +209,7 @@ pub fn ProtectedRoute(props: &ProtectedRouteProps) -> Html {
 
     let on_nav_click = {
         let sidebar_open = sidebar_open.clone();
-        Callback::from(move |_: ()| {
+        Callback::from(move |()| {
             sidebar_open.set(false);
         })
     };
@@ -244,10 +246,10 @@ pub fn App() -> Html {
 
     let needs_restore = auth.token.is_some() && auth.user.is_none() && !*fetched;
 
+    #[allow(clippy::redundant_clone)]
     {
         let auth = auth.clone();
-        let fetched = fetched.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             if auth.token.is_some() && auth.user.is_none() {
                 wasm_bindgen_futures::spawn_local(async move {
                     match api_get::<User>("/perfil").await {
@@ -264,12 +266,10 @@ pub fn App() -> Html {
         web_sys::window()
             .and_then(|w| w.document())
             .and_then(|d| d.document_element())
-            .map(|el| {
+            .is_some_and(|el| {
                 el.get_attribute("data-theme")
-                    .map(|t| t == "dark")
-                    .unwrap_or(false)
+                    .is_some_and(|t| t == "dark")
             })
-            .unwrap_or(false)
     });
 
     if needs_restore {

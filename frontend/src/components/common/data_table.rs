@@ -29,13 +29,16 @@ pub fn DataTable(props: &DataTableProps) -> Html {
                         { for props.headers.iter().enumerate().filter(|(_, h)| !h.is_empty()).map(|(i, header)| {
                             let field = props.sortable_fields.get(i).cloned().unwrap_or_default();
                             if has_sort && !field.is_empty() {
+                                let Some(ref on_sort) = props.on_sort else {
+                                    return html! { <th>{header}</th> };
+                                };
                                 html! {
                                     <SortableHeader
                                         label={header.clone()}
                                         field={field}
                                         current_sort={props.current_sort.clone()}
                                         current_order={props.current_order.clone()}
-                                        on_sort={props.on_sort.clone().unwrap()}
+                                        on_sort={on_sort.clone()}
                                     />
                                 }
                             } else {

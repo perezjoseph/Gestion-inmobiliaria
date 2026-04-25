@@ -25,7 +25,7 @@ use crate::utils::{
     input_class,
 };
 
-fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
+fn push_toast(toasts: Option<&ToastContext>, msg: &str, kind: ToastKind) {
     if let Some(t) = toasts {
         t.dispatch(ToastAction::Push(msg.into(), kind));
     }
@@ -33,6 +33,7 @@ fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_field_names)]
 struct Unidad {
     id: String,
     propiedad_id: String,
@@ -71,7 +72,7 @@ struct FormErrors {
 }
 
 impl FormErrors {
-    fn has_errors(&self) -> bool {
+    const fn has_errors(&self) -> bool {
         self.propiedad_id.is_some()
             || self.categoria.is_some()
             || self.descripcion.is_some()
@@ -218,7 +219,9 @@ fn GastoForm(props: &GastoFormProps) -> Html {
         .filter(|u| u.propiedad_id == *props.propiedad_id)
         .collect();
 
-    let scan_button = if !props.is_editing {
+    let scan_button = if props.is_editing {
+        html! {}
+    } else {
         html! {
             <OcrScanButton
                 document_type="recibo_gasto"
@@ -226,8 +229,6 @@ fn GastoForm(props: &GastoFormProps) -> Html {
                 label={AttrValue::from("📷 Escanear Factura")}
             />
         }
-    } else {
-        html! {}
     };
 
     html! {
@@ -380,8 +381,7 @@ fn render_gasto_row(
     let cat_label = CATEGORIAS
         .iter()
         .find(|(v, _)| *v == g.categoria)
-        .map(|(_, l)| *l)
-        .unwrap_or(&g.categoria);
+        .map_or(g.categoria.as_str(), |(_, l)| l);
     let gc = g.clone();
     let gd = g.clone();
     let on_edit = on_edit.clone();
@@ -545,11 +545,12 @@ fn load_gasto_refs(
 fn register_escape_listener(escape_handler: EscapeHandler) -> Option<EventListener> {
     web_sys::window().and_then(|w| w.document()).map(|doc| {
         EventListener::new(&doc, "keydown", move |event| {
-            let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
-            if event.key() == "Escape"
-                && let Some(ref cb) = *escape_handler.borrow()
-            {
-                cb();
+            if let Some(event) = event.dyn_ref::<web_sys::KeyboardEvent>() {
+                if event.key() == "Escape"
+                    && let Some(ref cb) = *escape_handler.borrow()
+                {
+                    cb();
+                }
             }
         })
     })
@@ -626,7 +627,7 @@ fn do_save_gasto(
             Ok(()) => {
                 reset_form();
                 reload.set(*reload + 1);
-                push_toast(&toasts, "Gasto guardado", ToastKind::Success);
+                push_toast(toasts.as_ref(), "Gasto guardado", ToastKind::Success);
             }
             Err(err) => error.set(Some(err)),
         }
@@ -735,9 +736,9 @@ pub fn Gastos() -> Html {
         let f_categoria = (*filter_categoria).clone();
         let f_estado = (*filter_estado).clone();
         use_effect_with(
-            (reload_val, pg, f_propiedad.clone(), f_categoria.clone(), f_estado.clone()),
-            move |_| {
-                let url = build_gastos_url(pg, pp, &f_propiedad, &f_categoria, &f_estado);
+            (reload_val, pg, f_propiedad, f_categoria, f_estado),
+            move |(_, _, f_propiedad, f_categoria, f_estado)| {
+                let url = build_gastos_url(pg, pp, f_propiedad, f_categoria, f_estado);
                 load_gastos_data(items, total, error, loading, url);
             },
         );
@@ -745,7 +746,7 @@ pub fn Gastos() -> Html {
 
     {
         let propiedades = propiedades.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             load_gasto_refs(propiedades);
         });
     }
@@ -756,8 +757,7 @@ pub fn Gastos() -> Html {
             propiedades
                 .iter()
                 .find(|p| p.id == id)
-                .map(|p| p.titulo.clone())
-                .unwrap_or_else(|| id)
+                .map_or_else(|| id, |p| p.titulo.clone())
         })
     };
 
@@ -808,7 +808,7 @@ pub fn Gastos() -> Html {
     }
     {
         let escape_handler = escape_handler.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             let listener = register_escape_listener(escape_handler);
             move || drop(listener)
         });
@@ -942,8 +942,6 @@ pub fn Gastos() -> Html {
         let error = error.clone();
         let reload = reload.clone();
         let reset_form = reset_form.clone();
-        let validate_form = validate_form.clone();
-        let toasts = toasts.clone();
         let submitting = submitting.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
@@ -992,7 +990,7 @@ pub fn Gastos() -> Html {
         })
     };
 
-    let on_cancel = super::page_helpers::cancel_cb(reset_form.clone());
+    let on_cancel = super::page_helpers::cancel_cb(reset_form);
 
     let on_filter_apply = super::page_helpers::filter_apply_cb(&page, &reload);
     let on_filter_clear = {
@@ -1133,23 +1131,23 @@ fn render_gastos_view(
         html! {}
     };
 
-    let error_html = match (**error).as_ref() {
-        Some(err) => {
+    let error_html = (**error).as_ref().map_or_else(
+        || html! {},
+        |err| {
             let error = error.clone();
             html! { <ErrorBanner message={err.clone()} onclose={Callback::from(move |_: MouseEvent| error.set(None))} /> }
-        }
-        None => html! {},
-    };
+        },
+    );
 
-    let delete_html = match (**delete_target).as_ref() {
-        Some(g) => html! {
+    let delete_html = (**delete_target).as_ref().map_or_else(
+        || html! {},
+        |g| html! {
             <DeleteConfirmModal
                 message={format!("¿Está seguro de que desea eliminar el gasto de {}? Esta acción no se puede deshacer.", format_currency(&g.moneda, g.monto))}
                 on_confirm={on_delete_confirm} on_cancel={on_delete_cancel}
             />
         },
-        None => html! {},
-    };
+    );
 
     let form_html = if **show_form {
         html! {

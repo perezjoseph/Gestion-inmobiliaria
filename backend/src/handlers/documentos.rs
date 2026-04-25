@@ -14,6 +14,7 @@ pub struct DocumentoPath {
     pub entity_id: Uuid,
 }
 
+#[allow(clippy::future_not_send)]
 pub async fn upload(
     db: web::Data<DatabaseConnection>,
     claims: Claims,
@@ -41,8 +42,8 @@ pub async fn upload(
             filename = disposition
                 .as_ref()
                 .and_then(|d| d.get_filename())
-                .map(|f| f.to_string());
-            content_type = field.content_type().map(|ct| ct.to_string());
+                .map(ToString::to_string);
+            content_type = field.content_type().map(ToString::to_string);
 
             let mut data = Vec::new();
             while let Some(chunk) = field.next().await {

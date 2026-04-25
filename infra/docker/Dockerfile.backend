@@ -8,18 +8,18 @@ COPY frontend/ frontend/
 RUN cargo build --locked -p realestate-backend --release
 RUN cp target/release/realestate-backend /app/realestate-backend
 
-FROM debian:bookworm-slim AS prebuilt
+FROM debian:trixie-slim AS prebuilt
 WORKDIR /app
 COPY realestate-backend /app/realestate-backend
 RUN chmod +x /app/realestate-backend
 
 FROM ${MODE} AS source
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 RUN apt-get update && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends \
-    ca-certificates libssl3 libpq5 curl \
+    ca-certificates libssl3t64 libpq5 curl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -r -s /bin/false appuser \
     && mkdir -p /app/uploads && chown appuser:appuser /app/uploads

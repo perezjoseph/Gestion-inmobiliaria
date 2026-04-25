@@ -25,6 +25,7 @@ use yew::prelude::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_field_names)]
 struct Unidad {
     id: String,
     propiedad_id: String,
@@ -45,7 +46,7 @@ struct FormErrors {
 }
 
 impl FormErrors {
-    fn has_errors(&self) -> bool {
+    const fn has_errors(&self) -> bool {
         self.titulo.is_some() || self.propiedad_id.is_some()
     }
 }
@@ -96,7 +97,7 @@ fn MantenimientoForm(props: &MantenimientoFormProps) -> Html {
     } else {
         "Guardar"
     };
-    let error_html = render_form_error(&props.error, &props.on_error_close);
+    let error_html = render_form_error(props.error.as_ref(), &props.on_error_close);
     let prop_error_html = field_error(&fe.propiedad_id);
     let titulo_error_html = field_error(&fe.titulo);
 
@@ -225,11 +226,11 @@ fn MantenimientoForm(props: &MantenimientoFormProps) -> Html {
     }
 }
 
-fn render_form_error(error: &Option<String>, on_close: &Callback<MouseEvent>) -> Html {
-    match error {
-        Some(err) => html! { <ErrorBanner message={err.clone()} onclose={on_close.clone()} /> },
-        None => html! {},
-    }
+fn render_form_error(error: Option<&String>, on_close: &Callback<MouseEvent>) -> Html {
+    error.map_or_else(
+        || html! {},
+        |err| html! { <ErrorBanner message={err.clone()} onclose={on_close.clone()} /> },
+    )
 }
 
 #[derive(Properties, PartialEq)]
@@ -283,11 +284,11 @@ fn render_detail_field(label: &str, value: &str, style: &str) -> Html {
     }
 }
 
-fn render_optional_field(label: &str, value: &Option<String>, style: &str) -> Html {
-    match value {
-        Some(v) => render_detail_field(label, v, style),
-        None => html! {},
-    }
+fn render_optional_field(label: &str, value: Option<&String>, style: &str) -> Html {
+    value.map_or_else(
+        || html! {},
+        |v| render_detail_field(label, v, style),
+    )
 }
 
 fn render_detail_fields(sol: &Solicitud, prop_label: &Callback<String, String>) -> Html {
@@ -299,12 +300,12 @@ fn render_detail_fields(sol: &Solicitud, prop_label: &Callback<String, String>) 
     };
     let fecha_inicio_html = render_optional_field(
         "Fecha Inicio",
-        &sol.fecha_inicio.as_ref().map(|f| format_date_display(f)),
+        sol.fecha_inicio.as_ref().map(|f| format_date_display(f)).as_ref(),
         "",
     );
     let fecha_fin_html = render_optional_field(
         "Fecha Fin",
-        &sol.fecha_fin.as_ref().map(|f| format_date_display(f)),
+        sol.fecha_fin.as_ref().map(|f| format_date_display(f)).as_ref(),
         "",
     );
 
@@ -320,10 +321,10 @@ fn render_detail_fields(sol: &Solicitud, prop_label: &Callback<String, String>) 
                     <span class="gi-label">{"Prioridad"}</span>
                     <div>{prioridad_badge(&sol.prioridad)}</div>
                 </div>
-                {render_optional_field("Descripción", &sol.descripcion, "grid-column: 1 / -1;")}
-                {render_optional_field("Proveedor", &sol.nombre_proveedor, "")}
-                {render_optional_field("Teléfono Proveedor", &sol.telefono_proveedor, "")}
-                {render_optional_field("Email Proveedor", &sol.email_proveedor, "")}
+                {render_optional_field("Descripción", sol.descripcion.as_ref(), "grid-column: 1 / -1;")}
+                {render_optional_field("Proveedor", sol.nombre_proveedor.as_ref(), "")}
+                {render_optional_field("Teléfono Proveedor", sol.telefono_proveedor.as_ref(), "")}
+                {render_optional_field("Email Proveedor", sol.email_proveedor.as_ref(), "")}
                 {costo_html}
                 {fecha_inicio_html}
                 {fecha_fin_html}
@@ -627,7 +628,7 @@ fn do_save_solicitud(
             Ok(()) => {
                 reset_form();
                 reload.set(*reload + 1);
-                push_toast(&toasts, "Solicitud guardada", ToastKind::Success);
+                push_toast(toasts.as_ref(), "Solicitud guardada", ToastKind::Success);
             }
             Err(err) => error.set(Some(err)),
         }
@@ -648,7 +649,7 @@ fn do_delete_solicitud(
             Ok(()) => {
                 delete_target.set(None);
                 reload.set(*reload + 1);
-                push_toast(&toasts, &format!("\"{label}\" eliminada"), ToastKind::Info);
+                push_toast(toasts.as_ref(), &format!("\"{label}\" eliminada"), ToastKind::Info);
             }
             Err(err) => {
                 delete_target.set(None);
@@ -676,7 +677,7 @@ fn do_cambiar_estado(
                 detail_item.set(Some(updated));
                 reload.set(*reload + 1);
                 push_toast(
-                    &toasts,
+                    toasts.as_ref(),
                     &format!("Estado cambiado a {estado_label}"),
                     ToastKind::Success,
                 );
@@ -718,7 +719,7 @@ fn build_mantenimiento_url(pg: u64, pp: u64, fe: &str, fp: &str) -> String {
     format!("/mantenimiento?{}", params.join("&"))
 }
 
-fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
+fn push_toast(toasts: Option<&ToastContext>, msg: &str, kind: ToastKind) {
     if let Some(t) = toasts {
         t.dispatch(ToastAction::Push(msg.into(), kind));
     }
@@ -743,7 +744,9 @@ fn load_mant_refs(
 fn register_escape_listener_m(escape_handler: EscapeHandler) -> Option<EventListener> {
     web_sys::window().and_then(|w| w.document()).map(|doc| {
         EventListener::new(&doc, "keydown", move |event| {
-            let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
+            let Some(event) = event.dyn_ref::<web_sys::KeyboardEvent>() else {
+                return;
+            };
             if event.key() == "Escape"
                 && let Some(ref cb) = *escape_handler.borrow()
             {
@@ -969,8 +972,7 @@ fn render_mantenimiento_view(
             propiedades
                 .iter()
                 .find(|p| p.id == id)
-                .map(|p| p.titulo.clone())
-                .unwrap_or_else(|| "—".into())
+                .map_or_else(|| "—".into(), |p| p.titulo.clone())
         })
     };
 
@@ -1130,10 +1132,10 @@ fn render_opt_error(
     error: &UseStateHandle<Option<String>>,
     on_close: Callback<MouseEvent>,
 ) -> Html {
-    match (*error).as_ref() {
-        Some(err) => html! { <ErrorBanner message={err.clone()} onclose={on_close} /> },
-        None => html! {},
-    }
+    (*error).as_ref().map_or_else(
+        || html! {},
+        |err| html! { <ErrorBanner message={err.clone()} onclose={on_close} /> },
+    )
 }
 
 fn render_delete_confirm_mant(
@@ -1141,15 +1143,15 @@ fn render_delete_confirm_mant(
     on_confirm: Callback<MouseEvent>,
     on_cancel: Callback<MouseEvent>,
 ) -> Html {
-    match (**target).as_ref() {
-        Some(t) => html! {
+    (**target).as_ref().map_or_else(
+        || html! {},
+        |t| html! {
             <DeleteConfirmModal
                 message={format!("¿Está seguro de que desea eliminar la solicitud \"{}\"? Esta acción no se puede deshacer.", t.titulo)}
                 on_confirm={on_confirm} on_cancel={on_cancel}
             />
         },
-        None => html! {},
-    }
+    )
 }
 
 #[derive(Properties, PartialEq)]
@@ -1258,7 +1260,7 @@ pub fn Mantenimiento() -> Html {
     {
         let propiedades = propiedades.clone();
         let inquilinos_list = inquilinos_list.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             load_mant_refs(propiedades, inquilinos_list);
         });
     }
@@ -1308,7 +1310,7 @@ pub fn Mantenimiento() -> Html {
     }
     {
         let escape_handler = escape_handler.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             let listener = register_escape_listener_m(escape_handler);
             move || drop(listener)
         });
@@ -1389,6 +1391,7 @@ pub fn Mantenimiento() -> Html {
         }
     };
 
+    #[allow(clippy::redundant_clone)]
     let on_submit = {
         let f_propiedad_id = f_propiedad_id.clone();
         let f_unidad_id = f_unidad_id.clone();
@@ -1433,13 +1436,12 @@ pub fn Mantenimiento() -> Html {
         })
     };
 
-    let on_cancel = super::page_helpers::cancel_cb(reset_form.clone());
+    let on_cancel = super::page_helpers::cancel_cb(reset_form);
 
     let on_cambiar_estado = {
         let error = error.clone();
         let detail_item = detail_item.clone();
         let reload = reload.clone();
-        let toasts = toasts.clone();
         Callback::from(move |(id, nuevo_estado): (String, String)| {
             do_cambiar_estado(
                 id,

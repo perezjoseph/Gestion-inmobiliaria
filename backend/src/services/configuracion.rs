@@ -50,21 +50,15 @@ pub async fn actualizar_moneda(
         .one(db)
         .await?;
 
+    let model = configuracion::ActiveModel {
+        clave: Set(CLAVE_TASA_CAMBIO.to_string()),
+        valor: Set(valor_json),
+        updated_at: Set(now.into()),
+        updated_by: Set(Some(updated_by)),
+    };
     if existing.is_some() {
-        let model = configuracion::ActiveModel {
-            clave: Set(CLAVE_TASA_CAMBIO.to_string()),
-            valor: Set(valor_json),
-            updated_at: Set(now.into()),
-            updated_by: Set(Some(updated_by)),
-        };
         model.update(db).await?;
     } else {
-        let model = configuracion::ActiveModel {
-            clave: Set(CLAVE_TASA_CAMBIO.to_string()),
-            valor: Set(valor_json),
-            updated_at: Set(now.into()),
-            updated_by: Set(Some(updated_by)),
-        };
         model.insert(db).await?;
     }
 
@@ -76,6 +70,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn moneda_config_serialization_roundtrip() {
         let config = MonedaConfig {
             tasa: 58.50,
@@ -88,6 +83,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn update_moneda_request_deserialization() {
         let json = r#"{"tasa": 59.25}"#;
         let req: UpdateMonedaRequest = serde_json::from_str(json).unwrap();

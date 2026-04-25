@@ -36,8 +36,8 @@ impl From<solicitud_mantenimiento::Model> for SolicitudResponse {
             email_proveedor: m.email_proveedor,
             costo_monto: m.costo_monto,
             costo_moneda: m.costo_moneda,
-            fecha_inicio: m.fecha_inicio.map(|dt| dt.into()),
-            fecha_fin: m.fecha_fin.map(|dt| dt.into()),
+            fecha_inicio: m.fecha_inicio.map(Into::into),
+            fecha_fin: m.fecha_fin.map(Into::into),
             notas: None,
             created_at: m.created_at.into(),
             updated_at: m.updated_at.into(),
@@ -59,8 +59,7 @@ impl From<nota_mantenimiento::Model> for NotaResponse {
 
 pub fn validar_transicion(estado_actual: &str, nuevo_estado: &str) -> Result<(), AppError> {
     match (estado_actual, nuevo_estado) {
-        ("pendiente", "en_progreso") => Ok(()),
-        ("en_progreso", "completado") => Ok(()),
+        ("pendiente", "en_progreso") | ("en_progreso", "completado") => Ok(()),
         ("pendiente", "completado") => Err(AppError::Validation(
             "La solicitud debe pasar por 'en_progreso' antes de completarse".to_string(),
         )),
@@ -421,6 +420,7 @@ pub async fn agregar_nota<C: ConnectionTrait>(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use actix_web::error::ResponseError;
@@ -443,7 +443,7 @@ mod tests {
             nombre_proveedor: Some("Plomería Express".to_string()),
             telefono_proveedor: Some("809-555-1234".to_string()),
             email_proveedor: Some("plomeria@example.com".to_string()),
-            costo_monto: Some(Decimal::new(150050, 2)),
+            costo_monto: Some(Decimal::new(150_050, 2)),
             costo_moneda: Some("DOP".to_string()),
             fecha_inicio: Some(now),
             fecha_fin: None,
@@ -549,7 +549,7 @@ mod tests {
             resp.email_proveedor.as_deref(),
             Some("plomeria@example.com")
         );
-        assert_eq!(resp.costo_monto, Some(Decimal::new(150050, 2)));
+        assert_eq!(resp.costo_monto, Some(Decimal::new(150_050, 2)));
         assert_eq!(resp.costo_moneda.as_deref(), Some("DOP"));
         assert!(resp.fecha_inicio.is_some());
         assert!(resp.fecha_fin.is_none());

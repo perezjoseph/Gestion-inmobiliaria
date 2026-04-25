@@ -43,12 +43,14 @@ pub fn logout() {
     }
 }
 
+#[allow(clippy::future_not_send)]
 pub async fn login(request: LoginRequest) -> Result<LoginResponse, String> {
     let response: LoginResponse = api_post("/auth/login", &request).await?;
     set_token(&response.token);
     Ok(response)
 }
 
+#[allow(clippy::future_not_send)]
 pub async fn register(request: RegisterRequest) -> Result<User, String> {
     api_post("/auth/register", &request).await
 }

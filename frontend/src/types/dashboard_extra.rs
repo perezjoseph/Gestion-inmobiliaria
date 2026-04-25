@@ -24,6 +24,7 @@ pub struct IngresoComparacion {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PagoProximo {
     pub pago_id: String,
@@ -35,7 +36,7 @@ pub struct PagoProximo {
     pub fecha_vencimiento: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ContratoCalendario {
     pub contrato_id: String,

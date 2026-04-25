@@ -33,10 +33,10 @@ pub fn validate_password(input: &str) -> Option<String> {
 }
 
 pub fn validate_confirm_password(password: &str, confirm: &str) -> Option<String> {
-    if password != confirm {
-        Some("Las contraseñas no coinciden".into())
-    } else {
+    if password == confirm {
         None
+    } else {
+        Some("Las contraseñas no coinciden".into())
     }
 }
 
@@ -63,7 +63,7 @@ pub fn validate_form(
     })
 }
 
-fn input_class(has_error: bool) -> &'static str {
+const fn input_class(has_error: bool) -> &'static str {
     if has_error {
         "gi-input gi-input-error"
     } else {
@@ -81,6 +81,7 @@ fn humanize_register_error(err: String) -> String {
     }
 }
 
+#[allow(clippy::future_not_send)]
 async fn do_register_and_login(
     request: RegisterRequest,
     login_email: String,
@@ -165,7 +166,6 @@ pub fn RegisterForm(props: &RegisterFormProps) -> Html {
         let confirm_error = confirm_error.clone();
         let server_error = server_error.clone();
         let loading = loading.clone();
-        let on_success = on_success.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
 
@@ -264,6 +264,7 @@ pub fn RegisterForm(props: &RegisterFormProps) -> Html {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic)]
 mod tests {
     use super::*;
 
@@ -375,11 +376,12 @@ mod tests {
         let pw = test_password("valid_form");
         let result = validate_form("Juan", "juan@test.com", &pw, &pw);
         assert!(result.is_some());
-        let req = result.unwrap();
-        assert_eq!(req.nombre, "Juan");
-        assert_eq!(req.email, "juan@test.com");
-        assert_eq!(req.password, pw);
-        assert_eq!(req.rol, "gerente");
+        if let Some(req) = result {
+            assert_eq!(req.nombre, "Juan");
+            assert_eq!(req.email, "juan@test.com");
+            assert_eq!(req.password, pw);
+            assert_eq!(req.rol, "gerente");
+        }
     }
 
     #[test]

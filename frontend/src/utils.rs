@@ -24,7 +24,7 @@ pub fn format_currency(moneda: &str, monto: f64) -> String {
     }
 }
 
-pub fn input_class(has_error: bool) -> &'static str {
+pub const fn input_class(has_error: bool) -> &'static str {
     if has_error {
         "gi-input gi-input-error"
     } else {
@@ -32,11 +32,12 @@ pub fn input_class(has_error: bool) -> &'static str {
     }
 }
 
+#[allow(clippy::ref_option)]
 pub fn field_error(error: &Option<String>) -> yew::Html {
-    match error {
-        Some(msg) => yew::html! { <p class="gi-field-error">{msg}</p> },
-        None => yew::html! {},
-    }
+    error.as_ref().map_or_else(
+        || yew::html! {},
+        |msg| yew::html! { <p class="gi-field-error">{msg}</p> },
+    )
 }
 
 pub type EscapeHandler = std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>>;

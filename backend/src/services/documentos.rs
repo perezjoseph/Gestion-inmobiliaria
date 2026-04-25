@@ -62,6 +62,7 @@ fn get_upload_dir() -> String {
     std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string())
 }
 
+#[allow(clippy::cast_possible_wrap)]
 pub async fn upload(
     db: &DatabaseConnection,
     entity_type: &str,
@@ -162,10 +163,12 @@ pub async fn listar_documentos(
 }
 
 #[cfg(test)]
+#[allow(unsafe_code)]
 mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn validate_file_size_rejects_over_10mb() {
         let size = 11 * 1024 * 1024;
         let result = validate_file_size(size);
@@ -209,6 +212,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn validate_mime_type_rejects_gif() {
         let result = validate_mime_type("image/gif");
         assert!(result.is_err());
@@ -247,6 +251,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn sanitize_filename_strips_path_separators() {
         let result = sanitize_filename("../../etc/passwd").unwrap();
         assert!(!result.contains('/'));
@@ -254,6 +259,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn sanitize_filename_strips_backslashes() {
         let result = sanitize_filename("..\\..\\windows\\system32").unwrap();
         assert!(!result.contains('\\'));
@@ -261,6 +267,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn sanitize_filename_preserves_normal_name() {
         assert_eq!(sanitize_filename("photo.jpg").unwrap(), "photo.jpg");
     }
@@ -273,6 +280,8 @@ mod tests {
     static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
+    #[allow(clippy::unwrap_used)]
+    #[allow(unsafe_code)]
     fn get_upload_dir_returns_default() {
         let _guard = ENV_LOCK.lock().unwrap();
         unsafe { std::env::remove_var("UPLOAD_DIR") };
@@ -280,6 +289,8 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unwrap_used)]
+    #[allow(unsafe_code)]
     fn get_upload_dir_returns_env_value() {
         let _guard = ENV_LOCK.lock().unwrap();
         unsafe { std::env::set_var("UPLOAD_DIR", "/tmp/test-uploads") };

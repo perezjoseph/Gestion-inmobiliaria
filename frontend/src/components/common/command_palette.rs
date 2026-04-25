@@ -105,20 +105,21 @@ pub fn CommandPalette() -> Html {
     let query = use_state(String::new);
     let selected = use_state(|| 0usize);
     let input_ref = use_node_ref();
-    let navigator = use_navigator().expect("CommandPalette must be inside BrowserRouter");
+    let Some(navigator) = use_navigator() else {
+        return html! {};
+    };
     let auth = use_context::<AuthContext>();
     let user_can_write = auth
         .as_ref()
         .and_then(|a| a.user.as_ref())
-        .map(|u| u.rol == "admin" || u.rol == "gerente")
-        .unwrap_or(false);
+        .is_some_and(|u| u.rol == "admin" || u.rol == "gerente");
 
     let items = all_items(user_can_write);
     let filtered = filter_items(&items, &query);
 
     {
         let open = open.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             let listener = web_sys::window().and_then(|w| w.document()).map(|doc| {
                 EventListener::new(&doc, "keydown", move |event| {
                     if let Some(ke) = event.dyn_ref::<web_sys::KeyboardEvent>()
@@ -205,8 +206,7 @@ pub fn CommandPalette() -> Html {
             {
                 let is_overlay = target
                     .get_attribute("class")
-                    .map(|c| c.contains("gi-palette-overlay"))
-                    .unwrap_or(false);
+                    .is_some_and(|c| c.contains("gi-palette-overlay"));
                 if is_overlay {
                     open.set(false);
                     query.set(String::new());

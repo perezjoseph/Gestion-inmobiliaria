@@ -40,6 +40,7 @@ struct ApiErr {
     message: String,
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn humanize_duplicate_error(msg: &str) -> Option<String> {
     if msg.contains("cedula") {
         return Some("Esta cédula ya está registrada en el sistema.".into());
@@ -91,6 +92,7 @@ fn humanize_error(status: u16, raw: &str) -> String {
     }
 }
 
+#[allow(clippy::future_not_send)]
 async fn handle_response(
     response: gloo_net::http::Response,
 ) -> Result<gloo_net::http::Response, String> {
@@ -111,6 +113,7 @@ async fn handle_response(
     Ok(response)
 }
 
+#[allow(clippy::future_not_send)]
 pub async fn api_get<T: DeserializeOwned>(path: &str) -> Result<T, String> {
     let url = format!("{BASE_URL}{path}");
     let response = apply_auth(Request::get(&url))
@@ -124,6 +127,7 @@ pub async fn api_get<T: DeserializeOwned>(path: &str) -> Result<T, String> {
         .map_err(|e| format!("Error al procesar respuesta: {e}"))
 }
 
+#[allow(clippy::future_not_send)]
 pub async fn api_post<T: DeserializeOwned, B: Serialize>(
     path: &str,
     body: &B,
@@ -145,6 +149,7 @@ pub async fn api_post<T: DeserializeOwned, B: Serialize>(
         .map_err(|e| format!("Error al procesar respuesta: {e}"))
 }
 
+#[allow(clippy::future_not_send)]
 pub async fn api_put<T: DeserializeOwned, B: Serialize>(path: &str, body: &B) -> Result<T, String> {
     let url = format!("{BASE_URL}{path}");
     let json =
@@ -163,6 +168,7 @@ pub async fn api_put<T: DeserializeOwned, B: Serialize>(path: &str, body: &B) ->
         .map_err(|e| format!("Error al procesar respuesta: {e}"))
 }
 
+#[allow(clippy::future_not_send)]
 pub async fn api_delete(path: &str) -> Result<(), String> {
     let url = format!("{BASE_URL}{path}");
     let response = apply_auth(Request::delete(&url))
@@ -175,14 +181,14 @@ pub async fn api_delete(path: &str) -> Result<(), String> {
 
 use crate::types::ocr::ConfirmPreviewRequest;
 
-#[allow(dead_code)]
+#[allow(dead_code, clippy::future_not_send)]
 pub async fn confirmar_preview(
     request: &ConfirmPreviewRequest,
 ) -> Result<serde_json::Value, String> {
     api_post("/importar/ocr/confirmar", request).await
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, clippy::future_not_send)]
 pub async fn descartar_preview(preview_id: &str) -> Result<(), String> {
     api_delete(&format!("/importar/ocr/preview/{preview_id}")).await
 }

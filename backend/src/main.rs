@@ -10,6 +10,7 @@ use sea_orm::Database;
 use sea_orm_migration::MigratorTrait;
 use tracing_subscriber::EnvFilter;
 
+#[allow(clippy::expect_used)]
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     tracing_subscriber::fmt()

@@ -71,13 +71,13 @@ pub async fn listar(
     if let Some(fecha_desde) = query.fecha_desde {
         select = select.filter(
             registro_auditoria::Column::CreatedAt
-                .gte(fecha_desde.and_hms_opt(0, 0, 0).expect("valid time")),
+                .gte(fecha_desde.and_hms_opt(0, 0, 0).unwrap_or_default()),
         );
     }
     if let Some(fecha_hasta) = query.fecha_hasta {
         select = select.filter(
             registro_auditoria::Column::CreatedAt
-                .lte(fecha_hasta.and_hms_opt(23, 59, 59).expect("valid time")),
+                .lte(fecha_hasta.and_hms_opt(23, 59, 59).unwrap_or_default()),
         );
     }
 
@@ -99,7 +99,6 @@ pub async fn listar(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::FixedOffset;
     use serde_json::json;
 
     fn make_model(entity_type: &str, accion: &str) -> registro_auditoria::Model {
@@ -110,7 +109,7 @@ mod tests {
             entity_id: Uuid::new_v4(),
             accion: accion.to_string(),
             cambios: json!({"campo": "valor"}),
-            created_at: Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap()),
+            created_at: Utc::now().fixed_offset(),
         }
     }
 
@@ -135,15 +134,15 @@ mod tests {
     #[test]
     fn from_model_converts_all_fields() {
         let model = make_model("contrato", "actualizar");
-        let original_id = model.id;
-        let original_uid = model.usuario_id;
-        let original_eid = model.entity_id;
+        let model_id = model.id;
+        let model_usuario_id = model.usuario_id;
+        let model_entity_id = model.entity_id;
 
         let resp = AuditoriaResponse::from(model);
-        assert_eq!(resp.id, original_id);
-        assert_eq!(resp.usuario_id, original_uid);
+        assert_eq!(resp.id, model_id);
+        assert_eq!(resp.usuario_id, model_usuario_id);
         assert_eq!(resp.entity_type, "contrato");
-        assert_eq!(resp.entity_id, original_eid);
+        assert_eq!(resp.entity_id, model_entity_id);
         assert_eq!(resp.accion, "actualizar");
         assert_eq!(resp.cambios["campo"], "valor");
     }
@@ -176,7 +175,12 @@ mod tests {
             accion: "eliminar".to_string(),
             cambios: json!({}),
         };
-        assert!(entry.cambios.as_object().unwrap().is_empty());
+        assert!(
+            entry
+                .cambios
+                .as_object()
+                .is_none_or(serde_json::Map::is_empty)
+        );
     }
 
     #[test]

@@ -28,15 +28,21 @@ struct SumResult {
     total: Option<Decimal>,
 }
 
+/// Helper to build a `NaiveDate` from year/month/day, returning an `AppError` on invalid input.
+fn naive_date(year: i32, month: u32, day: u32) -> Result<NaiveDate, AppError> {
+    NaiveDate::from_ymd_opt(year, month, day)
+        .ok_or_else(|| AppError::Internal(anyhow::anyhow!("Fecha inválida: {year}-{month}-{day}")))
+}
+
 pub async fn get_stats(db: &DatabaseConnection) -> Result<DashboardStats, AppError> {
     let today = Utc::now().date_naive();
     let anio = today.year();
     let mes = today.month();
-    let primer_dia_mes = NaiveDate::from_ymd_opt(anio, mes, 1).unwrap();
+    let primer_dia_mes = naive_date(anio, mes, 1)?;
     let ultimo_dia_mes = if mes == 12 {
-        NaiveDate::from_ymd_opt(anio + 1, 1, 1).unwrap() - chrono::Days::new(1)
+        naive_date(anio + 1, 1, 1)? - chrono::Days::new(1)
     } else {
-        NaiveDate::from_ymd_opt(anio, mes + 1, 1).unwrap() - chrono::Days::new(1)
+        naive_date(anio, mes + 1, 1)? - chrono::Days::new(1)
     };
 
     let (total_propiedades, ocupadas, ingreso_result, pagos_atrasados, gastos_result) = tokio::try_join!(
@@ -96,7 +102,7 @@ pub async fn ocupacion_tendencia(
     let today = Utc::now().date_naive();
     let oldest_target = today - chrono::Months::new(meses - 1);
     let primer_dia_rango =
-        NaiveDate::from_ymd_opt(oldest_target.year(), oldest_target.month(), 1).unwrap();
+        naive_date(oldest_target.year(), oldest_target.month(), 1)?;
 
     let contratos = contrato::Entity::find()
         .filter(contrato::Column::FechaFin.gte(primer_dia_rango))
@@ -111,11 +117,11 @@ pub async fn ocupacion_tendencia(
         let target = today - chrono::Months::new(i);
         let anio = target.year();
         let mes = target.month();
-        let primer_dia = NaiveDate::from_ymd_opt(anio, mes, 1).unwrap();
+        let primer_dia = naive_date(anio, mes, 1)?;
         let ultimo_dia = if mes == 12 {
-            NaiveDate::from_ymd_opt(anio + 1, 1, 1).unwrap() - chrono::Days::new(1)
+            naive_date(anio + 1, 1, 1)? - chrono::Days::new(1)
         } else {
-            NaiveDate::from_ymd_opt(anio, mes + 1, 1).unwrap() - chrono::Days::new(1)
+            naive_date(anio, mes + 1, 1)? - chrono::Days::new(1)
         };
 
         let contratos_activos = contratos
@@ -136,11 +142,11 @@ pub async fn ingreso_comparacion(db: &DatabaseConnection) -> Result<IngresoCompa
     let today = Utc::now().date_naive();
     let anio = today.year();
     let mes = today.month();
-    let primer_dia = NaiveDate::from_ymd_opt(anio, mes, 1).unwrap();
+    let primer_dia = naive_date(anio, mes, 1)?;
     let ultimo_dia = if mes == 12 {
-        NaiveDate::from_ymd_opt(anio + 1, 1, 1).unwrap() - chrono::Days::new(1)
+        naive_date(anio + 1, 1, 1)? - chrono::Days::new(1)
     } else {
-        NaiveDate::from_ymd_opt(anio, mes + 1, 1).unwrap() - chrono::Days::new(1)
+        naive_date(anio, mes + 1, 1)? - chrono::Days::new(1)
     };
 
     let (esperado_result, cobrado_result) = tokio::try_join!(
@@ -338,15 +344,15 @@ pub async fn gastos_comparacion(db: &DatabaseConnection) -> Result<GastosCompara
     let anio = today.year();
     let mes = today.month();
 
-    let primer_dia_actual = NaiveDate::from_ymd_opt(anio, mes, 1).unwrap();
+    let primer_dia_actual = naive_date(anio, mes, 1)?;
     let ultimo_dia_actual = if mes == 12 {
-        NaiveDate::from_ymd_opt(anio + 1, 1, 1).unwrap() - chrono::Days::new(1)
+        naive_date(anio + 1, 1, 1)? - chrono::Days::new(1)
     } else {
-        NaiveDate::from_ymd_opt(anio, mes + 1, 1).unwrap() - chrono::Days::new(1)
+        naive_date(anio, mes + 1, 1)? - chrono::Days::new(1)
     };
 
     let prev = today - chrono::Months::new(1);
-    let primer_dia_anterior = NaiveDate::from_ymd_opt(prev.year(), prev.month(), 1).unwrap();
+    let primer_dia_anterior = naive_date(prev.year(), prev.month(), 1)?;
     let ultimo_dia_anterior = primer_dia_actual - chrono::Days::new(1);
 
     let (actual_result, anterior_result) = tokio::try_join!(

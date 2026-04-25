@@ -24,7 +24,7 @@ where
 
     struct F64Visitor;
 
-    impl<'de> de::Visitor<'de> for F64Visitor {
+    impl de::Visitor<'_> for F64Visitor {
         type Value = f64;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -101,7 +101,7 @@ where
     deserializer.deserialize_option(OptionF64Visitor)
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PaginatedResponse<T> {
     pub data: Vec<T>,

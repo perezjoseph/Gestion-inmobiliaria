@@ -5,7 +5,9 @@ use crate::app::{AuthAction, AuthContext, Route, ThemeContext};
 
 #[function_component]
 fn NavbarSearch() -> Html {
-    let navigator = use_navigator().unwrap();
+    let Some(navigator) = use_navigator() else {
+        return html! {};
+    };
     let search_query = use_state(String::new);
     let search_open = use_state(|| false);
 
@@ -31,7 +33,6 @@ fn NavbarSearch() -> Html {
 
     let on_search_keydown = {
         let search_query = search_query.clone();
-        let navigator = navigator.clone();
         let search_open = search_open.clone();
         Callback::from(move |e: KeyboardEvent| {
             if e.key() == "Enter" {
@@ -101,7 +102,9 @@ fn apply_theme(is_dark: bool) {
 
 #[function_component]
 fn ThemeToggle() -> Html {
-    let theme = use_context::<ThemeContext>().unwrap();
+    let Some(theme) = use_context::<ThemeContext>() else {
+        return html! {};
+    };
 
     let on_toggle_theme = {
         let theme = theme.clone();
@@ -128,12 +131,14 @@ struct UserMenuProps {
 
 #[function_component]
 fn UserMenu(props: &UserMenuProps) -> Html {
-    let auth = use_context::<AuthContext>().unwrap();
-    let navigator = use_navigator().unwrap();
+    let Some(auth) = use_context::<AuthContext>() else {
+        return html! {};
+    };
+    let Some(navigator) = use_navigator() else {
+        return html! {};
+    };
 
     let on_logout = {
-        let auth = auth.clone();
-        let navigator = navigator.clone();
         Callback::from(move |_: MouseEvent| {
             auth.dispatch(AuthAction::Logout);
             navigator.push(&Route::Login);

@@ -11,6 +11,7 @@ pub fn validate_enum(field_name: &str, value: &str, allowed: &[&str]) -> Result<
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use actix_web::error::ResponseError;

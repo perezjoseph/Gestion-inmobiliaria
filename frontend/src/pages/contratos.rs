@@ -26,19 +26,20 @@ use crate::utils::{
     EscapeHandler, can_delete, can_write, field_error, format_date_display, input_class,
 };
 
-fn push_toast(toasts: &Option<ToastContext>, msg: &str, kind: ToastKind) {
+fn push_toast(toasts: Option<&ToastContext>, msg: &str, kind: ToastKind) {
     if let Some(t) = toasts {
         t.dispatch(ToastAction::Push(msg.into(), kind));
     }
 }
 
 struct ContratoActions {
-    on_edit: Callback<Contrato>,
-    on_delete: Callback<Contrato>,
-    on_renew: Callback<Contrato>,
-    on_terminate: Callback<Contrato>,
+    edit: Callback<Contrato>,
+    delete: Callback<Contrato>,
+    renew: Callback<Contrato>,
+    terminate: Callback<Contrato>,
 }
 
+#[allow(clippy::missing_const_for_fn)]
 fn estado_badge(estado: &str) -> (&'static str, &'static str) {
     match estado {
         "activo" => ("gi-badge gi-badge-success", "Activo"),
@@ -57,7 +58,7 @@ struct FormErrors {
     monto_mensual: Option<String>,
 }
 impl FormErrors {
-    fn has_errors(&self) -> bool {
+    const fn has_errors(&self) -> bool {
         self.propiedad_id.is_some()
             || self.inquilino_id.is_some()
             || self.fecha_inicio.is_some()
@@ -117,7 +118,9 @@ fn ContratoForm(props: &ContratoFormProps) -> Html {
         })
     };
 
-    let scan_button = if !props.is_editing {
+    let scan_button = if props.is_editing {
+        html! {}
+    } else {
         html! {
             <OcrScanButton
                 document_type="contrato"
@@ -125,8 +128,6 @@ fn ContratoForm(props: &ContratoFormProps) -> Html {
                 label={AttrValue::from("📷 Escanear Contrato")}
             />
         }
-    } else {
-        html! {}
     };
 
     html! {
@@ -343,10 +344,10 @@ fn ContratoList(props: &ContratoListProps) -> Html {
             <DataTable headers={props.headers.clone()}>
                 { for {
                     let actions = ContratoActions {
-                        on_edit: props.on_edit.clone(),
-                        on_delete: props.on_delete.clone(),
-                        on_renew: props.on_renew.clone(),
-                        on_terminate: props.on_terminate.clone(),
+                        edit: props.on_edit.clone(),
+                        delete: props.on_delete.clone(),
+                        renew: props.on_renew.clone(),
+                        terminate: props.on_terminate.clone(),
                     };
                     props.items.iter().map(move |c| render_contrato_row(c, &props.user_rol, &props.prop_label, &props.inq_label, &actions))
                 } }
@@ -413,10 +414,10 @@ fn render_contrato_actions(user_rol: &str, c: &Contrato, actions: &ContratoActio
     let cd = c.clone();
     let cr = c.clone();
     let ct = c.clone();
-    let on_edit = actions.on_edit.clone();
-    let on_delete_click = actions.on_delete.clone();
-    let on_renew_click = actions.on_renew.clone();
-    let on_terminate_click = actions.on_terminate.clone();
+    let on_edit = actions.edit.clone();
+    let on_delete_click = actions.delete.clone();
+    let on_renew_click = actions.renew.clone();
+    let on_terminate_click = actions.terminate.clone();
     let active_btns = if c.estado == "activo" {
         html! {
             <>
@@ -540,7 +541,7 @@ fn do_save_contrato(
             Ok(()) => {
                 reset_form();
                 reload.set(*reload + 1);
-                push_toast(&toasts, "Contrato guardado", ToastKind::Success);
+                push_toast(toasts.as_ref(), "Contrato guardado", ToastKind::Success);
             }
             Err(err) => error.set(Some(err)),
         }
@@ -600,7 +601,7 @@ fn do_renew_contrato(
                 renew_target.set(None);
                 renew_fecha_fin.set(String::new());
                 reload.set(*reload + 1);
-                push_toast(&toasts, "Contrato renovado", ToastKind::Success);
+                push_toast(toasts.as_ref(), "Contrato renovado", ToastKind::Success);
             }
             Err(err) => error.set(Some(err)),
         }
@@ -623,7 +624,7 @@ fn do_terminate_contrato(
                 terminate_target.set(None);
                 terminate_fecha.set(String::new());
                 reload.set(*reload + 1);
-                push_toast(&toasts, "Contrato terminado", ToastKind::Success);
+                push_toast(toasts.as_ref(), "Contrato terminado", ToastKind::Success);
             }
             Err(err) => error.set(Some(err)),
         }
@@ -649,11 +650,12 @@ fn load_contrato_refs(
 fn register_escape_listener(escape_handler: EscapeHandler) -> Option<EventListener> {
     web_sys::window().and_then(|w| w.document()).map(|doc| {
         EventListener::new(&doc, "keydown", move |event| {
-            let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
-            if event.key() == "Escape"
-                && let Some(ref cb) = *escape_handler.borrow()
-            {
-                cb();
+            if let Some(event) = event.dyn_ref::<web_sys::KeyboardEvent>() {
+                if event.key() == "Escape"
+                    && let Some(ref cb) = *escape_handler.borrow()
+                {
+                    cb();
+                }
             }
         })
     })
@@ -943,13 +945,13 @@ fn render_new_btn_contrato(user_rol: &str, on_new: &Callback<MouseEvent>) -> Htm
 }
 
 fn render_opt_error_contrato(error: &UseStateHandle<Option<String>>) -> Html {
-    match (*error).as_ref() {
-        Some(err) => {
+    (*error).as_ref().map_or_else(
+        || html! {},
+        |err| {
             let error = error.clone();
             html! { <ErrorBanner message={err.clone()} onclose={Callback::from(move |_: MouseEvent| error.set(None))} /> }
-        }
-        None => html! {},
-    }
+        },
+    )
 }
 
 fn render_delete_confirm_contrato(
@@ -958,15 +960,15 @@ fn render_delete_confirm_contrato(
     on_confirm: &Callback<MouseEvent>,
     on_cancel: &Callback<MouseEvent>,
 ) -> Html {
-    match (**target).as_ref() {
-        Some(t) => html! {
+    (**target).as_ref().map_or_else(
+        || html! {},
+        |t| html! {
             <DeleteConfirmModal
                 message={format!("¿Está seguro de que desea eliminar el contrato de la propiedad \"{}\"? Esta acción no se puede deshacer.", prop_label.emit(t.propiedad_id.clone()))}
                 on_confirm={on_confirm.clone()} on_cancel={on_cancel.clone()}
             />
         },
-        None => html! {},
-    }
+    )
 }
 
 fn render_renew_modal(
@@ -1101,7 +1103,7 @@ pub fn Contratos() -> Html {
     {
         let propiedades = propiedades.clone();
         let inquilinos = inquilinos.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             load_contrato_refs(propiedades, inquilinos);
         });
     }
@@ -1112,8 +1114,7 @@ pub fn Contratos() -> Html {
             propiedades
                 .iter()
                 .find(|p| p.id == id)
-                .map(|p| format!("{} — {}", p.titulo, p.direccion))
-                .unwrap_or_else(|| id.to_string())
+                .map_or_else(|| id.clone(), |p| format!("{} — {}", p.titulo, p.direccion))
         })
     };
 
@@ -1123,8 +1124,7 @@ pub fn Contratos() -> Html {
             inquilinos
                 .iter()
                 .find(|i| i.id == id)
-                .map(|i| format!("{} {} ({})", i.nombre, i.apellido, i.cedula))
-                .unwrap_or_else(|| id.to_string())
+                .map_or_else(|| id.clone(), |i| format!("{} {} ({})", i.nombre, i.apellido, i.cedula))
         })
     };
 
@@ -1169,7 +1169,7 @@ pub fn Contratos() -> Html {
     }
     {
         let escape_handler = escape_handler.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             let listener = register_escape_listener(escape_handler);
             move || drop(listener)
         });
@@ -1244,7 +1244,6 @@ pub fn Contratos() -> Html {
         let error = error.clone();
         let reload = reload.clone();
         let reset_form = reset_form.clone();
-        let validate_form = validate_form.clone();
         let toasts = toasts.clone();
         let submitting = submitting.clone();
         Callback::from(move |e: SubmitEvent| {
@@ -1269,7 +1268,7 @@ pub fn Contratos() -> Html {
         })
     };
 
-    let on_cancel = super::page_helpers::cancel_cb(reset_form.clone());
+    let on_cancel = super::page_helpers::cancel_cb(reset_form);
 
     let on_ocr_result = {
         let monto_mensual = monto_mensual.clone();
@@ -1346,7 +1345,6 @@ pub fn Contratos() -> Html {
         let terminate_fecha = terminate_fecha.clone();
         let error = error.clone();
         let reload = reload.clone();
-        let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
             handle_contrato_terminate_confirm(
                 &terminate_target,

@@ -90,6 +90,7 @@ pub struct NotaResponse {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
@@ -111,7 +112,7 @@ mod tests {
         let req: CreateSolicitudRequest = serde_json::from_value(json).unwrap();
         assert_eq!(req.titulo, "Fuga de agua en baño");
         assert_eq!(req.prioridad.as_deref(), Some("alta"));
-        assert_eq!(req.costo_monto, Some(Decimal::new(150050, 2)));
+        assert_eq!(req.costo_monto, Some(Decimal::new(150_050, 2)));
         assert_eq!(req.costo_moneda.as_deref(), Some("DOP"));
         assert!(req.unidad_id.is_some());
         assert!(req.inquilino_id.is_some());

@@ -1,3 +1,4 @@
+#![allow(clippy::unnecessary_literal_bound)]
 pub mod m20250408_000001_create_usuarios;
 pub mod m20250408_000002_create_propiedades;
 pub mod m20250408_000003_create_inquilinos;
