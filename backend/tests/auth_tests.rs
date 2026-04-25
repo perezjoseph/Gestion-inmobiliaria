@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod auth_tests {
     #[test]
     #[ignore]

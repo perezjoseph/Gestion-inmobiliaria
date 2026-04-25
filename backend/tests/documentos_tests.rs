@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod documentos_tests {
     #[test]
     #[ignore]

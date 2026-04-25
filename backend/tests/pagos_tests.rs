@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod pagos_tests {
     #[test]
     #[ignore]

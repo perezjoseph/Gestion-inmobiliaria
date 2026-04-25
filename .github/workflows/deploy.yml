@@ -97,7 +97,7 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy application manifests
-        run: kubectl apply -k k8s/app/
+        run: kubectl apply -k infra/k8s/app/
 
       - name: Update container images by digest
         id: deploy

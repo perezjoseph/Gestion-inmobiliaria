@@ -64,7 +64,7 @@ pub async fn listar_pagos_vencidos(db: &DatabaseConnection) -> Result<Vec<PagoVe
         })
         .collect();
 
-    results.sort_by(|a, b| b.dias_vencido.cmp(&a.dias_vencido));
+    results.sort_by_key(|b| std::cmp::Reverse(b.dias_vencido));
 
     Ok(results)
 }

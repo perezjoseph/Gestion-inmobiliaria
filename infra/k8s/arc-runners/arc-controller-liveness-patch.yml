@@ -3,7 +3,7 @@
 # To re-add a probe in the future, use:
 #
 #   kubectl patch deployment arc-actions-runner-controller -n arc-systems \
-#     --type strategic -p "$(cat k8s/arc-runners/arc-controller-liveness-patch.yml)"
+#     --type strategic -p "$(cat infra/k8s/arc-runners/arc-controller-liveness-patch.yml)"
 #
 # spec:
 #   template:

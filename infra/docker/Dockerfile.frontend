@@ -25,7 +25,7 @@ RUN apk upgrade --no-cache && \
     addgroup -S app && adduser -S app -G app
 
 COPY --from=caddy-image /usr/bin/caddy /usr/bin/caddy
-COPY Caddyfile /etc/caddy/Caddyfile
+COPY infra/caddy/Caddyfile /etc/caddy/Caddyfile
 COPY --from=source /app/dist/ /srv/
 
 RUN mkdir -p /data /config /home/app && \

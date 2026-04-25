@@ -1,5 +1,4 @@
-#[allow(clippy::needless_return)]
-
+#![allow(clippy::needless_return)]
 use proptest::prelude::*;
 use proptest::test_runner::{Config as ProptestConfig, TestRunner};
 use realestate_backend::services::mantenimiento::validar_transicion;

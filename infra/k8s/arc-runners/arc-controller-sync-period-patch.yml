@@ -3,7 +3,7 @@
 #
 # Apply with:
 #   kubectl patch deployment arc-actions-runner-controller -n arc-systems \
-#     --type strategic -p "$(cat k8s/arc-runners/arc-controller-sync-period-patch.yml)"
+#     --type strategic -p "$(cat infra/k8s/arc-runners/arc-controller-sync-period-patch.yml)"
 #
 # Or via Helm upgrade:
 #   helm upgrade arc-controller <chart> --set syncPeriod=10s
