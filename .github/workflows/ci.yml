@@ -85,6 +85,16 @@ jobs:
       is-pr: ${{ github.event_name == 'pull_request' }}
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
+  codeql:
+    name: CodeQL
+    needs: [changes]
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/codeql.yml
+    with:
+      is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+
   lint:
     name: Lint
     needs: [changes]
