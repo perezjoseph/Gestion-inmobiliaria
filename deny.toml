@@ -50,7 +50,7 @@ registries = []
 # Crate-specific license exceptions for copyleft/uncommon licenses
 [[licenses.exceptions]]
 name = "actix-governor"
-allow = ["GPL-3.0"]
+allow = ["GPL-3.0-or-later"]
 
 [[licenses.exceptions]]
 name = "numaelis-rckive-genpdf"

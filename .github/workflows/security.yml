@@ -53,164 +53,6 @@ jobs:
           deny-licenses: AGPL-3.0, GPL-3.0, GPL-2.0
           comment-summary-in-pr: on-failure
 
-  cargo-audit:
-    name: CVE Scanning (cargo-audit)
-    runs-on: arc-runner-dind
-    if: ${{ !inputs.is-fork-pr }}
-    permissions:
-      contents: read
-      security-events: write
-    outputs:
-      error_log: ${{ steps.collect-errors.outputs.error_log }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - name: Rust setup
-        uses: ./.github/actions/rust-setup
-
-      - name: Install cargo-audit
-        id: install_audit
-        run: |
-          for dir in "$HOME/.cargo" "$HOME/.cargo/bin"; do
-            mkdir -p "$dir" 2>/dev/null || sudo mkdir -p "$dir"
-            if [ ! -w "$dir" ]; then
-              sudo chown -R "$(id -u):$(id -g)" "$HOME/.cargo"
-            fi
-          done
-          export PATH="$HOME/.cargo/bin:$PATH"
-          if command -v cargo-audit &>/dev/null && cargo audit --version &>/dev/null; then
-            echo "cargo-audit already installed: $(cargo audit --version)"
-            echo "installed=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          rm -f "$HOME/.cargo/bin/cargo-audit"
-          AUDIT_VERSION="0.22.1"
-          AUDIT_SHA256_musl="c32506f338bdcdaef5a17fb9f33abb6ecf9561324cfd34237fd335f9283a1eab"
-          AUDIT_SHA256_gnu="1890badd5f15831a9af4b074399fcd21e6f7c0fe42c84e9254cdffc9f813765c"
-          INSTALLED=false
-          for VARIANT in musl gnu; do
-            URL="https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-${VARIANT}-v${AUDIT_VERSION}.tgz"
-            EXPECTED_SHA=$(eval echo "\$AUDIT_SHA256_${VARIANT}")
-            if curl -sSfL --proto =https --retry 3 --retry-delay 10 --connect-timeout 30 -o "${RUNNER_TEMP}/cargo-audit.tgz" "$URL" 2>"${RUNNER_TEMP}/install-audit-output.txt"; then
-              if ! echo "${EXPECTED_SHA}  ${RUNNER_TEMP}/cargo-audit.tgz" | sha256sum -c -; then
-                echo "::warning::Checksum mismatch for cargo-audit ${VARIANT} binary -- skipping"
-                rm -f "${RUNNER_TEMP}/cargo-audit.tgz"
-                continue
-              fi
-              if tar xzf "${RUNNER_TEMP}/cargo-audit.tgz" --no-same-owner --strip-components=1 -C "$HOME/.cargo/bin/" 2>>"${RUNNER_TEMP}/install-audit-output.txt"; then
-                chmod +x "$HOME/.cargo/bin/cargo-audit"
-                if cargo audit --version &>/dev/null; then
-                  INSTALLED=true
-                  break
-                fi
-                rm -f "$HOME/.cargo/bin/cargo-audit"
-              fi
-            fi
-          done
-          if [ "$INSTALLED" = "true" ] && command -v cargo-audit &>/dev/null; then
-            cargo audit --version
-            echo "installed=true" >> $GITHUB_OUTPUT
-          else
-            echo "::warning::cargo-audit installation failed -- skipping CVE scan"
-            echo "installed=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Fetch and patch advisory DB for CVSS 4.0 compatibility
-        if: steps.install_audit.outputs.installed == 'true'
-        run: |
-          set -euo pipefail
-          # cargo-audit 0.22.x and cargo-deny 0.16.x use the rustsec crate which
-          # cannot parse CVSS v4.0 strings. Advisories with CVSS:4.0 crash the DB
-          # loader before the ignore list is evaluated, aborting the entire scan.
-          #
-          # Workaround: fresh-clone the advisory DB into the default path both
-          # tools share, strip CVSS 4.0 lines, then run with --no-fetch.
-          # Remove this workaround once rustsec ships CVSS 4.0 support.
-
-          DB_DIR="$HOME/.cargo/advisory-dbs/github.com-a946fc29ac602819"
-          rm -rf "$DB_DIR"
-          mkdir -p "$(dirname "$DB_DIR")"
-          git clone --depth=1 https://github.com/RustSec/advisory-db.git "$DB_DIR"
-
-          # Strip every CVSS 4.0 line from advisory TOML front-matter
-          count=0
-          while IFS= read -r file; do
-            sed -i '/^cvss = "CVSS:4\.0/d' "$file"
-            count=$((count + 1))
-            echo "  patched: $file"
-          done < <(grep -rl 'CVSS:4\.0' "$DB_DIR/crates/" || true)
-          echo "Patched $count advisory file(s) containing CVSS 4.0 strings"
-
-          # Verify the specific known-bad file is fixed
-          TARGET="$DB_DIR/crates/astral-tokio-tar/RUSTSEC-2026-0066.md"
-          if [ -f "$TARGET" ]; then
-            if grep -q 'CVSS:4\.0' "$TARGET"; then
-              echo "::error::Patch failed — CVSS 4.0 still present in $TARGET"
-              cat "$TARGET"
-              exit 1
-            else
-              echo "Verified: CVSS 4.0 removed from RUSTSEC-2026-0066"
-            fi
-          fi
-
-      - name: Scan Rust dependencies for known vulnerabilities (CVEs)
-        id: cargo_audit
-        if: steps.install_audit.outputs.installed == 'true'
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
-        with:
-          timeout_minutes: 10
-          max_attempts: 2
-          command: |
-            export PATH="$HOME/.cargo/bin:$PATH"
-            cargo audit --no-fetch --deny yanked --deny unmaintained --deny unsound 2>&1 | tee "${RUNNER_TEMP}/audit-output.txt"
-            exit ${PIPESTATUS[0]}
-
-      - name: Generate cargo-audit SARIF report
-        if: always() && steps.install_audit.outputs.installed == 'true'
-        run: |
-          umask 077
-          export PATH="$HOME/.cargo/bin:$PATH"
-          cargo audit --no-fetch --json 2>/dev/null | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
-          sarif = {
-            '\$schema': 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json',
-            'version': '2.1.0',
-            'runs': [{'tool': {'driver': {'name': 'cargo-audit', 'version': '0.22.1', 'rules': []}}, 'results': []}]
-          }
-          rules = {}
-          for vuln in data.get('vulnerabilities', {}).get('list', []):
-            adv = vuln.get('advisory', {})
-            vid = adv.get('id', 'UNKNOWN')
-            pkg = vuln.get('package', {})
-            if vid not in rules:
-              rules[vid] = {'id': vid, 'shortDescription': {'text': adv.get('title', vid)}, 'helpUri': adv.get('url', ''), 'properties': {'tags': ['security', 'vulnerability']}}
-            sarif['runs'][0]['results'].append({'ruleId': vid, 'level': 'error', 'message': {'text': f\"{adv.get('title', '')} in {pkg.get('name', '?')} {pkg.get('version', '?')}\"}, 'locations': [{'physicalLocation': {'artifactLocation': {'uri': 'Cargo.lock'}, 'region': {'startLine': 1}}}]})
-          sarif['runs'][0]['tool']['driver']['rules'] = list(rules.values())
-          json.dump(sarif, sys.stdout, indent=2)
-          " > cargo-audit.sarif 2>/dev/null || echo '{\"version\":\"2.1.0\",\"runs\":[{\"tool\":{\"driver\":{\"name\":\"cargo-audit\",\"rules\":[]}},\"results\":[]}]}' > cargo-audit.sarif
-
-      - name: Upload cargo-audit SARIF to GitHub Security
-        if: always() && steps.install_audit.outputs.installed == 'true' && hashFiles('cargo-audit.sarif') != ''
-        uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4.35.2
-        with:
-          sarif_file: cargo-audit.sarif
-          category: cargo-audit
-        continue-on-error: true
-
-      - name: Collect errors
-        id: collect-errors
-        if: always() && steps.cargo_audit.outcome == 'failure'
-        run: |
-          ERROR="[cargo-audit] $(head -c 2000 "${RUNNER_TEMP}/audit-output.txt" 2>/dev/null || echo 'cargo audit found vulnerabilities.')"
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
-          echo "$ERROR" >> $GITHUB_OUTPUT
-          echo "$EOF" >> $GITHUB_OUTPUT
-
   cargo-deny:
     name: Supply Chain Policy (cargo-deny)
     runs-on: arc-runner-dind
@@ -244,8 +86,8 @@ jobs:
             echo "installed=true" >> $GITHUB_OUTPUT
             exit 0
           fi
-          DENY_VERSION="0.16.4"
-          DENY_SHA256="28b7f8e12df46a9ce186547e38278c851905fc4bda59a0cc57d2aade9fdf6962"
+          DENY_VERSION="0.19.4"
+          DENY_SHA256="3bd58b784e83715b86ddbc9deac591890372ec77fda5741bb0826970b958506f"
           URL="https://github.com/EmbarkStudios/cargo-deny/releases/download/${DENY_VERSION}/cargo-deny-${DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz"
           if curl -sSfL --proto =https --retry 3 --connect-timeout 15 --max-time 120 -o "${RUNNER_TEMP}/cargo-deny.tar.gz" "$URL"; then
             echo "${DENY_SHA256}  ${RUNNER_TEMP}/cargo-deny.tar.gz" | sha256sum -c -
@@ -369,7 +211,7 @@ jobs:
     name: Security Gate
     runs-on: arc-runner-dind
     if: always() && !inputs.is-fork-pr
-    needs: [cargo-audit, cargo-deny, trivy-iac]
+    needs: [cargo-deny, trivy-iac]
     permissions:
       contents: read
     outputs:
@@ -395,22 +237,16 @@ jobs:
             echo "## Dependency Security Results"
             echo "| Check | Status |"
             echo "|-------|--------|"
-            echo "| cargo audit | ${{ needs.cargo-audit.result == 'success' && '✅ Pass' || (needs.cargo-audit.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
             echo "| cargo deny | ${{ needs.cargo-deny.result == 'success' && '✅ Pass' || (needs.cargo-deny.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
             echo "| Trivy IaC scan | ${{ needs.trivy-iac.result == 'success' && '✅ Pass' || (needs.trivy-iac.result == 'skipped' && '⏭️ Skipped' || '⚠️ Findings') }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect errors
         id: collect-errors
-        if: always() && (needs.cargo-audit.result == 'failure' || needs.cargo-deny.result == 'failure' || needs.trivy-iac.result == 'failure')
+        if: always() && (needs.cargo-deny.result == 'failure' || needs.trivy-iac.result == 'failure')
         run: |
           ERROR=""
           FAILED=""
-          if [ "${{ needs.cargo-audit.result }}" = "failure" ]; then
-            FAILED="${FAILED}cargo-audit,"
-            AUDIT_ERR='${{ needs.cargo-audit.outputs.error_log }}'
-            ERROR="${ERROR}${AUDIT_ERR:-[cargo-audit] cargo audit found vulnerabilities.}\n\n"
-          fi
           if [ "${{ needs.cargo-deny.result }}" = "failure" ]; then
             FAILED="${FAILED}cargo-deny,"
             DENY_ERR='${{ needs.cargo-deny.outputs.error_log }}'
@@ -435,5 +271,5 @@ jobs:
           start-time: ${{ steps.start.outputs.time }}
 
       - name: Fail if any security job failed
-        if: always() && (needs.cargo-audit.result == 'failure' || needs.cargo-deny.result == 'failure' || needs.trivy-iac.result == 'failure')
+        if: always() && (needs.cargo-deny.result == 'failure' || needs.trivy-iac.result == 'failure')
         run: exit 1
