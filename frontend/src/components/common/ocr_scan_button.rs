@@ -61,10 +61,10 @@ async fn perform_ocr_extract(
             .text()
             .await
             .unwrap_or_else(|_| "Error desconocido".into());
-        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text) {
-            if let Some(msg) = parsed.get("message").and_then(|v| v.as_str()) {
-                return Err(msg.to_string());
-            }
+        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text)
+            && let Some(msg) = parsed.get("message").and_then(|v| v.as_str())
+        {
+            return Err(msg.to_string());
         }
         return Err(match resp.status() {
             503 => "Servicio OCR no disponible".into(),
