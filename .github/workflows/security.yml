@@ -122,16 +122,17 @@ jobs:
         if: steps.install_audit.outputs.installed == 'true'
         run: |
           set -euo pipefail
-          # cargo-audit 0.22.x cannot parse CVSS v4.0 strings (only v2/v3.x).
-          # Advisories using CVSS:4.0 crash the DB loader before the ignore list
-          # is evaluated, aborting the entire audit.
+          # cargo-audit 0.22.x and cargo-deny 0.16.x use the rustsec crate which
+          # cannot parse CVSS v4.0 strings. Advisories with CVSS:4.0 crash the DB
+          # loader before the ignore list is evaluated, aborting the entire scan.
           #
-          # Strategy: clone the advisory DB ourselves, strip CVSS 4.0 lines,
-          # then point cargo audit at the patched copy with --db + --no-fetch.
-          # Remove this workaround once cargo-audit ships CVSS 4.0 support.
+          # Workaround: fresh-clone the advisory DB into the default path both
+          # tools share, strip CVSS 4.0 lines, then run with --no-fetch.
+          # Remove this workaround once rustsec ships CVSS 4.0 support.
 
-          DB_DIR="${RUNNER_TEMP}/advisory-db"
+          DB_DIR="$HOME/.cargo/advisory-dbs/github.com-a946fc29ac602819"
           rm -rf "$DB_DIR"
+          mkdir -p "$(dirname "$DB_DIR")"
           git clone --depth=1 https://github.com/RustSec/advisory-db.git "$DB_DIR"
 
           # Strip every CVSS 4.0 line from advisory TOML front-matter
@@ -164,7 +165,7 @@ jobs:
           max_attempts: 2
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            cargo audit --db "${RUNNER_TEMP}/advisory-db" --no-fetch --deny yanked --deny unmaintained --deny unsound 2>&1 | tee "${RUNNER_TEMP}/audit-output.txt"
+            cargo audit --no-fetch --deny yanked --deny unmaintained --deny unsound 2>&1 | tee "${RUNNER_TEMP}/audit-output.txt"
             exit ${PIPESTATUS[0]}
 
       - name: Generate cargo-audit SARIF report
@@ -172,7 +173,7 @@ jobs:
         run: |
           umask 077
           export PATH="$HOME/.cargo/bin:$PATH"
-          cargo audit --db "${RUNNER_TEMP}/advisory-db" --no-fetch --json 2>/dev/null | python3 -c "
+          cargo audit --no-fetch --json 2>/dev/null | python3 -c "
           import json, sys
           data = json.load(sys.stdin)
           sarif = {
