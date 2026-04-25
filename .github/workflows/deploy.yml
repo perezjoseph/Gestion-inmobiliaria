@@ -159,26 +159,3 @@ jobs:
           kubectl rollout undo deployment/ocr-service --namespace realestate
           kubectl rollout status deployment/backend --namespace realestate --timeout=120s || true
           echo "::error::Rollback attempted. Manual verification required."
-
-      - name: Collect deploy errors
-        id: collect-errors
-        if: failure()
-        run: |
-          ERROR=""
-          if [ "${{ steps.deploy.outcome }}" = "failure" ]; then
-            ERROR="[deploy] kubectl set image failed."
-          elif [ "${{ steps.rollout.outcome }}" = "failure" ]; then
-            ERROR="[rollout] Deployment rollout timed out. $(kubectl get pods -n realestate -o wide 2>/dev/null | head -20)"
-          elif [ "${{ steps.health-check.outcome }}" = "failure" ]; then
-            ERROR="[health-check] App health check failed after deployment. $(kubectl logs -n realestate -l app.kubernetes.io/name=backend --tail=20 2>/dev/null)"
-          elif [ "${{ steps.verify-backend.outcome }}" = "failure" ]; then
-            ERROR="[attestation] Backend image attestation verification failed."
-          elif [ "${{ steps.verify-frontend.outcome }}" = "failure" ]; then
-            ERROR="[attestation] Frontend image attestation verification failed."
-          elif [ "${{ steps.verify-ocr-service.outcome }}" = "failure" ]; then
-            ERROR="[attestation] OCR service image attestation verification failed."
-          fi
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
-          echo "$ERROR" >> $GITHUB_OUTPUT
-          echo "$EOF" >> $GITHUB_OUTPUT

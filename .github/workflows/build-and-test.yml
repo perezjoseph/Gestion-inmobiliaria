@@ -11,13 +11,6 @@ on:
         type: boolean
         required: false
         default: false
-    outputs:
-      # Test outputs
-      test-backend-result:
-        value: ${{ jobs.backend.result }}
-      test-frontend-result:
-        value: ${{ jobs.frontend.result }}
-
 permissions: {}
 
 jobs:
@@ -35,9 +28,6 @@ jobs:
     env:
       SERVER_PORT: "8080"
       CORS_ORIGIN: http://localhost:8080
-    outputs:
-      error_log: ${{ steps.collect-errors.outputs.error_log }}
-      duration: ${{ steps.timing.outputs.duration }}
     services:
       postgres:
         image: postgres:16@sha256:5a65324fe84dc41709ff914e90b07f3e2f577073ed27bf917d4873aca0c9ec51
@@ -54,10 +44,6 @@ jobs:
           --health-retries 10
           --health-start-period 15s
     steps:
-      - name: Record start time
-        id: start
-        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -222,7 +208,6 @@ jobs:
         with:
           subject-path: target/ci-release/realestate-backend
 
-      # ── Summary & error collection ──
       - name: Write backend summary
         if: always()
         run: |
@@ -235,34 +220,6 @@ jobs:
             echo "| Release Build | ${{ steps.build.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Record duration
-        id: timing
-        if: always()
-        uses: ./.github/actions/job-timing
-        with:
-          start-time: ${{ steps.start.outputs.time }}
-
-      - name: Collect errors
-        id: collect-errors
-        if: always() && failure()
-        run: |
-          ERROR=""
-          if [ "${{ steps.clippy.outcome }}" = "failure" ]; then
-            ERROR="[clippy-backend] $(head -c 1500 "${RUNNER_TEMP}/clippy-backend-output.txt" 2>/dev/null || echo 'Backend clippy found warnings/errors.')"
-          elif [ "${{ steps.tests.outcome }}" = "failure" ]; then
-            TERR=$(grep -E '(FAILED|error\[|panicked|failures:)' "${RUNNER_TEMP}/test-backend-output.txt" 2>/dev/null | head -c 2000 || true)
-            if [ -z "$TERR" ]; then
-              TERR=$(tail -c 3000 "${RUNNER_TEMP}/test-backend-output.txt" 2>/dev/null || echo 'Backend tests failed.')
-            fi
-            ERROR="[test-backend] $TERR"
-          elif [ "${{ steps.build.outcome }}" = "failure" ]; then
-            ERROR="[build-backend] $(head -c 3000 "${RUNNER_TEMP}/build-backend-output.txt" 2>/dev/null || echo 'Backend build failed.')"
-          fi
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
-          echo "$ERROR" >> $GITHUB_OUTPUT
-          echo "$EOF" >> $GITHUB_OUTPUT
-
   # ── Frontend: clippy → test → trunk release build ──
   # Single Rust compilation warms sccache; subsequent steps are near-instant.
   frontend:
@@ -273,14 +230,7 @@ jobs:
       contents: read
       id-token: write
       attestations: write
-    outputs:
-      error_log: ${{ steps.collect-errors.outputs.error_log }}
-      duration: ${{ steps.timing.outputs.duration }}
     steps:
-      - name: Record start time
-        id: start
-        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -415,7 +365,6 @@ jobs:
         with:
           subject-path: frontend/dist/
 
-      # ── Summary & error collection ──
       - name: Write frontend summary
         if: always()
         run: |
@@ -427,33 +376,3 @@ jobs:
             echo "| Tests | ${{ steps.tests.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
             echo "| Trunk Build | ${{ steps.build.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Record duration
-        id: timing
-        if: always()
-        uses: ./.github/actions/job-timing
-        with:
-          start-time: ${{ steps.start.outputs.time }}
-
-      - name: Collect errors
-        id: collect-errors
-        if: always() && failure()
-        run: |
-          ERROR=""
-          if [ "${{ steps.clippy.outcome }}" = "failure" ]; then
-            ERROR="[clippy-frontend] $(head -c 1500 "${RUNNER_TEMP}/clippy-frontend-output.txt" 2>/dev/null || echo 'Frontend clippy found warnings/errors.')"
-          elif [ "${{ steps.tests.outcome }}" = "failure" ]; then
-            TERR=$(grep -E '(FAILED|error\[|panicked|failures:)' "${RUNNER_TEMP}/test-frontend-output.txt" 2>/dev/null | head -c 2000 || true)
-            if [ -z "$TERR" ]; then
-              TERR=$(tail -c 3000 "${RUNNER_TEMP}/test-frontend-output.txt" 2>/dev/null || echo 'Frontend tests failed.')
-            fi
-            ERROR="[test-frontend] $TERR"
-          elif [ "${{ steps.build.outcome }}" = "failure" ]; then
-            ERROR="[build-frontend] $(head -c 3000 "${RUNNER_TEMP}/build-frontend-output.txt" 2>/dev/null || echo 'Frontend build failed.')"
-          fi
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
-          echo "$ERROR" >> $GITHUB_OUTPUT
-          echo "$EOF" >> $GITHUB_OUTPUT
-
-

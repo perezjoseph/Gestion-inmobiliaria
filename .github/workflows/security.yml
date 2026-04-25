@@ -60,8 +60,6 @@ jobs:
     permissions:
       contents: read
       security-events: write
-    outputs:
-      error_log: ${{ steps.collect-errors.outputs.error_log }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -140,16 +138,6 @@ jobs:
           category: cargo-deny
         continue-on-error: true
 
-      - name: Collect errors
-        id: collect-errors
-        if: always() && steps.cargo_deny.outcome == 'failure'
-        run: |
-          ERROR="[cargo-deny] $(head -c 2000 "${RUNNER_TEMP}/deny-output.txt" 2>/dev/null || echo 'cargo deny found policy violations.')"
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
-          echo "$ERROR" >> $GITHUB_OUTPUT
-          echo "$EOF" >> $GITHUB_OUTPUT
-
   trivy-iac:
     name: IaC Scanning (Trivy)
     runs-on: arc-runner-dind
@@ -157,8 +145,6 @@ jobs:
     permissions:
       contents: read
       security-events: write
-    outputs:
-      error_log: ${{ steps.collect-errors.outputs.error_log }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -196,16 +182,6 @@ jobs:
           category: trivy-iac
         continue-on-error: true
 
-      - name: Collect errors
-        id: collect-errors
-        if: always() && steps.trivy_iac.outcome == 'failure'
-        run: |
-          ERROR="[trivy-iac] $(head -c 2000 "${RUNNER_TEMP}/trivy-iac-output.txt" 2>/dev/null || echo 'Trivy found Dockerfile/compose misconfigurations.')"
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
-          echo "$ERROR" >> $GITHUB_OUTPUT
-          echo "$EOF" >> $GITHUB_OUTPUT
-
   # Gate job: merges results from parallel security jobs
   quality-gate:
     name: Security Gate
@@ -214,15 +190,7 @@ jobs:
     needs: [cargo-deny, trivy-iac]
     permissions:
       contents: read
-    outputs:
-      error_log: ${{ steps.collect-errors.outputs.error_log }}
-      failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
-      duration: ${{ steps.timing.outputs.duration }}
     steps:
-      - name: Record start time
-        id: start
-        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -240,35 +208,6 @@ jobs:
             echo "| cargo deny | ${{ needs.cargo-deny.result == 'success' && '✅ Pass' || (needs.cargo-deny.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
             echo "| Trivy IaC scan | ${{ needs.trivy-iac.result == 'success' && '✅ Pass' || (needs.trivy-iac.result == 'skipped' && '⏭️ Skipped' || '⚠️ Findings') }} |"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Collect errors
-        id: collect-errors
-        if: always() && (needs.cargo-deny.result == 'failure' || needs.trivy-iac.result == 'failure')
-        run: |
-          ERROR=""
-          FAILED=""
-          if [ "${{ needs.cargo-deny.result }}" = "failure" ]; then
-            FAILED="${FAILED}cargo-deny,"
-            DENY_ERR='${{ needs.cargo-deny.outputs.error_log }}'
-            ERROR="${ERROR}${DENY_ERR:-[cargo-deny] cargo deny found policy violations.}\n\n"
-          fi
-          if [ "${{ needs.trivy-iac.result }}" = "failure" ]; then
-            FAILED="${FAILED}trivy-iac,"
-            TRIVY_ERR='${{ needs.trivy-iac.outputs.error_log }}'
-            ERROR="${ERROR}${TRIVY_ERR:-[trivy-iac] Trivy found Dockerfile/compose misconfigurations.}\n\n"
-          fi
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
-          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
-          echo "$ERROR" >> $GITHUB_OUTPUT
-          echo "$EOF" >> $GITHUB_OUTPUT
-
-      - name: Record duration
-        id: timing
-        if: always()
-        uses: ./.github/actions/job-timing
-        with:
-          start-time: ${{ steps.start.outputs.time }}
 
       - name: Fail if any security job failed
         if: always() && (needs.cargo-deny.result == 'failure' || needs.trivy-iac.result == 'failure')

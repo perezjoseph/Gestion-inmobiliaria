@@ -6,9 +6,6 @@ on:
       is-fork-pr:
         type: boolean
         required: true
-    outputs:
-      result:
-        value: ${{ jobs.gate.result }}
 
 permissions: {}
 
@@ -19,8 +16,6 @@ jobs:
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       contents: read
-    outputs:
-      error_log: ${{ steps.collect-errors.outputs.error_log }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -37,16 +32,6 @@ jobs:
         id: fmt
         run: cargo fmt --all -- --check 2>&1 | tee "${RUNNER_TEMP}/fmt-output.txt"
 
-      - name: Collect errors
-        id: collect-errors
-        if: always() && steps.fmt.outcome == 'failure'
-        run: |
-          ERROR="[rustfmt] $(head -c 1500 "${RUNNER_TEMP}/fmt-output.txt" 2>/dev/null || echo 'rustfmt found formatting issues.')"
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
-          echo "$ERROR" >> $GITHUB_OUTPUT
-          echo "$EOF" >> $GITHUB_OUTPUT
-
   gate:
     name: Lint Gate
     runs-on: arc-runner-dind
@@ -54,15 +39,7 @@ jobs:
     needs: [fmt]
     permissions:
       contents: read
-    outputs:
-      error_log: ${{ steps.collect-errors.outputs.error_log }}
-      failed_steps: ${{ steps.collect-errors.outputs.failed_steps }}
-      duration: ${{ steps.timing.outputs.duration }}
     steps:
-      - name: Record start time
-        id: start
-        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
-
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -79,30 +56,6 @@ jobs:
             echo "|-------|--------|"
             echo "| rustfmt | ${{ needs.fmt.result == 'success' && '✅ Pass' || (needs.fmt.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Collect errors for notification
-        id: collect-errors
-        if: always() && needs.fmt.result == 'failure'
-        run: |
-          ERROR=""
-          FAILED=""
-          if [ "${{ needs.fmt.result }}" = "failure" ]; then
-            FAILED="${FAILED}rustfmt,"
-            FMT_ERR='${{ needs.fmt.outputs.error_log }}'
-            ERROR="${ERROR}${FMT_ERR:-[rustfmt] formatting issues found.}\n\n"
-          fi
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          echo "failed_steps=${FAILED%,}" >> $GITHUB_OUTPUT
-          echo "error_log<<$EOF" >> $GITHUB_OUTPUT
-          echo "$ERROR" >> $GITHUB_OUTPUT
-          echo "$EOF" >> $GITHUB_OUTPUT
-
-      - name: Record duration
-        id: timing
-        if: always()
-        uses: ./.github/actions/job-timing
-        with:
-          start-time: ${{ steps.start.outputs.time }}
 
       - name: Fail if any lint job failed
         if: always() && needs.fmt.result == 'failure'
