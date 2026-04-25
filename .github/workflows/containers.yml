@@ -48,8 +48,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
-        with:
-          driver: docker
 
       - name: Download backend binary artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -73,6 +71,8 @@ jobs:
             ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }}
             ${{ inputs.is-production && format('ghcr.io/{0}/realestate-backend:latest', github.repository_owner) || '' }}
           build-args: MODE=prebuilt
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-backend:buildcache
+          cache-to: ${{ inputs.is-production && format('type=registry,ref=ghcr.io/{0}/realestate-backend:buildcache,mode=max', github.repository_owner) || '' }}
 
       - name: Install Trivy
         uses: ./.github/actions/install-security-tools
@@ -167,8 +167,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
-        with:
-          driver: docker
 
       - name: Download frontend dist artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -191,6 +189,8 @@ jobs:
             ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }}
             ${{ inputs.is-production && format('ghcr.io/{0}/realestate-frontend:latest', github.repository_owner) || '' }}
           build-args: MODE=prebuilt
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-frontend:buildcache
+          cache-to: ${{ inputs.is-production && format('type=registry,ref=ghcr.io/{0}/realestate-frontend:buildcache,mode=max', github.repository_owner) || '' }}
 
       - name: Install Trivy
         uses: ./.github/actions/install-security-tools
@@ -286,8 +286,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
-        with:
-          driver: docker
 
       - name: Build and push OCR service container image
         id: push
@@ -299,6 +297,8 @@ jobs:
           tags: |
             ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service:${{ env.IMAGE_TAG }}
             ${{ inputs.is-production && format('ghcr.io/{0}/realestate-ocr-service:latest', github.repository_owner) || '' }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-ocr-service:buildcache
+          cache-to: ${{ inputs.is-production && format('type=registry,ref=ghcr.io/{0}/realestate-ocr-service:buildcache,mode=max', github.repository_owner) || '' }}
 
       - name: Install Trivy
         uses: ./.github/actions/install-security-tools
