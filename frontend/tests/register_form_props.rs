@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::if_not_else
+)]
 use proptest::prelude::*;
 use realestate_frontend::components::auth::register_form::{
     validate_confirm_password, validate_email, validate_form, validate_nombre, validate_password,

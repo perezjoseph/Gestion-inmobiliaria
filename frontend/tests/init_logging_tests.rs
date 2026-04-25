@@ -1,3 +1,14 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::todo,
+    clippy::ignore_without_reason,
+    clippy::option_if_let_else,
+    clippy::range_plus_one,
+    clippy::if_not_else,
+    clippy::manual_let_else
+)]
 use proptest::prelude::*;
 
 fn route_variant_name(index: usize) -> &'static str {
