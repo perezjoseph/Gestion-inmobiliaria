@@ -39,15 +39,31 @@ jobs:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         persist-credentials: false
-    - name: Run Rust and Kotlin community rules
+    - name: Run enterprise security rules (SOC 1/2/3)
       run: |
         semgrep scan \
           --config "p/rust" \
           --config "p/kotlin" \
-          --config "p/trailofbits" \
+          --config "p/java" \
+          --config "p/python" \
+          --config "p/fastapi" \
           --config "p/owasp-top-ten" \
+          --config "p/cwe-top-25" \
+          --config "p/command-injection" \
+          --config "p/sql-injection" \
+          --config "p/xss" \
+          --config "p/jwt" \
+          --config "p/insecure-transport" \
           --config "p/secrets" \
           --config "p/security-audit" \
+          --config "p/trailofbits" \
+          --config "p/supply-chain" \
+          --config "p/docker" \
+          --config "p/dockerfile" \
+          --config "p/kubernetes" \
+          --config "p/github-actions" \
+          --config "p/yaml" \
+          --config "p/default" \
           --error \
           --json \
           --output semgrep-community-results.json \
@@ -55,8 +71,24 @@ jobs:
         semgrep scan \
           --config "p/rust" \
           --config "p/kotlin" \
-          --config "p/trailofbits" \
+          --config "p/java" \
+          --config "p/python" \
+          --config "p/fastapi" \
           --config "p/owasp-top-ten" \
+          --config "p/cwe-top-25" \
+          --config "p/command-injection" \
+          --config "p/sql-injection" \
+          --config "p/xss" \
+          --config "p/jwt" \
+          --config "p/insecure-transport" \
           --config "p/secrets" \
           --config "p/security-audit" \
+          --config "p/trailofbits" \
+          --config "p/supply-chain" \
+          --config "p/docker" \
+          --config "p/dockerfile" \
+          --config "p/kubernetes" \
+          --config "p/github-actions" \
+          --config "p/yaml" \
+          --config "p/default" \
           .

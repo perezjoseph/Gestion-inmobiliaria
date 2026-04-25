@@ -27,6 +27,12 @@ android {
     kotlinOptions { jvmTarget = "11" }
 
     buildFeatures { compose = true }
+
+    packaging {
+        resources {
+            excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+        }
+    }
 }
 
 dependencies {
@@ -66,6 +72,9 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
+
+    // Networking (for Response type in ErrorHandler)
+    implementation(libs.retrofit2)
 
     // Serialization (for error parsing)
     implementation(libs.kotlinx.serialization)

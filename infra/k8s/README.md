@@ -19,14 +19,12 @@ graph TB
                 traefik[Traefik]
                 mdns[mDNS publisher<br/>gestion.local]
             end
-            arc_deploy[arc-deploy<br/>fixed ×1]
         end
 
         subgraph pc1["pc1 (worker) — WSL2 bridged<br/>Ubuntu 22.04 · DHCP<br/>18 CPU / 64 GB · role=desktop"]
             subgraph ns_arc["arc-systems"]
                 arc_ctrl[ARC controller]
-                arc_runner[arc-runner<br/>×1–10]
-                arc_dind[arc-runner-dind<br/>×1–10]
+                arc_dind[arc-runner-dind<br/>×1–5<br/>labels: arc-runner,<br/>arc-runner-dind, arc-deploy]
             end
         end
 
@@ -34,7 +32,7 @@ graph TB
     end
 
     gh([GitHub Actions]) -.->|"webhook polling"| arc_ctrl
-    arc_ctrl -->|"schedules jobs"| arc_runner & arc_dind & arc_deploy
+    arc_ctrl -->|"schedules jobs"| arc_dind
     traefik -->|"gestion.local"| backend
 ```
 
@@ -75,10 +73,8 @@ k8s/
 │   ├── ocr-service.yml        # OCR service deployment
 │   └── ingress.yml            # Traefik IngressRoute
 └── arc-runners/
-    ├── arc-runner.yml          # General runner (desktop, autoscaled 1-10)
-    ├── arc-runner-dind.yml     # Docker-in-Docker runner (desktop, autoscaled 1-10)
-    ├── arc-deploy.yml          # Deploy runner (server, fixed 1 replica)
-    └── arc-controller-liveness-patch.yml  # ARC controller /readyz probe patch
+    ├── arc-runner-dind.yml               # DinD runner (labels: arc-runner, arc-runner-dind, arc-deploy; autoscaled 1-5)
+    └── arc-controller-sync-period-patch.yml  # ARC controller --sync-period=10s patch
 ```
 
 ## Initial Setup

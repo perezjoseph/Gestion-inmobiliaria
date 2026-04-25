@@ -3,3 +3,8 @@ ocr-service/.hypothesis/
 
 # Local development environment
 .env
+
+# Android build output and tooling artifacts
+android/**/build/
+android/.kotlin/
+android/.gradle/

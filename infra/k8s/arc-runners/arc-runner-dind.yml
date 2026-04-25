@@ -42,17 +42,17 @@ spec:
           mountPath: /home/runner/_work/_target
       volumes:
         - name: cargo-cache
-          hostPath:
-            path: /opt/cargo-cache
-            type: DirectoryOrCreate
+          nfs:
+            server: 192.168.88.22
+            path: /volume1/k3s-cache/cargo-cache
         - name: sccache
-          hostPath:
-            path: /opt/sccache
-            type: DirectoryOrCreate
+          nfs:
+            server: 192.168.88.22
+            path: /volume1/k3s-cache/sccache
         - name: cargo-target
-          hostPath:
-            path: /opt/cargo-target
-            type: DirectoryOrCreate
+          nfs:
+            server: 192.168.88.22
+            path: /volume1/k3s-cache/cargo-target
 ---
 apiVersion: actions.summerwind.dev/v1alpha1
 kind: HorizontalRunnerAutoscaler

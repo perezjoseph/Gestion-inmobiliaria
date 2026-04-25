@@ -35,6 +35,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
 
+    // OkHttp (for MultipartBody)
+    implementation(libs.okhttp3)
+
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
