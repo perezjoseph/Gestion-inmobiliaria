@@ -121,43 +121,39 @@ jobs:
       - name: Fetch and patch advisory DB for CVSS 4.0 compatibility
         if: steps.install_audit.outputs.installed == 'true'
         run: |
+          set -euo pipefail
           # cargo-audit 0.22.x cannot parse CVSS v4.0 strings (only v2/v3.x).
           # Advisories using CVSS:4.0 crash the DB loader before the ignore list
           # is evaluated, aborting the entire audit.
           #
-          # Strategy: let cargo-audit fetch the DB once (it will crash), then
-          # patch the CVSS 4.0 lines out and re-run with --no-fetch.
+          # Strategy: clone the advisory DB ourselves, strip CVSS 4.0 lines,
+          # then point cargo audit at the patched copy with --db + --no-fetch.
           # Remove this workaround once cargo-audit ships CVSS 4.0 support.
-          export PATH="$HOME/.cargo/bin:$PATH"
 
-          # Trigger a fetch — this will likely crash on CVSS 4.0, that's expected
-          cargo audit --no-fetch 2>/dev/null || cargo audit 2>/dev/null || true
+          DB_DIR="${RUNNER_TEMP}/advisory-db"
+          rm -rf "$DB_DIR"
+          git clone --depth=1 https://github.com/RustSec/advisory-db.git "$DB_DIR"
 
-          # Find the advisory DB — cargo-audit uses one of these paths
-          DB_DIR=""
-          for candidate in \
-            "$HOME/.cargo/advisory-dbs/github.com-"* \
-            "$HOME/.cargo/advisory-db"; do
-            if [ -d "$candidate/crates" ]; then
-              DB_DIR="$candidate"
-              echo "Found advisory DB at: $DB_DIR"
-              break
+          # Strip every CVSS 4.0 line from advisory TOML front-matter
+          count=0
+          while IFS= read -r file; do
+            sed -i '/^cvss = "CVSS:4\.0/d' "$file"
+            count=$((count + 1))
+            echo "  patched: $file"
+          done < <(grep -rl 'CVSS:4\.0' "$DB_DIR/crates/" || true)
+          echo "Patched $count advisory file(s) containing CVSS 4.0 strings"
+
+          # Verify the specific known-bad file is fixed
+          TARGET="$DB_DIR/crates/astral-tokio-tar/RUSTSEC-2026-0066.md"
+          if [ -f "$TARGET" ]; then
+            if grep -q 'CVSS:4\.0' "$TARGET"; then
+              echo "::error::Patch failed — CVSS 4.0 still present in $TARGET"
+              cat "$TARGET"
+              exit 1
+            else
+              echo "Verified: CVSS 4.0 removed from RUSTSEC-2026-0066"
             fi
-          done
-
-          if [ -z "$DB_DIR" ]; then
-            echo "::warning::Advisory DB not found after fetch — audit will run without patch"
-            exit 0
           fi
-
-          # Remove CVSS 4.0 lines from all advisory files
-          PATCHED=0
-          for f in $(grep -rl '^cvss = "CVSS:4\.0' "$DB_DIR/crates/" 2>/dev/null); do
-            echo "Stripping CVSS 4.0 line from: $f"
-            sed -i '/^cvss = "CVSS:4\.0/d' "$f"
-            PATCHED=$((PATCHED + 1))
-          done
-          echo "Patched $PATCHED advisory file(s) with CVSS 4.0 strings"
 
       - name: Scan Rust dependencies for known vulnerabilities (CVEs)
         id: cargo_audit
@@ -168,7 +164,7 @@ jobs:
           max_attempts: 2
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            cargo audit --no-fetch --stale --deny yanked --deny unmaintained --deny unsound 2>&1 | tee "${RUNNER_TEMP}/audit-output.txt"
+            cargo audit --db "${RUNNER_TEMP}/advisory-db" --no-fetch --deny yanked --deny unmaintained --deny unsound 2>&1 | tee "${RUNNER_TEMP}/audit-output.txt"
             exit ${PIPESTATUS[0]}
 
       - name: Generate cargo-audit SARIF report
@@ -176,7 +172,7 @@ jobs:
         run: |
           umask 077
           export PATH="$HOME/.cargo/bin:$PATH"
-          cargo audit --no-fetch --stale --json 2>/dev/null | python3 -c "
+          cargo audit --db "${RUNNER_TEMP}/advisory-db" --no-fetch --json 2>/dev/null | python3 -c "
           import json, sys
           data = json.load(sys.stdin)
           sarif = {
