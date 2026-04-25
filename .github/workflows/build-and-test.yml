@@ -297,7 +297,7 @@ jobs:
             TRUNK_VERSION="0.21.14"
             TRUNK_SHA256="a67f4054b249fe9acc5fabc25de1aebf19783aca3ad6ff64bf34d7da44d0ea20"
             ARCHIVE="${RUNNER_TEMP}/trunk.tar.gz"
-            curl -sSfL --proto =https --retry 3 --retry-delay 5 --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+            curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
               "https://github.com/trunk-rs/trunk/releases/download/v${TRUNK_VERSION}/trunk-x86_64-unknown-linux-musl.tar.gz"
             echo "${TRUNK_SHA256}  ${ARCHIVE}" | sha256sum -c -
             mkdir -p "${HOME}/.local/bin"
