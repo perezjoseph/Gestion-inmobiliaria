@@ -1,6 +1,8 @@
 ARG MODE=compile
+ARG GH_REPO=perezjoseph/Gestion-inmobiliaria
 
-FROM rust:1.88-bookworm AS compile
+FROM rust:1.88-alpine AS compile
+RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static postgresql-dev pkgconf
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY backend/ backend/
@@ -8,20 +10,44 @@ COPY frontend/ frontend/
 RUN cargo build --locked -p realestate-backend --release
 RUN cp target/release/realestate-backend /app/realestate-backend
 
-FROM debian:trixie-slim AS prebuilt
+FROM alpine:3.22 AS prebuilt
+ARG GH_REPO
+ARG GH_RUN_ID
+RUN apk add --no-cache github-cli
 WORKDIR /app
-COPY realestate-backend /app/realestate-backend
-RUN chmod +x /app/realestate-backend
+RUN --mount=type=secret,id=gh_token \
+    GH_TOKEN=$(cat /run/secrets/gh_token) \
+    && export GH_TOKEN \
+    && if [ -n "${GH_RUN_ID}" ]; then \
+         gh run download "${GH_RUN_ID}" \
+           --repo "${GH_REPO}" \
+           --name backend-binary \
+           --dir /tmp/artifact; \
+       else \
+         RUN_ID=$(gh run list \
+           --repo "${GH_REPO}" \
+           --workflow build-and-test.yml \
+           --branch main \
+           --status success \
+           --limit 1 \
+           --json databaseId \
+           --jq '.[0].databaseId') \
+         && gh run download "${RUN_ID}" \
+           --repo "${GH_REPO}" \
+           --name backend-binary \
+           --dir /tmp/artifact; \
+       fi \
+    && cp /tmp/artifact/realestate-backend /app/realestate-backend \
+    && chmod +x /app/realestate-backend \
+    && rm -rf /tmp/artifact
 
 FROM ${MODE} AS source
 
-FROM debian:trixie-slim
+FROM alpine:3.22
 
-RUN apt-get update && apt-get upgrade -y --no-install-recommends \
-    && apt-get install -y --no-install-recommends \
-    ca-certificates libssl3t64 libpq5 curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd -r -s /bin/false appuser \
+RUN apk add --no-cache \
+    ca-certificates libssl3 libpq curl gcompat \
+    && adduser -D -s /bin/false appuser \
     && mkdir -p /app/uploads && chown appuser:appuser /app/uploads
 
 WORKDIR /app

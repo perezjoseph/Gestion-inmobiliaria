@@ -1,3 +1,6 @@
+# Rust build artifacts
+target/
+
 # Auto-generated test framework cache (Hypothesis/Starlette)
 ocr-service/.hypothesis/
 
