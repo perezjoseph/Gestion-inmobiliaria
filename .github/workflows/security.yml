@@ -118,25 +118,50 @@ jobs:
             echo "installed=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Patch advisory DB for CVSS 4.0 compatibility
+      - name: Fetch and patch advisory DB for CVSS 4.0 compatibility
+        id: fetch_db
         if: steps.install_audit.outputs.installed == 'true'
         run: |
           # cargo-audit 0.22.x cannot parse CVSS v4.0 strings (only v2/v3.x).
           # Advisories using CVSS:4.0 crash the DB loader before the ignore list
           # is evaluated, aborting the entire audit.
-          # Workaround: strip the cvss line from affected advisories after fetch.
+          #
+          # Strategy: clone/update the advisory DB via git directly, then patch
+          # any CVSS 4.0 lines so cargo audit --no-fetch can load it cleanly.
           # Remove this step once cargo-audit ships CVSS 4.0 support.
-          export PATH="$HOME/.cargo/bin:$PATH"
-          DB_DIR="$HOME/.cargo/advisory-db"
-          if [ ! -d "$DB_DIR" ]; then
-            # Also check the legacy plural path used by some versions
+
+          DB_DIR=""
+          for candidate in \
+            "$HOME/.cargo/advisory-dbs/github.com-a946fc29ac602819" \
+            "$HOME/.cargo/advisory-db"; do
+            if [ -d "$candidate/.git" ]; then
+              DB_DIR="$candidate"
+              break
+            fi
+          done
+
+          if [ -n "$DB_DIR" ]; then
+            echo "Updating existing advisory DB at $DB_DIR"
+            git -C "$DB_DIR" fetch --depth=1 origin main 2>/dev/null || git -C "$DB_DIR" fetch origin main 2>/dev/null || true
+            git -C "$DB_DIR" reset --hard origin/main 2>/dev/null || true
+          else
+            # Fresh clone into the path cargo-audit 0.22.x expects
             DB_DIR="$HOME/.cargo/advisory-dbs/github.com-a946fc29ac602819"
+            mkdir -p "$(dirname "$DB_DIR")"
+            git clone --depth=1 https://github.com/RustSec/advisory-db.git "$DB_DIR" 2>/dev/null || true
           fi
+
           if [ -d "$DB_DIR" ]; then
-            find "$DB_DIR" -name '*.md' -exec grep -l 'CVSS:4\.0' {} + 2>/dev/null | while read -r f; do
-              echo "Stripping CVSS 4.0 line from: $f"
+            PATCHED=0
+            while IFS= read -r f; do
               sed -i '/^cvss = "CVSS:4\.0/d' "$f"
-            done
+              PATCHED=$((PATCHED + 1))
+            done < <(grep -rl 'CVSS:4\.0' "$DB_DIR/crates/" 2>/dev/null || true)
+            echo "Patched $PATCHED advisory file(s) with CVSS 4.0 strings"
+            echo "db_dir=$DB_DIR" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Could not fetch advisory DB for patching"
+            echo "db_dir=" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Scan Rust dependencies for known vulnerabilities (CVEs)
@@ -148,7 +173,12 @@ jobs:
           max_attempts: 2
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            cargo audit --deny yanked --deny unmaintained --deny unsound 2>&1 | tee "${RUNNER_TEMP}/audit-output.txt"
+            AUDIT_FLAGS="--deny yanked --deny unmaintained --deny unsound"
+            DB_DIR="${{ steps.fetch_db.outputs.db_dir }}"
+            if [ -n "$DB_DIR" ] && [ -d "$DB_DIR" ]; then
+              AUDIT_FLAGS="$AUDIT_FLAGS --no-fetch --db $DB_DIR"
+            fi
+            cargo audit $AUDIT_FLAGS 2>&1 | tee "${RUNNER_TEMP}/audit-output.txt"
             exit ${PIPESTATUS[0]}
 
       - name: Generate cargo-audit SARIF report
