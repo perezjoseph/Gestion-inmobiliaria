@@ -36,10 +36,19 @@ runs:
     - name: Ensure CARGO_HOME directories are writable
       shell: bash
       run: |
-        # Ensure directories exist. On ephemeral ARC runners these are always
-        # fresh (container filesystem) or NFS-mounted (already writable).
-        for dir in "$HOME/.cargo/bin" "$HOME/.cargo/registry" "$HOME/.cargo/git" "$HOME/.rustup"; do
+        # Ensure directories exist and are writable.
+        # NFS-mounted dirs (registry, git) are already writable via the export.
+        # Local dirs (bin, .rustup) may need ownership fix on ephemeral runners.
+        for dir in "$HOME/.cargo" "$HOME/.cargo/bin" "$HOME/.rustup"; do
           mkdir -p "$dir" 2>/dev/null || sudo mkdir -p "$dir"
+          if [ ! -w "$dir" ]; then
+            echo "Fixing ownership on $dir"
+            sudo chown "$(id -u):$(id -g)" "$dir"
+          fi
+        done
+        # NFS-mounted dirs — just ensure mount points exist, no chown needed
+        for dir in "$HOME/.cargo/registry" "$HOME/.cargo/git"; do
+          mkdir -p "$dir" 2>/dev/null || true
         done
         echo "CARGO_HOME=$HOME/.cargo" >> "$GITHUB_ENV"
         echo "RUSTUP_HOME=$HOME/.rustup" >> "$GITHUB_ENV"
