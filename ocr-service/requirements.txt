@@ -7,12 +7,6 @@ Pillow==12.2.0
 PyMuPDF==1.25.5
 wheel==0.46.2
 
-# Pinned overrides for transitive CVE fixes
-langchain-core==0.3.81
-langchain-community==0.3.27
-langchain-text-splitters==0.3.9
-jaraco.context==6.1.0
-
 # dev / test
 pytest==8.3.5
 httpx==0.28.1
