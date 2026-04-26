@@ -1,0 +1,152 @@
+# Values for the gha-runner-scale-set Helm chart.
+# Replaces the legacy RunnerDeployment + HorizontalRunnerAutoscaler.
+#
+# Install with:
+#   helm install arc-runner-dind \
+#     --namespace arc-runners-v2 \
+#     -f infra/k8s/arc-v2/runner-scale-set-values.yml \
+#     oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set
+
+## ── GitHub target ──────────────────────────────────────────────
+githubConfigUrl: "https://github.com/perezjoseph/Gestion-inmobiliaria"
+
+## Authentication — pre-created k8s secret.
+## Create with:
+##   kubectl create secret generic arc-github-secret \
+##     --namespace arc-runners-v2 \
+##     --from-literal=github_token=<PAT>
+githubConfigSecret: arc-github-secret
+
+## ── Scaling ────────────────────────────────────────────────────
+minRunners: 1
+maxRunners: 3
+
+## ── Container mode ─────────────────────────────────────────────
+## Per the chart docs: "If any customization is required for dind mode,
+## containerMode should remain empty, and configuration should be applied
+## to the template." We define the full dind pod spec manually below.
+
+## ── Runner pod template (manual dind) ──────────────────────────
+template:
+  spec:
+    securityContext:
+      runAsNonRoot: false
+    initContainers:
+      - name: init-dind-externals
+        image: ghcr.io/actions/actions-runner:latest
+        imagePullPolicy: IfNotPresent
+        command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
+        volumeMounts:
+          - name: dind-externals
+            mountPath: /home/runner/tmpDir
+      - name: dind
+        image: docker:dind
+        imagePullPolicy: IfNotPresent
+        args:
+          - dockerd
+          - --host=unix:///var/run/docker.sock
+          - --group=$(DOCKER_GROUP_GID)
+        env:
+          - name: DOCKER_GROUP_GID
+            value: "123"
+        securityContext:
+          privileged: true
+        restartPolicy: Always
+        startupProbe:
+          exec:
+            command: ["docker", "info"]
+          initialDelaySeconds: 0
+          failureThreshold: 24
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: "500m"
+            memory: 1Gi
+          limits:
+            cpu: "1"
+            memory: 2Gi
+        volumeMounts:
+          - name: work
+            mountPath: /home/runner/_work
+          - name: dind-sock
+            mountPath: /var/run
+          - name: dind-externals
+            mountPath: /home/runner/externals
+    containers:
+      - name: runner
+        image: ghcr.io/actions/actions-runner:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/home/runner/run.sh"]
+        env:
+          - name: DOCKER_HOST
+            value: unix:///var/run/docker.sock
+          - name: RUNNER_WAIT_FOR_DOCKER_IN_SECONDS
+            value: "120"
+        resources:
+          requests:
+            cpu: "1"
+            memory: 2Gi
+          limits:
+            cpu: "2"
+            memory: 8Gi
+        volumeMounts:
+          - name: work
+            mountPath: /home/runner/_work
+          - name: dind-sock
+            mountPath: /var/run
+          - name: cargo-cache
+            mountPath: /home/runner/.cargo/registry
+            subPath: registry
+          - name: cargo-cache
+            mountPath: /home/runner/.cargo/git
+            subPath: git
+          - name: sccache
+            mountPath: /home/runner/.sccache
+          - name: cargo-target
+            mountPath: /home/runner/_work/_target
+    restartPolicy: Never
+    dnsPolicy: "None"
+    dnsConfig:
+      nameservers:
+        - 10.43.0.10
+        - 8.8.8.8
+        - 1.1.1.1
+      searches:
+        - arc-runners-v2.svc.cluster.local
+        - svc.cluster.local
+        - cluster.local
+      options:
+        - name: ndots
+          value: "5"
+        - name: timeout
+          value: "3"
+        - name: attempts
+          value: "3"
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  actions.github.com/scale-set-name: arc-runner-dind
+              topologyKey: kubernetes.io/hostname
+    volumes:
+      - name: work
+        emptyDir: {}
+      - name: dind-sock
+        emptyDir: {}
+      - name: dind-externals
+        emptyDir: {}
+      - name: cargo-cache
+        nfs:
+          server: 192.168.88.22
+          path: /volume1/docker/k3s-cache/cargo-cache
+      - name: sccache
+        nfs:
+          server: 192.168.88.22
+          path: /volume1/docker/k3s-cache/sccache
+      - name: cargo-target
+        nfs:
+          server: 192.168.88.22
+          path: /volume1/docker/k3s-cache/cargo-target

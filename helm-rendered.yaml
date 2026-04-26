@@ -1,0 +1,15 @@
+﻿helm : Pulled: ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set:0.14.1
+At line:1 char:1
++ helm template arc-runner-dind --namespace arc-runners-v2 -f infra/k8s ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Pulled: ghcr.io...cale-set:0.14.1:String) [], RemoteExce 
+   ption
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Digest: sha256:01e467a50fdceeb54f981d1eaff327e4f8aa1c652bc326e5de7c6f1f69626690
+Error: execution error at (gha-runner-scale-set/templates/manager_role_binding.yaml:42:11): No 
+gha-rs-controller deployment found using label (app.kubernetes.io/part-of=gha-rs-controller). 
+Consider setting controllerServiceAccount.name in values.yaml to be explicit if you think the 
+discovery is wrong.
+
+Use --debug flag to render out invalid YAML
