@@ -39,7 +39,7 @@ runs:
         # Pre-create directories so rustup doesn't fail with "Permission denied".
         # Also fix ownership in case a cache restore created them as a different user.
         # Skip chown on NFS mounts (read-only filesystem for ownership changes).
-        for dir in "$HOME/.cargo/bin" "$HOME/.cargo/registry" "$HOME/.cargo/git" "$HOME/.rustup"; do
+        for dir in "$HOME/.cargo" "$HOME/.cargo/bin" "$HOME/.cargo/registry" "$HOME/.cargo/git" "$HOME/.rustup"; do
           mkdir -p "$dir" 2>/dev/null || sudo mkdir -p "$dir"
           if [ ! -w "$dir" ]; then
             # Check if the mount is NFS — chown will fail on root_squash NFS exports
@@ -47,7 +47,7 @@ runs:
               echo "Skipping chown on NFS mount: $dir"
             else
               echo "Fixing ownership on $dir"
-              sudo chown -R "$(id -u):$(id -g)" "$(dirname "$dir")"
+              sudo chown "$(id -u):$(id -g)" "$dir"
             fi
           fi
         done
