@@ -9,6 +9,10 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   fmt:
     name: Format (rustfmt)
@@ -35,7 +39,7 @@ jobs:
   gate:
     name: Lint Gate
     runs-on: arc-runner-dind
-    if: always() && !inputs.is-fork-pr
+    if: "!cancelled() && !inputs.is-fork-pr"
     needs: [fmt]
     permissions:
       contents: read
@@ -48,7 +52,7 @@ jobs:
           sparse-checkout-cone-mode: true
 
       - name: Write lint summary
-        if: always()
+        if: "!cancelled()"
         run: |
           {
             echo "## Lint & Format Results"
@@ -58,5 +62,5 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail if any lint job failed
-        if: always() && needs.fmt.result == 'failure'
+        if: "!cancelled() && needs.fmt.result == 'failure'"
         run: exit 1

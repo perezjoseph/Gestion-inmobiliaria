@@ -9,6 +9,10 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # ── Rust: build-mode none (no build needed, uses rust-analyzer internally) ──
   # Requires rustup and cargo on PATH. Cargo.toml must be present.

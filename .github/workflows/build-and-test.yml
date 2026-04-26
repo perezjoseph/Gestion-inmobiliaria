@@ -13,6 +13,10 @@ on:
         default: false
 permissions: {}
 
+concurrency:
+  group: build-test-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # ── Backend: clippy → test (with coverage) → release build ──
   # Single Rust compilation warms sccache; subsequent steps are near-instant.
@@ -79,7 +83,7 @@ jobs:
           fi
 
       - name: Upload clippy backend report
-        if: always() && hashFiles(format('{0}/clippy-backend.json', runner.temp)) != ''
+        if: "!cancelled() && hashFiles(format('{0}/clippy-backend.json', runner.temp)) != ''"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: clippy-backend-report
@@ -209,7 +213,7 @@ jobs:
           subject-path: target/ci-release/realestate-backend
 
       - name: Write backend summary
-        if: always()
+        if: "!cancelled()"
         run: |
           {
             echo "## Backend Results"
@@ -267,7 +271,7 @@ jobs:
           fi
 
       - name: Upload clippy frontend report
-        if: always() && hashFiles(format('{0}/clippy-frontend.json', runner.temp)) != ''
+        if: "!cancelled() && hashFiles(format('{0}/clippy-frontend.json', runner.temp)) != ''"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: clippy-frontend-report
@@ -366,7 +370,7 @@ jobs:
           subject-path: frontend/dist/
 
       - name: Write frontend summary
-        if: always()
+        if: "!cancelled()"
         run: |
           {
             echo "## Frontend Results"

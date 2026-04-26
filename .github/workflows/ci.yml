@@ -134,7 +134,7 @@ jobs:
     name: Containers
     needs: [build-and-test, security, lint]
     if: |
-      always() &&
+      !cancelled() &&
       needs.build-and-test.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       (needs.lint.result == 'success' || needs.lint.result == 'skipped')

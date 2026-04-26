@@ -17,6 +17,10 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: containers-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   container-image-backend:
     name: Container Image (Backend)
@@ -87,7 +91,7 @@ jobs:
             exit ${PIPESTATUS[0]}
 
       - name: Generate SARIF report
-        if: always()
+        if: "!cancelled()"
         run: |
           umask 077
           trivy image --severity CRITICAL,HIGH,MEDIUM \
@@ -110,7 +114,7 @@ jobs:
           retention-days: 30
 
       - name: Upload SARIF to GitHub Security
-        if: always() && hashFiles('backend-image.sarif') != ''
+        if: "!cancelled() && hashFiles('backend-image.sarif') != ''"
         uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4.35.2
         with:
           sarif_file: backend-image.sarif
@@ -205,7 +209,7 @@ jobs:
             exit ${PIPESTATUS[0]}
 
       - name: Generate SARIF report
-        if: always()
+        if: "!cancelled()"
         run: |
           umask 077
           trivy image --severity CRITICAL,HIGH,MEDIUM \
@@ -228,7 +232,7 @@ jobs:
           retention-days: 30
 
       - name: Upload SARIF to GitHub Security
-        if: always() && hashFiles('frontend-image.sarif') != ''
+        if: "!cancelled() && hashFiles('frontend-image.sarif') != ''"
         uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4.35.2
         with:
           sarif_file: frontend-image.sarif
@@ -314,7 +318,7 @@ jobs:
             exit ${PIPESTATUS[0]}
 
       - name: Generate SARIF report
-        if: always()
+        if: "!cancelled()"
         run: |
           umask 077
           trivy image --severity CRITICAL,HIGH,MEDIUM \
@@ -337,7 +341,7 @@ jobs:
           retention-days: 30
 
       - name: Upload SARIF to GitHub Security
-        if: always() && hashFiles('ocr-service-image.sarif') != ''
+        if: "!cancelled() && hashFiles('ocr-service-image.sarif') != ''"
         uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4.35.2
         with:
           sarif_file: ocr-service-image.sarif

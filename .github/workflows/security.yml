@@ -11,6 +11,10 @@ on:
         required: true
 permissions: {}
 
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   secret-scan:
     name: Secret Scanning (Gitleaks)
@@ -114,7 +118,7 @@ jobs:
             exit ${PIPESTATUS[0]}
 
       - name: Generate cargo-deny SARIF report
-        if: always() && steps.install_deny.outputs.installed == 'true'
+        if: "!cancelled() && steps.install_deny.outputs.installed == 'true'"
         run: |
           umask 077
           export PATH="$HOME/.cargo/bin:$PATH"
@@ -131,7 +135,7 @@ jobs:
           " > cargo-deny.sarif 2>/dev/null || echo '{\"version\":\"2.1.0\",\"runs\":[{\"tool\":{\"driver\":{\"name\":\"cargo-deny\",\"rules\":[]}},\"results\":[]}]}' > cargo-deny.sarif
 
       - name: Upload cargo-deny SARIF to GitHub Security
-        if: always() && steps.install_deny.outputs.installed == 'true' && hashFiles('cargo-deny.sarif') != ''
+        if: "!cancelled() && steps.install_deny.outputs.installed == 'true' && hashFiles('cargo-deny.sarif') != ''"
         uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4.35.2
         with:
           sarif_file: cargo-deny.sarif
@@ -167,7 +171,7 @@ jobs:
             infra/docker/Dockerfile.backend infra/docker/Dockerfile.frontend infra/docker/docker-compose.prod.yml infra/docker/docker-compose.dev.yml 2>&1 | tee "${RUNNER_TEMP}/trivy-iac-output.txt"
 
       - name: Generate Trivy IaC SARIF report
-        if: always() && steps.install_trivy.outputs.trivy-installed == 'true'
+        if: "!cancelled() && steps.install_trivy.outputs.trivy-installed == 'true'"
         run: |
           umask 077
           trivy fs --scanners misconfig --severity CRITICAL,HIGH,MEDIUM \
@@ -175,7 +179,7 @@ jobs:
             infra/docker/Dockerfile.backend infra/docker/Dockerfile.frontend infra/docker/docker-compose.prod.yml infra/docker/docker-compose.dev.yml || true
 
       - name: Upload Trivy IaC SARIF to GitHub Security
-        if: always() && steps.install_trivy.outputs.trivy-installed == 'true' && hashFiles('trivy-iac.sarif') != ''
+        if: "!cancelled() && steps.install_trivy.outputs.trivy-installed == 'true' && hashFiles('trivy-iac.sarif') != ''"
         uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4.35.2
         with:
           sarif_file: trivy-iac.sarif
@@ -186,7 +190,7 @@ jobs:
   quality-gate:
     name: Security Gate
     runs-on: arc-runner-dind
-    if: always() && !inputs.is-fork-pr
+    if: "!cancelled() && !inputs.is-fork-pr"
     needs: [cargo-deny, trivy-iac]
     permissions:
       contents: read
@@ -199,7 +203,7 @@ jobs:
           sparse-checkout-cone-mode: true
 
       - name: Write quality gate summary
-        if: always()
+        if: "!cancelled()"
         run: |
           {
             echo "## Dependency Security Results"
@@ -210,5 +214,5 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail if any security job failed
-        if: always() && (needs.cargo-deny.result == 'failure' || needs.trivy-iac.result == 'failure')
+        if: "!cancelled() && (needs.cargo-deny.result == 'failure' || needs.trivy-iac.result == 'failure')"
         run: exit 1
