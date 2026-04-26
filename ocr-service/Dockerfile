@@ -20,8 +20,9 @@ ENV PADDLE_PDX_CACHE_HOME=/app/.paddleocr
 # Use Baidu Object Storage as download source (better availability outside China)
 ENV PADDLE_PDX_MODEL_SOURCE=BOS
 
-RUN for i in 1 2 3 4 5; do \
-    python -c "from paddleocr import PaddleOCR; PaddleOCR(use_textline_orientation=True, lang='es', device='cpu')" \
+RUN for i in 1 2 3; do \
+    timeout 300 python -c \
+      "from paddleocr import PaddleOCR; PaddleOCR(use_textline_orientation=True, lang='es', device='cpu')" \
     && break \
     || { echo "Attempt $i failed, retrying in 15s..."; sleep 15; }; \
     done
