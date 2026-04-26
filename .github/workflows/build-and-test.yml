@@ -13,10 +13,6 @@ on:
         default: false
 permissions: {}
 
-concurrency:
-  group: build-test-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
   # ── Backend: clippy → test (with coverage) → release build ──
   # Single Rust compilation warms sccache; subsequent steps are near-instant.

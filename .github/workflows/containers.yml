@@ -17,10 +17,6 @@ on:
 
 permissions: {}
 
-concurrency:
-  group: containers-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
   container-image-backend:
     name: Container Image (Backend)

@@ -9,10 +9,6 @@ on:
 
 permissions: {}
 
-concurrency:
-  group: lint-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
   fmt:
     name: Format (rustfmt)
