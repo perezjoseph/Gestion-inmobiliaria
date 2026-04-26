@@ -36,20 +36,10 @@ runs:
     - name: Ensure CARGO_HOME directories are writable
       shell: bash
       run: |
-        # Pre-create directories so rustup doesn't fail with "Permission denied".
-        # Also fix ownership in case a cache restore created them as a different user.
-        # Skip chown on NFS mounts (read-only filesystem for ownership changes).
-        for dir in "$HOME/.cargo" "$HOME/.cargo/bin" "$HOME/.cargo/registry" "$HOME/.cargo/git" "$HOME/.rustup"; do
+        # Ensure directories exist. On ephemeral ARC runners these are always
+        # fresh (container filesystem) or NFS-mounted (already writable).
+        for dir in "$HOME/.cargo/bin" "$HOME/.cargo/registry" "$HOME/.cargo/git" "$HOME/.rustup"; do
           mkdir -p "$dir" 2>/dev/null || sudo mkdir -p "$dir"
-          if [ ! -w "$dir" ]; then
-            # Check if the mount is NFS — chown will fail on root_squash NFS exports
-            if findmnt -n -o FSTYPE --target "$dir" 2>/dev/null | grep -q nfs; then
-              echo "Skipping chown on NFS mount: $dir"
-            else
-              echo "Fixing ownership on $dir"
-              sudo chown "$(id -u):$(id -g)" "$dir"
-            fi
-          fi
         done
         echo "CARGO_HOME=$HOME/.cargo" >> "$GITHUB_ENV"
         echo "RUSTUP_HOME=$HOME/.rustup" >> "$GITHUB_ENV"
