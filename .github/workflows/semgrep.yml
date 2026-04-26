@@ -62,7 +62,6 @@ jobs:
           --config "p/dockerfile" \
           --config "p/kubernetes" \
           --config "p/github-actions" \
-          --config "p/yaml" \
           --config "p/default" \
           --error \
           --json \
@@ -89,6 +88,5 @@ jobs:
           --config "p/dockerfile" \
           --config "p/kubernetes" \
           --config "p/github-actions" \
-          --config "p/yaml" \
           --config "p/default" \
           .
