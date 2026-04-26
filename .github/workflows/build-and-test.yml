@@ -192,7 +192,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
         with:
           name: backend-binary
-          path: target/ci-release/realestate-backend
+          path: ${{ env.CARGO_TARGET_DIR || 'target' }}/ci-release/realestate-backend
           retention-days: 7
           if-no-files-found: error
 
@@ -207,7 +207,7 @@ jobs:
       - name: Attest build provenance
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
-          subject-path: target/ci-release/realestate-backend
+          subject-path: ${{ env.CARGO_TARGET_DIR || 'target' }}/ci-release/realestate-backend
 
       - name: Write backend summary
         if: "!cancelled()"
