@@ -17,14 +17,17 @@ COPY dist/ /app/dist/
 FROM ${MODE} AS source
 
 FROM golang:1.26.2-alpine AS caddy-builder
-RUN apk add --no-cache git && \
-    go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
-RUN xcaddy build v2.11.2 \
-    --with github.com/go-jose/go-jose/v3=github.com/go-jose/go-jose/v3@v3.0.5 \
-    --with github.com/go-jose/go-jose/v4=github.com/go-jose/go-jose/v4@v4.1.4 \
-    --with github.com/smallstep/certificates=github.com/smallstep/certificates@v0.30.0 \
-    --with go.opentelemetry.io/otel/sdk=go.opentelemetry.io/otel/sdk@v1.43.0 \
-    --with google.golang.org/grpc=google.golang.org/grpc@v1.79.3
+RUN apk add --no-cache git
+WORKDIR /build
+RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && \
+    XCADDY_SKIP_CLEANUP=1 xcaddy build v2.11.2 || true
+RUN cd /tmp/buildenv_* && \
+    go get github.com/go-jose/go-jose/v3@v3.0.5 && \
+    go get github.com/go-jose/go-jose/v4@v4.1.4 && \
+    go get go.opentelemetry.io/otel/sdk@v1.43.0 && \
+    go get google.golang.org/grpc@v1.79.3 && \
+    go mod tidy && \
+    go build -o /usr/bin/caddy -ldflags "-w -s" -trimpath -tags nobadger,nomysql,nopgx
 
 FROM alpine:3.23
 
@@ -32,7 +35,7 @@ RUN apk upgrade --no-cache && \
     apk add --no-cache ca-certificates mailcap wget && \
     addgroup -S app && adduser -S app -G app
 
-COPY --from=caddy-builder /go/caddy /usr/bin/caddy
+COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
 COPY infra/caddy/Caddyfile /etc/caddy/Caddyfile
 COPY --from=source /app/dist/ /srv/
 
