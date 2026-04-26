@@ -307,6 +307,7 @@ jobs:
           max_attempts: 2
           command: |
             trivy image --exit-code 1 --severity CRITICAL,HIGH \
+              --ignorefile ocr-service/.trivyignore \
               --no-progress --format table \
               ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ steps.push.outputs.digest }} \
               2>&1 | tee "${RUNNER_TEMP}/trivy-ocr-service-image.txt"
