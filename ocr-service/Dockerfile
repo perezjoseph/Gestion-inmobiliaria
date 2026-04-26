@@ -1,15 +1,23 @@
-FROM python:3.11-slim AS builder
+FROM python:3.11-alpine AS builder
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 \
-    libglib2.0-0 \
-    libgomp1 \
-    libsm6 \
-    libxext6 \
-    libxrender1 \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache \
+    mesa-gl \
+    glib \
+    libgomp \
+    libsm \
+    libxext \
+    libxrender \
+    # Build deps for native Python packages
+    gcc \
+    g++ \
+    musl-dev \
+    linux-headers \
+    mesa-dev \
+    glib-dev \
+    libffi-dev \
+    openblas-dev
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -26,21 +34,21 @@ RUN for i in 1 2 3 4 5; do \
     || { echo "Attempt $i failed, retrying in 15s..."; sleep 15; }; \
     done
 
-FROM python:3.11-slim
+FROM python:3.11-alpine
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 \
-    libglib2.0-0 \
-    libgomp1 \
-    libsm6 \
-    libxext6 \
-    libxrender1 \
+RUN apk add --no-cache \
+    mesa-gl \
+    glib \
+    libgomp \
+    libsm \
+    libxext \
+    libxrender \
+    libstdc++ \
+    openblas \
     curl \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN groupadd -r ocruser && useradd -r -g ocruser -d /app -s /sbin/nologin ocruser
+    && addgroup -S ocruser && adduser -S -G ocruser -h /app -s /sbin/nologin ocruser
 
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
