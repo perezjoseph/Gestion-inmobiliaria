@@ -75,7 +75,23 @@ jobs:
           secrets: |
             gh_token=${{ secrets.GITHUB_TOKEN }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-backend:buildcache
-          cache-to: ${{ inputs.is-production && format('type=registry,ref=ghcr.io/{0}/realestate-backend:buildcache,mode=min', github.repository_owner) || '' }}
+
+      - name: Export build cache
+        if: inputs.is-production
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
+        continue-on-error: true
+        with:
+          context: .
+          file: infra/docker/Dockerfile.backend
+          push: false
+          build-args: |
+            MODE=prebuilt
+            GH_REPO=${{ github.repository }}
+            GH_RUN_ID=${{ github.run_id }}
+          secrets: |
+            gh_token=${{ secrets.GITHUB_TOKEN }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-backend:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-backend:buildcache,mode=min
 
       - name: Install Trivy
         uses: ./.github/actions/install-security-tools
@@ -202,7 +218,18 @@ jobs:
             ${{ inputs.is-production && format('ghcr.io/{0}/realestate-frontend:latest', github.repository_owner) || '' }}
           build-args: MODE=prebuilt
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-frontend:buildcache
-          cache-to: ${{ inputs.is-production && format('type=registry,ref=ghcr.io/{0}/realestate-frontend:buildcache,mode=min', github.repository_owner) || '' }}
+
+      - name: Export build cache
+        if: inputs.is-production
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
+        continue-on-error: true
+        with:
+          context: .
+          file: infra/docker/Dockerfile.frontend
+          push: false
+          build-args: MODE=prebuilt
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-frontend:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-frontend:buildcache,mode=min
 
       - name: Install Trivy
         uses: ./.github/actions/install-security-tools
@@ -319,8 +346,18 @@ jobs:
             ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service:${{ env.IMAGE_TAG }}
             ${{ inputs.is-production && format('ghcr.io/{0}/realestate-ocr-service:latest', github.repository_owner) || '' }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-ocr-service:buildcache
-          cache-to: ${{ inputs.is-production && format('type=registry,ref=ghcr.io/{0}/realestate-ocr-service:buildcache,mode=min', github.repository_owner) || '' }}
           outputs: type=registry,compression=zstd,compression-level=3,force-compression=true
+
+      - name: Export build cache
+        if: inputs.is-production
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
+        continue-on-error: true
+        with:
+          context: ./ocr-service
+          file: ./ocr-service/Dockerfile
+          push: false
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-ocr-service:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-ocr-service:buildcache,mode=min
 
       - name: Install Trivy
         uses: ./.github/actions/install-security-tools

@@ -50,6 +50,15 @@ jobs:
             ghcr.io/${{ env.IMAGE_OWNER }}/realestate-runner:latest
             ghcr.io/${{ env.IMAGE_OWNER }}/realestate-runner:${{ github.sha }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-runner:buildcache
+
+      - name: Export build cache
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
+        continue-on-error: true
+        with:
+          context: .
+          file: infra/docker/Dockerfile.runner
+          push: false
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-runner:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-runner:buildcache,mode=min
 
       - name: Credential cleanup
