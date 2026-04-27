@@ -1,4 +1,4 @@
-﻿name: Security Scanning
+name: Security Scanning
 
 on:
   workflow_call:
@@ -47,7 +47,7 @@ jobs:
           persist-credentials: false
 
       - name: Review dependency changes for vulnerabilities and license issues
-        uses: actions/dependency-review-action@da24556b548a50705dd671f47852072ea4c105d9 # v4.7.1
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
         with:
           fail-on-severity: high
           deny-licenses: AGPL-3.0, GPL-3.0, GPL-2.0
@@ -104,7 +104,7 @@ jobs:
       - name: Run cargo-deny supply chain checks
         id: cargo_deny
         if: steps.install_deny.outputs.installed == 'true'
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 10
           max_attempts: 2
