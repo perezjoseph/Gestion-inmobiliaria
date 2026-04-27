@@ -9,7 +9,7 @@ workspace = true
 
 [dependencies]
 yew = { version = "0.21", features = ["csr"] }
-yew-router = "0.18"
+yew-router = "0.20"
 gloo-net = { version = "0.6", features = ["http"] }
 serde.workspace = true
 serde_json.workspace = true
