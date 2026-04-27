@@ -102,7 +102,7 @@ pub struct RegisterFormProps {
     pub on_success: Callback<LoginResponse>,
 }
 
-#[function_component]
+#[component]
 pub fn RegisterForm(props: &RegisterFormProps) -> Html {
     let nombre = use_state(String::new);
     let email = use_state(String::new);

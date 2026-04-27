@@ -34,7 +34,7 @@ struct InquilinoSearchBarProps {
     on_clear: Callback<MouseEvent>,
 }
 
-#[function_component]
+#[component]
 fn InquilinoSearchBar(props: &InquilinoSearchBarProps) -> Html {
     let s = props.search.clone();
     let on_input = Callback::from(move |e: InputEvent| {
@@ -90,7 +90,7 @@ struct InquilinoFormProps {
     on_confidence_clear: Callback<String>,
 }
 
-#[function_component]
+#[component]
 fn InquilinoForm(props: &InquilinoFormProps) -> Html {
     let show_optional = use_state(|| false);
     let fe = props.form_errors.clone();
@@ -233,7 +233,7 @@ struct InquilinoListProps {
     on_per_page_change: Callback<u64>,
 }
 
-#[function_component]
+#[component]
 fn InquilinoList(props: &InquilinoListProps) -> Html {
     if props.items.is_empty() {
         return render_inquilino_empty_state(&props.user_rol, &props.on_new);
@@ -688,7 +688,7 @@ fn render_inquilinos_view(
     }
 }
 
-#[function_component]
+#[component]
 pub fn Inquilinos() -> Html {
     let auth = use_context::<AuthContext>();
     let toasts = use_context::<ToastContext>();

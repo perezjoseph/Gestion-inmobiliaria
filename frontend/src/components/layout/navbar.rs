@@ -3,7 +3,7 @@ use yew_router::prelude::*;
 
 use crate::app::{AuthAction, AuthContext, Route, ThemeContext};
 
-#[function_component]
+#[component]
 fn NavbarSearch() -> Html {
     let Some(navigator) = use_navigator() else {
         return html! {};
@@ -100,7 +100,7 @@ fn apply_theme(is_dark: bool) {
     }
 }
 
-#[function_component]
+#[component]
 fn ThemeToggle() -> Html {
     let Some(theme) = use_context::<ThemeContext>() else {
         return html! {};
@@ -129,7 +129,7 @@ struct UserMenuProps {
     user_role: String,
 }
 
-#[function_component]
+#[component]
 fn UserMenu(props: &UserMenuProps) -> Html {
     let Some(auth) = use_context::<AuthContext>() else {
         return html! {};
@@ -177,7 +177,7 @@ pub struct NavbarProps {
     pub on_toggle_sidebar: Callback<MouseEvent>,
 }
 
-#[function_component]
+#[component]
 pub fn Navbar(props: &NavbarProps) -> Html {
     html! {
         <nav class="gi-navbar" style="padding: var(--space-3) var(--space-5); display: flex; justify-content: space-between; align-items: center; gap: var(--space-2);">

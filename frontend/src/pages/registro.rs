@@ -6,7 +6,7 @@ use crate::components::auth::register_form::RegisterForm;
 use crate::services::auth::is_authenticated;
 use crate::types::usuario::LoginResponse;
 
-#[function_component]
+#[component]
 pub fn Registro() -> Html {
     let Some(navigator) = use_navigator() else {
         return html! {};

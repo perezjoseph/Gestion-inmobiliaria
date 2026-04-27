@@ -9,7 +9,7 @@ pub struct ErrorBannerProps {
     pub on_retry: Option<Callback<MouseEvent>>,
 }
 
-#[function_component]
+#[component]
 pub fn ErrorBanner(props: &ErrorBannerProps) -> Html {
     html! {
         <div class="gi-error-banner" role="alert">

@@ -1,7 +1,7 @@
 use gloo_timers::callback::Interval;
 use yew::prelude::*;
 
-#[function_component]
+#[component]
 pub fn OfflineBanner() -> Html {
     let is_offline = use_state(|| false);
 

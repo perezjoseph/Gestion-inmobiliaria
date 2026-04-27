@@ -9,7 +9,7 @@ pub struct DeleteConfirmModalProps {
     pub on_cancel: Callback<MouseEvent>,
 }
 
-#[function_component]
+#[component]
 pub fn DeleteConfirmModal(props: &DeleteConfirmModalProps) -> Html {
     let cancel_ref = use_node_ref();
 

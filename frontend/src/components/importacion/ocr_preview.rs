@@ -13,7 +13,7 @@ pub struct OcrPreviewProps {
     pub on_discarded: Callback<()>,
 }
 
-#[function_component]
+#[component]
 pub fn OcrPreview(props: &OcrPreviewProps) -> Html {
     let field_values: UseStateHandle<HashMap<String, String>> = {
         let initial: HashMap<String, String> = props

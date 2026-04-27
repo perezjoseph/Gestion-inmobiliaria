@@ -16,7 +16,7 @@ pub struct DocumentGalleryProps {
     pub token: String,
 }
 
-#[function_component]
+#[component]
 pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
     let documents = use_state(Vec::<DocumentoResponse>::new);
     let loading = use_state(|| true);

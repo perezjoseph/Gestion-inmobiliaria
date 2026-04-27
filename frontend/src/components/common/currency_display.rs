@@ -12,7 +12,7 @@ pub struct CurrencyDisplayProps {
     pub tasa_cambio: f64,
 }
 
-#[function_component]
+#[component]
 pub fn CurrencyDisplay(props: &CurrencyDisplayProps) -> Html {
     let formatted = format_dr_currency(props.monto, &props.moneda);
 

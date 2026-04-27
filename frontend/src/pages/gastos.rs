@@ -91,7 +91,7 @@ struct GastoFilterBarProps {
     on_clear: Callback<MouseEvent>,
 }
 
-#[function_component]
+#[component]
 fn GastoFilterBar(props: &GastoFilterBarProps) -> Html {
     let fp = props.filter_propiedad.clone();
     let on_prop_change = Callback::from(move |e: Event| {
@@ -175,7 +175,7 @@ struct GastoFormProps {
     on_confidence_clear: Callback<String>,
 }
 
-#[function_component]
+#[component]
 fn GastoForm(props: &GastoFormProps) -> Html {
     let fe = props.form_errors.clone();
 
@@ -433,7 +433,7 @@ fn render_gasto_empty_state(user_rol: &str, on_new: &Callback<MouseEvent>) -> Ht
     }
 }
 
-#[function_component]
+#[component]
 fn GastoList(props: &GastoListProps) -> Html {
     if props.items.is_empty() {
         return render_gasto_empty_state(&props.user_rol, &props.on_new);
@@ -681,7 +681,7 @@ fn handle_escape_gastos(
     }
 }
 
-#[function_component]
+#[component]
 pub fn Gastos() -> Html {
     let auth = use_context::<AuthContext>();
     let toasts = use_context::<ToastContext>();

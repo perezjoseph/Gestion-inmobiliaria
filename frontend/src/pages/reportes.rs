@@ -7,7 +7,7 @@ use crate::components::common::skeleton::ReportSkeleton;
 use crate::services::api::{BASE_URL, api_get};
 use crate::types::reporte::IngresoReportSummary;
 
-#[function_component]
+#[component]
 pub fn Reportes() -> Html {
     let mes = use_state(|| {
         let d = js_sys::Date::new_0();

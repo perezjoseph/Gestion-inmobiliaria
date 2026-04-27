@@ -23,7 +23,7 @@ struct UsuarioRowProps {
     on_toggle_active: Callback<(String, bool)>,
 }
 
-#[function_component]
+#[component]
 fn UsuarioRow(props: &UsuarioRowProps) -> Html {
     let u = &props.user;
     let uid = u.id.clone();
@@ -66,7 +66,7 @@ fn UsuarioRow(props: &UsuarioRowProps) -> Html {
     }
 }
 
-#[function_component]
+#[component]
 pub fn Usuarios() -> Html {
     let toasts = use_context::<ToastContext>();
     let items = use_state(Vec::<User>::new);

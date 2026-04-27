@@ -5,7 +5,7 @@ pub struct FormErrorSummaryProps {
     pub errors: Vec<String>,
 }
 
-#[function_component]
+#[component]
 pub fn FormErrorSummary(props: &FormErrorSummaryProps) -> Html {
     if props.errors.is_empty() {
         return html! {};

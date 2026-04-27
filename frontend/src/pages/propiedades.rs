@@ -32,7 +32,7 @@ struct PropiedadFilterBarProps {
     on_clear: Callback<MouseEvent>,
 }
 
-#[function_component]
+#[component]
 fn PropiedadFilterBar(props: &PropiedadFilterBarProps) -> Html {
     let fc = props.filter_ciudad.clone();
     let on_ciudad_input = Callback::from(move |e: InputEvent| {
@@ -139,7 +139,7 @@ struct PropiedadFormProps {
     token: String,
 }
 
-#[function_component]
+#[component]
 fn PropiedadForm(props: &PropiedadFormProps) -> Html {
     let show_optional = use_state(|| false);
     let fe = props.form_errors.clone();
@@ -299,7 +299,7 @@ struct PropiedadListProps {
     on_per_page_change: Callback<u64>,
 }
 
-#[function_component]
+#[component]
 fn PropiedadList(props: &PropiedadListProps) -> Html {
     if props.items.is_empty() {
         return render_propiedad_empty_state(&props.user_rol, &props.on_new);
@@ -870,7 +870,7 @@ fn render_propiedades_view(
     }
 }
 
-#[function_component]
+#[component]
 pub fn Propiedades() -> Html {
     let auth = use_context::<AuthContext>();
     let toasts = use_context::<ToastContext>();

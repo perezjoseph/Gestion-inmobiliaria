@@ -9,7 +9,7 @@ pub struct SortableHeaderProps {
     pub on_sort: Callback<(String, String)>,
 }
 
-#[function_component]
+#[component]
 pub fn SortableHeader(props: &SortableHeaderProps) -> Html {
     let is_active = props
         .current_sort

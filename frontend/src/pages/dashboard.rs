@@ -11,7 +11,7 @@ use crate::types::DashboardStats;
 use crate::types::dashboard_extra::IngresoComparacion;
 use crate::types::notificacion::PagoVencido;
 
-#[function_component]
+#[component]
 pub fn Dashboard() -> Html {
     let stats = use_state(|| Option::<DashboardStats>::None);
     let overdue_pagos = use_state(Vec::<PagoVencido>::new);
@@ -86,7 +86,7 @@ pub fn Dashboard() -> Html {
     }
 }
 
-#[function_component]
+#[component]
 fn WelcomeCard() -> Html {
     html! {
         <div class="gi-welcome-card">
@@ -134,7 +134,7 @@ struct StatsHeaderProps {
     ingreso_comp: Option<IngresoComparacion>,
 }
 
-#[function_component]
+#[component]
 fn StatsHeader(props: &StatsHeaderProps) -> Html {
     let s = &props.stats;
     html! {
@@ -190,7 +190,7 @@ struct OverdueSectionProps {
     pagos: Vec<PagoVencido>,
 }
 
-#[function_component]
+#[component]
 fn OverdueSection(props: &OverdueSectionProps) -> Html {
     html! {
         <div class="gi-card-section">

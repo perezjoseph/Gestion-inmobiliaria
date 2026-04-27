@@ -76,7 +76,7 @@ struct MantenimientoFormProps {
     on_error_close: Callback<MouseEvent>,
 }
 
-#[function_component]
+#[component]
 fn MantenimientoForm(props: &MantenimientoFormProps) -> Html {
     let selected_prop = (*props.f_propiedad_id).clone();
     let filtered_unidades: Vec<&Unidad> = props
@@ -395,7 +395,7 @@ fn render_detail_notas(
     }
 }
 
-#[function_component]
+#[component]
 fn MantenimientoDetail(props: &MantenimientoDetailProps) -> Html {
     let sol = &props.sol;
 
@@ -514,7 +514,7 @@ fn render_mantenimiento_empty_state(user_rol: &str, on_new: &Callback<MouseEvent
     }
 }
 
-#[function_component]
+#[component]
 fn MantenimientoList(props: &MantenimientoListProps) -> Html {
     if props.items.is_empty() {
         return render_mantenimiento_empty_state(&props.user_rol, &props.on_new);
@@ -1162,7 +1162,7 @@ struct MantFilterBarProps {
     on_filter_clear: Callback<MouseEvent>,
 }
 
-#[function_component]
+#[component]
 fn MantFilterBar(props: &MantFilterBarProps) -> Html {
     html! {
         <div class="gi-filter-bar">
@@ -1196,7 +1196,7 @@ fn MantFilterBar(props: &MantFilterBarProps) -> Html {
     }
 }
 
-#[function_component]
+#[component]
 pub fn Mantenimiento() -> Html {
     let auth = use_context::<AuthContext>();
     let toasts = use_context::<ToastContext>();

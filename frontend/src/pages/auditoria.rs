@@ -10,7 +10,7 @@ use crate::types::PaginatedResponse;
 use crate::types::auditoria::AuditoriaEntry;
 use crate::utils::format_date_display;
 
-#[function_component]
+#[component]
 pub fn Auditoria() -> Html {
     let items = use_state(Vec::<AuditoriaEntry>::new);
     let total = use_state(|| 0u64);

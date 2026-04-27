@@ -10,7 +10,7 @@ pub struct SkeletonProps {
     pub radius: String,
 }
 
-#[function_component]
+#[component]
 pub fn Skeleton(props: &SkeletonProps) -> Html {
     html! {
         <div class="gi-skeleton"
@@ -31,7 +31,7 @@ pub struct TableSkeletonProps {
     pub has_filter: bool,
 }
 
-#[function_component]
+#[component]
 pub fn TableSkeleton(props: &TableSkeletonProps) -> Html {
     let col_widths = [
         "40%", "25%", "20%", "15%", "30%", "35%", "22%", "18%",
@@ -103,7 +103,7 @@ pub fn TableSkeleton(props: &TableSkeletonProps) -> Html {
     }
 }
 
-#[function_component]
+#[component]
 pub fn ProfileSkeleton() -> Html {
     html! {
         <div aria-busy="true" aria-label="Cargando perfil">
@@ -144,7 +144,7 @@ pub fn ProfileSkeleton() -> Html {
     }
 }
 
-#[function_component]
+#[component]
 pub fn ReportSkeleton() -> Html {
     html! {
         <div aria-busy="true" aria-label="Cargando reporte">
@@ -157,7 +157,7 @@ pub fn ReportSkeleton() -> Html {
     }
 }
 
-#[function_component]
+#[component]
 pub fn DashboardSkeleton() -> Html {
     html! {
         <div>

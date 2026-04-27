@@ -37,7 +37,7 @@ fn friendly_server_error(err: &str) -> String {
     }
 }
 
-#[function_component]
+#[component]
 pub fn LoginForm(props: &LoginFormProps) -> Html {
     let email = use_state(String::new);
     let password = use_state(String::new);

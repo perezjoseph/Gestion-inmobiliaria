@@ -125,7 +125,7 @@ fn icon_profile() -> Html {
     }
 }
 
-#[function_component]
+#[component]
 pub fn Sidebar(props: &SidebarProps) -> Html {
     let current_route = use_route::<Route>();
     let on_nav_click = props.on_nav_click.clone();

@@ -13,7 +13,7 @@ fn is_image_file(name: &str) -> bool {
         || ext.eq_ignore_ascii_case("pdf")
 }
 
-#[function_component]
+#[component]
 pub fn FileTypeIndicator(props: &FileTypeIndicatorProps) -> Html {
     let (icon, label) = if is_image_file(&props.filename) {
         ("🖼️", "Imagen")

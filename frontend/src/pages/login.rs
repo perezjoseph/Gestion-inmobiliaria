@@ -6,7 +6,7 @@ use crate::components::auth::login_form::LoginForm;
 use crate::services::auth::is_authenticated;
 use crate::types::usuario::LoginResponse;
 
-#[function_component]
+#[component]
 pub fn Login() -> Html {
     let Some(navigator) = use_navigator() else {
         return html! {};

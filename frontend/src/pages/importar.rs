@@ -72,7 +72,7 @@ async fn perform_upload(file: web_sys::File, entity_type: String) -> Result<Uplo
     handle_upload_response(resp).await
 }
 
-#[function_component]
+#[component]
 pub fn Importar() -> Html {
     let entity_type = use_state(|| "propiedades".to_string());
     let result = use_state(|| Option::<ImportResult>::None);

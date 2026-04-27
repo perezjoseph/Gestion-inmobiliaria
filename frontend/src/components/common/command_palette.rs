@@ -99,7 +99,7 @@ fn filter_items(items: &[PaletteItem], query: &str) -> Vec<PaletteItem> {
         .collect()
 }
 
-#[function_component]
+#[component]
 pub fn CommandPalette() -> Html {
     let open = use_state(|| false);
     let query = use_state(String::new);
@@ -273,7 +273,7 @@ pub fn CommandPalette() -> Html {
     }
 }
 
-#[function_component]
+#[component]
 fn PaletteFooter() -> Html {
     html! {
         <div class="gi-palette-footer">

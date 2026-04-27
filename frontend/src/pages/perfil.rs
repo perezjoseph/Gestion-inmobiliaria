@@ -8,7 +8,7 @@ use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{api_get, api_put};
 use crate::types::usuario::User;
 
-#[function_component]
+#[component]
 fn PasswordChangeForm() -> Html {
     let toasts = use_context::<ToastContext>();
     let password_actual = use_state(String::new);
@@ -104,7 +104,7 @@ fn PasswordChangeForm() -> Html {
     }
 }
 
-#[function_component]
+#[component]
 pub fn Perfil() -> Html {
     let auth = use_context::<AuthContext>();
     let toasts = use_context::<ToastContext>();

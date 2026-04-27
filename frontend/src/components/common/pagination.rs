@@ -10,7 +10,7 @@ pub struct PaginationProps {
     pub on_per_page_change: Callback<u64>,
 }
 
-#[function_component]
+#[component]
 pub fn Pagination(props: &PaginationProps) -> Html {
     let total = props.total;
     let page = props.page;

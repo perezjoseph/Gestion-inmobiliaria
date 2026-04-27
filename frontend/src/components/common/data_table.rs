@@ -17,7 +17,7 @@ pub struct DataTableProps {
     pub on_sort: Option<Callback<(String, String)>>,
 }
 
-#[function_component]
+#[component]
 pub fn DataTable(props: &DataTableProps) -> Html {
     let has_sort = props.on_sort.is_some() && !props.sortable_fields.is_empty();
 

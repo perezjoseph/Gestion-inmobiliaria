@@ -79,7 +79,7 @@ async fn perform_ocr_extract(
         .map_err(|e| format!("Error al procesar respuesta: {e}"))
 }
 
-#[function_component]
+#[component]
 pub fn OcrScanButton(props: &OcrScanButtonProps) -> Html {
     let loading = use_state(|| false);
     let error = use_state(|| Option::<String>::None);

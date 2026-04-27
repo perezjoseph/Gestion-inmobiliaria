@@ -113,7 +113,7 @@ pub struct ToastItemProps {
     pub on_dismiss: Callback<u32>,
 }
 
-#[function_component]
+#[component]
 fn ToastItem(props: &ToastItemProps) -> Html {
     let id = props.msg.id;
     let on_dismiss = props.on_dismiss.clone();
@@ -178,7 +178,7 @@ fn ToastItem(props: &ToastItemProps) -> Html {
 #[derive(Properties, PartialEq, Eq)]
 pub struct ToastContainerProps;
 
-#[function_component]
+#[component]
 pub fn ToastContainer(_props: &ToastContainerProps) -> Html {
     let toasts = use_context::<ToastContext>();
 

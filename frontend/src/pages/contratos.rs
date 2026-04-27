@@ -89,7 +89,7 @@ struct ContratoFormProps {
     on_confidence_clear: Callback<String>,
 }
 
-#[function_component]
+#[component]
 fn ContratoForm(props: &ContratoFormProps) -> Html {
     let fe = props.form_errors.clone();
 
@@ -240,7 +240,7 @@ struct RenewModalProps {
     on_cancel: Callback<MouseEvent>,
 }
 
-#[function_component]
+#[component]
 fn RenewModal(props: &RenewModalProps) -> Html {
     html! {
         <div class="gi-modal-overlay">
@@ -288,7 +288,7 @@ struct TerminateModalProps {
     on_cancel: Callback<MouseEvent>,
 }
 
-#[function_component]
+#[component]
 fn TerminateModal(props: &TerminateModalProps) -> Html {
     html! {
         <div class="gi-modal-overlay">
@@ -333,7 +333,7 @@ struct ContratoListProps {
     on_per_page_change: Callback<u64>,
 }
 
-#[function_component]
+#[component]
 fn ContratoList(props: &ContratoListProps) -> Html {
     if props.items.is_empty() {
         return render_contrato_empty_state();
@@ -1039,7 +1039,7 @@ fn render_contrato_form_section(
     }
 }
 
-#[function_component]
+#[component]
 pub fn Contratos() -> Html {
     let auth = use_context::<AuthContext>();
     let toasts = use_context::<ToastContext>();

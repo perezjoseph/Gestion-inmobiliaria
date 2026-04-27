@@ -1,6 +1,6 @@
 use yew::prelude::*;
 
-#[function_component]
+#[component]
 pub fn Footer() -> Html {
     html! {
         <footer class="gi-footer">

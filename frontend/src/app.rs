@@ -158,7 +158,7 @@ pub struct ProtectedRouteProps {
     pub children: Html,
 }
 
-#[function_component]
+#[component]
 pub fn ProtectedRoute(props: &ProtectedRouteProps) -> Html {
     let Some(navigator) = use_navigator() else {
         return html! {};
@@ -238,7 +238,7 @@ pub fn ProtectedRoute(props: &ProtectedRouteProps) -> Html {
     }
 }
 
-#[function_component]
+#[component]
 pub fn App() -> Html {
     let auth = use_reducer(AuthState::default);
     let toasts = use_reducer(ToastState::default);

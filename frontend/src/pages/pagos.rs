@@ -44,7 +44,7 @@ struct PagoFilterBarProps {
     on_clear: Callback<MouseEvent>,
 }
 
-#[function_component]
+#[component]
 fn PagoFilterBar(props: &PagoFilterBarProps) -> Html {
     let fc = props.filter_contrato.clone();
     let on_contrato_change = Callback::from(move |e: Event| {
@@ -141,7 +141,7 @@ struct PagoFormProps {
     on_confidence_clear: Callback<String>,
 }
 
-#[function_component]
+#[component]
 fn PagoForm(props: &PagoFormProps) -> Html {
     let fe = props.form_errors.clone();
 
@@ -390,7 +390,7 @@ fn render_pago_empty_state(user_rol: &str, on_new: &Callback<MouseEvent>) -> Htm
     }
 }
 
-#[function_component]
+#[component]
 fn PagoList(props: &PagoListProps) -> Html {
     if props.items.is_empty() {
         return render_pago_empty_state(&props.user_rol, &props.on_new);
@@ -720,7 +720,7 @@ fn handle_escape_pagos(
     }
 }
 
-#[function_component]
+#[component]
 pub fn Pagos() -> Html {
     let auth = use_context::<AuthContext>();
     let toasts = use_context::<ToastContext>();

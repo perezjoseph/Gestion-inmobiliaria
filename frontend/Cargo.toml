@@ -8,7 +8,7 @@ publish = false
 workspace = true
 
 [dependencies]
-yew = { version = "0.21", features = ["csr"] }
+yew = { version = "0.23", features = ["csr"] }
 yew-router = "0.20"
 gloo-net = { version = "0.6", features = ["http"] }
 serde.workspace = true

@@ -17,7 +17,7 @@ fn is_low_confidence(confidence: Option<f64>) -> bool {
     matches!(confidence, Some(c) if c < 0.7)
 }
 
-#[function_component]
+#[component]
 pub fn ConfidenceInput(props: &ConfidenceInputProps) -> Html {
     let low = is_low_confidence(props.confidence);
 
