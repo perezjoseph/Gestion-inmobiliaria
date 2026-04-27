@@ -15,12 +15,14 @@ RUN apt-get update -qq \
 # ── Static binaries (musl, no runtime deps) ────────────────────
 # All downloads are checksum-verified. Versions are pinned as ARGs
 # so Dependabot / Renovate can bump them in one place.
+# Every curl uses --retry to handle flaky TLS on the build node.
 
 # sccache — Rust compilation cache
 ARG SCCACHE_VERSION=0.14.0
 ARG SCCACHE_SHA256=8424b38cda4ecce616a1557d81328f3d7c96503a171eab79942fad618b42af44
 RUN ARCHIVE="/tmp/sccache.tar.gz" \
-    && curl -sSfL --proto =https -o "$ARCHIVE" \
+    && curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors \
+       --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
        "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
     && echo "${SCCACHE_SHA256}  ${ARCHIVE}" | sha256sum -c - \
     && tar xzf "$ARCHIVE" --no-same-owner --strip-components=1 -C /usr/local/bin \
@@ -31,7 +33,8 @@ RUN ARCHIVE="/tmp/sccache.tar.gz" \
 # cargo-llvm-cov — test coverage
 ARG LLVM_COV_VERSION=0.8.4
 RUN ARCHIVE="/tmp/cargo-llvm-cov.tar.gz" \
-    && curl -sSfL --proto =https -o "$ARCHIVE" \
+    && curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors \
+       --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
        "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v${LLVM_COV_VERSION}/cargo-llvm-cov-x86_64-unknown-linux-musl.tar.gz" \
     && tar xzf "$ARCHIVE" --no-same-owner -C /usr/local/bin cargo-llvm-cov \
     && chmod +x /usr/local/bin/cargo-llvm-cov \
@@ -41,7 +44,8 @@ RUN ARCHIVE="/tmp/cargo-llvm-cov.tar.gz" \
 ARG TRUNK_VERSION=0.21.14
 ARG TRUNK_SHA256=a67f4054b249fe9acc5fabc25de1aebf19783aca3ad6ff64bf34d7da44d0ea20
 RUN ARCHIVE="/tmp/trunk.tar.gz" \
-    && curl -sSfL --proto =https -o "$ARCHIVE" \
+    && curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors \
+       --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
        "https://github.com/trunk-rs/trunk/releases/download/v${TRUNK_VERSION}/trunk-x86_64-unknown-linux-musl.tar.gz" \
     && echo "${TRUNK_SHA256}  ${ARCHIVE}" | sha256sum -c - \
     && tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C /usr/local/bin trunk \
@@ -52,7 +56,8 @@ RUN ARCHIVE="/tmp/trunk.tar.gz" \
 ARG CARGO_DENY_VERSION=0.19.4
 ARG CARGO_DENY_SHA256=3bd58b784e83715b86ddbc9deac591890372ec77fda5741bb0826970b958506f
 RUN ARCHIVE="/tmp/cargo-deny.tar.gz" \
-    && curl -sSfL --proto =https -o "$ARCHIVE" \
+    && curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors \
+       --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
        "https://github.com/EmbarkStudios/cargo-deny/releases/download/${CARGO_DENY_VERSION}/cargo-deny-${CARGO_DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
     && echo "${CARGO_DENY_SHA256}  ${ARCHIVE}" | sha256sum -c - \
     && tar xzf "$ARCHIVE" --no-same-owner --strip-components=1 -C /usr/local/bin \
@@ -63,7 +68,8 @@ RUN ARCHIVE="/tmp/cargo-deny.tar.gz" \
 ARG GITLEAKS_VERSION=8.24.3
 ARG GITLEAKS_SHA256=9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c
 RUN ARCHIVE="/tmp/gitleaks.tar.gz" \
-    && curl -sSfL --proto =https -o "$ARCHIVE" \
+    && curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors \
+       --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
        "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
     && echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c - \
     && tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C /usr/local/bin gitleaks \
@@ -74,7 +80,8 @@ RUN ARCHIVE="/tmp/gitleaks.tar.gz" \
 ARG TRIVY_VERSION=0.69.3
 ARG TRIVY_SHA256=1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75
 RUN ARCHIVE="/tmp/trivy.tar.gz" \
-    && curl -sSfL --proto =https -o "$ARCHIVE" \
+    && curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors \
+       --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
        "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
     && echo "${TRIVY_SHA256}  ${ARCHIVE}" | sha256sum -c - \
     && tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C /usr/local/bin trivy \
