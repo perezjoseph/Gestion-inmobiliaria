@@ -1,4 +1,4 @@
-﻿name: Build & Test
+name: Build & Test
 
 on:
   workflow_call:
@@ -116,7 +116,7 @@ jobs:
 
       - name: Install cargo-llvm-cov
         id: install-llvm-cov
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 10
           max_attempts: 3
@@ -139,7 +139,7 @@ jobs:
 
       - name: Run tests with coverage (llvm-cov)
         id: tests
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 30
           max_attempts: 2
@@ -160,7 +160,7 @@ jobs:
       # ── Phase 3: Release build (sccache makes this fast after clippy+test) ──
       - name: Build backend release binary
         id: build
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 30
           max_attempts: 2
@@ -279,7 +279,7 @@ jobs:
       # ── Phase 2: Tests ──
       - name: Run frontend tests
         id: tests
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 30
           max_attempts: 2
@@ -290,7 +290,7 @@ jobs:
       # ── Phase 3: Trunk release build (sccache makes this fast) ──
       - name: Install Trunk
         id: install-trunk
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 10
           max_attempts: 3
@@ -324,7 +324,7 @@ jobs:
 
       - name: Build frontend with Trunk
         id: build
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 30
           max_attempts: 2
