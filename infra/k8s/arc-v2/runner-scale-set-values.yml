@@ -42,7 +42,7 @@ template:
       - name: init-nfs-permissions
         image: ghcr.io/perezjoseph/realestate-runner:latest
         imagePullPolicy: Always
-        command: ["sh", "-c", "chmod -R 777 /mnt/registry /mnt/git /mnt/sccache /mnt/target 2>/dev/null; true"]
+        command: ["sh", "-c", "find /mnt/registry /mnt/git /mnt/sccache /mnt/target -not -perm 777 -print0 2>/dev/null | xargs -0 -P4 -r chmod 777; true"]
         securityContext:
           runAsUser: 0
         volumeMounts:
