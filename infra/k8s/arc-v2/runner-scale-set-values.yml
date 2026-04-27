@@ -39,6 +39,21 @@ template:
         volumeMounts:
           - name: dind-externals
             mountPath: /home/runner/tmpDir
+      - name: init-nfs-permissions
+        image: ghcr.io/actions/actions-runner:latest
+        imagePullPolicy: IfNotPresent
+        command: ["sh", "-c", "chmod -R 777 /mnt/registry /mnt/git /mnt/sccache /mnt/target 2>/dev/null; true"]
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+          - name: cargo-registry
+            mountPath: /mnt/registry
+          - name: cargo-git
+            mountPath: /mnt/git
+          - name: sccache
+            mountPath: /mnt/sccache
+          - name: cargo-target
+            mountPath: /mnt/target
       - name: dind
         image: docker:dind
         imagePullPolicy: IfNotPresent
@@ -94,12 +109,10 @@ template:
             mountPath: /home/runner/_work
           - name: dind-sock
             mountPath: /var/run
-          - name: cargo-cache
+          - name: cargo-registry
             mountPath: /home/runner/.cargo/registry
-            subPath: registry
-          - name: cargo-cache
+          - name: cargo-git
             mountPath: /home/runner/.cargo/git
-            subPath: git
           - name: sccache
             mountPath: /home/runner/.sccache
           - name: cargo-target
@@ -138,10 +151,14 @@ template:
         emptyDir: {}
       - name: dind-externals
         emptyDir: {}
-      - name: cargo-cache
+      - name: cargo-registry
         nfs:
           server: 192.168.88.22
-          path: /volume1/docker/k3s-cache/cargo-cache
+          path: /volume1/docker/k3s-cache/cargo-cache/registry
+      - name: cargo-git
+        nfs:
+          server: 192.168.88.22
+          path: /volume1/docker/k3s-cache/cargo-cache/git
       - name: sccache
         nfs:
           server: 192.168.88.22
