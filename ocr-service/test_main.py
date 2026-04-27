@@ -12,6 +12,23 @@ from starlette.testclient import TestClient
 
 from main import app, ocr_engine, _classify_document, _extract_structured_fields
 
+def _mock_predict_result(lines):
+    """Convert old-style OCR lines to PaddleOCR 3.5 predict() result format."""
+    if not lines:
+        return []
+    import numpy as np
+    rec_texts = [text for _, (text, _) in lines]
+    rec_scores = np.array([conf for _, (_, conf) in lines])
+    dt_polys = np.array([bbox for bbox, _ in lines], dtype=np.int16)
+    result = MagicMock()
+    result.rec_texts = rec_texts
+    result.rec_scores = rec_scores
+    result.dt_polys = dt_polys
+    # Support dict-style access too
+    result.__getitem__ = lambda self, key: getattr(self, key)
+    result.__contains__ = lambda self, key: hasattr(self, key)
+    return [result]
+
 
 @pytest.fixture()
 def client():
@@ -50,19 +67,11 @@ def test_oversized_file_returns_413(client):
 
 
 def test_valid_image_returns_200(client):
-    sample_ocr_result = [
-        [
-            (
-                [[10, 20], [300, 20], [300, 50], [10, 50]],
-                ("BANCO POPULAR DOMINICANO", 0.97),
-            ),
-            (
-                [[10, 60], [200, 60], [200, 90], [10, 90]],
-                ("DEPOSITO AHORROS", 0.95),
-            ),
-        ]
-    ]
-    ocr_engine.ocr = MagicMock(return_value=sample_ocr_result)
+    sample_predict_result = _mock_predict_result([
+        ([[10, 20], [300, 20], [300, 50], [10, 50]], ("BANCO POPULAR DOMINICANO", 0.97)),
+        ([[10, 60], [200, 60], [200, 90], [10, 90]], ("DEPOSITO AHORROS", 0.95)),
+    ])
+    ocr_engine.predict = MagicMock(return_value=sample_predict_result)
 
     resp = client.post(
         "/ocr/extract",
@@ -203,12 +212,10 @@ class TestExtractContrato:
 
 class TestExtractEndpointDocumentType:
     def test_provided_document_type_skips_classification(self, client):
-        sample_ocr_result = [
-            [
-                ([[0, 0], [100, 0], [100, 30], [0, 30]], ("RANDOM TEXT", 0.90)),
-            ]
-        ]
-        ocr_engine.ocr = MagicMock(return_value=sample_ocr_result)
+        sample_predict_result = _mock_predict_result([
+            ([[0, 0], [100, 0], [100, 30], [0, 30]], ("RANDOM TEXT", 0.90)),
+        ])
+        ocr_engine.predict = MagicMock(return_value=sample_predict_result)
 
         resp = client.post(
             "/ocr/extract",
@@ -220,12 +227,10 @@ class TestExtractEndpointDocumentType:
         assert body["document_type"] == "cedula"
 
     def test_contrato_document_type_passthrough(self, client):
-        sample_ocr_result = [
-            [
-                ([[0, 0], [100, 0], [100, 30], [0, 30]], ("CANON MENSUAL RD$ 20,000.00", 0.92)),
-            ]
-        ]
-        ocr_engine.ocr = MagicMock(return_value=sample_ocr_result)
+        sample_predict_result = _mock_predict_result([
+            ([[0, 0], [100, 0], [100, 30], [0, 30]], ("CANON MENSUAL RD$ 20,000.00", 0.92)),
+        ])
+        ocr_engine.predict = MagicMock(return_value=sample_predict_result)
 
         resp = client.post(
             "/ocr/extract",
@@ -238,13 +243,11 @@ class TestExtractEndpointDocumentType:
         assert "structured_fields" in body
 
     def test_omitted_document_type_uses_auto_classification(self, client):
-        sample_ocr_result = [
-            [
-                ([[0, 0], [100, 0], [100, 30], [0, 30]], ("CEDULA DE IDENTIDAD", 0.95)),
-                ([[0, 40], [100, 40], [100, 70], [0, 70]], ("001-1234567-8", 0.90)),
-            ]
-        ]
-        ocr_engine.ocr = MagicMock(return_value=sample_ocr_result)
+        sample_predict_result = _mock_predict_result([
+            ([[0, 0], [100, 0], [100, 30], [0, 30]], ("CEDULA DE IDENTIDAD", 0.95)),
+            ([[0, 40], [100, 40], [100, 70], [0, 70]], ("001-1234567-8", 0.90)),
+        ])
+        ocr_engine.predict = MagicMock(return_value=sample_predict_result)
 
         resp = client.post(
             "/ocr/extract",

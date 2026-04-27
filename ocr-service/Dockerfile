@@ -22,7 +22,7 @@ ENV PADDLE_PDX_MODEL_SOURCE=BOS
 
 RUN for i in 1 2 3; do \
     timeout 300 python -c \
-      "from paddleocr import PaddleOCR; PaddleOCR(use_textline_orientation=True, lang='es', device='cpu')" \
+      "from paddleocr import PaddleOCR; PaddleOCR(use_textline_orientation=True, use_doc_orientation_classify=False, use_doc_unwarping=False, lang='es', device='cpu')" \
     && break \
     || { echo "Attempt $i failed, retrying in 15s..."; sleep 15; }; \
     done

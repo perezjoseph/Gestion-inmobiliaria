@@ -12,7 +12,13 @@ from PIL import Image
 
 app = FastAPI(title="OCR Service")
 
-ocr_engine = PaddleOCR(use_textline_orientation=True, lang="es", device="cpu")
+ocr_engine = PaddleOCR(
+    use_textline_orientation=True,
+    use_doc_orientation_classify=False,
+    use_doc_unwarping=False,
+    lang="es",
+    device="cpu",
+)
 
 
 @app.get("/health")
@@ -249,18 +255,26 @@ def _extract_structured_fields(lines: list[dict], document_type: str) -> dict:
 
 def _run_ocr(img_array: np.ndarray) -> list[dict]:
     """Run PaddleOCR on a numpy image array and return structured line dicts."""
-    result = ocr_engine.ocr(img_array, cls=True)
+    results = ocr_engine.predict(img_array)
 
-    if not result or not result[0]:
+    if not results:
+        return []
+
+    res = results[0]
+    rec_texts = res["rec_texts"] if isinstance(res, dict) else res.rec_texts
+    rec_scores = res["rec_scores"] if isinstance(res, dict) else res.rec_scores
+    dt_polys = res["dt_polys"] if isinstance(res, dict) else res.dt_polys
+
+    if not len(rec_texts):
         return []
 
     lines: list[dict] = []
-    for line in result[0]:
-        bbox_points, (text, confidence) = line
-        flat_bbox = [coord for point in bbox_points for coord in point]
+    for i, text in enumerate(rec_texts):
+        poly = dt_polys[i]
+        flat_bbox = [float(coord) for point in poly for coord in point]
         lines.append({
-            "text": text,
-            "confidence": float(confidence),
+            "text": str(text),
+            "confidence": float(rec_scores[i]),
             "bbox": flat_bbox,
         })
     return lines

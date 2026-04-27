@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-    <!--
-        OWASP Dependency-Check suppression file for the Rust/WASM CI pipeline.
-        Add entries here for confirmed false positives only.
-        Each suppression MUST include a <notes> explaining why it is safe.
-        Review this file periodically and remove entries for resolved CVEs.
-    -->
-</suppressions>
