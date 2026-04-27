@@ -34,14 +34,14 @@ template:
     initContainers:
       - name: init-dind-externals
         image: ghcr.io/perezjoseph/realestate-runner:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
         volumeMounts:
           - name: dind-externals
             mountPath: /home/runner/tmpDir
       - name: init-nfs-permissions
         image: ghcr.io/perezjoseph/realestate-runner:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         command: ["sh", "-c", "chmod -R 777 /mnt/registry /mnt/git /mnt/sccache /mnt/target 2>/dev/null; true"]
         securityContext:
           runAsUser: 0
@@ -91,7 +91,7 @@ template:
     containers:
       - name: runner
         image: ghcr.io/perezjoseph/realestate-runner:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         command: ["/home/runner/run.sh"]
         env:
           - name: DOCKER_HOST
