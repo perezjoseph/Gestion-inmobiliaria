@@ -61,6 +61,7 @@ template:
           - dockerd
           - --host=unix:///var/run/docker.sock
           - --group=$(DOCKER_GROUP_GID)
+          - --mtu=1400
         env:
           - name: DOCKER_GROUP_GID
             value: "123"
