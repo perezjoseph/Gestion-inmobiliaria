@@ -15,7 +15,7 @@ permissions: {}
 jobs:
   semgrep:
     name: semgrep/ci
-    runs-on: self-hosted
+    runs-on: arc-runner-dind
     permissions:
       contents: read
     env:
@@ -30,7 +30,7 @@ jobs:
 
   semgrep-community:
     name: semgrep/community-rules
-    runs-on: self-hosted
+    runs-on: arc-runner-dind
     permissions:
       contents: read
     container:
