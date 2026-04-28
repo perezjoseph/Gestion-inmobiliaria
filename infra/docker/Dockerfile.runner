@@ -10,6 +10,7 @@ RUN apt-get update -qq \
        build-essential \
        pkg-config \
        libssl-dev \
+       musl-tools \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Static binaries (musl, no runtime deps) ────────────────────
