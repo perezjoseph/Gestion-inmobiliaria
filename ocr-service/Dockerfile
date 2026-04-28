@@ -12,8 +12,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --force-reinstall setuptools wheel \
-    && pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip cache purge 2>/dev/null || true \
+    # Remove stale dist-info left by base image or transitive installs
+    && find /usr/local/lib/python3.11/site-packages \
+        -maxdepth 1 -type d -name 'setuptools-79*' -exec rm -rf {} + \
+    && find /usr/local/lib/python3.11/site-packages \
+        -maxdepth 1 -type d -name 'wheel-0.45*' -exec rm -rf {} + \
+    # Remove vulnerable vendored copies inside setuptools
+    && rm -rf /usr/local/lib/python3.11/site-packages/setuptools/_vendor/jaraco.context-5.3.0.dist-info \
+    && rm -rf /usr/local/lib/python3.11/site-packages/setuptools/_vendor/wheel-0.45.1.dist-info
 
 COPY main.py .
 
