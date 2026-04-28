@@ -85,6 +85,7 @@ spec:
             periodSeconds: 15
           securityContext:
             runAsNonRoot: true
+            runAsUser: 1000
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
       volumes:
