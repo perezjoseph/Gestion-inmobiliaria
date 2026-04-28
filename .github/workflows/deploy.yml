@@ -17,13 +17,15 @@ on:
         required: true
       JWT_SECRET:
         required: true
+      KUBECONFIG_DATA:
+        required: true
 
 permissions: {}
 
 jobs:
   deploy:
     name: Deploy to Production (k3s)
-    runs-on: arc-runner-dind
+    runs-on: self-hosted
     environment: production
     concurrency:
       group: deploy-production
@@ -40,35 +42,98 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install kubectl
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        env:
+          KUBECTL_VERSION: "1.32.4"
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            if kubectl version --client 2>/dev/null | grep -q "${KUBECTL_VERSION}"; then
+              echo "kubectl ${KUBECTL_VERSION} already installed"
+              exit 0
+            fi
+            curl -sSfL --proto =https --retry 3 --retry-delay 5 \
+              "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
+              -o /tmp/kubectl
+            install -m 755 /tmp/kubectl /usr/local/bin/kubectl
+            rm -f /tmp/kubectl
+            kubectl version --client
+
+      - name: Install gh CLI
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        env:
+          GH_VERSION: "2.74.1"
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            if gh --version 2>/dev/null | grep -q "${GH_VERSION}"; then
+              echo "gh ${GH_VERSION} already installed"
+              exit 0
+            fi
+            curl -sSfL --proto =https --retry 3 --retry-delay 5 \
+              "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
+              -o /tmp/gh.tar.gz
+            tar xzf /tmp/gh.tar.gz -C /tmp --strip-components=1
+            install -m 755 /tmp/bin/gh /usr/local/bin/gh
+            rm -rf /tmp/gh.tar.gz /tmp/bin /tmp/share
+            gh --version
+
+      - name: Configure kubeconfig
+        run: |
+          umask 077
+          mkdir -p "${HOME}/.kube"
+          echo "${{ secrets.KUBECONFIG_DATA }}" | base64 -d > "${HOME}/.kube/config"
+          kubectl cluster-info
+
       - name: Verify backend attestation
         id: verify-backend
-        run: |
-          gh attestation verify \
-            "oci://ghcr.io/${IMAGE_OWNER}/realestate-backend@${BACKEND_DIGEST}" \
-            --owner "${IMAGE_OWNER}"
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BACKEND_DIGEST: ${{ inputs.backend-digest }}
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            gh attestation verify \
+              "oci://ghcr.io/${IMAGE_OWNER}/realestate-backend@${BACKEND_DIGEST}" \
+              --owner "${IMAGE_OWNER}"
 
       - name: Verify frontend attestation
         id: verify-frontend
-        run: |
-          gh attestation verify \
-            "oci://ghcr.io/${IMAGE_OWNER}/realestate-frontend@${FRONTEND_DIGEST}" \
-            --owner "${IMAGE_OWNER}"
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FRONTEND_DIGEST: ${{ inputs.frontend-digest }}
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            gh attestation verify \
+              "oci://ghcr.io/${IMAGE_OWNER}/realestate-frontend@${FRONTEND_DIGEST}" \
+              --owner "${IMAGE_OWNER}"
 
       - name: Verify OCR service attestation
         id: verify-ocr-service
-        run: |
-          gh attestation verify \
-            "oci://ghcr.io/${IMAGE_OWNER}/realestate-ocr-service@${OCR_DIGEST}" \
-            --owner "${IMAGE_OWNER}"
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OCR_DIGEST: ${{ inputs.ocr-service-digest }}
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            gh attestation verify \
+              "oci://ghcr.io/${IMAGE_OWNER}/realestate-ocr-service@${OCR_DIGEST}" \
+              --owner "${IMAGE_OWNER}"
 
       - name: Mask secrets
         run: |
@@ -159,3 +224,7 @@ jobs:
           kubectl rollout undo deployment/ocr-service --namespace realestate
           kubectl rollout status deployment/backend --namespace realestate --timeout=120s || true
           echo "::error::Rollback attempted. Manual verification required."
+
+      - name: Credential cleanup
+        if: always()
+        run: rm -f "${HOME}/.kube/config"

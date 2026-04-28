@@ -165,3 +165,4 @@ jobs:
     secrets:
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_DATA }}

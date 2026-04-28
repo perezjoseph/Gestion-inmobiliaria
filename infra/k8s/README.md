@@ -24,7 +24,7 @@ graph TB
         subgraph pc1["pc1 (worker) — WSL2 bridged<br/>Ubuntu 22.04 · DHCP<br/>18 CPU / 64 GB · role=desktop"]
             subgraph ns_arc["arc-systems"]
                 arc_ctrl[ARC controller]
-                arc_dind[arc-runner-dind<br/>×1–5<br/>labels: arc-runner,<br/>arc-runner-dind, arc-deploy]
+                arc_dind[arc-runner-dind<br/>×1–3<br/>labels: arc-runner,<br/>arc-runner-dind]
             end
         end
 
