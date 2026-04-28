@@ -4,6 +4,7 @@ use actix_web::error::ResponseError;
 use actix_web::http::header;
 use actix_web::web;
 use actix_web::web::JsonConfig;
+use actix_web::HttpResponse;
 use sea_orm::DatabaseConnection;
 use tracing_actix_web::TracingLogger;
 
@@ -11,6 +12,10 @@ use crate::config::AppConfig;
 use crate::errors::AppError;
 use crate::routes;
 use crate::services::ocr_preview::PreviewStore;
+
+async fn health() -> HttpResponse {
+    HttpResponse::Ok().json(serde_json::json!({"status": "ok"}))
+}
 
 fn build_cors(config: &AppConfig) -> Cors {
     config.cors_origin.as_deref().map_or_else(Cors::permissive, |origin| {
@@ -55,6 +60,7 @@ pub fn create_app(
         .app_data(web::Data::new(config))
         .app_data(preview_store)
         .app_data(json_cfg)
+        .route("/health", web::get().to(health))
         .configure(routes::configure)
         .service(Files::new("/uploads", &upload_dir).show_files_listing())
 }
