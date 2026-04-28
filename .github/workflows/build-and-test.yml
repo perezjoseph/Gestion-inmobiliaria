@@ -55,6 +55,7 @@ jobs:
         uses: ./.github/actions/rust-setup
         with:
           components: clippy,llvm-tools-preview
+          targets: x86_64-unknown-linux-musl
 
       # ── Phase 1: Clippy (compiles everything, warms sccache) ──
       - name: Clippy backend
@@ -158,6 +159,11 @@ jobs:
           retention-days: 7
 
       # ── Phase 3: Release build (sccache makes this fast after clippy+test) ──
+      - name: Install musl tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends musl-tools
+
       - name: Build backend release binary
         id: build
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
@@ -165,7 +171,7 @@ jobs:
           timeout_minutes: 30
           max_attempts: 2
           command: |
-            cargo build --locked -p realestate-backend --profile ci-release 2>&1 | tee "${RUNNER_TEMP}/build-backend-output.txt"
+            cargo build --locked -p realestate-backend --profile ci-release --target x86_64-unknown-linux-musl 2>&1 | tee "${RUNNER_TEMP}/build-backend-output.txt"
             exit ${PIPESTATUS[0]}
 
       - name: Verify Cargo.lock is up to date
@@ -192,7 +198,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
         with:
           name: backend-binary
-          path: ${{ env.CARGO_TARGET_DIR || 'target' }}/ci-release/realestate-backend
+          path: ${{ env.CARGO_TARGET_DIR || 'target' }}/x86_64-unknown-linux-musl/ci-release/realestate-backend
           retention-days: 7
           if-no-files-found: error
 
@@ -207,7 +213,7 @@ jobs:
       - name: Attest build provenance
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
-          subject-path: ${{ env.CARGO_TARGET_DIR || 'target' }}/ci-release/realestate-backend
+          subject-path: ${{ env.CARGO_TARGET_DIR || 'target' }}/x86_64-unknown-linux-musl/ci-release/realestate-backend
 
       - name: Write backend summary
         if: "!cancelled()"
