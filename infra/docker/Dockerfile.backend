@@ -46,7 +46,7 @@ FROM ${MODE} AS source
 FROM alpine:3.22
 
 RUN apk add --no-cache \
-    ca-certificates libssl3 libpq curl gcompat \
+    ca-certificates libssl3 libpq curl gcompat libgcc \
     && adduser -D -s /bin/false appuser \
     && mkdir -p /app/uploads && chown appuser:appuser /app/uploads
 
