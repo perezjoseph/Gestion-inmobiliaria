@@ -23,7 +23,7 @@ permissions: {}
 jobs:
   deploy:
     name: Deploy to Production (k3s)
-    runs-on: arc-deploy
+    runs-on: arc-runner-dind
     environment: production
     concurrency:
       group: deploy-production
