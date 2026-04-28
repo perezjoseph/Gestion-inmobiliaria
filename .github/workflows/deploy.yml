@@ -160,19 +160,18 @@ jobs:
           timeout_minutes: 5
           max_attempts: 2
           command: |
-            BACKEND_POD=$(kubectl get pod -n realestate -l app.kubernetes.io/name=backend -o jsonpath='{.items[0].metadata.name}')
-            MAX_RETRIES=15
-            INTERVAL=5
-            for i in $(seq 1 $MAX_RETRIES); do
-              if kubectl exec -n realestate "$BACKEND_POD" -- curl -sf --connect-timeout 3 --max-time 5 http://localhost:8080/health > /dev/null 2>&1; then
-                echo "Health check passed on attempt $i"
-                exit 0
+            for DEPLOY in backend frontend ocr-service; do
+              READY=$(kubectl get deployment "$DEPLOY" -n realestate \
+                -o jsonpath='{.status.readyReplicas}')
+              DESIRED=$(kubectl get deployment "$DEPLOY" -n realestate \
+                -o jsonpath='{.spec.replicas}')
+              if [ "${READY:-0}" -lt "${DESIRED:-1}" ]; then
+                echo "::error::${DEPLOY}: ${READY:-0}/${DESIRED:-1} replicas ready"
+                exit 1
               fi
-              echo "Attempt $i/$MAX_RETRIES failed -- retrying in ${INTERVAL}s"
-              sleep $INTERVAL
+              echo "${DEPLOY}: ${READY}/${DESIRED} replicas ready"
             done
-            echo "::error::Health check failed after $MAX_RETRIES attempts"
-            exit 1
+            echo "All deployments healthy"
 
       - name: Rollback on failure
         if: failure() && steps.deploy.outcome == 'success'
