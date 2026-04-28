@@ -1,6 +1,10 @@
 # To switch to Let's Encrypt: replace ":8443" with your domain
 # and replace "tls internal" with "tls your@email.com"
 
+{
+	auto_https off
+}
+
 :8443 {
 	tls internal
 
