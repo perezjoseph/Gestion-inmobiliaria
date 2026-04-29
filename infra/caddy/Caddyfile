@@ -1,7 +1,7 @@
 # To switch to Let's Encrypt: replace "localhost:8443" with your domain
 # and replace "tls internal" with "tls your@email.com"
 
-gestion.local:8443 {
+:8443 {
 	tls internal
 
 	handle /health {
