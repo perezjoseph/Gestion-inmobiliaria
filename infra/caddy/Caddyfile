@@ -1,8 +1,10 @@
 # To switch to Let's Encrypt: replace ":8443" with your domain
 # and replace "tls internal" with "tls your@email.com"
 
-{
-	auto_https off
+http://:8080 {
+	handle /health {
+		respond "OK" 200
+	}
 }
 
 :8443 {
@@ -24,12 +26,5 @@
 		root * /srv
 		try_files {path} /index.html
 		file_server
-	}
-}
-
-# Plaintext health endpoint for k8s probes (no TLS verification needed)
-:8080 {
-	handle /health {
-		respond "OK" 200
 	}
 }
