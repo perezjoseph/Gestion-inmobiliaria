@@ -47,15 +47,13 @@ spec:
               memory: 256Mi
               ephemeral-storage: 256Mi
           readinessProbe:
-            httpGet:
-              path: /health
-              port: 8080
+            tcpSocket:
+              port: 8443
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
-            httpGet:
-              path: /health
-              port: 8080
+            tcpSocket:
+              port: 8443
             initialDelaySeconds: 10
             periodSeconds: 15
           securityContext:

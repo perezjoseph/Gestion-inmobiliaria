@@ -1,10 +1,6 @@
 # To switch to Let's Encrypt: replace ":8443" with your domain
 # and replace "tls internal" with "tls your@email.com"
 
-{
-	auto_https off
-}
-
 :8443 {
 	tls internal
 
@@ -24,11 +20,5 @@
 		root * /srv
 		try_files {path} /index.html
 		file_server
-	}
-}
-
-:8080 {
-	handle /health {
-		respond "OK" 200
 	}
 }
