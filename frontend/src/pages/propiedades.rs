@@ -1,4 +1,5 @@
 use gloo_events::EventListener;
+use gloo_timers::callback::Timeout;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
@@ -28,7 +29,7 @@ struct PropiedadFilterBarProps {
     filter_ciudad: UseStateHandle<String>,
     filter_tipo: UseStateHandle<String>,
     filter_estado: UseStateHandle<String>,
-    on_apply: Callback<MouseEvent>,
+    on_enter: Callback<()>,
     on_clear: Callback<MouseEvent>,
 }
 
@@ -38,6 +39,13 @@ fn PropiedadFilterBar(props: &PropiedadFilterBarProps) -> Html {
     let on_ciudad_input = Callback::from(move |e: InputEvent| {
         let input: web_sys::HtmlInputElement = e.target_unchecked_into();
         fc.set(input.value());
+    });
+    let on_enter = props.on_enter.clone();
+    let on_ciudad_keydown = Callback::from(move |e: KeyboardEvent| {
+        if e.key() == "Enter" {
+            e.prevent_default();
+            on_enter.emit(());
+        }
     });
     let ft = props.filter_tipo.clone();
     let on_tipo_change = Callback::from(move |e: Event| {
@@ -55,6 +63,7 @@ fn PropiedadFilterBar(props: &PropiedadFilterBarProps) -> Html {
                 <div>
                     <label class="gi-label">{"Ciudad"}</label>
                     <input type="text" value={(*props.filter_ciudad).clone()} oninput={on_ciudad_input}
+                        onkeydown={on_ciudad_keydown}
                         class="gi-input" placeholder="Filtrar por ciudad" />
                 </div>
                 <div>
@@ -78,7 +87,6 @@ fn PropiedadFilterBar(props: &PropiedadFilterBarProps) -> Html {
                     </select>
                 </div>
                 <div style="display: flex; gap: var(--space-2);">
-                    <button onclick={props.on_apply.clone()} class="gi-btn gi-btn-primary">{"Filtrar"}</button>
                     <button onclick={props.on_clear.clone()} class="gi-btn gi-btn-ghost">{"Limpiar"}</button>
                 </div>
             </div>
@@ -734,7 +742,7 @@ fn render_propiedades_view(
     filter_ciudad: UseStateHandle<String>,
     filter_tipo: UseStateHandle<String>,
     filter_estado: UseStateHandle<String>,
-    on_filter_apply: Callback<MouseEvent>,
+    on_filter_enter: Callback<()>,
     on_filter_clear: Callback<MouseEvent>,
     show_form: &UseStateHandle<bool>,
     editing: &UseStateHandle<Option<Propiedad>>,
@@ -769,10 +777,6 @@ fn render_propiedades_view(
     on_page_change: Callback<u64>,
     on_per_page_change: Callback<u64>,
 ) -> Html {
-    if **loading {
-        return html! { <TableSkeleton title_width="200px" columns={7} has_filter=true /> };
-    }
-
     let last_header = if can_write(user_rol) { "Acciones" } else { "" };
     let headers: Vec<String> = vec![
         "Título".into(),
@@ -821,51 +825,57 @@ fn render_propiedades_view(
                 filter_ciudad={filter_ciudad}
                 filter_tipo={filter_tipo}
                 filter_estado={filter_estado}
-                on_apply={on_filter_apply}
+                on_enter={on_filter_enter}
                 on_clear={on_filter_clear}
             />
 
-            if **show_form {
-                <PropiedadForm
-                    is_editing={editing.is_some()}
-                    titulo={titulo}
-                    descripcion={descripcion}
-                    direccion={direccion}
-                    ciudad={ciudad}
-                    provincia={provincia}
-                    tipo_propiedad={tipo_propiedad}
-                    habitaciones={habitaciones}
-                    banos={banos}
-                    area_m2={area_m2}
-                    precio={precio}
-                    moneda={moneda}
-                    estado={estado}
-                    form_errors={(*(*form_errors)).clone()}
-                    submitting={**submitting}
-                    on_submit={on_submit}
-                    on_cancel={on_cancel}
-                    editing_id={editing_id}
-                    token={token}
-                />
-            }
+            if **loading {
+                <TableSkeleton title_width="200px" columns={7} has_filter=false />
+            } else {
+                <>
+                    if **show_form {
+                        <PropiedadForm
+                            is_editing={editing.is_some()}
+                            titulo={titulo}
+                            descripcion={descripcion}
+                            direccion={direccion}
+                            ciudad={ciudad}
+                            provincia={provincia}
+                            tipo_propiedad={tipo_propiedad}
+                            habitaciones={habitaciones}
+                            banos={banos}
+                            area_m2={area_m2}
+                            precio={precio}
+                            moneda={moneda}
+                            estado={estado}
+                            form_errors={(*(*form_errors)).clone()}
+                            submitting={**submitting}
+                            on_submit={on_submit}
+                            on_cancel={on_cancel}
+                            editing_id={editing_id}
+                            token={token}
+                        />
+                    }
 
-            <PropiedadList
-                items={(*(*items)).clone()}
-                user_rol={user_rol.to_string()}
-                headers={headers}
-                sortable_fields={sortable_fields}
-                current_sort={(*(*sort_field)).clone()}
-                current_order={(*(*sort_order)).clone()}
-                total={**total}
-                page={**page}
-                per_page={**per_page}
-                on_sort={on_sort}
-                on_edit={on_edit}
-                on_delete={on_delete_click}
-                on_new={on_new}
-                on_page_change={on_page_change}
-                on_per_page_change={on_per_page_change}
-            />
+                    <PropiedadList
+                        items={(*(*items)).clone()}
+                        user_rol={user_rol.to_string()}
+                        headers={headers}
+                        sortable_fields={sortable_fields}
+                        current_sort={(*(*sort_field)).clone()}
+                        current_order={(*(*sort_order)).clone()}
+                        total={**total}
+                        page={**page}
+                        per_page={**per_page}
+                        on_sort={on_sort}
+                        on_edit={on_edit}
+                        on_delete={on_delete_click}
+                        on_new={on_new}
+                        on_page_change={on_page_change}
+                        on_per_page_change={on_per_page_change}
+                    />
+                </>
+            }
         </div>
     }
 }
@@ -912,6 +922,64 @@ pub fn Propiedades() -> Html {
     let sort_field = use_state(|| Option::<String>::None);
     let sort_order = use_state(|| Option::<String>::None);
 
+    // Track whether initial mount has completed to skip first-run filter effects
+    let mounted = use_mut_ref(|| false);
+
+    // Debounce ciudad text input: wait 300ms after last keystroke, then bump reload
+    {
+        let ciudad_val = (*filter_ciudad).clone();
+        let reload = reload.clone();
+        let page = page.clone();
+        let mounted = mounted.clone();
+        use_effect_with(ciudad_val, move |_| {
+            let handle = if *mounted.borrow() {
+                Some(Timeout::new(300, move || {
+                    page.set(1);
+                    reload.set(*reload + 1);
+                }))
+            } else {
+                None
+            };
+            move || drop(handle)
+        });
+    }
+
+    // Dropdowns apply immediately on change
+    {
+        let tipo_val = (*filter_tipo).clone();
+        let reload = reload.clone();
+        let page = page.clone();
+        let mounted = mounted.clone();
+        use_effect_with(tipo_val, move |_| {
+            if !*mounted.borrow() {
+                return;
+            }
+            page.set(1);
+            reload.set(*reload + 1);
+        });
+    }
+    {
+        let estado_val = (*filter_estado).clone();
+        let reload = reload.clone();
+        let page = page.clone();
+        let mounted = mounted.clone();
+        use_effect_with(estado_val, move |_| {
+            if !*mounted.borrow() {
+                return;
+            }
+            page.set(1);
+            reload.set(*reload + 1);
+        });
+    }
+
+    // Mark mounted after initial data load effect registers
+    {
+        let mounted = mounted;
+        use_effect_with((), move |()| {
+            *mounted.borrow_mut() = true;
+        });
+    }
+
     {
         let items = items.clone();
         let total = total.clone();
@@ -926,15 +994,7 @@ pub fn Propiedades() -> Html {
         let sf = (*sort_field).clone();
         let so = (*sort_order).clone();
         use_effect_with(
-            (
-                reload_val,
-                pg,
-                fc.clone(),
-                ft.clone(),
-                fe.clone(),
-                sf.clone(),
-                so.clone(),
-            ),
+            (reload_val, pg),
             move |_| {
                 let url = build_propiedades_url(pg, pp, &fc, &ft, &fe, sf.as_ref(), so.as_ref());
                 load_propiedades_data(items, total, error, loading, url);
@@ -1098,7 +1158,15 @@ pub fn Propiedades() -> Html {
 
     let on_cancel = super::page_helpers::cancel_cb(reset_form);
 
-    let on_filter_apply = super::page_helpers::filter_apply_cb(&page, &reload);
+    let on_filter_enter = {
+        let reload = reload.clone();
+        let page = page.clone();
+        Callback::from(move |()| {
+            page.set(1);
+            reload.set(*reload + 1);
+        })
+    };
+
     let on_filter_clear = {
         let fc = filter_ciudad.clone();
         let ft = filter_tipo.clone();
@@ -1149,7 +1217,7 @@ pub fn Propiedades() -> Html {
         filter_ciudad,
         filter_tipo,
         filter_estado,
-        on_filter_apply,
+        on_filter_enter,
         on_filter_clear,
         &show_form,
         &editing,

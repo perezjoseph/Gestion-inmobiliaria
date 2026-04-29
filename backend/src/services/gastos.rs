@@ -14,7 +14,7 @@ use crate::models::gasto::{
     UpdateGastoRequest,
 };
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
-use crate::services::validation::validate_enum;
+use crate::services::validation::{validate_enum, MONEDAS};
 
 pub const CATEGORIAS_GASTO: &[&str] = &[
     "mantenimiento",
@@ -27,7 +27,6 @@ pub const CATEGORIAS_GASTO: &[&str] = &[
     "otro",
 ];
 pub const ESTADOS_GASTO: &[&str] = &["pendiente", "pagado", "cancelado"];
-pub const MONEDAS: &[&str] = &["DOP", "USD"];
 
 impl From<gasto::Model> for GastoResponse {
     fn from(m: gasto::Model) -> Self {
@@ -103,8 +102,7 @@ pub async fn create<C: ConnectionTrait>(
 
     let record = model.insert(db).await?;
 
-    auditoria::registrar(
-        db,
+    auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "gasto".to_string(),
@@ -113,7 +111,7 @@ pub async fn create<C: ConnectionTrait>(
             cambios: serde_json::json!(GastoResponse::from(record.clone())),
         },
     )
-    .await?;
+    .await;
 
     Ok(GastoResponse::from(record))
 }
@@ -253,8 +251,7 @@ pub async fn update<C: ConnectionTrait>(
 
     let updated = active.update(db).await?;
 
-    auditoria::registrar(
-        db,
+    auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "gasto".to_string(),
@@ -263,7 +260,7 @@ pub async fn update<C: ConnectionTrait>(
             cambios: serde_json::json!(GastoResponse::from(updated.clone())),
         },
     )
-    .await?;
+    .await;
 
     Ok(GastoResponse::from(updated))
 }
@@ -278,8 +275,7 @@ pub async fn delete<C: ConnectionTrait>(
         return Err(AppError::NotFound("Gasto no encontrado".to_string()));
     }
 
-    auditoria::registrar(
-        db,
+    auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "gasto".to_string(),
@@ -288,7 +284,7 @@ pub async fn delete<C: ConnectionTrait>(
             cambios: serde_json::json!({ "id": id }),
         },
     )
-    .await?;
+    .await;
 
     Ok(())
 }

@@ -11,6 +11,13 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .finish()
         .unwrap();
 
+    #[allow(clippy::unwrap_used)]
+    let write_governor_conf = GovernorConfigBuilder::default()
+        .seconds_per_request(2)
+        .burst_size(20)
+        .finish()
+        .unwrap();
+
     cfg.service(
         web::scope("/api/v1")
             .service(
@@ -177,6 +184,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             )
             .service(
                 web::scope("/documentos")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route(
                         "/{entity_type}/{entity_id}",
                         web::post().to(handlers::documentos::upload),
@@ -199,6 +207,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             )
             .service(
                 web::scope("/importar")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route(
                         "/propiedades",
                         web::post().to(handlers::importacion::importar_propiedades),
@@ -228,7 +237,9 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     ),
             )
             .service(
-                web::scope("/ocr").route("/extract", web::post().to(handlers::ocr::ocr_extract)),
+                web::scope("/ocr")
+                    .wrap(Governor::new(&write_governor_conf))
+                    .route("/extract", web::post().to(handlers::ocr::ocr_extract)),
             ),
     );
 }

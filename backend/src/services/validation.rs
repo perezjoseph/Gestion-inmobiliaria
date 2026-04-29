@@ -1,5 +1,9 @@
 use crate::errors::AppError;
 
+// ── Shared domain constants ──────────────────────────────────────────
+pub const MONEDAS: &[&str] = &["DOP", "USD"];
+pub const METODOS_PAGO: &[&str] = &["efectivo", "transferencia", "cheque", "tarjeta"];
+
 pub fn validate_enum(field_name: &str, value: &str, allowed: &[&str]) -> Result<(), AppError> {
     if !allowed.contains(&value) {
         return Err(AppError::Validation(format!(

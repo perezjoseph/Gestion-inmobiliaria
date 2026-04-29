@@ -120,6 +120,13 @@ jobs:
             --from-literal=jwt-secret="${{ secrets.JWT_SECRET }}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Update Caddyfile ConfigMap
+        run: |
+          kubectl create configmap caddyfile \
+            --namespace realestate \
+            --from-file=Caddyfile=infra/caddy/Caddyfile \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Deploy application manifests
         run: kubectl apply -k infra/k8s/app/
 

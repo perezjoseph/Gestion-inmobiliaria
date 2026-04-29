@@ -10,11 +10,9 @@ use crate::errors::AppError;
 use crate::models::PaginatedResponse;
 use crate::models::pago::{CreatePagoRequest, PagoListQuery, PagoResponse, UpdatePagoRequest};
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
-use crate::services::validation::validate_enum;
+use crate::services::validation::{validate_enum, METODOS_PAGO, MONEDAS};
 
 const ESTADOS_PAGO: &[&str] = &["pendiente", "pagado", "atrasado"];
-const MONEDAS: &[&str] = &["DOP", "USD"];
-const METODOS_PAGO: &[&str] = &["efectivo", "transferencia", "cheque", "tarjeta"];
 
 impl From<pago::Model> for PagoResponse {
     fn from(m: pago::Model) -> Self {
@@ -70,8 +68,7 @@ pub async fn create<C: ConnectionTrait>(
 
     let record = model.insert(db).await?;
 
-    auditoria::registrar(
-        db,
+    auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "pago".to_string(),
@@ -80,7 +77,7 @@ pub async fn create<C: ConnectionTrait>(
             cambios: serde_json::json!(PagoResponse::from(record.clone())),
         },
     )
-    .await?;
+    .await;
 
     Ok(PagoResponse::from(record))
 }
@@ -170,8 +167,7 @@ pub async fn update<C: ConnectionTrait>(
 
     let updated = active.update(db).await?;
 
-    auditoria::registrar(
-        db,
+    auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "pago".to_string(),
@@ -180,7 +176,7 @@ pub async fn update<C: ConnectionTrait>(
             cambios: serde_json::json!(PagoResponse::from(updated.clone())),
         },
     )
-    .await?;
+    .await;
 
     Ok(PagoResponse::from(updated))
 }
@@ -195,8 +191,7 @@ pub async fn delete<C: ConnectionTrait>(
         return Err(AppError::NotFound("Pago no encontrado".to_string()));
     }
 
-    auditoria::registrar(
-        db,
+    auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "pago".to_string(),
@@ -205,7 +200,7 @@ pub async fn delete<C: ConnectionTrait>(
             cambios: serde_json::json!({ "id": id }),
         },
     )
-    .await?;
+    .await;
 
     Ok(())
 }

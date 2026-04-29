@@ -14,11 +14,10 @@ use crate::models::mantenimiento::{
     UpdateSolicitudRequest,
 };
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
-use crate::services::validation::validate_enum;
+use crate::services::validation::{validate_enum, MONEDAS};
 
 const ESTADOS_SOLICITUD: &[&str] = &["pendiente", "en_progreso", "completado"];
 const PRIORIDADES: &[&str] = &["baja", "media", "alta", "urgente"];
-const MONEDAS_COSTO: &[&str] = &["DOP", "USD"];
 
 impl From<solicitud_mantenimiento::Model> for SolicitudResponse {
     fn from(m: solicitud_mantenimiento::Model) -> Self {
@@ -112,7 +111,7 @@ pub async fn create<C: ConnectionTrait>(
     validate_enum("prioridad", &prioridad, PRIORIDADES)?;
 
     if let Some(ref moneda) = input.costo_moneda {
-        validate_enum("moneda", moneda, MONEDAS_COSTO)?;
+        validate_enum("moneda", moneda, MONEDAS)?;
     }
     if let Some(monto) = input.costo_monto
         && monto < Decimal::ZERO
@@ -147,8 +146,7 @@ pub async fn create<C: ConnectionTrait>(
 
     let record = model.insert(db).await?;
 
-    auditoria::registrar(
-        db,
+    auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "solicitud_mantenimiento".to_string(),
@@ -157,7 +155,7 @@ pub async fn create<C: ConnectionTrait>(
             cambios: serde_json::json!(SolicitudResponse::from(record.clone())),
         },
     )
-    .await?;
+    .await;
 
     Ok(SolicitudResponse::from(record))
 }
@@ -225,7 +223,7 @@ pub async fn update<C: ConnectionTrait>(
         validate_enum("prioridad", prioridad, PRIORIDADES)?;
     }
     if let Some(ref moneda) = input.costo_moneda {
-        validate_enum("moneda", moneda, MONEDAS_COSTO)?;
+        validate_enum("moneda", moneda, MONEDAS)?;
     }
     if let Some(monto) = input.costo_monto
         && monto < Decimal::ZERO
@@ -279,8 +277,7 @@ pub async fn update<C: ConnectionTrait>(
 
     let updated = active.update(db).await?;
 
-    auditoria::registrar(
-        db,
+    auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "solicitud_mantenimiento".to_string(),
@@ -289,7 +286,7 @@ pub async fn update<C: ConnectionTrait>(
             cambios: serde_json::json!(SolicitudResponse::from(updated.clone())),
         },
     )
-    .await?;
+    .await;
 
     Ok(SolicitudResponse::from(updated))
 }
@@ -326,8 +323,7 @@ pub async fn cambiar_estado<C: ConnectionTrait>(
 
     let updated = active.update(db).await?;
 
-    auditoria::registrar(
-        db,
+    auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "solicitud_mantenimiento".to_string(),
@@ -338,7 +334,7 @@ pub async fn cambiar_estado<C: ConnectionTrait>(
             }),
         },
     )
-    .await?;
+    .await;
 
     Ok(SolicitudResponse::from(updated))
 }
@@ -357,8 +353,7 @@ pub async fn delete<C: ConnectionTrait>(
         ));
     }
 
-    auditoria::registrar(
-        db,
+    auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "solicitud_mantenimiento".to_string(),
@@ -367,7 +362,7 @@ pub async fn delete<C: ConnectionTrait>(
             cambios: serde_json::json!({ "id": id }),
         },
     )
-    .await?;
+    .await;
 
     Ok(())
 }
@@ -404,8 +399,7 @@ pub async fn agregar_nota<C: ConnectionTrait>(
 
     let record = model.insert(db).await?;
 
-    auditoria::registrar(
-        db,
+    auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "nota_mantenimiento".to_string(),
@@ -414,7 +408,7 @@ pub async fn agregar_nota<C: ConnectionTrait>(
             cambios: serde_json::json!(NotaResponse::from(record.clone())),
         },
     )
-    .await?;
+    .await;
 
     Ok(NotaResponse::from(record))
 }

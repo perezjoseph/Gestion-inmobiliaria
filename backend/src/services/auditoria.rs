@@ -50,6 +50,17 @@ where
     Ok(())
 }
 
+/// Best-effort audit: logs failures instead of propagating them.
+/// Use in services where an audit failure should not roll back the business operation.
+pub async fn registrar_best_effort<C>(db: &C, entry: CreateAuditoriaEntry)
+where
+    C: sea_orm::ConnectionTrait,
+{
+    if let Err(e) = registrar(db, entry).await {
+        tracing::error!("Fallo al registrar auditoría (no fatal): {e}");
+    }
+}
+
 pub async fn listar(
     db: &DatabaseConnection,
     query: AuditoriaQuery,

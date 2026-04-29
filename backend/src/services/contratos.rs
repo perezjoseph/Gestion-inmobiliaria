@@ -13,10 +13,9 @@ use crate::models::contrato::{
     UpdateContratoRequest,
 };
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
-use crate::services::validation::validate_enum;
+use crate::services::validation::{validate_enum, MONEDAS};
 
 const ESTADOS_CONTRATO: &[&str] = &["activo", "vencido", "cancelado"];
-const MONEDAS: &[&str] = &["DOP", "USD"];
 
 impl From<contrato::Model> for ContratoResponse {
     fn from(m: contrato::Model) -> Self {
@@ -70,6 +69,12 @@ pub async fn create(
     input: CreateContratoRequest,
     usuario_id: Uuid,
 ) -> Result<ContratoResponse, AppError> {
+    if input.fecha_inicio >= input.fecha_fin {
+        return Err(AppError::Validation(
+            "La fecha de fin debe ser posterior a la fecha de inicio".to_string(),
+        ));
+    }
+
     if let Some(ref moneda) = input.moneda {
         validate_enum("moneda", moneda, MONEDAS)?;
     }
@@ -121,7 +126,7 @@ pub async fn create(
     prop_active.updated_at = Set(Utc::now().into());
     prop_active.update(&txn).await?;
 
-    auditoria::registrar(
+    auditoria::registrar_best_effort(
         &txn,
         CreateAuditoriaEntry {
             usuario_id,
@@ -131,7 +136,7 @@ pub async fn create(
             cambios: serde_json::json!(ContratoResponse::from(record.clone())),
         },
     )
-    .await?;
+    .await;
 
     txn.commit().await?;
 
@@ -227,7 +232,7 @@ pub async fn update(
         prop_active.update(&txn).await?;
     }
 
-    auditoria::registrar(
+    auditoria::registrar_best_effort(
         &txn,
         CreateAuditoriaEntry {
             usuario_id,
@@ -237,7 +242,7 @@ pub async fn update(
             cambios: serde_json::json!(ContratoResponse::from(updated.clone())),
         },
     )
-    .await?;
+    .await;
 
     txn.commit().await?;
 
@@ -252,7 +257,7 @@ pub async fn delete(db: &DatabaseConnection, id: Uuid, usuario_id: Uuid) -> Resu
         return Err(AppError::NotFound("Contrato no encontrado".to_string()));
     }
 
-    auditoria::registrar(
+    auditoria::registrar_best_effort(
         &txn,
         CreateAuditoriaEntry {
             usuario_id,
@@ -262,7 +267,7 @@ pub async fn delete(db: &DatabaseConnection, id: Uuid, usuario_id: Uuid) -> Resu
             cambios: serde_json::json!({ "id": id }),
         },
     )
-    .await?;
+    .await;
 
     txn.commit().await?;
 
@@ -327,7 +332,7 @@ pub async fn renovar(
     original_active.updated_at = Set(Utc::now().into());
     original_active.update(&txn).await?;
 
-    auditoria::registrar(
+    auditoria::registrar_best_effort(
         &txn,
         CreateAuditoriaEntry {
             usuario_id,
@@ -341,7 +346,7 @@ pub async fn renovar(
             }),
         },
     )
-    .await?;
+    .await;
 
     txn.commit().await?;
 
@@ -403,7 +408,7 @@ pub async fn terminar(
         prop_active.update(&txn).await?;
     }
 
-    auditoria::registrar(
+    auditoria::registrar_best_effort(
         &txn,
         CreateAuditoriaEntry {
             usuario_id,
@@ -417,7 +422,7 @@ pub async fn terminar(
             }),
         },
     )
-    .await?;
+    .await;
 
     txn.commit().await?;
 
@@ -428,7 +433,7 @@ pub async fn listar_por_vencer(
     db: &DatabaseConnection,
     dias: Option<i64>,
 ) -> Result<Vec<ContratoResponse>, AppError> {
-    let dias = dias.unwrap_or(90);
+    let dias = dias.unwrap_or(90).min(365);
     let today = Utc::now().date_naive();
     let cutoff = today + Duration::days(dias);
 

@@ -7,8 +7,8 @@ use rust_decimal::prelude::ToPrimitive;
 use realestate_backend::models::gasto::ResumenCategoriaRow;
 use realestate_backend::models::importacion::{ImportError, ImportResult};
 use realestate_backend::services::dashboard::calcular_porcentaje_cambio;
-use realestate_backend::services::gastos::{CATEGORIAS_GASTO, ESTADOS_GASTO, MONEDAS};
-use realestate_backend::services::validation::validate_enum;
+use realestate_backend::services::gastos::{CATEGORIAS_GASTO, ESTADOS_GASTO};
+use realestate_backend::services::validation::{MONEDAS, validate_enum};
 
 fn arbitrary_string() -> impl Strategy<Value = String> {
     "[a-zA-Z0-9_]{1,30}"

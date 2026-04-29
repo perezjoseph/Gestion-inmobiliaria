@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use chrono::{NaiveDate, Utc};
 use numaelis_rckive_genpdf::Element as _;
 use numaelis_rckive_genpdf::elements;
@@ -94,19 +96,24 @@ pub async fn generar_reporte_ingresos(
     let mut total_pendiente = Decimal::ZERO;
     let mut total_atrasado = Decimal::ZERO;
 
+    let contrato_map: HashMap<uuid::Uuid, &contrato::Model> =
+        contratos.iter().map(|c| (c.id, c)).collect();
+    let prop_map: HashMap<uuid::Uuid, &propiedad::Model> =
+        propiedades.iter().map(|p| (p.id, p)).collect();
+    let inq_map: HashMap<uuid::Uuid, &inquilino::Model> =
+        inquilinos.iter().map(|i| (i.id, i)).collect();
+
     for p in &pagos {
-        let contrato_model = contratos.iter().find(|c| c.id == p.contrato_id);
+        let contrato_model = contrato_map.get(&p.contrato_id);
         let (prop_titulo, inq_nombre) = contrato_model.map_or_else(
             || (String::new(), String::new()),
             |c| {
-                let prop = propiedades
-                    .iter()
-                    .find(|pr| pr.id == c.propiedad_id)
+                let prop = prop_map
+                    .get(&c.propiedad_id)
                     .map(|pr| pr.titulo.clone())
                     .unwrap_or_default();
-                let inq = inquilinos
-                    .iter()
-                    .find(|i| i.id == c.inquilino_id)
+                let inq = inq_map
+                    .get(&c.inquilino_id)
                     .map(|i| format!("{} {}", i.nombre, i.apellido))
                     .unwrap_or_default();
                 (prop, inq)
@@ -231,50 +238,63 @@ pub async fn generar_reporte_rentabilidad(
         propiedad::Entity::find().all(db).await?
     };
 
+    let prop_ids: Vec<uuid::Uuid> = propiedades.iter().map(|p| p.id).collect();
+
+    // Batch-load all contratos for the target propiedades
+    let all_contratos = contrato::Entity::find()
+        .filter(contrato::Column::PropiedadId.is_in(prop_ids.clone()))
+        .all(db)
+        .await?;
+
+    let all_contrato_ids: Vec<uuid::Uuid> = all_contratos.iter().map(|c| c.id).collect();
+
+    // Batch-load all paid pagos for those contratos in the date range
+    let all_pagos = if all_contrato_ids.is_empty() {
+        vec![]
+    } else {
+        pago::Entity::find()
+            .filter(pago::Column::ContratoId.is_in(all_contrato_ids))
+            .filter(pago::Column::Estado.eq("pagado"))
+            .filter(pago::Column::FechaVencimiento.gte(first_day))
+            .filter(pago::Column::FechaVencimiento.lte(last_day))
+            .all(db)
+            .await?
+    };
+
+    // Batch-load all paid gastos for those propiedades in the date range
+    let all_gastos = gasto::Entity::find()
+        .filter(gasto::Column::PropiedadId.is_in(prop_ids))
+        .filter(gasto::Column::Estado.eq("pagado"))
+        .filter(gasto::Column::FechaGasto.gte(first_day))
+        .filter(gasto::Column::FechaGasto.lte(last_day))
+        .all(db)
+        .await?;
+
+    // Build lookup maps: contrato -> propiedad, pago -> contrato
+    let contrato_prop_map: HashMap<uuid::Uuid, uuid::Uuid> =
+        all_contratos.iter().map(|c| (c.id, c.propiedad_id)).collect();
+
+    // Aggregate income per propiedad via contrato linkage
+    let mut income_by_prop: HashMap<uuid::Uuid, Decimal> = HashMap::new();
+    for p in &all_pagos {
+        if let Some(&prop_id) = contrato_prop_map.get(&p.contrato_id) {
+            *income_by_prop.entry(prop_id).or_insert(Decimal::ZERO) += p.monto;
+        }
+    }
+
+    // Aggregate expenses per propiedad
+    let mut expense_by_prop: HashMap<uuid::Uuid, Decimal> = HashMap::new();
+    for g in &all_gastos {
+        *expense_by_prop.entry(g.propiedad_id).or_insert(Decimal::ZERO) += g.monto;
+    }
+
     let mut rows = Vec::with_capacity(propiedades.len());
     let mut grand_ingresos = Decimal::ZERO;
     let mut grand_gastos = Decimal::ZERO;
 
     for prop in &propiedades {
-        let prop_id = prop.id;
-
-        let income_fut = async {
-            let contrato_ids: Vec<uuid::Uuid> = contrato::Entity::find()
-                .filter(contrato::Column::PropiedadId.eq(prop_id))
-                .all(db)
-                .await?
-                .into_iter()
-                .map(|c| c.id)
-                .collect();
-
-            if contrato_ids.is_empty() {
-                return Ok::<Decimal, AppError>(Decimal::ZERO);
-            }
-
-            let paid_pagos = pago::Entity::find()
-                .filter(pago::Column::ContratoId.is_in(contrato_ids))
-                .filter(pago::Column::Estado.eq("pagado"))
-                .filter(pago::Column::FechaVencimiento.gte(first_day))
-                .filter(pago::Column::FechaVencimiento.lte(last_day))
-                .all(db)
-                .await?;
-
-            Ok(paid_pagos.iter().map(|p| p.monto).sum())
-        };
-
-        let expense_fut = async {
-            let paid_gastos = gasto::Entity::find()
-                .filter(gasto::Column::PropiedadId.eq(prop_id))
-                .filter(gasto::Column::Estado.eq("pagado"))
-                .filter(gasto::Column::FechaGasto.gte(first_day))
-                .filter(gasto::Column::FechaGasto.lte(last_day))
-                .all(db)
-                .await?;
-
-            Ok::<Decimal, AppError>(paid_gastos.iter().map(|g| g.monto).sum())
-        };
-
-        let (total_ingresos, total_gastos) = tokio::try_join!(income_fut, expense_fut)?;
+        let total_ingresos = income_by_prop.get(&prop.id).copied().unwrap_or(Decimal::ZERO);
+        let total_gastos = expense_by_prop.get(&prop.id).copied().unwrap_or(Decimal::ZERO);
         let ingreso_neto = total_ingresos - total_gastos;
 
         grand_ingresos += total_ingresos;

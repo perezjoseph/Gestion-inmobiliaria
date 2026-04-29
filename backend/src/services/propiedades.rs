@@ -12,7 +12,7 @@ use crate::models::propiedad::{
     CreatePropiedadRequest, PropiedadListQuery, PropiedadResponse, UpdatePropiedadRequest,
 };
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
-use crate::services::validation::validate_enum;
+use crate::services::validation::{validate_enum, MONEDAS};
 
 const TIPOS_PROPIEDAD: &[&str] = &[
     "casa",
@@ -23,7 +23,6 @@ const TIPOS_PROPIEDAD: &[&str] = &[
     "oficina",
 ];
 const ESTADOS_PROPIEDAD: &[&str] = &["disponible", "ocupada", "mantenimiento"];
-const MONEDAS: &[&str] = &["DOP", "USD"];
 
 impl From<propiedad::Model> for PropiedadResponse {
     fn from(m: propiedad::Model) -> Self {
@@ -85,8 +84,7 @@ pub async fn create<C: ConnectionTrait>(
 
     let record = model.insert(db).await?;
 
-    auditoria::registrar(
-        db,
+    auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "propiedad".to_string(),
@@ -95,7 +93,7 @@ pub async fn create<C: ConnectionTrait>(
             cambios: serde_json::json!(PropiedadResponse::from(record.clone())),
         },
     )
-    .await?;
+    .await;
 
     Ok(PropiedadResponse::from(record))
 }
@@ -223,8 +221,7 @@ pub async fn update<C: ConnectionTrait>(
 
     let updated = active.update(db).await?;
 
-    auditoria::registrar(
-        db,
+    auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "propiedad".to_string(),
@@ -233,7 +230,7 @@ pub async fn update<C: ConnectionTrait>(
             cambios: serde_json::json!(PropiedadResponse::from(updated.clone())),
         },
     )
-    .await?;
+    .await;
 
     Ok(PropiedadResponse::from(updated))
 }
@@ -248,8 +245,7 @@ pub async fn delete<C: ConnectionTrait>(
         return Err(AppError::NotFound("Propiedad no encontrada".to_string()));
     }
 
-    auditoria::registrar(
-        db,
+    auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "propiedad".to_string(),
@@ -258,7 +254,7 @@ pub async fn delete<C: ConnectionTrait>(
             cambios: serde_json::json!({ "id": id }),
         },
     )
-    .await?;
+    .await;
 
     Ok(())
 }

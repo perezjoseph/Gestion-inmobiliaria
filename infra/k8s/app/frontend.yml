@@ -37,6 +37,10 @@ spec:
               mountPath: /config
             - name: tmp
               mountPath: /tmp
+            - name: caddyfile
+              mountPath: /etc/caddy/Caddyfile
+              subPath: Caddyfile
+              readOnly: true
           resources:
             requests:
               cpu: 50m
@@ -71,6 +75,9 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: 32Mi
+        - name: caddyfile
+          configMap:
+            name: caddyfile
 ---
 apiVersion: v1
 kind: Service

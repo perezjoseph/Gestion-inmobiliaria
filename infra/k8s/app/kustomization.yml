@@ -13,6 +13,9 @@ resources:
 # Image tags are overridden by the CI/CD pipeline via:
 #   kubectl set image deployment/backend backend=ghcr.io/perezjoseph/realestate-backend@<digest>
 # or via kustomize edit set image.
+# Image tags are overridden by the CI/CD pipeline via:
+#   kubectl set image deployment/backend backend=ghcr.io/perezjoseph/realestate-backend@<digest>
+# or via kustomize edit set image.
 images:
   - name: ghcr.io/perezjoseph/realestate-backend
     newTag: latest
