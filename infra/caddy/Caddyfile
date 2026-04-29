@@ -1,8 +1,10 @@
 # To switch to Let's Encrypt: replace "localhost:8443" with your domain
 # and replace "tls internal" with "tls your@email.com"
 
-:8443 {
-	tls internal
+https://:8443 {
+	tls internal {
+		on_demand
+	}
 
 	handle /health {
 		respond "OK" 200
