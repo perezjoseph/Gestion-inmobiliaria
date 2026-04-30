@@ -222,7 +222,6 @@ pub fn RegisterForm(props: &RegisterFormProps) -> Html {
         let representante_legal_error = representante_legal_error.clone();
         let server_error = server_error.clone();
         let loading = loading.clone();
-        let on_success = on_success.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
 

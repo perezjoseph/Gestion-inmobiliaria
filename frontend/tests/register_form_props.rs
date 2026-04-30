@@ -68,7 +68,7 @@ proptest! {
         password in ".{0,20}",
         confirm in ".{0,20}",
     ) {
-        let result = validate_form(&nombre, &email, &password, &confirm);
+        let result = validate_form(&nombre, &email, &password, &confirm, "persona_fisica");
 
         let nombre_valid = !nombre.trim().is_empty();
         let email_trimmed = email.trim();
@@ -82,7 +82,7 @@ proptest! {
             prop_assert_eq!(&req.nombre, &nombre);
             prop_assert_eq!(&req.email, &email);
             prop_assert_eq!(&req.password, &password);
-            prop_assert_eq!(&req.rol, "gerente");
+            prop_assert_eq!(&req.tipo, "persona_fisica");
         } else {
             prop_assert!(result.is_none(), "expected None for invalid inputs");
         }
