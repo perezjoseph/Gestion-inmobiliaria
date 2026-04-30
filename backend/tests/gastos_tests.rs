@@ -342,12 +342,12 @@ mod db_async {
         }
     }
 
-    fn make_token(user_id: Uuid, rol: &str) -> String {
+    fn make_token(user_id: Uuid, rol: &str, org_id: Uuid) -> String {
         let claims = Claims {
             sub: user_id,
             email: format!("{rol}@test.com"),
             rol: rol.to_string(),
-            organizacion_id: Uuid::new_v4(),
+            organizacion_id: org_id,
             exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
         };
         encode_jwt(&claims, JWT_SECRET).unwrap()
@@ -440,7 +440,7 @@ mod db_async {
             let config = make_config();
             let org_id = create_test_organizacion(&db).await;
             let admin_id = create_test_usuario(&db, "admin", org_id).await;
-            let token = make_token(admin_id, "admin");
+            let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
                 db.clone(),
@@ -516,7 +516,7 @@ mod db_async {
             let config = make_config();
             let org_id = create_test_organizacion(&db).await;
             let admin_id = create_test_usuario(&db, "admin", org_id).await;
-            let token = make_token(admin_id, "admin");
+            let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
                 db.clone(),
@@ -571,7 +571,7 @@ mod db_async {
             let config = make_config();
             let org_id = create_test_organizacion(&db).await;
             let admin_id = create_test_usuario(&db, "admin", org_id).await;
-            let token = make_token(admin_id, "admin");
+            let token = make_token(admin_id, "admin", org_id);
             let prop_a = create_test_propiedad(&db, org_id).await;
             let prop_b = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
@@ -635,7 +635,7 @@ mod db_async {
             let config = make_config();
             let org_id = create_test_organizacion(&db).await;
             let admin_id = create_test_usuario(&db, "admin", org_id).await;
-            let token = make_token(admin_id, "admin");
+            let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
                 db.clone(),
@@ -683,7 +683,7 @@ mod db_async {
             let config = make_config();
             let org_id = create_test_organizacion(&db).await;
             let admin_id = create_test_usuario(&db, "admin", org_id).await;
-            let token = make_token(admin_id, "admin");
+            let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
                 db.clone(),
@@ -737,7 +737,7 @@ mod db_async {
             let config = make_config();
             let org_id = create_test_organizacion(&db).await;
             let admin_id = create_test_usuario(&db, "admin", org_id).await;
-            let token = make_token(admin_id, "admin");
+            let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
                 db.clone(),
@@ -782,7 +782,7 @@ mod db_async {
             let config = make_config();
             let org_id = create_test_organizacion(&db).await;
             let admin_id = create_test_usuario(&db, "admin", org_id).await;
-            let token = make_token(admin_id, "admin");
+            let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
                 db.clone(),
@@ -831,7 +831,7 @@ mod db_async {
             let config = make_config();
             let org_id = create_test_organizacion(&db).await;
             let admin_id = create_test_usuario(&db, "admin", org_id).await;
-            let token = make_token(admin_id, "admin");
+            let token = make_token(admin_id, "admin", org_id);
             let app = test::init_service(create_app(
                 db.clone(),
                 config,
@@ -867,7 +867,7 @@ mod db_async {
             let config = make_config();
             let org_id = create_test_organizacion(&db).await;
             let admin_id = create_test_usuario(&db, "admin", org_id).await;
-            let token = make_token(admin_id, "admin");
+            let token = make_token(admin_id, "admin", org_id);
             let app = test::init_service(create_app(
                 db.clone(),
                 config,
@@ -898,7 +898,7 @@ mod db_async {
             let config = make_config();
             let org_id = create_test_organizacion(&db).await;
             let admin_id = create_test_usuario(&db, "admin", org_id).await;
-            let token = make_token(admin_id, "admin");
+            let token = make_token(admin_id, "admin", org_id);
             let app = test::init_service(create_app(
                 db.clone(),
                 config,
@@ -924,7 +924,7 @@ mod db_async {
             let config = make_config();
             let org_id = create_test_organizacion(&db).await;
             let admin_id = create_test_usuario(&db, "admin", org_id).await;
-            let token = make_token(admin_id, "admin");
+            let token = make_token(admin_id, "admin", org_id);
             let app = test::init_service(create_app(
                 db.clone(),
                 config,
@@ -950,7 +950,7 @@ mod db_async {
             let config = make_config();
             let org_id = create_test_organizacion(&db).await;
             let admin_id = create_test_usuario(&db, "admin", org_id).await;
-            let token = make_token(admin_id, "admin");
+            let token = make_token(admin_id, "admin", org_id);
             let app = test::init_service(create_app(
                 db.clone(),
                 config,
@@ -976,7 +976,7 @@ mod db_async {
             let config = make_config();
             let org_id = create_test_organizacion(&db).await;
             let admin_id = create_test_usuario(&db, "admin", org_id).await;
-            let token = make_token(admin_id, "admin");
+            let token = make_token(admin_id, "admin", org_id);
             let app = test::init_service(create_app(
                 db.clone(),
                 config,

@@ -80,12 +80,12 @@ fn make_config() -> AppConfig {
     }
 }
 
-fn make_token(user_id: Uuid, rol: &str) -> String {
+fn make_token(user_id: Uuid, rol: &str, org_id: Uuid) -> String {
     let claims = Claims {
         sub: user_id,
         email: format!("{rol}@test.com"),
         rol: rol.to_string(),
-        organizacion_id: Uuid::new_v4(),
+        organizacion_id: org_id,
         exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
     };
     encode_jwt(&claims, JWT_SECRET).unwrap()
@@ -232,7 +232,7 @@ fn test_crud_cycle() {
         let config = make_config();
         let org_id = create_test_organizacion(&db).await;
         let admin_id = create_test_usuario(&db, "admin", org_id).await;
-        let token = make_token(admin_id, "admin");
+        let token = make_token(admin_id, "admin", org_id);
         let propiedad_id = create_test_propiedad(&db, org_id).await;
 
         let app = actix_web::test::init_service(create_app(
@@ -324,7 +324,7 @@ fn test_state_machine_flow() {
         let config = make_config();
         let org_id = create_test_organizacion(&db).await;
         let admin_id = create_test_usuario(&db, "admin", org_id).await;
-        let token = make_token(admin_id, "admin");
+        let token = make_token(admin_id, "admin", org_id);
         let propiedad_id = create_test_propiedad(&db, org_id).await;
 
         let app = actix_web::test::init_service(create_app(
@@ -383,7 +383,7 @@ fn test_invalid_state_transitions() {
         let config = make_config();
         let org_id = create_test_organizacion(&db).await;
         let admin_id = create_test_usuario(&db, "admin", org_id).await;
-        let token = make_token(admin_id, "admin");
+        let token = make_token(admin_id, "admin", org_id);
         let propiedad_id = create_test_propiedad(&db, org_id).await;
 
         let app = actix_web::test::init_service(create_app(
@@ -469,7 +469,7 @@ fn test_notes_add_and_list() {
         let config = make_config();
         let org_id = create_test_organizacion(&db).await;
         let admin_id = create_test_usuario(&db, "admin", org_id).await;
-        let token = make_token(admin_id, "admin");
+        let token = make_token(admin_id, "admin", org_id);
         let propiedad_id = create_test_propiedad(&db, org_id).await;
 
         let app = actix_web::test::init_service(create_app(
@@ -535,7 +535,7 @@ fn test_filters() {
         let config = make_config();
         let org_id = create_test_organizacion(&db).await;
         let admin_id = create_test_usuario(&db, "admin", org_id).await;
-        let token = make_token(admin_id, "admin");
+        let token = make_token(admin_id, "admin", org_id);
         let propiedad_id = create_test_propiedad(&db, org_id).await;
         let propiedad_id2 = create_test_propiedad(&db, org_id).await;
 
@@ -624,9 +624,9 @@ fn test_access_control() {
         let admin_id = create_test_usuario(&db, "admin", org_id).await;
         let gerente_id = create_test_usuario(&db, "gerente", org_id).await;
         let visualizador_id = create_test_usuario(&db, "visualizador", org_id).await;
-        let admin_token = make_token(admin_id, "admin");
-        let gerente_token = make_token(gerente_id, "gerente");
-        let viewer_token = make_token(visualizador_id, "visualizador");
+        let admin_token = make_token(admin_id, "admin", org_id);
+        let gerente_token = make_token(gerente_id, "gerente", org_id);
+        let viewer_token = make_token(visualizador_id, "visualizador", org_id);
         let propiedad_id = create_test_propiedad(&db, org_id).await;
 
         let app = actix_web::test::init_service(create_app(
@@ -722,7 +722,7 @@ fn test_fk_validations() {
         let config = make_config();
         let org_id = create_test_organizacion(&db).await;
         let admin_id = create_test_usuario(&db, "admin", org_id).await;
-        let token = make_token(admin_id, "admin");
+        let token = make_token(admin_id, "admin", org_id);
         let propiedad_id = create_test_propiedad(&db, org_id).await;
         let propiedad_id2 = create_test_propiedad(&db, org_id).await;
         let unidad_id = create_test_unidad(&db, propiedad_id2).await;
@@ -784,7 +784,7 @@ fn test_validations() {
         let config = make_config();
         let org_id = create_test_organizacion(&db).await;
         let admin_id = create_test_usuario(&db, "admin", org_id).await;
-        let token = make_token(admin_id, "admin");
+        let token = make_token(admin_id, "admin", org_id);
         let propiedad_id = create_test_propiedad(&db, org_id).await;
 
         let app = actix_web::test::init_service(create_app(
@@ -890,7 +890,7 @@ fn test_auditoria_entries() {
         let config = make_config();
         let org_id = create_test_organizacion(&db).await;
         let admin_id = create_test_usuario(&db, "admin", org_id).await;
-        let token = make_token(admin_id, "admin");
+        let token = make_token(admin_id, "admin", org_id);
         let propiedad_id = create_test_propiedad(&db, org_id).await;
 
         let app = actix_web::test::init_service(create_app(
@@ -993,7 +993,7 @@ fn test_default_prioridad() {
         let config = make_config();
         let org_id = create_test_organizacion(&db).await;
         let admin_id = create_test_usuario(&db, "admin", org_id).await;
-        let token = make_token(admin_id, "admin");
+        let token = make_token(admin_id, "admin", org_id);
         let propiedad_id = create_test_propiedad(&db, org_id).await;
 
         let app = actix_web::test::init_service(create_app(
