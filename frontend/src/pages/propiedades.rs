@@ -32,6 +32,10 @@ struct PropiedadFilterBarProps {
     filter_estado: UseStateHandle<String>,
     on_enter: Callback<()>,
     on_clear: Callback<MouseEvent>,
+    #[prop_or_default]
+    total: u64,
+    #[prop_or_default]
+    showing: u64,
 }
 
 #[component]
@@ -105,6 +109,15 @@ fn PropiedadFilterBar(props: &PropiedadFilterBarProps) -> Html {
                     <button onclick={props.on_clear.clone()} class="gi-btn gi-btn-ghost">{"Limpiar"}</button>
                 </div>
             </div>
+            if props.total > 0 || active_count > 0 {
+                <div style="margin-top: var(--space-2); font-size: var(--text-xs); color: var(--text-tertiary);">
+                    if active_count > 0 {
+                        {format!("Mostrando {} de {} propiedades", props.showing, props.total)}
+                    } else {
+                        {format!("{} propiedades en total", props.total)}
+                    }
+                </div>
+            }
         </div>
     }
 }
@@ -195,7 +208,7 @@ fn PropiedadForm(props: &PropiedadFormProps) -> Html {
     let opt_open = *show_optional;
 
     html! {
-        <div class="gi-card gi-form-enter" style="padding: var(--space-6); margin-bottom: var(--space-5);">
+        <div class="gi-card gi-form-enter" style="padding: var(--space-6); margin-bottom: var(--space-5); max-width: 960px;">
             <h2 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
                 {if props.is_editing { "Editar Propiedad" } else { "Nueva Propiedad" }}</h2>
             <form onsubmit={props.on_submit.clone()} style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
@@ -863,6 +876,15 @@ fn render_propiedades_view(
                 }
             </div>
 
+            if !can_write(user_rol) {
+                <div style="display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); margin-bottom: var(--space-3); border-radius: 8px; background-color: var(--color-info-light); font-size: var(--text-xs); color: var(--color-info-dark);">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+                    </svg>
+                    {"Modo solo lectura — no tiene permisos para modificar propiedades"}
+                </div>
+            }
+
             if let Some(err) = (*(*error)).as_ref() {
                 <ErrorBanner message={err.clone()} onclose={Callback::from({
                     let error = error.clone();
@@ -884,6 +906,8 @@ fn render_propiedades_view(
                 filter_estado={filter_estado}
                 on_enter={on_filter_enter}
                 on_clear={on_filter_clear}
+                total={**total}
+                showing={(*(*items)).len() as u64}
             />
 
             if **loading {
