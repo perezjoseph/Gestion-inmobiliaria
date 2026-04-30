@@ -1055,7 +1055,6 @@ pub fn Propiedades() -> Html {
 
     // Mark mounted after initial data load effect registers
     {
-        let mounted = mounted;
         use_effect_with((), move |()| {
             *mounted.borrow_mut() = true;
         });
