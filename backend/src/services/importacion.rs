@@ -121,6 +121,7 @@ struct PropiedadIndices {
 fn process_propiedad_row(
     row: &[String],
     idx: &PropiedadIndices,
+    org_id: Uuid,
 ) -> Result<propiedad::ActiveModel, String> {
     let titulo = get_field(row, idx.titulo);
     let direccion = get_field(row, idx.direccion);
@@ -171,6 +172,7 @@ fn process_propiedad_row(
         moneda: Set(moneda.to_string()),
         estado: Set(estado.to_string()),
         imagenes: Set(None),
+        organizacion_id: Set(org_id),
         created_at: Set(now),
         updated_at: Set(now),
     })
@@ -180,6 +182,7 @@ pub async fn importar_propiedades(
     db: &DatabaseConnection,
     data: &[u8],
     formato: ImportFormat,
+    org_id: Uuid,
 ) -> Result<ImportResult, AppError> {
     let rows = parse_rows(data, formato)?;
     if rows.is_empty() {
@@ -210,7 +213,7 @@ pub async fn importar_propiedades(
 
     for (i, row) in data_rows.iter().enumerate() {
         let fila = i + 2;
-        let model = match process_propiedad_row(row, &idx) {
+        let model = match process_propiedad_row(row, &idx, org_id) {
             Ok(m) => m,
             Err(error) => {
                 fallidos.push(ImportError { fila, error });

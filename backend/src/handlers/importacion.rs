@@ -79,12 +79,12 @@ async fn extract_file(mut payload: Multipart) -> Result<(Vec<u8>, String), AppEr
 #[allow(clippy::future_not_send)]
 pub async fn importar_propiedades(
     db: web::Data<DatabaseConnection>,
-    _access: WriteAccess,
+    access: WriteAccess,
     payload: Multipart,
 ) -> Result<HttpResponse, AppError> {
     let (file_data, filename) = extract_file(payload).await?;
     let formato = detect_format(&filename)?;
-    let result = importacion::importar_propiedades(db.get_ref(), &file_data, formato).await?;
+    let result = importacion::importar_propiedades(db.get_ref(), &file_data, formato, access.0.organizacion_id).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
