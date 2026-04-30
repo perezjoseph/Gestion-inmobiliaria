@@ -48,3 +48,6 @@ k3s/
 *.orig
 *.log
 *.cache
+
+# Kiro MCP Manager - Sensitive configuration files
+.kiro/settings/

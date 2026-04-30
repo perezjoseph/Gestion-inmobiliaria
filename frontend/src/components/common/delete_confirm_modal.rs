@@ -7,6 +7,8 @@ pub struct DeleteConfirmModalProps {
     pub message: String,
     pub on_confirm: Callback<MouseEvent>,
     pub on_cancel: Callback<MouseEvent>,
+    #[prop_or_default]
+    pub confirm_label: Option<String>,
 }
 
 #[component]
@@ -68,7 +70,7 @@ pub fn DeleteConfirmModal(props: &DeleteConfirmModalProps) -> Html {
                     {&props.message}</p>
                 <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
                     <button ref={cancel_ref} onclick={props.on_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                    <button onclick={props.on_confirm.clone()} class="gi-btn gi-btn-danger">{"Eliminar"}</button>
+                    <button onclick={props.on_confirm.clone()} class="gi-btn gi-btn-danger">{props.confirm_label.as_deref().unwrap_or("Eliminar")}</button>
                 </div>
             </div>
         </div>

@@ -368,6 +368,61 @@ h1, h2, h3, h4, h5, h6,
   color: oklch(70% 0.008 80);
 }
 
+/* Icon buttons (table row actions) */
+.gi-btn-icon {
+  background: none;
+  border: none;
+  padding: var(--space-2);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out),
+              background-color var(--duration-fast) var(--ease-out);
+}
+
+.gi-btn-icon:hover {
+  color: var(--text-primary);
+  background-color: var(--color-sand-100);
+}
+
+.gi-btn-icon:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.gi-btn-icon-danger:hover {
+  color: var(--color-error);
+  background-color: var(--color-error-light);
+}
+
+[data-theme="dark"] .gi-btn-icon:hover {
+  background-color: oklch(22% 0.012 185);
+}
+
+[data-theme="dark"] .gi-btn-icon-danger:hover {
+  color: oklch(80% 0.10 25);
+  background-color: oklch(25% 0.04 25);
+}
+
+/* Filter bar dimmed when form is open */
+.gi-filter-bar-dimmed {
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity var(--duration-normal) var(--ease-out);
+}
+
+/* Empty state CTA hover lift */
+.gi-empty-state .gi-btn {
+  transition: background-color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out),
+              transform var(--duration-fast) var(--ease-out);
+}
+
+.gi-empty-state .gi-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
 /* Buttons */
 .gi-btn {
   display: inline-flex;
@@ -1549,6 +1604,49 @@ h1, h2, h3, h4, h5, h6,
 }
 
 /* ============================================
+   Form entrance animation
+   ============================================ */
+@keyframes gi-form-enter-kf {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.gi-form-enter {
+  animation: gi-form-enter-kf 300ms var(--ease-out) both;
+}
+
+/* Generic fade-in utility */
+.gi-fade-in {
+  animation: gi-fade-in 200ms var(--ease-out) both;
+}
+
+/* Row actions — subtle until hover */
+.gi-row-actions {
+  display: flex;
+  gap: var(--space-1);
+  opacity: 0.3;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.gi-table tbody tr:hover .gi-row-actions,
+.gi-table tbody tr:focus-within .gi-row-actions {
+  opacity: 1;
+}
+
+/* On touch devices, always show actions (no hover) */
+@media (hover: none) and (pointer: coarse) {
+  .gi-row-actions {
+    opacity: 1;
+  }
+}
+
+/* ============================================
    Reduced Motion (accessibility)
    ============================================ */
 @media (prefers-reduced-motion: reduce) {
@@ -1564,6 +1662,22 @@ h1, h2, h3, h4, h5, h6,
     animation: none;
     border-top-color: var(--color-primary-500);
     opacity: 0.6;
+  }
+
+  .gi-form-enter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .gi-fade-in {
+    animation: none;
+    opacity: 1;
+  }
+
+  .gi-row-actions {
+    opacity: 1;
+    transition: none;
   }
 
   .gi-stat:hover {

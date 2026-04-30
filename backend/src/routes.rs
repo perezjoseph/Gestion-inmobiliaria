@@ -27,6 +27,17 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route("/login", web::post().to(handlers::auth::login)),
             )
             .service(
+                web::scope("/organizacion")
+                    .route("", web::get().to(handlers::organizaciones::get))
+                    .route("", web::put().to(handlers::organizaciones::update)),
+            )
+            .service(
+                web::scope("/invitaciones")
+                    .route("", web::post().to(handlers::invitaciones::crear))
+                    .route("", web::get().to(handlers::invitaciones::listar))
+                    .route("/{id}", web::delete().to(handlers::invitaciones::revocar)),
+            )
+            .service(
                 web::scope("/propiedades")
                     .route("", web::get().to(handlers::propiedades::list))
                     .route("", web::post().to(handlers::propiedades::create))

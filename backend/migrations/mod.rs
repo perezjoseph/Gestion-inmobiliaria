@@ -12,6 +12,9 @@ pub mod m20250410_000001_create_unidades;
 pub mod m20250411_000001_create_solicitudes_mantenimiento;
 pub mod m20250411_000002_create_notas_mantenimiento;
 pub mod m20250412_000001_create_gastos;
+pub mod m20250413_000001_create_organizaciones;
+pub mod m20250413_000002_add_organizacion_id;
+pub mod m20250413_000003_create_invitaciones;
 
 use sea_orm_migration::prelude::*;
 
@@ -34,6 +37,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20250411_000001_create_solicitudes_mantenimiento::Migration),
             Box::new(m20250411_000002_create_notas_mantenimiento::Migration),
             Box::new(m20250412_000001_create_gastos::Migration),
+            Box::new(m20250413_000001_create_organizaciones::Migration),
+            Box::new(m20250413_000002_add_organizacion_id::Migration),
+            Box::new(m20250413_000003_create_invitaciones::Migration),
         ]
     }
 }

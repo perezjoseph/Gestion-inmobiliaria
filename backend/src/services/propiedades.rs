@@ -49,6 +49,7 @@ impl From<propiedad::Model> for PropiedadResponse {
 
 pub async fn create<C: ConnectionTrait>(
     db: &C,
+    org_id: Uuid,
     input: CreatePropiedadRequest,
     usuario_id: Uuid,
 ) -> Result<PropiedadResponse, AppError> {
@@ -78,6 +79,7 @@ pub async fn create<C: ConnectionTrait>(
         moneda: Set(input.moneda.unwrap_or_else(|| "DOP".to_string())),
         estado: Set(input.estado.unwrap_or_else(|| "disponible".to_string())),
         imagenes: Set(input.imagenes.or(Some(serde_json::json!([])))),
+        organizacion_id: Set(org_id),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -98,8 +100,13 @@ pub async fn create<C: ConnectionTrait>(
     Ok(PropiedadResponse::from(record))
 }
 
-pub async fn get_by_id(db: &DatabaseConnection, id: Uuid) -> Result<PropiedadResponse, AppError> {
+pub async fn get_by_id(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    id: Uuid,
+) -> Result<PropiedadResponse, AppError> {
     let record = propiedad::Entity::find_by_id(id)
+        .filter(propiedad::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Propiedad no encontrada".to_string()))?;
@@ -108,12 +115,14 @@ pub async fn get_by_id(db: &DatabaseConnection, id: Uuid) -> Result<PropiedadRes
 
 pub async fn list(
     db: &DatabaseConnection,
+    org_id: Uuid,
     query: PropiedadListQuery,
 ) -> Result<PaginatedResponse<PropiedadResponse>, AppError> {
     let page = query.page.unwrap_or(1).max(1);
     let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
 
-    let mut select = propiedad::Entity::find();
+    let mut select =
+        propiedad::Entity::find().filter(propiedad::Column::OrganizacionId.eq(org_id));
 
     if let Some(ref ciudad) = query.ciudad {
         select = select.filter(propiedad::Column::Ciudad.eq(ciudad));
@@ -164,6 +173,7 @@ fn validate_propiedad_update(input: &UpdatePropiedadRequest) -> Result<(), AppEr
 
 pub async fn update<C: ConnectionTrait>(
     db: &C,
+    org_id: Uuid,
     id: Uuid,
     input: UpdatePropiedadRequest,
     usuario_id: Uuid,
@@ -171,6 +181,7 @@ pub async fn update<C: ConnectionTrait>(
     validate_propiedad_update(&input)?;
 
     let existing = propiedad::Entity::find_by_id(id)
+        .filter(propiedad::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Propiedad no encontrada".to_string()))?;
@@ -237,13 +248,18 @@ pub async fn update<C: ConnectionTrait>(
 
 pub async fn delete<C: ConnectionTrait>(
     db: &C,
+    org_id: Uuid,
     id: Uuid,
     usuario_id: Uuid,
 ) -> Result<(), AppError> {
-    let result = propiedad::Entity::delete_by_id(id).exec(db).await?;
-    if result.rows_affected == 0 {
-        return Err(AppError::NotFound("Propiedad no encontrada".to_string()));
-    }
+    let existing = propiedad::Entity::find_by_id(id)
+        .filter(propiedad::Column::OrganizacionId.eq(org_id))
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Propiedad no encontrada".to_string()))?;
+
+    let active: propiedad::ActiveModel = existing.into();
+    active.delete(db).await?;
 
     auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {

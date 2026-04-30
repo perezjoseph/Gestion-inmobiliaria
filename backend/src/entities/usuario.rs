@@ -13,11 +13,25 @@ pub struct Model {
     pub password_hash: String,
     pub rol: String,
     pub activo: bool,
+    pub organizacion_id: Uuid,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(
+        belongs_to = "super::organizacion::Entity",
+        from = "Column::OrganizacionId",
+        to = "super::organizacion::Column::Id"
+    )]
+    Organizacion,
+}
+
+impl Related<super::organizacion::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Organizacion.def()
+    }
+}
 
 impl ActiveModelBehavior for ActiveModel {}

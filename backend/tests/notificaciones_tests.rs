@@ -26,6 +26,7 @@ mod notificaciones_handler_tests {
             sub: Uuid::new_v4(),
             email: "test@example.com".to_string(),
             rol: rol.to_string(),
+            organizacion_id: Uuid::new_v4(),
             exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
         };
         encode_jwt(&claims, JWT_SECRET).unwrap()

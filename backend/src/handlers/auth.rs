@@ -8,10 +8,11 @@ use crate::services::auth;
 
 pub async fn register(
     db: web::Data<DatabaseConnection>,
+    config: web::Data<AppConfig>,
     body: web::Json<RegisterRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let user = auth::register(db.get_ref(), body.into_inner()).await?;
-    Ok(HttpResponse::Created().json(user))
+    let response = auth::register(db.get_ref(), body.into_inner(), &config.jwt_secret).await?;
+    Ok(HttpResponse::Created().json(response))
 }
 
 pub async fn login(

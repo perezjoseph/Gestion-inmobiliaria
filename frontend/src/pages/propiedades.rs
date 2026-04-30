@@ -3,8 +3,9 @@ use gloo_timers::callback::Timeout;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
+use yew_router::prelude::*;
 
-use crate::app::AuthContext;
+use crate::app::{AuthContext, Route};
 use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
@@ -57,6 +58,15 @@ fn PropiedadFilterBar(props: &PropiedadFilterBarProps) -> Html {
         let el: web_sys::HtmlSelectElement = e.target_unchecked_into();
         fe.set(el.value());
     });
+    let active_count = [
+        !props.filter_ciudad.is_empty(),
+        !props.filter_tipo.is_empty(),
+        !props.filter_estado.is_empty(),
+    ]
+    .iter()
+    .filter(|&&v| v)
+    .count();
+
     html! {
         <div class="gi-filter-bar">
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); align-items: end;">
@@ -86,7 +96,12 @@ fn PropiedadFilterBar(props: &PropiedadFilterBarProps) -> Html {
                         <option value="mantenimiento" selected={*props.filter_estado == "mantenimiento"}>{"Mantenimiento"}</option>
                     </select>
                 </div>
-                <div style="display: flex; gap: var(--space-2);">
+                <div style="display: flex; gap: var(--space-2); align-items: center;">
+                    if active_count > 0 {
+                        <span class="gi-badge gi-badge-info" style="font-size: var(--text-xs);">
+                            {format!("{active_count} filtro{} activo{}", if active_count > 1 { "s" } else { "" }, if active_count > 1 { "s" } else { "" })}
+                        </span>
+                    }
                     <button onclick={props.on_clear.clone()} class="gi-btn gi-btn-ghost">{"Limpiar"}</button>
                 </div>
             </div>
@@ -180,7 +195,7 @@ fn PropiedadForm(props: &PropiedadFormProps) -> Html {
     let opt_open = *show_optional;
 
     html! {
-        <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
+        <div class="gi-card gi-form-enter" style="padding: var(--space-6); margin-bottom: var(--space-5);">
             <h2 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
                 {if props.is_editing { "Editar Propiedad" } else { "Nueva Propiedad" }}</h2>
             <form onsubmit={props.on_submit.clone()} style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
@@ -327,21 +342,53 @@ fn PropiedadList(props: &PropiedadListProps) -> Html {
 }
 
 fn render_propiedad_empty_state(user_rol: &str, on_new: &Callback<MouseEvent>) -> Html {
-    let btn = if can_write(user_rol) {
-        html! { <button onclick={on_new.clone()} class="gi-btn gi-btn-primary" style="margin-top: var(--space-4);">{"+ Nueva Propiedad"}</button> }
+    let actions = if can_write(user_rol) {
+        html! {
+            <div style="display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: wrap; justify-content: center;">
+                <button onclick={on_new.clone()} class="gi-btn gi-btn-primary">
+                    {"Agregar primera propiedad"}
+                </button>
+                <Link<Route> to={Route::Importar} classes="gi-btn-text">
+                    {"¿Ya tiene datos? Importar"}
+                </Link<Route>>
+            </div>
+        }
     } else {
         html! {}
     };
     html! {
         <div class="gi-empty-state">
             <div class="gi-empty-state-icon">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
-                    <path d="M3 21V9l9-6 9 6v12"/><path d="M9 21V12h6v9"/>
+                <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    // Property card preview outline
+                    <rect x="8" y="12" width="48" height="40" rx="4" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+                    // Roof
+                    <path d="M16 28V20l16-8 16 8v8" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
+                    // Door
+                    <rect x="27" y="32" width="10" height="14" rx="1" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>
+                    // Windows
+                    <rect x="18" y="30" width="6" height="5" rx="0.5" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+                    <rect x="40" y="30" width="6" height="5" rx="0.5" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+                    // Price tag accent
+                    <circle cx="52" cy="16" r="6" fill="var(--color-primary-500)" opacity="0.15"/>
+                    <text x="52" y="18" text-anchor="middle" font-size="6" fill="var(--color-primary-500)" font-weight="600" opacity="0.7">{"$"}</text>
                 </svg>
             </div>
-            <div class="gi-empty-state-title">{"Sin propiedades registradas"}</div>
-            <p class="gi-empty-state-text">{"Las propiedades son la base de su portafolio. Agregue la primera para luego asignar inquilinos y contratos."}</p>
-            {btn}
+            <div class="gi-empty-state-title">{"Comience con su primera propiedad"}</div>
+            <p class="gi-empty-state-text">
+                {"Necesitará: nombre, dirección, ciudad y precio de alquiler. Los demás campos son opcionales."}
+            </p>
+            // Workflow breadcrumb
+            <div style="display: flex; align-items: center; justify-content: center; gap: var(--space-2); margin-top: var(--space-3); font-size: var(--text-xs); color: var(--text-tertiary);">
+                <span style="font-weight: 600; color: var(--color-primary-500);">{"Propiedad"}</span>
+                <span style="opacity: 0.4;">{"→"}</span>
+                <span>{"Inquilino"}</span>
+                <span style="opacity: 0.4;">{"→"}</span>
+                <span>{"Contrato"}</span>
+                <span style="opacity: 0.4;">{"→"}</span>
+                <span>{"Pagos"}</span>
+            </div>
+            {actions}
         </div>
     }
 }
@@ -398,9 +445,11 @@ fn render_propiedad_actions(
         html! {}
     };
     html! {
-        <td style="padding: var(--space-3) var(--space-5); display: flex; gap: var(--space-2);">
-            <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(pc.clone()))} class="gi-btn-text">{"Editar"}</button>
-            {delete_btn}
+        <td style="padding: var(--space-3) var(--space-5);">
+            <div class="gi-row-actions">
+                <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(pc.clone()))} class="gi-btn-text">{"Editar"}</button>
+                {delete_btn}
+            </div>
         </td>
     }
 }
@@ -467,20 +516,28 @@ fn validate_propiedad_fields(
 ) -> FormErrors {
     let mut errs = FormErrors::default();
     if titulo.trim().is_empty() {
-        errs.titulo = Some("El título es obligatorio".into());
+        errs.titulo = Some(
+            "Ingrese un título para identificar la propiedad, ej: \"Apartamento Naco 3B\"".into(),
+        );
     }
     if direccion.trim().is_empty() {
-        errs.direccion = Some("La dirección es obligatoria".into());
+        errs.direccion = Some(
+            "Ingrese la dirección completa, ej: \"Calle Principal #12, Ens. Naco\"".into(),
+        );
     }
     if ciudad.trim().is_empty() {
-        errs.ciudad = Some("La ciudad es obligatoria".into());
+        errs.ciudad = Some("Ingrese la ciudad, ej: \"Santo Domingo\"".into());
     }
     if provincia.trim().is_empty() {
-        errs.provincia = Some("La provincia es obligatoria".into());
+        errs.provincia = Some("Ingrese la provincia, ej: \"Distrito Nacional\"".into());
     }
     match precio.parse::<f64>() {
-        Ok(v) if v <= 0.0 => errs.precio = Some("El precio debe ser mayor a 0".into()),
-        Err(_) => errs.precio = Some("Precio inválido".into()),
+        Ok(v) if v <= 0.0 => {
+            errs.precio = Some("El precio debe ser mayor a 0".into());
+        }
+        Err(_) => {
+            errs.precio = Some("Ingrese un monto numérico válido, ej: \"25000.00\"".into());
+        }
         _ => {}
     }
     errs

@@ -17,6 +17,7 @@ impl From<usuario::Model> for UsuarioResponse {
             email: m.email,
             rol: m.rol,
             activo: m.activo,
+            organizacion_id: m.organizacion_id,
             created_at: m.created_at.into(),
         }
     }

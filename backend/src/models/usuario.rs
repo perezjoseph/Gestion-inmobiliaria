@@ -5,11 +5,24 @@ use uuid::Uuid;
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RegisterRequest {
+    // User fields
     pub nombre: String,
     pub email: String,
     pub password: String,
-    #[allow(dead_code)]
-    pub rol: String,
+    // Organization type discriminator
+    pub tipo: Option<String>, // "persona_fisica" | "persona_juridica"
+    // persona_fisica fields
+    pub cedula: Option<String>,
+    pub telefono: Option<String>,
+    pub nombre_organizacion: Option<String>,
+    // persona_juridica fields
+    pub rnc: Option<String>,
+    pub razon_social: Option<String>,
+    pub nombre_comercial: Option<String>,
+    pub direccion_fiscal: Option<String>,
+    pub representante_legal: Option<String>,
+    // Invitation flow (mutually exclusive with tipo)
+    pub token_invitacion: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -34,6 +47,7 @@ pub struct UserResponse {
     pub email: String,
     pub rol: String,
     pub activo: bool,
+    pub organizacion_id: Uuid,
     pub created_at: DateTime<Utc>,
 }
 
@@ -45,6 +59,7 @@ pub struct UsuarioResponse {
     pub email: String,
     pub rol: String,
     pub activo: bool,
+    pub organizacion_id: Uuid,
     pub created_at: DateTime<Utc>,
 }
 
@@ -81,6 +96,7 @@ mod tests {
             email: "juan@example.com".to_string(),
             rol: "admin".to_string(),
             activo: true,
+            organizacion_id: Uuid::nil(),
             created_at: DateTime::from_timestamp(0, 0).unwrap(),
         };
         let json = serde_json::to_value(&resp).unwrap();

@@ -24,6 +24,7 @@ pub struct Model {
     pub estado: String,
     #[sea_orm(column_type = "JsonBinary", nullable)]
     pub imagenes: Option<Json>,
+    pub organizacion_id: Uuid,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }
@@ -32,11 +33,23 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "super::contrato::Entity")]
     Contratos,
+    #[sea_orm(
+        belongs_to = "super::organizacion::Entity",
+        from = "Column::OrganizacionId",
+        to = "super::organizacion::Column::Id"
+    )]
+    Organizacion,
 }
 
 impl Related<super::contrato::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Contratos.def()
+    }
+}
+
+impl Related<super::organizacion::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Organizacion.def()
     }
 }
 

@@ -16,6 +16,8 @@ pub enum AppError {
     Validation(String),
     #[error("Conflicto: {0}")]
     Conflict(String),
+    #[error("Recurso expirado: {0}")]
+    Gone(String),
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
@@ -29,6 +31,7 @@ impl actix_web::error::ResponseError for AppError {
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
             Self::Conflict(_) => StatusCode::CONFLICT,
+            Self::Gone(_) => StatusCode::GONE,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -41,6 +44,7 @@ impl actix_web::error::ResponseError for AppError {
             Self::Forbidden => ("forbidden", self.to_string()),
             Self::Validation(msg) => ("validation", msg.clone()),
             Self::Conflict(msg) => ("conflict", msg.clone()),
+            Self::Gone(msg) => ("gone", msg.clone()),
             Self::Internal(_) => ("internal", "Error interno del servidor".to_string()),
         };
 
@@ -96,6 +100,12 @@ mod tests {
     fn conflict_returns_409() {
         let err = AppError::Conflict("ya existe".to_string());
         assert_eq!(err.status_code(), StatusCode::CONFLICT);
+    }
+
+    #[test]
+    fn gone_returns_410() {
+        let err = AppError::Gone("expirado".to_string());
+        assert_eq!(err.status_code(), StatusCode::GONE);
     }
 
     #[test]

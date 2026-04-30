@@ -7,9 +7,11 @@ pub mod documentos;
 pub mod gastos;
 pub mod importacion;
 pub mod inquilinos;
+pub mod invitaciones;
 pub mod mantenimiento;
 pub mod notificaciones;
 pub mod ocr_client;
+pub mod organizaciones;
 pub mod ocr_mapping;
 #[cfg(test)]
 mod ocr_mapping_pbt;
@@ -22,4 +24,5 @@ pub mod propiedades;
 pub mod recibos;
 pub mod reportes;
 pub mod usuarios;
+pub mod validacion_fiscal;
 pub mod validation;
