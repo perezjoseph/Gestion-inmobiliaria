@@ -130,7 +130,7 @@ pub fn Usuarios() -> Html {
             let reload = reload.clone();
             let toasts = toasts.clone();
             spawn_local(async move {
-                let body = serde_json::json!({ "rol": rol });
+                let body = serde_json::json!({ "nuevoRol": rol });
                 match api_put::<User, _>(&format!("/usuarios/{id}/rol"), &body).await {
                     Ok(_) => {
                         reload.set(*reload + 1);
