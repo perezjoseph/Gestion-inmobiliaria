@@ -31,5 +31,24 @@ pub struct RegisterRequest {
     pub nombre: String,
     pub email: String,
     pub password: String,
-    pub rol: String,
+    // Organization type discriminator
+    pub tipo: String,
+    // persona_fisica fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cedula: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub telefono: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nombre_organizacion: Option<String>,
+    // persona_juridica fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rnc: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub razon_social: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nombre_comercial: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub direccion_fiscal: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub representante_legal: Option<String>,
 }

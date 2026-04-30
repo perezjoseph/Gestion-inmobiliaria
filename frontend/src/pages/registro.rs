@@ -38,8 +38,8 @@ pub fn Registro() -> Html {
 
     html! {
         <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: var(--surface-base);">
-            <div style="width: 100%; max-width: 420px; padding: var(--space-4);">
-                <div class="gi-card" style="padding: var(--space-7) var(--space-6);">
+            <div style="width: 100%; max-width: 480px; padding: var(--space-4);">
+                <div class="gi-card" style="padding: var(--space-7) var(--space-6); max-height: 90vh; overflow-y: auto;">
                     <div style="text-align: center; margin-bottom: var(--space-6);">
                         <div class="gi-logo-mark" style="margin: 0 auto var(--space-3);">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
