@@ -32,6 +32,7 @@ pub async fn create<C: ConnectionTrait>(
     db: &C,
     input: CreateInquilinoRequest,
     usuario_id: Uuid,
+    organizacion_id: Uuid,
 ) -> Result<InquilinoResponse, AppError> {
     let existing = inquilino::Entity::find()
         .filter(inquilino::Column::Cedula.eq(&input.cedula))
@@ -57,6 +58,7 @@ pub async fn create<C: ConnectionTrait>(
         contacto_emergencia: Set(input.contacto_emergencia),
         notas: Set(input.notas),
         documentos: Set(None),
+        organizacion_id: Set(organizacion_id),
         created_at: Set(now),
         updated_at: Set(now),
     };

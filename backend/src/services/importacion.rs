@@ -246,6 +246,7 @@ fn process_inquilino_row(
     idx_cedula: Option<usize>,
     idx_email: Option<usize>,
     idx_telefono: Option<usize>,
+    organizacion_id: Uuid,
 ) -> Result<(&str, inquilino::ActiveModel), String> {
     let nombre = get_field(row, idx_nombre);
     let apellido = get_field(row, idx_apellido);
@@ -275,6 +276,7 @@ fn process_inquilino_row(
         contacto_emergencia: Set(None),
         notas: Set(None),
         documentos: Set(None),
+        organizacion_id: Set(organizacion_id),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -286,6 +288,7 @@ pub async fn importar_inquilinos(
     db: &DatabaseConnection,
     data: &[u8],
     formato: ImportFormat,
+    organizacion_id: Uuid,
 ) -> Result<ImportResult, AppError> {
     let rows = parse_rows(data, formato)?;
     if rows.is_empty() {
@@ -317,6 +320,7 @@ pub async fn importar_inquilinos(
             idx_cedula,
             idx_email,
             idx_telefono,
+            organizacion_id,
         ) {
             Ok(result) => result,
             Err(error) => {

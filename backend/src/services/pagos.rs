@@ -36,6 +36,7 @@ pub async fn create<C: ConnectionTrait>(
     db: &C,
     input: CreatePagoRequest,
     usuario_id: Uuid,
+    organizacion_id: Uuid,
 ) -> Result<PagoResponse, AppError> {
     if let Some(ref moneda) = input.moneda {
         validate_enum("moneda", moneda, MONEDAS)?;
@@ -62,6 +63,7 @@ pub async fn create<C: ConnectionTrait>(
         metodo_pago: Set(input.metodo_pago),
         estado: Set("pendiente".to_string()),
         notas: Set(input.notas),
+        organizacion_id: Set(organizacion_id),
         created_at: Set(now),
         updated_at: Set(now),
     };

@@ -272,6 +272,7 @@ mod db_async {
     };
     use sea_orm_migration::MigratorTrait;
     use serde_json::{Value, json};
+    use std::net::SocketAddr;
     use uuid::Uuid;
 
     const JWT_SECRET: &str = "test_secret_key_that_is_long_enough_for_jwt";
@@ -759,6 +760,7 @@ mod db_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/v1/importar/gastos")
+                .peer_addr("127.0.0.1:12345".parse::<SocketAddr>().unwrap())
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .insert_header((
                     "Content-Type",
@@ -805,6 +807,7 @@ mod db_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/v1/importar/gastos")
+                .peer_addr("127.0.0.1:12345".parse::<SocketAddr>().unwrap())
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .insert_header((
                     "Content-Type",
@@ -846,6 +849,7 @@ mod db_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/v1/importar/gastos")
+                .peer_addr("127.0.0.1:12345".parse::<SocketAddr>().unwrap())
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .insert_header((
                     "Content-Type",

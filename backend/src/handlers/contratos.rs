@@ -37,7 +37,7 @@ pub async fn create(
     body: web::Json<CreateContratoRequest>,
 ) -> Result<HttpResponse, AppError> {
     let usuario_id = access.0.sub;
-    let result = contratos::create(db.get_ref(), body.into_inner(), usuario_id).await?;
+    let result = contratos::create(db.get_ref(), body.into_inner(), usuario_id, access.0.organizacion_id).await?;
     Ok(HttpResponse::Created().json(result))
 }
 

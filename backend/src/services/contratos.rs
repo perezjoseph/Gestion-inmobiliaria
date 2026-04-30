@@ -68,6 +68,7 @@ pub async fn create(
     db: &DatabaseConnection,
     input: CreateContratoRequest,
     usuario_id: Uuid,
+    organizacion_id: Uuid,
 ) -> Result<ContratoResponse, AppError> {
     if input.fecha_inicio >= input.fecha_fin {
         return Err(AppError::Validation(
@@ -115,6 +116,7 @@ pub async fn create(
         moneda: Set(input.moneda.unwrap_or_else(|| "DOP".to_string())),
         estado: Set("activo".to_string()),
         documentos: Set(None),
+        organizacion_id: Set(organizacion_id),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -321,6 +323,7 @@ pub async fn renovar(
         moneda: Set(original.moneda.clone()),
         estado: Set("activo".to_string()),
         documentos: Set(None),
+        organizacion_id: Set(original.organizacion_id),
         created_at: Set(now),
         updated_at: Set(now),
     };

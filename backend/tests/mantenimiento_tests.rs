@@ -183,6 +183,7 @@ async fn create_test_inquilino(db: &DatabaseConnection) -> Uuid {
         contacto_emergencia: Set(None),
         notas: Set(None),
         documentos: Set(None),
+        organizacion_id: Set(Uuid::nil()),
         created_at: Set(now),
         updated_at: Set(now),
     }
