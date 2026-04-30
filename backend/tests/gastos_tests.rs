@@ -352,7 +352,34 @@ mod db_async {
         encode_jwt(&claims, JWT_SECRET).unwrap()
     }
 
-    async fn create_test_usuario(db: &DatabaseConnection, rol: &str) -> Uuid {
+    async fn create_test_organizacion(db: &DatabaseConnection) -> Uuid {
+        use realestate_backend::entities::organizacion;
+        let id = Uuid::new_v4();
+        let now = Utc::now().into();
+        organizacion::ActiveModel {
+            id: Set(id),
+            tipo: Set("persona_fisica".to_string()),
+            nombre: Set(format!("Org Test {id}")),
+            estado: Set("activo".to_string()),
+            cedula: Set(None),
+            telefono: Set(None),
+            email_organizacion: Set(None),
+            rnc: Set(None),
+            razon_social: Set(None),
+            nombre_comercial: Set(None),
+            direccion_fiscal: Set(None),
+            representante_legal: Set(None),
+            dgii_data: Set(None),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .expect("Failed to create test organizacion");
+        id
+    }
+
+    async fn create_test_usuario(db: &DatabaseConnection, rol: &str, org_id: Uuid) -> Uuid {
         use realestate_backend::entities::usuario;
         let id = Uuid::new_v4();
         let now = Utc::now().into();
@@ -363,6 +390,7 @@ mod db_async {
             password_hash: Set("not_used".to_string()),
             rol: Set(rol.to_string()),
             activo: Set(true),
+            organizacion_id: Set(org_id),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -372,7 +400,7 @@ mod db_async {
         id
     }
 
-    async fn create_test_propiedad(db: &DatabaseConnection) -> Uuid {
+    async fn create_test_propiedad(db: &DatabaseConnection, org_id: Uuid) -> Uuid {
         use realestate_backend::entities::propiedad;
         let id = Uuid::new_v4();
         let now = Utc::now().into();
@@ -391,6 +419,7 @@ mod db_async {
             moneda: Set("DOP".to_string()),
             estado: Set("disponible".to_string()),
             imagenes: Set(None),
+            organizacion_id: Set(org_id),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -408,9 +437,10 @@ mod db_async {
     pub fn crud_cycle() {
         with_db(|db| async move {
             let config = make_config();
-            let admin_id = create_test_usuario(&db, "admin").await;
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
             let token = make_token(admin_id, "admin");
-            let propiedad_id = create_test_propiedad(&db).await;
+            let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
                 db.clone(),
                 config,
@@ -483,9 +513,10 @@ mod db_async {
     pub fn pagination() {
         with_db(|db| async move {
             let config = make_config();
-            let admin_id = create_test_usuario(&db, "admin").await;
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
             let token = make_token(admin_id, "admin");
-            let propiedad_id = create_test_propiedad(&db).await;
+            let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
                 db.clone(),
                 config,
@@ -537,10 +568,11 @@ mod db_async {
     pub fn filter_propiedad_id() {
         with_db(|db| async move {
             let config = make_config();
-            let admin_id = create_test_usuario(&db, "admin").await;
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
             let token = make_token(admin_id, "admin");
-            let prop_a = create_test_propiedad(&db).await;
-            let prop_b = create_test_propiedad(&db).await;
+            let prop_a = create_test_propiedad(&db, org_id).await;
+            let prop_b = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
                 db.clone(),
                 config,
@@ -600,9 +632,10 @@ mod db_async {
     pub fn filter_categoria() {
         with_db(|db| async move {
             let config = make_config();
-            let admin_id = create_test_usuario(&db, "admin").await;
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
             let token = make_token(admin_id, "admin");
-            let propiedad_id = create_test_propiedad(&db).await;
+            let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
                 db.clone(),
                 config,
@@ -647,9 +680,10 @@ mod db_async {
     pub fn filter_date_range() {
         with_db(|db| async move {
             let config = make_config();
-            let admin_id = create_test_usuario(&db, "admin").await;
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
             let token = make_token(admin_id, "admin");
-            let propiedad_id = create_test_propiedad(&db).await;
+            let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
                 db.clone(),
                 config,
@@ -700,9 +734,10 @@ mod db_async {
     pub fn csv_import_valid() {
         with_db(|db| async move {
             let config = make_config();
-            let admin_id = create_test_usuario(&db, "admin").await;
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
             let token = make_token(admin_id, "admin");
-            let propiedad_id = create_test_propiedad(&db).await;
+            let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
                 db.clone(),
                 config,
@@ -743,9 +778,10 @@ mod db_async {
     pub fn csv_import_mixed() {
         with_db(|db| async move {
             let config = make_config();
-            let admin_id = create_test_usuario(&db, "admin").await;
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
             let token = make_token(admin_id, "admin");
-            let propiedad_id = create_test_propiedad(&db).await;
+            let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
                 db.clone(),
                 config,
@@ -790,7 +826,8 @@ mod db_async {
     pub fn csv_import_empty() {
         with_db(|db| async move {
             let config = make_config();
-            let admin_id = create_test_usuario(&db, "admin").await;
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
             let token = make_token(admin_id, "admin");
             let app = test::init_service(create_app(
                 db.clone(),
@@ -824,7 +861,8 @@ mod db_async {
     pub fn profitability_json() {
         with_db(|db| async move {
             let config = make_config();
-            let admin_id = create_test_usuario(&db, "admin").await;
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
             let token = make_token(admin_id, "admin");
             let app = test::init_service(create_app(
                 db.clone(),
@@ -854,7 +892,8 @@ mod db_async {
     pub fn profitability_pdf() {
         with_db(|db| async move {
             let config = make_config();
-            let admin_id = create_test_usuario(&db, "admin").await;
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
             let token = make_token(admin_id, "admin");
             let app = test::init_service(create_app(
                 db.clone(),
@@ -879,7 +918,8 @@ mod db_async {
     pub fn profitability_xlsx() {
         with_db(|db| async move {
             let config = make_config();
-            let admin_id = create_test_usuario(&db, "admin").await;
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
             let token = make_token(admin_id, "admin");
             let app = test::init_service(create_app(
                 db.clone(),
@@ -904,7 +944,8 @@ mod db_async {
     pub fn dashboard_stats_gastos() {
         with_db(|db| async move {
             let config = make_config();
-            let admin_id = create_test_usuario(&db, "admin").await;
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
             let token = make_token(admin_id, "admin");
             let app = test::init_service(create_app(
                 db.clone(),
@@ -929,7 +970,8 @@ mod db_async {
     pub fn gastos_comparacion() {
         with_db(|db| async move {
             let config = make_config();
-            let admin_id = create_test_usuario(&db, "admin").await;
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
             let token = make_token(admin_id, "admin");
             let app = test::init_service(create_app(
                 db.clone(),

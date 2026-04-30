@@ -91,7 +91,34 @@ fn make_token(user_id: Uuid, rol: &str) -> String {
     encode_jwt(&claims, JWT_SECRET).unwrap()
 }
 
-async fn create_test_usuario(db: &DatabaseConnection, rol: &str) -> Uuid {
+async fn create_test_organizacion(db: &DatabaseConnection) -> Uuid {
+    use realestate_backend::entities::organizacion;
+    let id = Uuid::new_v4();
+    let now = Utc::now().into();
+    organizacion::ActiveModel {
+        id: Set(id),
+        tipo: Set("persona_fisica".to_string()),
+        nombre: Set(format!("Org Test {id}")),
+        estado: Set("activo".to_string()),
+        cedula: Set(None),
+        telefono: Set(None),
+        email_organizacion: Set(None),
+        rnc: Set(None),
+        razon_social: Set(None),
+        nombre_comercial: Set(None),
+        direccion_fiscal: Set(None),
+        representante_legal: Set(None),
+        dgii_data: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+    }
+    .insert(db)
+    .await
+    .expect("Failed to create test organizacion");
+    id
+}
+
+async fn create_test_usuario(db: &DatabaseConnection, rol: &str, org_id: Uuid) -> Uuid {
     use realestate_backend::entities::usuario;
     let id = Uuid::new_v4();
     let now = Utc::now().into();
@@ -102,6 +129,7 @@ async fn create_test_usuario(db: &DatabaseConnection, rol: &str) -> Uuid {
         password_hash: Set("not_used".to_string()),
         rol: Set(rol.to_string()),
         activo: Set(true),
+        organizacion_id: Set(org_id),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -111,7 +139,7 @@ async fn create_test_usuario(db: &DatabaseConnection, rol: &str) -> Uuid {
     id
 }
 
-async fn create_test_propiedad(db: &DatabaseConnection) -> Uuid {
+async fn create_test_propiedad(db: &DatabaseConnection, org_id: Uuid) -> Uuid {
     use realestate_backend::entities::propiedad;
     let id = Uuid::new_v4();
     let now = Utc::now().into();
@@ -130,6 +158,7 @@ async fn create_test_propiedad(db: &DatabaseConnection) -> Uuid {
         moneda: Set("DOP".to_string()),
         estado: Set("disponible".to_string()),
         imagenes: Set(None),
+        organizacion_id: Set(org_id),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -200,9 +229,10 @@ async fn cleanup_solicitud(db: &DatabaseConnection, id: Uuid) {
 fn test_crud_cycle() {
     with_db(|db| async move {
         let config = make_config();
-        let admin_id = create_test_usuario(&db, "admin").await;
+        let org_id = create_test_organizacion(&db).await;
+        let admin_id = create_test_usuario(&db, "admin", org_id).await;
         let token = make_token(admin_id, "admin");
-        let propiedad_id = create_test_propiedad(&db).await;
+        let propiedad_id = create_test_propiedad(&db, org_id).await;
 
         let app = actix_web::test::init_service(create_app(
             db.clone(),
@@ -291,9 +321,10 @@ fn test_crud_cycle() {
 fn test_state_machine_flow() {
     with_db(|db| async move {
         let config = make_config();
-        let admin_id = create_test_usuario(&db, "admin").await;
+        let org_id = create_test_organizacion(&db).await;
+        let admin_id = create_test_usuario(&db, "admin", org_id).await;
         let token = make_token(admin_id, "admin");
-        let propiedad_id = create_test_propiedad(&db).await;
+        let propiedad_id = create_test_propiedad(&db, org_id).await;
 
         let app = actix_web::test::init_service(create_app(
             db.clone(),
@@ -349,9 +380,10 @@ fn test_state_machine_flow() {
 fn test_invalid_state_transitions() {
     with_db(|db| async move {
         let config = make_config();
-        let admin_id = create_test_usuario(&db, "admin").await;
+        let org_id = create_test_organizacion(&db).await;
+        let admin_id = create_test_usuario(&db, "admin", org_id).await;
         let token = make_token(admin_id, "admin");
-        let propiedad_id = create_test_propiedad(&db).await;
+        let propiedad_id = create_test_propiedad(&db, org_id).await;
 
         let app = actix_web::test::init_service(create_app(
             db.clone(),
@@ -434,9 +466,10 @@ fn test_invalid_state_transitions() {
 fn test_notes_add_and_list() {
     with_db(|db| async move {
         let config = make_config();
-        let admin_id = create_test_usuario(&db, "admin").await;
+        let org_id = create_test_organizacion(&db).await;
+        let admin_id = create_test_usuario(&db, "admin", org_id).await;
         let token = make_token(admin_id, "admin");
-        let propiedad_id = create_test_propiedad(&db).await;
+        let propiedad_id = create_test_propiedad(&db, org_id).await;
 
         let app = actix_web::test::init_service(create_app(
             db.clone(),
@@ -499,10 +532,11 @@ fn test_notes_add_and_list() {
 fn test_filters() {
     with_db(|db| async move {
         let config = make_config();
-        let admin_id = create_test_usuario(&db, "admin").await;
+        let org_id = create_test_organizacion(&db).await;
+        let admin_id = create_test_usuario(&db, "admin", org_id).await;
         let token = make_token(admin_id, "admin");
-        let propiedad_id = create_test_propiedad(&db).await;
-        let propiedad_id2 = create_test_propiedad(&db).await;
+        let propiedad_id = create_test_propiedad(&db, org_id).await;
+        let propiedad_id2 = create_test_propiedad(&db, org_id).await;
 
         let app = actix_web::test::init_service(create_app(
             db.clone(),
@@ -585,13 +619,14 @@ fn test_filters() {
 fn test_access_control() {
     with_db(|db| async move {
         let config = make_config();
-        let admin_id = create_test_usuario(&db, "admin").await;
-        let gerente_id = create_test_usuario(&db, "gerente").await;
-        let visualizador_id = create_test_usuario(&db, "visualizador").await;
+        let org_id = create_test_organizacion(&db).await;
+        let admin_id = create_test_usuario(&db, "admin", org_id).await;
+        let gerente_id = create_test_usuario(&db, "gerente", org_id).await;
+        let visualizador_id = create_test_usuario(&db, "visualizador", org_id).await;
         let admin_token = make_token(admin_id, "admin");
         let gerente_token = make_token(gerente_id, "gerente");
         let viewer_token = make_token(visualizador_id, "visualizador");
-        let propiedad_id = create_test_propiedad(&db).await;
+        let propiedad_id = create_test_propiedad(&db, org_id).await;
 
         let app = actix_web::test::init_service(create_app(
             db.clone(),
@@ -684,10 +719,11 @@ fn test_access_control() {
 fn test_fk_validations() {
     with_db(|db| async move {
         let config = make_config();
-        let admin_id = create_test_usuario(&db, "admin").await;
+        let org_id = create_test_organizacion(&db).await;
+        let admin_id = create_test_usuario(&db, "admin", org_id).await;
         let token = make_token(admin_id, "admin");
-        let propiedad_id = create_test_propiedad(&db).await;
-        let propiedad_id2 = create_test_propiedad(&db).await;
+        let propiedad_id = create_test_propiedad(&db, org_id).await;
+        let propiedad_id2 = create_test_propiedad(&db, org_id).await;
         let unidad_id = create_test_unidad(&db, propiedad_id2).await;
 
         let app = actix_web::test::init_service(create_app(
@@ -745,9 +781,10 @@ fn test_fk_validations() {
 fn test_validations() {
     with_db(|db| async move {
         let config = make_config();
-        let admin_id = create_test_usuario(&db, "admin").await;
+        let org_id = create_test_organizacion(&db).await;
+        let admin_id = create_test_usuario(&db, "admin", org_id).await;
         let token = make_token(admin_id, "admin");
-        let propiedad_id = create_test_propiedad(&db).await;
+        let propiedad_id = create_test_propiedad(&db, org_id).await;
 
         let app = actix_web::test::init_service(create_app(
             db.clone(),
@@ -850,9 +887,10 @@ fn test_validations() {
 fn test_auditoria_entries() {
     with_db(|db| async move {
         let config = make_config();
-        let admin_id = create_test_usuario(&db, "admin").await;
+        let org_id = create_test_organizacion(&db).await;
+        let admin_id = create_test_usuario(&db, "admin", org_id).await;
         let token = make_token(admin_id, "admin");
-        let propiedad_id = create_test_propiedad(&db).await;
+        let propiedad_id = create_test_propiedad(&db, org_id).await;
 
         let app = actix_web::test::init_service(create_app(
             db.clone(),
@@ -952,9 +990,10 @@ fn test_auditoria_entries() {
 fn test_default_prioridad() {
     with_db(|db| async move {
         let config = make_config();
-        let admin_id = create_test_usuario(&db, "admin").await;
+        let org_id = create_test_organizacion(&db).await;
+        let admin_id = create_test_usuario(&db, "admin", org_id).await;
         let token = make_token(admin_id, "admin");
-        let propiedad_id = create_test_propiedad(&db).await;
+        let propiedad_id = create_test_propiedad(&db, org_id).await;
 
         let app = actix_web::test::init_service(create_app(
             db.clone(),
