@@ -131,6 +131,7 @@ pub fn parse_cedula(formatted: &str) -> String {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
     use actix_web::error::ResponseError;
@@ -149,24 +150,27 @@ mod tests {
         // Change last digit from 6 to 5
         let result = validar_rnc("131246795");
         assert!(result.is_err());
-        assert_eq!(
-            result.expect_err("should be err").status_code(),
-            StatusCode::UNPROCESSABLE_ENTITY,
-        );
+        if let Err(e) = result {
+            assert_eq!(e.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+        }
     }
 
     #[test]
     fn validar_rnc_rechaza_longitud_corta() {
         let result = validar_rnc("12345678");
         assert!(result.is_err());
-        assert_eq!(result.expect_err("should be err").status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+        if let Err(e) = result {
+            assert_eq!(e.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+        }
     }
 
     #[test]
     fn validar_rnc_rechaza_longitud_larga() {
         let result = validar_rnc("1312467960");
         assert!(result.is_err());
-        assert_eq!(result.expect_err("should be err").status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+        if let Err(e) = result {
+            assert_eq!(e.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+        }
     }
 
     #[test]
@@ -189,24 +193,27 @@ mod tests {
         // Change last digit from 1 to 0
         let result = validar_cedula("22400022110");
         assert!(result.is_err());
-        assert_eq!(
-            result.expect_err("should be err").status_code(),
-            StatusCode::UNPROCESSABLE_ENTITY,
-        );
+        if let Err(e) = result {
+            assert_eq!(e.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+        }
     }
 
     #[test]
     fn validar_cedula_rechaza_longitud_corta() {
         let result = validar_cedula("2240002211");
         assert!(result.is_err());
-        assert_eq!(result.expect_err("should be err").status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+        if let Err(e) = result {
+            assert_eq!(e.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+        }
     }
 
     #[test]
     fn validar_cedula_rechaza_longitud_larga() {
         let result = validar_cedula("224000221110");
         assert!(result.is_err());
-        assert_eq!(result.expect_err("should be err").status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+        if let Err(e) = result {
+            assert_eq!(e.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+        }
     }
 
     #[test]
