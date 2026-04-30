@@ -16,8 +16,9 @@ pub async fn create(
     body: web::Json<CreateGastoRequest>,
 ) -> Result<HttpResponse, AppError> {
     let usuario_id = access.0.sub;
+    let organizacion_id = access.0.organizacion_id;
     let txn = db.begin().await?;
-    let result = gastos::create(&txn, body.into_inner(), usuario_id).await?;
+    let result = gastos::create(&txn, body.into_inner(), usuario_id, organizacion_id).await?;
     txn.commit().await?;
     Ok(HttpResponse::Created().json(result))
 }

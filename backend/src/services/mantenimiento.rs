@@ -78,6 +78,7 @@ pub async fn create<C: ConnectionTrait>(
     db: &C,
     input: CreateSolicitudRequest,
     usuario_id: Uuid,
+    organizacion_id: Uuid,
 ) -> Result<SolicitudResponse, AppError> {
     if input.titulo.trim().is_empty() {
         return Err(AppError::Validation("El título es requerido".to_string()));
@@ -140,6 +141,7 @@ pub async fn create<C: ConnectionTrait>(
         costo_moneda: Set(input.costo_moneda),
         fecha_inicio: Set(None),
         fecha_fin: Set(None),
+        organizacion_id: Set(organizacion_id),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -441,6 +443,7 @@ mod tests {
             costo_moneda: Some("DOP".to_string()),
             fecha_inicio: Some(now),
             fecha_fin: None,
+            organizacion_id: Uuid::new_v4(),
             created_at: now,
             updated_at: now,
         }
@@ -570,6 +573,7 @@ mod tests {
             costo_moneda: None,
             fecha_inicio: None,
             fecha_fin: None,
+            organizacion_id: Uuid::new_v4(),
             created_at: now,
             updated_at: now,
         };

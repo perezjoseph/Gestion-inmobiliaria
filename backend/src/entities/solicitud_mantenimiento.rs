@@ -23,6 +23,7 @@ pub struct Model {
     pub costo_moneda: Option<String>,
     pub fecha_inicio: Option<DateTimeWithTimeZone>,
     pub fecha_fin: Option<DateTimeWithTimeZone>,
+    pub organizacion_id: Uuid,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }
@@ -37,6 +38,18 @@ pub enum Relation {
     Propiedad,
     #[sea_orm(has_many = "super::nota_mantenimiento::Entity")]
     Notas,
+    #[sea_orm(
+        belongs_to = "super::organizacion::Entity",
+        from = "Column::OrganizacionId",
+        to = "super::organizacion::Column::Id"
+    )]
+    Organizacion,
+}
+
+impl Related<super::organizacion::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Organizacion.def()
+    }
 }
 
 impl Related<super::propiedad::Entity> for Entity {

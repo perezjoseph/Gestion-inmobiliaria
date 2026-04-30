@@ -20,6 +20,7 @@ pub struct Model {
     pub numero_factura: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub notas: Option<String>,
+    pub organizacion_id: Uuid,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }
@@ -38,6 +39,18 @@ pub enum Relation {
         to = "super::unidad::Column::Id"
     )]
     Unidad,
+    #[sea_orm(
+        belongs_to = "super::organizacion::Entity",
+        from = "Column::OrganizacionId",
+        to = "super::organizacion::Column::Id"
+    )]
+    Organizacion,
+}
+
+impl Related<super::organizacion::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Organizacion.def()
+    }
 }
 
 impl Related<super::propiedad::Entity> for Entity {

@@ -428,6 +428,7 @@ pub async fn importar_gastos(
     data: &[u8],
     formato: ImportFormat,
     usuario_id: Uuid,
+    organizacion_id: Uuid,
 ) -> Result<ImportResult, AppError> {
     let rows = parse_rows(data, formato)?;
     if rows.is_empty() {
@@ -472,7 +473,7 @@ pub async fn importar_gastos(
             }
         };
 
-        match gastos::create(db, request, usuario_id).await {
+        match gastos::create(db, request, usuario_id, organizacion_id).await {
             Ok(_) => exitosos += 1,
             Err(e) => {
                 fallidos.push(ImportError {

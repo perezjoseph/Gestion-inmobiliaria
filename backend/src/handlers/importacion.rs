@@ -158,7 +158,7 @@ pub async fn importar_gastos(
         Ok(HttpResponse::Ok().json(preview))
     } else {
         let result =
-            importacion::importar_gastos(db.get_ref(), &file_data, formato, access.0.sub)
+            importacion::importar_gastos(db.get_ref(), &file_data, formato, access.0.sub, access.0.organizacion_id)
                 .await?;
         Ok(HttpResponse::Ok().json(result))
     }

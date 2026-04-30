@@ -53,6 +53,7 @@ pub async fn create<C: ConnectionTrait>(
     db: &C,
     input: CreateGastoRequest,
     usuario_id: Uuid,
+    organizacion_id: Uuid,
 ) -> Result<GastoResponse, AppError> {
     validate_enum("categoria", &input.categoria, CATEGORIAS_GASTO)?;
     validate_enum("moneda", &input.moneda, MONEDAS)?;
@@ -96,6 +97,7 @@ pub async fn create<C: ConnectionTrait>(
         proveedor: Set(input.proveedor),
         numero_factura: Set(input.numero_factura),
         notas: Set(input.notas),
+        organizacion_id: Set(organizacion_id),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -353,6 +355,7 @@ mod tests {
             proveedor: Some("Proveedor ABC".to_string()),
             numero_factura: Some("FAC-001".to_string()),
             notas: Some("Nota de prueba".to_string()),
+            organizacion_id: Uuid::new_v4(),
             created_at: Utc::now().fixed_offset(),
             updated_at: Utc::now().fixed_offset(),
         }
