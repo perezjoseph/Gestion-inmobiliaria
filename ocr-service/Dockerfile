@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+RUN paddleocr install_hpi_deps cpu
+
 COPY main.py .
 
 ENV PADDLE_PDX_CACHE_HOME=/app/.paddleocr

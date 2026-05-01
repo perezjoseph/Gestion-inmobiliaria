@@ -2,7 +2,6 @@ fastapi==0.121.0
 uvicorn==0.34.3
 paddleocr==3.5.0
 paddlepaddle==3.2.2
-paddlex_hpi
 python-multipart==0.0.26
 Pillow==12.2.0
 PyMuPDF==1.25.5
