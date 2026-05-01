@@ -196,6 +196,50 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(
                 web::scope("/documentos")
                     .wrap(Governor::new(&write_governor_conf))
+                    // Static paths first
+                    .route(
+                        "/por-vencer",
+                        web::get().to(handlers::documentos::por_vencer),
+                    )
+                    .route(
+                        "/plantillas",
+                        web::get().to(handlers::documentos::listar_plantillas),
+                    )
+                    // Parameterized static paths
+                    .route(
+                        "/plantillas/{id}/rellenar/{entity_type}/{entity_id}",
+                        web::get().to(handlers::documentos::rellenar_plantilla),
+                    )
+                    .route(
+                        "/cumplimiento/resumen",
+                        web::get().to(handlers::documentos::cumplimiento_resumen),
+                    )
+                    .route(
+                        "/cumplimiento/{entity_type}/{entity_id}",
+                        web::get().to(handlers::documentos::cumplimiento),
+                    )
+                    .route(
+                        "/digitalizar/{entity_type}/{entity_id}",
+                        web::post().to(handlers::documentos::digitalizar),
+                    )
+                    // Dynamic paths
+                    .route(
+                        "/{id}/verificar",
+                        web::put().to(handlers::documentos::verificar),
+                    )
+                    .route(
+                        "/{id}/contenido",
+                        web::put().to(handlers::documentos::guardar_contenido),
+                    )
+                    .route(
+                        "/{id}/exportar-pdf",
+                        web::get().to(handlers::documentos::exportar_pdf),
+                    )
+                    .route(
+                        "/{id}",
+                        web::delete().to(handlers::documentos::eliminar),
+                    )
+                    // Existing routes (most dynamic — two path segments)
                     .route(
                         "/{entity_type}/{entity_id}",
                         web::post().to(handlers::documentos::upload),

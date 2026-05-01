@@ -10,6 +10,7 @@ use crate::components::layout::sidebar::Sidebar;
 use crate::pages::auditoria::Auditoria;
 use crate::pages::contratos::Contratos;
 use crate::pages::dashboard::Dashboard;
+use crate::pages::documento_editor::DocumentoEditorPage;
 use crate::pages::gastos::Gastos;
 use crate::pages::importar::Importar;
 use crate::pages::inquilinos::Inquilinos;
@@ -115,6 +116,17 @@ pub enum Route {
     Importar,
     #[at("/mantenimiento")]
     Mantenimiento,
+    #[at("/documentos/editor/:entity_type/:entity_id")]
+    DocumentoEditor {
+        entity_type: String,
+        entity_id: String,
+    },
+    #[at("/documentos/editor/:entity_type/:entity_id/:documento_id")]
+    DocumentoEditorExisting {
+        entity_type: String,
+        entity_id: String,
+        documento_id: String,
+    },
     #[not_found]
     #[at("/404")]
     NotFound,
@@ -136,6 +148,12 @@ fn switch(routes: Route) -> Html {
         Route::AuditoriaPage => html! { <ProtectedRoute><Auditoria /></ProtectedRoute> },
         Route::Importar => html! { <ProtectedRoute><Importar /></ProtectedRoute> },
         Route::Mantenimiento => html! { <ProtectedRoute><Mantenimiento /></ProtectedRoute> },
+        Route::DocumentoEditor { entity_type, entity_id } => html! {
+            <ProtectedRoute><DocumentoEditorPage entity_type={entity_type} entity_id={entity_id} /></ProtectedRoute>
+        },
+        Route::DocumentoEditorExisting { entity_type, entity_id, documento_id } => html! {
+            <ProtectedRoute><DocumentoEditorPage entity_type={entity_type} entity_id={entity_id} documento_id={Some(documento_id)} /></ProtectedRoute>
+        },
         Route::NotFound => {
             html! {
                 <div class="gi-empty-state">

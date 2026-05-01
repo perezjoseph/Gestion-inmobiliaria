@@ -7,11 +7,12 @@ use sea_orm::{
 use serde::Serialize;
 use std::collections::HashMap;
 
-use crate::entities::{contrato, gasto, inquilino, pago, propiedad};
+use crate::entities::{contrato, documento, gasto, inquilino, pago, propiedad};
 use crate::errors::AppError;
 use crate::models::dashboard::{
     ContratoCalendario, GastosComparacion, IngresoComparacion, OcupacionMensual, PagoProximo,
 };
+use crate::services::documentos::{REQUERIDOS_CONTRATO, REQUERIDOS_INQUILINO, REQUERIDOS_PROPIEDAD};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -21,6 +22,9 @@ pub struct DashboardStats {
     pub ingreso_mensual: Decimal,
     pub pagos_atrasados: u64,
     pub total_gastos_mes: Decimal,
+    pub documentos_vencidos: i64,
+    pub documentos_por_vencer: i64,
+    pub entidades_incompletas: i64,
 }
 
 #[derive(Debug, FromQueryResult)]
@@ -45,7 +49,17 @@ pub async fn get_stats(db: &DatabaseConnection) -> Result<DashboardStats, AppErr
         naive_date(anio, mes + 1, 1)? - chrono::Days::new(1)
     };
 
-    let (total_propiedades, ocupadas, ingreso_result, pagos_atrasados, gastos_result) = tokio::try_join!(
+    let fecha_limite_vencimiento = today + chrono::Days::new(30);
+
+    let (
+        total_propiedades,
+        ocupadas,
+        ingreso_result,
+        pagos_atrasados,
+        gastos_result,
+        documentos_vencidos,
+        documentos_por_vencer,
+    ) = tokio::try_join!(
         propiedad::Entity::find().count(db),
         propiedad::Entity::find()
             .filter(propiedad::Column::Estado.eq("ocupada"))
@@ -67,6 +81,14 @@ pub async fn get_stats(db: &DatabaseConnection) -> Result<DashboardStats, AppErr
             .filter(gasto::Column::FechaGasto.lte(ultimo_dia_mes))
             .into_model::<SumResult>()
             .one(db),
+        documento::Entity::find()
+            .filter(documento::Column::EstadoVerificacion.eq("vencido"))
+            .count(db),
+        documento::Entity::find()
+            .filter(documento::Column::EstadoVerificacion.eq("verificado"))
+            .filter(documento::Column::FechaVencimiento.gte(today))
+            .filter(documento::Column::FechaVencimiento.lte(fecha_limite_vencimiento))
+            .count(db),
     )?;
 
     let tasa_ocupacion = if total_propiedades > 0 {
@@ -81,13 +103,215 @@ pub async fn get_stats(db: &DatabaseConnection) -> Result<DashboardStats, AppErr
 
     let total_gastos_mes = gastos_result.and_then(|r| r.total).unwrap_or(Decimal::ZERO);
 
+    // Calculate entidades_incompletas: count entities with required docs below 100% compliance
+    let entidades_incompletas = contar_entidades_incompletas(db).await?;
+
     Ok(DashboardStats {
         total_propiedades,
         tasa_ocupacion,
         ingreso_mensual,
         pagos_atrasados,
         total_gastos_mes,
+        documentos_vencidos: i64::try_from(documentos_vencidos).unwrap_or(i64::MAX),
+        documentos_por_vencer: i64::try_from(documentos_por_vencer).unwrap_or(i64::MAX),
+        entidades_incompletas,
     })
+}
+
+/// Count entities (inquilinos, propiedades, contratos) that have required documents
+/// but are below 100% compliance. Uses batch queries with `is_in()` to avoid N+1.
+#[allow(clippy::cast_possible_truncation)]
+async fn contar_entidades_incompletas(db: &DatabaseConnection) -> Result<i64, AppError> {
+    // Fetch all entities of each type that have required documents
+    let (all_inquilinos, all_propiedades, all_contratos) = tokio::try_join!(
+        inquilino::Entity::find().all(db),
+        propiedad::Entity::find().all(db),
+        contrato::Entity::find().all(db),
+    )?;
+
+    // Collect all entity IDs per type for batch document queries
+    let inquilino_ids: Vec<uuid::Uuid> = all_inquilinos.iter().map(|i| i.id).collect();
+    let propiedad_ids: Vec<uuid::Uuid> = all_propiedades.iter().map(|p| p.id).collect();
+    let contrato_ids: Vec<uuid::Uuid> = all_contratos.iter().map(|c| c.id).collect();
+
+    // Batch-fetch all documents for these entities in 3 queries (not N+1)
+    let (docs_inquilinos, docs_propiedades, docs_contratos) = tokio::try_join!(
+        documento::Entity::find()
+            .filter(documento::Column::EntityType.eq("inquilino"))
+            .filter(documento::Column::EntityId.is_in(inquilino_ids.clone()))
+            .all(db),
+        documento::Entity::find()
+            .filter(documento::Column::EntityType.eq("propiedad"))
+            .filter(documento::Column::EntityId.is_in(propiedad_ids.clone()))
+            .all(db),
+        documento::Entity::find()
+            .filter(documento::Column::EntityType.eq("contrato"))
+            .filter(documento::Column::EntityId.is_in(contrato_ids.clone()))
+            .all(db),
+    )?;
+
+    // Group documents by entity_id using HashMaps
+    let mut inq_docs: HashMap<uuid::Uuid, Vec<&documento::Model>> = HashMap::new();
+    for doc in &docs_inquilinos {
+        inq_docs.entry(doc.entity_id).or_default().push(doc);
+    }
+    let mut prop_docs: HashMap<uuid::Uuid, Vec<&documento::Model>> = HashMap::new();
+    for doc in &docs_propiedades {
+        prop_docs.entry(doc.entity_id).or_default().push(doc);
+    }
+    let mut cont_docs: HashMap<uuid::Uuid, Vec<&documento::Model>> = HashMap::new();
+    for doc in &docs_contratos {
+        cont_docs.entry(doc.entity_id).or_default().push(doc);
+    }
+
+    let mut incompletas: i64 = 0;
+
+    // Check inquilinos compliance
+    for id in &inquilino_ids {
+        let docs = inq_docs.get(id).map_or(&[] as &[_], Vec::as_slice);
+        if !is_entity_compliant(docs, REQUERIDOS_INQUILINO) {
+            incompletas += 1;
+        }
+    }
+
+    // Check propiedades compliance
+    for id in &propiedad_ids {
+        let docs = prop_docs.get(id).map_or(&[] as &[_], Vec::as_slice);
+        if !is_entity_compliant(docs, REQUERIDOS_PROPIEDAD) {
+            incompletas += 1;
+        }
+    }
+
+    // Check contratos compliance
+    for id in &contrato_ids {
+        let docs = cont_docs.get(id).map_or(&[] as &[_], Vec::as_slice);
+        if !is_entity_compliant(docs, REQUERIDOS_CONTRATO) {
+            incompletas += 1;
+        }
+    }
+
+    Ok(incompletas)
+}
+
+/// Check if an entity has all required documents with `estado_verificacion` = "verificado".
+fn is_entity_compliant(docs: &[&documento::Model], requeridos: &[&str]) -> bool {
+    requeridos.iter().all(|&tipo| {
+        docs.iter()
+            .any(|d| d.tipo_documento == tipo && d.estado_verificacion == "verificado")
+    })
+}
+
+/// Compliance summary: returns entities with lowest compliance percentages.
+#[allow(clippy::cast_possible_truncation)]
+pub async fn cumplimiento_resumen(
+    db: &DatabaseConnection,
+) -> Result<Vec<CumplimientoResumenItem>, AppError> {
+    // Fetch all entities of each type
+    let (all_inquilinos, all_propiedades, all_contratos) = tokio::try_join!(
+        inquilino::Entity::find().all(db),
+        propiedad::Entity::find().all(db),
+        contrato::Entity::find().all(db),
+    )?;
+
+    let inquilino_ids: Vec<uuid::Uuid> = all_inquilinos.iter().map(|i| i.id).collect();
+    let propiedad_ids: Vec<uuid::Uuid> = all_propiedades.iter().map(|p| p.id).collect();
+    let contrato_ids: Vec<uuid::Uuid> = all_contratos.iter().map(|c| c.id).collect();
+
+    // Batch-fetch all documents
+    let (docs_inquilinos, docs_propiedades, docs_contratos) = tokio::try_join!(
+        documento::Entity::find()
+            .filter(documento::Column::EntityType.eq("inquilino"))
+            .filter(documento::Column::EntityId.is_in(inquilino_ids.clone()))
+            .all(db),
+        documento::Entity::find()
+            .filter(documento::Column::EntityType.eq("propiedad"))
+            .filter(documento::Column::EntityId.is_in(propiedad_ids.clone()))
+            .all(db),
+        documento::Entity::find()
+            .filter(documento::Column::EntityType.eq("contrato"))
+            .filter(documento::Column::EntityId.is_in(contrato_ids.clone()))
+            .all(db),
+    )?;
+
+    // Group documents by entity_id
+    let mut inq_docs: HashMap<uuid::Uuid, Vec<&documento::Model>> = HashMap::new();
+    for doc in &docs_inquilinos {
+        inq_docs.entry(doc.entity_id).or_default().push(doc);
+    }
+    let mut prop_docs: HashMap<uuid::Uuid, Vec<&documento::Model>> = HashMap::new();
+    for doc in &docs_propiedades {
+        prop_docs.entry(doc.entity_id).or_default().push(doc);
+    }
+    let mut cont_docs: HashMap<uuid::Uuid, Vec<&documento::Model>> = HashMap::new();
+    for doc in &docs_contratos {
+        cont_docs.entry(doc.entity_id).or_default().push(doc);
+    }
+
+    let mut items: Vec<CumplimientoResumenItem> = Vec::new();
+
+    // Calculate compliance for each inquilino
+    for id in &inquilino_ids {
+        let docs = inq_docs.get(id).map_or(&[] as &[_], Vec::as_slice);
+        let porcentaje = calcular_porcentaje_cumplimiento(docs, REQUERIDOS_INQUILINO);
+        items.push(CumplimientoResumenItem {
+            entity_type: "inquilino".to_string(),
+            entity_id: *id,
+            porcentaje,
+        });
+    }
+
+    // Calculate compliance for each propiedad
+    for id in &propiedad_ids {
+        let docs = prop_docs.get(id).map_or(&[] as &[_], Vec::as_slice);
+        let porcentaje = calcular_porcentaje_cumplimiento(docs, REQUERIDOS_PROPIEDAD);
+        items.push(CumplimientoResumenItem {
+            entity_type: "propiedad".to_string(),
+            entity_id: *id,
+            porcentaje,
+        });
+    }
+
+    // Calculate compliance for each contrato
+    for id in &contrato_ids {
+        let docs = cont_docs.get(id).map_or(&[] as &[_], Vec::as_slice);
+        let porcentaje = calcular_porcentaje_cumplimiento(docs, REQUERIDOS_CONTRATO);
+        items.push(CumplimientoResumenItem {
+            entity_type: "contrato".to_string(),
+            entity_id: *id,
+            porcentaje,
+        });
+    }
+
+    // Sort ascending by porcentaje, take the 10 lowest
+    items.sort_by_key(|i| i.porcentaje);
+    items.truncate(10);
+
+    Ok(items)
+}
+
+/// Calculate compliance percentage for an entity given its documents and required types.
+#[allow(clippy::cast_possible_truncation)]
+fn calcular_porcentaje_cumplimiento(docs: &[&documento::Model], requeridos: &[&str]) -> u8 {
+    if requeridos.is_empty() {
+        return 100;
+    }
+    let presente = requeridos
+        .iter()
+        .filter(|&&tipo| {
+            docs.iter()
+                .any(|d| d.tipo_documento == tipo && d.estado_verificacion == "verificado")
+        })
+        .count() as u32;
+    let total = requeridos.len() as u32;
+    ((presente * 100) / total).min(100) as u8
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CumplimientoResumenItem {
+    pub entity_type: String,
+    pub entity_id: uuid::Uuid,
+    pub porcentaje: u8,
 }
 
 pub async fn ocupacion_tendencia(

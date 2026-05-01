@@ -130,6 +130,25 @@ pub fn parse_cedula(formatted: &str) -> String {
     solo_digitos(formatted)
 }
 
+/// Validate a Dominican Republic NCF (Número de Comprobante Fiscal).
+///
+/// The NCF must be a single uppercase letter followed by exactly 10 digits
+/// (e.g., `B0100000001`). Total length: 11 characters.
+pub fn validar_ncf(ncf: &str) -> Result<(), AppError> {
+    let bytes = ncf.as_bytes();
+    if bytes.len() == 11
+        && bytes[0].is_ascii_uppercase()
+        && bytes[1..].iter().all(u8::is_ascii_digit)
+    {
+        Ok(())
+    } else {
+        Err(AppError::Validation(
+            "NCF inválido: debe ser una letra mayúscula seguida de 10 dígitos (ej: B0100000001)"
+                .to_string(),
+        ))
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::panic)]
 mod tests {
@@ -220,6 +239,82 @@ mod tests {
     fn validar_cedula_acepta_formato_con_guiones() {
         // "224-0002211-1" strips to "22400022111"
         assert!(validar_cedula("224-0002211-1").is_ok());
+    }
+
+    // ── NCF tests ──────────────────────────────────────────────
+
+    #[test]
+    fn validar_ncf_acepta_ncf_valido() {
+        assert!(validar_ncf("B0100000001").is_ok());
+    }
+
+    #[test]
+    fn validar_ncf_acepta_diferentes_prefijos() {
+        assert!(validar_ncf("A0000000001").is_ok());
+        assert!(validar_ncf("E0100000001").is_ok());
+        assert!(validar_ncf("Z9999999999").is_ok());
+    }
+
+    #[test]
+    fn validar_ncf_rechaza_cadena_vacia() {
+        let result = validar_ncf("");
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert_eq!(e.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+        }
+    }
+
+    #[test]
+    fn validar_ncf_rechaza_prefijo_minuscula() {
+        let result = validar_ncf("b0100000001");
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert_eq!(e.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+        }
+    }
+
+    #[test]
+    fn validar_ncf_rechaza_sin_prefijo_letra() {
+        let result = validar_ncf("10100000001");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validar_ncf_rechaza_pocos_digitos() {
+        // 9 digits instead of 10
+        let result = validar_ncf("B010000001");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validar_ncf_rechaza_muchos_digitos() {
+        // 11 digits instead of 10
+        let result = validar_ncf("B01000000011");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validar_ncf_rechaza_letras_en_digitos() {
+        let result = validar_ncf("B010000000A");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validar_ncf_rechaza_solo_letras() {
+        let result = validar_ncf("ABCDEFGHIJK");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validar_ncf_rechaza_con_espacios() {
+        let result = validar_ncf("B 010000001");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validar_ncf_rechaza_con_guiones() {
+        let result = validar_ncf("B-010000001");
+        assert!(result.is_err());
     }
 
     // ── Round-trip tests ───────────────────────────────────────

@@ -15,6 +15,9 @@ pub mod m20250412_000001_create_gastos;
 pub mod m20250413_000001_create_organizaciones;
 pub mod m20250413_000002_add_organizacion_id;
 pub mod m20250413_000003_create_invitaciones;
+pub mod m20250430_000001_extend_documentos_legal;
+pub mod m20250430_000002_add_documentos_editor;
+pub mod m20250430_000003_create_plantillas_documento;
 
 use sea_orm_migration::prelude::*;
 
@@ -40,6 +43,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20250413_000001_create_organizaciones::Migration),
             Box::new(m20250413_000002_add_organizacion_id::Migration),
             Box::new(m20250413_000003_create_invitaciones::Migration),
+            Box::new(m20250430_000001_extend_documentos_legal::Migration),
+            Box::new(m20250430_000002_add_documentos_editor::Migration),
+            Box::new(m20250430_000003_create_plantillas_documento::Migration),
         ]
     }
 }

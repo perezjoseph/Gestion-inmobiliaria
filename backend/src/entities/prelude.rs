@@ -20,6 +20,8 @@ pub use super::invitacion::Entity as Invitacion;
 #[allow(unused_imports)]
 pub use super::organizacion::Entity as Organizacion;
 #[allow(unused_imports)]
+pub use super::plantilla_documento::Entity as PlantillaDocumento;
+#[allow(unused_imports)]
 pub use super::pago::Entity as Pago;
 #[allow(unused_imports)]
 pub use super::propiedad::Entity as Propiedad;

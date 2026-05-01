@@ -15,6 +15,16 @@ pub struct Model {
     pub file_size: i64,
     pub uploaded_by: Uuid,
     pub created_at: DateTimeWithTimeZone,
+    pub tipo_documento: String,
+    pub estado_verificacion: String,
+    pub fecha_vencimiento: Option<Date>,
+    pub verificado_por: Option<Uuid>,
+    pub fecha_verificacion: Option<DateTimeWithTimeZone>,
+    pub notas_verificacion: Option<String>,
+    pub numero_documento: Option<String>,
+    #[sea_orm(column_type = "JsonBinary", nullable)]
+    pub contenido_editable: Option<Json>,
+    pub updated_at: Option<DateTimeWithTimeZone>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
