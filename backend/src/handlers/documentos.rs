@@ -70,8 +70,8 @@ pub async fn upload(
             }
             match field_name.as_str() {
                 "tipo_documento" => tipo_documento = Some(value),
-                "fecha_vencimiento" => {
-                    if !value.is_empty() {
+                "fecha_vencimiento"
+                    if !value.is_empty() => {
                         fecha_vencimiento = Some(
                             value.parse::<chrono::NaiveDate>().map_err(|_| {
                                 AppError::Validation(
@@ -81,17 +81,14 @@ pub async fn upload(
                             })?,
                         );
                     }
-                }
-                "numero_documento" => {
-                    if !value.is_empty() {
+                "numero_documento"
+                    if !value.is_empty() => {
                         numero_documento = Some(value);
                     }
-                }
-                "notas_verificacion" => {
-                    if !value.is_empty() {
+                "notas_verificacion"
+                    if !value.is_empty() => {
                         notas_verificacion = Some(value);
                     }
-                }
                 _ => {} // ignore unknown fields
             }
         }

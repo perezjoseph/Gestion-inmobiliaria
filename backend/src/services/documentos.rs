@@ -662,11 +662,9 @@ pub async fn cumplimiento(
     }
 
     let required_count = requeridos.len() as u32;
-    let porcentaje = if required_count == 0 {
-        100
-    } else {
-        ((presente_count * 100) / required_count).min(100) as u8
-    };
+    let porcentaje = (presente_count * 100)
+        .checked_div(required_count)
+        .map_or(100, |v| v.min(100) as u8);
 
     Ok(CumplimientoResponse {
         entity_type: entity_type.to_string(),
