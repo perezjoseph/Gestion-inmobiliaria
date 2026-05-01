@@ -17,7 +17,8 @@ ocr_engine = PaddleOCR(
     use_doc_orientation_classify=False,
     use_doc_unwarping=False,
     lang="es",
-    device="cpu",
+    device="gpu:0",
+    enable_hpi=True,
 )
 
 

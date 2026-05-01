@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsm6 \
     libxext6 \
     libxrender1 \
+    ocl-icd-libopencl1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -39,6 +40,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     libxrender1 \
     curl \
+    ocl-icd-libopencl1 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -r ocruser && useradd -r -g ocruser -d /app -s /sbin/nologin ocruser
 

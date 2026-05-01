@@ -38,10 +38,12 @@ spec:
               cpu: 100m
               memory: 1Gi
               ephemeral-storage: 64Mi
+              gpu.intel.com/i915: "1"
             limits:
               cpu: 500m
               memory: 2Gi
               ephemeral-storage: 256Mi
+              gpu.intel.com/i915: "1"
           readinessProbe:
             httpGet:
               path: /health
@@ -59,6 +61,7 @@ spec:
           securityContext:
             runAsNonRoot: true
             runAsUser: 999
+            runAsGroup: 44
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
           volumeMounts:
