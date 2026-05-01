@@ -36,11 +36,11 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 512Mi
+              memory: 1Gi
               ephemeral-storage: 64Mi
             limits:
               cpu: 500m
-              memory: 1Gi
+              memory: 2Gi
               ephemeral-storage: 256Mi
           readinessProbe:
             httpGet:
