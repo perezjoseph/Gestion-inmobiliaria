@@ -1,5 +1,6 @@
 use gloo_net::http::{Request, RequestBuilder};
 use serde::{Serialize, de::DeserializeOwned};
+use wasm_bindgen::JsCast;
 use web_sys::window;
 
 pub const BASE_URL: &str = "/api/v1";
@@ -176,6 +177,48 @@ pub async fn api_delete(path: &str) -> Result<(), String> {
         .await
         .map_err(|e| format!("Error de red: {e}"))?;
     handle_response(response).await?;
+    Ok(())
+}
+
+/// Authenticated binary download: fetches the URL with the JWT header,
+/// creates a blob, and triggers a browser download with the given filename.
+#[allow(clippy::future_not_send)]
+pub async fn api_download(path: &str, filename: &str) -> Result<(), String> {
+    let url = format!("{BASE_URL}{path}");
+    let response = apply_auth(Request::get(&url))
+        .send()
+        .await
+        .map_err(|e| format!("Error de red: {e}"))?;
+    let response = handle_response(response).await?;
+
+    let bytes = response
+        .binary()
+        .await
+        .map_err(|e| format!("Error al leer respuesta: {e}"))?;
+
+    let uint8 = js_sys::Uint8Array::from(bytes.as_slice());
+    let array = js_sys::Array::new();
+    array.push(&uint8.buffer());
+
+    let blob = web_sys::Blob::new_with_u8_array_sequence(&array)
+        .map_err(|_| "Error al crear blob")?;
+
+    let blob_url = web_sys::Url::create_object_url_with_blob(&blob)
+        .map_err(|_| "Error al crear URL de descarga")?;
+
+    if let Some(doc) = web_sys::window().and_then(|w| w.document()) {
+        let a: web_sys::HtmlElement = doc
+            .create_element("a")
+            .map_err(|_| "Error al crear enlace")?
+            .unchecked_into();
+        a.set_attribute("href", &blob_url)
+            .map_err(|_| "Error al configurar enlace")?;
+        a.set_attribute("download", filename)
+            .map_err(|_| "Error al configurar enlace")?;
+        a.click();
+    }
+
+    let _ = web_sys::Url::revoke_object_url(&blob_url);
     Ok(())
 }
 

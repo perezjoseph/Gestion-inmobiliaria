@@ -10,6 +10,7 @@ use crate::components::common::confidence_input::ConfidenceInput;
 use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
+use crate::components::common::document_gallery::DocumentGallery;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::ocr_scan_button::OcrScanButton;
 use crate::components::common::pagination::Pagination;
@@ -173,6 +174,10 @@ struct GastoFormProps {
     confidences: HashMap<String, f64>,
     on_ocr_result: Callback<Vec<OcrExtractField>>,
     on_confidence_clear: Callback<String>,
+    #[prop_or_default]
+    editing_id: Option<String>,
+    #[prop_or_default]
+    token: String,
 }
 
 #[component]
@@ -349,6 +354,15 @@ fn GastoForm(props: &GastoFormProps) -> Html {
                     </button>
                 </div>
             </form>
+            if let Some(ref id) = props.editing_id {
+                <div style="margin-top: var(--space-5); border-top: 1px solid var(--border-subtle); padding-top: var(--space-5);">
+                    <DocumentGallery
+                        entity_type={"gasto".to_string()}
+                        entity_id={id.clone()}
+                        token={props.token.clone()}
+                    />
+                </div>
+            }
         </div>
     }
 }
@@ -1011,6 +1025,12 @@ pub fn Gastos() -> Html {
     let (on_page_change, on_per_page_change) =
         super::page_helpers::pagination_cbs(&page, &per_page, &reload);
 
+    let editing_id = editing.as_ref().map(|e| e.id.clone());
+    let token = auth
+        .as_ref()
+        .and_then(|a| a.token.clone())
+        .unwrap_or_default();
+
     render_gastos_view(
         &loading,
         &user_rol,
@@ -1046,6 +1066,8 @@ pub fn Gastos() -> Html {
         &confidences,
         on_ocr_result,
         on_confidence_clear,
+        editing_id,
+        token,
         &items,
         &total,
         &page,
@@ -1095,6 +1117,8 @@ fn render_gastos_view(
     confidences: &UseStateHandle<HashMap<String, f64>>,
     on_ocr_result: Callback<Vec<OcrExtractField>>,
     on_confidence_clear: Callback<String>,
+    editing_id: Option<String>,
+    token: String,
     items: &UseStateHandle<Vec<Gasto>>,
     total: &UseStateHandle<u64>,
     page: &UseStateHandle<u64>,
@@ -1164,6 +1188,8 @@ fn render_gastos_view(
                 on_propiedad_change={on_propiedad_change}
                 confidences={(**confidences).clone()} on_ocr_result={on_ocr_result}
                 on_confidence_clear={on_confidence_clear}
+                editing_id={editing_id}
+                token={token}
             />
         }
     } else {

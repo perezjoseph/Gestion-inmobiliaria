@@ -11,6 +11,7 @@ use crate::components::common::confidence_input::ConfidenceInput;
 use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
+use crate::components::common::document_gallery::DocumentGallery;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::ocr_scan_button::OcrScanButton;
 use crate::components::common::skeleton::TableSkeleton;
@@ -139,6 +140,10 @@ struct PagoFormProps {
     confidences: HashMap<String, f64>,
     on_ocr_result: Callback<Vec<OcrExtractField>>,
     on_confidence_clear: Callback<String>,
+    #[prop_or_default]
+    editing_id: Option<String>,
+    #[prop_or_default]
+    token: String,
 }
 
 #[component]
@@ -280,6 +285,15 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                     </button>
                 </div>
             </form>
+            if let Some(ref id) = props.editing_id {
+                <div style="margin-top: var(--space-5); border-top: 1px solid var(--border-subtle); padding-top: var(--space-5);">
+                    <DocumentGallery
+                        entity_type={"pago".to_string()}
+                        entity_id={id.clone()}
+                        token={props.token.clone()}
+                    />
+                </div>
+            }
         </div>
     }
 }
@@ -999,6 +1013,12 @@ pub fn Pagos() -> Html {
     let (on_page_change, on_per_page_change) =
         super::page_helpers::pagination_cbs(&page, &per_page, &reload);
 
+    let editing_id = editing.as_ref().map(|e| e.id.clone());
+    let token = auth
+        .as_ref()
+        .and_then(|a| a.token.clone())
+        .unwrap_or_default();
+
     render_pagos_view(
         &loading,
         &user_rol,
@@ -1029,6 +1049,8 @@ pub fn Pagos() -> Html {
         &confidences,
         on_ocr_result,
         on_confidence_clear,
+        editing_id,
+        token,
         &items,
         &total,
         &page,
@@ -1072,6 +1094,8 @@ fn render_pagos_view(
     confidences: &UseStateHandle<HashMap<String, f64>>,
     on_ocr_result: Callback<Vec<OcrExtractField>>,
     on_confidence_clear: Callback<String>,
+    editing_id: Option<String>,
+    token: String,
     items: &UseStateHandle<Vec<Pago>>,
     total: &UseStateHandle<u64>,
     page: &UseStateHandle<u64>,
@@ -1124,6 +1148,8 @@ fn render_pagos_view(
         confidences,
         on_ocr_result,
         on_confidence_clear,
+        editing_id,
+        token,
     );
 
     html! {
@@ -1209,6 +1235,8 @@ fn render_pago_form_section(
     confidences: &UseStateHandle<HashMap<String, f64>>,
     on_ocr_result: Callback<Vec<OcrExtractField>>,
     on_confidence_clear: Callback<String>,
+    editing_id: Option<String>,
+    token: String,
 ) -> Html {
     if !**show_form {
         return html! {};
@@ -1224,6 +1252,8 @@ fn render_pago_form_section(
             on_submit={on_submit} on_cancel={on_cancel}
             confidences={(**confidences).clone()} on_ocr_result={on_ocr_result}
             on_confidence_clear={on_confidence_clear}
+            editing_id={editing_id}
+            token={token}
         />
     }
 }

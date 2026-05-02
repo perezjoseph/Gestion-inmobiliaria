@@ -10,6 +10,7 @@ use crate::app::{AuthContext, Route};
 use crate::components::common::confidence_input::ConfidenceInput;
 use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
+use crate::components::common::document_gallery::DocumentGallery;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::ocr_scan_button::OcrScanButton;
 use crate::components::common::skeleton::TableSkeleton;
@@ -88,6 +89,10 @@ struct InquilinoFormProps {
     confidences: HashMap<String, f64>,
     on_ocr_result: Callback<Vec<OcrExtractField>>,
     on_confidence_clear: Callback<String>,
+    #[prop_or_default]
+    editing_id: Option<String>,
+    #[prop_or_default]
+    token: String,
 }
 
 #[component]
@@ -214,6 +219,15 @@ fn InquilinoForm(props: &InquilinoFormProps) -> Html {
                     </button>
                 </div>
             </form>
+            if let Some(ref id) = props.editing_id {
+                <div style="margin-top: var(--space-5); border-top: 1px solid var(--border-subtle); padding-top: var(--space-5);">
+                    <DocumentGallery
+                        entity_type={"inquilino".to_string()}
+                        entity_id={id.clone()}
+                        token={props.token.clone()}
+                    />
+                </div>
+            }
         </div>
     }
 }
@@ -594,6 +608,8 @@ fn render_inquilinos_view(
     confidences: &UseStateHandle<HashMap<String, f64>>,
     on_ocr_result: Callback<Vec<OcrExtractField>>,
     on_confidence_clear: Callback<String>,
+    editing_id: Option<String>,
+    token: String,
     items: &UseStateHandle<Vec<Inquilino>>,
     total: u64,
     page: u64,
@@ -668,6 +684,8 @@ fn render_inquilinos_view(
                     confidences={(**confidences).clone()}
                     on_ocr_result={on_ocr_result}
                     on_confidence_clear={on_confidence_clear}
+                    editing_id={editing_id}
+                    token={token}
                 />
             }
 
@@ -915,6 +933,12 @@ pub fn Inquilinos() -> Html {
     let (on_page_change, on_per_page_change) =
         super::page_helpers::pagination_cbs(&page, &per_page, &reload);
 
+    let editing_id = editing.as_ref().map(|e| e.id.clone());
+    let token = auth
+        .as_ref()
+        .and_then(|a| a.token.clone())
+        .unwrap_or_default();
+
     render_inquilinos_view(
         &loading,
         &user_rol,
@@ -941,6 +965,8 @@ pub fn Inquilinos() -> Html {
         &confidences,
         on_ocr_result,
         on_confidence_clear,
+        editing_id,
+        token,
         &items,
         *total,
         *page,

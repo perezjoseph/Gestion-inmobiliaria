@@ -24,13 +24,13 @@ fn field_confidence(result: &OcrResult, value: &str) -> f64 {
     }
 
     // 2. Digits-only match: strip non-digit chars and compare
-    let value_digits: String = value.chars().filter(|c| c.is_ascii_digit()).collect();
+    let value_digits: String = value.chars().filter(char::is_ascii_digit).collect();
     if value_digits.len() >= 3 {
         let digits_match = result
             .lines
             .iter()
             .filter(|l| {
-                let line_digits: String = l.text.chars().filter(|c| c.is_ascii_digit()).collect();
+                let line_digits: String = l.text.chars().filter(char::is_ascii_digit).collect();
                 line_digits.contains(&value_digits) || value_digits.contains(&line_digits)
             })
             .map(|l| l.confidence)

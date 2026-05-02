@@ -4,7 +4,7 @@ use yew::prelude::*;
 use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::skeleton::ReportSkeleton;
-use crate::services::api::{BASE_URL, api_get};
+use crate::services::api::{api_download, api_get};
 use crate::types::reporte::IngresoReportSummary;
 
 #[component]
@@ -50,24 +50,34 @@ pub fn Reportes() -> Html {
     let on_export_pdf = {
         let mes = mes.clone();
         let anio = anio.clone();
+        let error = error.clone();
         Callback::from(move |_: MouseEvent| {
-            let url = format!(
-                "{BASE_URL}/reportes/ingresos/pdf?mes={}&anio={}",
-                *mes, *anio
-            );
-            let _ = web_sys::window().and_then(|w| w.open_with_url(&url).ok());
+            let m = *mes;
+            let a = *anio;
+            let error = error.clone();
+            spawn_local(async move {
+                let path = format!("/reportes/ingresos/pdf?mes={m}&anio={a}");
+                if let Err(e) = api_download(&path, "reporte-ingresos.pdf").await {
+                    error.set(Some(e));
+                }
+            });
         })
     };
 
     let on_export_xlsx = {
         let mes = mes.clone();
         let anio = anio.clone();
+        let error = error.clone();
         Callback::from(move |_: MouseEvent| {
-            let url = format!(
-                "{BASE_URL}/reportes/ingresos/xlsx?mes={}&anio={}",
-                *mes, *anio
-            );
-            let _ = web_sys::window().and_then(|w| w.open_with_url(&url).ok());
+            let m = *mes;
+            let a = *anio;
+            let error = error.clone();
+            spawn_local(async move {
+                let path = format!("/reportes/ingresos/xlsx?mes={m}&anio={a}");
+                if let Err(e) = api_download(&path, "reporte-ingresos.xlsx").await {
+                    error.set(Some(e));
+                }
+            });
         })
     };
 
