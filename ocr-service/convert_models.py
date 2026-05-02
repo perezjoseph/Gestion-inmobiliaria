@@ -1,15 +1,12 @@
-"""Download PaddleOCR PP-OCRv5 models and convert to OpenVINO IR format.
+"""Download PaddleOCR PP-OCRv5 models and convert to ONNX for OpenVINO.
 
-Run during Docker build to bake pre-converted IR models into the image.
-OpenVINO can read PaddlePaddle .pdmodel files directly via ov.convert_model(),
-then we serialize to IR (.xml + .bin) for faster runtime loading.
+Run during Docker build to bake ONNX models into the image.
+paddle2onnx.export() accepts file paths (including .json model files)
+and produces ONNX output.
 """
 
 import os
-import shutil
 from pathlib import Path
-
-import openvino as ov
 
 CACHE_HOME = Path(os.environ.get("PADDLE_PDX_CACHE_HOME", "/app/.paddleocr"))
 MODEL_DIR = CACHE_HOME / "official_models"
@@ -43,12 +40,10 @@ def discover_models() -> list[Path]:
     return models
 
 
-def convert_to_openvino_ir() -> None:
-    """Convert all PaddlePaddle models to OpenVINO IR format (.xml + .bin).
+def convert_to_onnx() -> None:
+    """Convert PaddleX models to ONNX using paddle2onnx."""
+    import paddle2onnx
 
-    PaddleX stores the model graph in inference.json (same format as .pdmodel).
-    We copy it to inference.pdmodel so OpenVINO's PaddlePaddle frontend can read it.
-    """
     models = discover_models()
     if not models:
         raise RuntimeError(f"No models found in {MODEL_DIR}")
@@ -58,41 +53,40 @@ def convert_to_openvino_ir() -> None:
         print(f"  - {m.name}")
 
     for model_path in models:
-        output_xml = model_path / "inference.xml"
+        output_onnx = model_path / "inference.onnx"
 
-        if output_xml.exists():
-            print(f"OpenVINO IR already exists for {model_path.name}, skipping.")
+        if output_onnx.exists():
+            print(f"ONNX already exists for {model_path.name}, skipping.")
             continue
 
-        json_file = model_path / "inference.json"
-        pdmodel_file = model_path / "inference.pdmodel"
+        model_file = str(model_path / "inference.json")
+        params_file = str(model_path / "inference.pdiparams")
 
-        # PaddleX uses inference.json; OpenVINO expects .pdmodel extension
-        if json_file.exists() and not pdmodel_file.exists():
-            shutil.copy2(json_file, pdmodel_file)
-
-        if not pdmodel_file.exists():
-            print(f"WARNING: no .pdmodel for {model_path.name}, skipping")
+        if not Path(model_file).exists():
+            print(f"WARNING: no inference.json for {model_path.name}, skipping")
             continue
 
-        print(f"Converting {model_path.name} to OpenVINO IR...")
-        ov_model = ov.convert_model(str(pdmodel_file))
-        ov.save_model(ov_model, str(output_xml))
-        print(f"  -> {output_xml} ({output_xml.stat().st_size} bytes)")
+        print(f"Converting {model_path.name} to ONNX...")
+        paddle2onnx.export(
+            model_file,
+            params_file,
+            str(output_onnx),
+            opset_version=14,
+        )
+        print(f"  -> {output_onnx} ({output_onnx.stat().st_size} bytes)")
 
 
 def main() -> None:
     download_models()
-    convert_to_openvino_ir()
+    convert_to_onnx()
 
-    # Verify at least the key models converted
     converted = [
         d.name for d in MODEL_DIR.iterdir()
-        if d.is_dir() and (d / "inference.xml").exists()
+        if d.is_dir() and (d / "inference.onnx").exists()
     ]
     print(f"Converted models: {converted}")
     if not converted:
-        raise RuntimeError("No models were converted to OpenVINO IR")
+        raise RuntimeError("No models were converted to ONNX")
 
     print("All models converted successfully.")
 

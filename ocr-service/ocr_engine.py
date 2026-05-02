@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 MODEL_DIR = Path(os.environ.get("PADDLE_PDX_CACHE_HOME", "/app/.paddleocr")) / "official_models"
 DEVICE = os.environ.get("OPENVINO_DEVICE", "GPU")
-IR_MODEL_FILE = "inference.xml"
+IR_MODEL_FILE = "inference.onnx"
 
 # Detection config — resolved at runtime
 DET_MODEL = None  # set by _resolve_model_names()
