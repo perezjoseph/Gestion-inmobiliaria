@@ -1,13 +1,15 @@
-"""Download PaddleOCR PP-OCRv5 mobile models and convert to ONNX for OpenVINO.
+"""Download PaddleOCR PP-OCRv5 mobile models and convert to OpenVINO IR format.
 
-Run during Docker build to bake ONNX models into the image.
-PaddleX models use inference.json (not .pdmodel), so we use paddlex's
-built-in export to produce ONNX files.
+Run during Docker build to bake pre-converted IR models into the image.
+OpenVINO can read PaddlePaddle .pdmodel files directly via ov.convert_model(),
+then we serialize to IR (.xml + .bin) for faster runtime loading.
 """
 
 import os
 import shutil
 from pathlib import Path
+
+import openvino as ov
 
 CACHE_HOME = Path(os.environ.get("PADDLE_PDX_CACHE_HOME", "/app/.paddleocr"))
 MODEL_DIR = CACHE_HOME / "official_models"
@@ -35,32 +37,24 @@ def download_models() -> None:
     print("Models downloaded successfully.")
 
 
-def convert_to_onnx() -> None:
-    """Convert PaddlePaddle inference models to ONNX format.
+def convert_to_openvino_ir() -> None:
+    """Convert PaddlePaddle models to OpenVINO IR format (.xml + .bin).
 
-    PaddleX models store the model graph in inference.json (not .pdmodel).
-    We rename inference.json -> inference.pdmodel temporarily so paddle2onnx
-    can process them, then produce inference.onnx.
+    PaddleX stores the model graph in inference.json (same format as .pdmodel).
+    We copy it to inference.pdmodel so OpenVINO's PaddlePaddle frontend can read it.
     """
-    import paddle2onnx
-
     for model_name in MODELS:
         model_path = MODEL_DIR / model_name
-        output_onnx = model_path / "inference.onnx"
+        output_xml = model_path / "inference.xml"
 
-        if output_onnx.exists():
-            print(f"ONNX already exists for {model_name}, skipping.")
+        if output_xml.exists():
+            print(f"OpenVINO IR already exists for {model_name}, skipping.")
             continue
 
         json_file = model_path / "inference.json"
         pdmodel_file = model_path / "inference.pdmodel"
-        pdiparams = model_path / "inference.pdiparams"
 
-        if not pdiparams.exists():
-            print(f"WARNING: {pdiparams} not found, skipping {model_name}")
-            continue
-
-        # PaddleX uses inference.json; paddle2onnx expects inference.pdmodel
+        # PaddleX uses inference.json; OpenVINO expects .pdmodel extension
         if json_file.exists() and not pdmodel_file.exists():
             shutil.copy2(json_file, pdmodel_file)
 
@@ -68,29 +62,23 @@ def convert_to_onnx() -> None:
             print(f"WARNING: no model file found for {model_name}, skipping")
             continue
 
-        print(f"Converting {model_name} to ONNX...")
-        model_content = pdmodel_file.read_bytes()
-        params_content = pdiparams.read_bytes()
-
-        onnx_model = paddle2onnx.export(
-            model_content,
-            params_content,
-            opset_version=14,
-        )
-        output_onnx.write_bytes(onnx_model)
-        print(f"  -> {output_onnx} ({output_onnx.stat().st_size} bytes)")
+        print(f"Converting {model_name} to OpenVINO IR...")
+        ov_model = ov.convert_model(str(pdmodel_file))
+        ov.save_model(ov_model, str(output_xml))
+        print(f"  -> {output_xml} ({output_xml.stat().st_size} bytes)")
 
 
 def main() -> None:
     download_models()
-    convert_to_onnx()
+    convert_to_openvino_ir()
 
-    # Verify all ONNX files exist
+    # Verify all IR files exist
     for model_name in MODELS:
-        onnx_path = MODEL_DIR / model_name / "inference.onnx"
-        if not onnx_path.exists():
-            raise RuntimeError(f"ONNX conversion failed for {model_name}: {onnx_path}")
-        print(f"Verified: {onnx_path} ({onnx_path.stat().st_size} bytes)")
+        xml_path = MODEL_DIR / model_name / "inference.xml"
+        bin_path = MODEL_DIR / model_name / "inference.bin"
+        if not xml_path.exists() or not bin_path.exists():
+            raise RuntimeError(f"OpenVINO IR conversion failed for {model_name}")
+        print(f"Verified: {xml_path} ({xml_path.stat().st_size} bytes)")
 
     print("All models converted successfully.")
 

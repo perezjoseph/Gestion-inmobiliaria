@@ -267,8 +267,8 @@ class OpenVINOOCREngine:
 
     def _load_models(self) -> None:
         """Compile detection and recognition models."""
-        det_path = MODEL_DIR / DET_MODEL / "inference.onnx"
-        rec_path = MODEL_DIR / REC_MODEL / "inference.onnx"
+        det_path = MODEL_DIR / DET_MODEL / "inference.xml"
+        rec_path = MODEL_DIR / REC_MODEL / "inference.xml"
 
         # Enable model caching for faster subsequent loads
         cache_dir = os.environ.get("OPENVINO_CACHE_DIR", "/app/.cache")

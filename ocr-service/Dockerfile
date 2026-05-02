@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download PaddleOCR models and convert to ONNX for OpenVINO
+# Download PaddleOCR models and convert to OpenVINO IR format
 RUN pip install --no-cache-dir paddleocr==3.5.0 paddlepaddle==3.2.2
 
 ENV PADDLE_PDX_CACHE_HOME=/app/.paddleocr
