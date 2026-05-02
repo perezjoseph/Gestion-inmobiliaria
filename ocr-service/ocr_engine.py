@@ -25,22 +25,51 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 MODEL_DIR = Path(os.environ.get("PADDLE_PDX_CACHE_HOME", "/app/.paddleocr")) / "official_models"
 DEVICE = os.environ.get("OPENVINO_DEVICE", "GPU")
+IR_MODEL_FILE = "inference.xml"
 
-# Detection config
-DET_MODEL = "PP-OCRv5_mobile_det"
-DET_INPUT_SIZE = (960, 960)
+# Detection config — resolved at runtime
+DET_MODEL = None  # set by _resolve_model_names()
 DET_THRESH = 0.3
 DET_BOX_THRESH = 0.6
 DET_UNCLIP_RATIO = 1.5
 DET_MIN_SIZE = 3
 
-# Recognition config
-REC_MODEL = "PP-OCRv5_mobile_rec"
+# Recognition config — resolved at runtime
+REC_MODEL = None  # set by _resolve_model_names()
 REC_IMG_HEIGHT = 48
 REC_IMG_WIDTH = 320
 
-# Orientation config
-ORI_MODEL = "PP-LCNet_x0_25_textline_ori"
+# Orientation config — resolved at runtime
+ORI_MODEL = None  # set by _resolve_model_names()
+
+
+def _resolve_model_names() -> tuple[str, str, str]:
+    """Discover actual model directory names by pattern matching.
+
+    PaddleOCR versions use different naming (e.g. PP-OCRv5_mobile_det vs
+    PP-OCRv5_server_det, latin_PP-OCRv5_mobile_rec vs PP-OCRv5_mobile_rec).
+    """
+    det, rec, ori = None, None, None
+    if not MODEL_DIR.exists():
+        raise RuntimeError(f"Model directory not found: {MODEL_DIR}")
+
+    for d in MODEL_DIR.iterdir():
+        if not d.is_dir():
+            continue
+        name = d.name.lower()
+        if "det" in name and (d / IR_MODEL_FILE).exists():
+            det = d.name
+        elif "rec" in name and (d / IR_MODEL_FILE).exists():
+            rec = d.name
+        elif "textline_ori" in name and (d / IR_MODEL_FILE).exists():
+            ori = d.name
+
+    if not det:
+        raise RuntimeError(f"No detection model found in {MODEL_DIR}")
+    if not rec:
+        raise RuntimeError(f"No recognition model found in {MODEL_DIR}")
+
+    return det, rec, ori
 
 
 def _load_character_dict(model_name: str) -> list[str]:
@@ -258,6 +287,10 @@ class OpenVINOOCREngine:
             logger.warning("Device %s not available, falling back to CPU", device)
             self.device = "CPU"
 
+        global DET_MODEL, REC_MODEL, ORI_MODEL
+        DET_MODEL, REC_MODEL, ORI_MODEL = _resolve_model_names()
+        logger.info("Resolved models: det=%s, rec=%s, ori=%s", DET_MODEL, REC_MODEL, ORI_MODEL)
+
         self._load_models()
         self.char_dict = _load_character_dict(REC_MODEL)
         logger.info(
@@ -267,8 +300,8 @@ class OpenVINOOCREngine:
 
     def _load_models(self) -> None:
         """Compile detection and recognition models."""
-        det_path = MODEL_DIR / DET_MODEL / "inference.xml"
-        rec_path = MODEL_DIR / REC_MODEL / "inference.xml"
+        det_path = MODEL_DIR / DET_MODEL / IR_MODEL_FILE
+        rec_path = MODEL_DIR / REC_MODEL / IR_MODEL_FILE
 
         # Enable model caching for faster subsequent loads
         cache_dir = os.environ.get("OPENVINO_CACHE_DIR", "/app/.cache")

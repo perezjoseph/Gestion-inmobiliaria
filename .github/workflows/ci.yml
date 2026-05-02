@@ -121,7 +121,6 @@ jobs:
       github.event_name != 'pull_request' ||
       needs.changes.outputs.backend == 'true' ||
       needs.changes.outputs.frontend == 'true' ||
-      needs.changes.outputs.ocr-service == 'true' ||
       needs.changes.outputs.ci == 'true'
     permissions:
       contents: read
