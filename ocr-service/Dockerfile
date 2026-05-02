@@ -17,6 +17,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 RUN paddleocr install_hpi_deps cpu
 
+RUN pip install --no-cache-dir "onnx>=1.21.0"
+
 COPY main.py .
 
 ENV PADDLE_PDX_CACHE_HOME=/app/.paddleocr
