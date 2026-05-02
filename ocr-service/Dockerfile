@@ -31,7 +31,8 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Install system deps, Intel compute runtime (OpenCL for all Intel GPUs: HD 530+, UHD,
-# Iris Xe, Arc) from Debian non-free repos, and create non-root user with GPU access
+# Iris Xe, Arc) from GitHub releases, and create non-root user with GPU access.
+# Uses legacy1 packages for Skylake/Kaby Lake support (Gen9).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
@@ -41,14 +42,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 \
     curl \
     ocl-icd-libopencl1 \
-    && mkdir -p /tmp/gpu && cd /tmp/gpu \
-    && curl -fsSL -O https://github.com/intel/intel-graphics-compiler/releases/download/v2.10.8/intel-igc-core-2.10.8_amd64.deb \
-    && curl -fsSL -O https://github.com/intel/intel-graphics-compiler/releases/download/v2.10.8/intel-igc-opencl-2.10.8_amd64.deb \
-    && curl -fsSL -O https://github.com/intel/compute-runtime/releases/download/25.13.33276.16/intel-opencl-icd_25.13.33276.16_amd64.deb \
-    && curl -fsSL -O https://github.com/intel/compute-runtime/releases/download/25.13.33276.16/libigdgmm12_22.7.1_amd64.deb \
-    && dpkg -i *.deb || apt-get install -f -y --no-install-recommends \
+    && mkdir -p /tmp/gpu \
+    && curl -fsSL -o /tmp/gpu/intel-igc-core.deb \
+    https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.17537.20/intel-igc-core_1.0.17537.20_amd64.deb \
+    && curl -fsSL -o /tmp/gpu/intel-igc-opencl.deb \
+    https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.17537.20/intel-igc-opencl_1.0.17537.20_amd64.deb \
+    && curl -fsSL -o /tmp/gpu/libigdgmm12.deb \
+    https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/libigdgmm12_22.5.0_amd64.deb \
+    && curl -fsSL -o /tmp/gpu/intel-opencl-icd.deb \
+    https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/intel-opencl-icd_24.35.30872.22_amd64.deb \
+    && curl -fsSL -o /tmp/gpu/intel-opencl-icd-legacy1.deb \
+    https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/intel-opencl-icd-legacy1_24.35.30872.22_amd64.deb \
+    && dpkg -i /tmp/gpu/*.deb || apt-get install -f -y --no-install-recommends \
     && rm -rf /tmp/gpu /var/lib/apt/lists/* \
-    && groupadd -r ocruser && useradd -r -g ocruser -d /app -s /sbin/nologin ocruser \
+    && groupadd -r ocruser \
+    && groupadd -r render || true \
+    && useradd -r -g ocruser -d /app -s /sbin/nologin ocruser \
     && usermod -aG video ocruser \
     && usermod -aG render ocruser
 
