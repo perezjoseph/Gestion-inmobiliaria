@@ -17,12 +17,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Download PaddleOCR models and convert to ONNX for OpenVINO
 RUN pip install --no-cache-dir paddleocr==3.5.0 paddlepaddle==3.2.2
 
+ENV PADDLE_PDX_CACHE_HOME=/app/.paddleocr
+ENV PADDLE_PDX_MODEL_SOURCE=BOS
+
 COPY convert_models.py .
 RUN for i in 1 2 3; do \
     timeout 300 python convert_models.py \
     && break \
     || { echo "Attempt $i failed, retrying in 15s..."; sleep 15; }; \
-    done
+    done \
+    && ls -la /app/.paddleocr/official_models/
 
 COPY main.py ocr_engine.py ./
 
