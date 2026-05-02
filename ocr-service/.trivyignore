@@ -17,3 +17,9 @@ CVE-2026-27135
 
 # systemd/libudev — init system libs, not used in container
 CVE-2026-29111
+
+# libcap2 — TOCTOU race in cap_set_file(), no upstream fix
+CVE-2026-4878
+
+# libgnutls30t64 — DTLS zero-length fragment DoS, no upstream fix
+CVE-2026-33845
