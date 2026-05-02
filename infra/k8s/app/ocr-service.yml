@@ -37,6 +37,8 @@ spec:
               value: /app/.paddleocr
             - name: OPENVINO_DEVICE
               value: GPU
+            - name: OPENVINO_TELEMETRY_ENABLE
+              value: "0"
           resources:
             requests:
               cpu: 50m

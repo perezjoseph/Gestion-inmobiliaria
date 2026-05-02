@@ -7,13 +7,41 @@ use crate::errors::AppError;
 use crate::models::ocr::{ExtractField, ImportPreview, OcrResult, PreviewField};
 
 fn field_confidence(result: &OcrResult, value: &str) -> f64 {
-    result
+    if value.is_empty() {
+        return 0.0;
+    }
+
+    // 1. Exact substring match (original logic)
+    let exact = result
         .lines
         .iter()
         .filter(|l| l.text.contains(value) || value.contains(&l.text))
         .map(|l| l.confidence)
-        .fold(f64::NEG_INFINITY, f64::max)
-        .max(0.0)
+        .fold(f64::NEG_INFINITY, f64::max);
+
+    if exact > 0.0 {
+        return exact;
+    }
+
+    // 2. Digits-only match: strip non-digit chars and compare
+    let value_digits: String = value.chars().filter(|c| c.is_ascii_digit()).collect();
+    if value_digits.len() >= 3 {
+        let digits_match = result
+            .lines
+            .iter()
+            .filter(|l| {
+                let line_digits: String = l.text.chars().filter(|c| c.is_ascii_digit()).collect();
+                line_digits.contains(&value_digits) || value_digits.contains(&line_digits)
+            })
+            .map(|l| l.confidence)
+            .fold(f64::NEG_INFINITY, f64::max);
+
+        if digits_match > 0.0 {
+            return digits_match;
+        }
+    }
+
+    0.0
 }
 
 pub fn map_deposito(result: &OcrResult) -> Result<ImportPreview, AppError> {

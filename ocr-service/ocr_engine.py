@@ -270,6 +270,81 @@ def _rec_postprocess(output: np.ndarray, char_dict: list[str]) -> tuple[str, flo
 
 
 # ---------------------------------------------------------------------------
+# Line grouping: merge word-level boxes into text lines
+# ---------------------------------------------------------------------------
+
+def _box_center_y(box: np.ndarray) -> float:
+    """Get the vertical center of a 4-point box."""
+    return float(np.mean(box[:, 1]))
+
+
+def _box_height(box: np.ndarray) -> float:
+    """Get the height of a 4-point box."""
+    return float(max(np.linalg.norm(box[0] - box[3]), np.linalg.norm(box[1] - box[2])))
+
+
+def _box_left(box: np.ndarray) -> float:
+    """Get the leftmost x coordinate."""
+    return float(np.min(box[:, 0]))
+
+
+def _merge_boxes(boxes: list[np.ndarray]) -> np.ndarray:
+    """Merge multiple boxes into one bounding box."""
+    all_points = np.vstack(boxes)
+    x_min, y_min = all_points.min(axis=0)
+    x_max, y_max = all_points.max(axis=0)
+    return np.array([
+        [x_min, y_min], [x_max, y_min],
+        [x_max, y_max], [x_min, y_max],
+    ], dtype=np.float32)
+
+
+def _group_boxes_into_lines(boxes: list[np.ndarray],
+                            y_overlap_thresh: float = 0.5) -> list[list[int]]:
+    """Group word-level boxes into lines based on vertical overlap.
+
+    Two boxes are on the same line if their vertical overlap exceeds
+    y_overlap_thresh relative to the shorter box height.
+    Returns list of groups, each group is a list of box indices sorted left-to-right.
+    """
+    if not boxes:
+        return []
+
+    n = len(boxes)
+    used = [False] * n
+    groups: list[list[int]] = []
+
+    # Sort by vertical center
+    indices = sorted(range(n), key=lambda i: _box_center_y(boxes[i]))
+
+    for idx in indices:
+        if used[idx]:
+            continue
+
+        group = [idx]
+        used[idx] = True
+        cy = _box_center_y(boxes[idx])
+        h = _box_height(boxes[idx])
+
+        for other in indices:
+            if used[other]:
+                continue
+            other_cy = _box_center_y(boxes[other])
+            other_h = _box_height(boxes[other])
+            min_h = max(min(h, other_h), 1.0)
+            overlap = min_h - abs(cy - other_cy)
+            if overlap / min_h >= y_overlap_thresh:
+                group.append(other)
+                used[other] = True
+
+        # Sort group left-to-right
+        group.sort(key=lambda i: _box_left(boxes[i]))
+        groups.append(group)
+
+    return groups
+
+
+# ---------------------------------------------------------------------------
 # Main OCR Engine
 # ---------------------------------------------------------------------------
 
@@ -319,6 +394,7 @@ class OpenVINOOCREngine:
         """Run full OCR pipeline on an RGB image array.
 
         Returns a list of dicts with keys: text, confidence, bbox.
+        Word-level detections are grouped into text lines.
         """
         if img.ndim != 3 or img.shape[2] != 3:
             return []
@@ -326,22 +402,41 @@ class OpenVINOOCREngine:
         # BGR for OpenCV operations
         img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
-        # 1. Detection
+        # 1. Detection (word-level boxes)
         boxes = self._detect(img_bgr)
         if not boxes:
             return []
 
-        # 2. Recognition for each detected region
-        results = []
+        # 2. Recognition for each detected word
+        word_results = []
         for box in boxes:
             crop = _crop_text_region(img_bgr, box)
             text, confidence = self._recognize(crop)
             if not text.strip():
                 continue
-            flat_bbox = [float(coord) for point in box for coord in point]
+            word_results.append({"text": text, "confidence": confidence, "box": box})
+
+        if not word_results:
+            return []
+
+        # 3. Group words into lines
+        word_boxes = [w["box"] for w in word_results]
+        line_groups = _group_boxes_into_lines(word_boxes)
+
+        results = []
+        for group in line_groups:
+            texts = [word_results[i]["text"] for i in group]
+            confs = [word_results[i]["confidence"] for i in group]
+            group_boxes = [word_results[i]["box"] for i in group]
+
+            line_text = " ".join(texts)
+            line_conf = float(np.mean(confs)) if confs else 0.0
+            merged_box = _merge_boxes(group_boxes)
+            flat_bbox = [float(coord) for point in merged_box for coord in point]
+
             results.append({
-                "text": text,
-                "confidence": confidence,
+                "text": line_text,
+                "confidence": line_conf,
                 "bbox": flat_bbox,
             })
 
