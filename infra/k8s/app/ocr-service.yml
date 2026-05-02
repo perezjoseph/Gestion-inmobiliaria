@@ -33,6 +33,8 @@ spec:
           env:
             - name: PADDLE_PDX_CACHE_HOME
               value: /app/.paddleocr
+            - name: OPENVINO_DEVICE
+              value: GPU
           resources:
             requests:
               cpu: 100m
@@ -67,15 +69,15 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
-            - name: ultra-infer-cache
-              mountPath: /app/.ultra_infer
+            - name: openvino-cache
+              mountPath: /app/.cache
       volumes:
         - name: tmp
           emptyDir:
             sizeLimit: 256Mi
-        - name: ultra-infer-cache
+        - name: openvino-cache
           emptyDir:
-            sizeLimit: 128Mi
+            sizeLimit: 256Mi
 ---
 apiVersion: v1
 kind: Service

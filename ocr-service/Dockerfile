@@ -9,33 +9,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsm6 \
     libxext6 \
     libxrender1 \
-    ocl-icd-libopencl1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN paddleocr install_hpi_deps cpu
+# Download PaddleOCR models and convert to ONNX for OpenVINO
+RUN pip install --no-cache-dir paddleocr==3.5.0 paddlepaddle==3.2.2
 
-RUN pip install --no-cache-dir "onnx>=1.21.0"
-
-COPY main.py .
-
-ENV PADDLE_PDX_CACHE_HOME=/app/.paddleocr
-# Use Baidu Object Storage as download source (better availability outside China)
-ENV PADDLE_PDX_MODEL_SOURCE=BOS
-
+COPY convert_models.py .
 RUN for i in 1 2 3; do \
-    timeout 300 python -c \
-      "from paddleocr import PaddleOCR; PaddleOCR(use_textline_orientation=True, use_doc_orientation_classify=False, use_doc_unwarping=False, lang='es', device='cpu')" \
+    timeout 300 python convert_models.py \
     && break \
     || { echo "Attempt $i failed, retrying in 15s..."; sleep 15; }; \
     done
+
+COPY main.py ocr_engine.py ./
 
 FROM python:3.12-slim
 
 WORKDIR /app
 
+# Install system deps, Intel compute runtime (OpenCL for all Intel GPUs: HD 530+, UHD,
+# Iris Xe, Arc), and create non-root user with GPU access
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
@@ -44,16 +40,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     libxrender1 \
     curl \
+    gpg-agent \
+    software-properties-common \
+    && curl -fsSL https://repositories.intel.com/gpu/intel-graphics.key | \
+    gpg --dearmor -o /usr/share/keyrings/intel-graphics.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu-jammy/production/2350 unified main" \
+    > /etc/apt/sources.list.d/intel-gpu.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    intel-opencl-icd \
+    intel-level-zero-gpu \
+    level-zero \
     ocl-icd-libopencl1 \
+    && apt-get purge -y gpg-agent software-properties-common \
+    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd -r ocruser && useradd -r -g ocruser -d /app -s /sbin/nologin ocruser
+    && groupadd -r ocruser && useradd -r -g ocruser -d /app -s /sbin/nologin ocruser \
+    && usermod -aG video ocruser \
+    && usermod -aG render ocruser
 
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
-COPY --from=builder /app/main.py .
+COPY --from=builder /app/main.py /app/ocr_engine.py ./
 COPY --from=builder /app/.paddleocr /app/.paddleocr
 
 ENV PADDLE_PDX_CACHE_HOME=/app/.paddleocr
+ENV OPENVINO_DEVICE=GPU
 
 RUN chown -R ocruser:ocruser /app
 

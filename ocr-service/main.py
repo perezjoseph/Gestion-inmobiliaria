@@ -7,19 +7,13 @@ from typing import Optional
 
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import JSONResponse
-from paddleocr import PaddleOCR
 from PIL import Image
+
+from ocr_engine import OpenVINOOCREngine
 
 app = FastAPI(title="OCR Service")
 
-ocr_engine = PaddleOCR(
-    use_textline_orientation=True,
-    use_doc_orientation_classify=False,
-    use_doc_unwarping=False,
-    lang="es",
-    device="gpu:0",
-    enable_hpi=True,
-)
+ocr_engine = OpenVINOOCREngine()
 
 
 @app.get("/health")
@@ -255,30 +249,8 @@ def _extract_structured_fields(lines: list[dict], document_type: str) -> dict:
 
 
 def _run_ocr(img_array: np.ndarray) -> list[dict]:
-    """Run PaddleOCR on a numpy image array and return structured line dicts."""
-    results = ocr_engine.predict(img_array)
-
-    if not results:
-        return []
-
-    res = results[0]
-    rec_texts = res["rec_texts"] if isinstance(res, dict) else res.rec_texts
-    rec_scores = res["rec_scores"] if isinstance(res, dict) else res.rec_scores
-    dt_polys = res["dt_polys"] if isinstance(res, dict) else res.dt_polys
-
-    if not len(rec_texts):
-        return []
-
-    lines: list[dict] = []
-    for i, text in enumerate(rec_texts):
-        poly = dt_polys[i]
-        flat_bbox = [float(coord) for point in poly for coord in point]
-        lines.append({
-            "text": str(text),
-            "confidence": float(rec_scores[i]),
-            "bbox": flat_bbox,
-        })
-    return lines
+    """Run OpenVINO OCR on a numpy image array and return structured line dicts."""
+    return ocr_engine.predict(img_array)
 
 
 @app.post("/ocr/extract")
