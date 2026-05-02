@@ -67,10 +67,15 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: ultra-infer-cache
+              mountPath: /app/.ultra_infer
       volumes:
         - name: tmp
           emptyDir:
             sizeLimit: 256Mi
+        - name: ultra-infer-cache
+          emptyDir:
+            sizeLimit: 128Mi
 ---
 apiVersion: v1
 kind: Service
