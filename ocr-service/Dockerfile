@@ -31,8 +31,10 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Install system deps, Intel compute runtime (OpenCL for all Intel GPUs: HD 530+, UHD,
-# Iris Xe, Arc), and create non-root user with GPU access
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Iris Xe, Arc) from Debian non-free repos, and create non-root user with GPU access
+RUN echo "deb http://deb.debian.org/debian bookworm non-free non-free-firmware" \
+    >> /etc/apt/sources.list.d/non-free.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \
@@ -40,19 +42,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     libxrender1 \
     curl \
-    gpg-agent \
-    software-properties-common \
-    && curl -fsSL https://repositories.intel.com/gpu/intel-graphics.key | \
-    gpg --dearmor -o /usr/share/keyrings/intel-graphics.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu-jammy/production/2350 unified main" \
-    > /etc/apt/sources.list.d/intel-gpu.list \
-    && apt-get update && apt-get install -y --no-install-recommends \
     intel-opencl-icd \
-    intel-level-zero-gpu \
-    level-zero \
     ocl-icd-libopencl1 \
-    && apt-get purge -y gpg-agent software-properties-common \
-    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -r ocruser && useradd -r -g ocruser -d /app -s /sbin/nologin ocruser \
     && usermod -aG video ocruser \
