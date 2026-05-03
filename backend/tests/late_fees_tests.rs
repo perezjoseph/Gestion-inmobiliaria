@@ -180,7 +180,7 @@ async fn create_test_inquilino(db: &DatabaseConnection, org_id: Uuid) -> Uuid {
         apellido: Set("LateFee".to_string()),
         email: Set(Some(format!("inquilino+{id}@latefees.com"))),
         telefono: Set(None),
-        cedula: Set(format!("CED-LF-{id}")),
+        cedula: Set(format!("C{}", &id.simple().to_string()[..19])),
         contacto_emergencia: Set(None),
         notas: Set(None),
         documentos: Set(None),

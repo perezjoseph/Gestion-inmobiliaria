@@ -175,7 +175,7 @@ mod pbt_async {
             apellido: Set("LateFees".to_string()),
             email: Set(Some(format!("inq+lf+{id}@pbt.com"))),
             telefono: Set(None),
-            cedula: Set(format!("CED-LF-{id}")),
+            cedula: Set(format!("C{}", &id.simple().to_string()[..19])),
             contacto_emergencia: Set(None),
             notas: Set(None),
             documentos: Set(None),
