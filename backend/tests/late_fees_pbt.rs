@@ -6,35 +6,35 @@ use crate::migrations;
 
 // ── Custom Strategies ──────────────────────────────────────────────────
 
-/// Random monto as i64 cents (1..99_999_999) to build Decimal with scale 2.
+/// Random monto as `i64` cents (`1..99_999_999`) to build `Decimal` with scale 2.
 fn monto_cents() -> impl Strategy<Value = i64> {
     1i64..99_999_999i64
 }
 
-/// Random porcentaje as i64 hundredths (0..10_000) to build Decimal with scale 2.
+/// Random porcentaje as `i64` hundredths (`0..10_000`) to build `Decimal` with scale 2.
 fn porcentaje_hundredths() -> impl Strategy<Value = i64> {
     0i64..=10_000i64
 }
 
-/// Random valid recargo_porcentaje (0..100) as i64 hundredths for contrato fields.
+/// Random valid `recargo_porcentaje` (0..100) as `i64` hundredths for contrato fields.
 fn valid_recargo_porcentaje_hundredths() -> impl Strategy<Value = i64> {
     0i64..=10_000i64
 }
 
-/// Random valid dias_gracia (0..365).
+/// Random valid `dias_gracia` (0..365).
 fn valid_dias_gracia() -> impl Strategy<Value = i32> {
     0i32..=365i32
 }
 
-/// Random invalid porcentaje: either < 0 or > 100 (as i64 hundredths).
+/// Random invalid porcentaje: either < 0 or > 100 (as `i64` hundredths).
 fn invalid_porcentaje_hundredths() -> impl Strategy<Value = i64> {
     prop_oneof![
-        -99_999i64..=-1i64,   // negative
+        -99_999i64..=-1i64,    // negative
         10_001i64..=99_999i64, // > 100
     ]
 }
 
-/// Random negative dias_gracia.
+/// Random negative `dias_gracia`.
 fn negative_dias_gracia() -> impl Strategy<Value = i32> {
     -365i32..=-1i32
 }
@@ -447,15 +447,8 @@ mod pbt_async {
             clear_recargo_config(&db).await;
 
             // Create contrato WITHOUT recargo_porcentaje
-            let contrato_id = create_contrato_raw(
-                &db,
-                propiedad_id,
-                inquilino_id,
-                org_id,
-                None,
-                None,
-            )
-            .await;
+            let contrato_id =
+                create_contrato_raw(&db, propiedad_id, inquilino_id, org_id, None, None).await;
 
             let contrato_model = contrato::Entity::find_by_id(contrato_id)
                 .one(&db)
@@ -484,18 +477,17 @@ mod pbt_async {
             let invalid_pct = Decimal::new(invalid_pct_hundredths, 2);
 
             // Test contrato create with invalid recargo_porcentaje
-            let create_req =
-                realestate_backend::models::contrato::CreateContratoRequest {
-                    propiedad_id,
-                    inquilino_id,
-                    fecha_inicio: chrono::NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
-                    fecha_fin: chrono::NaiveDate::from_ymd_opt(2025, 12, 31).unwrap(),
-                    monto_mensual: Decimal::new(25000, 0),
-                    deposito: None,
-                    moneda: None,
-                    recargo_porcentaje: Some(invalid_pct),
-                    dias_gracia: None,
-                };
+            let create_req = realestate_backend::models::contrato::CreateContratoRequest {
+                propiedad_id,
+                inquilino_id,
+                fecha_inicio: chrono::NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+                fecha_fin: chrono::NaiveDate::from_ymd_opt(2025, 12, 31).unwrap(),
+                monto_mensual: Decimal::new(25000, 0),
+                deposito: None,
+                moneda: None,
+                recargo_porcentaje: Some(invalid_pct),
+                dias_gracia: None,
+            };
             let result =
                 realestate_backend::services::contratos::create(&db, create_req, user_id, org_id)
                     .await;
@@ -523,18 +515,17 @@ mod pbt_async {
             let inquilino_id = create_inquilino(&db, org_id).await;
 
             // Test contrato create with negative dias_gracia
-            let create_req =
-                realestate_backend::models::contrato::CreateContratoRequest {
-                    propiedad_id,
-                    inquilino_id,
-                    fecha_inicio: chrono::NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
-                    fecha_fin: chrono::NaiveDate::from_ymd_opt(2025, 12, 31).unwrap(),
-                    monto_mensual: Decimal::new(25000, 0),
-                    deposito: None,
-                    moneda: None,
-                    recargo_porcentaje: None,
-                    dias_gracia: Some(negative_dias),
-                };
+            let create_req = realestate_backend::models::contrato::CreateContratoRequest {
+                propiedad_id,
+                inquilino_id,
+                fecha_inicio: chrono::NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+                fecha_fin: chrono::NaiveDate::from_ymd_opt(2025, 12, 31).unwrap(),
+                monto_mensual: Decimal::new(25000, 0),
+                deposito: None,
+                moneda: None,
+                recargo_porcentaje: None,
+                dias_gracia: Some(negative_dias),
+            };
             let result =
                 realestate_backend::services::contratos::create(&db, create_req, user_id, org_id)
                     .await;
@@ -572,15 +563,13 @@ mod pbt_async {
             // fecha_vencimiento = today - 1 → effective_due = today - 1 + dias_gracia
             // If dias_gracia >= 1, effective_due >= today, so NOT overdue
             let yesterday = Utc::now().date_naive() - chrono::Duration::days(1);
-            let pago_within_id =
-                insert_pago_raw(&db, contrato_id, org_id, monto, yesterday).await;
+            let pago_within_id = insert_pago_raw(&db, contrato_id, org_id, monto, yesterday).await;
 
             // Pago 2: overdue well beyond grace period
             // fecha_vencimiento = today - dias_gracia - 2
-            let far_past = Utc::now().date_naive()
-                - chrono::Duration::days(i64::from(dias_gracia) + 2);
-            let pago_beyond_id =
-                insert_pago_raw(&db, contrato_id, org_id, monto, far_past).await;
+            let far_past =
+                Utc::now().date_naive() - chrono::Duration::days(i64::from(dias_gracia) + 2);
+            let pago_beyond_id = insert_pago_raw(&db, contrato_id, org_id, monto, far_past).await;
 
             // Run mark_overdue
             pagos::mark_overdue(&db).await.expect("mark_overdue");
@@ -642,8 +631,7 @@ mod pbt_async {
 
             // Create overdue pago (5 days past due)
             let overdue_date = Utc::now().date_naive() - chrono::Duration::days(5);
-            let pago_id =
-                insert_pago_raw(&db, contrato_id, org_id, monto, overdue_date).await;
+            let pago_id = insert_pago_raw(&db, contrato_id, org_id, monto, overdue_date).await;
 
             // Run mark_overdue
             pagos::mark_overdue(&db).await.expect("mark_overdue");
@@ -696,8 +684,7 @@ mod pbt_async {
 
             // Create overdue pago
             let overdue_date = Utc::now().date_naive() - chrono::Duration::days(5);
-            let pago_id =
-                insert_pago_raw(&db, contrato_id, org_id, monto, overdue_date).await;
+            let pago_id = insert_pago_raw(&db, contrato_id, org_id, monto, overdue_date).await;
 
             // Run mark_overdue
             pagos::mark_overdue(&db).await.expect("mark_overdue");
@@ -751,7 +738,10 @@ fn test_calculo_recargo_correcto() {
                     result,
                     expected,
                     "calcular_recargo({}, {}) = {}, expected {}",
-                    monto, porcentaje, result, expected
+                    monto,
+                    porcentaje,
+                    result,
+                    expected
                 );
                 Ok(())
             },
@@ -809,13 +799,10 @@ fn test_resolucion_fallback_org() {
         ..Default::default()
     });
     runner
-        .run(
-            &valid_recargo_porcentaje_hundredths(),
-            |org_pct| {
-                pbt_async::p4(org_pct);
-                Ok(())
-            },
-        )
+        .run(&valid_recargo_porcentaje_hundredths(), |org_pct| {
+            pbt_async::p4(org_pct);
+            Ok(())
+        })
         .unwrap();
 }
 
@@ -828,7 +815,7 @@ fn test_resolucion_ambos_null() {
         ..Default::default()
     });
     runner
-        .run(&Just(()), |_| {
+        .run(&Just(()), |()| {
             pbt_async::p5();
             Ok(())
         })
@@ -892,13 +879,10 @@ fn test_recargo_al_marcar_atrasado() {
         ..Default::default()
     });
     runner
-        .run(
-            &(monto_cents(), porcentaje_hundredths()),
-            |(monto, pct)| {
-                pbt_async::p9(monto, pct);
-                Ok(())
-            },
-        )
+        .run(&(monto_cents(), porcentaje_hundredths()), |(monto, pct)| {
+            pbt_async::p9(monto, pct);
+            Ok(())
+        })
         .unwrap();
 }
 

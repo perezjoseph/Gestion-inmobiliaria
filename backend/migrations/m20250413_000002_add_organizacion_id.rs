@@ -89,10 +89,8 @@ impl MigrationTrait for Migration {
 
         // Reverse order: drop indexes, drop FKs, drop columns
         for table in TABLES {
-            db.execute_unprepared(&format!(
-                "DROP INDEX IF EXISTS idx_{table}_organizacion_id"
-            ))
-            .await?;
+            db.execute_unprepared(&format!("DROP INDEX IF EXISTS idx_{table}_organizacion_id"))
+                .await?;
         }
 
         for table in TABLES {

@@ -275,10 +275,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                         "/{id}/exportar-pdf",
                         web::get().to(handlers::documentos::exportar_pdf),
                     )
-                    .route(
-                        "/{id}",
-                        web::delete().to(handlers::documentos::eliminar),
-                    )
+                    .route("/{id}", web::delete().to(handlers::documentos::eliminar))
                     // Existing routes (most dynamic — two path segments)
                     .route(
                         "/{entity_type}/{entity_id}",

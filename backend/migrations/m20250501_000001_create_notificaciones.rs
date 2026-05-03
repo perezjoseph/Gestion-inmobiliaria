@@ -36,11 +36,7 @@ impl MigrationTrait for Migration {
                             .string_len(500)
                             .not_null(),
                     )
-                    .col(
-                        ColumnDef::new(Notificaciones::Mensaje)
-                            .text()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(Notificaciones::Mensaje).text().not_null())
                     .col(
                         ColumnDef::new(Notificaciones::Leida)
                             .boolean()
@@ -52,16 +48,8 @@ impl MigrationTrait for Migration {
                             .string_len(50)
                             .not_null(),
                     )
-                    .col(
-                        ColumnDef::new(Notificaciones::EntityId)
-                            .uuid()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(Notificaciones::UsuarioId)
-                            .uuid()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(Notificaciones::EntityId).uuid().not_null())
+                    .col(ColumnDef::new(Notificaciones::UsuarioId).uuid().not_null())
                     .col(
                         ColumnDef::new(Notificaciones::OrganizacionId)
                             .uuid()

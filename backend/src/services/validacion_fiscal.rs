@@ -21,18 +21,11 @@ pub fn validar_rnc(rnc: &str) -> Result<(), AppError> {
         ));
     }
 
-    let cifras: Vec<u32> = solo
-        .chars()
-        .map(|c| c.to_digit(10).unwrap_or(0))
-        .collect();
+    let cifras: Vec<u32> = solo.chars().map(|c| c.to_digit(10).unwrap_or(0)).collect();
 
     let weights: [u32; 8] = [7, 9, 8, 6, 5, 4, 3, 2];
 
-    let sum: u32 = weights
-        .iter()
-        .zip(cifras.iter())
-        .map(|(w, d)| w * d)
-        .sum();
+    let sum: u32 = weights.iter().zip(cifras.iter()).map(|(w, d)| w * d).sum();
 
     let check = sum % 11;
     let expected = (10 - check) % 9 + 1;
@@ -62,10 +55,7 @@ pub fn validar_cedula(cedula: &str) -> Result<(), AppError> {
         ));
     }
 
-    let cifras: Vec<u32> = solo
-        .chars()
-        .map(|c| c.to_digit(10).unwrap_or(0))
-        .collect();
+    let cifras: Vec<u32> = solo.chars().map(|c| c.to_digit(10).unwrap_or(0)).collect();
 
     let weights: [u32; 10] = [1, 2, 1, 2, 1, 2, 1, 2, 1, 2];
 

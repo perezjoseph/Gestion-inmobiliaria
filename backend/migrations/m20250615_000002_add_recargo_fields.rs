@@ -26,9 +26,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Contratos::Table)
-                    .add_column(
-                        ColumnDef::new(RecargoFields::RecargoPorcentaje).decimal_len(5, 2),
-                    )
+                    .add_column(ColumnDef::new(RecargoFields::RecargoPorcentaje).decimal_len(5, 2))
                     .to_owned(),
             )
             .await?;

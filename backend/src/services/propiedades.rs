@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use chrono::Utc;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
-    FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set,
-    sea_query::Expr,
+    FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set, sea_query::Expr,
 };
 use uuid::Uuid;
 
@@ -16,7 +15,7 @@ use crate::models::propiedad::{
 };
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
 use crate::services::unidades;
-use crate::services::validation::{validate_enum, MONEDAS};
+use crate::services::validation::{MONEDAS, validate_enum};
 
 #[derive(Debug, FromQueryResult)]
 struct OccupancyRow {
@@ -100,7 +99,8 @@ pub async fn create<C: ConnectionTrait>(
 
     let record = model.insert(db).await?;
 
-    auditoria::registrar_best_effort(db,
+    auditoria::registrar_best_effort(
+        db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "propiedad".to_string(),
@@ -143,8 +143,7 @@ pub async fn list(
     let page = query.page.unwrap_or(1).max(1);
     let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
 
-    let mut select =
-        propiedad::Entity::find().filter(propiedad::Column::OrganizacionId.eq(org_id));
+    let mut select = propiedad::Entity::find().filter(propiedad::Column::OrganizacionId.eq(org_id));
 
     if let Some(ref ciudad) = query.ciudad {
         select = select.filter(propiedad::Column::Ciudad.eq(ciudad));
@@ -304,7 +303,8 @@ pub async fn update<C: ConnectionTrait>(
 
     let updated = active.update(db).await?;
 
-    auditoria::registrar_best_effort(db,
+    auditoria::registrar_best_effort(
+        db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "propiedad".to_string(),
@@ -333,7 +333,8 @@ pub async fn delete<C: ConnectionTrait>(
     let active: propiedad::ActiveModel = existing.into();
     active.delete(db).await?;
 
-    auditoria::registrar_best_effort(db,
+    auditoria::registrar_best_effort(
+        db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "propiedad".to_string(),

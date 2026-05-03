@@ -187,10 +187,14 @@ pub async fn historial_pagos(
     Ok(entries)
 }
 
-pub async fn calcular_tasa_ocupacion(db: &DatabaseConnection, org_id: Uuid) -> Result<f64, AppError> {
+pub async fn calcular_tasa_ocupacion(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+) -> Result<f64, AppError> {
     let total = propiedad::Entity::find()
         .filter(propiedad::Column::OrganizacionId.eq(org_id))
-        .count(db).await?;
+        .count(db)
+        .await?;
     if total == 0 {
         return Ok(0.0);
     }
@@ -247,7 +251,8 @@ pub async fn generar_reporte_rentabilidad(
     } else {
         propiedad::Entity::find()
             .filter(propiedad::Column::OrganizacionId.eq(org_id))
-            .all(db).await?
+            .all(db)
+            .await?
     };
 
     let prop_ids: Vec<uuid::Uuid> = propiedades.iter().map(|p| p.id).collect();
@@ -283,8 +288,10 @@ pub async fn generar_reporte_rentabilidad(
         .await?;
 
     // Build lookup maps: contrato -> propiedad, pago -> contrato
-    let contrato_prop_map: HashMap<uuid::Uuid, uuid::Uuid> =
-        all_contratos.iter().map(|c| (c.id, c.propiedad_id)).collect();
+    let contrato_prop_map: HashMap<uuid::Uuid, uuid::Uuid> = all_contratos
+        .iter()
+        .map(|c| (c.id, c.propiedad_id))
+        .collect();
 
     // Aggregate income per propiedad via contrato linkage
     let mut income_by_prop: HashMap<uuid::Uuid, Decimal> = HashMap::new();
@@ -297,7 +304,9 @@ pub async fn generar_reporte_rentabilidad(
     // Aggregate expenses per propiedad
     let mut expense_by_prop: HashMap<uuid::Uuid, Decimal> = HashMap::new();
     for g in &all_gastos {
-        *expense_by_prop.entry(g.propiedad_id).or_insert(Decimal::ZERO) += g.monto;
+        *expense_by_prop
+            .entry(g.propiedad_id)
+            .or_insert(Decimal::ZERO) += g.monto;
     }
 
     let mut rows = Vec::with_capacity(propiedades.len());
@@ -305,8 +314,14 @@ pub async fn generar_reporte_rentabilidad(
     let mut grand_gastos = Decimal::ZERO;
 
     for prop in &propiedades {
-        let total_ingresos = income_by_prop.get(&prop.id).copied().unwrap_or(Decimal::ZERO);
-        let total_gastos = expense_by_prop.get(&prop.id).copied().unwrap_or(Decimal::ZERO);
+        let total_ingresos = income_by_prop
+            .get(&prop.id)
+            .copied()
+            .unwrap_or(Decimal::ZERO);
+        let total_gastos = expense_by_prop
+            .get(&prop.id)
+            .copied()
+            .unwrap_or(Decimal::ZERO);
         let ingreso_neto = total_ingresos - total_gastos;
 
         grand_ingresos += total_ingresos;

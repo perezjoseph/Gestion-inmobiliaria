@@ -392,8 +392,7 @@ mod pbt_async {
             let org_id = create_org(&db).await;
             let propiedad_id = create_propiedad(&db, org_id).await;
             let inquilino_id = create_inquilino(&db, org_id).await;
-            let contrato_id =
-                create_contrato(&db, propiedad_id, inquilino_id, org_id).await;
+            let contrato_id = create_contrato(&db, propiedad_id, inquilino_id, org_id).await;
 
             // Insert pagos with random estados and dates
             let mut pago_ids = Vec::new();
@@ -427,15 +426,9 @@ mod pbt_async {
             let mut contrato_ids = Vec::new();
             for (estado, offset) in estados.iter().zip(offsets.iter()) {
                 let fecha_fin = Utc::now().date_naive() + chrono::Duration::days(*offset);
-                let id = create_contrato_pbt(
-                    &db,
-                    propiedad_id,
-                    inquilino_id,
-                    org_id,
-                    estado,
-                    fecha_fin,
-                )
-                .await;
+                let id =
+                    create_contrato_pbt(&db, propiedad_id, inquilino_id, org_id, estado, fecha_fin)
+                        .await;
                 contrato_ids.push(id);
             }
 
@@ -461,13 +454,12 @@ mod pbt_async {
     // ── P4: Registro de ejecución completo ───────────────────────────
     pub fn p4(nombre_tarea: String) {
         with_db(|db| async move {
-            let result =
-                realestate_backend::services::background_jobs::ejecutar_tarea_por_nombre(
-                    &db,
-                    &nombre_tarea,
-                )
-                .await
-                .expect("ejecutar_tarea_por_nombre should succeed");
+            let result = realestate_backend::services::background_jobs::ejecutar_tarea_por_nombre(
+                &db,
+                &nombre_tarea,
+            )
+            .await
+            .expect("ejecutar_tarea_por_nombre should succeed");
 
             // id is not nil UUID
             assert_ne!(
@@ -509,15 +501,9 @@ mod pbt_async {
             // Insert documentos with random estados and fecha_vencimiento
             let mut doc_ids = Vec::new();
             for (estado, offset) in estados.iter().zip(offsets.iter()) {
-                let fecha_vencimiento =
-                    Utc::now().date_naive() + chrono::Duration::days(*offset);
-                let id = create_documento_pbt(
-                    &db,
-                    uploaded_by,
-                    estado,
-                    Some(fecha_vencimiento),
-                )
-                .await;
+                let fecha_vencimiento = Utc::now().date_naive() + chrono::Duration::days(*offset);
+                let id =
+                    create_documento_pbt(&db, uploaded_by, estado, Some(fecha_vencimiento)).await;
                 doc_ids.push(id);
             }
 
@@ -542,12 +528,11 @@ mod pbt_async {
     // ── P5: Nombre de tarea inválido retorna 404 ──────────────────────
     pub fn p5(nombre_invalido: String) {
         with_db(|db| async move {
-            let result =
-                realestate_backend::services::background_jobs::ejecutar_tarea_por_nombre(
-                    &db,
-                    &nombre_invalido,
-                )
-                .await;
+            let result = realestate_backend::services::background_jobs::ejecutar_tarea_por_nombre(
+                &db,
+                &nombre_invalido,
+            )
+            .await;
 
             assert!(
                 result.is_err(),
@@ -661,8 +646,7 @@ mod pbt_async {
             let org_id = create_org(&db).await;
             let propiedad_id = create_propiedad(&db, org_id).await;
             let inquilino_id = create_inquilino(&db, org_id).await;
-            let contrato_id =
-                create_contrato(&db, propiedad_id, inquilino_id, org_id).await;
+            let contrato_id = create_contrato(&db, propiedad_id, inquilino_id, org_id).await;
 
             // Insert pagos with random estados and dates
             let mut pago_ids = Vec::new();
@@ -689,7 +673,10 @@ mod pbt_async {
                 remaining.is_empty(),
                 "After mark_overdue, found {} pagos still pendiente with fecha_vencimiento < today: {:?}",
                 remaining.len(),
-                remaining.iter().map(|p| (p.id, &p.estado, p.fecha_vencimiento)).collect::<Vec<_>>(),
+                remaining
+                    .iter()
+                    .map(|p| (p.id, &p.estado, p.fecha_vencimiento))
+                    .collect::<Vec<_>>(),
             );
 
             // Cleanup
@@ -708,15 +695,9 @@ mod pbt_async {
             let mut contrato_ids = Vec::new();
             for (estado, offset) in estados.iter().zip(offsets.iter()) {
                 let fecha_fin = Utc::now().date_naive() + chrono::Duration::days(*offset);
-                let id = create_contrato_pbt(
-                    &db,
-                    propiedad_id,
-                    inquilino_id,
-                    org_id,
-                    estado,
-                    fecha_fin,
-                )
-                .await;
+                let id =
+                    create_contrato_pbt(&db, propiedad_id, inquilino_id, org_id, estado, fecha_fin)
+                        .await;
                 contrato_ids.push(id);
             }
 
@@ -741,7 +722,10 @@ mod pbt_async {
                 remaining.is_empty(),
                 "After marcar_vencidos, found {} contratos still activo with fecha_fin < today: {:?}",
                 remaining.len(),
-                remaining.iter().map(|c| (c.id, &c.estado, c.fecha_fin)).collect::<Vec<_>>(),
+                remaining
+                    .iter()
+                    .map(|c| (c.id, &c.estado, c.fecha_fin))
+                    .collect::<Vec<_>>(),
             );
 
             // Cleanup
@@ -758,15 +742,9 @@ mod pbt_async {
             // Insert documentos with random estados and fecha_vencimiento
             let mut doc_ids = Vec::new();
             for (estado, offset) in estados.iter().zip(offsets.iter()) {
-                let fecha_vencimiento =
-                    Utc::now().date_naive() + chrono::Duration::days(*offset);
-                let id = create_documento_pbt(
-                    &db,
-                    uploaded_by,
-                    estado,
-                    Some(fecha_vencimiento),
-                )
-                .await;
+                let fecha_vencimiento = Utc::now().date_naive() + chrono::Duration::days(*offset);
+                let id =
+                    create_documento_pbt(&db, uploaded_by, estado, Some(fecha_vencimiento)).await;
                 doc_ids.push(id);
             }
 
@@ -791,7 +769,10 @@ mod pbt_async {
                 remaining.is_empty(),
                 "After marcar_vencidos, found {} documentos still verificado with fecha_vencimiento < today: {:?}",
                 remaining.len(),
-                remaining.iter().map(|d| (d.id, &d.estado_verificacion, d.fecha_vencimiento)).collect::<Vec<_>>(),
+                remaining
+                    .iter()
+                    .map(|d| (d.id, &d.estado_verificacion, d.fecha_vencimiento))
+                    .collect::<Vec<_>>(),
             );
 
             // Cleanup
@@ -921,13 +902,10 @@ fn test_historial_ordenado() {
         ..Default::default()
     });
     runner
-        .run(
-            &proptest::collection::vec(tarea_valida(), 1..5),
-            |tareas| {
-                pbt_async::p6(tareas);
-                Ok(())
-            },
-        )
+        .run(&proptest::collection::vec(tarea_valida(), 1..5), |tareas| {
+            pbt_async::p6(tareas);
+            Ok(())
+        })
         .unwrap();
 }
 

@@ -579,13 +579,19 @@ fn test_terminar_contrato_cancels_future_pending_pagos() {
             .unwrap();
 
         // Mark January pago as pagado
-        let jan_pago = pagos.iter().find(|p| p.fecha_vencimiento.month() == 1).unwrap();
+        let jan_pago = pagos
+            .iter()
+            .find(|p| p.fecha_vencimiento.month() == 1)
+            .unwrap();
         let mut active: pago::ActiveModel = jan_pago.clone().into();
         active.estado = Set("pagado".to_string());
         active.update(&db).await.unwrap();
 
         // Mark February pago as atrasado
-        let feb_pago = pagos.iter().find(|p| p.fecha_vencimiento.month() == 2).unwrap();
+        let feb_pago = pagos
+            .iter()
+            .find(|p| p.fecha_vencimiento.month() == 2)
+            .unwrap();
         let mut active: pago::ActiveModel = feb_pago.clone().into();
         active.estado = Set("atrasado".to_string());
         active.update(&db).await.unwrap();
@@ -1131,9 +1137,7 @@ fn test_auditoria_entries_for_pago_generation_and_cancellation() {
         }
 
         let req = actix_web::test::TestRequest::post()
-            .uri(&format!(
-                "/api/v1/contratos/{contrato_id}/pagos/generar"
-            ))
+            .uri(&format!("/api/v1/contratos/{contrato_id}/pagos/generar"))
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({}))
             .to_request();

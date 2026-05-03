@@ -127,7 +127,10 @@ mod tests {
         assert_eq!(pagos.len(), 1);
         assert_eq!(pagos[0].monto, monto);
         assert_eq!(pagos[0].moneda, "DOP");
-        assert_eq!(pagos[0].fecha_vencimiento, NaiveDate::from_ymd_opt(2025, 3, 1).unwrap());
+        assert_eq!(
+            pagos[0].fecha_vencimiento,
+            NaiveDate::from_ymd_opt(2025, 3, 1).unwrap()
+        );
     }
 
     #[test]

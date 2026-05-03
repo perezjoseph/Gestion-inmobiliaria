@@ -13,13 +13,13 @@ pub mod invitaciones;
 pub mod mantenimiento;
 pub mod notificaciones;
 pub mod ocr_client;
-pub mod organizaciones;
 pub mod ocr_mapping;
 #[cfg(test)]
 mod ocr_mapping_pbt;
 #[cfg(test)]
 mod ocr_mapping_tests;
 pub mod ocr_preview;
+pub mod organizaciones;
 pub mod pago_generacion;
 pub mod pagos;
 pub mod perfil;

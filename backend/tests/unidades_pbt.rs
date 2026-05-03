@@ -843,7 +843,17 @@ fn test_creation_round_trip() {
     runner
         .run(
             &strategy,
-            |(numero_unidad, piso, habitaciones, banos, area_m2, precio, moneda, estado, descripcion)| {
+            |(
+                numero_unidad,
+                piso,
+                habitaciones,
+                banos,
+                area_m2,
+                precio,
+                moneda,
+                estado,
+                descripcion,
+            )| {
                 pbt_async::p1_round_trip(
                     numero_unidad,
                     piso,
@@ -941,7 +951,16 @@ fn test_update_preserves_and_replaces() {
     runner
         .run(
             &strategy,
-            |(update_numero, new_numero, update_estado, new_estado, update_precio, new_precio, update_moneda, new_moneda)| {
+            |(
+                update_numero,
+                new_numero,
+                update_estado,
+                new_estado,
+                update_precio,
+                new_precio,
+                update_moneda,
+                new_moneda,
+            )| {
                 pbt_async::p5_update_preserves(
                     update_numero,
                     new_numero,
@@ -1034,10 +1053,7 @@ fn test_nonexistent_propiedad_rejected() {
         ..Default::default()
     });
 
-    let uuid_strategy = (
-        proptest::bits::u128::ANY,
-    )
-        .prop_map(|(bits,)| Uuid::from_u128(bits));
+    let uuid_strategy = (proptest::bits::u128::ANY,).prop_map(|(bits,)| Uuid::from_u128(bits));
 
     runner
         .run(&uuid_strategy, |fake_prop| {

@@ -124,10 +124,7 @@ mod tests {
     fn calcular_recargo_cero_porciento() {
         let monto = Decimal::from(5000);
         let porcentaje = Decimal::from(0);
-        assert_eq!(
-            calcular_recargo(monto, porcentaje),
-            Decimal::ZERO
-        );
+        assert_eq!(calcular_recargo(monto, porcentaje), Decimal::ZERO);
     }
 
     #[test]

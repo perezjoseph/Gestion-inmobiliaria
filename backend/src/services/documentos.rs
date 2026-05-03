@@ -51,11 +51,7 @@ pub const TIPOS_PAGO: &[&str] = &[
     "comprobante_fiscal_ncf",
     "comprobante_transferencia",
 ];
-pub const TIPOS_GASTO: &[&str] = &[
-    "factura_proveedor",
-    "comprobante_fiscal_ncf",
-    "recibo_pago",
-];
+pub const TIPOS_GASTO: &[&str] = &["factura_proveedor", "comprobante_fiscal_ncf", "recibo_pago"];
 
 // ── Required document types per entity type ────────────────────
 
@@ -373,9 +369,7 @@ pub async fn verificar(
     let doc = documento::Entity::find_by_id(documento_id)
         .one(db)
         .await?
-        .ok_or_else(|| {
-            AppError::NotFound(format!("Documento {documento_id} no encontrado"))
-        })?;
+        .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
 
     let old_status = doc.estado_verificacion.clone();
     let now = Utc::now().into();
@@ -436,9 +430,7 @@ pub async fn eliminar(
     let doc = documento::Entity::find_by_id(documento_id)
         .one(db)
         .await?
-        .ok_or_else(|| {
-            AppError::NotFound(format!("Documento {documento_id} no encontrado"))
-        })?;
+        .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
 
     // Delete file from disk (best-effort — don't fail if file is already gone)
     let upload_dir = get_upload_dir();
@@ -533,7 +525,8 @@ fn nombre_tipo_documento(tipo: &str) -> &'static str {
 /// Determine the compliance status for a document type based on existing documents.
 fn estado_for_tipo(docs: &[documento::Model], tipo: &str) -> &'static str {
     // Find the most recent document of this type
-    let matching: Vec<&documento::Model> = docs.iter().filter(|d| d.tipo_documento == tipo).collect();
+    let matching: Vec<&documento::Model> =
+        docs.iter().filter(|d| d.tipo_documento == tipo).collect();
 
     if matching.is_empty() {
         return "faltante";
@@ -541,16 +534,25 @@ fn estado_for_tipo(docs: &[documento::Model], tipo: &str) -> &'static str {
 
     // Priority: verificado > pendiente > vencido > rechazado
     // If any doc of this type is verified, status is "presente"
-    if matching.iter().any(|d| d.estado_verificacion == "verificado") {
+    if matching
+        .iter()
+        .any(|d| d.estado_verificacion == "verificado")
+    {
         return "presente";
     }
-    if matching.iter().any(|d| d.estado_verificacion == "pendiente") {
+    if matching
+        .iter()
+        .any(|d| d.estado_verificacion == "pendiente")
+    {
         return "pendiente";
     }
     if matching.iter().any(|d| d.estado_verificacion == "vencido") {
         return "vencido";
     }
-    if matching.iter().any(|d| d.estado_verificacion == "rechazado") {
+    if matching
+        .iter()
+        .any(|d| d.estado_verificacion == "rechazado")
+    {
         return "rechazado";
     }
 
@@ -584,9 +586,7 @@ async fn verificar_entidad_existe(
             contrato::Entity::find_by_id(entity_id)
                 .one(db)
                 .await?
-                .ok_or_else(|| {
-                    AppError::NotFound(format!("Contrato {entity_id} no encontrado"))
-                })?;
+                .ok_or_else(|| AppError::NotFound(format!("Contrato {entity_id} no encontrado")))?;
         }
         // For pago/gasto, just check if any documents exist for this entity
         "pago" | "gasto" => {
@@ -900,10 +900,7 @@ mod tests {
             msg.contains("no es válido"),
             "error should mention invalid type"
         );
-        assert!(
-            msg.contains("cedula"),
-            "error should list valid types"
-        );
+        assert!(msg.contains("cedula"), "error should list valid types");
     }
 
     #[test]
@@ -1073,7 +1070,10 @@ mod tests {
     #[test]
     fn nombre_tipo_documento_returns_spanish_names() {
         assert_eq!(nombre_tipo_documento("cedula"), "Cédula de Identidad");
-        assert_eq!(nombre_tipo_documento("titulo_propiedad"), "Título de Propiedad");
+        assert_eq!(
+            nombre_tipo_documento("titulo_propiedad"),
+            "Título de Propiedad"
+        );
         assert_eq!(
             nombre_tipo_documento("contrato_arrendamiento"),
             "Contrato de Arrendamiento"

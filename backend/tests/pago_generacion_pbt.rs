@@ -25,9 +25,8 @@ fn safe_day() -> impl Strategy<Value = u32> {
 }
 
 fn valid_date() -> impl Strategy<Value = NaiveDate> {
-    (valid_year(), valid_month(), safe_day()).prop_map(|(y, m, d)| {
-        NaiveDate::from_ymd_opt(y, m, d).unwrap()
-    })
+    (valid_year(), valid_month(), safe_day())
+        .prop_map(|(y, m, d)| NaiveDate::from_ymd_opt(y, m, d).unwrap())
 }
 
 /// Two dates where inicio <= fin.
@@ -93,7 +92,6 @@ fn last_day_of_month(year: i32, month: u32) -> u32 {
         .and_then(|d| d.pred_opt())
         .map_or(28, |d| d.day())
 }
-
 
 // Feature: auto-generate-pagos, Property 1: Month count correctness
 // **Validates: Requirements 1.1, 1.4, 1.5, 1.6**
@@ -161,7 +159,11 @@ fn test_date_calculation_day_clamping() {
 
     runner
         .run(
-            &(ordered_date_pair(), positive_decimal(), dia_vencimiento_strategy()),
+            &(
+                ordered_date_pair(),
+                positive_decimal(),
+                dia_vencimiento_strategy(),
+            ),
             |((inicio, fin), monto, dia)| {
                 let pagos = calcular_pagos(inicio, fin, monto, "DOP", dia);
 
@@ -202,10 +204,7 @@ fn test_cancellation_correctness() {
 
     // Generate a list of (estado, fecha_vencimiento) pairs and a fecha_terminacion
     let pago_entry = (valid_estado(), valid_date());
-    let strategy = (
-        proptest::collection::vec(pago_entry, 1..20),
-        valid_date(),
-    );
+    let strategy = (proptest::collection::vec(pago_entry, 1..20), valid_date());
 
     runner
         .run(&strategy, |(entries, fecha_terminacion)| {
@@ -355,10 +354,7 @@ fn test_invalid_dia_vencimiento_rejected() {
     });
 
     // Generate u32 values where value == 0 or value > 31
-    let invalid_dia = prop_oneof![
-        Just(0u32),
-        32u32..=1000u32,
-    ];
+    let invalid_dia = prop_oneof![Just(0u32), 32u32..=1000u32,];
 
     runner
         .run(&invalid_dia, |dia| {

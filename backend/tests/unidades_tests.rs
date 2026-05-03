@@ -77,9 +77,16 @@ mod unidades_rbac_tests {
     #[actix_web::test]
     async fn visualizador_can_list_unidades() {
         let prop_id = Uuid::new_v4();
-        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route("/api/propiedades/{propiedad_id}/unidades", web::get().to(claims_list_stub))).await;
+        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
+            "/api/propiedades/{propiedad_id}/unidades",
+            web::get().to(claims_list_stub),
+        ))
+        .await;
         let token = make_token("visualizador");
-        let req = test::TestRequest::get().uri(&format!("/api/propiedades/{prop_id}/unidades")).insert_header(("Authorization", format!("Bearer {token}"))).to_request();
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/propiedades/{prop_id}/unidades"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
     }
@@ -88,9 +95,16 @@ mod unidades_rbac_tests {
     async fn visualizador_can_get_unidad_by_id() {
         let prop_id = Uuid::new_v4();
         let id = Uuid::new_v4();
-        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route("/api/propiedades/{propiedad_id}/unidades/{id}", web::get().to(claims_get_stub))).await;
+        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
+            "/api/propiedades/{propiedad_id}/unidades/{id}",
+            web::get().to(claims_get_stub),
+        ))
+        .await;
         let token = make_token("visualizador");
-        let req = test::TestRequest::get().uri(&format!("/api/propiedades/{prop_id}/unidades/{id}")).insert_header(("Authorization", format!("Bearer {token}"))).to_request();
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/propiedades/{prop_id}/unidades/{id}"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
     }
@@ -98,9 +112,17 @@ mod unidades_rbac_tests {
     #[actix_web::test]
     async fn visualizador_cannot_create_unidad() {
         let prop_id = Uuid::new_v4();
-        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route("/api/propiedades/{propiedad_id}/unidades", web::post().to(write_access_stub))).await;
+        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
+            "/api/propiedades/{propiedad_id}/unidades",
+            web::post().to(write_access_stub),
+        ))
+        .await;
         let token = make_token("visualizador");
-        let req = test::TestRequest::post().uri(&format!("/api/propiedades/{prop_id}/unidades")).insert_header(("Authorization", format!("Bearer {token}"))).set_json(serde_json::json!({})).to_request();
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/propiedades/{prop_id}/unidades"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(serde_json::json!({}))
+            .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
     }
@@ -108,9 +130,17 @@ mod unidades_rbac_tests {
     #[actix_web::test]
     async fn admin_can_create_unidad() {
         let prop_id = Uuid::new_v4();
-        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route("/api/propiedades/{propiedad_id}/unidades", web::post().to(write_access_stub))).await;
+        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
+            "/api/propiedades/{propiedad_id}/unidades",
+            web::post().to(write_access_stub),
+        ))
+        .await;
         let token = make_token("admin");
-        let req = test::TestRequest::post().uri(&format!("/api/propiedades/{prop_id}/unidades")).insert_header(("Authorization", format!("Bearer {token}"))).set_json(serde_json::json!({})).to_request();
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/propiedades/{prop_id}/unidades"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(serde_json::json!({}))
+            .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::CREATED);
     }
@@ -118,9 +148,17 @@ mod unidades_rbac_tests {
     #[actix_web::test]
     async fn gerente_can_create_unidad() {
         let prop_id = Uuid::new_v4();
-        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route("/api/propiedades/{propiedad_id}/unidades", web::post().to(write_access_stub))).await;
+        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
+            "/api/propiedades/{propiedad_id}/unidades",
+            web::post().to(write_access_stub),
+        ))
+        .await;
         let token = make_token("gerente");
-        let req = test::TestRequest::post().uri(&format!("/api/propiedades/{prop_id}/unidades")).insert_header(("Authorization", format!("Bearer {token}"))).set_json(serde_json::json!({})).to_request();
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/propiedades/{prop_id}/unidades"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(serde_json::json!({}))
+            .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::CREATED);
     }
@@ -129,9 +167,17 @@ mod unidades_rbac_tests {
     async fn visualizador_cannot_update_unidad() {
         let prop_id = Uuid::new_v4();
         let id = Uuid::new_v4();
-        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route("/api/propiedades/{propiedad_id}/unidades/{id}", web::put().to(write_access_update_stub))).await;
+        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
+            "/api/propiedades/{propiedad_id}/unidades/{id}",
+            web::put().to(write_access_update_stub),
+        ))
+        .await;
         let token = make_token("visualizador");
-        let req = test::TestRequest::put().uri(&format!("/api/propiedades/{prop_id}/unidades/{id}")).insert_header(("Authorization", format!("Bearer {token}"))).set_json(serde_json::json!({"estado": "ocupada"})).to_request();
+        let req = test::TestRequest::put()
+            .uri(&format!("/api/propiedades/{prop_id}/unidades/{id}"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(serde_json::json!({"estado": "ocupada"}))
+            .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
     }
@@ -140,9 +186,17 @@ mod unidades_rbac_tests {
     async fn admin_can_update_unidad() {
         let prop_id = Uuid::new_v4();
         let id = Uuid::new_v4();
-        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route("/api/propiedades/{propiedad_id}/unidades/{id}", web::put().to(write_access_update_stub))).await;
+        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
+            "/api/propiedades/{propiedad_id}/unidades/{id}",
+            web::put().to(write_access_update_stub),
+        ))
+        .await;
         let token = make_token("admin");
-        let req = test::TestRequest::put().uri(&format!("/api/propiedades/{prop_id}/unidades/{id}")).insert_header(("Authorization", format!("Bearer {token}"))).set_json(serde_json::json!({"estado": "ocupada"})).to_request();
+        let req = test::TestRequest::put()
+            .uri(&format!("/api/propiedades/{prop_id}/unidades/{id}"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(serde_json::json!({"estado": "ocupada"}))
+            .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
     }
@@ -151,9 +205,16 @@ mod unidades_rbac_tests {
     async fn visualizador_cannot_delete_unidad() {
         let prop_id = Uuid::new_v4();
         let id = Uuid::new_v4();
-        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route("/api/propiedades/{propiedad_id}/unidades/{id}", web::delete().to(admin_only_stub))).await;
+        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
+            "/api/propiedades/{propiedad_id}/unidades/{id}",
+            web::delete().to(admin_only_stub),
+        ))
+        .await;
         let token = make_token("visualizador");
-        let req = test::TestRequest::delete().uri(&format!("/api/propiedades/{prop_id}/unidades/{id}")).insert_header(("Authorization", format!("Bearer {token}"))).to_request();
+        let req = test::TestRequest::delete()
+            .uri(&format!("/api/propiedades/{prop_id}/unidades/{id}"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
     }
@@ -162,9 +223,16 @@ mod unidades_rbac_tests {
     async fn gerente_cannot_delete_unidad() {
         let prop_id = Uuid::new_v4();
         let id = Uuid::new_v4();
-        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route("/api/propiedades/{propiedad_id}/unidades/{id}", web::delete().to(admin_only_stub))).await;
+        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
+            "/api/propiedades/{propiedad_id}/unidades/{id}",
+            web::delete().to(admin_only_stub),
+        ))
+        .await;
         let token = make_token("gerente");
-        let req = test::TestRequest::delete().uri(&format!("/api/propiedades/{prop_id}/unidades/{id}")).insert_header(("Authorization", format!("Bearer {token}"))).to_request();
+        let req = test::TestRequest::delete()
+            .uri(&format!("/api/propiedades/{prop_id}/unidades/{id}"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
     }
@@ -173,9 +241,16 @@ mod unidades_rbac_tests {
     async fn admin_can_delete_unidad() {
         let prop_id = Uuid::new_v4();
         let id = Uuid::new_v4();
-        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route("/api/propiedades/{propiedad_id}/unidades/{id}", web::delete().to(admin_only_stub))).await;
+        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
+            "/api/propiedades/{propiedad_id}/unidades/{id}",
+            web::delete().to(admin_only_stub),
+        ))
+        .await;
         let token = make_token("admin");
-        let req = test::TestRequest::delete().uri(&format!("/api/propiedades/{prop_id}/unidades/{id}")).insert_header(("Authorization", format!("Bearer {token}"))).to_request();
+        let req = test::TestRequest::delete()
+            .uri(&format!("/api/propiedades/{prop_id}/unidades/{id}"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
     }
@@ -183,8 +258,14 @@ mod unidades_rbac_tests {
     #[actix_web::test]
     async fn unauthenticated_cannot_list_unidades() {
         let prop_id = Uuid::new_v4();
-        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route("/api/propiedades/{propiedad_id}/unidades", web::get().to(claims_list_stub))).await;
-        let req = test::TestRequest::get().uri(&format!("/api/propiedades/{prop_id}/unidades")).to_request();
+        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
+            "/api/propiedades/{propiedad_id}/unidades",
+            web::get().to(claims_list_stub),
+        ))
+        .await;
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/propiedades/{prop_id}/unidades"))
+            .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
@@ -192,8 +273,15 @@ mod unidades_rbac_tests {
     #[actix_web::test]
     async fn unauthenticated_cannot_create_unidad() {
         let prop_id = Uuid::new_v4();
-        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route("/api/propiedades/{propiedad_id}/unidades", web::post().to(write_access_stub))).await;
-        let req = test::TestRequest::post().uri(&format!("/api/propiedades/{prop_id}/unidades")).set_json(serde_json::json!({})).to_request();
+        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
+            "/api/propiedades/{propiedad_id}/unidades",
+            web::post().to(write_access_stub),
+        ))
+        .await;
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/propiedades/{prop_id}/unidades"))
+            .set_json(serde_json::json!({}))
+            .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
@@ -392,8 +480,11 @@ mod db_async {
             let app = test::init_service(create_app(
                 db.clone(),
                 config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             // Create
             let req = test::TestRequest::post()
@@ -480,9 +571,13 @@ mod db_async {
             let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             // Create first unidad
             let req = test::TestRequest::post()
@@ -516,9 +611,13 @@ mod db_async {
             let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri(&base_uri(propiedad_id))
@@ -561,9 +660,13 @@ mod db_async {
             let prop_a = create_test_propiedad(&db, org_id).await;
             let prop_b = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             // Same numero_unidad in different propiedades is allowed
             let req = test::TestRequest::post()
@@ -599,12 +702,20 @@ mod db_async {
             let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let mut ids = Vec::new();
-            for (num, estado) in &[("F-1", "disponible"), ("F-2", "ocupada"), ("F-3", "mantenimiento")] {
+            for (num, estado) in &[
+                ("F-1", "disponible"),
+                ("F-2", "ocupada"),
+                ("F-3", "mantenimiento"),
+            ] {
                 let req = test::TestRequest::post()
                     .uri(&base_uri(propiedad_id))
                     .insert_header(("Authorization", format!("Bearer {token}")))
@@ -640,9 +751,13 @@ mod db_async {
             let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let mut ids = Vec::new();
             // Create in reverse order
@@ -685,9 +800,13 @@ mod db_async {
             let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri(&base_uri(propiedad_id))
@@ -707,9 +826,13 @@ mod db_async {
             let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri(&base_uri(propiedad_id))
@@ -729,9 +852,13 @@ mod db_async {
             let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri(&base_uri(propiedad_id))
@@ -751,9 +878,13 @@ mod db_async {
             let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri(&base_uri(propiedad_id))
@@ -773,9 +904,13 @@ mod db_async {
             let token = make_token(admin_id, "admin", org_id);
             let fake_prop = Uuid::new_v4();
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri(&base_uri(fake_prop))
@@ -795,9 +930,13 @@ mod db_async {
             let token = make_token(admin_id, "admin", org_id);
             let fake_prop = Uuid::new_v4();
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::get()
                 .uri(&base_uri(fake_prop))
@@ -817,9 +956,13 @@ mod db_async {
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let fake_id = Uuid::new_v4();
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::get()
                 .uri(&format!("{}/{fake_id}", base_uri(propiedad_id)))
@@ -839,9 +982,13 @@ mod db_async {
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let fake_id = Uuid::new_v4();
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::put()
                 .uri(&format!("{}/{fake_id}", base_uri(propiedad_id)))
@@ -862,9 +1009,13 @@ mod db_async {
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let fake_id = Uuid::new_v4();
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::delete()
                 .uri(&format!("{}/{fake_id}", base_uri(propiedad_id)))
@@ -883,9 +1034,13 @@ mod db_async {
             let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             let req = test::TestRequest::post()
                 .uri(&base_uri(propiedad_id))
@@ -921,9 +1076,13 @@ mod db_async {
             let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             // Create 2 unidades: 1 ocupada, 1 disponible
             let mut ids = Vec::new();
@@ -982,9 +1141,13 @@ mod db_async {
             let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             // Create
             let req = test::TestRequest::post()
@@ -1023,7 +1186,10 @@ mod db_async {
                 .all(&db)
                 .await
                 .unwrap();
-            assert!(!actualizar_entries.is_empty(), "Expected actualizar audit entry");
+            assert!(
+                !actualizar_entries.is_empty(),
+                "Expected actualizar audit entry"
+            );
 
             // Delete
             let req = test::TestRequest::delete()
@@ -1040,7 +1206,10 @@ mod db_async {
                 .all(&db)
                 .await
                 .unwrap();
-            assert!(!eliminar_entries.is_empty(), "Expected eliminar audit entry");
+            assert!(
+                !eliminar_entries.is_empty(),
+                "Expected eliminar audit entry"
+            );
         });
     }
 
@@ -1052,9 +1221,13 @@ mod db_async {
             let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let app = test::init_service(create_app(
-                db.clone(), config,
-                actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
-            )).await;
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
 
             // Create with only required fields - defaults should apply
             let req = test::TestRequest::post()

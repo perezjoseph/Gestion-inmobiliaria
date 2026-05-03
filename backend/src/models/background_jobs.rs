@@ -59,7 +59,10 @@ mod tests {
             "perPage": 20
         });
         let query: HistorialQuery = serde_json::from_value(json).unwrap();
-        assert_eq!(query.nombre_tarea.as_deref(), Some("marcar_pagos_atrasados"));
+        assert_eq!(
+            query.nombre_tarea.as_deref(),
+            Some("marcar_pagos_atrasados")
+        );
         assert_eq!(query.exitosa, Some(true));
         assert_eq!(query.page, Some(1));
         assert_eq!(query.per_page, Some(20));
@@ -134,6 +137,9 @@ mod tests {
         assert_eq!(response.duracion_ms, 250);
         assert!(!response.exitosa);
         assert_eq!(response.registros_afectados, 0);
-        assert_eq!(response.mensaje_error.as_deref(), Some("db connection error"));
+        assert_eq!(
+            response.mensaje_error.as_deref(),
+            Some("db connection error")
+        );
     }
 }

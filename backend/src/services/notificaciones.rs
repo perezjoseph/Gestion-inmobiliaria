@@ -9,10 +9,10 @@ use uuid::Uuid;
 
 use crate::entities::{contrato, documento, inquilino, notificacion, pago, propiedad, usuario};
 use crate::errors::AppError;
+use crate::models::PaginatedResponse;
 use crate::models::notificacion::{
     GenerarNotificacionesResponse, NotificacionListQuery, NotificacionResponse, PagoVencido,
 };
-use crate::models::PaginatedResponse;
 
 pub const TIPOS_NOTIFICACION: &[&str] = &[
     "pago_vencido",
@@ -39,7 +39,10 @@ impl From<notificacion::Model> for NotificacionResponse {
     }
 }
 
-pub async fn listar_pagos_vencidos(db: &DatabaseConnection, org_id: Uuid) -> Result<Vec<PagoVencido>, AppError> {
+pub async fn listar_pagos_vencidos(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+) -> Result<Vec<PagoVencido>, AppError> {
     let today = Utc::now().date_naive();
 
     let pagos = pago::Entity::find()
@@ -112,8 +115,8 @@ pub async fn listar(
     let page = query.page.unwrap_or(1).max(1);
     let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
 
-    let mut select = notificacion::Entity::find()
-        .filter(notificacion::Column::UsuarioId.eq(usuario_id));
+    let mut select =
+        notificacion::Entity::find().filter(notificacion::Column::UsuarioId.eq(usuario_id));
 
     if let Some(leida) = query.leida {
         select = select.filter(notificacion::Column::Leida.eq(leida));
@@ -130,17 +133,17 @@ pub async fn listar(
     let records = paginator.fetch_page(page - 1).await?;
 
     Ok(PaginatedResponse {
-        data: records.into_iter().map(NotificacionResponse::from).collect(),
+        data: records
+            .into_iter()
+            .map(NotificacionResponse::from)
+            .collect(),
         total,
         page,
         per_page,
     })
 }
 
-pub async fn conteo_no_leidas(
-    db: &DatabaseConnection,
-    usuario_id: Uuid,
-) -> Result<u64, AppError> {
+pub async fn conteo_no_leidas(db: &DatabaseConnection, usuario_id: Uuid) -> Result<u64, AppError> {
     let count = notificacion::Entity::find()
         .filter(notificacion::Column::UsuarioId.eq(usuario_id))
         .filter(notificacion::Column::Leida.eq(false))
@@ -356,8 +359,14 @@ pub async fn generar_contratos_por_vencer(
         let dias_restantes = (contrato_model.fecha_fin - today).num_days();
 
         for &uid in &usuario_ids {
-            if existe_notificacion(db, "contrato_por_vencer", "contrato", contrato_model.id, uid)
-                .await?
+            if existe_notificacion(
+                db,
+                "contrato_por_vencer",
+                "contrato",
+                contrato_model.id,
+                uid,
+            )
+            .await?
             {
                 continue;
             }

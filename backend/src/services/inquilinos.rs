@@ -104,8 +104,7 @@ pub async fn list(
     let page = page.unwrap_or(1).max(1);
     let per_page = per_page.unwrap_or(20).clamp(1, 100);
 
-    let mut select =
-        inquilino::Entity::find().filter(inquilino::Column::OrganizacionId.eq(org_id));
+    let mut select = inquilino::Entity::find().filter(inquilino::Column::OrganizacionId.eq(org_id));
 
     if let Some(ref term) = search {
         let condition = Condition::any()

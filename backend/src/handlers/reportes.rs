@@ -12,8 +12,13 @@ pub async fn ingresos(
     claims: Claims,
     query: web::Query<IngresoReportQuery>,
 ) -> Result<HttpResponse, AppError> {
-    let summary =
-        reportes::generar_reporte_ingresos(db.get_ref(), claims.organizacion_id, query.into_inner(), claims.email).await?;
+    let summary = reportes::generar_reporte_ingresos(
+        db.get_ref(),
+        claims.organizacion_id,
+        query.into_inner(),
+        claims.email,
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(summary))
 }
 
@@ -22,8 +27,13 @@ pub async fn ingresos_pdf(
     claims: Claims,
     query: web::Query<IngresoReportQuery>,
 ) -> Result<HttpResponse, AppError> {
-    let summary =
-        reportes::generar_reporte_ingresos(db.get_ref(), claims.organizacion_id, query.into_inner(), claims.email).await?;
+    let summary = reportes::generar_reporte_ingresos(
+        db.get_ref(),
+        claims.organizacion_id,
+        query.into_inner(),
+        claims.email,
+    )
+    .await?;
     let bytes = reportes::exportar_pdf(&summary)?;
     Ok(HttpResponse::Ok()
         .content_type("application/pdf")
@@ -39,8 +49,13 @@ pub async fn ingresos_xlsx(
     claims: Claims,
     query: web::Query<IngresoReportQuery>,
 ) -> Result<HttpResponse, AppError> {
-    let summary =
-        reportes::generar_reporte_ingresos(db.get_ref(), claims.organizacion_id, query.into_inner(), claims.email).await?;
+    let summary = reportes::generar_reporte_ingresos(
+        db.get_ref(),
+        claims.organizacion_id,
+        query.into_inner(),
+        claims.email,
+    )
+    .await?;
     let bytes = reportes::exportar_xlsx(&summary)?;
     Ok(HttpResponse::Ok()
         .content_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -57,8 +72,13 @@ pub async fn historial_pagos(
     query: web::Query<HistorialPagosQuery>,
 ) -> Result<HttpResponse, AppError> {
     let params = query.into_inner();
-    let entries =
-        reportes::historial_pagos(db.get_ref(), claims.organizacion_id, params.fecha_desde, params.fecha_hasta).await?;
+    let entries = reportes::historial_pagos(
+        db.get_ref(),
+        claims.organizacion_id,
+        params.fecha_desde,
+        params.fecha_hasta,
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(entries))
 }
 
@@ -75,9 +95,13 @@ pub async fn rentabilidad(
     claims: Claims,
     query: web::Query<RentabilidadReportQuery>,
 ) -> Result<HttpResponse, AppError> {
-    let summary =
-        reportes::generar_reporte_rentabilidad(db.get_ref(), claims.organizacion_id, query.into_inner(), claims.email)
-            .await?;
+    let summary = reportes::generar_reporte_rentabilidad(
+        db.get_ref(),
+        claims.organizacion_id,
+        query.into_inner(),
+        claims.email,
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(summary))
 }
 
@@ -86,9 +110,13 @@ pub async fn rentabilidad_pdf(
     claims: Claims,
     query: web::Query<RentabilidadReportQuery>,
 ) -> Result<HttpResponse, AppError> {
-    let summary =
-        reportes::generar_reporte_rentabilidad(db.get_ref(), claims.organizacion_id, query.into_inner(), claims.email)
-            .await?;
+    let summary = reportes::generar_reporte_rentabilidad(
+        db.get_ref(),
+        claims.organizacion_id,
+        query.into_inner(),
+        claims.email,
+    )
+    .await?;
     let bytes = reportes::exportar_rentabilidad_pdf(&summary)?;
     Ok(HttpResponse::Ok()
         .content_type("application/pdf")
@@ -104,9 +132,13 @@ pub async fn rentabilidad_xlsx(
     claims: Claims,
     query: web::Query<RentabilidadReportQuery>,
 ) -> Result<HttpResponse, AppError> {
-    let summary =
-        reportes::generar_reporte_rentabilidad(db.get_ref(), claims.organizacion_id, query.into_inner(), claims.email)
-            .await?;
+    let summary = reportes::generar_reporte_rentabilidad(
+        db.get_ref(),
+        claims.organizacion_id,
+        query.into_inner(),
+        claims.email,
+    )
+    .await?;
     let bytes = reportes::exportar_rentabilidad_xlsx(&summary)?;
     Ok(HttpResponse::Ok()
         .content_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

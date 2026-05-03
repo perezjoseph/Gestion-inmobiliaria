@@ -489,7 +489,11 @@ mod pbt_async {
             if valid {
                 assert_eq!(resp.status(), 200, "Valid retention should succeed");
             } else {
-                assert_eq!(resp.status(), 422, "Invalid retention amount should be rejected");
+                assert_eq!(
+                    resp.status(),
+                    422,
+                    "Invalid retention amount should be rejected"
+                );
             }
         });
     }
@@ -546,7 +550,11 @@ mod pbt_async {
                 .set_json(&body)
                 .to_request();
             let resp = test::call_service(&app, req).await;
-            assert_eq!(resp.status(), 422, "Missing/empty motivo should be rejected");
+            assert_eq!(
+                resp.status(),
+                422,
+                "Missing/empty motivo should be rejected"
+            );
         });
     }
 

@@ -13,7 +13,7 @@ use crate::models::unidad::{
     CreateUnidadRequest, OcupacionResumen, UnidadListQuery, UnidadResponse, UpdateUnidadRequest,
 };
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
-use crate::services::validation::{validate_enum, MONEDAS};
+use crate::services::validation::{MONEDAS, validate_enum};
 
 pub const ESTADOS_UNIDAD: &[&str] = &["disponible", "ocupada", "mantenimiento"];
 
@@ -193,8 +193,7 @@ pub async fn list(
     let page = query.page.unwrap_or(1).max(1);
     let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
 
-    let mut select =
-        unidad::Entity::find().filter(unidad::Column::PropiedadId.eq(propiedad_id));
+    let mut select = unidad::Entity::find().filter(unidad::Column::PropiedadId.eq(propiedad_id));
 
     if let Some(ref estado) = query.estado {
         select = select.filter(unidad::Column::Estado.eq(estado));

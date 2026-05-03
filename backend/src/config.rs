@@ -146,7 +146,9 @@ mod tests {
 
     #[test]
     fn from_env_with_all_vars() {
-        let _guard = ENV_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             clear_env_vars();
             env::set_var("DATABASE_URL", "postgres://localhost/test");
@@ -166,7 +168,9 @@ mod tests {
 
     #[test]
     fn from_env_defaults_port_when_not_set() {
-        let _guard = ENV_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             clear_env_vars();
             env::set_var("DATABASE_URL", "postgres://localhost/test");
@@ -182,7 +186,9 @@ mod tests {
 
     #[test]
     fn from_env_fails_with_invalid_port() {
-        let _guard = ENV_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             clear_env_vars();
             env::set_var("DATABASE_URL", "postgres://localhost/test");
@@ -198,7 +204,9 @@ mod tests {
 
     #[test]
     fn pool_config_uses_defaults_when_not_set() {
-        let _guard = ENV_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             clear_env_vars();
             env::set_var("DATABASE_URL", "postgres://localhost/test");
@@ -218,7 +226,9 @@ mod tests {
 
     #[test]
     fn pool_config_reads_custom_values() {
-        let _guard = ENV_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             clear_env_vars();
             env::set_var("DATABASE_URL", "postgres://localhost/test");
@@ -244,7 +254,9 @@ mod tests {
 
     #[test]
     fn pool_config_fails_with_invalid_max_connections() {
-        let _guard = ENV_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             clear_env_vars();
             env::set_var("DATABASE_URL", "postgres://localhost/test");

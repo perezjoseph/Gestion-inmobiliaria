@@ -1,10 +1,10 @@
 use actix_cors::Cors;
 use actix_files::Files;
+use actix_web::HttpResponse;
 use actix_web::error::ResponseError;
 use actix_web::http::header;
 use actix_web::web;
 use actix_web::web::JsonConfig;
-use actix_web::HttpResponse;
 use sea_orm::DatabaseConnection;
 use tracing_actix_web::TracingLogger;
 
@@ -20,7 +20,9 @@ async fn health() -> HttpResponse {
 fn build_cors(config: &AppConfig) -> Cors {
     config.cors_origin.as_deref().map_or_else(
         || {
-            tracing::warn!("CORS_ORIGIN no configurado — usando política permisiva. No usar en producción.");
+            tracing::warn!(
+                "CORS_ORIGIN no configurado — usando política permisiva. No usar en producción."
+            );
             Cors::permissive()
         },
         |origin| {

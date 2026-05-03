@@ -22,9 +22,13 @@ pub async fn list(
     query: web::Query<UnidadListQuery>,
 ) -> Result<HttpResponse, AppError> {
     let propiedad_id = path.into_inner();
-    let result =
-        unidades::list(db.get_ref(), propiedad_id, claims.organizacion_id, query.into_inner())
-            .await?;
+    let result = unidades::list(
+        db.get_ref(),
+        propiedad_id,
+        claims.organizacion_id,
+        query.into_inner(),
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
@@ -65,9 +69,15 @@ pub async fn update(
     let org_id = access.0.organizacion_id;
     let p = path.into_inner();
     let txn = db.begin().await?;
-    let result =
-        unidades::update(&txn, p.propiedad_id, org_id, p.id, body.into_inner(), usuario_id)
-            .await?;
+    let result = unidades::update(
+        &txn,
+        p.propiedad_id,
+        org_id,
+        p.id,
+        body.into_inner(),
+        usuario_id,
+    )
+    .await?;
     txn.commit().await?;
     Ok(HttpResponse::Ok().json(result))
 }

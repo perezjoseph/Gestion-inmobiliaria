@@ -29,9 +29,7 @@ pub async fn obtener_recargo_defecto(
     _claims: crate::services::auth::Claims,
 ) -> Result<HttpResponse, AppError> {
     let result = configuracion::obtener_recargo_defecto(db.get_ref()).await?;
-    let response = RecargoDefectoResponse {
-        porcentaje: result,
-    };
+    let response = RecargoDefectoResponse { porcentaje: result };
     Ok(HttpResponse::Ok().json(response))
 }
 

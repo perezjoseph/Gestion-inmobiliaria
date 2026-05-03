@@ -27,10 +27,10 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(Organizaciones::Tipo)
                             .string_len(20)
                             .not_null()
-                            .check(Expr::col(Organizaciones::Tipo).is_in([
-                                "persona_fisica",
-                                "persona_juridica",
-                            ])),
+                            .check(
+                                Expr::col(Organizaciones::Tipo)
+                                    .is_in(["persona_fisica", "persona_juridica"]),
+                            ),
                     )
                     .col(
                         ColumnDef::new(Organizaciones::Nombre)
@@ -42,10 +42,7 @@ impl MigrationTrait for Migration {
                             .string_len(20)
                             .not_null()
                             .default("activo")
-                            .check(Expr::col(Organizaciones::Estado).is_in([
-                                "activo",
-                                "inactivo",
-                            ])),
+                            .check(Expr::col(Organizaciones::Estado).is_in(["activo", "inactivo"])),
                     )
                     // persona_fisica fields
                     .col(
@@ -53,40 +50,19 @@ impl MigrationTrait for Migration {
                             .string_len(11)
                             .unique_key(),
                     )
-                    .col(
-                        ColumnDef::new(Organizaciones::Telefono)
-                            .string_len(20),
-                    )
-                    .col(
-                        ColumnDef::new(Organizaciones::EmailOrganizacion)
-                            .string_len(255),
-                    )
+                    .col(ColumnDef::new(Organizaciones::Telefono).string_len(20))
+                    .col(ColumnDef::new(Organizaciones::EmailOrganizacion).string_len(255))
                     // persona_juridica fields
                     .col(
                         ColumnDef::new(Organizaciones::Rnc)
                             .string_len(9)
                             .unique_key(),
                     )
-                    .col(
-                        ColumnDef::new(Organizaciones::RazonSocial)
-                            .string_len(200),
-                    )
-                    .col(
-                        ColumnDef::new(Organizaciones::NombreComercial)
-                            .string_len(200),
-                    )
-                    .col(
-                        ColumnDef::new(Organizaciones::DireccionFiscal)
-                            .text(),
-                    )
-                    .col(
-                        ColumnDef::new(Organizaciones::RepresentanteLegal)
-                            .string_len(200),
-                    )
-                    .col(
-                        ColumnDef::new(Organizaciones::DgiiData)
-                            .json_binary(),
-                    )
+                    .col(ColumnDef::new(Organizaciones::RazonSocial).string_len(200))
+                    .col(ColumnDef::new(Organizaciones::NombreComercial).string_len(200))
+                    .col(ColumnDef::new(Organizaciones::DireccionFiscal).text())
+                    .col(ColumnDef::new(Organizaciones::RepresentanteLegal).string_len(200))
+                    .col(ColumnDef::new(Organizaciones::DgiiData).json_binary())
                     // timestamps
                     .col(
                         ColumnDef::new(Organizaciones::CreatedAt)

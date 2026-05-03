@@ -70,25 +70,20 @@ pub async fn upload(
             }
             match field_name.as_str() {
                 "tipo_documento" => tipo_documento = Some(value),
-                "fecha_vencimiento"
-                    if !value.is_empty() => {
-                        fecha_vencimiento = Some(
-                            value.parse::<chrono::NaiveDate>().map_err(|_| {
-                                AppError::Validation(
-                                    "Formato de fecha_vencimiento inválido (esperado: YYYY-MM-DD)"
-                                        .to_string(),
-                                )
-                            })?,
-                        );
-                    }
-                "numero_documento"
-                    if !value.is_empty() => {
-                        numero_documento = Some(value);
-                    }
-                "notas_verificacion"
-                    if !value.is_empty() => {
-                        notas_verificacion = Some(value);
-                    }
+                "fecha_vencimiento" if !value.is_empty() => {
+                    fecha_vencimiento = Some(value.parse::<chrono::NaiveDate>().map_err(|_| {
+                        AppError::Validation(
+                            "Formato de fecha_vencimiento inválido (esperado: YYYY-MM-DD)"
+                                .to_string(),
+                        )
+                    })?);
+                }
+                "numero_documento" if !value.is_empty() => {
+                    numero_documento = Some(value);
+                }
+                "notas_verificacion" if !value.is_empty() => {
+                    notas_verificacion = Some(value);
+                }
                 _ => {} // ignore unknown fields
             }
         }
@@ -185,8 +180,7 @@ pub async fn cumplimiento(
     path: web::Path<DocumentoPath>,
 ) -> Result<HttpResponse, AppError> {
     let path = path.into_inner();
-    let result =
-        documentos::cumplimiento(db.get_ref(), &path.entity_type, path.entity_id).await?;
+    let result = documentos::cumplimiento(db.get_ref(), &path.entity_type, path.entity_id).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
@@ -196,7 +190,9 @@ pub async fn cumplimiento_resumen(
     db: web::Data<DatabaseConnection>,
     claims: Claims,
 ) -> Result<HttpResponse, AppError> {
-    let result = crate::services::dashboard::cumplimiento_resumen(db.get_ref(), claims.organizacion_id).await?;
+    let result =
+        crate::services::dashboard::cumplimiento_resumen(db.get_ref(), claims.organizacion_id)
+            .await?;
     Ok(HttpResponse::Ok().json(result))
 }
 

@@ -142,7 +142,10 @@ mod tests {
         assert_eq!(json["id"], id.to_string());
         assert_eq!(json["tipo"], "pago_vencido");
         assert_eq!(json["titulo"], "Pago vencido - Apartamento Centro");
-        assert_eq!(json["mensaje"], "El pago de 25000 DOP tiene 15 días de vencido");
+        assert_eq!(
+            json["mensaje"],
+            "El pago de 25000 DOP tiene 15 días de vencido"
+        );
         assert_eq!(json["leida"], false);
         assert!(json.get("entityType").is_some());
         assert_eq!(json["entityType"], "pago");

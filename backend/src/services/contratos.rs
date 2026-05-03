@@ -8,14 +8,14 @@ use uuid::Uuid;
 
 use crate::entities::{contrato, inquilino, pago, propiedad};
 use crate::errors::AppError;
-use crate::services::pago_generacion::{calcular_pagos, PagoGenerado};
 use crate::models::PaginatedResponse;
 use crate::models::contrato::{
-    CambiarEstadoDepositoRequest, ContratoResponse, CreateContratoRequest,
-    RenovarContratoRequest, TerminarContratoRequest, UpdateContratoRequest,
+    CambiarEstadoDepositoRequest, ContratoResponse, CreateContratoRequest, RenovarContratoRequest,
+    TerminarContratoRequest, UpdateContratoRequest,
 };
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
-use crate::services::validation::{validate_enum, MONEDAS};
+use crate::services::pago_generacion::{PagoGenerado, calcular_pagos};
+use crate::services::validation::{MONEDAS, validate_enum};
 
 const ESTADOS_CONTRATO: &[&str] = &["activo", "vencido", "cancelado"];
 
@@ -74,9 +74,7 @@ impl From<contrato::Model> for ContratoResponse {
             pagos_generados: None,
             estado_deposito: m.estado_deposito,
             fecha_cobro_deposito: m.fecha_cobro_deposito.map(|dt| dt.with_timezone(&Utc)),
-            fecha_devolucion_deposito: m
-                .fecha_devolucion_deposito
-                .map(|dt| dt.with_timezone(&Utc)),
+            fecha_devolucion_deposito: m.fecha_devolucion_deposito.map(|dt| dt.with_timezone(&Utc)),
             monto_retenido: m.monto_retenido,
             motivo_retencion: m.motivo_retencion,
             recargo_porcentaje: m.recargo_porcentaje,
@@ -311,7 +309,11 @@ pub async fn create(
     Ok(response)
 }
 
-pub async fn get_by_id(db: &DatabaseConnection, org_id: Uuid, id: Uuid) -> Result<ContratoResponse, AppError> {
+pub async fn get_by_id(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    id: Uuid,
+) -> Result<ContratoResponse, AppError> {
     let record = contrato::Entity::find_by_id(id)
         .filter(contrato::Column::OrganizacionId.eq(org_id))
         .one(db)
@@ -444,7 +446,12 @@ pub async fn update(
     Ok(ContratoResponse::from(updated))
 }
 
-pub async fn delete(db: &DatabaseConnection, org_id: Uuid, id: Uuid, usuario_id: Uuid) -> Result<(), AppError> {
+pub async fn delete(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    id: Uuid,
+    usuario_id: Uuid,
+) -> Result<(), AppError> {
     let txn = db.begin().await?;
 
     let existing = contrato::Entity::find_by_id(id)
@@ -748,23 +755,16 @@ pub async fn cambiar_estado_deposito(
         .deposito
         .filter(|d| *d > rust_decimal::Decimal::ZERO)
         .ok_or_else(|| {
-            AppError::Validation(
-                "El contrato no tiene depósito de garantía".to_string(),
-            )
+            AppError::Validation("El contrato no tiene depósito de garantía".to_string())
         })?;
 
     // 3. Validate estado enum
     validate_enum("estado de depósito", &input.estado, ESTADOS_DEPOSITO)?;
 
     // 4. Get current estado_deposito
-    let estado_actual = existing
-        .estado_deposito
-        .clone()
-        .ok_or_else(|| {
-            AppError::Validation(
-                "El contrato no tiene depósito de garantía".to_string(),
-            )
-        })?;
+    let estado_actual = existing.estado_deposito.clone().ok_or_else(|| {
+        AppError::Validation("El contrato no tiene depósito de garantía".to_string())
+    })?;
 
     // 5. Validate transition
     validar_transicion_deposito(&estado_actual, &input.estado)?;
@@ -772,9 +772,7 @@ pub async fn cambiar_estado_deposito(
     // 6. For retenido: validate monto_retenido and motivo_retencion
     if input.estado == "retenido" {
         let monto = input.monto_retenido.ok_or_else(|| {
-            AppError::Validation(
-                "El monto retenido es requerido para retención".to_string(),
-            )
+            AppError::Validation("El monto retenido es requerido para retención".to_string())
         })?;
 
         if monto <= rust_decimal::Decimal::ZERO {
@@ -843,7 +841,6 @@ pub async fn cambiar_estado_deposito(
 
     Ok(ContratoResponse::from(updated))
 }
-
 
 #[cfg(test)]
 mod tests {

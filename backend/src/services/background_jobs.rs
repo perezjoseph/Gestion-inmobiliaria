@@ -10,8 +10,8 @@ use uuid::Uuid;
 
 use crate::entities::{ejecucion_tarea, organizacion};
 use crate::errors::AppError;
-use crate::models::background_jobs::{EjecucionTareaResponse, HistorialQuery};
 use crate::models::PaginatedResponse;
+use crate::models::background_jobs::{EjecucionTareaResponse, HistorialQuery};
 
 pub const TAREAS_VALIDAS: &[&str] = &[
     "marcar_pagos_atrasados",
@@ -59,9 +59,7 @@ pub async fn ejecutar_tarea_por_nombre(
     nombre: &str,
 ) -> Result<EjecucionTareaResponse, AppError> {
     if !TAREAS_VALIDAS.contains(&nombre) {
-        return Err(AppError::NotFound(format!(
-            "Tarea no encontrada: {nombre}"
-        )));
+        return Err(AppError::NotFound(format!("Tarea no encontrada: {nombre}")));
     }
     ejecutar_tarea_con_registro(db.clone(), nombre.to_string()).await
 }
@@ -112,9 +110,7 @@ async fn ejecutar_tarea_con_registro(
         "marcar_documentos_vencidos" => ejecutar_marcar_documentos_vencidos(&db).await,
         "generar_notificaciones" => ejecutar_generar_notificaciones(&db).await,
         _ => {
-            return Err(AppError::NotFound(format!(
-                "Tarea no encontrada: {nombre}"
-            )));
+            return Err(AppError::NotFound(format!("Tarea no encontrada: {nombre}")));
         }
     };
 
@@ -126,15 +122,7 @@ async fn ejecutar_tarea_con_registro(
         }
         Err(e) => {
             let mensaje_error = e.to_string();
-            registrar_ejecucion(
-                &db,
-                &nombre,
-                duracion_ms,
-                false,
-                0,
-                Some(mensaje_error),
-            )
-            .await
+            registrar_ejecucion(&db, &nombre, duracion_ms, false, 0, Some(mensaje_error)).await
         }
     }
 }

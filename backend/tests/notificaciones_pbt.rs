@@ -258,8 +258,15 @@ mod pbt_async {
             insert_notificacion(&db, &tipo, et, user_id, org_id, true).await;
             insert_notificacion(&db, &tipo, et, user_id, org_id, false).await;
             insert_notificacion(&db, "pago_vencido", "pago", user_id, org_id, true).await;
-            insert_notificacion(&db, "contrato_por_vencer", "contrato", user_id, org_id, false)
-                .await;
+            insert_notificacion(
+                &db,
+                "contrato_por_vencer",
+                "contrato",
+                user_id,
+                org_id,
+                false,
+            )
+            .await;
 
             // Filter by tipo
             let query_tipo = NotificacionListQuery {
@@ -268,9 +275,15 @@ mod pbt_async {
                 page: Some(1),
                 per_page: Some(100),
             };
-            let result = notificaciones::listar(&db, user_id, query_tipo).await.unwrap();
+            let result = notificaciones::listar(&db, user_id, query_tipo)
+                .await
+                .unwrap();
             for n in &result.data {
-                assert_eq!(n.tipo, tipo, "Filter by tipo returned wrong tipo: {}", n.tipo);
+                assert_eq!(
+                    n.tipo, tipo,
+                    "Filter by tipo returned wrong tipo: {}",
+                    n.tipo
+                );
             }
 
             // Filter by leida
@@ -280,7 +293,9 @@ mod pbt_async {
                 page: Some(1),
                 per_page: Some(100),
             };
-            let result = notificaciones::listar(&db, user_id, query_leida).await.unwrap();
+            let result = notificaciones::listar(&db, user_id, query_leida)
+                .await
+                .unwrap();
             for n in &result.data {
                 assert_eq!(
                     n.leida, filter_leida,
@@ -310,7 +325,9 @@ mod pbt_async {
             }
 
             // Verify initial count
-            let count = notificaciones::conteo_no_leidas(&db, user_id).await.unwrap();
+            let count = notificaciones::conteo_no_leidas(&db, user_id)
+                .await
+                .unwrap();
             assert_eq!(
                 count, num_unread as u64,
                 "Initial unread count mismatch: expected {num_unread}, got {count}"
@@ -321,7 +338,9 @@ mod pbt_async {
                 let _ = notificaciones::marcar_leida(&db, unread_ids[0], user_id)
                     .await
                     .unwrap();
-                let count = notificaciones::conteo_no_leidas(&db, user_id).await.unwrap();
+                let count = notificaciones::conteo_no_leidas(&db, user_id)
+                    .await
+                    .unwrap();
                 assert_eq!(
                     count,
                     (num_unread - 1) as u64,
@@ -331,8 +350,12 @@ mod pbt_async {
             }
 
             // Mark all as read
-            let _ = notificaciones::marcar_todas_leidas(&db, user_id).await.unwrap();
-            let count = notificaciones::conteo_no_leidas(&db, user_id).await.unwrap();
+            let _ = notificaciones::marcar_todas_leidas(&db, user_id)
+                .await
+                .unwrap();
+            let count = notificaciones::conteo_no_leidas(&db, user_id)
+                .await
+                .unwrap();
             assert_eq!(count, 0, "After mark all, count should be 0");
 
             cleanup(&db, user_id).await;
@@ -352,14 +375,18 @@ mod pbt_async {
                 .await
                 .unwrap();
             assert!(resp1.leida, "First mark should set leida=true");
-            let count1 = notificaciones::conteo_no_leidas(&db, user_id).await.unwrap();
+            let count1 = notificaciones::conteo_no_leidas(&db, user_id)
+                .await
+                .unwrap();
 
             // Second mark (idempotent)
             let resp2 = notificaciones::marcar_leida(&db, notif_id, user_id)
                 .await
                 .unwrap();
             assert!(resp2.leida, "Second mark should still be leida=true");
-            let count2 = notificaciones::conteo_no_leidas(&db, user_id).await.unwrap();
+            let count2 = notificaciones::conteo_no_leidas(&db, user_id)
+                .await
+                .unwrap();
 
             assert_eq!(
                 count1, count2,
@@ -383,13 +410,17 @@ mod pbt_async {
                 insert_notificacion(&db, "pago_vencido", "pago", user_id, org_id, false).await;
             }
 
-            let updated = notificaciones::marcar_todas_leidas(&db, user_id).await.unwrap();
+            let updated = notificaciones::marcar_todas_leidas(&db, user_id)
+                .await
+                .unwrap();
             assert_eq!(
                 updated, num_unread as u64,
                 "mark_all should return count of previously unread: expected {num_unread}, got {updated}"
             );
 
-            let count = notificaciones::conteo_no_leidas(&db, user_id).await.unwrap();
+            let count = notificaciones::conteo_no_leidas(&db, user_id)
+                .await
+                .unwrap();
             assert_eq!(count, 0, "After mark all, unread count should be 0");
 
             cleanup(&db, user_id).await;
@@ -514,7 +545,9 @@ mod pbt_async {
 
             // Mark all of user A's as read
             for id in &a_ids {
-                let _ = notificaciones::marcar_leida(&db, *id, user_a).await.unwrap();
+                let _ = notificaciones::marcar_leida(&db, *id, user_a)
+                    .await
+                    .unwrap();
             }
 
             // User B's count should be unchanged
@@ -534,7 +567,10 @@ mod pbt_async {
             let b_list = notificaciones::listar(&db, user_b, b_query).await.unwrap();
             if let Some(b_notif) = b_list.data.first() {
                 let result = notificaciones::marcar_leida(&db, b_notif.id, user_a).await;
-                assert!(result.is_err(), "User A should not be able to mark B's notification");
+                assert!(
+                    result.is_err(),
+                    "User A should not be able to mark B's notification"
+                );
             }
 
             cleanup(&db, user_a).await;
@@ -567,7 +603,10 @@ mod pbt_async {
             let result = notificaciones::listar(&db, user_id, query).await.unwrap();
 
             for n in &result.data {
-                assert!(!n.leida, "New notification should default to unread (leida=false)");
+                assert!(
+                    !n.leida,
+                    "New notification should default to unread (leida=false)"
+                );
             }
 
             cleanup(&db, user_id).await;
@@ -698,7 +737,6 @@ mod pbt_async {
         id
     }
 } // end pbt_async
-
 
 // ── Test functions ─────────────────────────────────────────────────────
 

@@ -5,7 +5,7 @@ use realestate_backend::services::auth::{Claims, encode_jwt};
 use rust_decimal::Decimal;
 use sea_orm::{ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, EntityTrait, Set};
 use sea_orm_migration::MigratorTrait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::migrations;
@@ -290,7 +290,6 @@ async fn setup_notif_data(db: &DatabaseConnection) -> (Uuid, Uuid, Uuid) {
     (org_id, admin_id, propiedad_id)
 }
 
-
 // ── Tests ──────────────────────────────────────────────────────────────
 
 #[test]
@@ -303,7 +302,9 @@ fn test_list_empty_notifications() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -330,7 +331,9 @@ fn test_generate_notifications_counts() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -357,7 +360,9 @@ fn test_list_after_generation() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -392,7 +397,9 @@ fn test_filter_by_tipo() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -440,7 +447,9 @@ fn test_filter_by_leida() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -489,7 +498,9 @@ fn test_unread_count() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -525,7 +536,9 @@ fn test_mark_one_as_read() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -587,7 +600,9 @@ fn test_mark_nonexistent_returns_404() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -612,7 +627,9 @@ fn test_mark_another_users_notification_returns_404() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -654,7 +671,9 @@ fn test_mark_all_as_read() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -698,7 +717,9 @@ fn test_generate_as_visualizador_returns_403() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -720,7 +741,9 @@ fn test_generate_twice_deduplication() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -758,7 +781,9 @@ fn test_mantenimiento_state_change_generates_notification() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -807,11 +832,10 @@ fn test_mantenimiento_state_change_generates_notification() {
 
         // Cleanup
         use realestate_backend::entities::solicitud_mantenimiento;
-        let _ = solicitud_mantenimiento::Entity::delete_by_id(
-            solicitud_id.parse::<Uuid>().unwrap(),
-        )
-        .exec(&db)
-        .await;
+        let _ =
+            solicitud_mantenimiento::Entity::delete_by_id(solicitud_id.parse::<Uuid>().unwrap())
+                .exec(&db)
+                .await;
         cleanup_notificaciones(&db, admin_id).await;
     });
 }
@@ -826,7 +850,9 @@ fn test_legacy_pagos_vencidos_endpoint() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 

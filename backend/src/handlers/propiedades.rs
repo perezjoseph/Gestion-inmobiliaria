@@ -15,7 +15,8 @@ pub async fn list(
     claims: Claims,
     query: web::Query<PropiedadListQuery>,
 ) -> Result<HttpResponse, AppError> {
-    let result = propiedades::list(db.get_ref(), claims.organizacion_id, query.into_inner()).await?;
+    let result =
+        propiedades::list(db.get_ref(), claims.organizacion_id, query.into_inner()).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 

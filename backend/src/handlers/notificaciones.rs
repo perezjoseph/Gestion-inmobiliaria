@@ -4,7 +4,9 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::middleware::rbac::WriteAccess;
-use crate::models::notificacion::{ConteoNoLeidasResponse, MarcarTodasResponse, NotificacionListQuery};
+use crate::models::notificacion::{
+    ConteoNoLeidasResponse, MarcarTodasResponse, NotificacionListQuery,
+};
 use crate::services::auth::Claims;
 use crate::services::notificaciones;
 
@@ -12,7 +14,8 @@ pub async fn pagos_vencidos(
     db: web::Data<DatabaseConnection>,
     claims: Claims,
 ) -> Result<HttpResponse, AppError> {
-    let results = notificaciones::listar_pagos_vencidos(db.get_ref(), claims.organizacion_id).await?;
+    let results =
+        notificaciones::listar_pagos_vencidos(db.get_ref(), claims.organizacion_id).await?;
     Ok(HttpResponse::Ok().json(results))
 }
 
@@ -55,6 +58,7 @@ pub async fn generar(
     db: web::Data<DatabaseConnection>,
     access: WriteAccess,
 ) -> Result<HttpResponse, AppError> {
-    let result = notificaciones::generar_notificaciones(db.get_ref(), access.0.organizacion_id).await?;
+    let result =
+        notificaciones::generar_notificaciones(db.get_ref(), access.0.organizacion_id).await?;
     Ok(HttpResponse::Ok().json(result))
 }

@@ -10,7 +10,10 @@ use crate::errors::AppError;
 use crate::models::PaginatedResponse;
 use crate::models::pago::{CreatePagoRequest, PagoListQuery, PagoResponse, UpdatePagoRequest};
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
-use crate::services::{recargos, validation::{validate_enum, METODOS_PAGO, MONEDAS}};
+use crate::services::{
+    recargos,
+    validation::{METODOS_PAGO, MONEDAS, validate_enum},
+};
 
 const ESTADOS_PAGO: &[&str] = &["pendiente", "pagado", "atrasado", "cancelado"];
 
@@ -72,7 +75,8 @@ pub async fn create<C: ConnectionTrait>(
 
     let record = model.insert(db).await?;
 
-    auditoria::registrar_best_effort(db,
+    auditoria::registrar_best_effort(
+        db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "pago".to_string(),
@@ -86,7 +90,11 @@ pub async fn create<C: ConnectionTrait>(
     Ok(PagoResponse::from(record))
 }
 
-pub async fn get_by_id(db: &DatabaseConnection, org_id: Uuid, id: Uuid) -> Result<PagoResponse, AppError> {
+pub async fn get_by_id(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    id: Uuid,
+) -> Result<PagoResponse, AppError> {
     let record = pago::Entity::find_by_id(id)
         .filter(pago::Column::OrganizacionId.eq(org_id))
         .one(db)
@@ -103,8 +111,7 @@ pub async fn list(
     let page = query.page.unwrap_or(1).max(1);
     let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
 
-    let mut select = pago::Entity::find()
-        .filter(pago::Column::OrganizacionId.eq(org_id));
+    let mut select = pago::Entity::find().filter(pago::Column::OrganizacionId.eq(org_id));
 
     if let Some(ref contrato_id) = query.contrato_id {
         select = select.filter(pago::Column::ContratoId.eq(*contrato_id));
@@ -199,7 +206,8 @@ pub async fn update<C: ConnectionTrait>(
         updated = clear_active.update(db).await?;
     }
 
-    auditoria::registrar_best_effort(db,
+    auditoria::registrar_best_effort(
+        db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "pago".to_string(),
@@ -228,7 +236,8 @@ pub async fn delete<C: ConnectionTrait>(
     let active: pago::ActiveModel = existing.into();
     active.delete(db).await?;
 
-    auditoria::registrar_best_effort(db,
+    auditoria::registrar_best_effort(
+        db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "pago".to_string(),
@@ -246,12 +255,11 @@ pub async fn mark_overdue(db: &DatabaseConnection) -> Result<u64, AppError> {
     let today = Utc::now().date_naive();
 
     // Fetch pending pagos with their contratos to check dias_gracia
-    let pending_pagos: Vec<(pago::Model, Option<contrato::Model>)> =
-        pago::Entity::find()
-            .filter(pago::Column::Estado.eq("pendiente"))
-            .find_also_related(contrato::Entity)
-            .all(db)
-            .await?;
+    let pending_pagos: Vec<(pago::Model, Option<contrato::Model>)> = pago::Entity::find()
+        .filter(pago::Column::Estado.eq("pendiente"))
+        .find_also_related(contrato::Entity)
+        .all(db)
+        .await?;
 
     let mut affected_count: u64 = 0;
     let mut recargos_calculated: u64 = 0;
@@ -262,8 +270,8 @@ pub async fn mark_overdue(db: &DatabaseConnection) -> Result<u64, AppError> {
             .and_then(|c| c.dias_gracia)
             .unwrap_or(0);
 
-        let effective_due = pago_record.fecha_vencimiento
-            + chrono::Duration::days(i64::from(dias_gracia));
+        let effective_due =
+            pago_record.fecha_vencimiento + chrono::Duration::days(i64::from(dias_gracia));
 
         if today <= effective_due {
             continue;

@@ -3,9 +3,7 @@ use realestate_backend::app::create_app;
 use realestate_backend::config::AppConfig;
 use realestate_backend::services::auth::{Claims, encode_jwt};
 use rust_decimal::Decimal;
-use sea_orm::{
-    ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, EntityTrait, Set,
-};
+use sea_orm::{ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, EntityTrait, Set};
 use sea_orm_migration::MigratorTrait;
 use serde_json::Value;
 use uuid::Uuid;
@@ -642,8 +640,7 @@ fn test_marcar_documentos_vencidos_updates_documents() {
 
         // Create a verified document with expired fecha_vencimiento
         let expired_date = Utc::now().date_naive() - chrono::Duration::days(10);
-        let doc_id =
-            create_test_documento(&db, admin_id, "verificado", Some(expired_date)).await;
+        let doc_id = create_test_documento(&db, admin_id, "verificado", Some(expired_date)).await;
 
         let app = actix_web::test::init_service(make_app(db.clone())).await;
 

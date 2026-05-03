@@ -76,6 +76,8 @@ pub async fn resumen_categorias(
     claims: Claims,
     query: web::Query<ResumenCategoriasQuery>,
 ) -> Result<HttpResponse, AppError> {
-    let result = gastos::resumen_categorias(db.get_ref(), claims.organizacion_id, query.into_inner()).await?;
+    let result =
+        gastos::resumen_categorias(db.get_ref(), claims.organizacion_id, query.into_inner())
+            .await?;
     Ok(HttpResponse::Ok().json(result))
 }

@@ -13,7 +13,9 @@ use crate::errors::AppError;
 use crate::models::dashboard::{
     ContratoCalendario, GastosComparacion, IngresoComparacion, OcupacionMensual, PagoProximo,
 };
-use crate::services::documentos::{REQUERIDOS_CONTRATO, REQUERIDOS_INQUILINO, REQUERIDOS_PROPIEDAD};
+use crate::services::documentos::{
+    REQUERIDOS_CONTRATO, REQUERIDOS_INQUILINO, REQUERIDOS_PROPIEDAD,
+};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -128,7 +130,10 @@ pub async fn get_stats(db: &DatabaseConnection, org_id: Uuid) -> Result<Dashboar
 /// Count entities (inquilinos, propiedades, contratos) that have required documents
 /// but are below 100% compliance. Uses batch queries with `is_in()` to avoid N+1.
 #[allow(clippy::cast_possible_truncation)]
-async fn contar_entidades_incompletas(db: &DatabaseConnection, org_id: Uuid) -> Result<i64, AppError> {
+async fn contar_entidades_incompletas(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+) -> Result<i64, AppError> {
     // Fetch all entities of each type that have required documents
     let (all_inquilinos, all_propiedades, all_contratos) = tokio::try_join!(
         inquilino::Entity::find()
@@ -341,15 +346,15 @@ pub async fn ocupacion_tendencia(
 ) -> Result<Vec<OcupacionMensual>, AppError> {
     let total_propiedades = propiedad::Entity::find()
         .filter(propiedad::Column::OrganizacionId.eq(org_id))
-        .count(db).await?;
+        .count(db)
+        .await?;
     if total_propiedades == 0 {
         return Ok(Vec::new());
     }
 
     let today = Utc::now().date_naive();
     let oldest_target = today - chrono::Months::new(meses - 1);
-    let primer_dia_rango =
-        naive_date(oldest_target.year(), oldest_target.month(), 1)?;
+    let primer_dia_rango = naive_date(oldest_target.year(), oldest_target.month(), 1)?;
 
     let contratos = contrato::Entity::find()
         .filter(contrato::Column::OrganizacionId.eq(org_id))
@@ -386,7 +391,10 @@ pub async fn ocupacion_tendencia(
     Ok(resultados)
 }
 
-pub async fn ingreso_comparacion(db: &DatabaseConnection, org_id: Uuid) -> Result<IngresoComparacion, AppError> {
+pub async fn ingreso_comparacion(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+) -> Result<IngresoComparacion, AppError> {
     let today = Utc::now().date_naive();
     let anio = today.year();
     let mes = today.month();
@@ -593,7 +601,10 @@ pub fn calcular_porcentaje_cambio(actual: Decimal, anterior: Decimal) -> f64 {
     cambio.to_f64().unwrap_or(0.0)
 }
 
-pub async fn gastos_comparacion(db: &DatabaseConnection, org_id: Uuid) -> Result<GastosComparacion, AppError> {
+pub async fn gastos_comparacion(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+) -> Result<GastosComparacion, AppError> {
     let today = Utc::now().date_naive();
     let anio = today.year();
     let mes = today.month();

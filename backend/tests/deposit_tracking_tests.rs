@@ -231,7 +231,9 @@ fn test_create_contrato_with_deposit_sets_pendiente() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -255,7 +257,9 @@ fn test_create_contrato_without_deposit_estado_null() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -279,7 +283,9 @@ fn test_full_flow_pendiente_cobrado_devuelto() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -304,7 +310,10 @@ fn test_full_flow_pendiente_cobrado_devuelto() {
         assert_eq!(resp.status(), 200);
         let body: Value = actix_web::test::read_body_json(resp).await;
         assert_eq!(body["estadoDeposito"], "cobrado");
-        assert!(!body["fechaCobroDeposito"].is_null(), "fecha_cobro_deposito should be set");
+        assert!(
+            !body["fechaCobroDeposito"].is_null(),
+            "fecha_cobro_deposito should be set"
+        );
 
         // cobrado → devuelto
         let req = actix_web::test::TestRequest::put()
@@ -316,7 +325,10 @@ fn test_full_flow_pendiente_cobrado_devuelto() {
         assert_eq!(resp.status(), 200);
         let body: Value = actix_web::test::read_body_json(resp).await;
         assert_eq!(body["estadoDeposito"], "devuelto");
-        assert!(!body["fechaDevolucionDeposito"].is_null(), "fecha_devolucion_deposito should be set");
+        assert!(
+            !body["fechaDevolucionDeposito"].is_null(),
+            "fecha_devolucion_deposito should be set"
+        );
     });
 }
 
@@ -328,7 +340,9 @@ fn test_full_flow_pendiente_cobrado_retenido() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -380,7 +394,9 @@ fn test_invalid_transitions_return_422() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -427,7 +443,9 @@ fn test_terminal_states_cannot_transition() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -464,7 +482,12 @@ fn test_terminal_states_cannot_transition() {
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 422);
         let body: Value = actix_web::test::read_body_json(resp).await;
-        assert!(body["message"].as_str().unwrap().contains("devueltos o retenidos"));
+        assert!(
+            body["message"]
+                .as_str()
+                .unwrap()
+                .contains("devueltos o retenidos")
+        );
     });
 }
 
@@ -476,7 +499,9 @@ fn test_retention_without_monto_retenido_returns_422() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -518,7 +543,9 @@ fn test_retention_with_monto_zero_returns_422() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -543,7 +570,9 @@ fn test_retention_with_monto_zero_returns_422() {
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(json!({"estado": "retenido", "montoRetenido": "0", "motivoRetencion": "Daños"}))
+            .set_json(
+                json!({"estado": "retenido", "montoRetenido": "0", "motivoRetencion": "Daños"}),
+            )
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 422);
@@ -560,7 +589,9 @@ fn test_retention_with_monto_exceeding_deposit_returns_422() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -585,7 +616,9 @@ fn test_retention_with_monto_exceeding_deposit_returns_422() {
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(json!({"estado": "retenido", "montoRetenido": "50000", "motivoRetencion": "Daños"}))
+            .set_json(
+                json!({"estado": "retenido", "montoRetenido": "50000", "motivoRetencion": "Daños"}),
+            )
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 422);
@@ -602,7 +635,9 @@ fn test_retention_without_motivo_returns_422() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -644,7 +679,9 @@ fn test_change_estado_on_contrato_without_deposit_returns_422() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -676,7 +713,9 @@ fn test_visualizador_cannot_change_deposit_estado() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -711,7 +750,9 @@ fn test_nonexistent_contrato_returns_404() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -734,7 +775,9 @@ fn test_invalid_estado_enum_returns_422() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -765,7 +808,9 @@ fn test_deposit_fields_in_get_response() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -802,7 +847,9 @@ fn test_auditoria_entries_for_estado_changes() {
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             make_config(),
-            actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new()),
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
         ))
         .await;
 
@@ -834,7 +881,10 @@ fn test_auditoria_entries_for_estado_changes() {
             .all(&db)
             .await
             .unwrap();
-        assert!(!entries.is_empty(), "Expected audit entry for cambiar_estado_deposito");
+        assert!(
+            !entries.is_empty(),
+            "Expected audit entry for cambiar_estado_deposito"
+        );
         assert_eq!(entries[0].cambios["estado_nuevo"], "cobrado");
         assert_eq!(entries[0].cambios["estado_anterior"], "pendiente");
 

@@ -50,7 +50,9 @@ pub async fn digitalizar(
 
     // 2. Call OCR service to extract text
     let ocr_client = OcrClient::new()?;
-    let ocr_result = ocr_client.extract(file_data, filename, mime_type, None).await?;
+    let ocr_result = ocr_client
+        .extract(file_data, filename, mime_type, None)
+        .await?;
 
     // 3. Convert OcrResult to editor JSON
     let (contenido_editable, campos_baja_confianza) =
@@ -127,7 +129,11 @@ async fn convertir_ocr_a_editor(
     // If document_type is known (not "unknown"), try to match a Plantilla and merge fields
     if ocr_result.document_type != "unknown" && !ocr_result.document_type.is_empty() {
         if let Some(plantilla) = find_matching_plantilla(db, &ocr_result.document_type).await? {
-            merge_plantilla_fields(&mut blocks, &plantilla.contenido, &ocr_result.structured_fields);
+            merge_plantilla_fields(
+                &mut blocks,
+                &plantilla.contenido,
+                &ocr_result.structured_fields,
+            );
         }
     }
 
@@ -196,9 +202,7 @@ fn merge_plantilla_fields(
     }
 
     // Extract template blocks to understand the expected structure
-    let template_blocks = plantilla_contenido
-        .get("blocks")
-        .and_then(|b| b.as_array());
+    let template_blocks = plantilla_contenido.get("blocks").and_then(|b| b.as_array());
 
     if let Some(template_blocks) = template_blocks {
         // For each template block, check if it contains placeholders that match OCR fields
@@ -251,9 +255,7 @@ pub async fn guardar_contenido(
     let doc = documento::Entity::find_by_id(documento_id)
         .one(db)
         .await?
-        .ok_or_else(|| {
-            AppError::NotFound(format!("Documento {documento_id} no encontrado"))
-        })?;
+        .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
 
     let mut active: documento::ActiveModel = doc.into_active_model();
     active.contenido_editable = Set(Some(contenido.clone()));
@@ -289,14 +291,10 @@ pub async fn exportar_pdf(
     let doc = documento::Entity::find_by_id(documento_id)
         .one(db)
         .await?
-        .ok_or_else(|| {
-            AppError::NotFound(format!("Documento {documento_id} no encontrado"))
-        })?;
+        .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
 
     let contenido = doc.contenido_editable.ok_or_else(|| {
-        AppError::Validation(
-            "El documento no tiene contenido editable para exportar".to_string(),
-        )
+        AppError::Validation("El documento no tiene contenido editable para exportar".to_string())
     })?;
 
     let blocks = contenido
@@ -365,10 +363,7 @@ fn load_font_family() -> Result<
 }
 
 /// Render a single editor block into the PDF document.
-fn render_block(
-    doc: &mut numaelis_rckive_genpdf::Document,
-    block: &serde_json::Value,
-) {
+fn render_block(doc: &mut numaelis_rckive_genpdf::Document, block: &serde_json::Value) {
     let block_type = block
         .get("type")
         .and_then(|t| t.as_str())
@@ -389,10 +384,7 @@ fn render_block(
     }
 }
 
-fn render_heading(
-    doc: &mut numaelis_rckive_genpdf::Document,
-    block: &serde_json::Value,
-) {
+fn render_heading(doc: &mut numaelis_rckive_genpdf::Document, block: &serde_json::Value) {
     let text = block
         .get("text")
         .and_then(serde_json::Value::as_str)
@@ -411,40 +403,26 @@ fn render_heading(
 
     doc.push(elements::Break::new(0.5));
     doc.push(
-        elements::Paragraph::new(text)
-            .styled(style::Style::new().bold().with_font_size(font_size)),
+        elements::Paragraph::new(text).styled(style::Style::new().bold().with_font_size(font_size)),
     );
     doc.push(elements::Break::new(0.3));
 }
 
-fn render_paragraph(
-    doc: &mut numaelis_rckive_genpdf::Document,
-    block: &serde_json::Value,
-) {
-    let text = block
-        .get("text")
-        .and_then(|t| t.as_str())
-        .unwrap_or("");
+fn render_paragraph(doc: &mut numaelis_rckive_genpdf::Document, block: &serde_json::Value) {
+    let text = block.get("text").and_then(|t| t.as_str()).unwrap_or("");
 
     if !text.is_empty() {
-        doc.push(
-            elements::Paragraph::new(text).styled(style::Style::new().with_font_size(11)),
-        );
+        doc.push(elements::Paragraph::new(text).styled(style::Style::new().with_font_size(11)));
         doc.push(elements::Break::new(0.2));
     }
 }
 
-fn render_list(
-    doc: &mut numaelis_rckive_genpdf::Document,
-    block: &serde_json::Value,
-) {
+fn render_list(doc: &mut numaelis_rckive_genpdf::Document, block: &serde_json::Value) {
     let _ordered = block
         .get("ordered")
         .and_then(serde_json::Value::as_bool)
         .unwrap_or(false);
-    let items = block
-        .get("items")
-        .and_then(serde_json::Value::as_array);
+    let items = block.get("items").and_then(serde_json::Value::as_array);
 
     if let Some(items) = items {
         let mut list = elements::OrderedList::new();
@@ -459,20 +437,17 @@ fn render_list(
     }
 }
 
-fn render_table(
-    doc: &mut numaelis_rckive_genpdf::Document,
-    block: &serde_json::Value,
-) {
-    let headers = block
-        .get("headers")
-        .and_then(serde_json::Value::as_array);
-    let rows = block
-        .get("rows")
-        .and_then(serde_json::Value::as_array);
+fn render_table(doc: &mut numaelis_rckive_genpdf::Document, block: &serde_json::Value) {
+    let headers = block.get("headers").and_then(serde_json::Value::as_array);
+    let rows = block.get("rows").and_then(serde_json::Value::as_array);
 
     let col_count = headers
         .map(Vec::len)
-        .or_else(|| rows.and_then(|r| r.first()).and_then(serde_json::Value::as_array).map(Vec::len))
+        .or_else(|| {
+            rows.and_then(|r| r.first())
+                .and_then(serde_json::Value::as_array)
+                .map(Vec::len)
+        })
         .unwrap_or(0);
 
     if col_count == 0 {
@@ -493,9 +468,11 @@ fn render_table(
                     .styled(style::Style::new().bold().with_font_size(10)),
             );
         }
-        row.push().map_err(|e| {
-            tracing::error!("Error adding table header row: {e}");
-        }).ok();
+        row.push()
+            .map_err(|e| {
+                tracing::error!("Error adding table header row: {e}");
+            })
+            .ok();
     }
 
     // Data rows
@@ -510,9 +487,11 @@ fn render_table(
                             .styled(style::Style::new().with_font_size(10)),
                     );
                 }
-                row.push().map_err(|e| {
-                    tracing::error!("Error adding table data row: {e}");
-                }).ok();
+                row.push()
+                    .map_err(|e| {
+                        tracing::error!("Error adding table data row: {e}");
+                    })
+                    .ok();
             }
         }
     }

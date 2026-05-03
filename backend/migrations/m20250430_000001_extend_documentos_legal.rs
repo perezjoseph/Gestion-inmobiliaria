@@ -116,9 +116,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Documentos::Table)
-                    .add_column(
-                        ColumnDef::new(DocumentosLegal::NumeroDocumento).string_len(100),
-                    )
+                    .add_column(ColumnDef::new(DocumentosLegal::NumeroDocumento).string_len(100))
                     .to_owned(),
             )
             .await?;

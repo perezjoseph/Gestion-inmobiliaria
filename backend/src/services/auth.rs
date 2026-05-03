@@ -135,7 +135,16 @@ async fn register_new_org(
     }
 
     // Validate fiscal ID and required fields before starting the transaction
-    let (org_nombre, org_cedula, org_telefono, org_rnc, org_razon_social, org_nombre_comercial, org_direccion_fiscal, org_representante_legal);
+    let (
+        org_nombre,
+        org_cedula,
+        org_telefono,
+        org_rnc,
+        org_razon_social,
+        org_nombre_comercial,
+        org_direccion_fiscal,
+        org_representante_legal,
+    );
 
     if tipo == "persona_fisica" {
         let cedula = input.cedula.as_deref().ok_or_else(|| {

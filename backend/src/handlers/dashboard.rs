@@ -20,7 +20,8 @@ pub async fn ocupacion_tendencia(
     query: web::Query<OcupacionTendenciaQuery>,
 ) -> Result<HttpResponse, AppError> {
     let meses = query.meses.unwrap_or(12);
-    let result = dashboard::ocupacion_tendencia(db.get_ref(), claims.organizacion_id, meses).await?;
+    let result =
+        dashboard::ocupacion_tendencia(db.get_ref(), claims.organizacion_id, meses).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 

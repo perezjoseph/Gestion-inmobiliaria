@@ -14,8 +14,8 @@ use crate::models::mantenimiento::{
     UpdateSolicitudRequest,
 };
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
-use crate::services::validation::{validate_enum, MONEDAS};
 use crate::services::notificaciones;
+use crate::services::validation::{MONEDAS, validate_enum};
 
 const ESTADOS_SOLICITUD: &[&str] = &["pendiente", "en_progreso", "completado"];
 const PRIORIDADES: &[&str] = &["baja", "media", "alta", "urgente"];
@@ -149,7 +149,8 @@ pub async fn create<C: ConnectionTrait>(
 
     let record = model.insert(db).await?;
 
-    auditoria::registrar_best_effort(db,
+    auditoria::registrar_best_effort(
+        db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "solicitud_mantenimiento".to_string(),
@@ -289,7 +290,8 @@ pub async fn update<C: ConnectionTrait>(
 
     let updated = active.update(db).await?;
 
-    auditoria::registrar_best_effort(db,
+    auditoria::registrar_best_effort(
+        db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "solicitud_mantenimiento".to_string(),
@@ -354,7 +356,8 @@ pub async fn cambiar_estado<C: ConnectionTrait>(
         tracing::warn!("Fallo al crear notificación de mantenimiento (no fatal): {e}");
     }
 
-    auditoria::registrar_best_effort(db,
+    auditoria::registrar_best_effort(
+        db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "solicitud_mantenimiento".to_string(),
@@ -387,7 +390,8 @@ pub async fn delete<C: ConnectionTrait>(
     let active: solicitud_mantenimiento::ActiveModel = existing.into();
     active.delete(db).await?;
 
-    auditoria::registrar_best_effort(db,
+    auditoria::registrar_best_effort(
+        db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "solicitud_mantenimiento".to_string(),
@@ -435,7 +439,8 @@ pub async fn agregar_nota<C: ConnectionTrait>(
 
     let record = model.insert(db).await?;
 
-    auditoria::registrar_best_effort(db,
+    auditoria::registrar_best_effort(
+        db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "nota_mantenimiento".to_string(),

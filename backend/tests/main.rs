@@ -18,6 +18,8 @@
     clippy::case_sensitive_file_extension_comparisons,
     clippy::suspicious_open_options,
     clippy::literal_string_with_formatting_args,
+    clippy::doc_markdown,
+    clippy::ignored_unit_patterns,
     unsafe_code
 )]
 
@@ -42,8 +44,8 @@ mod mantenimiento_tests;
 mod notificaciones_pbt;
 mod notificaciones_tests;
 mod ocr_pbt;
-mod organizaciones_tests;
 mod ocr_tests;
+mod organizaciones_tests;
 mod pago_generacion_pbt;
 mod pago_generacion_tests;
 mod pagos_tests;

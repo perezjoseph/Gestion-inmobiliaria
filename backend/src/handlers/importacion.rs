@@ -84,7 +84,13 @@ pub async fn importar_propiedades(
 ) -> Result<HttpResponse, AppError> {
     let (file_data, filename) = extract_file(payload).await?;
     let formato = detect_format(&filename)?;
-    let result = importacion::importar_propiedades(db.get_ref(), &file_data, formato, access.0.organizacion_id).await?;
+    let result = importacion::importar_propiedades(
+        db.get_ref(),
+        &file_data,
+        formato,
+        access.0.organizacion_id,
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
@@ -96,7 +102,13 @@ pub async fn importar_inquilinos(
 ) -> Result<HttpResponse, AppError> {
     let (file_data, filename) = extract_file(payload).await?;
     let formato = detect_format(&filename)?;
-    let result = importacion::importar_inquilinos(db.get_ref(), &file_data, formato, access.0.organizacion_id).await?;
+    let result = importacion::importar_inquilinos(
+        db.get_ref(),
+        &file_data,
+        formato,
+        access.0.organizacion_id,
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
@@ -157,9 +169,14 @@ pub async fn importar_gastos(
         preview_store.insert(preview.clone());
         Ok(HttpResponse::Ok().json(preview))
     } else {
-        let result =
-            importacion::importar_gastos(db.get_ref(), &file_data, formato, access.0.sub, access.0.organizacion_id)
-                .await?;
+        let result = importacion::importar_gastos(
+            db.get_ref(),
+            &file_data,
+            formato,
+            access.0.sub,
+            access.0.organizacion_id,
+        )
+        .await?;
         Ok(HttpResponse::Ok().json(result))
     }
 }

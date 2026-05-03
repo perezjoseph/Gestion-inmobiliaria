@@ -80,9 +80,7 @@ pub async fn actualizar_moneda(
     Ok(valor)
 }
 
-pub async fn obtener_recargo_defecto(
-    db: &DatabaseConnection,
-) -> Result<Option<Decimal>, AppError> {
+pub async fn obtener_recargo_defecto(db: &DatabaseConnection) -> Result<Option<Decimal>, AppError> {
     let config = configuracion::Entity::find_by_id(CLAVE_RECARGO_DEFECTO)
         .one(db)
         .await?;

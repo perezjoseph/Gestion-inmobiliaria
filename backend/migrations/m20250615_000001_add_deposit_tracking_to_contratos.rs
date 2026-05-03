@@ -63,9 +63,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Contratos::Table)
-                    .add_column(
-                        ColumnDef::new(DepositTracking::MontoRetenido).decimal_len(12, 2),
-                    )
+                    .add_column(ColumnDef::new(DepositTracking::MontoRetenido).decimal_len(12, 2))
                     .to_owned(),
             )
             .await?;

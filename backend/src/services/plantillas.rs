@@ -11,8 +11,8 @@ pub async fn listar(
     db: &DatabaseConnection,
     entity_type_filter: Option<&str>,
 ) -> Result<Vec<PlantillaResponse>, AppError> {
-    let mut query = plantilla_documento::Entity::find()
-        .filter(plantilla_documento::Column::Activo.eq(true));
+    let mut query =
+        plantilla_documento::Entity::find().filter(plantilla_documento::Column::Activo.eq(true));
 
     if let Some(et) = entity_type_filter {
         query = query.filter(plantilla_documento::Column::EntityType.eq(et));
@@ -162,10 +162,7 @@ async fn load_entity_fields(
             insert_pago_fields(&mut fields, &pg);
 
             // Also load related contrato, propiedad, and inquilino
-            if let Some(c) = contrato::Entity::find_by_id(pg.contrato_id)
-                .one(db)
-                .await?
-            {
+            if let Some(c) = contrato::Entity::find_by_id(pg.contrato_id).one(db).await? {
                 insert_contrato_fields(&mut fields, &c);
                 if let Some(p) = propiedad::Entity::find_by_id(c.propiedad_id)
                     .one(db)
@@ -214,10 +211,7 @@ fn insert_propiedad_fields(
     fields.insert("propiedad.direccion".into(), p.direccion.clone());
     fields.insert("propiedad.ciudad".into(), p.ciudad.clone());
     fields.insert("propiedad.provincia".into(), p.provincia.clone());
-    fields.insert(
-        "propiedad.tipo_propiedad".into(),
-        p.tipo_propiedad.clone(),
-    );
+    fields.insert("propiedad.tipo_propiedad".into(), p.tipo_propiedad.clone());
     fields.insert("propiedad.precio".into(), p.precio.to_string());
     fields.insert("propiedad.moneda".into(), p.moneda.clone());
     fields.insert("propiedad.estado".into(), p.estado.clone());
@@ -249,10 +243,7 @@ fn insert_inquilino_fields(
         fields.insert("inquilino.telefono".into(), tel.clone());
     }
     if let Some(ref contacto) = i.contacto_emergencia {
-        fields.insert(
-            "inquilino.contacto_emergencia".into(),
-            contacto.clone(),
-        );
+        fields.insert("inquilino.contacto_emergencia".into(), contacto.clone());
     }
 }
 
@@ -260,15 +251,9 @@ fn insert_contrato_fields(
     fields: &mut std::collections::HashMap<String, String>,
     c: &contrato::Model,
 ) {
-    fields.insert(
-        "contrato.fecha_inicio".into(),
-        c.fecha_inicio.to_string(),
-    );
+    fields.insert("contrato.fecha_inicio".into(), c.fecha_inicio.to_string());
     fields.insert("contrato.fecha_fin".into(), c.fecha_fin.to_string());
-    fields.insert(
-        "contrato.monto_mensual".into(),
-        c.monto_mensual.to_string(),
-    );
+    fields.insert("contrato.monto_mensual".into(), c.monto_mensual.to_string());
     fields.insert("contrato.moneda".into(), c.moneda.clone());
     fields.insert("contrato.estado".into(), c.estado.clone());
     if let Some(ref dep) = c.deposito {
@@ -276,10 +261,7 @@ fn insert_contrato_fields(
     }
 }
 
-fn insert_pago_fields(
-    fields: &mut std::collections::HashMap<String, String>,
-    pg: &pago::Model,
-) {
+fn insert_pago_fields(fields: &mut std::collections::HashMap<String, String>, pg: &pago::Model) {
     fields.insert("pago.monto".into(), pg.monto.to_string());
     fields.insert("pago.moneda".into(), pg.moneda.clone());
     fields.insert(
@@ -295,18 +277,12 @@ fn insert_pago_fields(
     }
 }
 
-fn insert_gasto_fields(
-    fields: &mut std::collections::HashMap<String, String>,
-    g: &gasto::Model,
-) {
+fn insert_gasto_fields(fields: &mut std::collections::HashMap<String, String>, g: &gasto::Model) {
     fields.insert("gasto.categoria".into(), g.categoria.clone());
     fields.insert("gasto.descripcion".into(), g.descripcion.clone());
     fields.insert("gasto.monto".into(), g.monto.to_string());
     fields.insert("gasto.moneda".into(), g.moneda.clone());
-    fields.insert(
-        "gasto.fecha_gasto".into(),
-        g.fecha_gasto.to_string(),
-    );
+    fields.insert("gasto.fecha_gasto".into(), g.fecha_gasto.to_string());
     fields.insert("gasto.estado".into(), g.estado.clone());
     if let Some(ref prov) = g.proveedor {
         fields.insert("gasto.proveedor".into(), prov.clone());

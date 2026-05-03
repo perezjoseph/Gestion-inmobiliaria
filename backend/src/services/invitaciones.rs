@@ -66,11 +66,7 @@ pub async fn listar(
     Ok(records.into_iter().map(InvitacionResponse::from).collect())
 }
 
-pub async fn revocar(
-    db: &DatabaseConnection,
-    org_id: Uuid,
-    id: Uuid,
-) -> Result<(), AppError> {
+pub async fn revocar(db: &DatabaseConnection, org_id: Uuid, id: Uuid) -> Result<(), AppError> {
     let record = invitacion::Entity::find_by_id(id)
         .filter(invitacion::Column::OrganizacionId.eq(org_id))
         .one(db)
@@ -100,9 +96,7 @@ pub async fn validar_token(
 
     let now: chrono::DateTime<chrono::FixedOffset> = Utc::now().into();
     if record.expires_at < now {
-        return Err(AppError::Gone(
-            "La invitación ha expirado".to_string(),
-        ));
+        return Err(AppError::Gone("La invitación ha expirado".to_string()));
     }
 
     Ok(record)

@@ -50,10 +50,7 @@ fn format_currency_dr(monto: rust_decimal::Decimal, moneda: &str) -> String {
     let decimal_part = parts.get(1).unwrap_or(&"00");
 
     let negative = integer_part.starts_with('-');
-    let digits: String = integer_part
-        .chars()
-        .filter(char::is_ascii_digit)
-        .collect();
+    let digits: String = integer_part.chars().filter(char::is_ascii_digit).collect();
 
     let mut formatted = String::new();
     for (i, ch) in digits.chars().rev().enumerate() {

@@ -39,7 +39,8 @@ pub async fn create(
     let usuario_id = access.0.sub;
     let organizacion_id = access.0.organizacion_id;
     let txn = db.begin().await?;
-    let result = mantenimiento::create(&txn, body.into_inner(), usuario_id, organizacion_id).await?;
+    let result =
+        mantenimiento::create(&txn, body.into_inner(), usuario_id, organizacion_id).await?;
     txn.commit().await?;
     Ok(HttpResponse::Created().json(result))
 }

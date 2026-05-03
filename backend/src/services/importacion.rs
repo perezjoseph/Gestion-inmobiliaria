@@ -87,8 +87,7 @@ fn find_column_index(headers: &[String], name: &str) -> Option<usize> {
 }
 
 fn get_field(row: &[String], idx: Option<usize>) -> &str {
-    idx.and_then(|i| row.get(i))
-        .map_or("", String::as_str)
+    idx.and_then(|i| row.get(i)).map_or("", String::as_str)
 }
 
 fn validate_required_fields<'a>(fields: &[(&str, &'a str)]) -> Vec<&'a str> {

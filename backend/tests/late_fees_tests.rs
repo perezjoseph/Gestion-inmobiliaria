@@ -3,9 +3,7 @@ use realestate_backend::app::create_app;
 use realestate_backend::config::AppConfig;
 use realestate_backend::services::auth::{Claims, encode_jwt};
 use rust_decimal::Decimal;
-use sea_orm::{
-    ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, EntityTrait, Set,
-};
+use sea_orm::{ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, EntityTrait, Set};
 use sea_orm_migration::MigratorTrait;
 use serde_json::Value;
 use std::str::FromStr;
@@ -724,10 +722,7 @@ fn test_mark_overdue_calculates_recargo_contrato_porcentaje() {
             .unwrap()
             .unwrap();
         assert_eq!(updated.estado, "atrasado");
-        assert_eq!(
-            updated.recargo,
-            Some(Decimal::from_str("2500.00").unwrap())
-        );
+        assert_eq!(updated.recargo, Some(Decimal::from_str("2500.00").unwrap()));
     });
 }
 

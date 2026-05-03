@@ -14,7 +14,7 @@ use crate::models::gasto::{
     UpdateGastoRequest,
 };
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
-use crate::services::validation::{validate_enum, MONEDAS};
+use crate::services::validation::{MONEDAS, validate_enum};
 
 pub const CATEGORIAS_GASTO: &[&str] = &[
     "mantenimiento",
@@ -104,7 +104,8 @@ pub async fn create<C: ConnectionTrait>(
 
     let record = model.insert(db).await?;
 
-    auditoria::registrar_best_effort(db,
+    auditoria::registrar_best_effort(
+        db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "gasto".to_string(),
@@ -261,7 +262,8 @@ pub async fn update<C: ConnectionTrait>(
 
     let updated = active.update(db).await?;
 
-    auditoria::registrar_best_effort(db,
+    auditoria::registrar_best_effort(
+        db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "gasto".to_string(),
@@ -290,7 +292,8 @@ pub async fn delete<C: ConnectionTrait>(
     let active: gasto::ActiveModel = existing.into();
     active.delete(db).await?;
 
-    auditoria::registrar_best_effort(db,
+    auditoria::registrar_best_effort(
+        db,
         CreateAuditoriaEntry {
             usuario_id,
             entity_type: "gasto".to_string(),

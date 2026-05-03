@@ -13,13 +13,14 @@ use crate::models::contrato::{
 };
 use crate::models::pago::PagoResponse;
 use crate::models::pago_generacion::{
-    GenerarPagosRequest, GenerarPagosResponse, PagoPreview, PreviewPagosQuery,
-    PreviewPagosResponse,
+    GenerarPagosRequest, GenerarPagosResponse, PagoPreview, PreviewPagosQuery, PreviewPagosResponse,
 };
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
 use crate::services::auth::Claims;
 use crate::services::contratos;
-use crate::services::pago_generacion::{calcular_pagos, filtrar_existentes, validar_dia_vencimiento};
+use crate::services::pago_generacion::{
+    calcular_pagos, filtrar_existentes, validar_dia_vencimiento,
+};
 
 pub async fn list(
     db: web::Data<DatabaseConnection>,
@@ -47,7 +48,13 @@ pub async fn create(
     body: web::Json<CreateContratoRequest>,
 ) -> Result<HttpResponse, AppError> {
     let usuario_id = access.0.sub;
-    let result = contratos::create(db.get_ref(), body.into_inner(), usuario_id, access.0.organizacion_id).await?;
+    let result = contratos::create(
+        db.get_ref(),
+        body.into_inner(),
+        usuario_id,
+        access.0.organizacion_id,
+    )
+    .await?;
     Ok(HttpResponse::Created().json(result))
 }
 
@@ -59,7 +66,14 @@ pub async fn update(
 ) -> Result<HttpResponse, AppError> {
     let usuario_id = access.0.sub;
     let id = path.into_inner();
-    let result = contratos::update(db.get_ref(), access.0.organizacion_id, id, body.into_inner(), usuario_id).await?;
+    let result = contratos::update(
+        db.get_ref(),
+        access.0.organizacion_id,
+        id,
+        body.into_inner(),
+        usuario_id,
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
@@ -83,7 +97,14 @@ pub async fn renovar(
 ) -> Result<HttpResponse, AppError> {
     let usuario_id = access.0.sub;
     let id = path.into_inner();
-    let result = contratos::renovar(db.get_ref(), access.0.organizacion_id, id, body.into_inner(), usuario_id).await?;
+    let result = contratos::renovar(
+        db.get_ref(),
+        access.0.organizacion_id,
+        id,
+        body.into_inner(),
+        usuario_id,
+    )
+    .await?;
     Ok(HttpResponse::Created().json(result))
 }
 
@@ -95,7 +116,14 @@ pub async fn terminar(
 ) -> Result<HttpResponse, AppError> {
     let usuario_id = access.0.sub;
     let id = path.into_inner();
-    let result = contratos::terminar(db.get_ref(), access.0.organizacion_id, id, body.into_inner(), usuario_id).await?;
+    let result = contratos::terminar(
+        db.get_ref(),
+        access.0.organizacion_id,
+        id,
+        body.into_inner(),
+        usuario_id,
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
@@ -140,10 +168,7 @@ pub async fn preview_pagos(
         .all(db.get_ref())
         .await?;
 
-    let fechas_existentes: Vec<_> = existing_pagos
-        .iter()
-        .map(|p| p.fecha_vencimiento)
-        .collect();
+    let fechas_existentes: Vec<_> = existing_pagos.iter().map(|p| p.fecha_vencimiento).collect();
 
     // Filter to get only new pagos
     let new_pagos = filtrar_existentes(&all_pagos, &fechas_existentes);
@@ -219,10 +244,7 @@ pub async fn generar_pagos(
         .all(db.get_ref())
         .await?;
 
-    let fechas_existentes: Vec<_> = existing_pagos
-        .iter()
-        .map(|p| p.fecha_vencimiento)
-        .collect();
+    let fechas_existentes: Vec<_> = existing_pagos.iter().map(|p| p.fecha_vencimiento).collect();
 
     // Filter to get only new pagos
     let new_pagos = filtrar_existentes(&all_pagos, &fechas_existentes);
@@ -230,9 +252,13 @@ pub async fn generar_pagos(
     // Insert new pagos in a transaction
     let txn = db.begin().await?;
 
-    let pagos_generados =
-        contratos::insertar_pagos_generados(&txn, contrato_id, contrato_record.organizacion_id, &new_pagos)
-            .await?;
+    let pagos_generados = contratos::insertar_pagos_generados(
+        &txn,
+        contrato_id,
+        contrato_record.organizacion_id,
+        &new_pagos,
+    )
+    .await?;
 
     // Register audit entry
     auditoria::registrar_best_effort(
@@ -287,8 +313,13 @@ pub async fn cambiar_estado_deposito(
 ) -> Result<HttpResponse, AppError> {
     let usuario_id = access.0.sub;
     let id = path.into_inner();
-    let result =
-        contratos::cambiar_estado_deposito(db.get_ref(), access.0.organizacion_id, id, body.into_inner(), usuario_id)
-            .await?;
+    let result = contratos::cambiar_estado_deposito(
+        db.get_ref(),
+        access.0.organizacion_id,
+        id,
+        body.into_inner(),
+        usuario_id,
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(result))
 }

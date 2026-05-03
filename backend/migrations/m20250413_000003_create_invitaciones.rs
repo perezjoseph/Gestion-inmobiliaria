@@ -39,10 +39,7 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(Invitaciones::Rol)
                             .string_len(20)
                             .not_null()
-                            .check(Expr::col(Invitaciones::Rol).is_in([
-                                "gerente",
-                                "visualizador",
-                            ])),
+                            .check(Expr::col(Invitaciones::Rol).is_in(["gerente", "visualizador"])),
                     )
                     .col(
                         ColumnDef::new(Invitaciones::Token)

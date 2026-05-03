@@ -16,7 +16,14 @@ pub async fn list(
 ) -> Result<HttpResponse, AppError> {
     let q = query.into_inner();
     let term = q.busqueda.or(q.search).filter(|t| t.len() >= 2);
-    let result = inquilinos::list(db.get_ref(), claims.organizacion_id, term, q.page, q.per_page).await?;
+    let result = inquilinos::list(
+        db.get_ref(),
+        claims.organizacion_id,
+        term,
+        q.page,
+        q.per_page,
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(result))
 }
 

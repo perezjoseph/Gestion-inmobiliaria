@@ -95,7 +95,10 @@ mod tests {
         assert_eq!(req.precio, Decimal::new(2_500_000, 2));
         assert_eq!(req.moneda.as_deref(), Some("DOP"));
         assert_eq!(req.estado.as_deref(), Some("disponible"));
-        assert_eq!(req.descripcion.as_deref(), Some("Apartamento con vista al mar"));
+        assert_eq!(
+            req.descripcion.as_deref(),
+            Some("Apartamento con vista al mar")
+        );
     }
 
     #[test]

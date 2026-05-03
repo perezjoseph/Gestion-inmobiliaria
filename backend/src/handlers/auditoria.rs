@@ -11,6 +11,7 @@ pub async fn list(
     admin: AdminOnly,
     query: web::Query<AuditoriaQuery>,
 ) -> Result<HttpResponse, AppError> {
-    let result = auditoria::listar(db.get_ref(), admin.0.organizacion_id, query.into_inner()).await?;
+    let result =
+        auditoria::listar(db.get_ref(), admin.0.organizacion_id, query.into_inner()).await?;
     Ok(HttpResponse::Ok().json(result))
 }
