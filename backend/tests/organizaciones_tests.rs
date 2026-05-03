@@ -58,8 +58,7 @@ mod db_async {
             eprintln!("DATABASE_URL not set -- skipping DB integration test");
             return;
         }
-        static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
-        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::GLOBAL_DB_SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         let Some((rt, db)) = shared_rt_and_db() else {
             eprintln!("Database not reachable -- skipping DB integration test");
             return;

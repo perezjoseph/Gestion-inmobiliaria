@@ -93,8 +93,7 @@ mod pbt_async {
             eprintln!("⚠ DATABASE_URL not set – skipping PBT");
             return;
         }
-        static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
-        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::GLOBAL_DB_SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         let Some((rt, db)) = shared_rt_and_db() else {
             eprintln!("⚠ DB not reachable – skipping PBT");
             return;
