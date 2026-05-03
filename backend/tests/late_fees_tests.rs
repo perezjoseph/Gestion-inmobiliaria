@@ -214,6 +214,29 @@ fn make_app(
 
 // ── Tests ──────────────────────────────────────────────────────────────
 
+fn future_date_range() -> (String, String) {
+    let today = Utc::now().date_naive();
+    let fecha_inicio = today.format("%Y-%m-%d").to_string();
+    let fecha_fin = (today + chrono::Duration::days(365))
+        .format("%Y-%m-%d")
+        .to_string();
+    (fecha_inicio, fecha_fin)
+}
+
+fn future_fecha_vencimiento() -> String {
+    let today = Utc::now().date_naive();
+    (today + chrono::Duration::days(30))
+        .format("%Y-%m-%d")
+        .to_string()
+}
+
+fn future_fecha_pago() -> String {
+    let today = Utc::now().date_naive();
+    (today + chrono::Duration::days(45))
+        .format("%Y-%m-%d")
+        .to_string()
+}
+
 /// Test: Create contrato with recargo_porcentaje and dias_gracia → fields stored and returned
 /// Requirements: 1.1, 1.2, 1.7
 #[test]
@@ -227,14 +250,15 @@ fn test_create_contrato_with_recargo_fields() {
 
         let app = actix_web::test::init_service(make_app(db.clone())).await;
 
+        let (fecha_inicio, fecha_fin) = future_date_range();
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-12-31",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "25000.00",
                 "recargoPorcentaje": "5.50",
                 "diasGracia": 3
@@ -262,14 +286,15 @@ fn test_create_contrato_without_recargo_fields() {
 
         let app = actix_web::test::init_service(make_app(db.clone())).await;
 
+        let (fecha_inicio, fecha_fin) = future_date_range();
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-12-31",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "25000.00"
             }))
             .to_request();
@@ -295,6 +320,7 @@ fn test_update_contrato_recargo_fields() {
 
         let app = actix_web::test::init_service(make_app(db.clone())).await;
 
+        let (fecha_inicio, fecha_fin) = future_date_range();
         // Create contrato without recargo fields
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
@@ -302,8 +328,8 @@ fn test_update_contrato_recargo_fields() {
             .set_json(serde_json::json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-12-31",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "25000.00"
             }))
             .to_request();
@@ -343,14 +369,15 @@ fn test_create_contrato_recargo_porcentaje_negative_422() {
 
         let app = actix_web::test::init_service(make_app(db.clone())).await;
 
+        let (fecha_inicio, fecha_fin) = future_date_range();
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-12-31",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "25000.00",
                 "recargoPorcentaje": "-1.00"
             }))
@@ -373,14 +400,15 @@ fn test_create_contrato_recargo_porcentaje_over_100_422() {
 
         let app = actix_web::test::init_service(make_app(db.clone())).await;
 
+        let (fecha_inicio, fecha_fin) = future_date_range();
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-12-31",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "25000.00",
                 "recargoPorcentaje": "100.01"
             }))
@@ -403,14 +431,15 @@ fn test_create_contrato_dias_gracia_negative_422() {
 
         let app = actix_web::test::init_service(make_app(db.clone())).await;
 
+        let (fecha_inicio, fecha_fin) = future_date_range();
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-12-31",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "25000.00",
                 "diasGracia": -1
             }))
@@ -914,14 +943,15 @@ fn test_manual_update_estado_atrasado_calculates_recargo() {
         // Create contrato with 5% recargo via API
         let app = actix_web::test::init_service(make_app(db.clone())).await;
 
+        let (fecha_inicio, fecha_fin) = future_date_range();
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-12-31",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "20000.00",
                 "recargoPorcentaje": "5.00"
             }))
@@ -932,13 +962,14 @@ fn test_manual_update_estado_atrasado_calculates_recargo() {
         let contrato_id = contrato_body["id"].as_str().unwrap();
 
         // Create a pago via API
+        let fecha_vencimiento = future_fecha_vencimiento();
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/pagos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({
                 "contratoId": contrato_id,
                 "monto": "20000.00",
-                "fechaVencimiento": "2025-06-01"
+                "fechaVencimiento": fecha_vencimiento
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -977,14 +1008,15 @@ fn test_update_estado_atrasado_to_pagado_clears_recargo() {
         let app = actix_web::test::init_service(make_app(db.clone())).await;
 
         // Create contrato with recargo
+        let (fecha_inicio, fecha_fin) = future_date_range();
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-12-31",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "15000.00",
                 "recargoPorcentaje": "10.00"
             }))
@@ -995,13 +1027,14 @@ fn test_update_estado_atrasado_to_pagado_clears_recargo() {
         let contrato_id = contrato_body["id"].as_str().unwrap();
 
         // Create pago
+        let fecha_vencimiento = future_fecha_vencimiento();
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/pagos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({
                 "contratoId": contrato_id,
                 "monto": "15000.00",
-                "fechaVencimiento": "2025-06-01"
+                "fechaVencimiento": fecha_vencimiento
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -1021,12 +1054,13 @@ fn test_update_estado_atrasado_to_pagado_clears_recargo() {
         assert_eq!(body["recargo"], "1500.00"); // 15000 * 10%
 
         // Now mark as pagado → recargo should be cleared
+        let fecha_pago = future_fecha_pago();
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/pagos/{pago_id}"))
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({
                 "estado": "pagado",
-                "fechaPago": "2025-06-15",
+                "fechaPago": fecha_pago,
                 "metodoPago": "transferencia"
             }))
             .to_request();
@@ -1052,14 +1086,15 @@ fn test_pago_response_includes_recargo_field() {
         let app = actix_web::test::init_service(make_app(db.clone())).await;
 
         // Create contrato
+        let (fecha_inicio, fecha_fin) = future_date_range();
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-12-31",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "30000.00"
             }))
             .to_request();
@@ -1069,13 +1104,14 @@ fn test_pago_response_includes_recargo_field() {
         let contrato_id = contrato_body["id"].as_str().unwrap();
 
         // Create pago
+        let fecha_vencimiento = future_fecha_vencimiento();
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/pagos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(serde_json::json!({
                 "contratoId": contrato_id,
                 "monto": "30000.00",
-                "fechaVencimiento": "2025-06-01"
+                "fechaVencimiento": fecha_vencimiento
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;

@@ -281,11 +281,16 @@ mod pbt_async {
     }
 
     fn contrato_body(propiedad_id: Uuid, inquilino_id: Uuid, deposito: Option<&str>) -> Value {
+        let today = Utc::now().date_naive();
+        let fecha_inicio = today.format("%Y-%m-%d").to_string();
+        let fecha_fin = (today + chrono::Duration::days(365))
+            .format("%Y-%m-%d")
+            .to_string();
         let mut body = json!({
             "propiedadId": propiedad_id,
             "inquilinoId": inquilino_id,
-            "fechaInicio": "2025-01-01",
-            "fechaFin": "2025-12-31",
+            "fechaInicio": fecha_inicio,
+            "fechaFin": fecha_fin,
             "montoMensual": "15000",
             "moneda": "DOP"
         });

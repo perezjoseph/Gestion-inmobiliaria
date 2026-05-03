@@ -481,8 +481,8 @@ mod pbt_async {
             let create_req = realestate_backend::models::contrato::CreateContratoRequest {
                 propiedad_id,
                 inquilino_id,
-                fecha_inicio: chrono::NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
-                fecha_fin: chrono::NaiveDate::from_ymd_opt(2025, 12, 31).unwrap(),
+                fecha_inicio: Utc::now().date_naive(),
+                fecha_fin: Utc::now().date_naive() + chrono::Duration::days(365),
                 monto_mensual: Decimal::new(25000, 0),
                 deposito: None,
                 moneda: None,
@@ -520,8 +520,8 @@ mod pbt_async {
             let create_req = realestate_backend::models::contrato::CreateContratoRequest {
                 propiedad_id,
                 inquilino_id,
-                fecha_inicio: chrono::NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
-                fecha_fin: chrono::NaiveDate::from_ymd_opt(2025, 12, 31).unwrap(),
+                fecha_inicio: Utc::now().date_naive(),
+                fecha_fin: Utc::now().date_naive() + chrono::Duration::days(365),
                 monto_mensual: Decimal::new(25000, 0),
                 deposito: None,
                 moneda: None,

@@ -355,6 +355,25 @@ mod pago_generacion_rbac_tests {
 
 // ── DB integration tests ────────────────────────────────────────────
 
+fn future_contrato_dates(months: i32) -> (String, String) {
+    let today = Utc::now().date_naive();
+    let start = chrono::NaiveDate::from_ymd_opt(today.year(), today.month(), 1).unwrap_or(today);
+    let end =
+        start + chrono::Months::new(u32::try_from(months).unwrap_or(1)) - chrono::Duration::days(1);
+    (
+        start.format("%Y-%m-%d").to_string(),
+        end.format("%Y-%m-%d").to_string(),
+    )
+}
+
+fn future_termination_date(months_from_start: i32) -> String {
+    let today = Utc::now().date_naive();
+    let start = chrono::NaiveDate::from_ymd_opt(today.year(), today.month(), 1).unwrap_or(today);
+    let end = start + chrono::Months::new(u32::try_from(months_from_start).unwrap_or(1))
+        - chrono::Duration::days(1);
+    end.format("%Y-%m-%d").to_string()
+}
+
 #[test]
 fn test_create_active_contrato_generates_pagos() {
     with_db(|db| async move {
@@ -375,14 +394,15 @@ fn test_create_active_contrato_generates_pagos() {
         .await;
 
         // Create active contrato spanning 3 months
+        let (fecha_inicio, fecha_fin) = future_contrato_dates(3);
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-03-31",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "15000.00",
                 "moneda": "DOP"
             }))
@@ -435,14 +455,15 @@ fn test_create_non_active_contrato_no_pagos() {
         .await;
 
         // Create contrato, then terminate it so propiedad is freed
+        let (fecha_inicio, fecha_fin) = future_contrato_dates(3);
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-03-31",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "15000.00",
                 "moneda": "DOP"
             }))
@@ -480,14 +501,15 @@ fn test_renovar_contrato_generates_pagos_for_new_period() {
         .await;
 
         // Create original contrato (3 months)
+        let (fecha_inicio, fecha_fin) = future_contrato_dates(3);
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-03-31",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "15000.00",
                 "moneda": "DOP"
             }))
@@ -497,12 +519,13 @@ fn test_renovar_contrato_generates_pagos_for_new_period() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let original_id: Uuid = body["id"].as_str().unwrap().parse().unwrap();
 
-        // Renovar with new monto for 2 months (April 1 - May 31)
+        // Renovar with new monto for 2 months
+        let (_, renewal_fecha_fin) = future_contrato_dates(5);
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/contratos/{original_id}/renovar"))
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
-                "fechaFin": "2025-05-31",
+                "fechaFin": renewal_fecha_fin,
                 "montoMensual": "18000.00"
             }))
             .to_request();
@@ -511,8 +534,12 @@ fn test_renovar_contrato_generates_pagos_for_new_period() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let new_id: Uuid = body["id"].as_str().unwrap().parse().unwrap();
 
-        // New contrato starts day after original ends: 2025-04-01
-        assert_eq!(body["fechaInicio"], "2025-04-01");
+        // New contrato starts day after original ends
+        let original_end = chrono::NaiveDate::parse_from_str(&fecha_fin, "%Y-%m-%d").unwrap();
+        let expected_start = (original_end + chrono::Duration::days(1))
+            .format("%Y-%m-%d")
+            .to_string();
+        assert_eq!(body["fechaInicio"], expected_start);
         assert_eq!(body["pagosGenerados"], 2);
 
         // Verify new pagos have the new monto
@@ -553,14 +580,15 @@ fn test_terminar_contrato_cancels_future_pending_pagos() {
         .await;
 
         // Create contrato spanning 6 months
+        let (fecha_inicio, fecha_fin) = future_contrato_dates(6);
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-06-30",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "15000.00",
                 "moneda": "DOP"
             }))
@@ -573,35 +601,30 @@ fn test_terminar_contrato_cancels_future_pending_pagos() {
 
         // Manually mark one pago as "pagado" and one as "atrasado"
         use realestate_backend::entities::pago;
+        use sea_orm::QueryOrder;
         let pagos = pago::Entity::find()
             .filter(pago::Column::ContratoId.eq(contrato_id))
+            .order_by_asc(pago::Column::FechaVencimiento)
             .all(&db)
             .await
             .unwrap();
 
-        // Mark January pago as pagado
-        let jan_pago = pagos
-            .iter()
-            .find(|p| p.fecha_vencimiento.month() == 1)
-            .unwrap();
-        let mut active: pago::ActiveModel = jan_pago.clone().into();
+        // Mark first month pago as pagado
+        let mut active: pago::ActiveModel = pagos[0].clone().into();
         active.estado = Set("pagado".to_string());
         active.update(&db).await.unwrap();
 
-        // Mark February pago as atrasado
-        let feb_pago = pagos
-            .iter()
-            .find(|p| p.fecha_vencimiento.month() == 2)
-            .unwrap();
-        let mut active: pago::ActiveModel = feb_pago.clone().into();
+        // Mark second month pago as atrasado
+        let mut active: pago::ActiveModel = pagos[1].clone().into();
         active.estado = Set("atrasado".to_string());
         active.update(&db).await.unwrap();
 
-        // Terminate contrato at end of March
+        // Terminate contrato at end of 3rd month
+        let fecha_terminacion = future_termination_date(3);
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/contratos/{contrato_id}/terminar"))
             .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(json!({ "fechaTerminacion": "2025-03-31" }))
+            .set_json(json!({ "fechaTerminacion": fecha_terminacion }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
@@ -609,18 +632,21 @@ fn test_terminar_contrato_cancels_future_pending_pagos() {
         // Verify pago states after termination
         let pagos_after = pago::Entity::find()
             .filter(pago::Column::ContratoId.eq(contrato_id))
+            .order_by_asc(pago::Column::FechaVencimiento)
             .all(&db)
             .await
             .unwrap();
 
-        for p in &pagos_after {
-            let month = p.fecha_vencimiento.month();
-            match month {
-                1 => assert_eq!(p.estado, "pagado", "Jan should remain pagado"),
-                2 => assert_eq!(p.estado, "atrasado", "Feb should remain atrasado"),
-                3 => assert_eq!(p.estado, "pendiente", "Mar (<=terminacion) stays pendiente"),
-                4..=6 => assert_eq!(p.estado, "cancelado", "Month {month} should be cancelado"),
-                _ => panic!("Unexpected month {month}"),
+        for (i, p) in pagos_after.iter().enumerate() {
+            match i {
+                0 => assert_eq!(p.estado, "pagado", "1st month should remain pagado"),
+                1 => assert_eq!(p.estado, "atrasado", "2nd month should remain atrasado"),
+                2 => assert_eq!(
+                    p.estado, "pendiente",
+                    "3rd month (<=terminacion) stays pendiente"
+                ),
+                3..=5 => assert_eq!(p.estado, "cancelado", "Month {} should be cancelado", i + 1),
+                _ => panic!("Unexpected pago index {i}"),
             }
         }
 
@@ -648,14 +674,15 @@ fn test_preview_pagos_returns_correct_response() {
         .await;
 
         // Create contrato (4 months)
+        let (fecha_inicio, fecha_fin) = future_contrato_dates(4);
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-04-30",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "20000.00",
                 "moneda": "DOP"
             }))
@@ -732,14 +759,15 @@ fn test_preview_pagos_does_not_create_records() {
         .await;
 
         // Create contrato
+        let (fecha_inicio, fecha_fin) = future_contrato_dates(3);
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-03-31",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "10000.00",
                 "moneda": "DOP"
             }))
@@ -799,14 +827,15 @@ fn test_generar_pagos_active_contrato() {
         .await;
 
         // Create contrato (auto-generates pagos with dia_vencimiento=1)
+        let (fecha_inicio, fecha_fin) = future_contrato_dates(3);
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-03-31",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "12000.00",
                 "moneda": "DOP"
             }))
@@ -868,14 +897,15 @@ fn test_generar_pagos_non_active_contrato_returns_422() {
         .await;
 
         // Create and terminate contrato
+        let (fecha_inicio, fecha_fin) = future_contrato_dates(6);
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-06-30",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "15000.00",
                 "moneda": "DOP"
             }))
@@ -885,11 +915,15 @@ fn test_generar_pagos_non_active_contrato_returns_422() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let contrato_id: Uuid = body["id"].as_str().unwrap().parse().unwrap();
 
-        // Terminate it
+        // Terminate it (mid first month)
+        let start_date = chrono::NaiveDate::parse_from_str(&fecha_inicio, "%Y-%m-%d").unwrap();
+        let fecha_terminacion = (start_date + chrono::Duration::days(14))
+            .format("%Y-%m-%d")
+            .to_string();
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/contratos/{contrato_id}/terminar"))
             .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(json!({ "fechaTerminacion": "2025-01-15" }))
+            .set_json(json!({ "fechaTerminacion": fecha_terminacion }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
@@ -955,14 +989,15 @@ fn test_generar_pagos_invalid_dia_vencimiento_returns_422() {
         .await;
 
         // Create contrato
+        let (fecha_inicio, fecha_fin) = future_contrato_dates(3);
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-03-31",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "15000.00",
                 "moneda": "DOP"
             }))
@@ -1014,14 +1049,15 @@ fn test_generar_pagos_deduplication() {
         .await;
 
         // Create contrato (3 months, auto-generates 3 pagos)
+        let (fecha_inicio, fecha_fin) = future_contrato_dates(3);
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-03-31",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "15000.00",
                 "moneda": "DOP"
             }))
@@ -1032,23 +1068,21 @@ fn test_generar_pagos_deduplication() {
         let contrato_id: Uuid = body["id"].as_str().unwrap().parse().unwrap();
         assert_eq!(body["pagosGenerados"], 3);
 
-        // Delete only the February pago to simulate a gap
+        // Delete the second pago to simulate a gap
         use realestate_backend::entities::pago;
+        use sea_orm::QueryOrder;
         let pagos = pago::Entity::find()
             .filter(pago::Column::ContratoId.eq(contrato_id))
+            .order_by_asc(pago::Column::FechaVencimiento)
             .all(&db)
             .await
             .unwrap();
-        let feb_pago = pagos
-            .iter()
-            .find(|p| p.fecha_vencimiento.month() == 2)
-            .unwrap();
-        pago::Entity::delete_by_id(feb_pago.id)
+        pago::Entity::delete_by_id(pagos[1].id)
             .exec(&db)
             .await
             .unwrap();
 
-        // POST generar — should only generate the missing February pago
+        // POST generar — should only generate the missing pago
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/contratos/{contrato_id}/pagos/generar"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -1091,14 +1125,15 @@ fn test_auditoria_entries_for_pago_generation_and_cancellation() {
         .await;
 
         // 1. Create contrato → auto-generates pagos → audit "generar_pagos_auto"
+        let (fecha_inicio, fecha_fin) = future_contrato_dates(6);
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
                 "inquilinoId": inquilino_id,
-                "fechaInicio": "2025-01-01",
-                "fechaFin": "2025-06-30",
+                "fechaInicio": fecha_inicio,
+                "fechaFin": fecha_fin,
                 "montoMensual": "15000.00",
                 "moneda": "DOP"
             }))
@@ -1163,10 +1198,11 @@ fn test_auditoria_entries_for_pago_generation_and_cancellation() {
         );
 
         // 3. Terminate contrato → audit "cancelar_pagos_futuros"
+        let fecha_terminacion = future_termination_date(3);
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/contratos/{contrato_id}/terminar"))
             .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(json!({ "fechaTerminacion": "2025-03-31" }))
+            .set_json(json!({ "fechaTerminacion": fecha_terminacion }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
