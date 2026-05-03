@@ -42,6 +42,7 @@ mod mantenimiento_tests;
 mod notificaciones_pbt;
 mod notificaciones_tests;
 mod ocr_pbt;
+mod organizaciones_tests;
 mod ocr_tests;
 mod pago_generacion_pbt;
 mod pago_generacion_tests;
