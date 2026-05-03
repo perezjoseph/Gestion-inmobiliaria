@@ -85,10 +85,12 @@ fn parse_decimal_from_json(valor: &serde_json::Value) -> Result<Option<Decimal>,
         return Ok(Some(d));
     }
 
-    if let Some(n) = valor.as_f64() {
-        let d = Decimal::try_from(n)
+    if valor.is_number() {
+        let d: Decimal = valor
+            .to_string()
+            .parse()
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Error parseando recargo: {e}")))?;
-        return Ok(Some(d.round_dp(2)));
+        return Ok(Some(d));
     }
 
     Err(AppError::Internal(anyhow::anyhow!(

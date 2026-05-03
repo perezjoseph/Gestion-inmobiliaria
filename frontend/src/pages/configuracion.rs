@@ -56,14 +56,10 @@ fn RecargoSection(props: &RecargoSectionProps) -> Html {
                 return;
             };
             if !(0.0..=100.0).contains(&parsed) {
-                error.set(Some(
-                    "El porcentaje debe estar entre 0 y 100".into(),
-                ));
+                error.set(Some("El porcentaje debe estar entre 0 y 100".into()));
                 return;
             }
-            let body = UpdateRecargoDefectoRequest {
-                porcentaje: parsed,
-            };
+            let body = UpdateRecargoDefectoRequest { porcentaje: parsed };
             let error = error.clone();
             let current_porcentaje = current_porcentaje.clone();
             let saving = saving.clone();
@@ -104,7 +100,8 @@ fn RecargoSection(props: &RecargoSectionProps) -> Html {
         };
     }
 
-    let display_value = current_porcentaje.map_or_else(|| "No configurado".to_string(), |p| format!("{p:.2}%"));
+    let display_value =
+        current_porcentaje.map_or_else(|| "No configurado".to_string(), |p| format!("{p:.2}%"));
 
     html! {
         <div class="gi-card" style="padding: var(--space-5);">

@@ -254,15 +254,14 @@ pub async fn delete<C: ConnectionTrait>(
 pub async fn mark_overdue(db: &DatabaseConnection) -> Result<u64, AppError> {
     let today = Utc::now().date_naive();
 
-    // Fetch pending pagos with their contratos to check dias_gracia
     let pending_pagos: Vec<(pago::Model, Option<contrato::Model>)> = pago::Entity::find()
         .filter(pago::Column::Estado.eq("pendiente"))
         .find_also_related(contrato::Entity)
         .all(db)
         .await?;
 
-    let mut affected_count: u64 = 0;
-    let mut recargos_calculated: u64 = 0;
+    let mut overdue_ids: Vec<Uuid> = Vec::new();
+    let mut recargo_candidates: Vec<(Uuid, contrato::Model)> = Vec::new();
 
     for (pago_record, contrato_opt) in &pending_pagos {
         let dias_gracia = contrato_opt
@@ -277,25 +276,39 @@ pub async fn mark_overdue(db: &DatabaseConnection) -> Result<u64, AppError> {
             continue;
         }
 
-        // Mark as atrasado
-        let mut active: pago::ActiveModel = pago_record.clone().into();
-        active.estado = Set("atrasado".to_string());
-        active.updated_at = Set(Utc::now().into());
-        active.update(db).await?;
+        overdue_ids.push(pago_record.id);
 
-        affected_count += 1;
-
-        // Calculate and store recargo if contrato is available
         if let Some(contrato_model) = contrato_opt {
-            if let Some(_recargo) =
-                recargos::aplicar_recargo(db, pago_record.id, contrato_model).await?
-            {
-                recargos_calculated += 1;
-            }
+            recargo_candidates.push((pago_record.id, contrato_model.clone()));
         }
     }
 
-    // Register audit entry with counts
+    if overdue_ids.is_empty() {
+        return Ok(0);
+    }
+
+    let result = pago::Entity::update_many()
+        .col_expr(
+            pago::Column::Estado,
+            sea_orm::sea_query::Expr::value("atrasado"),
+        )
+        .col_expr(
+            pago::Column::UpdatedAt,
+            sea_orm::sea_query::Expr::value(Utc::now().fixed_offset()),
+        )
+        .filter(pago::Column::Id.is_in(overdue_ids))
+        .exec(db)
+        .await?;
+
+    let affected_count = result.rows_affected;
+
+    let mut recargos_calculated: u64 = 0;
+    for (pago_id, contrato_model) in &recargo_candidates {
+        if (recargos::aplicar_recargo(db, *pago_id, contrato_model).await?).is_some() {
+            recargos_calculated += 1;
+        }
+    }
+
     if affected_count > 0 {
         auditoria::registrar_best_effort(
             db,

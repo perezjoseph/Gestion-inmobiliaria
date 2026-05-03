@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use chrono::Utc;
 use sea_orm::{
@@ -192,20 +192,7 @@ pub async fn marcar_todas_leidas(
     Ok(result.rows_affected)
 }
 
-pub async fn usuarios_activos_organizacion(
-    db: &DatabaseConnection,
-    organizacion_id: Uuid,
-) -> Result<Vec<Uuid>, AppError> {
-    let usuarios = usuario::Entity::find()
-        .filter(usuario::Column::OrganizacionId.eq(organizacion_id))
-        .filter(usuario::Column::Activo.eq(true))
-        .all(db)
-        .await?;
-
-    Ok(usuarios.into_iter().map(|u| u.id).collect())
-}
-
-async fn usuarios_activos_organizacion_generic<C: sea_orm::ConnectionTrait>(
+pub(crate) async fn usuarios_activos_organizacion<C: sea_orm::ConnectionTrait>(
     db: &C,
     organizacion_id: Uuid,
 ) -> Result<Vec<Uuid>, AppError> {
@@ -218,25 +205,32 @@ async fn usuarios_activos_organizacion_generic<C: sea_orm::ConnectionTrait>(
     Ok(usuarios.into_iter().map(|u| u.id).collect())
 }
 
-pub async fn existe_notificacion(
+async fn batch_existing_notifications(
     db: &DatabaseConnection,
     tipo: &str,
     entity_type: &str,
-    entity_id: Uuid,
-    usuario_id: Uuid,
-) -> Result<bool, AppError> {
-    let count = notificacion::Entity::find()
+    entity_ids: &[Uuid],
+) -> Result<HashSet<(Uuid, Uuid)>, AppError> {
+    if entity_ids.is_empty() {
+        return Ok(HashSet::new());
+    }
+
+    let records = notificacion::Entity::find()
         .filter(notificacion::Column::Tipo.eq(tipo))
         .filter(notificacion::Column::EntityType.eq(entity_type))
-        .filter(notificacion::Column::EntityId.eq(entity_id))
-        .filter(notificacion::Column::UsuarioId.eq(usuario_id))
-        .count(db)
+        .filter(notificacion::Column::EntityId.is_in(entity_ids.to_vec()))
+        .all(db)
         .await?;
 
-    Ok(count > 0)
+    let set: HashSet<(Uuid, Uuid)> = records
+        .into_iter()
+        .map(|n| (n.entity_id, n.usuario_id))
+        .collect();
+
+    Ok(set)
 }
 
-pub async fn generar_pagos_vencidos(
+pub(crate) async fn generar_pagos_vencidos(
     db: &DatabaseConnection,
     organizacion_id: Uuid,
 ) -> Result<u64, AppError> {
@@ -276,6 +270,9 @@ pub async fn generar_pagos_vencidos(
         return Ok(0);
     }
 
+    let pago_ids: Vec<Uuid> = pagos.iter().map(|p| p.id).collect();
+    let existing = batch_existing_notifications(db, "pago_vencido", "pago", &pago_ids).await?;
+
     let now = Utc::now().into();
     let mut count: u64 = 0;
 
@@ -288,7 +285,7 @@ pub async fn generar_pagos_vencidos(
         let dias_vencido = (today - pago_model.fecha_vencimiento).num_days();
 
         for &uid in &usuario_ids {
-            if existe_notificacion(db, "pago_vencido", "pago", pago_model.id, uid).await? {
+            if existing.contains(&(pago_model.id, uid)) {
                 continue;
             }
 
@@ -315,7 +312,7 @@ pub async fn generar_pagos_vencidos(
     Ok(count)
 }
 
-pub async fn generar_contratos_por_vencer(
+pub(crate) async fn generar_contratos_por_vencer(
     db: &DatabaseConnection,
     organizacion_id: Uuid,
 ) -> Result<u64, AppError> {
@@ -348,6 +345,10 @@ pub async fn generar_contratos_por_vencer(
         return Ok(0);
     }
 
+    let contrato_ids: Vec<Uuid> = contratos.iter().map(|c| c.id).collect();
+    let existing =
+        batch_existing_notifications(db, "contrato_por_vencer", "contrato", &contrato_ids).await?;
+
     let now = Utc::now().into();
     let mut count: u64 = 0;
 
@@ -359,15 +360,7 @@ pub async fn generar_contratos_por_vencer(
         let dias_restantes = (contrato_model.fecha_fin - today).num_days();
 
         for &uid in &usuario_ids {
-            if existe_notificacion(
-                db,
-                "contrato_por_vencer",
-                "contrato",
-                contrato_model.id,
-                uid,
-            )
-            .await?
-            {
+            if existing.contains(&(contrato_model.id, uid)) {
                 continue;
             }
 
@@ -395,7 +388,7 @@ pub async fn generar_contratos_por_vencer(
     Ok(count)
 }
 
-pub async fn generar_documentos_vencidos(
+pub(crate) async fn generar_documentos_vencidos(
     db: &DatabaseConnection,
     organizacion_id: Uuid,
 ) -> Result<u64, AppError> {
@@ -471,6 +464,10 @@ pub async fn generar_documentos_vencidos(
         return Ok(0);
     }
 
+    let doc_ids: Vec<Uuid> = org_docs.iter().map(|d| d.id).collect();
+    let existing =
+        batch_existing_notifications(db, "documento_vencido", "documento", &doc_ids).await?;
+
     let now = Utc::now().into();
     let mut count: u64 = 0;
 
@@ -480,7 +477,7 @@ pub async fn generar_documentos_vencidos(
         };
 
         for &uid in &usuario_ids {
-            if existe_notificacion(db, "documento_vencido", "documento", doc.id, uid).await? {
+            if existing.contains(&(doc.id, uid)) {
                 continue;
             }
 
@@ -531,7 +528,7 @@ pub async fn crear_notificacion_mantenimiento<C: sea_orm::ConnectionTrait>(
     estado_nuevo: &str,
     organizacion_id: Uuid,
 ) -> Result<u64, AppError> {
-    let usuario_ids = usuarios_activos_organizacion_generic(db, organizacion_id).await?;
+    let usuario_ids = usuarios_activos_organizacion(db, organizacion_id).await?;
     if usuario_ids.is_empty() {
         return Ok(0);
     }

@@ -12,8 +12,8 @@ use crate::components::common::pagination::Pagination;
 use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{api_delete, api_get, api_post, api_put};
-use crate::types::unidad::{CreateUnidad, Unidad, UpdateUnidad};
 use crate::types::PaginatedResponse;
+use crate::types::unidad::{CreateUnidad, Unidad, UpdateUnidad};
 use crate::utils::{can_delete, can_write, field_error, input_class};
 
 fn push_toast(toasts: Option<&ToastContext>, msg: &str, kind: ToastKind) {
@@ -49,7 +49,6 @@ impl FormErrors {
         self.numero_unidad.is_some()
     }
 }
-
 
 // ---------------------------------------------------------------------------
 // Filter bar sub-component
@@ -199,7 +198,6 @@ fn UnidadForm(props: &UnidadFormProps) -> Html {
     }
 }
 
-
 // ---------------------------------------------------------------------------
 // List sub-component
 // ---------------------------------------------------------------------------
@@ -306,7 +304,6 @@ fn UnidadList(props: &UnidadListProps) -> Html {
     }
 }
 
-
 // ---------------------------------------------------------------------------
 // Helper functions
 // ---------------------------------------------------------------------------
@@ -348,10 +345,7 @@ fn build_unidades_url(propiedad_id: &str, pg: u64, pp: u64, f_estado: &str) -> S
     if !f_estado.is_empty() {
         params.push(format!("estado={f_estado}"));
     }
-    format!(
-        "/propiedades/{propiedad_id}/unidades?{}",
-        params.join("&")
-    )
+    format!("/propiedades/{propiedad_id}/unidades?{}", params.join("&"))
 }
 
 fn load_unidades_data(
@@ -388,21 +382,16 @@ fn do_save_unidad(
 ) {
     spawn_local(async move {
         let res = match editing_id {
-            Some(id) => {
-                api_put::<Unidad, _>(
-                    &format!("/propiedades/{propiedad_id}/unidades/{id}"),
-                    &update,
-                )
-                .await
-                .map(|_| ())
-            }
+            Some(id) => api_put::<Unidad, _>(
+                &format!("/propiedades/{propiedad_id}/unidades/{id}"),
+                &update,
+            )
+            .await
+            .map(|_| ()),
             None => {
-                api_post::<Unidad, _>(
-                    &format!("/propiedades/{propiedad_id}/unidades"),
-                    &create,
-                )
-                .await
-                .map(|_| ())
+                api_post::<Unidad, _>(&format!("/propiedades/{propiedad_id}/unidades"), &create)
+                    .await
+                    .map(|_| ())
             }
         };
         match res {
@@ -446,9 +435,7 @@ fn do_delete_unidad(
     });
 }
 
-fn register_escape_listener(
-    escape_handler: crate::utils::EscapeHandler,
-) -> Option<EventListener> {
+fn register_escape_listener(escape_handler: crate::utils::EscapeHandler) -> Option<EventListener> {
     web_sys::window().and_then(|w| w.document()).map(|doc| {
         EventListener::new(&doc, "keydown", move |event| {
             if let Some(event) = event.dyn_ref::<web_sys::KeyboardEvent>() {
@@ -477,11 +464,8 @@ fn make_unidad_edit_cb(
     show_form: &UseStateHandle<bool>,
     form_errors: &UseStateHandle<FormErrors>,
 ) -> Callback<Unidad> {
-    let (numero_unidad, piso, habitaciones) = (
-        numero_unidad.clone(),
-        piso.clone(),
-        habitaciones.clone(),
-    );
+    let (numero_unidad, piso, habitaciones) =
+        (numero_unidad.clone(), piso.clone(), habitaciones.clone());
     let (banos, area_m2, descripcion) = (banos.clone(), area_m2.clone(), descripcion.clone());
     let (precio, moneda, estado_form) = (precio.clone(), moneda.clone(), estado_form.clone());
     let (editing, show_form, form_errors) =
@@ -501,7 +485,6 @@ fn make_unidad_edit_cb(
         form_errors.set(FormErrors::default());
     })
 }
-
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -827,7 +810,6 @@ pub fn UnidadesTab(props: &UnidadesTabProps) -> Html {
         on_per_page_change,
     )
 }
-
 
 // ---------------------------------------------------------------------------
 // Render view (split from main component to keep html! blocks small)

@@ -7,8 +7,8 @@ use crate::components::common::pagination::Pagination;
 use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{api_get, api_put};
-use crate::types::notificacion::{MarcarTodasResponse, Notificacion};
 use crate::types::PaginatedResponse;
+use crate::types::notificacion::{MarcarTodasResponse, Notificacion};
 use crate::utils::format_date_display;
 
 fn push_toast(toasts: Option<&ToastContext>, msg: &str, kind: ToastKind) {
@@ -97,10 +97,7 @@ fn NotificacionFilterBar(props: &NotificacionFilterBarProps) -> Html {
     }
 }
 
-fn render_notificacion_row(
-    n: &Notificacion,
-    on_mark_read: &Callback<String>,
-) -> Html {
+fn render_notificacion_row(n: &Notificacion, on_mark_read: &Callback<String>) -> Html {
     let (badge_cls, badge_label) = tipo_badge(&n.tipo);
     let color = tipo_color(&n.tipo);
     let icon = tipo_icon(&n.tipo);
@@ -302,7 +299,11 @@ pub fn Notificaciones() -> Html {
                 match api_put::<Notificacion, _>(&url, &()).await {
                     Ok(_) => {
                         reload.set(*reload + 1);
-                        push_toast(toasts.as_ref(), "Notificación marcada como leída", ToastKind::Success);
+                        push_toast(
+                            toasts.as_ref(),
+                            "Notificación marcada como leída",
+                            ToastKind::Success,
+                        );
                     }
                     Err(err) => error.set(Some(err)),
                 }
@@ -323,7 +324,8 @@ pub fn Notificaciones() -> Html {
                 match api_put::<MarcarTodasResponse, _>("/notificaciones/leer-todas", &()).await {
                     Ok(resp) => {
                         reload.set(*reload + 1);
-                        let msg = format!("{} notificaciones marcadas como leídas", resp.actualizadas);
+                        let msg =
+                            format!("{} notificaciones marcadas como leídas", resp.actualizadas);
                         push_toast(toasts.as_ref(), &msg, ToastKind::Success);
                     }
                     Err(err) => error.set(Some(err)),

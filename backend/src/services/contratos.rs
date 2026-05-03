@@ -14,10 +14,62 @@ use crate::models::contrato::{
     TerminarContratoRequest, UpdateContratoRequest,
 };
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
-use crate::services::pago_generacion::{PagoGenerado, calcular_pagos};
+use crate::services::pago_generacion::{PagoGenerado, calcular_pagos, validar_dia_vencimiento};
 use crate::services::validation::{MONEDAS, validate_enum};
 
 const ESTADOS_CONTRATO: &[&str] = &["activo", "vencido", "cancelado"];
+
+fn validar_recargo_y_gracia(
+    recargo_porcentaje: Option<Decimal>,
+    dias_gracia: Option<i32>,
+) -> Result<(), AppError> {
+    if let Some(p) = recargo_porcentaje {
+        if p < Decimal::ZERO || p > Decimal::from(100) {
+            return Err(AppError::Validation(
+                "El porcentaje de recargo debe estar entre 0 y 100".to_string(),
+            ));
+        }
+    }
+    if let Some(d) = dias_gracia {
+        if d < 0 {
+            return Err(AppError::Validation(
+                "Los días de gracia deben ser mayor o igual a 0".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validar_retencion(
+    monto_retenido: Option<Decimal>,
+    motivo_retencion: Option<&str>,
+    deposito: Decimal,
+) -> Result<(), AppError> {
+    let monto = monto_retenido.ok_or_else(|| {
+        AppError::Validation("El monto retenido es requerido para retención".to_string())
+    })?;
+
+    if monto <= Decimal::ZERO {
+        return Err(AppError::Validation(
+            "El monto retenido debe ser mayor a cero".to_string(),
+        ));
+    }
+
+    if monto > deposito {
+        return Err(AppError::Validation(
+            "El monto retenido no puede exceder el depósito".to_string(),
+        ));
+    }
+
+    let motivo = motivo_retencion.unwrap_or("");
+    if motivo.trim().is_empty() {
+        return Err(AppError::Validation(
+            "El motivo de retención es requerido".to_string(),
+        ));
+    }
+
+    Ok(())
+}
 
 pub const ESTADOS_DEPOSITO: &[&str] = &["pendiente", "cobrado", "devuelto", "retenido"];
 
@@ -118,10 +170,14 @@ pub(crate) async fn insertar_pagos_generados<C: ConnectionTrait>(
     organizacion_id: Uuid,
     pagos: &[PagoGenerado],
 ) -> Result<usize, AppError> {
-    let mut count = 0;
-    for p in pagos {
-        let now = Utc::now().into();
-        let model = pago::ActiveModel {
+    if pagos.is_empty() {
+        return Ok(0);
+    }
+
+    let now = Utc::now().into();
+    let models: Vec<pago::ActiveModel> = pagos
+        .iter()
+        .map(|p| pago::ActiveModel {
             id: Set(Uuid::new_v4()),
             contrato_id: Set(contrato_id),
             monto: Set(p.monto),
@@ -135,10 +191,53 @@ pub(crate) async fn insertar_pagos_generados<C: ConnectionTrait>(
             organizacion_id: Set(organizacion_id),
             created_at: Set(now),
             updated_at: Set(now),
-        };
-        model.insert(db).await?;
-        count += 1;
-    }
+        })
+        .collect();
+
+    let count = models.len();
+    pago::Entity::insert_many(models).exec(db).await?;
+    Ok(count)
+}
+
+struct PagoGeneracionParams<'a> {
+    contrato_id: Uuid,
+    organizacion_id: Uuid,
+    fecha_inicio: NaiveDate,
+    fecha_fin: NaiveDate,
+    monto_mensual: Decimal,
+    moneda: &'a str,
+    dia_vencimiento: u32,
+    usuario_id: Uuid,
+}
+
+async fn generar_pagos_para_contrato<C: ConnectionTrait>(
+    db: &C,
+    params: &PagoGeneracionParams<'_>,
+) -> Result<usize, AppError> {
+    let pagos = calcular_pagos(
+        params.fecha_inicio,
+        params.fecha_fin,
+        params.monto_mensual,
+        params.moneda,
+        params.dia_vencimiento,
+    );
+    let count =
+        insertar_pagos_generados(db, params.contrato_id, params.organizacion_id, &pagos).await?;
+
+    auditoria::registrar_best_effort(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id: params.usuario_id,
+            entity_type: "contrato".to_string(),
+            entity_id: params.contrato_id,
+            accion: "generar_pagos_auto".to_string(),
+            cambios: serde_json::json!({
+                "pagos_generados": count,
+            }),
+        },
+    )
+    .await;
+
     Ok(count)
 }
 
@@ -180,20 +279,11 @@ pub async fn create(
         ));
     }
 
-    if let Some(p) = input.recargo_porcentaje {
-        if p < Decimal::ZERO || p > Decimal::from(100) {
-            return Err(AppError::Validation(
-                "El porcentaje de recargo debe estar entre 0 y 100".to_string(),
-            ));
-        }
-    }
+    validar_recargo_y_gracia(input.recargo_porcentaje, input.dias_gracia)?;
 
-    if let Some(d) = input.dias_gracia {
-        if d < 0 {
-            return Err(AppError::Validation(
-                "Los días de gracia deben ser mayor o igual a 0".to_string(),
-            ));
-        }
+    let dia_vencimiento = input.dia_vencimiento.unwrap_or(1);
+    if input.dia_vencimiento.is_some() {
+        validar_dia_vencimiento(dia_vencimiento)?;
     }
 
     if let Some(ref moneda) = input.moneda {
@@ -272,31 +362,21 @@ pub async fn create(
     )
     .await;
 
-    // Generate pagos automatically for active contracts
     let pagos_count = if record.estado == "activo" {
-        let pagos = calcular_pagos(
-            record.fecha_inicio,
-            record.fecha_fin,
-            record.monto_mensual,
-            &record.moneda,
-            1, // default dia_vencimiento
-        );
-        let count = insertar_pagos_generados(&txn, id, organizacion_id, &pagos).await?;
-
-        auditoria::registrar_best_effort(
+        let count = generar_pagos_para_contrato(
             &txn,
-            CreateAuditoriaEntry {
+            &PagoGeneracionParams {
+                contrato_id: id,
+                organizacion_id,
+                fecha_inicio: record.fecha_inicio,
+                fecha_fin: record.fecha_fin,
+                monto_mensual: record.monto_mensual,
+                moneda: &record.moneda,
+                dia_vencimiento,
                 usuario_id,
-                entity_type: "contrato".to_string(),
-                entity_id: id,
-                accion: "generar_pagos_auto".to_string(),
-                cambios: serde_json::json!({
-                    "pagos_generados": count,
-                }),
             },
         )
-        .await;
-
+        .await?;
         Some(count)
     } else {
         None
@@ -358,21 +438,7 @@ pub async fn update(
         validate_enum("estado", estado, ESTADOS_CONTRATO)?;
     }
 
-    if let Some(p) = input.recargo_porcentaje {
-        if p < Decimal::ZERO || p > Decimal::from(100) {
-            return Err(AppError::Validation(
-                "El porcentaje de recargo debe estar entre 0 y 100".to_string(),
-            ));
-        }
-    }
-
-    if let Some(d) = input.dias_gracia {
-        if d < 0 {
-            return Err(AppError::Validation(
-                "Los días de gracia deben ser mayor o igual a 0".to_string(),
-            ));
-        }
-    }
+    validar_recargo_y_gracia(input.recargo_porcentaje, input.dias_gracia)?;
 
     let existing = contrato::Entity::find_by_id(id)
         .filter(contrato::Column::OrganizacionId.eq(org_id))
@@ -487,6 +553,11 @@ pub async fn renovar(
     input: RenovarContratoRequest,
     usuario_id: Uuid,
 ) -> Result<ContratoResponse, AppError> {
+    let dia_vencimiento = input.dia_vencimiento.unwrap_or(1);
+    if input.dia_vencimiento.is_some() {
+        validar_dia_vencimiento(dia_vencimiento)?;
+    }
+
     let txn = db.begin().await?;
 
     let original = contrato::Entity::find_by_id(contrato_id)
@@ -564,30 +635,20 @@ pub async fn renovar(
     )
     .await;
 
-    // Generate pagos automatically for the renewed contract
-    let pagos = calcular_pagos(
-        new_record.fecha_inicio,
-        new_record.fecha_fin,
-        new_record.monto_mensual,
-        &new_record.moneda,
-        1, // default dia_vencimiento
-    );
-    let pagos_count =
-        insertar_pagos_generados(&txn, new_id, new_record.organizacion_id, &pagos).await?;
-
-    auditoria::registrar_best_effort(
+    let pagos_count = generar_pagos_para_contrato(
         &txn,
-        CreateAuditoriaEntry {
+        &PagoGeneracionParams {
+            contrato_id: new_id,
+            organizacion_id: new_record.organizacion_id,
+            fecha_inicio: new_record.fecha_inicio,
+            fecha_fin: new_record.fecha_fin,
+            monto_mensual: new_record.monto_mensual,
+            moneda: &new_record.moneda,
+            dia_vencimiento,
             usuario_id,
-            entity_type: "contrato".to_string(),
-            entity_id: new_id,
-            accion: "generar_pagos_auto".to_string(),
-            cambios: serde_json::json!({
-                "pagos_generados": pagos_count,
-            }),
         },
     )
-    .await;
+    .await?;
 
     txn.commit().await?;
 
@@ -692,6 +753,8 @@ pub async fn terminar(
     Ok(ContratoResponse::from(updated))
 }
 
+/// Marks expired contracts across ALL organizations. Intentionally not
+/// org-scoped because this runs as a global background job via the scheduler.
 pub async fn marcar_vencidos(db: &DatabaseConnection) -> Result<u64, AppError> {
     let today = Utc::now().date_naive();
 
@@ -771,28 +834,11 @@ pub async fn cambiar_estado_deposito(
 
     // 6. For retenido: validate monto_retenido and motivo_retencion
     if input.estado == "retenido" {
-        let monto = input.monto_retenido.ok_or_else(|| {
-            AppError::Validation("El monto retenido es requerido para retención".to_string())
-        })?;
-
-        if monto <= rust_decimal::Decimal::ZERO {
-            return Err(AppError::Validation(
-                "El monto retenido debe ser mayor a cero".to_string(),
-            ));
-        }
-
-        if monto > deposito {
-            return Err(AppError::Validation(
-                "El monto retenido no puede exceder el depósito".to_string(),
-            ));
-        }
-
-        let motivo = input.motivo_retencion.as_deref().unwrap_or("");
-        if motivo.trim().is_empty() {
-            return Err(AppError::Validation(
-                "El motivo de retención es requerido".to_string(),
-            ));
-        }
+        validar_retencion(
+            input.monto_retenido,
+            input.motivo_retencion.as_deref(),
+            deposito,
+        )?;
     }
 
     // 7. Open transaction and update fields based on new estado

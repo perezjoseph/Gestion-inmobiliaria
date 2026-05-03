@@ -99,10 +99,7 @@ fn parse_single_block(v: &Value) -> EditorBlock {
         })
         .unwrap_or_default();
     let confidence = v.get("confidence").and_then(Value::as_f64);
-    let source = v
-        .get("source")
-        .and_then(Value::as_str)
-        .map(String::from);
+    let source = v.get("source").and_then(Value::as_str).map(String::from);
 
     EditorBlock {
         block_type,

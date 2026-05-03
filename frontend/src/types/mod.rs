@@ -2,9 +2,9 @@ pub mod auditoria;
 pub mod configuracion;
 pub mod contrato;
 pub mod dashboard_extra;
-pub mod gasto;
 #[allow(dead_code)]
 pub mod documento;
+pub mod gasto;
 pub mod importacion;
 pub mod inquilino;
 pub mod mantenimiento;

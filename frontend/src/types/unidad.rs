@@ -52,4 +52,3 @@ pub struct UpdateUnidad {
     pub estado: Option<String>,
     pub descripcion: Option<String>,
 }
-

@@ -17,10 +17,10 @@ use crate::components::common::pagination::Pagination;
 use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{api_delete, api_get, api_post, api_put};
+use crate::types::PaginatedResponse;
 use crate::types::gasto::{CreateGasto, Gasto, UpdateGasto};
 use crate::types::ocr::OcrExtractField;
 use crate::types::propiedad::Propiedad;
-use crate::types::PaginatedResponse;
 use crate::utils::{
     EscapeHandler, can_delete, can_write, field_error, format_currency, format_date_display,
     input_class,
@@ -203,20 +203,19 @@ fn GastoForm(props: &GastoFormProps) -> Html {
         }};
     }
 
-    let confidence_for = |name: &str| -> Option<f64> {
-        props.confidences.get(name).copied()
-    };
+    let confidence_for = |name: &str| -> Option<f64> { props.confidences.get(name).copied() };
 
-    let input_cb_conf = |state: &UseStateHandle<String>, field_name: &str| -> Callback<InputEvent> {
-        let s = state.clone();
-        let clear = props.on_confidence_clear.clone();
-        let name = field_name.to_string();
-        Callback::from(move |e: InputEvent| {
-            let input: web_sys::HtmlInputElement = e.target_unchecked_into();
-            s.set(input.value());
-            clear.emit(name.clone());
-        })
-    };
+    let input_cb_conf =
+        |state: &UseStateHandle<String>, field_name: &str| -> Callback<InputEvent> {
+            let s = state.clone();
+            let clear = props.on_confidence_clear.clone();
+            let name = field_name.to_string();
+            Callback::from(move |e: InputEvent| {
+                let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+                s.set(input.value());
+                clear.emit(name.clone());
+            })
+        };
 
     let filtered_unidades: Vec<&Unidad> = props
         .unidades
@@ -545,9 +544,7 @@ fn load_gastos_data(
     });
 }
 
-fn load_gasto_refs(
-    propiedades: UseStateHandle<Vec<Propiedad>>,
-) {
+fn load_gasto_refs(propiedades: UseStateHandle<Vec<Propiedad>>) {
     spawn_local(async move {
         if let Ok(resp) = api_get::<PaginatedResponse<Propiedad>>("/propiedades?perPage=200").await
         {
@@ -587,17 +584,11 @@ fn make_gasto_edit_cb(
     show_form: &UseStateHandle<bool>,
     form_errors: &UseStateHandle<FormErrors>,
 ) -> Callback<Gasto> {
-    let (propiedad_id, unidad_id, categoria) = (
-        propiedad_id.clone(),
-        unidad_id.clone(),
-        categoria.clone(),
-    );
+    let (propiedad_id, unidad_id, categoria) =
+        (propiedad_id.clone(), unidad_id.clone(), categoria.clone());
     let (descripcion, monto, moneda) = (descripcion.clone(), monto.clone(), moneda.clone());
-    let (fecha_gasto, estado_form, proveedor) = (
-        fecha_gasto.clone(),
-        estado_form.clone(),
-        proveedor.clone(),
-    );
+    let (fecha_gasto, estado_form, proveedor) =
+        (fecha_gasto.clone(), estado_form.clone(), proveedor.clone());
     let (numero_factura, notas) = (numero_factura.clone(), notas.clone());
     let (editing, show_form, form_errors) =
         (editing.clone(), show_form.clone(), form_errors.clone());

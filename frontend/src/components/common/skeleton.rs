@@ -33,9 +33,7 @@ pub struct TableSkeletonProps {
 
 #[component]
 pub fn TableSkeleton(props: &TableSkeletonProps) -> Html {
-    let col_widths = [
-        "40%", "25%", "20%", "15%", "30%", "35%", "22%", "18%",
-    ];
+    let col_widths = ["40%", "25%", "20%", "15%", "30%", "35%", "22%", "18%"];
 
     html! {
         <div aria-busy="true" aria-label="Cargando contenido">

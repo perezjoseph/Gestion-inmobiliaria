@@ -2,8 +2,8 @@ use crate::app::AuthContext;
 use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::error_banner::ErrorBanner;
-use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::pagination::Pagination;
+use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::components::mantenimiento::{estado_badge, prioridad_badge};
 use crate::services::api::{api_delete, api_get, api_post, api_put};
@@ -285,10 +285,7 @@ fn render_detail_field(label: &str, value: &str, style: &str) -> Html {
 }
 
 fn render_optional_field(label: &str, value: Option<&String>, style: &str) -> Html {
-    value.map_or_else(
-        || html! {},
-        |v| render_detail_field(label, v, style),
-    )
+    value.map_or_else(|| html! {}, |v| render_detail_field(label, v, style))
 }
 
 fn render_detail_fields(sol: &Solicitud, prop_label: &Callback<String, String>) -> Html {
@@ -300,12 +297,18 @@ fn render_detail_fields(sol: &Solicitud, prop_label: &Callback<String, String>) 
     };
     let fecha_inicio_html = render_optional_field(
         "Fecha Inicio",
-        sol.fecha_inicio.as_ref().map(|f| format_date_display(f)).as_ref(),
+        sol.fecha_inicio
+            .as_ref()
+            .map(|f| format_date_display(f))
+            .as_ref(),
         "",
     );
     let fecha_fin_html = render_optional_field(
         "Fecha Fin",
-        sol.fecha_fin.as_ref().map(|f| format_date_display(f)).as_ref(),
+        sol.fecha_fin
+            .as_ref()
+            .map(|f| format_date_display(f))
+            .as_ref(),
         "",
     );
 
@@ -649,7 +652,11 @@ fn do_delete_solicitud(
             Ok(()) => {
                 delete_target.set(None);
                 reload.set(*reload + 1);
-                push_toast(toasts.as_ref(), &format!("\"{label}\" eliminada"), ToastKind::Info);
+                push_toast(
+                    toasts.as_ref(),
+                    &format!("\"{label}\" eliminada"),
+                    ToastKind::Info,
+                );
             }
             Err(err) => {
                 delete_target.set(None);

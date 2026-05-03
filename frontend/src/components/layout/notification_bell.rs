@@ -1,9 +1,20 @@
+use gloo_timers::callback::Interval;
 use yew::prelude::*;
 use yew_router::prelude::*;
 
 use crate::app::Route;
 use crate::services::api::api_get;
 use crate::types::notificacion::ConteoNoLeidas;
+
+const POLL_INTERVAL_MS: u32 = 60_000;
+
+fn fetch_count(count: UseStateHandle<u64>) {
+    wasm_bindgen_futures::spawn_local(async move {
+        if let Ok(resp) = api_get::<ConteoNoLeidas>("/notificaciones/no-leidas/conteo").await {
+            count.set(resp.count);
+        }
+    });
+}
 
 #[component]
 pub fn NotificationBell() -> Html {
@@ -13,12 +24,16 @@ pub fn NotificationBell() -> Html {
     {
         let count = count.clone();
         use_effect_with((), move |()| {
-            wasm_bindgen_futures::spawn_local(async move {
-                if let Ok(resp) = api_get::<ConteoNoLeidas>("/notificaciones/no-leidas/conteo").await
-                {
-                    count.set(resp.count);
-                }
+            // Initial fetch on mount
+            fetch_count(count.clone());
+
+            // Poll every 60 seconds
+            let interval = Interval::new(POLL_INTERVAL_MS, move || {
+                fetch_count(count.clone());
             });
+
+            // Cleanup: drop the interval when the component unmounts
+            move || drop(interval)
         });
     }
 

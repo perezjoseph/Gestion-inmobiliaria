@@ -8,6 +8,8 @@ use sea_orm::{
 };
 use uuid::Uuid;
 
+use tokio_util::sync::CancellationToken;
+
 use crate::entities::{ejecucion_tarea, organizacion};
 use crate::errors::AppError;
 use crate::models::PaginatedResponse;
@@ -22,20 +24,37 @@ pub const TAREAS_VALIDAS: &[&str] = &[
 
 const INTERVALO_POR_DEFECTO_SECS: u64 = 86_400;
 
-pub fn iniciar_scheduler(db: DatabaseConnection) {
+pub fn iniciar_scheduler(
+    db: DatabaseConnection,
+    token: CancellationToken,
+) -> Vec<tokio::task::JoinHandle<()>> {
+    let mut handles = Vec::with_capacity(TAREAS_VALIDAS.len());
+
     for &tarea in TAREAS_VALIDAS {
         let db = db.clone();
         let nombre = tarea.to_string();
-        tokio::spawn(async move {
+        let token = token.clone();
+
+        let handle = tokio::spawn(async move {
             let mut interval =
                 tokio::time::interval(Duration::from_secs(INTERVALO_POR_DEFECTO_SECS));
             // The first tick completes immediately — skip it so the first
             // execution happens after one full interval.
             interval.tick().await;
             loop {
-                interval.tick().await;
+                tokio::select! {
+                    _ = interval.tick() => {}
+                    () = token.cancelled() => {
+                        tracing::info!(tarea = %nombre, "Tarea de fondo cancelada por shutdown");
+                        return;
+                    }
+                }
+
                 let db_ref = db.clone();
                 let nombre_ref = nombre.clone();
+                // SAFETY: Each iteration creates fresh owned values (db_ref, nombre_ref).
+                // No shared mutable state survives across the panic boundary, so
+                // AssertUnwindSafe is sound here.
                 let result = std::panic::catch_unwind(AssertUnwindSafe(|| {
                     Box::pin(ejecutar_tarea_con_registro(db_ref, nombre_ref))
                 }));
@@ -51,7 +70,11 @@ pub fn iniciar_scheduler(db: DatabaseConnection) {
                 }
             }
         });
+
+        handles.push(handle);
     }
+
+    handles
 }
 
 pub async fn ejecutar_tarea_por_nombre(

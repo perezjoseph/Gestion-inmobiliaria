@@ -3,8 +3,8 @@ use yew::prelude::*;
 
 use crate::components::common::data_table::DataTable;
 use crate::components::common::error_banner::ErrorBanner;
-use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::pagination::Pagination;
+use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{api_get, api_put};
 use crate::types::PaginatedResponse;

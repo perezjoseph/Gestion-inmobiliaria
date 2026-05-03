@@ -16,7 +16,9 @@ pub fn Reportes() -> Html {
     let anio = use_state(|| {
         let d = js_sys::Date::new_0();
         #[allow(clippy::cast_possible_wrap)]
-        { d.get_full_year() as i32 }
+        {
+            d.get_full_year() as i32
+        }
     });
     let report = use_state(|| Option::<IngresoReportSummary>::None);
     let error = use_state(|| Option::<String>::None);

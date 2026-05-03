@@ -200,8 +200,8 @@ pub async fn api_download(path: &str, filename: &str) -> Result<(), String> {
     let array = js_sys::Array::new();
     array.push(&uint8.buffer());
 
-    let blob = web_sys::Blob::new_with_u8_array_sequence(&array)
-        .map_err(|_| "Error al crear blob")?;
+    let blob =
+        web_sys::Blob::new_with_u8_array_sequence(&array).map_err(|_| "Error al crear blob")?;
 
     let blob_url = web_sys::Url::create_object_url_with_blob(&blob)
         .map_err(|_| "Error al crear URL de descarga")?;

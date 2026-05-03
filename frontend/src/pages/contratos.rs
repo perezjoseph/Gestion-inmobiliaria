@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use gloo_events::EventListener;
 use wasm_bindgen::JsCast;
@@ -14,8 +15,8 @@ use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::document_gallery::DocumentGallery;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::ocr_scan_button::OcrScanButton;
-use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::pagination::Pagination;
+use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{api_delete, api_get, api_post, api_put};
 use crate::types::PaginatedResponse;
@@ -90,7 +91,7 @@ struct ContratoFormProps {
     submitting: bool,
     on_submit: Callback<SubmitEvent>,
     on_cancel: Callback<MouseEvent>,
-    confidences: HashMap<String, f64>,
+    confidences: Rc<HashMap<String, f64>>,
     on_ocr_result: Callback<Vec<OcrExtractField>>,
     on_confidence_clear: Callback<String>,
     #[prop_or_default]
@@ -113,20 +114,19 @@ fn ContratoForm(props: &ContratoFormProps) -> Html {
         }};
     }
 
-    let confidence_for = |name: &str| -> Option<f64> {
-        props.confidences.get(name).copied()
-    };
+    let confidence_for = |name: &str| -> Option<f64> { props.confidences.get(name).copied() };
 
-    let input_cb_conf = |state: &UseStateHandle<String>, field_name: &str| -> Callback<InputEvent> {
-        let s = state.clone();
-        let clear = props.on_confidence_clear.clone();
-        let name = field_name.to_string();
-        Callback::from(move |e: InputEvent| {
-            let input: web_sys::HtmlInputElement = e.target_unchecked_into();
-            s.set(input.value());
-            clear.emit(name.clone());
-        })
-    };
+    let input_cb_conf =
+        |state: &UseStateHandle<String>, field_name: &str| -> Callback<InputEvent> {
+            let s = state.clone();
+            let clear = props.on_confidence_clear.clone();
+            let name = field_name.to_string();
+            Callback::from(move |e: InputEvent| {
+                let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+                s.set(input.value());
+                clear.emit(name.clone());
+            })
+        };
 
     let scan_button = if props.is_editing {
         html! {}
@@ -389,10 +389,7 @@ fn GenerarPagosPreviewModal(props: &GenerarPagosPreviewModalProps) -> Html {
 }
 
 fn render_preview_summary(preview: &PreviewPagos) -> Html {
-    let moneda = preview
-        .pagos
-        .first()
-        .map_or("DOP", |p| p.moneda.as_str());
+    let moneda = preview.pagos.first().map_or("DOP", |p| p.moneda.as_str());
     html! {
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); margin-bottom: var(--space-4); padding: var(--space-3); background: var(--bg-subtle); border-radius: var(--radius-md);">
             <div><span style="font-weight: 600;">{"Total pagos: "}</span>{preview.total_pagos}</div>
@@ -488,11 +485,13 @@ fn DepositoSection(props: &DepositoSectionProps) -> Html {
     }
 }
 
-fn render_deposito_info(c: &Contrato, deposito_val: f64, badge_cls: &str, badge_label: &str) -> Html {
-    let fecha_cobro = c
-        .fecha_cobro_deposito
-        .as_deref()
-        .map(format_date_display);
+fn render_deposito_info(
+    c: &Contrato,
+    deposito_val: f64,
+    badge_cls: &str,
+    badge_label: &str,
+) -> Html {
+    let fecha_cobro = c.fecha_cobro_deposito.as_deref().map(format_date_display);
     let fecha_devolucion = c
         .fecha_devolucion_deposito
         .as_deref()
@@ -574,26 +573,39 @@ fn render_deposito_buttons(
     }
 
     match estado_dep {
-        "pendiente" => {
-            on_cobrar.as_ref().map_or_else(|| html! {}, |cb| html! {
-                <div style="display: flex; gap: var(--space-2);">
-                    <button onclick={cb.clone()} class="gi-btn gi-btn-primary">
-                        {"Marcar como Cobrado"}
-                    </button>
-                </div>
-            })
-        }
+        "pendiente" => on_cobrar.as_ref().map_or_else(
+            || html! {},
+            |cb| {
+                html! {
+                    <div style="display: flex; gap: var(--space-2);">
+                        <button onclick={cb.clone()} class="gi-btn gi-btn-primary">
+                            {"Marcar como Cobrado"}
+                        </button>
+                    </div>
+                }
+            },
+        ),
         "cobrado" => {
-            let devolver_btn = on_devolver.as_ref().map_or_else(|| html! {}, |cb| html! {
-                <button onclick={cb.clone()} class="gi-btn gi-btn-primary">
-                    {"Devolver Depósito"}
-                </button>
-            });
-            let retener_btn = on_retener.as_ref().map_or_else(|| html! {}, |cb| html! {
-                <button onclick={cb.clone()} class="gi-btn gi-btn-danger">
-                    {"Retener Depósito"}
-                </button>
-            });
+            let devolver_btn = on_devolver.as_ref().map_or_else(
+                || html! {},
+                |cb| {
+                    html! {
+                        <button onclick={cb.clone()} class="gi-btn gi-btn-primary">
+                            {"Devolver Depósito"}
+                        </button>
+                    }
+                },
+            );
+            let retener_btn = on_retener.as_ref().map_or_else(
+                || html! {},
+                |cb| {
+                    html! {
+                        <button onclick={cb.clone()} class="gi-btn gi-btn-danger">
+                            {"Retener Depósito"}
+                        </button>
+                    }
+                },
+            );
             html! {
                 <div style="display: flex; gap: var(--space-2);">
                     {devolver_btn}
@@ -642,18 +654,15 @@ fn RetenerDepositoModal(props: &RetenerDepositoModalProps) -> Html {
             let mut errs = RetenerFormErrors::default();
             match monto_retenido.parse::<f64>() {
                 Ok(v) if v <= 0.0 => {
-                    errs.monto_retenido =
-                        Some("El monto retenido debe ser mayor a cero".into());
+                    errs.monto_retenido = Some("El monto retenido debe ser mayor a cero".into());
                 }
                 Err(_) | Ok(_) if monto_retenido.is_empty() => {
-                    errs.monto_retenido =
-                        Some("El monto retenido es requerido".into());
+                    errs.monto_retenido = Some("El monto retenido es requerido".into());
                 }
                 _ => {}
             }
             if motivo_retencion.trim().is_empty() {
-                errs.motivo_retencion =
-                    Some("El motivo de retención es requerido".into());
+                errs.motivo_retencion = Some("El motivo de retención es requerido".into());
             }
             let valid = errs.monto_retenido.is_none() && errs.motivo_retencion.is_none();
             form_errors.set(errs);
@@ -691,14 +700,15 @@ fn RetenerDepositoModal(props: &RetenerDepositoModalProps) -> Html {
                     monto_retenido: Some(monto),
                     motivo_retencion: Some(motivo),
                 };
-                match api_put::<Contrato, _>(
-                    &format!("/contratos/{contrato_id}/deposito"),
-                    &body,
-                )
-                .await
+                match api_put::<Contrato, _>(&format!("/contratos/{contrato_id}/deposito"), &body)
+                    .await
                 {
                     Ok(_) => {
-                        push_toast(toasts.as_ref(), "Depósito retenido exitosamente", ToastKind::Success);
+                        push_toast(
+                            toasts.as_ref(),
+                            "Depósito retenido exitosamente",
+                            ToastKind::Success,
+                        );
                         on_success.emit(());
                         on_close.emit(());
                     }
@@ -718,11 +728,7 @@ fn RetenerDepositoModal(props: &RetenerDepositoModalProps) -> Html {
         })
     };
 
-    let form_body = render_retener_form_body(
-        &monto_retenido,
-        &motivo_retencion,
-        &form_errors,
-    );
+    let form_body = render_retener_form_body(&monto_retenido, &motivo_retencion, &form_errors);
 
     html! {
         <div class="gi-modal-overlay">
@@ -967,7 +973,11 @@ fn make_contrato_edit_cb(
         deposito.set(c.deposito.map(|v| v.to_string()).unwrap_or_default());
         moneda.set(c.moneda.clone());
         estado.set(c.estado.clone());
-        recargo_porcentaje.set(c.recargo_porcentaje.map(|v| v.to_string()).unwrap_or_default());
+        recargo_porcentaje.set(
+            c.recargo_porcentaje
+                .map(|v| v.to_string())
+                .unwrap_or_default(),
+        );
         dias_gracia.set(c.dias_gracia.map(|v| v.to_string()).unwrap_or_default());
         editing.set(Some(c));
         show_form.set(true);
@@ -1311,77 +1321,92 @@ fn handle_escape_contratos(
     }
 }
 
-#[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
-fn render_contratos_view(
+struct ContratoViewState<'a> {
     loading: bool,
-    user_rol: &str,
-    error: &UseStateHandle<Option<String>>,
-    delete_target: &UseStateHandle<Option<Contrato>>,
-    renew_target: &UseStateHandle<Option<Contrato>>,
-    renew_fecha_fin: &UseStateHandle<String>,
-    renew_monto: &UseStateHandle<String>,
-    terminate_target: &UseStateHandle<Option<Contrato>>,
-    terminate_fecha: &UseStateHandle<String>,
-    preview_data: Option<&PreviewPagos>,
-    preview_confirming: bool,
-    on_preview_confirm: Callback<MouseEvent>,
-    on_preview_cancel: Callback<MouseEvent>,
-    show_form: bool,
-    editing: &UseStateHandle<Option<Contrato>>,
-    propiedad_id: &UseStateHandle<String>,
-    inquilino_id: &UseStateHandle<String>,
-    fecha_inicio: &UseStateHandle<String>,
-    fecha_fin: &UseStateHandle<String>,
-    monto_mensual: &UseStateHandle<String>,
-    deposito: &UseStateHandle<String>,
-    moneda: &UseStateHandle<String>,
-    estado: &UseStateHandle<String>,
-    recargo_porcentaje: &UseStateHandle<String>,
-    dias_gracia: &UseStateHandle<String>,
-    propiedades: &UseStateHandle<Vec<Propiedad>>,
-    inquilinos: &UseStateHandle<Vec<Inquilino>>,
-    form_errors: &UseStateHandle<FormErrors>,
-    submitting: bool,
-    on_submit: Callback<SubmitEvent>,
-    on_cancel: Callback<MouseEvent>,
-    on_new: Callback<MouseEvent>,
-    on_delete_confirm: Callback<MouseEvent>,
-    on_delete_cancel: Callback<MouseEvent>,
-    on_renew_confirm: Callback<MouseEvent>,
-    on_renew_cancel: Callback<MouseEvent>,
-    on_terminate_confirm: Callback<MouseEvent>,
-    on_terminate_cancel: Callback<MouseEvent>,
-    items: &UseStateHandle<Vec<Contrato>>,
+    user_rol: &'a str,
+    error: &'a UseStateHandle<Option<String>>,
+    items: &'a UseStateHandle<Vec<Contrato>>,
     total: u64,
     page: u64,
     per_page: u64,
-    prop_label: Callback<String, String>,
-    inq_label: Callback<String, String>,
-    on_edit: Callback<Contrato>,
-    on_delete_click: Callback<Contrato>,
-    on_renew_click: Callback<Contrato>,
-    on_terminate_click: Callback<Contrato>,
-    on_generar_pagos_click: Callback<Contrato>,
-    on_page_change: Callback<u64>,
-    on_per_page_change: Callback<u64>,
-    confidences: &UseStateHandle<HashMap<String, f64>>,
-    on_ocr_result: Callback<Vec<OcrExtractField>>,
-    on_confidence_clear: Callback<String>,
+}
+
+struct ContratoFormState<'a> {
+    show_form: bool,
+    editing: &'a UseStateHandle<Option<Contrato>>,
+    propiedad_id: &'a UseStateHandle<String>,
+    inquilino_id: &'a UseStateHandle<String>,
+    fecha_inicio: &'a UseStateHandle<String>,
+    fecha_fin: &'a UseStateHandle<String>,
+    monto_mensual: &'a UseStateHandle<String>,
+    deposito: &'a UseStateHandle<String>,
+    moneda: &'a UseStateHandle<String>,
+    estado: &'a UseStateHandle<String>,
+    recargo_porcentaje: &'a UseStateHandle<String>,
+    dias_gracia: &'a UseStateHandle<String>,
+    propiedades: &'a UseStateHandle<Vec<Propiedad>>,
+    inquilinos: &'a UseStateHandle<Vec<Inquilino>>,
+    form_errors: &'a UseStateHandle<FormErrors>,
+    submitting: bool,
+    confidences: &'a UseStateHandle<Rc<HashMap<String, f64>>>,
     editing_id: Option<String>,
     token: String,
+}
+
+struct ContratoViewCallbacks {
+    on_submit: Callback<SubmitEvent>,
+    on_cancel: Callback<MouseEvent>,
+    on_new: Callback<MouseEvent>,
+    on_edit: Callback<Contrato>,
+    on_delete_click: Callback<Contrato>,
+    on_delete_confirm: Callback<MouseEvent>,
+    on_delete_cancel: Callback<MouseEvent>,
+    on_renew_click: Callback<Contrato>,
+    on_renew_confirm: Callback<MouseEvent>,
+    on_renew_cancel: Callback<MouseEvent>,
+    on_terminate_click: Callback<Contrato>,
+    on_terminate_confirm: Callback<MouseEvent>,
+    on_terminate_cancel: Callback<MouseEvent>,
+    on_generar_pagos_click: Callback<Contrato>,
+    on_preview_confirm: Callback<MouseEvent>,
+    on_preview_cancel: Callback<MouseEvent>,
+    on_page_change: Callback<u64>,
+    on_per_page_change: Callback<u64>,
+    prop_label: Callback<String, String>,
+    inq_label: Callback<String, String>,
+    on_ocr_result: Callback<Vec<OcrExtractField>>,
+    on_confidence_clear: Callback<String>,
     on_cobrar: Callback<MouseEvent>,
     on_devolver: Callback<MouseEvent>,
     on_retener: Callback<MouseEvent>,
-    show_retener_modal: bool,
-    retener_contrato_id: AttrValue,
     on_retener_close: Callback<()>,
     on_retener_success: Callback<()>,
+}
+
+struct ContratoModalState<'a> {
+    delete_target: &'a UseStateHandle<Option<Contrato>>,
+    renew_target: &'a UseStateHandle<Option<Contrato>>,
+    renew_fecha_fin: &'a UseStateHandle<String>,
+    renew_monto: &'a UseStateHandle<String>,
+    terminate_target: &'a UseStateHandle<Option<Contrato>>,
+    terminate_fecha: &'a UseStateHandle<String>,
+    preview_data: Option<&'a PreviewPagos>,
+    preview_confirming: bool,
+    show_retener_modal: bool,
+    retener_contrato_id: AttrValue,
+}
+
+fn render_contratos_view(
+    view: ContratoViewState<'_>,
+    form: ContratoFormState<'_>,
+    callbacks: ContratoViewCallbacks,
+    modals: ContratoModalState<'_>,
 ) -> Html {
-    if loading {
+    if view.loading {
         return html! { <TableSkeleton title_width="180px" columns={7} /> };
     }
 
-    let last_header: String = if can_write(user_rol) {
+    let last_header: String = if can_write(view.user_rol) {
         "Acciones".into()
     } else {
         String::new()
@@ -1395,59 +1420,59 @@ fn render_contratos_view(
         "Estado".into(),
         last_header,
     ];
-    let new_btn = render_new_btn_contrato(user_rol, &on_new);
-    let error_html = render_opt_error_contrato(error);
+    let new_btn = render_new_btn_contrato(view.user_rol, &callbacks.on_new);
+    let error_html = render_opt_error_contrato(view.error);
     let delete_html = render_delete_confirm_contrato(
-        delete_target,
-        &prop_label,
-        &on_delete_confirm,
-        &on_delete_cancel,
+        modals.delete_target,
+        &callbacks.prop_label,
+        &callbacks.on_delete_confirm,
+        &callbacks.on_delete_cancel,
     );
     let renew_html = render_renew_modal(
-        renew_target,
-        renew_fecha_fin,
-        renew_monto,
-        on_renew_confirm,
-        on_renew_cancel,
+        modals.renew_target,
+        modals.renew_fecha_fin,
+        modals.renew_monto,
+        callbacks.on_renew_confirm,
+        callbacks.on_renew_cancel,
     );
     let terminate_html = render_terminate_modal(
-        terminate_target,
-        terminate_fecha,
-        on_terminate_confirm,
-        on_terminate_cancel,
+        modals.terminate_target,
+        modals.terminate_fecha,
+        callbacks.on_terminate_confirm,
+        callbacks.on_terminate_cancel,
     );
     let form_html = render_contrato_form_section(
-        show_form,
-        editing,
-        propiedad_id,
-        inquilino_id,
-        fecha_inicio,
-        fecha_fin,
-        monto_mensual,
-        deposito,
-        moneda,
-        estado,
-        recargo_porcentaje,
-        dias_gracia,
-        propiedades,
-        inquilinos,
-        form_errors,
-        submitting,
-        on_submit,
-        on_cancel,
-        confidences,
-        on_ocr_result,
-        on_confidence_clear,
-        editing_id,
-        token,
-        user_rol,
-        on_cobrar,
-        on_devolver,
-        on_retener,
-        show_retener_modal,
-        retener_contrato_id,
-        on_retener_close,
-        on_retener_success,
+        form.show_form,
+        form.editing,
+        form.propiedad_id,
+        form.inquilino_id,
+        form.fecha_inicio,
+        form.fecha_fin,
+        form.monto_mensual,
+        form.deposito,
+        form.moneda,
+        form.estado,
+        form.recargo_porcentaje,
+        form.dias_gracia,
+        form.propiedades,
+        form.inquilinos,
+        form.form_errors,
+        form.submitting,
+        callbacks.on_submit,
+        callbacks.on_cancel,
+        form.confidences,
+        callbacks.on_ocr_result,
+        callbacks.on_confidence_clear,
+        form.editing_id,
+        form.token,
+        view.user_rol,
+        callbacks.on_cobrar,
+        callbacks.on_devolver,
+        callbacks.on_retener,
+        modals.show_retener_modal,
+        modals.retener_contrato_id,
+        callbacks.on_retener_close,
+        callbacks.on_retener_success,
     );
 
     html! {
@@ -1460,23 +1485,23 @@ fn render_contratos_view(
             {delete_html}
             {renew_html}
             {terminate_html}
-            {preview_data.map_or_else(|| html! {}, |preview| html! {
+            {modals.preview_data.map_or_else(|| html! {}, |preview| html! {
                     <GenerarPagosPreviewModal
                         preview={(*preview).clone()}
-                        confirming={preview_confirming}
-                        on_confirm={on_preview_confirm}
-                        on_cancel={on_preview_cancel}
+                        confirming={modals.preview_confirming}
+                        on_confirm={callbacks.on_preview_confirm}
+                        on_cancel={callbacks.on_preview_cancel}
                     />
                 })}
             {form_html}
             <ContratoList
-                items={(**items).clone()} user_rol={user_rol.to_string()} headers={headers}
-                total={total} page={page} per_page={per_page}
-                prop_label={prop_label.clone()} inq_label={inq_label.clone()}
-                on_edit={on_edit} on_delete={on_delete_click}
-                on_renew={on_renew_click} on_terminate={on_terminate_click}
-                on_generar_pagos={on_generar_pagos_click}
-                on_page_change={on_page_change} on_per_page_change={on_per_page_change}
+                items={(**view.items).clone()} user_rol={view.user_rol.to_string()} headers={headers}
+                total={view.total} page={view.page} per_page={view.per_page}
+                prop_label={callbacks.prop_label.clone()} inq_label={callbacks.inq_label.clone()}
+                on_edit={callbacks.on_edit} on_delete={callbacks.on_delete_click}
+                on_renew={callbacks.on_renew_click} on_terminate={callbacks.on_terminate_click}
+                on_generar_pagos={callbacks.on_generar_pagos_click}
+                on_page_change={callbacks.on_page_change} on_per_page_change={callbacks.on_per_page_change}
             />
         </div>
     }
@@ -1596,7 +1621,7 @@ fn render_contrato_form_section(
     submitting: bool,
     on_submit: Callback<SubmitEvent>,
     on_cancel: Callback<MouseEvent>,
-    confidences: &UseStateHandle<HashMap<String, f64>>,
+    confidences: &UseStateHandle<Rc<HashMap<String, f64>>>,
     on_ocr_result: Callback<Vec<OcrExtractField>>,
     on_confidence_clear: Callback<String>,
     editing_id: Option<String>,
@@ -1616,29 +1641,30 @@ fn render_contrato_form_section(
 
     let deposito_html = (**editing).as_ref().map_or_else(
         || html! {},
-        |c| html! {
-            <>
-                <DepositoSection
-                    contrato={c.clone()}
-                    user_rol={AttrValue::from(user_rol.to_string())}
-                    on_cobrar={on_cobrar}
-                    on_devolver={on_devolver}
-                    on_retener={on_retener}
-                />
-                <RetenerDepositoModal
-                    visible={show_retener_modal}
-                    contrato_id={retener_contrato_id}
-                    on_close={on_retener_close}
-                    on_success={on_retener_success}
-                />
-            </>
+        |c| {
+            html! {
+                <>
+                    <DepositoSection
+                        contrato={c.clone()}
+                        user_rol={AttrValue::from(user_rol.to_string())}
+                        on_cobrar={on_cobrar}
+                        on_devolver={on_devolver}
+                        on_retener={on_retener}
+                    />
+                    <RetenerDepositoModal
+                        visible={show_retener_modal}
+                        contrato_id={retener_contrato_id}
+                        on_close={on_retener_close}
+                        on_success={on_retener_success}
+                    />
+                </>
+            }
         },
     );
 
-    let recargo_detail_html = (**editing).as_ref().map_or_else(
-        || html! {},
-        render_recargo_detail,
-    );
+    let recargo_detail_html = (**editing)
+        .as_ref()
+        .map_or_else(|| html! {}, render_recargo_detail);
 
     html! {
         <>
@@ -1709,7 +1735,7 @@ pub fn Contratos() -> Html {
     let preview_data = use_state(|| Option::<PreviewPagos>::None);
     let preview_confirming = use_state(|| false);
 
-    let confidences = use_state(HashMap::<String, f64>::new);
+    let confidences = use_state(|| Rc::new(HashMap::<String, f64>::new()));
 
     let show_retener_modal = use_state(|| false);
 
@@ -1753,10 +1779,10 @@ pub fn Contratos() -> Html {
     let inq_label = {
         let inquilinos = inquilinos.clone();
         Callback::from(move |id: String| -> String {
-            inquilinos
-                .iter()
-                .find(|i| i.id == id)
-                .map_or_else(|| id.clone(), |i| format!("{} {} ({})", i.nombre, i.apellido, i.cedula))
+            inquilinos.iter().find(|i| i.id == id).map_or_else(
+                || id.clone(),
+                |i| format!("{} {} ({})", i.nombre, i.apellido, i.cedula),
+            )
         })
     };
 
@@ -1789,7 +1815,7 @@ pub fn Contratos() -> Html {
             editing.set(None);
             show_form.set(false);
             form_errors.set(FormErrors::default());
-            confidences.set(HashMap::new());
+            confidences.set(Rc::new(HashMap::new()));
         }
     };
 
@@ -1932,16 +1958,16 @@ pub fn Contratos() -> Html {
                 }
                 conf_map.insert(field.name.clone(), field.confidence);
             }
-            confidences.set(conf_map);
+            confidences.set(Rc::new(conf_map));
         })
     };
 
     let on_confidence_clear = {
         let confidences = confidences.clone();
         Callback::from(move |name: String| {
-            let mut c = (*confidences).clone();
+            let mut c = (*confidences).as_ref().clone();
             c.remove(&name);
-            confidences.set(c);
+            confidences.set(Rc::new(c));
         })
     };
 
@@ -2087,7 +2113,11 @@ pub fn Contratos() -> Html {
                 };
                 match api_put::<Contrato, _>(&format!("/contratos/{id}/deposito"), &body).await {
                     Ok(_) => {
-                        push_toast(toasts.as_ref(), "Depósito marcado como cobrado", ToastKind::Success);
+                        push_toast(
+                            toasts.as_ref(),
+                            "Depósito marcado como cobrado",
+                            ToastKind::Success,
+                        );
                         reload.set(*reload + 1);
                     }
                     Err(err) => {
@@ -2117,7 +2147,11 @@ pub fn Contratos() -> Html {
                 };
                 match api_put::<Contrato, _>(&format!("/contratos/{id}/deposito"), &body).await {
                     Ok(_) => {
-                        push_toast(toasts.as_ref(), "Depósito devuelto exitosamente", ToastKind::Success);
+                        push_toast(
+                            toasts.as_ref(),
+                            "Depósito devuelto exitosamente",
+                            ToastKind::Success,
+                        );
                         reload.set(*reload + 1);
                     }
                     Err(err) => {
@@ -2154,77 +2188,84 @@ pub fn Contratos() -> Html {
         super::page_helpers::pagination_cbs(&page, &per_page, &reload);
 
     let editing_id = editing.as_ref().map(|e| e.id.clone());
-    let retener_contrato_id = AttrValue::from(
-        editing.as_ref().map(|e| e.id.clone()).unwrap_or_default(),
-    );
+    let retener_contrato_id =
+        AttrValue::from(editing.as_ref().map(|e| e.id.clone()).unwrap_or_default());
     let token = auth
         .as_ref()
         .and_then(|a| a.token.clone())
         .unwrap_or_default();
 
     render_contratos_view(
-        *loading,
-        &user_rol,
-        &error,
-        &delete_target,
-        &renew_target,
-        &renew_fecha_fin,
-        &renew_monto,
-        &terminate_target,
-        &terminate_fecha,
-        preview_data.as_ref(),
-        *preview_confirming,
-        on_preview_confirm,
-        on_preview_cancel,
-        *show_form,
-        &editing,
-        &propiedad_id,
-        &inquilino_id,
-        &fecha_inicio,
-        &fecha_fin,
-        &monto_mensual,
-        &deposito,
-        &moneda,
-        &estado,
-        &recargo_porcentaje,
-        &dias_gracia,
-        &propiedades,
-        &inquilinos,
-        &form_errors,
-        *submitting,
-        on_submit,
-        on_cancel,
-        on_new,
-        on_delete_confirm,
-        on_delete_cancel,
-        on_renew_confirm,
-        on_renew_cancel,
-        on_terminate_confirm,
-        on_terminate_cancel,
-        &items,
-        *total,
-        *page,
-        *per_page,
-        prop_label,
-        inq_label,
-        on_edit,
-        on_delete_click,
-        on_renew_click,
-        on_terminate_click,
-        on_generar_pagos_click,
-        on_page_change,
-        on_per_page_change,
-        &confidences,
-        on_ocr_result,
-        on_confidence_clear,
-        editing_id,
-        token,
-        on_cobrar,
-        on_devolver,
-        on_retener,
-        *show_retener_modal,
-        retener_contrato_id,
-        on_retener_close,
-        on_retener_success,
+        ContratoViewState {
+            loading: *loading,
+            user_rol: &user_rol,
+            error: &error,
+            items: &items,
+            total: *total,
+            page: *page,
+            per_page: *per_page,
+        },
+        ContratoFormState {
+            show_form: *show_form,
+            editing: &editing,
+            propiedad_id: &propiedad_id,
+            inquilino_id: &inquilino_id,
+            fecha_inicio: &fecha_inicio,
+            fecha_fin: &fecha_fin,
+            monto_mensual: &monto_mensual,
+            deposito: &deposito,
+            moneda: &moneda,
+            estado: &estado,
+            recargo_porcentaje: &recargo_porcentaje,
+            dias_gracia: &dias_gracia,
+            propiedades: &propiedades,
+            inquilinos: &inquilinos,
+            form_errors: &form_errors,
+            submitting: *submitting,
+            confidences: &confidences,
+            editing_id,
+            token,
+        },
+        ContratoViewCallbacks {
+            on_submit,
+            on_cancel,
+            on_new,
+            on_edit,
+            on_delete_click,
+            on_delete_confirm,
+            on_delete_cancel,
+            on_renew_click,
+            on_renew_confirm,
+            on_renew_cancel,
+            on_terminate_click,
+            on_terminate_confirm,
+            on_terminate_cancel,
+            on_generar_pagos_click,
+            on_preview_confirm,
+            on_preview_cancel,
+            on_page_change,
+            on_per_page_change,
+            prop_label,
+            inq_label,
+            on_ocr_result,
+            on_confidence_clear,
+            on_cobrar,
+            on_devolver,
+            on_retener,
+            on_retener_close,
+            on_retener_success,
+        },
+        ContratoModalState {
+            delete_target: &delete_target,
+            renew_target: &renew_target,
+            renew_fecha_fin: &renew_fecha_fin,
+            renew_monto: &renew_monto,
+            terminate_target: &terminate_target,
+            terminate_fecha: &terminate_fecha,
+            preview_data: preview_data.as_ref(),
+            preview_confirming: *preview_confirming,
+            show_retener_modal: *show_retener_modal,
+            retener_contrato_id,
+        },
     )
 }

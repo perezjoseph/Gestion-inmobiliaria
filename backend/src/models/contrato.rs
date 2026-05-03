@@ -22,6 +22,7 @@ pub struct CreateContratoRequest {
     pub moneda: Option<String>,
     pub recargo_porcentaje: Option<Decimal>,
     pub dias_gracia: Option<i32>,
+    pub dia_vencimiento: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -29,6 +30,7 @@ pub struct CreateContratoRequest {
 pub struct RenovarContratoRequest {
     pub fecha_fin: NaiveDate,
     pub monto_mensual: Decimal,
+    pub dia_vencimiento: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]

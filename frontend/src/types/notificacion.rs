@@ -40,4 +40,3 @@ pub struct ConteoNoLeidas {
 pub struct MarcarTodasResponse {
     pub actualizadas: u64,
 }
-

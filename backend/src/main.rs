@@ -41,7 +41,11 @@ async fn main() -> std::io::Result<()> {
 
     // Iniciar scheduler de tareas de fondo
     let scheduler_db = db.clone();
-    realestate_backend::services::background_jobs::iniciar_scheduler(scheduler_db);
+    let shutdown_token = tokio_util::sync::CancellationToken::new();
+    let _scheduler_handles = realestate_backend::services::background_jobs::iniciar_scheduler(
+        scheduler_db,
+        shutdown_token.clone(),
+    );
 
     tracing::info!("Servidor iniciando en 0.0.0.0:{}", port);
 

@@ -14,8 +14,8 @@ use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::document_gallery::DocumentGallery;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::ocr_scan_button::OcrScanButton;
-use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::pagination::Pagination;
+use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{BASE_URL, api_delete, api_get, api_post, api_put};
 use crate::types::PaginatedResponse;
@@ -169,20 +169,19 @@ fn PagoForm(props: &PagoFormProps) -> Html {
         }};
     }
 
-    let confidence_for = |name: &str| -> Option<f64> {
-        props.confidences.get(name).copied()
-    };
+    let confidence_for = |name: &str| -> Option<f64> { props.confidences.get(name).copied() };
 
-    let input_cb_conf = |state: &UseStateHandle<String>, field_name: &str| -> Callback<InputEvent> {
-        let s = state.clone();
-        let clear = props.on_confidence_clear.clone();
-        let name = field_name.to_string();
-        Callback::from(move |e: InputEvent| {
-            let input: web_sys::HtmlInputElement = e.target_unchecked_into();
-            s.set(input.value());
-            clear.emit(name.clone());
-        })
-    };
+    let input_cb_conf =
+        |state: &UseStateHandle<String>, field_name: &str| -> Callback<InputEvent> {
+            let s = state.clone();
+            let clear = props.on_confidence_clear.clone();
+            let name = field_name.to_string();
+            Callback::from(move |e: InputEvent| {
+                let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+                s.set(input.value());
+                clear.emit(name.clone());
+            })
+        };
 
     let scan_button = if props.is_editing {
         html! {}
@@ -553,30 +552,27 @@ fn format_contrato_label(
     propiedades: &[Propiedad],
     inquilinos: &[Inquilino],
 ) -> String {
-    contratos
-        .iter()
-        .find(|c| c.id == id)
-        .map_or_else(
-            || id.to_string(),
-            |c| {
-                let prop_name = propiedades
-                    .iter()
-                    .find(|p| p.id == c.propiedad_id)
-                    .map_or("—", |p| p.titulo.as_str());
-                let tenant_name = inquilinos
-                    .iter()
-                    .find(|i| i.id == c.inquilino_id)
-                    .map_or_else(String::new, |i| format!("{} {}", i.nombre, i.apellido));
-                if tenant_name.is_empty() {
-                    format!("{} — {} {}", prop_name, c.moneda, c.monto_mensual)
-                } else {
-                    format!(
-                        "{} ({}) — {} {}",
-                        prop_name, tenant_name, c.moneda, c.monto_mensual
-                    )
-                }
-            },
-        )
+    contratos.iter().find(|c| c.id == id).map_or_else(
+        || id.to_string(),
+        |c| {
+            let prop_name = propiedades
+                .iter()
+                .find(|p| p.id == c.propiedad_id)
+                .map_or("—", |p| p.titulo.as_str());
+            let tenant_name = inquilinos
+                .iter()
+                .find(|i| i.id == c.inquilino_id)
+                .map_or_else(String::new, |i| format!("{} {}", i.nombre, i.apellido));
+            if tenant_name.is_empty() {
+                format!("{} — {} {}", prop_name, c.moneda, c.monto_mensual)
+            } else {
+                format!(
+                    "{} ({}) — {} {}",
+                    prop_name, tenant_name, c.moneda, c.monto_mensual
+                )
+            }
+        },
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -909,8 +905,10 @@ pub fn Pagos() -> Html {
                 .fold(0.0_f64, f64::max);
                 conf_map.insert("notas".to_string(), max_conf);
             }
-            conf_map.insert("fecha_pago".to_string(),
-                conf_map.get("fecha").copied().unwrap_or(0.0));
+            conf_map.insert(
+                "fecha_pago".to_string(),
+                conf_map.get("fecha").copied().unwrap_or(0.0),
+            );
             conf_map.insert("metodo_pago".to_string(), 1.0);
             confidences.set(conf_map);
         })
@@ -1282,10 +1280,9 @@ fn render_pago_form_section(
     if !**show_form {
         return html! {};
     }
-    let recargo_detail = editing.as_ref().map_or_else(
-        || html! {},
-        render_pago_recargo_detail,
-    );
+    let recargo_detail = editing
+        .as_ref()
+        .map_or_else(|| html! {}, render_pago_recargo_detail);
     html! {
         <>
         {recargo_detail}

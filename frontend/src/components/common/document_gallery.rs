@@ -546,10 +546,7 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
     let is_image = doc.mime_type.starts_with("image/");
     let file_url = format!("{}/{}", BASE_URL.trim_end_matches("/api"), doc.file_path);
     let size_label = format_file_size(doc.file_size);
-    let estado = doc
-        .estado_verificacion
-        .as_deref()
-        .unwrap_or("pendiente");
+    let estado = doc.estado_verificacion.as_deref().unwrap_or("pendiente");
     let tipo = doc.tipo_documento.as_deref().unwrap_or("otro");
     let tipo_label = tipo_doc_label(tipo, &props.entity_type);
     let editor_url = format!(

@@ -99,7 +99,9 @@ mod pbt_async {
             eprintln!("⚠ DATABASE_URL not set – skipping PBT");
             return;
         }
-        let _guard = crate::GLOBAL_DB_SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::GLOBAL_DB_SERIAL
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let Some((rt, db)) = shared_rt_and_db() else {
             eprintln!("⚠ DB not reachable – skipping PBT");
             return;
@@ -486,6 +488,7 @@ mod pbt_async {
                 moneda: None,
                 recargo_porcentaje: Some(invalid_pct),
                 dias_gracia: None,
+                dia_vencimiento: None,
             };
             let result =
                 realestate_backend::services::contratos::create(&db, create_req, user_id, org_id)
@@ -524,6 +527,7 @@ mod pbt_async {
                 moneda: None,
                 recargo_porcentaje: None,
                 dias_gracia: Some(negative_dias),
+                dia_vencimiento: None,
             };
             let result =
                 realestate_backend::services::contratos::create(&db, create_req, user_id, org_id)

@@ -9,8 +9,7 @@ pub fn OfflineBanner() -> Html {
         let is_offline = is_offline.clone();
         use_effect_with((), move |()| {
             let check_online = move || {
-                let online = web_sys::window()
-                    .is_none_or(|w| w.navigator().on_line());
+                let online = web_sys::window().is_none_or(|w| w.navigator().on_line());
                 is_offline.set(!online);
             };
             check_online();

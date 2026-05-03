@@ -66,37 +66,40 @@ pub fn DocumentoEditorPage(props: &DocumentoEditorPageProps) -> Html {
         let eid = entity_id.clone();
         let did = documento_id.clone();
 
-        use_effect_with((etype, eid, did), move |(entity_type, entity_id, documento_id)| {
-            let entity_type = entity_type.clone();
-            let entity_id = entity_id.clone();
-            let documento_id = documento_id.clone();
-            spawn_local(async move {
-                if let Some(ref doc_id) = documento_id {
-                    match fetch_document(&entity_type, &entity_id, doc_id).await {
-                        Ok(doc) => {
-                            contenido.set(doc.contenido_editable.clone());
-                            documento.set(Some(doc));
-                            mode.set(PageMode::Editor);
+        use_effect_with(
+            (etype, eid, did),
+            move |(entity_type, entity_id, documento_id)| {
+                let entity_type = entity_type.clone();
+                let entity_id = entity_id.clone();
+                let documento_id = documento_id.clone();
+                spawn_local(async move {
+                    if let Some(ref doc_id) = documento_id {
+                        match fetch_document(&entity_type, &entity_id, doc_id).await {
+                            Ok(doc) => {
+                                contenido.set(doc.contenido_editable.clone());
+                                documento.set(Some(doc));
+                                mode.set(PageMode::Editor);
+                            }
+                            Err(err) => {
+                                error.set(Some(err));
+                                mode.set(PageMode::Editor);
+                            }
                         }
-                        Err(err) => {
-                            error.set(Some(err));
-                            mode.set(PageMode::Editor);
+                    } else {
+                        match fetch_plantillas(&entity_type).await {
+                            Ok(tpls) => {
+                                plantillas.set(tpls);
+                                mode.set(PageMode::TemplateSelector);
+                            }
+                            Err(err) => {
+                                error.set(Some(err));
+                                mode.set(PageMode::TemplateSelector);
+                            }
                         }
                     }
-                } else {
-                    match fetch_plantillas(&entity_type).await {
-                        Ok(tpls) => {
-                            plantillas.set(tpls);
-                            mode.set(PageMode::TemplateSelector);
-                        }
-                        Err(err) => {
-                            error.set(Some(err));
-                            mode.set(PageMode::TemplateSelector);
-                        }
-                    }
-                }
-            });
-        });
+                });
+            },
+        );
     }
 
     // Save handler

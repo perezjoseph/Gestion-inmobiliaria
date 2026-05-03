@@ -11,8 +11,8 @@ use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::document_gallery::DocumentGallery;
 use crate::components::common::error_banner::ErrorBanner;
-use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::pagination::Pagination;
+use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::components::propiedades::unidades_tab::UnidadesTab;
 use crate::services::api::{api_delete, api_get, api_post, api_put};
@@ -549,9 +549,8 @@ fn validate_propiedad_fields(
         );
     }
     if direccion.trim().is_empty() {
-        errs.direccion = Some(
-            "Ingrese la dirección completa, ej: \"Calle Principal #12, Ens. Naco\"".into(),
-        );
+        errs.direccion =
+            Some("Ingrese la dirección completa, ej: \"Calle Principal #12, Ens. Naco\"".into());
     }
     if ciudad.trim().is_empty() {
         errs.ciudad = Some("Ingrese la ciudad, ej: \"Santo Domingo\"".into());
@@ -1151,13 +1150,10 @@ pub fn Propiedades() -> Html {
         let fe = (*filter_estado).clone();
         let sf = (*sort_field).clone();
         let so = (*sort_order).clone();
-        use_effect_with(
-            (reload_val, pg),
-            move |_| {
-                let url = build_propiedades_url(pg, pp, &fc, &ft, &fe, sf.as_ref(), so.as_ref());
-                load_propiedades_data(items, total, error, loading, url);
-            },
-        );
+        use_effect_with((reload_val, pg), move |_| {
+            let url = build_propiedades_url(pg, pp, &fc, &ft, &fe, sf.as_ref(), so.as_ref());
+            load_propiedades_data(items, total, error, loading, url);
+        });
     }
 
     let reset_form = {

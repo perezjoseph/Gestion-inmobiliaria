@@ -156,10 +156,17 @@ fn switch(routes: Route) -> Html {
         Route::Mantenimiento => html! { <ProtectedRoute><Mantenimiento /></ProtectedRoute> },
         Route::Notificaciones => html! { <ProtectedRoute><Notificaciones /></ProtectedRoute> },
         Route::Configuracion => html! { <ProtectedRoute><Configuracion /></ProtectedRoute> },
-        Route::DocumentoEditor { entity_type, entity_id } => html! {
+        Route::DocumentoEditor {
+            entity_type,
+            entity_id,
+        } => html! {
             <ProtectedRoute><DocumentoEditorPage entity_type={entity_type} entity_id={entity_id} /></ProtectedRoute>
         },
-        Route::DocumentoEditorExisting { entity_type, entity_id, documento_id } => html! {
+        Route::DocumentoEditorExisting {
+            entity_type,
+            entity_id,
+            documento_id,
+        } => html! {
             <ProtectedRoute><DocumentoEditorPage entity_type={entity_type} entity_id={entity_id} documento_id={Some(documento_id)} /></ProtectedRoute>
         },
         Route::NotFound => {
@@ -199,7 +206,6 @@ pub fn ProtectedRoute(props: &ProtectedRouteProps) -> Html {
             if !*authed {
                 navigator.push(&Route::Login);
             }
-        
         });
     }
 
@@ -292,10 +298,7 @@ pub fn App() -> Html {
         web_sys::window()
             .and_then(|w| w.document())
             .and_then(|d| d.document_element())
-            .is_some_and(|el| {
-                el.get_attribute("data-theme")
-                    .is_some_and(|t| t == "dark")
-            })
+            .is_some_and(|el| el.get_attribute("data-theme").is_some_and(|t| t == "dark"))
     });
 
     if needs_restore {

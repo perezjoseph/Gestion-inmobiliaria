@@ -61,7 +61,9 @@ where
         eprintln!("⚠ DATABASE_URL not set – skipping integration test");
         return;
     }
-    let _guard = crate::GLOBAL_DB_SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = crate::GLOBAL_DB_SERIAL
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let Some((rt, db)) = shared_rt_and_db() else {
         eprintln!("⚠ DB not reachable – skipping integration test");
         return;
