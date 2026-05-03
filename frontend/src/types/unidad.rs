@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::{deserialize_f64_from_any, deserialize_option_f64_from_any};
 
+#[allow(clippy::struct_field_names)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Unidad {
@@ -52,11 +53,3 @@ pub struct UpdateUnidad {
     pub descripcion: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct OcupacionResumen {
-    pub total_unidades: u64,
-    pub unidades_ocupadas: u64,
-    #[serde(deserialize_with = "deserialize_f64_from_any")]
-    pub tasa_ocupacion: f64,
-}
