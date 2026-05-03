@@ -1,21 +1,61 @@
-use chrono::{Duration, Utc};
+use chrono::{Duration, NaiveDate, Utc};
+use rust_decimal::Decimal;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DatabaseConnection, EntityTrait,
     PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
 };
 use uuid::Uuid;
 
-use crate::entities::{contrato, inquilino, propiedad};
+use crate::entities::{contrato, inquilino, pago, propiedad};
 use crate::errors::AppError;
+use crate::services::pago_generacion::{calcular_pagos, PagoGenerado};
 use crate::models::PaginatedResponse;
 use crate::models::contrato::{
-    ContratoResponse, CreateContratoRequest, RenovarContratoRequest, TerminarContratoRequest,
-    UpdateContratoRequest,
+    CambiarEstadoDepositoRequest, ContratoResponse, CreateContratoRequest,
+    RenovarContratoRequest, TerminarContratoRequest, UpdateContratoRequest,
 };
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
 use crate::services::validation::{validate_enum, MONEDAS};
 
 const ESTADOS_CONTRATO: &[&str] = &["activo", "vencido", "cancelado"];
+
+pub const ESTADOS_DEPOSITO: &[&str] = &["pendiente", "cobrado", "devuelto", "retenido"];
+
+/// Pure validation of deposit state transitions.
+///
+/// Valid transitions:
+///   pendiente → cobrado
+///   cobrado   → devuelto
+///   cobrado   → retenido
+pub fn validar_transicion_deposito(
+    estado_actual: &str,
+    nuevo_estado: &str,
+) -> Result<(), AppError> {
+    match (estado_actual, nuevo_estado) {
+        // Valid transitions
+        ("pendiente", "cobrado") | ("cobrado", "devuelto" | "retenido") => Ok(()),
+
+        // pendiente cannot skip to devuelto or retenido
+        ("pendiente", "devuelto" | "retenido") => Err(AppError::Validation(
+            "El depósito debe ser cobrado antes de ser devuelto o retenido".to_string(),
+        )),
+
+        // Terminal states cannot transition
+        ("devuelto" | "retenido", _) => Err(AppError::Validation(
+            "Los depósitos devueltos o retenidos no pueden cambiar de estado".to_string(),
+        )),
+
+        // cobrado cannot revert to pendiente
+        ("cobrado", "pendiente") => Err(AppError::Validation(
+            "No se puede revertir un depósito cobrado a pendiente".to_string(),
+        )),
+
+        // Any other combination (e.g. same state, unknown states)
+        _ => Err(AppError::Validation(format!(
+            "Transición de estado de depósito no válida: {estado_actual} → {nuevo_estado}"
+        ))),
+    }
+}
 
 impl From<contrato::Model> for ContratoResponse {
     fn from(m: contrato::Model) -> Self {
@@ -31,6 +71,16 @@ impl From<contrato::Model> for ContratoResponse {
             estado: m.estado,
             created_at: m.created_at.into(),
             updated_at: m.updated_at.into(),
+            pagos_generados: None,
+            estado_deposito: m.estado_deposito,
+            fecha_cobro_deposito: m.fecha_cobro_deposito.map(|dt| dt.with_timezone(&Utc)),
+            fecha_devolucion_deposito: m
+                .fecha_devolucion_deposito
+                .map(|dt| dt.with_timezone(&Utc)),
+            monto_retenido: m.monto_retenido,
+            motivo_retencion: m.motivo_retencion,
+            recargo_porcentaje: m.recargo_porcentaje,
+            dias_gracia: m.dias_gracia,
         }
     }
 }
@@ -64,6 +114,62 @@ async fn validate_no_overlap<C: ConnectionTrait>(
     Ok(())
 }
 
+pub(crate) async fn insertar_pagos_generados<C: ConnectionTrait>(
+    db: &C,
+    contrato_id: Uuid,
+    organizacion_id: Uuid,
+    pagos: &[PagoGenerado],
+) -> Result<usize, AppError> {
+    let mut count = 0;
+    for p in pagos {
+        let now = Utc::now().into();
+        let model = pago::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            contrato_id: Set(contrato_id),
+            monto: Set(p.monto),
+            moneda: Set(p.moneda.clone()),
+            fecha_pago: Set(None),
+            fecha_vencimiento: Set(p.fecha_vencimiento),
+            metodo_pago: Set(None),
+            estado: Set("pendiente".to_string()),
+            notas: Set(None),
+            recargo: Set(None),
+            organizacion_id: Set(organizacion_id),
+            created_at: Set(now),
+            updated_at: Set(now),
+        };
+        model.insert(db).await?;
+        count += 1;
+    }
+    Ok(count)
+}
+
+async fn cancelar_pagos_futuros<C: ConnectionTrait>(
+    db: &C,
+    contrato_id: Uuid,
+    fecha_terminacion: NaiveDate,
+) -> Result<usize, AppError> {
+    let result = pago::Entity::update_many()
+        .col_expr(
+            pago::Column::Estado,
+            sea_orm::sea_query::Expr::value("cancelado"),
+        )
+        .col_expr(
+            pago::Column::UpdatedAt,
+            sea_orm::sea_query::Expr::value(Utc::now().fixed_offset()),
+        )
+        .filter(
+            Condition::all()
+                .add(pago::Column::ContratoId.eq(contrato_id))
+                .add(pago::Column::Estado.eq("pendiente"))
+                .add(pago::Column::FechaVencimiento.gt(fecha_terminacion)),
+        )
+        .exec(db)
+        .await?;
+
+    Ok(result.rows_affected as usize)
+}
+
 pub async fn create(
     db: &DatabaseConnection,
     input: CreateContratoRequest,
@@ -74,6 +180,22 @@ pub async fn create(
         return Err(AppError::Validation(
             "La fecha de fin debe ser posterior a la fecha de inicio".to_string(),
         ));
+    }
+
+    if let Some(p) = input.recargo_porcentaje {
+        if p < Decimal::ZERO || p > Decimal::from(100) {
+            return Err(AppError::Validation(
+                "El porcentaje de recargo debe estar entre 0 y 100".to_string(),
+            ));
+        }
+    }
+
+    if let Some(d) = input.dias_gracia {
+        if d < 0 {
+            return Err(AppError::Validation(
+                "Los días de gracia deben ser mayor o igual a 0".to_string(),
+            ));
+        }
     }
 
     if let Some(ref moneda) = input.moneda {
@@ -105,6 +227,11 @@ pub async fn create(
     let now = Utc::now().into();
     let id = Uuid::new_v4();
 
+    let estado_deposito = match input.deposito {
+        Some(d) if d > rust_decimal::Decimal::ZERO => Some("pendiente".to_string()),
+        _ => None,
+    };
+
     let model = contrato::ActiveModel {
         id: Set(id),
         propiedad_id: Set(input.propiedad_id),
@@ -119,6 +246,13 @@ pub async fn create(
         organizacion_id: Set(organizacion_id),
         created_at: Set(now),
         updated_at: Set(now),
+        estado_deposito: Set(estado_deposito),
+        fecha_cobro_deposito: Set(None),
+        fecha_devolucion_deposito: Set(None),
+        monto_retenido: Set(None),
+        motivo_retencion: Set(None),
+        recargo_porcentaje: Set(input.recargo_porcentaje),
+        dias_gracia: Set(input.dias_gracia),
     };
 
     let record = model.insert(&txn).await?;
@@ -140,13 +274,46 @@ pub async fn create(
     )
     .await;
 
+    // Generate pagos automatically for active contracts
+    let pagos_count = if record.estado == "activo" {
+        let pagos = calcular_pagos(
+            record.fecha_inicio,
+            record.fecha_fin,
+            record.monto_mensual,
+            &record.moneda,
+            1, // default dia_vencimiento
+        );
+        let count = insertar_pagos_generados(&txn, id, organizacion_id, &pagos).await?;
+
+        auditoria::registrar_best_effort(
+            &txn,
+            CreateAuditoriaEntry {
+                usuario_id,
+                entity_type: "contrato".to_string(),
+                entity_id: id,
+                accion: "generar_pagos_auto".to_string(),
+                cambios: serde_json::json!({
+                    "pagos_generados": count,
+                }),
+            },
+        )
+        .await;
+
+        Some(count)
+    } else {
+        None
+    };
+
     txn.commit().await?;
 
-    Ok(ContratoResponse::from(record))
+    let mut response = ContratoResponse::from(record);
+    response.pagos_generados = pagos_count;
+    Ok(response)
 }
 
-pub async fn get_by_id(db: &DatabaseConnection, id: Uuid) -> Result<ContratoResponse, AppError> {
+pub async fn get_by_id(db: &DatabaseConnection, org_id: Uuid, id: Uuid) -> Result<ContratoResponse, AppError> {
     let record = contrato::Entity::find_by_id(id)
+        .filter(contrato::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
@@ -155,6 +322,7 @@ pub async fn get_by_id(db: &DatabaseConnection, id: Uuid) -> Result<ContratoResp
 
 pub async fn list(
     db: &DatabaseConnection,
+    org_id: Uuid,
     page: Option<u64>,
     per_page: Option<u64>,
 ) -> Result<PaginatedResponse<ContratoResponse>, AppError> {
@@ -162,6 +330,7 @@ pub async fn list(
     let per_page = per_page.unwrap_or(20).clamp(1, 100);
 
     let paginator = contrato::Entity::find()
+        .filter(contrato::Column::OrganizacionId.eq(org_id))
         .order_by_desc(contrato::Column::CreatedAt)
         .paginate(db, per_page);
 
@@ -178,6 +347,7 @@ pub async fn list(
 
 pub async fn update(
     db: &DatabaseConnection,
+    org_id: Uuid,
     id: Uuid,
     input: UpdateContratoRequest,
     usuario_id: Uuid,
@@ -186,7 +356,24 @@ pub async fn update(
         validate_enum("estado", estado, ESTADOS_CONTRATO)?;
     }
 
+    if let Some(p) = input.recargo_porcentaje {
+        if p < Decimal::ZERO || p > Decimal::from(100) {
+            return Err(AppError::Validation(
+                "El porcentaje de recargo debe estar entre 0 y 100".to_string(),
+            ));
+        }
+    }
+
+    if let Some(d) = input.dias_gracia {
+        if d < 0 {
+            return Err(AppError::Validation(
+                "Los días de gracia deben ser mayor o igual a 0".to_string(),
+            ));
+        }
+    }
+
     let existing = contrato::Entity::find_by_id(id)
+        .filter(contrato::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
@@ -217,6 +404,12 @@ pub async fn update(
     }
     if let Some(ref estado) = input.estado {
         active.estado = Set(estado.clone());
+    }
+    if let Some(recargo_porcentaje) = input.recargo_porcentaje {
+        active.recargo_porcentaje = Set(Some(recargo_porcentaje));
+    }
+    if let Some(dias_gracia) = input.dias_gracia {
+        active.dias_gracia = Set(Some(dias_gracia));
     }
 
     active.updated_at = Set(Utc::now().into());
@@ -251,13 +444,17 @@ pub async fn update(
     Ok(ContratoResponse::from(updated))
 }
 
-pub async fn delete(db: &DatabaseConnection, id: Uuid, usuario_id: Uuid) -> Result<(), AppError> {
+pub async fn delete(db: &DatabaseConnection, org_id: Uuid, id: Uuid, usuario_id: Uuid) -> Result<(), AppError> {
     let txn = db.begin().await?;
 
-    let result = contrato::Entity::delete_by_id(id).exec(&txn).await?;
-    if result.rows_affected == 0 {
-        return Err(AppError::NotFound("Contrato no encontrado".to_string()));
-    }
+    let existing = contrato::Entity::find_by_id(id)
+        .filter(contrato::Column::OrganizacionId.eq(org_id))
+        .one(&txn)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
+
+    let active: contrato::ActiveModel = existing.into();
+    active.delete(&txn).await?;
 
     auditoria::registrar_best_effort(
         &txn,
@@ -278,6 +475,7 @@ pub async fn delete(db: &DatabaseConnection, id: Uuid, usuario_id: Uuid) -> Resu
 
 pub async fn renovar(
     db: &DatabaseConnection,
+    org_id: Uuid,
     contrato_id: Uuid,
     input: RenovarContratoRequest,
     usuario_id: Uuid,
@@ -285,6 +483,7 @@ pub async fn renovar(
     let txn = db.begin().await?;
 
     let original = contrato::Entity::find_by_id(contrato_id)
+        .filter(contrato::Column::OrganizacionId.eq(org_id))
         .one(&txn)
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
@@ -326,6 +525,13 @@ pub async fn renovar(
         organizacion_id: Set(original.organizacion_id),
         created_at: Set(now),
         updated_at: Set(now),
+        estado_deposito: Set(None),
+        fecha_cobro_deposito: Set(None),
+        fecha_devolucion_deposito: Set(None),
+        monto_retenido: Set(None),
+        motivo_retencion: Set(None),
+        recargo_porcentaje: Set(original.recargo_porcentaje),
+        dias_gracia: Set(original.dias_gracia),
     };
 
     let new_record = new_contrato.insert(&txn).await?;
@@ -351,13 +557,41 @@ pub async fn renovar(
     )
     .await;
 
+    // Generate pagos automatically for the renewed contract
+    let pagos = calcular_pagos(
+        new_record.fecha_inicio,
+        new_record.fecha_fin,
+        new_record.monto_mensual,
+        &new_record.moneda,
+        1, // default dia_vencimiento
+    );
+    let pagos_count =
+        insertar_pagos_generados(&txn, new_id, new_record.organizacion_id, &pagos).await?;
+
+    auditoria::registrar_best_effort(
+        &txn,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "contrato".to_string(),
+            entity_id: new_id,
+            accion: "generar_pagos_auto".to_string(),
+            cambios: serde_json::json!({
+                "pagos_generados": pagos_count,
+            }),
+        },
+    )
+    .await;
+
     txn.commit().await?;
 
-    Ok(ContratoResponse::from(new_record))
+    let mut response = ContratoResponse::from(new_record);
+    response.pagos_generados = Some(pagos_count);
+    Ok(response)
 }
 
 pub async fn terminar(
     db: &DatabaseConnection,
+    org_id: Uuid,
     contrato_id: Uuid,
     input: TerminarContratoRequest,
     usuario_id: Uuid,
@@ -365,6 +599,7 @@ pub async fn terminar(
     let txn = db.begin().await?;
 
     let existing = contrato::Entity::find_by_id(contrato_id)
+        .filter(contrato::Column::OrganizacionId.eq(org_id))
         .one(&txn)
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
@@ -427,13 +662,52 @@ pub async fn terminar(
     )
     .await;
 
+    // Cancel future pending pagos
+    let pagos_cancelados =
+        cancelar_pagos_futuros(&txn, contrato_id, input.fecha_terminacion).await?;
+
+    auditoria::registrar_best_effort(
+        &txn,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "contrato".to_string(),
+            entity_id: contrato_id,
+            accion: "cancelar_pagos_futuros".to_string(),
+            cambios: serde_json::json!({
+                "pagos_cancelados": pagos_cancelados,
+            }),
+        },
+    )
+    .await;
+
     txn.commit().await?;
 
     Ok(ContratoResponse::from(updated))
 }
 
+pub async fn marcar_vencidos(db: &DatabaseConnection) -> Result<u64, AppError> {
+    let today = Utc::now().date_naive();
+
+    let result = contrato::Entity::update_many()
+        .col_expr(
+            contrato::Column::Estado,
+            sea_orm::sea_query::Expr::value("vencido"),
+        )
+        .col_expr(
+            contrato::Column::UpdatedAt,
+            sea_orm::sea_query::Expr::value(Utc::now().fixed_offset()),
+        )
+        .filter(contrato::Column::FechaFin.lt(today))
+        .filter(contrato::Column::Estado.eq("activo"))
+        .exec(db)
+        .await?;
+
+    Ok(result.rows_affected)
+}
+
 pub async fn listar_por_vencer(
     db: &DatabaseConnection,
+    org_id: Uuid,
     dias: Option<i64>,
 ) -> Result<Vec<ContratoResponse>, AppError> {
     let dias = dias.unwrap_or(90).min(365);
@@ -443,6 +717,7 @@ pub async fn listar_por_vencer(
     let records = contrato::Entity::find()
         .filter(
             Condition::all()
+                .add(contrato::Column::OrganizacionId.eq(org_id))
                 .add(contrato::Column::Estado.eq("activo"))
                 .add(contrato::Column::FechaFin.gte(today))
                 .add(contrato::Column::FechaFin.lte(cutoff)),
@@ -452,4 +727,189 @@ pub async fn listar_por_vencer(
         .await?;
 
     Ok(records.into_iter().map(ContratoResponse::from).collect())
+}
+
+pub async fn cambiar_estado_deposito(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    contrato_id: Uuid,
+    input: CambiarEstadoDepositoRequest,
+    usuario_id: Uuid,
+) -> Result<ContratoResponse, AppError> {
+    // 1. Find contrato by ID, scoped to org
+    let existing = contrato::Entity::find_by_id(contrato_id)
+        .filter(contrato::Column::OrganizacionId.eq(org_id))
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
+
+    // 2. Validate contrato has deposito > 0
+    let deposito = existing
+        .deposito
+        .filter(|d| *d > rust_decimal::Decimal::ZERO)
+        .ok_or_else(|| {
+            AppError::Validation(
+                "El contrato no tiene depósito de garantía".to_string(),
+            )
+        })?;
+
+    // 3. Validate estado enum
+    validate_enum("estado de depósito", &input.estado, ESTADOS_DEPOSITO)?;
+
+    // 4. Get current estado_deposito
+    let estado_actual = existing
+        .estado_deposito
+        .clone()
+        .ok_or_else(|| {
+            AppError::Validation(
+                "El contrato no tiene depósito de garantía".to_string(),
+            )
+        })?;
+
+    // 5. Validate transition
+    validar_transicion_deposito(&estado_actual, &input.estado)?;
+
+    // 6. For retenido: validate monto_retenido and motivo_retencion
+    if input.estado == "retenido" {
+        let monto = input.monto_retenido.ok_or_else(|| {
+            AppError::Validation(
+                "El monto retenido es requerido para retención".to_string(),
+            )
+        })?;
+
+        if monto <= rust_decimal::Decimal::ZERO {
+            return Err(AppError::Validation(
+                "El monto retenido debe ser mayor a cero".to_string(),
+            ));
+        }
+
+        if monto > deposito {
+            return Err(AppError::Validation(
+                "El monto retenido no puede exceder el depósito".to_string(),
+            ));
+        }
+
+        let motivo = input.motivo_retencion.as_deref().unwrap_or("");
+        if motivo.trim().is_empty() {
+            return Err(AppError::Validation(
+                "El motivo de retención es requerido".to_string(),
+            ));
+        }
+    }
+
+    // 7. Open transaction and update fields based on new estado
+    let txn = db.begin().await?;
+
+    let mut active: contrato::ActiveModel = existing.into();
+    active.estado_deposito = Set(Some(input.estado.clone()));
+    active.updated_at = Set(Utc::now().into());
+
+    match input.estado.as_str() {
+        "cobrado" => {
+            active.fecha_cobro_deposito = Set(Some(Utc::now().into()));
+        }
+        "devuelto" => {
+            active.fecha_devolucion_deposito = Set(Some(Utc::now().into()));
+        }
+        "retenido" => {
+            active.fecha_devolucion_deposito = Set(Some(Utc::now().into()));
+            active.monto_retenido = Set(input.monto_retenido);
+            active.motivo_retencion = Set(input.motivo_retencion.clone());
+        }
+        _ => {}
+    }
+
+    let updated = active.update(&txn).await?;
+
+    // 8. Register auditoría
+    auditoria::registrar_best_effort(
+        &txn,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "contrato".to_string(),
+            entity_id: contrato_id,
+            accion: "cambiar_estado_deposito".to_string(),
+            cambios: serde_json::json!({
+                "estado_anterior": estado_actual,
+                "estado_nuevo": input.estado,
+                "contrato": ContratoResponse::from(updated.clone()),
+            }),
+        },
+    )
+    .await;
+
+    // 9. Commit and return
+    txn.commit().await?;
+
+    Ok(ContratoResponse::from(updated))
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- Valid transitions ---
+
+    #[test]
+    fn transicion_pendiente_a_cobrado_ok() {
+        assert!(validar_transicion_deposito("pendiente", "cobrado").is_ok());
+    }
+
+    #[test]
+    fn transicion_cobrado_a_devuelto_ok() {
+        assert!(validar_transicion_deposito("cobrado", "devuelto").is_ok());
+    }
+
+    #[test]
+    fn transicion_cobrado_a_retenido_ok() {
+        assert!(validar_transicion_deposito("cobrado", "retenido").is_ok());
+    }
+
+    // --- Invalid transitions ---
+
+    #[test]
+    fn transicion_pendiente_a_devuelto_err() {
+        assert!(validar_transicion_deposito("pendiente", "devuelto").is_err());
+    }
+
+    #[test]
+    fn transicion_pendiente_a_retenido_err() {
+        assert!(validar_transicion_deposito("pendiente", "retenido").is_err());
+    }
+
+    #[test]
+    fn transicion_cobrado_a_pendiente_err() {
+        assert!(validar_transicion_deposito("cobrado", "pendiente").is_err());
+    }
+
+    #[test]
+    fn transicion_devuelto_a_pendiente_err() {
+        assert!(validar_transicion_deposito("devuelto", "pendiente").is_err());
+    }
+
+    #[test]
+    fn transicion_devuelto_a_cobrado_err() {
+        assert!(validar_transicion_deposito("devuelto", "cobrado").is_err());
+    }
+
+    #[test]
+    fn transicion_devuelto_a_retenido_err() {
+        assert!(validar_transicion_deposito("devuelto", "retenido").is_err());
+    }
+
+    #[test]
+    fn transicion_retenido_a_pendiente_err() {
+        assert!(validar_transicion_deposito("retenido", "pendiente").is_err());
+    }
+
+    #[test]
+    fn transicion_retenido_a_cobrado_err() {
+        assert!(validar_transicion_deposito("retenido", "cobrado").is_err());
+    }
+
+    #[test]
+    fn transicion_retenido_a_devuelto_err() {
+        assert!(validar_transicion_deposito("retenido", "devuelto").is_err());
+    }
 }

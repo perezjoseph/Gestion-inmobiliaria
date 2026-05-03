@@ -22,6 +22,15 @@ pub struct Model {
     pub organizacion_id: Uuid,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
+    pub estado_deposito: Option<String>,
+    pub fecha_cobro_deposito: Option<DateTimeWithTimeZone>,
+    pub fecha_devolucion_deposito: Option<DateTimeWithTimeZone>,
+    #[sea_orm(column_type = "Decimal(Some((12, 2)))", nullable)]
+    pub monto_retenido: Option<Decimal>,
+    pub motivo_retencion: Option<String>,
+    #[sea_orm(column_type = "Decimal(Some((5, 2)))", nullable)]
+    pub recargo_porcentaje: Option<Decimal>,
+    pub dias_gracia: Option<i32>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

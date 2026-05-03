@@ -11,22 +11,22 @@ use crate::services::inquilinos;
 
 pub async fn list(
     db: web::Data<DatabaseConnection>,
-    _claims: Claims,
+    claims: Claims,
     query: web::Query<InquilinoSearchQuery>,
 ) -> Result<HttpResponse, AppError> {
     let q = query.into_inner();
     let term = q.busqueda.or(q.search).filter(|t| t.len() >= 2);
-    let result = inquilinos::list(db.get_ref(), term, q.page, q.per_page).await?;
+    let result = inquilinos::list(db.get_ref(), claims.organizacion_id, term, q.page, q.per_page).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
 pub async fn get_by_id(
     db: web::Data<DatabaseConnection>,
-    _claims: Claims,
+    claims: Claims,
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
-    let result = inquilinos::get_by_id(db.get_ref(), id).await?;
+    let result = inquilinos::get_by_id(db.get_ref(), claims.organizacion_id, id).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
@@ -36,8 +36,9 @@ pub async fn create(
     body: web::Json<CreateInquilinoRequest>,
 ) -> Result<HttpResponse, AppError> {
     let usuario_id = access.0.sub;
+    let org_id = access.0.organizacion_id;
     let txn = db.begin().await?;
-    let result = inquilinos::create(&txn, body.into_inner(), usuario_id, access.0.organizacion_id).await?;
+    let result = inquilinos::create(&txn, org_id, body.into_inner(), usuario_id).await?;
     txn.commit().await?;
     Ok(HttpResponse::Created().json(result))
 }
@@ -49,9 +50,10 @@ pub async fn update(
     body: web::Json<UpdateInquilinoRequest>,
 ) -> Result<HttpResponse, AppError> {
     let usuario_id = access.0.sub;
+    let org_id = access.0.organizacion_id;
     let id = path.into_inner();
     let txn = db.begin().await?;
-    let result = inquilinos::update(&txn, id, body.into_inner(), usuario_id).await?;
+    let result = inquilinos::update(&txn, org_id, id, body.into_inner(), usuario_id).await?;
     txn.commit().await?;
     Ok(HttpResponse::Ok().json(result))
 }
@@ -62,9 +64,10 @@ pub async fn delete(
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
     let usuario_id = admin.0.sub;
+    let org_id = admin.0.organizacion_id;
     let id = path.into_inner();
     let txn = db.begin().await?;
-    inquilinos::delete(&txn, id, usuario_id).await?;
+    inquilinos::delete(&txn, org_id, id, usuario_id).await?;
     txn.commit().await?;
     Ok(HttpResponse::NoContent().finish())
 }

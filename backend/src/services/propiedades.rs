@@ -1,18 +1,29 @@
+use std::collections::HashMap;
+
 use chrono::Utc;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, Set,
+    FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+    sea_query::Expr,
 };
 use uuid::Uuid;
 
-use crate::entities::propiedad;
+use crate::entities::{propiedad, unidad};
 use crate::errors::AppError;
 use crate::models::PaginatedResponse;
 use crate::models::propiedad::{
     CreatePropiedadRequest, PropiedadListQuery, PropiedadResponse, UpdatePropiedadRequest,
 };
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
+use crate::services::unidades;
 use crate::services::validation::{validate_enum, MONEDAS};
+
+#[derive(Debug, FromQueryResult)]
+struct OccupancyRow {
+    propiedad_id: Uuid,
+    total: i64,
+    ocupadas: i64,
+}
 
 const TIPOS_PROPIEDAD: &[&str] = &[
     "casa",
@@ -41,6 +52,9 @@ impl From<propiedad::Model> for PropiedadResponse {
             moneda: m.moneda,
             estado: m.estado,
             imagenes: m.imagenes,
+            total_unidades: None,
+            unidades_ocupadas: None,
+            tasa_ocupacion: None,
             created_at: m.created_at.into(),
             updated_at: m.updated_at.into(),
         }
@@ -110,7 +124,15 @@ pub async fn get_by_id(
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Propiedad no encontrada".to_string()))?;
-    Ok(PropiedadResponse::from(record))
+
+    let mut resp = PropiedadResponse::from(record);
+
+    let resumen = unidades::get_ocupacion_resumen(db, id).await?;
+    resp.total_unidades = Some(resumen.total_unidades);
+    resp.unidades_ocupadas = Some(resumen.unidades_ocupadas);
+    resp.tasa_ocupacion = Some(resumen.tasa_ocupacion);
+
+    Ok(resp)
 }
 
 pub async fn list(
@@ -150,8 +172,58 @@ pub async fn list(
     let total = paginator.num_items().await?;
     let records = paginator.fetch_page(page - 1).await?;
 
+    let mut responses: Vec<PropiedadResponse> =
+        records.into_iter().map(PropiedadResponse::from).collect();
+
+    // Batch-query unidades counts using is_in() to avoid N+1
+    if !responses.is_empty() {
+        let propiedad_ids: Vec<Uuid> = responses.iter().map(|r| r.id).collect();
+
+        let occupancy_rows: Vec<OccupancyRow> = unidad::Entity::find()
+            .select_only()
+            .column(unidad::Column::PropiedadId)
+            .column_as(Expr::col(unidad::Column::Id).count(), "total")
+            .column_as(
+                Expr::expr(
+                    Expr::case(
+                        Expr::col(unidad::Column::Estado).eq("ocupada"),
+                        Expr::val(1),
+                    )
+                    .finally(Expr::val(0)),
+                )
+                .sum(),
+                "ocupadas",
+            )
+            .filter(unidad::Column::PropiedadId.is_in(propiedad_ids))
+            .group_by(unidad::Column::PropiedadId)
+            .into_model::<OccupancyRow>()
+            .all(db)
+            .await?;
+
+        let occupancy_map: HashMap<Uuid, &OccupancyRow> =
+            occupancy_rows.iter().map(|r| (r.propiedad_id, r)).collect();
+
+        for resp in &mut responses {
+            if let Some(row) = occupancy_map.get(&resp.id) {
+                let total_u = row.total as u64;
+                let occupied = row.ocupadas as u64;
+                resp.total_unidades = Some(total_u);
+                resp.unidades_ocupadas = Some(occupied);
+                resp.tasa_ocupacion = Some(if total_u == 0 {
+                    0.0
+                } else {
+                    (occupied as f64 / total_u as f64) * 100.0
+                });
+            } else {
+                resp.total_unidades = Some(0);
+                resp.unidades_ocupadas = Some(0);
+                resp.tasa_ocupacion = Some(0.0);
+            }
+        }
+    }
+
     Ok(PaginatedResponse {
-        data: records.into_iter().map(PropiedadResponse::from).collect(),
+        data: responses,
         total,
         page,
         per_page,

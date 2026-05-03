@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::types::deserialize_f64_from_any;
+use crate::types::{deserialize_f64_from_any, deserialize_option_f64_from_any};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -16,6 +16,8 @@ pub struct Pago {
     pub metodo_pago: Option<String>,
     pub estado: String,
     pub notas: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_option_f64_from_any")]
+    pub recargo: Option<f64>,
     pub created_at: String,
     pub updated_at: String,
 }

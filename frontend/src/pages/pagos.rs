@@ -323,6 +323,7 @@ fn render_pago_row(
 ) -> Html {
     let c_label = contrato_label.emit(p.contrato_id.clone());
     let (badge_cls, badge_label) = estado_badge(&p.estado);
+    let recargo_cell = render_recargo_cell(p.recargo, &p.moneda);
     let pc = p.clone();
     let pd = p.clone();
     let on_edit = on_edit.clone();
@@ -332,6 +333,7 @@ fn render_pago_row(
         <tr>
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{c_label}</td>
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={p.monto} moneda={p.moneda.clone()} /></td>
+            {recargo_cell}
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
                 {p.fecha_pago.as_deref().map_or_else(|| "—".into(), format_date_display)}</td>
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&p.fecha_vencimiento)}</td>
@@ -341,6 +343,19 @@ fn render_pago_row(
             {actions}
         </tr>
     }
+}
+
+fn render_recargo_cell(recargo: Option<f64>, moneda: &str) -> Html {
+    recargo.map_or_else(
+        || html! {
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{"—"}</td>
+        },
+        |r| html! {
+            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--color-error);">
+                <CurrencyDisplay monto={r} moneda={moneda.to_string()} />
+            </td>
+        },
+    )
 }
 
 fn render_pago_actions(
@@ -1107,7 +1122,7 @@ fn render_pagos_view(
     on_per_page_change: Callback<u64>,
 ) -> Html {
     if **loading {
-        return html! { <TableSkeleton title_width="160px" columns={7} has_filter=true /> };
+        return html! { <TableSkeleton title_width="160px" columns={8} has_filter=true /> };
     }
 
     let last_header: String = if can_write(user_rol) {
@@ -1118,6 +1133,7 @@ fn render_pagos_view(
     let headers: Vec<String> = vec![
         "Contrato".into(),
         "Monto".into(),
+        "Recargo".into(),
         "Fecha Pago".into(),
         "Vencimiento".into(),
         "Método".into(),
@@ -1214,6 +1230,31 @@ fn render_delete_confirm_pago(
     )
 }
 
+fn render_pago_recargo_detail(pago: &Pago) -> Html {
+    let Some(recargo) = pago.recargo else {
+        return html! {};
+    };
+    let monto_total = pago.monto + recargo;
+    html! {
+        <div class="gi-card" style="padding: var(--space-4) var(--space-6); margin-bottom: var(--space-4); background: var(--surface-warning-subtle, var(--color-warning-50, #fffbeb));">
+            <div style="display: flex; gap: var(--space-6); flex-wrap: wrap; align-items: center;">
+                <div>
+                    <span class="gi-label" style="margin-bottom: var(--space-1);">{"Recargo"}</span>
+                    <div class="tabular-nums" style="font-size: var(--text-sm); color: var(--color-error); font-weight: 500;">
+                        <CurrencyDisplay monto={recargo} moneda={pago.moneda.clone()} />
+                    </div>
+                </div>
+                <div>
+                    <span class="gi-label" style="margin-bottom: var(--space-1);">{"Monto Total"}</span>
+                    <div class="tabular-nums" style="font-size: var(--text-sm); font-weight: 600;">
+                        <CurrencyDisplay monto={monto_total} moneda={pago.moneda.clone()} />
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn render_pago_form_section(
     show_form: &UseStateHandle<bool>,
@@ -1241,7 +1282,13 @@ fn render_pago_form_section(
     if !**show_form {
         return html! {};
     }
+    let recargo_detail = editing.as_ref().map_or_else(
+        || html! {},
+        render_pago_recargo_detail,
+    );
     html! {
+        <>
+        {recargo_detail}
         <PagoForm
             is_editing={editing.is_some()}
             contrato_id={contrato_id} monto={monto} moneda={moneda}
@@ -1255,5 +1302,6 @@ fn render_pago_form_section(
             editing_id={editing_id}
             token={token}
         />
+        </>
     }
 }

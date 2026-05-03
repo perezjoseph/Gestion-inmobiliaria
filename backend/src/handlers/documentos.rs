@@ -194,9 +194,9 @@ pub async fn cumplimiento(
 
 pub async fn cumplimiento_resumen(
     db: web::Data<DatabaseConnection>,
-    _claims: Claims,
+    claims: Claims,
 ) -> Result<HttpResponse, AppError> {
-    let result = crate::services::dashboard::cumplimiento_resumen(db.get_ref()).await?;
+    let result = crate::services::dashboard::cumplimiento_resumen(db.get_ref(), claims.organizacion_id).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 

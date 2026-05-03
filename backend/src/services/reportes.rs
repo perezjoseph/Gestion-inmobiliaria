@@ -8,6 +8,7 @@ use rust_decimal::Decimal;
 use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
 };
+use uuid::Uuid;
 
 use crate::entities::{contrato, gasto, inquilino, pago, propiedad};
 use crate::errors::AppError;
@@ -18,6 +19,7 @@ use crate::models::reporte::{
 
 pub async fn generar_reporte_ingresos(
     db: &DatabaseConnection,
+    org_id: Uuid,
     query: IngresoReportQuery,
     generated_by: String,
 ) -> Result<IngresoReportSummary, AppError> {
@@ -37,6 +39,7 @@ pub async fn generar_reporte_ingresos(
     .ok_or_else(|| AppError::Validation("Fecha inválida".into()))?;
 
     let mut pago_select = pago::Entity::find()
+        .filter(pago::Column::OrganizacionId.eq(org_id))
         .filter(pago::Column::FechaVencimiento.gte(first_day))
         .filter(pago::Column::FechaVencimiento.lte(last_day));
 
@@ -136,7 +139,7 @@ pub async fn generar_reporte_ingresos(
         });
     }
 
-    let tasa_ocupacion = calcular_tasa_ocupacion(db).await?;
+    let tasa_ocupacion = calcular_tasa_ocupacion(db, org_id).await?;
 
     Ok(IngresoReportSummary {
         rows,
@@ -151,6 +154,7 @@ pub async fn generar_reporte_ingresos(
 
 pub async fn historial_pagos(
     db: &DatabaseConnection,
+    org_id: Uuid,
     fecha_desde: NaiveDate,
     fecha_hasta: NaiveDate,
 ) -> Result<Vec<HistorialPagoEntry>, AppError> {
@@ -161,6 +165,7 @@ pub async fn historial_pagos(
     }
 
     let pagos = pago::Entity::find()
+        .filter(pago::Column::OrganizacionId.eq(org_id))
         .filter(pago::Column::FechaVencimiento.gte(fecha_desde))
         .filter(pago::Column::FechaVencimiento.lte(fecha_hasta))
         .order_by_asc(pago::Column::FechaVencimiento)
@@ -182,13 +187,16 @@ pub async fn historial_pagos(
     Ok(entries)
 }
 
-pub async fn calcular_tasa_ocupacion(db: &DatabaseConnection) -> Result<f64, AppError> {
-    let total = propiedad::Entity::find().count(db).await?;
+pub async fn calcular_tasa_ocupacion(db: &DatabaseConnection, org_id: Uuid) -> Result<f64, AppError> {
+    let total = propiedad::Entity::find()
+        .filter(propiedad::Column::OrganizacionId.eq(org_id))
+        .count(db).await?;
     if total == 0 {
         return Ok(0.0);
     }
 
     let ocupadas = propiedad::Entity::find()
+        .filter(propiedad::Column::OrganizacionId.eq(org_id))
         .filter(propiedad::Column::Estado.eq("ocupada"))
         .count(db)
         .await?;
@@ -211,6 +219,7 @@ fn empty_summary(generated_by: String) -> IngresoReportSummary {
 
 pub async fn generar_reporte_rentabilidad(
     db: &DatabaseConnection,
+    org_id: Uuid,
     query: RentabilidadReportQuery,
     generated_by: String,
 ) -> Result<RentabilidadReportSummary, AppError> {
@@ -231,11 +240,14 @@ pub async fn generar_reporte_rentabilidad(
 
     let propiedades = if let Some(pid) = query.propiedad_id {
         propiedad::Entity::find()
+            .filter(propiedad::Column::OrganizacionId.eq(org_id))
             .filter(propiedad::Column::Id.eq(pid))
             .all(db)
             .await?
     } else {
-        propiedad::Entity::find().all(db).await?
+        propiedad::Entity::find()
+            .filter(propiedad::Column::OrganizacionId.eq(org_id))
+            .all(db).await?
     };
 
     let prop_ids: Vec<uuid::Uuid> = propiedades.iter().map(|p| p.id).collect();

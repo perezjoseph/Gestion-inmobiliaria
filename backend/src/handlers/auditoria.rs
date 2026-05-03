@@ -8,9 +8,9 @@ use crate::services::auditoria;
 
 pub async fn list(
     db: web::Data<DatabaseConnection>,
-    _admin: AdminOnly,
+    admin: AdminOnly,
     query: web::Query<AuditoriaQuery>,
 ) -> Result<HttpResponse, AppError> {
-    let result = auditoria::listar(db.get_ref(), query.into_inner()).await?;
+    let result = auditoria::listar(db.get_ref(), admin.0.organizacion_id, query.into_inner()).await?;
     Ok(HttpResponse::Ok().json(result))
 }

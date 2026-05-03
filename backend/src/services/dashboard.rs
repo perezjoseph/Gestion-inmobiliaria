@@ -6,6 +6,7 @@ use sea_orm::{
 };
 use serde::Serialize;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 use crate::entities::{contrato, documento, gasto, inquilino, pago, propiedad};
 use crate::errors::AppError;
@@ -38,7 +39,7 @@ fn naive_date(year: i32, month: u32, day: u32) -> Result<NaiveDate, AppError> {
         .ok_or_else(|| AppError::Internal(anyhow::anyhow!("Fecha inválida: {year}-{month}-{day}")))
 }
 
-pub async fn get_stats(db: &DatabaseConnection) -> Result<DashboardStats, AppError> {
+pub async fn get_stats(db: &DatabaseConnection, org_id: Uuid) -> Result<DashboardStats, AppError> {
     let today = Utc::now().date_naive();
     let anio = today.year();
     let mes = today.month();
@@ -60,22 +61,28 @@ pub async fn get_stats(db: &DatabaseConnection) -> Result<DashboardStats, AppErr
         documentos_vencidos,
         documentos_por_vencer,
     ) = tokio::try_join!(
-        propiedad::Entity::find().count(db),
         propiedad::Entity::find()
+            .filter(propiedad::Column::OrganizacionId.eq(org_id))
+            .count(db),
+        propiedad::Entity::find()
+            .filter(propiedad::Column::OrganizacionId.eq(org_id))
             .filter(propiedad::Column::Estado.eq("ocupada"))
             .count(db),
         contrato::Entity::find()
             .select_only()
             .column_as(contrato::Column::MontoMensual.sum(), "total")
+            .filter(contrato::Column::OrganizacionId.eq(org_id))
             .filter(contrato::Column::Estado.eq("activo"))
             .into_model::<SumResult>()
             .one(db),
         pago::Entity::find()
+            .filter(pago::Column::OrganizacionId.eq(org_id))
             .filter(pago::Column::Estado.eq("atrasado"))
             .count(db),
         gasto::Entity::find()
             .select_only()
             .column_as(gasto::Column::Monto.sum(), "total")
+            .filter(gasto::Column::OrganizacionId.eq(org_id))
             .filter(gasto::Column::Estado.eq("pagado"))
             .filter(gasto::Column::FechaGasto.gte(primer_dia_mes))
             .filter(gasto::Column::FechaGasto.lte(ultimo_dia_mes))
@@ -104,7 +111,7 @@ pub async fn get_stats(db: &DatabaseConnection) -> Result<DashboardStats, AppErr
     let total_gastos_mes = gastos_result.and_then(|r| r.total).unwrap_or(Decimal::ZERO);
 
     // Calculate entidades_incompletas: count entities with required docs below 100% compliance
-    let entidades_incompletas = contar_entidades_incompletas(db).await?;
+    let entidades_incompletas = contar_entidades_incompletas(db, org_id).await?;
 
     Ok(DashboardStats {
         total_propiedades,
@@ -121,12 +128,18 @@ pub async fn get_stats(db: &DatabaseConnection) -> Result<DashboardStats, AppErr
 /// Count entities (inquilinos, propiedades, contratos) that have required documents
 /// but are below 100% compliance. Uses batch queries with `is_in()` to avoid N+1.
 #[allow(clippy::cast_possible_truncation)]
-async fn contar_entidades_incompletas(db: &DatabaseConnection) -> Result<i64, AppError> {
+async fn contar_entidades_incompletas(db: &DatabaseConnection, org_id: Uuid) -> Result<i64, AppError> {
     // Fetch all entities of each type that have required documents
     let (all_inquilinos, all_propiedades, all_contratos) = tokio::try_join!(
-        inquilino::Entity::find().all(db),
-        propiedad::Entity::find().all(db),
-        contrato::Entity::find().all(db),
+        inquilino::Entity::find()
+            .filter(inquilino::Column::OrganizacionId.eq(org_id))
+            .all(db),
+        propiedad::Entity::find()
+            .filter(propiedad::Column::OrganizacionId.eq(org_id))
+            .all(db),
+        contrato::Entity::find()
+            .filter(contrato::Column::OrganizacionId.eq(org_id))
+            .all(db),
     )?;
 
     // Collect all entity IDs per type for batch document queries
@@ -205,12 +218,19 @@ fn is_entity_compliant(docs: &[&documento::Model], requeridos: &[&str]) -> bool 
 #[allow(clippy::cast_possible_truncation)]
 pub async fn cumplimiento_resumen(
     db: &DatabaseConnection,
+    org_id: Uuid,
 ) -> Result<Vec<CumplimientoResumenItem>, AppError> {
     // Fetch all entities of each type
     let (all_inquilinos, all_propiedades, all_contratos) = tokio::try_join!(
-        inquilino::Entity::find().all(db),
-        propiedad::Entity::find().all(db),
-        contrato::Entity::find().all(db),
+        inquilino::Entity::find()
+            .filter(inquilino::Column::OrganizacionId.eq(org_id))
+            .all(db),
+        propiedad::Entity::find()
+            .filter(propiedad::Column::OrganizacionId.eq(org_id))
+            .all(db),
+        contrato::Entity::find()
+            .filter(contrato::Column::OrganizacionId.eq(org_id))
+            .all(db),
     )?;
 
     let inquilino_ids: Vec<uuid::Uuid> = all_inquilinos.iter().map(|i| i.id).collect();
@@ -316,9 +336,12 @@ pub struct CumplimientoResumenItem {
 
 pub async fn ocupacion_tendencia(
     db: &DatabaseConnection,
+    org_id: Uuid,
     meses: u32,
 ) -> Result<Vec<OcupacionMensual>, AppError> {
-    let total_propiedades = propiedad::Entity::find().count(db).await?;
+    let total_propiedades = propiedad::Entity::find()
+        .filter(propiedad::Column::OrganizacionId.eq(org_id))
+        .count(db).await?;
     if total_propiedades == 0 {
         return Ok(Vec::new());
     }
@@ -329,6 +352,7 @@ pub async fn ocupacion_tendencia(
         naive_date(oldest_target.year(), oldest_target.month(), 1)?;
 
     let contratos = contrato::Entity::find()
+        .filter(contrato::Column::OrganizacionId.eq(org_id))
         .filter(contrato::Column::FechaFin.gte(primer_dia_rango))
         .filter(contrato::Column::FechaInicio.lte(today))
         .filter(contrato::Column::Estado.is_in(["activo", "finalizado", "terminado"]))
@@ -362,7 +386,7 @@ pub async fn ocupacion_tendencia(
     Ok(resultados)
 }
 
-pub async fn ingreso_comparacion(db: &DatabaseConnection) -> Result<IngresoComparacion, AppError> {
+pub async fn ingreso_comparacion(db: &DatabaseConnection, org_id: Uuid) -> Result<IngresoComparacion, AppError> {
     let today = Utc::now().date_naive();
     let anio = today.year();
     let mes = today.month();
@@ -377,6 +401,7 @@ pub async fn ingreso_comparacion(db: &DatabaseConnection) -> Result<IngresoCompa
         contrato::Entity::find()
             .select_only()
             .column_as(contrato::Column::MontoMensual.sum(), "total")
+            .filter(contrato::Column::OrganizacionId.eq(org_id))
             .filter(contrato::Column::Estado.eq("activo"))
             .filter(contrato::Column::FechaInicio.lte(ultimo_dia))
             .filter(contrato::Column::FechaFin.gte(primer_dia))
@@ -385,6 +410,7 @@ pub async fn ingreso_comparacion(db: &DatabaseConnection) -> Result<IngresoCompa
         pago::Entity::find()
             .select_only()
             .column_as(pago::Column::Monto.sum(), "total")
+            .filter(pago::Column::OrganizacionId.eq(org_id))
             .filter(pago::Column::Estado.eq("pagado"))
             .filter(pago::Column::FechaVencimiento.gte(primer_dia))
             .filter(pago::Column::FechaVencimiento.lte(ultimo_dia))
@@ -409,12 +435,14 @@ pub async fn ingreso_comparacion(db: &DatabaseConnection) -> Result<IngresoCompa
 
 pub async fn pagos_proximos(
     db: &DatabaseConnection,
+    org_id: Uuid,
     dias: i64,
 ) -> Result<Vec<PagoProximo>, AppError> {
     let today = Utc::now().date_naive();
     let limite = today + chrono::Days::new(dias as u64);
 
     let pagos = pago::Entity::find()
+        .filter(pago::Column::OrganizacionId.eq(org_id))
         .filter(pago::Column::Estado.eq("pendiente"))
         .filter(pago::Column::FechaVencimiento.gte(today))
         .filter(pago::Column::FechaVencimiento.lte(limite))
@@ -485,11 +513,13 @@ pub async fn pagos_proximos(
 
 pub async fn contratos_calendario(
     db: &DatabaseConnection,
+    org_id: Uuid,
 ) -> Result<Vec<ContratoCalendario>, AppError> {
     let today = Utc::now().date_naive();
     let limite = today + chrono::Days::new(90);
 
     let contratos = contrato::Entity::find()
+        .filter(contrato::Column::OrganizacionId.eq(org_id))
         .filter(contrato::Column::Estado.eq("activo"))
         .filter(contrato::Column::FechaFin.gte(today))
         .filter(contrato::Column::FechaFin.lte(limite))
@@ -563,7 +593,7 @@ pub fn calcular_porcentaje_cambio(actual: Decimal, anterior: Decimal) -> f64 {
     cambio.to_f64().unwrap_or(0.0)
 }
 
-pub async fn gastos_comparacion(db: &DatabaseConnection) -> Result<GastosComparacion, AppError> {
+pub async fn gastos_comparacion(db: &DatabaseConnection, org_id: Uuid) -> Result<GastosComparacion, AppError> {
     let today = Utc::now().date_naive();
     let anio = today.year();
     let mes = today.month();
@@ -583,6 +613,7 @@ pub async fn gastos_comparacion(db: &DatabaseConnection) -> Result<GastosCompara
         gasto::Entity::find()
             .select_only()
             .column_as(gasto::Column::Monto.sum(), "total")
+            .filter(gasto::Column::OrganizacionId.eq(org_id))
             .filter(gasto::Column::Estado.eq("pagado"))
             .filter(gasto::Column::FechaGasto.gte(primer_dia_actual))
             .filter(gasto::Column::FechaGasto.lte(ultimo_dia_actual))
@@ -591,6 +622,7 @@ pub async fn gastos_comparacion(db: &DatabaseConnection) -> Result<GastosCompara
         gasto::Entity::find()
             .select_only()
             .column_as(gasto::Column::Monto.sum(), "total")
+            .filter(gasto::Column::OrganizacionId.eq(org_id))
             .filter(gasto::Column::Estado.eq("pagado"))
             .filter(gasto::Column::FechaGasto.gte(primer_dia_anterior))
             .filter(gasto::Column::FechaGasto.lte(ultimo_dia_anterior))

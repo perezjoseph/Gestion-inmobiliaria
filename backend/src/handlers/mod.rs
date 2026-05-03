@@ -1,5 +1,6 @@
 pub mod auditoria;
 pub mod auth;
+pub mod background_jobs;
 pub mod configuracion;
 pub mod contratos;
 pub mod dashboard;
@@ -17,4 +18,5 @@ pub mod perfil;
 pub mod propiedades;
 pub mod recibos;
 pub mod reportes;
+pub mod unidades;
 pub mod usuarios;

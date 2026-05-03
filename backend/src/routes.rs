@@ -43,7 +43,15 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route("", web::post().to(handlers::propiedades::create))
                     .route("/{id}", web::get().to(handlers::propiedades::get_by_id))
                     .route("/{id}", web::put().to(handlers::propiedades::update))
-                    .route("/{id}", web::delete().to(handlers::propiedades::delete)),
+                    .route("/{id}", web::delete().to(handlers::propiedades::delete))
+                    .service(
+                        web::scope("/{propiedad_id}/unidades")
+                            .route("", web::get().to(handlers::unidades::list))
+                            .route("", web::post().to(handlers::unidades::create))
+                            .route("/{id}", web::get().to(handlers::unidades::get_by_id))
+                            .route("/{id}", web::put().to(handlers::unidades::update))
+                            .route("/{id}", web::delete().to(handlers::unidades::delete)),
+                    ),
             )
             .service(
                 web::scope("/inquilinos")
@@ -61,6 +69,10 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     )
                     .route("", web::get().to(handlers::contratos::list))
                     .route("", web::post().to(handlers::contratos::create))
+                    .route(
+                        "/{id}/deposito",
+                        web::put().to(handlers::contratos::cambiar_estado_deposito),
+                    )
                     .route("/{id}", web::get().to(handlers::contratos::get_by_id))
                     .route("/{id}", web::put().to(handlers::contratos::update))
                     .route("/{id}", web::delete().to(handlers::contratos::delete))
@@ -71,6 +83,14 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route(
                         "/{id}/terminar",
                         web::post().to(handlers::contratos::terminar),
+                    )
+                    .route(
+                        "/{id}/pagos/preview",
+                        web::get().to(handlers::contratos::preview_pagos),
+                    )
+                    .route(
+                        "/{id}/pagos/generar",
+                        web::post().to(handlers::contratos::generar_pagos),
                     ),
             )
             .service(
@@ -157,10 +177,30 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                         web::put().to(handlers::perfil::cambiar_password),
                     ),
             )
-            .service(web::scope("/notificaciones").route(
-                "/pagos-vencidos",
-                web::get().to(handlers::notificaciones::pagos_vencidos),
-            ))
+            .service(
+                web::scope("/notificaciones")
+                    .route(
+                        "/pagos-vencidos",
+                        web::get().to(handlers::notificaciones::pagos_vencidos),
+                    )
+                    .route(
+                        "/no-leidas/conteo",
+                        web::get().to(handlers::notificaciones::conteo_no_leidas),
+                    )
+                    .route(
+                        "/leer-todas",
+                        web::put().to(handlers::notificaciones::marcar_todas_leidas),
+                    )
+                    .route(
+                        "/generar",
+                        web::post().to(handlers::notificaciones::generar),
+                    )
+                    .route(
+                        "/{id}/leer",
+                        web::put().to(handlers::notificaciones::marcar_leida),
+                    )
+                    .route("", web::get().to(handlers::notificaciones::listar)),
+            )
             .service(
                 web::scope("/reportes")
                     .route("/ingresos", web::get().to(handlers::reportes::ingresos))
@@ -258,6 +298,14 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route(
                         "/moneda",
                         web::put().to(handlers::configuracion::actualizar_moneda),
+                    )
+                    .route(
+                        "/recargo",
+                        web::get().to(handlers::configuracion::obtener_recargo_defecto),
+                    )
+                    .route(
+                        "/recargo",
+                        web::put().to(handlers::configuracion::actualizar_recargo_defecto),
                     ),
             )
             .service(
@@ -295,6 +343,17 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                 web::scope("/ocr")
                     .wrap(Governor::new(&write_governor_conf))
                     .route("/extract", web::post().to(handlers::ocr::ocr_extract)),
+            )
+            .service(
+                web::scope("/tareas")
+                    .route(
+                        "/historial",
+                        web::get().to(handlers::background_jobs::historial),
+                    )
+                    .route(
+                        "/{nombre}/ejecutar",
+                        web::post().to(handlers::background_jobs::ejecutar_tarea),
+                    ),
             ),
     );
 }

@@ -19,12 +19,14 @@ use crate::components::common::pagination::Pagination;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::services::api::{api_delete, api_get, api_post, api_put};
 use crate::types::PaginatedResponse;
-use crate::types::contrato::{Contrato, CreateContrato, UpdateContrato};
+use crate::types::contrato::{CambiarEstadoDeposito, Contrato, CreateContrato, UpdateContrato};
 use crate::types::inquilino::Inquilino;
 use crate::types::ocr::OcrExtractField;
+use crate::types::pago_generacion::{GenerarPagosResponse, PreviewPagos};
 use crate::types::propiedad::Propiedad;
 use crate::utils::{
-    EscapeHandler, can_delete, can_write, field_error, format_date_display, input_class,
+    EscapeHandler, can_delete, can_write, field_error, format_currency, format_date_display,
+    input_class,
 };
 
 fn push_toast(toasts: Option<&ToastContext>, msg: &str, kind: ToastKind) {
@@ -38,6 +40,7 @@ struct ContratoActions {
     delete: Callback<Contrato>,
     renew: Callback<Contrato>,
     terminate: Callback<Contrato>,
+    generar_pagos: Callback<Contrato>,
 }
 
 #[allow(clippy::missing_const_for_fn)]
@@ -79,6 +82,8 @@ struct ContratoFormProps {
     deposito: UseStateHandle<String>,
     moneda: UseStateHandle<String>,
     estado: UseStateHandle<String>,
+    recargo_porcentaje: UseStateHandle<String>,
+    dias_gracia: UseStateHandle<String>,
     propiedades: Vec<Propiedad>,
     inquilinos: Vec<Inquilino>,
     form_errors: FormErrors,
@@ -216,6 +221,27 @@ fn ContratoForm(props: &ContratoFormProps) -> Html {
                         <option value="USD" selected={*props.moneda == "USD"}>{"USD"}</option>
                     </select>
                 </div>
+                <div>
+                    <label class="gi-label">{"Porcentaje de Recargo (%)"}</label>
+                    <input type="number" step="0.01" min="0" max="100"
+                        value={(*props.recargo_porcentaje).clone()}
+                        oninput={input_cb_conf(&props.recargo_porcentaje, "recargo_porcentaje")}
+                        class="gi-input"
+                        placeholder="Usar valor por defecto" />
+                    if props.recargo_porcentaje.is_empty() {
+                        <span style="font-size: var(--text-xs); color: var(--text-secondary); margin-top: var(--space-1); display: block;">
+                            {"(usa valor por defecto de la organización)"}
+                        </span>
+                    }
+                </div>
+                <div>
+                    <label class="gi-label">{"Días de Gracia"}</label>
+                    <input type="number" min="0" step="1"
+                        value={(*props.dias_gracia).clone()}
+                        oninput={input_cb_conf(&props.dias_gracia, "dias_gracia")}
+                        class="gi-input"
+                        placeholder="Sin período de gracia" />
+                </div>
                 if props.is_editing {
                     <div>
                         <label class="gi-label">{"Estado"}</label>
@@ -330,6 +356,444 @@ fn TerminateModal(props: &TerminateModalProps) -> Html {
 }
 
 #[derive(Properties, PartialEq)]
+struct GenerarPagosPreviewModalProps {
+    preview: PreviewPagos,
+    confirming: bool,
+    on_confirm: Callback<MouseEvent>,
+    on_cancel: Callback<MouseEvent>,
+}
+
+#[component]
+fn GenerarPagosPreviewModal(props: &GenerarPagosPreviewModalProps) -> Html {
+    let summary = render_preview_summary(&props.preview);
+    let table = render_preview_table(&props.preview.pagos);
+    html! {
+        <div class="gi-modal-overlay">
+            <div class="gi-modal" style="max-width: 640px; max-height: 80vh; display: flex; flex-direction: column;">
+                <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
+                    {"Generar Pagos — Vista Previa"}
+                </h3>
+                {summary}
+                <div style="overflow-y: auto; flex: 1; margin-bottom: var(--space-4);">
+                    {table}
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
+                    <button onclick={props.on_cancel.clone()} class="gi-btn gi-btn-ghost" disabled={props.confirming}>{"Cancelar"}</button>
+                    <button onclick={props.on_confirm.clone()} class="gi-btn gi-btn-primary" disabled={props.confirming}>
+                        {if props.confirming { "Generando..." } else { "Confirmar" }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+fn render_preview_summary(preview: &PreviewPagos) -> Html {
+    let moneda = preview
+        .pagos
+        .first()
+        .map_or("DOP", |p| p.moneda.as_str());
+    html! {
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); margin-bottom: var(--space-4); padding: var(--space-3); background: var(--bg-subtle); border-radius: var(--radius-md);">
+            <div><span style="font-weight: 600;">{"Total pagos: "}</span>{preview.total_pagos}</div>
+            <div><span style="font-weight: 600;">{"Monto total: "}</span>{format_currency(moneda, preview.monto_total)}</div>
+            <div><span style="font-weight: 600;">{"Existentes: "}</span>{preview.pagos_existentes}</div>
+            <div><span style="font-weight: 600;">{"Nuevos: "}</span>{preview.pagos_nuevos}</div>
+        </div>
+    }
+}
+
+fn render_preview_table(pagos: &[crate::types::pago_generacion::PagoPreviewItem]) -> Html {
+    if pagos.is_empty() {
+        return html! { <p style="color: var(--text-secondary); text-align: center;">{"No hay pagos nuevos por generar."}</p> };
+    }
+    html! {
+        <table class="gi-table" style="width: 100%;">
+            <thead>
+                <tr>
+                    <th style="padding: var(--space-2) var(--space-3); text-align: left; font-size: var(--text-sm);">{"Fecha Vencimiento"}</th>
+                    <th style="padding: var(--space-2) var(--space-3); text-align: right; font-size: var(--text-sm);">{"Monto"}</th>
+                    <th style="padding: var(--space-2) var(--space-3); text-align: left; font-size: var(--text-sm);">{"Moneda"}</th>
+                </tr>
+            </thead>
+            <tbody>
+                { for pagos.iter().map(|p| html! {
+                    <tr>
+                        <td style="padding: var(--space-2) var(--space-3); font-size: var(--text-sm);">{format_date_display(&p.fecha_vencimiento)}</td>
+                        <td class="tabular-nums" style="padding: var(--space-2) var(--space-3); font-size: var(--text-sm); text-align: right;">{format_currency(&p.moneda, p.monto)}</td>
+                        <td style="padding: var(--space-2) var(--space-3); font-size: var(--text-sm);">{&p.moneda}</td>
+                    </tr>
+                })}
+            </tbody>
+        </table>
+    }
+}
+
+// --- Deposit Section ---
+
+fn deposito_estado_badge(estado: &str) -> (&'static str, &'static str) {
+    match estado {
+        "pendiente" => ("bg-yellow-100 text-yellow-800", "Pendiente"),
+        "cobrado" => ("bg-blue-100 text-blue-800", "Cobrado"),
+        "devuelto" => ("bg-green-100 text-green-800", "Devuelto"),
+        "retenido" => ("bg-red-100 text-red-800", "Retenido"),
+        _ => ("bg-gray-100 text-gray-800", "Desconocido"),
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct DepositoSectionProps {
+    pub contrato: Contrato,
+    pub user_rol: AttrValue,
+    #[prop_or_default]
+    pub on_cobrar: Option<Callback<MouseEvent>>,
+    #[prop_or_default]
+    pub on_devolver: Option<Callback<MouseEvent>>,
+    #[prop_or_default]
+    pub on_retener: Option<Callback<MouseEvent>>,
+}
+
+#[component]
+fn DepositoSection(props: &DepositoSectionProps) -> Html {
+    let c = &props.contrato;
+
+    let has_deposito = c.deposito.is_some_and(|d| d > 0.0);
+    if !has_deposito {
+        return html! {};
+    }
+
+    let deposito_val = c.deposito.unwrap_or(0.0);
+    let estado_dep = c.estado_deposito.as_deref().unwrap_or("pendiente");
+    let (badge_cls, badge_label) = deposito_estado_badge(estado_dep);
+
+    let info_html = render_deposito_info(c, deposito_val, badge_cls, badge_label);
+    let retention_html = render_deposito_retention(c, deposito_val, estado_dep);
+    let buttons_html = render_deposito_buttons(
+        estado_dep,
+        &props.user_rol,
+        &props.on_cobrar,
+        &props.on_devolver,
+        &props.on_retener,
+    );
+
+    html! {
+        <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
+            <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; color: var(--text-primary); margin-bottom: var(--space-4);">
+                {"Depósito de Garantía"}
+            </h3>
+            {info_html}
+            {retention_html}
+            {buttons_html}
+        </div>
+    }
+}
+
+fn render_deposito_info(c: &Contrato, deposito_val: f64, badge_cls: &str, badge_label: &str) -> Html {
+    let fecha_cobro = c
+        .fecha_cobro_deposito
+        .as_deref()
+        .map(format_date_display);
+    let fecha_devolucion = c
+        .fecha_devolucion_deposito
+        .as_deref()
+        .map(format_date_display);
+
+    html! {
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4);">
+            <div>
+                <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Monto del Depósito"}</span>
+                <span class="tabular-nums" style="font-weight: 500;">
+                    <CurrencyDisplay monto={deposito_val} moneda={c.moneda.clone()} />
+                </span>
+            </div>
+            <div>
+                <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Estado"}</span>
+                <span class={format!("inline-block px-2 py-0.5 rounded text-xs font-medium {badge_cls}")}>
+                    {badge_label}
+                </span>
+            </div>
+            if let Some(fecha) = fecha_cobro {
+                <div>
+                    <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Fecha de Cobro"}</span>
+                    <span class="tabular-nums">{fecha}</span>
+                </div>
+            }
+            if let Some(fecha) = fecha_devolucion {
+                <div>
+                    <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Fecha de Devolución"}</span>
+                    <span class="tabular-nums">{fecha}</span>
+                </div>
+            }
+        </div>
+    }
+}
+
+fn render_deposito_retention(c: &Contrato, deposito_val: f64, estado_dep: &str) -> Html {
+    if estado_dep != "retenido" {
+        return html! {};
+    }
+
+    let monto_retenido = c.monto_retenido.unwrap_or(0.0);
+    let monto_devuelto = deposito_val - monto_retenido;
+    let motivo = c.motivo_retencion.as_deref().unwrap_or("");
+
+    html! {
+        <div style="padding: var(--space-3); background: var(--bg-subtle); border-radius: var(--radius-md); margin-bottom: var(--space-4);">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-3);">
+                <div>
+                    <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Monto Retenido"}</span>
+                    <span class="tabular-nums" style="font-weight: 500; color: var(--color-error);">
+                        <CurrencyDisplay monto={monto_retenido} moneda={c.moneda.clone()} />
+                    </span>
+                </div>
+                <div>
+                    <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Monto Devuelto"}</span>
+                    <span class="tabular-nums" style="font-weight: 500; color: var(--color-success);">
+                        <CurrencyDisplay monto={monto_devuelto} moneda={c.moneda.clone()} />
+                    </span>
+                </div>
+            </div>
+            <div>
+                <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Motivo de Retención"}</span>
+                <p style="margin: 0; color: var(--text-primary);">{motivo}</p>
+            </div>
+        </div>
+    }
+}
+
+#[allow(clippy::ref_option)]
+fn render_deposito_buttons(
+    estado_dep: &str,
+    user_rol: &str,
+    on_cobrar: &Option<Callback<MouseEvent>>,
+    on_devolver: &Option<Callback<MouseEvent>>,
+    on_retener: &Option<Callback<MouseEvent>>,
+) -> Html {
+    if !can_write(user_rol) {
+        return html! {};
+    }
+
+    match estado_dep {
+        "pendiente" => {
+            on_cobrar.as_ref().map_or_else(|| html! {}, |cb| html! {
+                <div style="display: flex; gap: var(--space-2);">
+                    <button onclick={cb.clone()} class="gi-btn gi-btn-primary">
+                        {"Marcar como Cobrado"}
+                    </button>
+                </div>
+            })
+        }
+        "cobrado" => {
+            let devolver_btn = on_devolver.as_ref().map_or_else(|| html! {}, |cb| html! {
+                <button onclick={cb.clone()} class="gi-btn gi-btn-primary">
+                    {"Devolver Depósito"}
+                </button>
+            });
+            let retener_btn = on_retener.as_ref().map_or_else(|| html! {}, |cb| html! {
+                <button onclick={cb.clone()} class="gi-btn gi-btn-danger">
+                    {"Retener Depósito"}
+                </button>
+            });
+            html! {
+                <div style="display: flex; gap: var(--space-2);">
+                    {devolver_btn}
+                    {retener_btn}
+                </div>
+            }
+        }
+        // devuelto / retenido → no buttons (final states)
+        _ => html! {},
+    }
+}
+
+// --- Retention Modal ---
+
+#[derive(Properties, PartialEq)]
+struct RetenerDepositoModalProps {
+    pub visible: bool,
+    pub contrato_id: AttrValue,
+    pub on_close: Callback<()>,
+    pub on_success: Callback<()>,
+}
+
+#[derive(Clone, Default, PartialEq)]
+struct RetenerFormErrors {
+    monto_retenido: Option<String>,
+    motivo_retencion: Option<String>,
+}
+
+#[component]
+fn RetenerDepositoModal(props: &RetenerDepositoModalProps) -> Html {
+    let monto_retenido = use_state(String::new);
+    let motivo_retencion = use_state(String::new);
+    let form_errors = use_state(RetenerFormErrors::default);
+    let submitting = use_state(|| false);
+    let toasts = use_context::<ToastContext>();
+
+    if !props.visible {
+        return html! {};
+    }
+
+    let validate = {
+        let monto_retenido = monto_retenido.clone();
+        let motivo_retencion = motivo_retencion.clone();
+        let form_errors = form_errors.clone();
+        move || -> bool {
+            let mut errs = RetenerFormErrors::default();
+            match monto_retenido.parse::<f64>() {
+                Ok(v) if v <= 0.0 => {
+                    errs.monto_retenido =
+                        Some("El monto retenido debe ser mayor a cero".into());
+                }
+                Err(_) | Ok(_) if monto_retenido.is_empty() => {
+                    errs.monto_retenido =
+                        Some("El monto retenido es requerido".into());
+                }
+                _ => {}
+            }
+            if motivo_retencion.trim().is_empty() {
+                errs.motivo_retencion =
+                    Some("El motivo de retención es requerido".into());
+            }
+            let valid = errs.monto_retenido.is_none() && errs.motivo_retencion.is_none();
+            form_errors.set(errs);
+            valid
+        }
+    };
+
+    let on_confirm = {
+        let monto_retenido = monto_retenido.clone();
+        let motivo_retencion = motivo_retencion.clone();
+        let submitting = submitting.clone();
+        let contrato_id = props.contrato_id.clone();
+        let on_close_confirm = props.on_close.clone();
+        let on_success = props.on_success.clone();
+        Callback::from(move |_: MouseEvent| {
+            if *submitting || !validate() {
+                return;
+            }
+            submitting.set(true);
+            let monto: f64 = if let Ok(v) = monto_retenido.parse() {
+                v
+            } else {
+                submitting.set(false);
+                return;
+            };
+            let motivo = (*motivo_retencion).clone();
+            let contrato_id = contrato_id.clone();
+            let on_success = on_success.clone();
+            let on_close = on_close_confirm.clone();
+            let toasts = toasts.clone();
+            let submitting = submitting.clone();
+            spawn_local(async move {
+                let body = CambiarEstadoDeposito {
+                    estado: "retenido".to_string(),
+                    monto_retenido: Some(monto),
+                    motivo_retencion: Some(motivo),
+                };
+                match api_put::<Contrato, _>(
+                    &format!("/contratos/{contrato_id}/deposito"),
+                    &body,
+                )
+                .await
+                {
+                    Ok(_) => {
+                        push_toast(toasts.as_ref(), "Depósito retenido exitosamente", ToastKind::Success);
+                        on_success.emit(());
+                        on_close.emit(());
+                    }
+                    Err(err) => {
+                        push_toast(toasts.as_ref(), &err, ToastKind::Error);
+                    }
+                }
+                submitting.set(false);
+            });
+        })
+    };
+
+    let on_cancel = {
+        let on_close = props.on_close.clone();
+        Callback::from(move |_: MouseEvent| {
+            on_close.emit(());
+        })
+    };
+
+    let form_body = render_retener_form_body(
+        &monto_retenido,
+        &motivo_retencion,
+        &form_errors,
+    );
+
+    html! {
+        <div class="gi-modal-overlay">
+            <div class="gi-modal">
+                <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
+                    {"Retener Depósito"}
+                </h3>
+                {form_body}
+                <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
+                    <button onclick={on_cancel} class="gi-btn gi-btn-ghost" disabled={*submitting}>{"Cancelar"}</button>
+                    <button onclick={on_confirm} class="gi-btn gi-btn-danger" disabled={*submitting}>
+                        {if *submitting { "Reteniendo..." } else { "Confirmar Retención" }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+fn render_retener_form_body(
+    monto_retenido: &UseStateHandle<String>,
+    motivo_retencion: &UseStateHandle<String>,
+    form_errors: &UseStateHandle<RetenerFormErrors>,
+) -> Html {
+    let fe = (**form_errors).clone();
+
+    let on_monto_input = {
+        let monto_retenido = monto_retenido.clone();
+        Callback::from(move |e: InputEvent| {
+            let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+            monto_retenido.set(input.value());
+        })
+    };
+
+    let on_motivo_input = {
+        let motivo_retencion = motivo_retencion.clone();
+        Callback::from(move |e: InputEvent| {
+            let input: web_sys::HtmlTextAreaElement = e.target_unchecked_into();
+            motivo_retencion.set(input.value());
+        })
+    };
+
+    let monto_val: String = (**monto_retenido).clone();
+    let motivo_val: String = (**motivo_retencion).clone();
+
+    html! {
+        <div style="display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-4);">
+            <div>
+                <label class="gi-label">{"Monto a Retener *"}</label>
+                <input type="number" step="0.01" min="0"
+                    value={AttrValue::from(monto_val)}
+                    oninput={on_monto_input}
+                    class={input_class(fe.monto_retenido.is_some())} />
+                {field_error(&fe.monto_retenido)}
+            </div>
+            <div>
+                <label class="gi-label">{"Motivo de Retención *"}</label>
+                <textarea
+                    rows="3"
+                    value={AttrValue::from(motivo_val)}
+                    oninput={on_motivo_input}
+                    class={input_class(fe.motivo_retencion.is_some())}
+                    placeholder="Describa el motivo de la retención..."
+                />
+                {field_error(&fe.motivo_retencion)}
+            </div>
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
 struct ContratoListProps {
     items: Vec<Contrato>,
     user_rol: String,
@@ -343,6 +807,7 @@ struct ContratoListProps {
     on_delete: Callback<Contrato>,
     on_renew: Callback<Contrato>,
     on_terminate: Callback<Contrato>,
+    on_generar_pagos: Callback<Contrato>,
     on_page_change: Callback<u64>,
     on_per_page_change: Callback<u64>,
 }
@@ -362,6 +827,7 @@ fn ContratoList(props: &ContratoListProps) -> Html {
                         delete: props.on_delete.clone(),
                         renew: props.on_renew.clone(),
                         terminate: props.on_terminate.clone(),
+                        generar_pagos: props.on_generar_pagos.clone(),
                     };
                     props.items.iter().map(move |c| render_contrato_row(c, &props.user_rol, &props.prop_label, &props.inq_label, &actions))
                 } }
@@ -428,14 +894,17 @@ fn render_contrato_actions(user_rol: &str, c: &Contrato, actions: &ContratoActio
     let cd = c.clone();
     let cr = c.clone();
     let ct = c.clone();
+    let cg = c.clone();
     let on_edit = actions.edit.clone();
     let on_delete_click = actions.delete.clone();
     let on_renew_click = actions.renew.clone();
     let on_terminate_click = actions.terminate.clone();
+    let on_generar_click = actions.generar_pagos.clone();
     let active_btns = if c.estado == "activo" {
         html! {
             <>
                 <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-success">{"Registrar Pago"}</Link<Route>>
+                <button onclick={Callback::from(move |_: MouseEvent| on_generar_click.emit(cg.clone()))} class="gi-btn-text" style="color: var(--color-primary-500);">{"Generar Pagos"}</button>
                 <button onclick={Callback::from(move |_: MouseEvent| on_renew_click.emit(cr.clone()))} class="gi-btn-text" style="color: var(--color-primary-500);">{"Renovar"}</button>
                 <button onclick={Callback::from(move |_: MouseEvent| on_terminate_click.emit(ct.clone()))} class="gi-btn-text" style="color: var(--color-warning);">{"Terminar"}</button>
             </>
@@ -467,6 +936,8 @@ fn make_contrato_edit_cb(
     deposito: &UseStateHandle<String>,
     moneda: &UseStateHandle<String>,
     estado: &UseStateHandle<String>,
+    recargo_porcentaje: &UseStateHandle<String>,
+    dias_gracia: &UseStateHandle<String>,
     editing: &UseStateHandle<Option<Contrato>>,
     show_form: &UseStateHandle<bool>,
     form_errors: &UseStateHandle<FormErrors>,
@@ -483,6 +954,8 @@ fn make_contrato_edit_cb(
         moneda.clone(),
         estado.clone(),
     );
+    let recargo_porcentaje = recargo_porcentaje.clone();
+    let dias_gracia = dias_gracia.clone();
     let (editing, show_form, form_errors) =
         (editing.clone(), show_form.clone(), form_errors.clone());
     Callback::from(move |c: Contrato| {
@@ -494,6 +967,8 @@ fn make_contrato_edit_cb(
         deposito.set(c.deposito.map(|v| v.to_string()).unwrap_or_default());
         moneda.set(c.moneda.clone());
         estado.set(c.estado.clone());
+        recargo_porcentaje.set(c.recargo_porcentaje.map(|v| v.to_string()).unwrap_or_default());
+        dias_gracia.set(c.dias_gracia.map(|v| v.to_string()).unwrap_or_default());
         editing.set(Some(c));
         show_form.set(true);
         form_errors.set(FormErrors::default());
@@ -546,16 +1021,20 @@ fn do_save_contrato(
         let res = match editing_id {
             Some(id) => api_put::<Contrato, _>(&format!("/contratos/{id}"), &update)
                 .await
-                .map(|_| ()),
+                .map(|c| c.pagos_generados),
             None => api_post::<Contrato, _>("/contratos", &create)
                 .await
-                .map(|_| ()),
+                .map(|c| c.pagos_generados),
         };
         match res {
-            Ok(()) => {
+            Ok(pagos_gen) => {
                 reset_form();
                 reload.set(*reload + 1);
-                push_toast(toasts.as_ref(), "Contrato guardado", ToastKind::Success);
+                let msg = match pagos_gen {
+                    Some(n) if n > 0 => format!("Contrato guardado — {n} pagos generados"),
+                    _ => "Contrato guardado".to_string(),
+                };
+                push_toast(toasts.as_ref(), &msg, ToastKind::Success);
             }
             Err(err) => error.set(Some(err)),
         }
@@ -707,6 +1186,8 @@ fn handle_contrato_submit(
     fecha_inicio: &UseStateHandle<String>,
     moneda: &UseStateHandle<String>,
     estado: &UseStateHandle<String>,
+    recargo_porcentaje: &UseStateHandle<String>,
+    dias_gracia: &UseStateHandle<String>,
     editing: &UseStateHandle<Option<Contrato>>,
     reset_form: impl Fn() + 'static,
     reload: UseStateHandle<u32>,
@@ -722,11 +1203,23 @@ fn handle_contrato_submit(
     submitting.set(true);
     let dep = deposito.parse::<f64>().ok();
     let editing_id = editing.as_ref().map(|e| e.id.clone());
+    let recargo = if recargo_porcentaje.is_empty() {
+        None
+    } else {
+        recargo_porcentaje.parse::<f64>().ok()
+    };
+    let gracia = if dias_gracia.is_empty() {
+        None
+    } else {
+        dias_gracia.parse::<i32>().ok()
+    };
     let update = UpdateContrato {
         fecha_fin: Some((**fecha_fin).clone()),
         monto_mensual: Some(monto_val),
         deposito: dep,
         estado: Some((**estado).clone()),
+        recargo_porcentaje: recargo,
+        dias_gracia: gracia,
     };
     let create = CreateContrato {
         propiedad_id: (**propiedad_id).clone(),
@@ -736,6 +1229,8 @@ fn handle_contrato_submit(
         monto_mensual: monto_val,
         deposito: dep,
         moneda: Some((**moneda).clone()),
+        recargo_porcentaje: recargo,
+        dias_gracia: gracia,
     };
     do_save_contrato(
         editing_id, update, create, reset_form, reload, error, toasts, submitting,
@@ -816,7 +1311,7 @@ fn handle_escape_contratos(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
 fn render_contratos_view(
     loading: bool,
     user_rol: &str,
@@ -827,6 +1322,10 @@ fn render_contratos_view(
     renew_monto: &UseStateHandle<String>,
     terminate_target: &UseStateHandle<Option<Contrato>>,
     terminate_fecha: &UseStateHandle<String>,
+    preview_data: Option<&PreviewPagos>,
+    preview_confirming: bool,
+    on_preview_confirm: Callback<MouseEvent>,
+    on_preview_cancel: Callback<MouseEvent>,
     show_form: bool,
     editing: &UseStateHandle<Option<Contrato>>,
     propiedad_id: &UseStateHandle<String>,
@@ -837,6 +1336,8 @@ fn render_contratos_view(
     deposito: &UseStateHandle<String>,
     moneda: &UseStateHandle<String>,
     estado: &UseStateHandle<String>,
+    recargo_porcentaje: &UseStateHandle<String>,
+    dias_gracia: &UseStateHandle<String>,
     propiedades: &UseStateHandle<Vec<Propiedad>>,
     inquilinos: &UseStateHandle<Vec<Inquilino>>,
     form_errors: &UseStateHandle<FormErrors>,
@@ -860,6 +1361,7 @@ fn render_contratos_view(
     on_delete_click: Callback<Contrato>,
     on_renew_click: Callback<Contrato>,
     on_terminate_click: Callback<Contrato>,
+    on_generar_pagos_click: Callback<Contrato>,
     on_page_change: Callback<u64>,
     on_per_page_change: Callback<u64>,
     confidences: &UseStateHandle<HashMap<String, f64>>,
@@ -867,6 +1369,13 @@ fn render_contratos_view(
     on_confidence_clear: Callback<String>,
     editing_id: Option<String>,
     token: String,
+    on_cobrar: Callback<MouseEvent>,
+    on_devolver: Callback<MouseEvent>,
+    on_retener: Callback<MouseEvent>,
+    show_retener_modal: bool,
+    retener_contrato_id: AttrValue,
+    on_retener_close: Callback<()>,
+    on_retener_success: Callback<()>,
 ) -> Html {
     if loading {
         return html! { <TableSkeleton title_width="180px" columns={7} /> };
@@ -918,6 +1427,8 @@ fn render_contratos_view(
         deposito,
         moneda,
         estado,
+        recargo_porcentaje,
+        dias_gracia,
         propiedades,
         inquilinos,
         form_errors,
@@ -929,6 +1440,14 @@ fn render_contratos_view(
         on_confidence_clear,
         editing_id,
         token,
+        user_rol,
+        on_cobrar,
+        on_devolver,
+        on_retener,
+        show_retener_modal,
+        retener_contrato_id,
+        on_retener_close,
+        on_retener_success,
     );
 
     html! {
@@ -941,6 +1460,14 @@ fn render_contratos_view(
             {delete_html}
             {renew_html}
             {terminate_html}
+            {preview_data.map_or_else(|| html! {}, |preview| html! {
+                    <GenerarPagosPreviewModal
+                        preview={(*preview).clone()}
+                        confirming={preview_confirming}
+                        on_confirm={on_preview_confirm}
+                        on_cancel={on_preview_cancel}
+                    />
+                })}
             {form_html}
             <ContratoList
                 items={(**items).clone()} user_rol={user_rol.to_string()} headers={headers}
@@ -948,6 +1475,7 @@ fn render_contratos_view(
                 prop_label={prop_label.clone()} inq_label={inq_label.clone()}
                 on_edit={on_edit} on_delete={on_delete_click}
                 on_renew={on_renew_click} on_terminate={on_terminate_click}
+                on_generar_pagos={on_generar_pagos_click}
                 on_page_change={on_page_change} on_per_page_change={on_per_page_change}
             />
         </div>
@@ -1016,6 +1544,38 @@ fn render_terminate_modal(
     }
 }
 
+fn render_recargo_detail(c: &Contrato) -> Html {
+    let recargo_text = c.recargo_porcentaje.map_or_else(
+        || html! {
+            <span style="color: var(--text-secondary); font-style: italic;">
+                {"(usa valor por defecto de la organización)"}
+            </span>
+        },
+        |v| html! { <span class="tabular-nums" style="font-weight: 500;">{format!("{v:.2}%")}</span> },
+    );
+    let gracia_text = c.dias_gracia.map_or_else(
+        || html! { <span style="color: var(--text-secondary);">{"No definido"}</span> },
+        |v| html! { <span class="tabular-nums" style="font-weight: 500;">{format!("{v} días")}</span> },
+    );
+    html! {
+        <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
+            <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; color: var(--text-primary); margin-bottom: var(--space-4);">
+                {"Recargo por Mora"}
+            </h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3);">
+                <div>
+                    <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Porcentaje de Recargo"}</span>
+                    {recargo_text}
+                </div>
+                <div>
+                    <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Días de Gracia"}</span>
+                    {gracia_text}
+                </div>
+            </div>
+        </div>
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn render_contrato_form_section(
     show_form: bool,
@@ -1028,6 +1588,8 @@ fn render_contrato_form_section(
     deposito: &UseStateHandle<String>,
     moneda: &UseStateHandle<String>,
     estado: &UseStateHandle<String>,
+    recargo_porcentaje: &UseStateHandle<String>,
+    dias_gracia: &UseStateHandle<String>,
     propiedades: &UseStateHandle<Vec<Propiedad>>,
     inquilinos: &UseStateHandle<Vec<Inquilino>>,
     form_errors: &UseStateHandle<FormErrors>,
@@ -1039,25 +1601,65 @@ fn render_contrato_form_section(
     on_confidence_clear: Callback<String>,
     editing_id: Option<String>,
     token: String,
+    user_rol: &str,
+    on_cobrar: Callback<MouseEvent>,
+    on_devolver: Callback<MouseEvent>,
+    on_retener: Callback<MouseEvent>,
+    show_retener_modal: bool,
+    retener_contrato_id: AttrValue,
+    on_retener_close: Callback<()>,
+    on_retener_success: Callback<()>,
 ) -> Html {
     if !show_form {
         return html! {};
     }
+
+    let deposito_html = (**editing).as_ref().map_or_else(
+        || html! {},
+        |c| html! {
+            <>
+                <DepositoSection
+                    contrato={c.clone()}
+                    user_rol={AttrValue::from(user_rol.to_string())}
+                    on_cobrar={on_cobrar}
+                    on_devolver={on_devolver}
+                    on_retener={on_retener}
+                />
+                <RetenerDepositoModal
+                    visible={show_retener_modal}
+                    contrato_id={retener_contrato_id}
+                    on_close={on_retener_close}
+                    on_success={on_retener_success}
+                />
+            </>
+        },
+    );
+
+    let recargo_detail_html = (**editing).as_ref().map_or_else(
+        || html! {},
+        render_recargo_detail,
+    );
+
     html! {
-        <ContratoForm
-            is_editing={editing.is_some()}
-            propiedad_id={propiedad_id.clone()} inquilino_id={inquilino_id.clone()}
-            fecha_inicio={fecha_inicio.clone()} fecha_fin={fecha_fin.clone()}
-            monto_mensual={monto_mensual.clone()} deposito={deposito.clone()}
-            moneda={moneda.clone()} estado={estado.clone()}
-            propiedades={(**propiedades).clone()} inquilinos={(**inquilinos).clone()}
-            form_errors={(**form_errors).clone()} submitting={submitting}
-            on_submit={on_submit} on_cancel={on_cancel}
-            confidences={(**confidences).clone()} on_ocr_result={on_ocr_result}
-            on_confidence_clear={on_confidence_clear}
-            editing_id={editing_id}
-            token={token}
-        />
+        <>
+            <ContratoForm
+                is_editing={editing.is_some()}
+                propiedad_id={propiedad_id.clone()} inquilino_id={inquilino_id.clone()}
+                fecha_inicio={fecha_inicio.clone()} fecha_fin={fecha_fin.clone()}
+                monto_mensual={monto_mensual.clone()} deposito={deposito.clone()}
+                moneda={moneda.clone()} estado={estado.clone()}
+                recargo_porcentaje={recargo_porcentaje.clone()} dias_gracia={dias_gracia.clone()}
+                propiedades={(**propiedades).clone()} inquilinos={(**inquilinos).clone()}
+                form_errors={(**form_errors).clone()} submitting={submitting}
+                on_submit={on_submit} on_cancel={on_cancel}
+                confidences={(**confidences).clone()} on_ocr_result={on_ocr_result}
+                on_confidence_clear={on_confidence_clear}
+                editing_id={editing_id}
+                token={token}
+            />
+            {recargo_detail_html}
+            {deposito_html}
+        </>
     }
 }
 
@@ -1094,6 +1696,8 @@ pub fn Contratos() -> Html {
     let deposito = use_state(String::new);
     let moneda = use_state(|| "DOP".to_string());
     let estado = use_state(|| "activo".to_string());
+    let recargo_porcentaje = use_state(String::new);
+    let dias_gracia = use_state(String::new);
 
     let renew_target = use_state(|| Option::<Contrato>::None);
     let renew_fecha_fin = use_state(String::new);
@@ -1101,7 +1705,13 @@ pub fn Contratos() -> Html {
     let terminate_target = use_state(|| Option::<Contrato>::None);
     let terminate_fecha = use_state(String::new);
 
+    let preview_target = use_state(|| Option::<Contrato>::None);
+    let preview_data = use_state(|| Option::<PreviewPagos>::None);
+    let preview_confirming = use_state(|| false);
+
     let confidences = use_state(HashMap::<String, f64>::new);
+
+    let show_retener_modal = use_state(|| false);
 
     {
         let items = items.clone();
@@ -1159,6 +1769,8 @@ pub fn Contratos() -> Html {
         let deposito = deposito.clone();
         let moneda = moneda.clone();
         let estado = estado.clone();
+        let recargo_porcentaje = recargo_porcentaje.clone();
+        let dias_gracia = dias_gracia.clone();
         let editing = editing.clone();
         let show_form = show_form.clone();
         let form_errors = form_errors.clone();
@@ -1172,6 +1784,8 @@ pub fn Contratos() -> Html {
             deposito.set(String::new());
             moneda.set("DOP".into());
             estado.set("activo".into());
+            recargo_porcentaje.set(String::new());
+            dias_gracia.set(String::new());
             editing.set(None);
             show_form.set(false);
             form_errors.set(FormErrors::default());
@@ -1208,6 +1822,8 @@ pub fn Contratos() -> Html {
         &deposito,
         &moneda,
         &estado,
+        &recargo_porcentaje,
+        &dias_gracia,
         &editing,
         &show_form,
         &form_errors,
@@ -1262,6 +1878,8 @@ pub fn Contratos() -> Html {
         let deposito = deposito.clone();
         let moneda = moneda.clone();
         let estado = estado.clone();
+        let recargo_porcentaje = recargo_porcentaje.clone();
+        let dias_gracia = dias_gracia.clone();
         let editing = editing.clone();
         let error = error.clone();
         let reload = reload.clone();
@@ -1281,6 +1899,8 @@ pub fn Contratos() -> Html {
                 &fecha_inicio,
                 &moneda,
                 &estado,
+                &recargo_porcentaje,
+                &dias_gracia,
                 &editing,
                 reset_form.clone(),
                 reload.clone(),
@@ -1367,6 +1987,7 @@ pub fn Contratos() -> Html {
         let terminate_fecha = terminate_fecha.clone();
         let error = error.clone();
         let reload = reload.clone();
+        let toasts = toasts.clone();
         Callback::from(move |_: MouseEvent| {
             handle_contrato_terminate_confirm(
                 &terminate_target,
@@ -1380,10 +2001,162 @@ pub fn Contratos() -> Html {
 
     let on_terminate_cancel = super::page_helpers::delete_cancel_cb(&terminate_target);
 
+    let on_generar_pagos_click = {
+        let preview_target = preview_target.clone();
+        let preview_data = preview_data.clone();
+        let error = error.clone();
+        Callback::from(move |c: Contrato| {
+            let id = c.id.clone();
+            let preview_data = preview_data.clone();
+            let error = error.clone();
+            preview_target.set(Some(c));
+            spawn_local(async move {
+                match api_get::<PreviewPagos>(&format!("/contratos/{id}/pagos/preview")).await {
+                    Ok(data) => preview_data.set(Some(data)),
+                    Err(err) => error.set(Some(err)),
+                }
+            });
+        })
+    };
+
+    let on_preview_confirm = {
+        let preview_target = preview_target.clone();
+        let preview_data = preview_data.clone();
+        let preview_confirming = preview_confirming.clone();
+        let reload = reload.clone();
+        let error = error.clone();
+        let toasts = toasts.clone();
+        Callback::from(move |_: MouseEvent| {
+            let Some(ref c) = *preview_target else {
+                return;
+            };
+            let id = c.id.clone();
+            let preview_target = preview_target.clone();
+            let preview_data = preview_data.clone();
+            let preview_confirming = preview_confirming.clone();
+            let reload = reload.clone();
+            let error = error.clone();
+            let toasts = toasts.clone();
+            preview_confirming.set(true);
+            spawn_local(async move {
+                let body = serde_json::json!({});
+                match api_post::<GenerarPagosResponse, _>(
+                    &format!("/contratos/{id}/pagos/generar"),
+                    &body,
+                )
+                .await
+                {
+                    Ok(resp) => {
+                        preview_target.set(None);
+                        preview_data.set(None);
+                        reload.set(*reload + 1);
+                        let msg = format!("{} pagos generados", resp.pagos_generados);
+                        push_toast(toasts.as_ref(), &msg, ToastKind::Success);
+                    }
+                    Err(err) => error.set(Some(err)),
+                }
+                preview_confirming.set(false);
+            });
+        })
+    };
+
+    let on_preview_cancel = {
+        let preview_data = preview_data.clone();
+        Callback::from(move |_: MouseEvent| {
+            preview_target.set(None);
+            preview_data.set(None);
+        })
+    };
+
+    let on_cobrar = {
+        let editing = editing.clone();
+        let reload = reload.clone();
+        let error = error.clone();
+        let toasts = toasts.clone();
+        Callback::from(move |_: MouseEvent| {
+            let Some(ref c) = *editing else { return };
+            let id = c.id.clone();
+            let reload = reload.clone();
+            let error = error.clone();
+            let toasts = toasts.clone();
+            spawn_local(async move {
+                let body = CambiarEstadoDeposito {
+                    estado: "cobrado".to_string(),
+                    monto_retenido: None,
+                    motivo_retencion: None,
+                };
+                match api_put::<Contrato, _>(&format!("/contratos/{id}/deposito"), &body).await {
+                    Ok(_) => {
+                        push_toast(toasts.as_ref(), "Depósito marcado como cobrado", ToastKind::Success);
+                        reload.set(*reload + 1);
+                    }
+                    Err(err) => {
+                        push_toast(toasts.as_ref(), &err, ToastKind::Error);
+                        error.set(Some(err));
+                    }
+                }
+            });
+        })
+    };
+
+    let on_devolver = {
+        let editing = editing.clone();
+        let reload = reload.clone();
+        let error = error.clone();
+        Callback::from(move |_: MouseEvent| {
+            let Some(ref c) = *editing else { return };
+            let id = c.id.clone();
+            let reload = reload.clone();
+            let error = error.clone();
+            let toasts = toasts.clone();
+            spawn_local(async move {
+                let body = CambiarEstadoDeposito {
+                    estado: "devuelto".to_string(),
+                    monto_retenido: None,
+                    motivo_retencion: None,
+                };
+                match api_put::<Contrato, _>(&format!("/contratos/{id}/deposito"), &body).await {
+                    Ok(_) => {
+                        push_toast(toasts.as_ref(), "Depósito devuelto exitosamente", ToastKind::Success);
+                        reload.set(*reload + 1);
+                    }
+                    Err(err) => {
+                        push_toast(toasts.as_ref(), &err, ToastKind::Error);
+                        error.set(Some(err));
+                    }
+                }
+            });
+        })
+    };
+
+    let on_retener = {
+        let show_retener_modal = show_retener_modal.clone();
+        Callback::from(move |_: MouseEvent| {
+            show_retener_modal.set(true);
+        })
+    };
+
+    let on_retener_close = {
+        let show_retener_modal = show_retener_modal.clone();
+        Callback::from(move |()| {
+            show_retener_modal.set(false);
+        })
+    };
+
+    let on_retener_success = {
+        let reload = reload.clone();
+        Callback::from(move |()| {
+            reload.set(*reload + 1);
+        })
+    };
+
     let (on_page_change, on_per_page_change) =
         super::page_helpers::pagination_cbs(&page, &per_page, &reload);
 
     let editing_id = editing.as_ref().map(|e| e.id.clone());
+    let retener_contrato_id = AttrValue::from(
+        editing.as_ref().map(|e| e.id.clone()).unwrap_or_default(),
+    );
     let token = auth
         .as_ref()
         .and_then(|a| a.token.clone())
@@ -1399,6 +2172,10 @@ pub fn Contratos() -> Html {
         &renew_monto,
         &terminate_target,
         &terminate_fecha,
+        preview_data.as_ref(),
+        *preview_confirming,
+        on_preview_confirm,
+        on_preview_cancel,
         *show_form,
         &editing,
         &propiedad_id,
@@ -1409,6 +2186,8 @@ pub fn Contratos() -> Html {
         &deposito,
         &moneda,
         &estado,
+        &recargo_porcentaje,
+        &dias_gracia,
         &propiedades,
         &inquilinos,
         &form_errors,
@@ -1432,6 +2211,7 @@ pub fn Contratos() -> Html {
         on_delete_click,
         on_renew_click,
         on_terminate_click,
+        on_generar_pagos_click,
         on_page_change,
         on_per_page_change,
         &confidences,
@@ -1439,5 +2219,12 @@ pub fn Contratos() -> Html {
         on_confidence_clear,
         editing_id,
         token,
+        on_cobrar,
+        on_devolver,
+        on_retener,
+        *show_retener_modal,
+        retener_contrato_id,
+        on_retener_close,
+        on_retener_success,
     )
 }

@@ -11,8 +11,10 @@ pub mod mantenimiento;
 pub mod notificacion;
 pub mod ocr;
 pub mod pago;
+pub mod pago_generacion;
 pub mod propiedad;
 pub mod reporte;
+pub mod unidad;
 pub mod usuario;
 
 use serde::{Deserialize, Serialize};

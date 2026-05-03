@@ -8,6 +8,7 @@ use crate::components::layout::footer::Footer;
 use crate::components::layout::navbar::Navbar;
 use crate::components::layout::sidebar::Sidebar;
 use crate::pages::auditoria::Auditoria;
+use crate::pages::configuracion::Configuracion;
 use crate::pages::contratos::Contratos;
 use crate::pages::dashboard::Dashboard;
 use crate::pages::documento_editor::DocumentoEditorPage;
@@ -16,6 +17,7 @@ use crate::pages::importar::Importar;
 use crate::pages::inquilinos::Inquilinos;
 use crate::pages::login::Login;
 use crate::pages::mantenimiento::Mantenimiento;
+use crate::pages::notificaciones::Notificaciones;
 use crate::pages::pagos::Pagos;
 use crate::pages::perfil::Perfil;
 use crate::pages::propiedades::Propiedades;
@@ -116,6 +118,10 @@ pub enum Route {
     Importar,
     #[at("/mantenimiento")]
     Mantenimiento,
+    #[at("/notificaciones")]
+    Notificaciones,
+    #[at("/configuracion")]
+    Configuracion,
     #[at("/documentos/editor/:entity_type/:entity_id")]
     DocumentoEditor {
         entity_type: String,
@@ -148,6 +154,8 @@ fn switch(routes: Route) -> Html {
         Route::AuditoriaPage => html! { <ProtectedRoute><Auditoria /></ProtectedRoute> },
         Route::Importar => html! { <ProtectedRoute><Importar /></ProtectedRoute> },
         Route::Mantenimiento => html! { <ProtectedRoute><Mantenimiento /></ProtectedRoute> },
+        Route::Notificaciones => html! { <ProtectedRoute><Notificaciones /></ProtectedRoute> },
+        Route::Configuracion => html! { <ProtectedRoute><Configuracion /></ProtectedRoute> },
         Route::DocumentoEditor { entity_type, entity_id } => html! {
             <ProtectedRoute><DocumentoEditorPage entity_type={entity_type} entity_id={entity_id} /></ProtectedRoute>
         },

@@ -18,6 +18,22 @@ pub struct Contrato {
     pub estado: String,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default)]
+    pub pagos_generados: Option<u64>,
+    #[serde(default)]
+    pub estado_deposito: Option<String>,
+    #[serde(default)]
+    pub fecha_cobro_deposito: Option<String>,
+    #[serde(default)]
+    pub fecha_devolucion_deposito: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_option_f64_from_any")]
+    pub monto_retenido: Option<f64>,
+    #[serde(default)]
+    pub motivo_retencion: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_option_f64_from_any")]
+    pub recargo_porcentaje: Option<f64>,
+    #[serde(default)]
+    pub dias_gracia: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -30,6 +46,8 @@ pub struct CreateContrato {
     pub monto_mensual: f64,
     pub deposito: Option<f64>,
     pub moneda: Option<String>,
+    pub recargo_porcentaje: Option<f64>,
+    pub dias_gracia: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -39,4 +57,14 @@ pub struct UpdateContrato {
     pub monto_mensual: Option<f64>,
     pub deposito: Option<f64>,
     pub estado: Option<String>,
+    pub recargo_porcentaje: Option<f64>,
+    pub dias_gracia: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CambiarEstadoDeposito {
+    pub estado: String,
+    pub monto_retenido: Option<f64>,
+    pub motivo_retencion: Option<String>,
 }

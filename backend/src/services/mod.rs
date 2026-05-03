@@ -1,5 +1,6 @@
 pub mod auditoria;
 pub mod auth;
+pub mod background_jobs;
 pub mod configuracion;
 pub mod contratos;
 pub mod dashboard;
@@ -19,12 +20,15 @@ mod ocr_mapping_pbt;
 #[cfg(test)]
 mod ocr_mapping_tests;
 pub mod ocr_preview;
+pub mod pago_generacion;
 pub mod pagos;
 pub mod perfil;
 pub mod plantillas;
 pub mod propiedades;
+pub mod recargos;
 pub mod recibos;
 pub mod reportes;
+pub mod unidades;
 pub mod usuarios;
 pub mod validacion_fiscal;
 pub mod validation;

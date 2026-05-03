@@ -48,6 +48,7 @@ pub struct PagoResponse {
     pub metodo_pago: Option<String>,
     pub estado: String,
     pub notas: Option<String>,
+    pub recargo: Option<Decimal>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

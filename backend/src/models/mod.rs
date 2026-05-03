@@ -1,4 +1,5 @@
 pub mod auditoria;
+pub mod background_jobs;
 pub mod contrato;
 pub mod dashboard;
 pub mod documento;
@@ -11,8 +12,10 @@ pub mod notificacion;
 pub mod ocr;
 pub mod organizacion;
 pub mod pago;
+pub mod pago_generacion;
 pub mod propiedad;
 pub mod reporte;
+pub mod unidad;
 pub mod usuario;
 
 use serde::Serialize;

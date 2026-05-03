@@ -1,4 +1,7 @@
-use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryOrder, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, Set,
+};
 use uuid::Uuid;
 
 use crate::entities::usuario;
@@ -25,6 +28,7 @@ impl From<usuario::Model> for UsuarioResponse {
 
 pub async fn listar(
     db: &DatabaseConnection,
+    org_id: Uuid,
     page: u64,
     per_page: u64,
 ) -> Result<PaginatedResponse<UsuarioResponse>, AppError> {
@@ -32,6 +36,7 @@ pub async fn listar(
     let per_page = per_page.clamp(1, 100);
 
     let paginator = usuario::Entity::find()
+        .filter(usuario::Column::OrganizacionId.eq(org_id))
         .order_by_desc(usuario::Column::CreatedAt)
         .paginate(db, per_page);
 

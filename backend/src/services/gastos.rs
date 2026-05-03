@@ -118,8 +118,13 @@ pub async fn create<C: ConnectionTrait>(
     Ok(GastoResponse::from(record))
 }
 
-pub async fn get_by_id(db: &DatabaseConnection, id: Uuid) -> Result<GastoResponse, AppError> {
+pub async fn get_by_id(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    id: Uuid,
+) -> Result<GastoResponse, AppError> {
     let record = gasto::Entity::find_by_id(id)
+        .filter(gasto::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Gasto no encontrado".to_string()))?;
@@ -128,12 +133,13 @@ pub async fn get_by_id(db: &DatabaseConnection, id: Uuid) -> Result<GastoRespons
 
 pub async fn list(
     db: &DatabaseConnection,
+    org_id: Uuid,
     query: GastoListQuery,
 ) -> Result<PaginatedResponse<GastoResponse>, AppError> {
     let page = query.page.unwrap_or(1).max(1);
     let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
 
-    let mut select = gasto::Entity::find();
+    let mut select = gasto::Entity::find().filter(gasto::Column::OrganizacionId.eq(org_id));
 
     if let Some(propiedad_id) = query.propiedad_id {
         select = select.filter(gasto::Column::PropiedadId.eq(propiedad_id));
@@ -191,6 +197,7 @@ fn validate_gasto_update(input: &UpdateGastoRequest) -> Result<(), AppError> {
 
 pub async fn update<C: ConnectionTrait>(
     db: &C,
+    org_id: Uuid,
     id: Uuid,
     input: UpdateGastoRequest,
     usuario_id: Uuid,
@@ -198,6 +205,7 @@ pub async fn update<C: ConnectionTrait>(
     validate_gasto_update(&input)?;
 
     let existing = gasto::Entity::find_by_id(id)
+        .filter(gasto::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Gasto no encontrado".to_string()))?;
@@ -269,13 +277,18 @@ pub async fn update<C: ConnectionTrait>(
 
 pub async fn delete<C: ConnectionTrait>(
     db: &C,
+    org_id: Uuid,
     id: Uuid,
     usuario_id: Uuid,
 ) -> Result<(), AppError> {
-    let result = gasto::Entity::delete_by_id(id).exec(db).await?;
-    if result.rows_affected == 0 {
-        return Err(AppError::NotFound("Gasto no encontrado".to_string()));
-    }
+    let existing = gasto::Entity::find_by_id(id)
+        .filter(gasto::Column::OrganizacionId.eq(org_id))
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Gasto no encontrado".to_string()))?;
+
+    let active: gasto::ActiveModel = existing.into();
+    active.delete(db).await?;
 
     auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {
@@ -300,11 +313,13 @@ struct CategoryAggRow {
 
 pub async fn resumen_categorias(
     db: &DatabaseConnection,
+    org_id: Uuid,
     query: ResumenCategoriasQuery,
 ) -> Result<Vec<ResumenCategoriaRow>, AppError> {
     use sea_orm::{QuerySelect, sea_query::Expr};
 
     let mut select = gasto::Entity::find()
+        .filter(gasto::Column::OrganizacionId.eq(org_id))
         .filter(gasto::Column::PropiedadId.eq(query.propiedad_id))
         .filter(gasto::Column::Estado.eq("pagado"));
 

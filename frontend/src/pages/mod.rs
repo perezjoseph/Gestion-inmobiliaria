@@ -1,4 +1,5 @@
 pub mod auditoria;
+pub mod configuracion;
 pub mod contratos;
 pub mod dashboard;
 pub mod documento_editor;
@@ -8,6 +9,7 @@ pub mod inquilinos;
 pub mod login;
 pub mod mantenimiento;
 mod page_helpers;
+pub mod notificaciones;
 pub mod pagos;
 pub mod perfil;
 pub mod propiedades;

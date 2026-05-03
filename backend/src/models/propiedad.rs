@@ -56,6 +56,9 @@ pub struct PropiedadResponse {
     pub moneda: String,
     pub estado: String,
     pub imagenes: Option<serde_json::Value>,
+    pub total_unidades: Option<u64>,
+    pub unidades_ocupadas: Option<u64>,
+    pub tasa_ocupacion: Option<f64>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

@@ -123,7 +123,7 @@ pub fn CommandPalette() -> Html {
             let listener = web_sys::window().and_then(|w| w.document()).map(|doc| {
                 EventListener::new(&doc, "keydown", move |event| {
                     if let Some(ke) = event.dyn_ref::<web_sys::KeyboardEvent>()
-                        && (ke.ctrl_key() || ke.meta_key())
+                        && ke.ctrl_key()
                         && ke.key() == "k"
                     {
                         ke.prevent_default();

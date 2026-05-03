@@ -14,6 +14,7 @@ use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::pagination::Pagination;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
+use crate::components::propiedades::unidades_tab::UnidadesTab;
 use crate::services::api::{api_delete, api_get, api_post, api_put};
 use crate::types::PaginatedResponse;
 use crate::types::propiedad::{CreatePropiedad, Propiedad, UpdatePropiedad};
@@ -426,9 +427,23 @@ fn render_propiedad_row(
     let (badge_cls, badge_label) = estado_badge(&p.estado);
     let tipo_label = tipo_propiedad_label(&p.tipo_propiedad);
     let actions = render_propiedad_actions(user_rol, p, on_edit, on_delete);
+    let ocupacion_info = match p.total_unidades {
+        Some(n) if n > 0 => {
+            let tasa = p.tasa_ocupacion.unwrap_or(0.0);
+            html! {
+                <div style="font-size: var(--text-xs); color: var(--text-tertiary); margin-top: 2px;">
+                    {format!("{n} unidades · {tasa:.1}% ocupación")}
+                </div>
+            }
+        }
+        _ => html! {},
+    };
     html! {
         <tr>
-            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{&p.titulo}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">
+                {&p.titulo}
+                {ocupacion_info}
+            </td>
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&p.direccion}</td>
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{&p.ciudad}</td>
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{tipo_label}</td>
@@ -801,6 +816,27 @@ fn handle_escape_propiedades(
     }
 }
 
+fn render_tab_button(label: &str, tab_id: &str, detail_tab: &UseStateHandle<String>) -> Html {
+    let is_active = **detail_tab == tab_id;
+    let dt = detail_tab.clone();
+    let id = tab_id.to_string();
+    let onclick = Callback::from(move |_: MouseEvent| {
+        dt.set(id.clone());
+    });
+    let style = if is_active {
+        "padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 600; \
+         border-bottom: 2px solid var(--color-primary-500); color: var(--color-primary-500); \
+         background: none; border-top: none; border-left: none; border-right: none; cursor: pointer;"
+    } else {
+        "padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500; \
+         border-bottom: 2px solid transparent; color: var(--text-secondary); \
+         background: none; border-top: none; border-left: none; border-right: none; cursor: pointer;"
+    };
+    html! {
+        <button type="button" {onclick} {style}>{label}</button>
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn render_propiedades_view(
     loading: &UseStateHandle<bool>,
@@ -846,6 +882,7 @@ fn render_propiedades_view(
     on_new: Callback<MouseEvent>,
     on_page_change: Callback<u64>,
     on_per_page_change: Callback<u64>,
+    detail_tab: &UseStateHandle<String>,
 ) -> Html {
     let last_header = if can_write(user_rol) { "Acciones" } else { "" };
     let headers: Vec<String> = vec![
@@ -915,27 +952,67 @@ fn render_propiedades_view(
             } else {
                 <>
                     if **show_form {
-                        <PropiedadForm
-                            is_editing={editing.is_some()}
-                            titulo={titulo}
-                            descripcion={descripcion}
-                            direccion={direccion}
-                            ciudad={ciudad}
-                            provincia={provincia}
-                            tipo_propiedad={tipo_propiedad}
-                            habitaciones={habitaciones}
-                            banos={banos}
-                            area_m2={area_m2}
-                            precio={precio}
-                            moneda={moneda}
-                            estado={estado}
-                            form_errors={(*(*form_errors)).clone()}
-                            submitting={**submitting}
-                            on_submit={on_submit}
-                            on_cancel={on_cancel}
-                            editing_id={editing_id}
-                            token={token}
-                        />
+                        if editing.is_some() {
+                            <div class="gi-card" style="margin-bottom: var(--space-5); max-width: 960px;">
+                                <div style="display: flex; gap: 0; border-bottom: 1px solid var(--border-subtle);">
+                                    {render_tab_button("Detalles", "detalles", detail_tab)}
+                                    {render_tab_button("Unidades", "unidades", detail_tab)}
+                                </div>
+                                <div style="padding: 0;">
+                                    if **detail_tab == "detalles" {
+                                        <PropiedadForm
+                                            is_editing={true}
+                                            titulo={titulo}
+                                            descripcion={descripcion}
+                                            direccion={direccion}
+                                            ciudad={ciudad}
+                                            provincia={provincia}
+                                            tipo_propiedad={tipo_propiedad}
+                                            habitaciones={habitaciones}
+                                            banos={banos}
+                                            area_m2={area_m2}
+                                            precio={precio}
+                                            moneda={moneda}
+                                            estado={estado}
+                                            form_errors={(*(*form_errors)).clone()}
+                                            submitting={**submitting}
+                                            on_submit={on_submit}
+                                            on_cancel={on_cancel}
+                                            editing_id={editing_id.clone()}
+                                            token={token.clone()}
+                                        />
+                                    } else {
+                                        <div style="padding: var(--space-4);">
+                                            if let Some(ref eid) = editing_id {
+                                                <UnidadesTab propiedad_id={AttrValue::from(eid.clone())} />
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        } else {
+                            <PropiedadForm
+                                is_editing={false}
+                                titulo={titulo}
+                                descripcion={descripcion}
+                                direccion={direccion}
+                                ciudad={ciudad}
+                                provincia={provincia}
+                                tipo_propiedad={tipo_propiedad}
+                                habitaciones={habitaciones}
+                                banos={banos}
+                                area_m2={area_m2}
+                                precio={precio}
+                                moneda={moneda}
+                                estado={estado}
+                                form_errors={(*(*form_errors)).clone()}
+                                submitting={**submitting}
+                                on_submit={on_submit}
+                                on_cancel={on_cancel}
+                                editing_id={editing_id}
+                                token={token}
+                            />
+                        }
                     }
 
                     <PropiedadList
@@ -983,6 +1060,7 @@ pub fn Propiedades() -> Html {
     let form_errors = use_state(FormErrors::default);
     let reload = use_state(|| 0u32);
     let submitting = use_state(|| false);
+    let detail_tab = use_state(|| "detalles".to_string());
 
     let titulo = use_state(String::new);
     let descripcion = use_state(String::new);
@@ -1098,6 +1176,7 @@ pub fn Propiedades() -> Html {
         let editing = editing.clone();
         let show_form = show_form.clone();
         let form_errors = form_errors.clone();
+        let detail_tab = detail_tab.clone();
         move || {
             titulo.set(String::new());
             descripcion.set(String::new());
@@ -1114,6 +1193,7 @@ pub fn Propiedades() -> Html {
             editing.set(None);
             show_form.set(false);
             form_errors.set(FormErrors::default());
+            detail_tab.set("detalles".into());
         }
     };
 
@@ -1331,5 +1411,6 @@ pub fn Propiedades() -> Html {
         on_new,
         on_page_change,
         on_per_page_change,
+        &detail_tab,
     )
 }

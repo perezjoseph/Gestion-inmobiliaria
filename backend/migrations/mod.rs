@@ -18,6 +18,10 @@ pub mod m20250413_000003_create_invitaciones;
 pub mod m20250430_000001_extend_documentos_legal;
 pub mod m20250430_000002_add_documentos_editor;
 pub mod m20250430_000003_create_plantillas_documento;
+pub mod m20250501_000001_create_notificaciones;
+pub mod m20250601_000001_create_ejecuciones_tareas;
+pub mod m20250615_000001_add_deposit_tracking_to_contratos;
+pub mod m20250615_000002_add_recargo_fields;
 
 use sea_orm_migration::prelude::*;
 
@@ -46,6 +50,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20250430_000001_extend_documentos_legal::Migration),
             Box::new(m20250430_000002_add_documentos_editor::Migration),
             Box::new(m20250430_000003_create_plantillas_documento::Migration),
+            Box::new(m20250501_000001_create_notificaciones::Migration),
+            Box::new(m20250601_000001_create_ejecuciones_tareas::Migration),
+            Box::new(m20250615_000001_add_deposit_tracking_to_contratos::Migration),
+            Box::new(m20250615_000002_add_recargo_fields::Migration),
         ]
     }
 }

@@ -20,6 +20,8 @@ pub struct CreateContratoRequest {
     pub monto_mensual: Decimal,
     pub deposito: Option<Decimal>,
     pub moneda: Option<String>,
+    pub recargo_porcentaje: Option<Decimal>,
+    pub dias_gracia: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -48,6 +50,8 @@ pub struct UpdateContratoRequest {
     pub monto_mensual: Option<Decimal>,
     pub deposito: Option<Decimal>,
     pub estado: Option<String>,
+    pub recargo_porcentaje: Option<Decimal>,
+    pub dias_gracia: Option<i32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -64,6 +68,23 @@ pub struct ContratoResponse {
     pub estado: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pagos_generados: Option<usize>,
+    pub estado_deposito: Option<String>,
+    pub fecha_cobro_deposito: Option<DateTime<Utc>>,
+    pub fecha_devolucion_deposito: Option<DateTime<Utc>>,
+    pub monto_retenido: Option<Decimal>,
+    pub motivo_retencion: Option<String>,
+    pub recargo_porcentaje: Option<Decimal>,
+    pub dias_gracia: Option<i32>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CambiarEstadoDepositoRequest {
+    pub estado: String,
+    pub monto_retenido: Option<Decimal>,
+    pub motivo_retencion: Option<String>,
 }
 
 #[cfg(test)]
@@ -122,6 +143,14 @@ mod tests {
             estado: "activo".to_string(),
             created_at: DateTime::from_timestamp(0, 0).unwrap(),
             updated_at: DateTime::from_timestamp(0, 0).unwrap(),
+            pagos_generados: None,
+            estado_deposito: None,
+            fecha_cobro_deposito: None,
+            fecha_devolucion_deposito: None,
+            monto_retenido: None,
+            motivo_retencion: None,
+            recargo_porcentaje: None,
+            dias_gracia: None,
         };
 
         let json = serde_json::to_value(&resp).unwrap();
@@ -133,5 +162,64 @@ mod tests {
         assert!(json.get("createdAt").is_some());
         assert!(json.get("updatedAt").is_some());
         assert!(json.get("propiedad_id").is_none());
+    }
+
+    #[test]
+    fn cambiar_estado_deposito_request_deserializes_camel_case() {
+        let json = r#"{"estado":"cobrado"}"#;
+        let req: CambiarEstadoDepositoRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.estado, "cobrado");
+        assert!(req.monto_retenido.is_none());
+        assert!(req.motivo_retencion.is_none());
+    }
+
+    #[test]
+    fn cambiar_estado_deposito_request_deserializes_with_retention_fields() {
+        let json = r#"{"estado":"retenido","montoRetenido":"5000.00","motivoRetencion":"Daños en la propiedad"}"#;
+        let req: CambiarEstadoDepositoRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.estado, "retenido");
+        assert_eq!(
+            req.monto_retenido,
+            Some(Decimal::from_str("5000.00").unwrap())
+        );
+        assert_eq!(
+            req.motivo_retencion,
+            Some("Daños en la propiedad".to_string())
+        );
+    }
+
+    #[test]
+    fn contrato_response_serializes_deposit_fields() {
+        let id = Uuid::nil();
+        let cobro_date = DateTime::from_timestamp(1_718_000_000, 0).unwrap();
+        let devolucion_date = DateTime::from_timestamp(1_718_100_000, 0).unwrap();
+        let resp = ContratoResponse {
+            id,
+            propiedad_id: id,
+            inquilino_id: id,
+            fecha_inicio: NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            fecha_fin: NaiveDate::from_ymd_opt(2025, 12, 31).unwrap(),
+            monto_mensual: Decimal::from_str("15000").unwrap(),
+            deposito: Some(Decimal::from_str("30000").unwrap()),
+            moneda: "DOP".to_string(),
+            estado: "activo".to_string(),
+            created_at: DateTime::from_timestamp(0, 0).unwrap(),
+            updated_at: DateTime::from_timestamp(0, 0).unwrap(),
+            pagos_generados: None,
+            estado_deposito: Some("retenido".to_string()),
+            fecha_cobro_deposito: Some(cobro_date),
+            fecha_devolucion_deposito: Some(devolucion_date),
+            monto_retenido: Some(Decimal::from_str("5000.00").unwrap()),
+            motivo_retencion: Some("Daños en la propiedad".to_string()),
+            recargo_porcentaje: None,
+            dias_gracia: None,
+        };
+
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["estadoDeposito"], "retenido");
+        assert!(json.get("fechaCobroDeposito").is_some());
+        assert!(json.get("fechaDevolucionDeposito").is_some());
+        assert_eq!(json["montoRetenido"], "5000.00");
+        assert_eq!(json["motivoRetencion"], "Daños en la propiedad");
     }
 }

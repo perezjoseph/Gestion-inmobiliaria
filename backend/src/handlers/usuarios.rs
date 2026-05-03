@@ -17,12 +17,12 @@ pub struct UsuarioListQuery {
 
 pub async fn list(
     db: web::Data<DatabaseConnection>,
-    _admin: AdminOnly,
+    admin: AdminOnly,
     query: web::Query<UsuarioListQuery>,
 ) -> Result<HttpResponse, AppError> {
     let page = query.page.unwrap_or(1);
     let per_page = query.per_page.unwrap_or(20);
-    let result = usuarios::listar(db.get_ref(), page, per_page).await?;
+    let result = usuarios::listar(db.get_ref(), admin.0.organizacion_id, page, per_page).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 

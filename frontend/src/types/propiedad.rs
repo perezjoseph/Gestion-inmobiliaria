@@ -22,6 +22,10 @@ pub struct Propiedad {
     pub moneda: String,
     pub estado: String,
     pub imagenes: Option<serde_json::Value>,
+    pub total_unidades: Option<u64>,
+    pub unidades_ocupadas: Option<u64>,
+    #[serde(default, deserialize_with = "deserialize_option_f64_from_any")]
+    pub tasa_ocupacion: Option<f64>,
     pub created_at: String,
     pub updated_at: String,
 }

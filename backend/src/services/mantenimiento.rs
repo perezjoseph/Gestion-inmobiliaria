@@ -15,6 +15,7 @@ use crate::models::mantenimiento::{
 };
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
 use crate::services::validation::{validate_enum, MONEDAS};
+use crate::services::notificaciones;
 
 const ESTADOS_SOLICITUD: &[&str] = &["pendiente", "en_progreso", "completado"];
 const PRIORIDADES: &[&str] = &["baja", "media", "alta", "urgente"];
@@ -162,8 +163,13 @@ pub async fn create<C: ConnectionTrait>(
     Ok(SolicitudResponse::from(record))
 }
 
-pub async fn get_by_id(db: &DatabaseConnection, id: Uuid) -> Result<SolicitudResponse, AppError> {
+pub async fn get_by_id(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    id: Uuid,
+) -> Result<SolicitudResponse, AppError> {
     let record = solicitud_mantenimiento::Entity::find_by_id(id)
+        .filter(solicitud_mantenimiento::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| {
@@ -183,12 +189,14 @@ pub async fn get_by_id(db: &DatabaseConnection, id: Uuid) -> Result<SolicitudRes
 
 pub async fn list(
     db: &DatabaseConnection,
+    org_id: Uuid,
     query: SolicitudListQuery,
 ) -> Result<PaginatedResponse<SolicitudResponse>, AppError> {
     let page = query.page.unwrap_or(1).max(1);
     let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
 
-    let mut select = solicitud_mantenimiento::Entity::find();
+    let mut select = solicitud_mantenimiento::Entity::find()
+        .filter(solicitud_mantenimiento::Column::OrganizacionId.eq(org_id));
 
     if let Some(ref estado) = query.estado {
         select = select.filter(solicitud_mantenimiento::Column::Estado.eq(estado));
@@ -217,6 +225,7 @@ pub async fn list(
 
 pub async fn update<C: ConnectionTrait>(
     db: &C,
+    org_id: Uuid,
     id: Uuid,
     input: UpdateSolicitudRequest,
     usuario_id: Uuid,
@@ -236,6 +245,7 @@ pub async fn update<C: ConnectionTrait>(
     }
 
     let existing = solicitud_mantenimiento::Entity::find_by_id(id)
+        .filter(solicitud_mantenimiento::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| {
@@ -295,6 +305,7 @@ pub async fn update<C: ConnectionTrait>(
 
 pub async fn cambiar_estado<C: ConnectionTrait>(
     db: &C,
+    org_id: Uuid,
     id: Uuid,
     nuevo_estado: &str,
     usuario_id: Uuid,
@@ -302,6 +313,7 @@ pub async fn cambiar_estado<C: ConnectionTrait>(
     validate_enum("estado", nuevo_estado, ESTADOS_SOLICITUD)?;
 
     let existing = solicitud_mantenimiento::Entity::find_by_id(id)
+        .filter(solicitud_mantenimiento::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| {
@@ -309,6 +321,10 @@ pub async fn cambiar_estado<C: ConnectionTrait>(
         })?;
 
     validar_transicion(&existing.estado, nuevo_estado)?;
+
+    let estado_anterior = existing.estado.clone();
+    let titulo_solicitud = existing.titulo.clone();
+    let organizacion_id = existing.organizacion_id;
 
     let mut active: solicitud_mantenimiento::ActiveModel = existing.into();
     active.estado = Set(nuevo_estado.to_string());
@@ -324,6 +340,19 @@ pub async fn cambiar_estado<C: ConnectionTrait>(
     active.updated_at = Set(Utc::now().into());
 
     let updated = active.update(db).await?;
+
+    if let Err(e) = notificaciones::crear_notificacion_mantenimiento(
+        db,
+        id,
+        &titulo_solicitud,
+        &estado_anterior,
+        nuevo_estado,
+        organizacion_id,
+    )
+    .await
+    {
+        tracing::warn!("Fallo al crear notificación de mantenimiento (no fatal): {e}");
+    }
 
     auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {
@@ -343,17 +372,20 @@ pub async fn cambiar_estado<C: ConnectionTrait>(
 
 pub async fn delete<C: ConnectionTrait>(
     db: &C,
+    org_id: Uuid,
     id: Uuid,
     usuario_id: Uuid,
 ) -> Result<(), AppError> {
-    let result = solicitud_mantenimiento::Entity::delete_by_id(id)
-        .exec(db)
-        .await?;
-    if result.rows_affected == 0 {
-        return Err(AppError::NotFound(
-            "Solicitud de mantenimiento no encontrada".to_string(),
-        ));
-    }
+    let existing = solicitud_mantenimiento::Entity::find_by_id(id)
+        .filter(solicitud_mantenimiento::Column::OrganizacionId.eq(org_id))
+        .one(db)
+        .await?
+        .ok_or_else(|| {
+            AppError::NotFound("Solicitud de mantenimiento no encontrada".to_string())
+        })?;
+
+    let active: solicitud_mantenimiento::ActiveModel = existing.into();
+    active.delete(db).await?;
 
     auditoria::registrar_best_effort(db,
         CreateAuditoriaEntry {
@@ -371,11 +403,13 @@ pub async fn delete<C: ConnectionTrait>(
 
 pub async fn agregar_nota<C: ConnectionTrait>(
     db: &C,
+    org_id: Uuid,
     solicitud_id: Uuid,
     contenido: String,
     usuario_id: Uuid,
 ) -> Result<NotaResponse, AppError> {
     solicitud_mantenimiento::Entity::find_by_id(solicitud_id)
+        .filter(solicitud_mantenimiento::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| {

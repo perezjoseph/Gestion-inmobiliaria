@@ -5,7 +5,7 @@ use sea_orm::{
 };
 use uuid::Uuid;
 
-use crate::entities::registro_auditoria;
+use crate::entities::{registro_auditoria, usuario};
 use crate::errors::AppError;
 use crate::models::PaginatedResponse;
 use crate::models::auditoria::{AuditoriaQuery, AuditoriaResponse};
@@ -63,12 +63,23 @@ where
 
 pub async fn listar(
     db: &DatabaseConnection,
+    org_id: Uuid,
     query: AuditoriaQuery,
 ) -> Result<PaginatedResponse<AuditoriaResponse>, AppError> {
     let page = query.page.unwrap_or(1).max(1);
     let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
 
-    let mut select = registro_auditoria::Entity::find();
+    // Filter audit logs to users belonging to this organization
+    let org_user_ids: Vec<Uuid> = usuario::Entity::find()
+        .filter(usuario::Column::OrganizacionId.eq(org_id))
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|u| u.id)
+        .collect();
+
+    let mut select = registro_auditoria::Entity::find()
+        .filter(registro_auditoria::Column::UsuarioId.is_in(org_user_ids));
 
     if let Some(ref entity_type) = query.entity_type {
         select = select.filter(registro_auditoria::Column::EntityType.eq(entity_type));

@@ -39,6 +39,10 @@ async fn main() -> std::io::Result<()> {
         }
     });
 
+    // Iniciar scheduler de tareas de fondo
+    let scheduler_db = db.clone();
+    realestate_backend::services::background_jobs::iniciar_scheduler(scheduler_db);
+
     tracing::info!("Servidor iniciando en 0.0.0.0:{}", port);
 
     actix_web::HttpServer::new(move || {

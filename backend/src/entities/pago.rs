@@ -17,6 +17,8 @@ pub struct Model {
     pub estado: String,
     #[sea_orm(column_type = "Text", nullable)]
     pub notas: Option<String>,
+    #[sea_orm(column_type = "Decimal(Some((12, 2)))", nullable)]
+    pub recargo: Option<Decimal>,
     pub organizacion_id: Uuid,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,

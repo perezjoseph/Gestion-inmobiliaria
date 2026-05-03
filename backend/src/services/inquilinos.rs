@@ -30,11 +30,12 @@ impl From<inquilino::Model> for InquilinoResponse {
 
 pub async fn create<C: ConnectionTrait>(
     db: &C,
+    org_id: Uuid,
     input: CreateInquilinoRequest,
     usuario_id: Uuid,
-    organizacion_id: Uuid,
 ) -> Result<InquilinoResponse, AppError> {
     let existing = inquilino::Entity::find()
+        .filter(inquilino::Column::OrganizacionId.eq(org_id))
         .filter(inquilino::Column::Cedula.eq(&input.cedula))
         .one(db)
         .await?;
@@ -58,7 +59,7 @@ pub async fn create<C: ConnectionTrait>(
         contacto_emergencia: Set(input.contacto_emergencia),
         notas: Set(input.notas),
         documentos: Set(None),
-        organizacion_id: Set(organizacion_id),
+        organizacion_id: Set(org_id),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -80,8 +81,13 @@ pub async fn create<C: ConnectionTrait>(
     Ok(InquilinoResponse::from(record))
 }
 
-pub async fn get_by_id(db: &DatabaseConnection, id: Uuid) -> Result<InquilinoResponse, AppError> {
+pub async fn get_by_id(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    id: Uuid,
+) -> Result<InquilinoResponse, AppError> {
     let record = inquilino::Entity::find_by_id(id)
+        .filter(inquilino::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Inquilino no encontrado".to_string()))?;
@@ -90,6 +96,7 @@ pub async fn get_by_id(db: &DatabaseConnection, id: Uuid) -> Result<InquilinoRes
 
 pub async fn list(
     db: &DatabaseConnection,
+    org_id: Uuid,
     search: Option<String>,
     page: Option<u64>,
     per_page: Option<u64>,
@@ -97,7 +104,8 @@ pub async fn list(
     let page = page.unwrap_or(1).max(1);
     let per_page = per_page.unwrap_or(20).clamp(1, 100);
 
-    let mut select = inquilino::Entity::find();
+    let mut select =
+        inquilino::Entity::find().filter(inquilino::Column::OrganizacionId.eq(org_id));
 
     if let Some(ref term) = search {
         let condition = Condition::any()
@@ -124,11 +132,13 @@ pub async fn list(
 
 pub async fn update<C: ConnectionTrait>(
     db: &C,
+    org_id: Uuid,
     id: Uuid,
     input: UpdateInquilinoRequest,
     usuario_id: Uuid,
 ) -> Result<InquilinoResponse, AppError> {
     let existing = inquilino::Entity::find_by_id(id)
+        .filter(inquilino::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Inquilino no encontrado".to_string()))?;
@@ -178,13 +188,18 @@ pub async fn update<C: ConnectionTrait>(
 
 pub async fn delete<C: ConnectionTrait>(
     db: &C,
+    org_id: Uuid,
     id: Uuid,
     usuario_id: Uuid,
 ) -> Result<(), AppError> {
-    let result = inquilino::Entity::delete_by_id(id).exec(db).await?;
-    if result.rows_affected == 0 {
-        return Err(AppError::NotFound("Inquilino no encontrado".to_string()));
-    }
+    let existing = inquilino::Entity::find_by_id(id)
+        .filter(inquilino::Column::OrganizacionId.eq(org_id))
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Inquilino no encontrado".to_string()))?;
+
+    let active: inquilino::ActiveModel = existing.into();
+    active.delete(db).await?;
 
     auditoria::registrar(
         db,

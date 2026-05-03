@@ -13,7 +13,7 @@ pub async fn ingresos(
     query: web::Query<IngresoReportQuery>,
 ) -> Result<HttpResponse, AppError> {
     let summary =
-        reportes::generar_reporte_ingresos(db.get_ref(), query.into_inner(), claims.email).await?;
+        reportes::generar_reporte_ingresos(db.get_ref(), claims.organizacion_id, query.into_inner(), claims.email).await?;
     Ok(HttpResponse::Ok().json(summary))
 }
 
@@ -23,7 +23,7 @@ pub async fn ingresos_pdf(
     query: web::Query<IngresoReportQuery>,
 ) -> Result<HttpResponse, AppError> {
     let summary =
-        reportes::generar_reporte_ingresos(db.get_ref(), query.into_inner(), claims.email).await?;
+        reportes::generar_reporte_ingresos(db.get_ref(), claims.organizacion_id, query.into_inner(), claims.email).await?;
     let bytes = reportes::exportar_pdf(&summary)?;
     Ok(HttpResponse::Ok()
         .content_type("application/pdf")
@@ -40,7 +40,7 @@ pub async fn ingresos_xlsx(
     query: web::Query<IngresoReportQuery>,
 ) -> Result<HttpResponse, AppError> {
     let summary =
-        reportes::generar_reporte_ingresos(db.get_ref(), query.into_inner(), claims.email).await?;
+        reportes::generar_reporte_ingresos(db.get_ref(), claims.organizacion_id, query.into_inner(), claims.email).await?;
     let bytes = reportes::exportar_xlsx(&summary)?;
     Ok(HttpResponse::Ok()
         .content_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -53,20 +53,20 @@ pub async fn ingresos_xlsx(
 
 pub async fn historial_pagos(
     db: web::Data<DatabaseConnection>,
-    _claims: Claims,
+    claims: Claims,
     query: web::Query<HistorialPagosQuery>,
 ) -> Result<HttpResponse, AppError> {
     let params = query.into_inner();
     let entries =
-        reportes::historial_pagos(db.get_ref(), params.fecha_desde, params.fecha_hasta).await?;
+        reportes::historial_pagos(db.get_ref(), claims.organizacion_id, params.fecha_desde, params.fecha_hasta).await?;
     Ok(HttpResponse::Ok().json(entries))
 }
 
 pub async fn ocupacion_tendencia(
     db: web::Data<DatabaseConnection>,
-    _claims: Claims,
+    claims: Claims,
 ) -> Result<HttpResponse, AppError> {
-    let tasa = reportes::calcular_tasa_ocupacion(db.get_ref()).await?;
+    let tasa = reportes::calcular_tasa_ocupacion(db.get_ref(), claims.organizacion_id).await?;
     Ok(HttpResponse::Ok().json(json!({ "tasaOcupacion": tasa })))
 }
 
@@ -76,7 +76,7 @@ pub async fn rentabilidad(
     query: web::Query<RentabilidadReportQuery>,
 ) -> Result<HttpResponse, AppError> {
     let summary =
-        reportes::generar_reporte_rentabilidad(db.get_ref(), query.into_inner(), claims.email)
+        reportes::generar_reporte_rentabilidad(db.get_ref(), claims.organizacion_id, query.into_inner(), claims.email)
             .await?;
     Ok(HttpResponse::Ok().json(summary))
 }
@@ -87,7 +87,7 @@ pub async fn rentabilidad_pdf(
     query: web::Query<RentabilidadReportQuery>,
 ) -> Result<HttpResponse, AppError> {
     let summary =
-        reportes::generar_reporte_rentabilidad(db.get_ref(), query.into_inner(), claims.email)
+        reportes::generar_reporte_rentabilidad(db.get_ref(), claims.organizacion_id, query.into_inner(), claims.email)
             .await?;
     let bytes = reportes::exportar_rentabilidad_pdf(&summary)?;
     Ok(HttpResponse::Ok()
@@ -105,7 +105,7 @@ pub async fn rentabilidad_xlsx(
     query: web::Query<RentabilidadReportQuery>,
 ) -> Result<HttpResponse, AppError> {
     let summary =
-        reportes::generar_reporte_rentabilidad(db.get_ref(), query.into_inner(), claims.email)
+        reportes::generar_reporte_rentabilidad(db.get_ref(), claims.organizacion_id, query.into_inner(), claims.email)
             .await?;
     let bytes = reportes::exportar_rentabilidad_xlsx(&summary)?;
     Ok(HttpResponse::Ok()

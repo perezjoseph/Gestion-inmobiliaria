@@ -3,6 +3,8 @@ use yew_router::prelude::*;
 
 use crate::app::{AuthAction, AuthContext, Route, ThemeContext};
 
+use super::notification_bell::NotificationBell;
+
 #[component]
 fn NavbarSearch() -> Html {
     let Some(navigator) = use_navigator() else {
@@ -196,6 +198,7 @@ pub fn Navbar(props: &NavbarProps) -> Html {
             </div>
             <div style="display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0;">
                 <NavbarSearch />
+                <NotificationBell />
                 <ThemeToggle />
                 <UserMenu user_name={props.user_name.clone()} user_role={props.user_role.clone()} />
             </div>
