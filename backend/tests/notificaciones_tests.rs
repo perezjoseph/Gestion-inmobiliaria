@@ -208,7 +208,7 @@ async fn create_test_contrato(
         id: Set(id),
         propiedad_id: Set(propiedad_id),
         inquilino_id: Set(inquilino_id),
-        fecha_inicio: Set(chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap()),
+        fecha_inicio: Set(Utc::now().date_naive() - chrono::Duration::days(365)),
         fecha_fin: Set(fecha_fin),
         monto_mensual: Set(Decimal::new(25000, 0)),
         deposito: Set(None),
