@@ -1,6 +1,6 @@
 [versions]
 activityCompose = "1.13.0"
-agp = "8.9.1"
+agp = "9.2.0"
 androidxSecurityCrypto = "1.1.0"
 coreKtx = "1.18.0"
 compileSdk = "36"
