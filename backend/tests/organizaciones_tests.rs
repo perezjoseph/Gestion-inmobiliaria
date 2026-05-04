@@ -440,7 +440,7 @@ mod db_async {
                     "email": unique_email(),
                     "password": "SecurePass123!",
                     "tipo": "persona_fisica",
-                    "cedula": "00000000000",
+                    "cedula": "12345678901",
                     "telefono": "809-555-0006",
                     "nombreOrganizacion": "Org Inválida"
                 }))
