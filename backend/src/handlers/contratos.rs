@@ -267,7 +267,7 @@ pub async fn generar_pagos(
             usuario_id,
             entity_type: "contrato".to_string(),
             entity_id: contrato_id,
-            accion: "generar_pagos_manual".to_string(),
+            accion: "gen_pagos_manual".to_string(),
             cambios: serde_json::json!({
                 "pagos_generados": pagos_generados,
                 "dia_vencimiento": dia_vencimiento,

@@ -270,7 +270,7 @@ pub async fn guardar_contenido(
             usuario_id,
             entity_type: "documento".to_string(),
             entity_id: documento_id,
-            accion: "guardar_contenido_editable".to_string(),
+            accion: "guardar_editable".to_string(),
             cambios: serde_json::json!({
                 "documento_id": documento_id.to_string(),
             }),

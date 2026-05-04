@@ -1193,8 +1193,8 @@ fn test_auditoria_entries_for_pago_generation_and_cancellation() {
         assert!(
             entries
                 .iter()
-                .any(|e| e["accion"] == "generar_pagos_manual"),
-            "Should have generar_pagos_manual audit entry"
+                .any(|e| e["accion"] == "gen_pagos_manual"),
+            "Should have gen_pagos_manual audit entry"
         );
 
         // 3. Terminate contrato → audit "cancelar_pagos_futuros"

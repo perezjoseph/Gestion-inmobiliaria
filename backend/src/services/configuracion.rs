@@ -137,7 +137,7 @@ pub async fn actualizar_recargo_defecto(
             usuario_id: updated_by,
             entity_type: "configuracion".to_string(),
             entity_id: updated_by,
-            accion: "actualizar_recargo_defecto".to_string(),
+            accion: "config_recargo".to_string(),
             cambios: serde_json::json!({
                 "clave": CLAVE_RECARGO_DEFECTO,
                 "antes": old_value,
