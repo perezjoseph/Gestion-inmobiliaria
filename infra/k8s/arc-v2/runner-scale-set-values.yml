@@ -76,11 +76,11 @@ template:
           periodSeconds: 5
         resources:
           requests:
-            cpu: "250m"
+            cpu: "100m"
             memory: 512Mi
           limits:
-            cpu: "1"
-            memory: 2Gi
+            cpu: "4"
+            memory: 3Gi
         volumeMounts:
           - name: work
             mountPath: /home/runner/_work
@@ -100,10 +100,10 @@ template:
             value: "120"
         resources:
           requests:
-            cpu: "500m"
+            cpu: "100m"
             memory: 1Gi
           limits:
-            cpu: "2"
+            cpu: "4"
             memory: 8Gi
         volumeMounts:
           - name: work
