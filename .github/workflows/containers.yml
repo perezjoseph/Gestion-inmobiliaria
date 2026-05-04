@@ -136,7 +136,7 @@ jobs:
 
       - name: Upload SARIF to GitHub Security
         if: "!cancelled() && hashFiles('backend-image.sarif') != ''"
-        uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4.35.2
+        uses: github/codeql-action/upload-sarif@e46ed2cbd01164d986452f91f178727624ae40d7 # v4.35.3
         with:
           sarif_file: backend-image.sarif
           category: trivy-backend-image
@@ -274,7 +274,7 @@ jobs:
 
       - name: Upload SARIF to GitHub Security
         if: "!cancelled() && hashFiles('frontend-image.sarif') != ''"
-        uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4.35.2
+        uses: github/codeql-action/upload-sarif@e46ed2cbd01164d986452f91f178727624ae40d7 # v4.35.3
         with:
           sarif_file: frontend-image.sarif
           category: trivy-frontend-image
@@ -403,7 +403,7 @@ jobs:
 
       - name: Upload SARIF to GitHub Security
         if: "!cancelled() && hashFiles('ocr-service-image.sarif') != ''"
-        uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4.35.2
+        uses: github/codeql-action/upload-sarif@e46ed2cbd01164d986452f91f178727624ae40d7 # v4.35.3
         with:
           sarif_file: ocr-service-image.sarif
           category: trivy-ocr-service-image
