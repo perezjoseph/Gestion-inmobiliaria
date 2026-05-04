@@ -806,14 +806,36 @@ pub async fn cambiar_estado_deposito(
     input: CambiarEstadoDepositoRequest,
     usuario_id: Uuid,
 ) -> Result<ContratoResponse, AppError> {
-    // 1. Find contrato by ID, scoped to org
+    // 1. Validate estado enum (before opening transaction)
+    validate_enum("estado de depósito", &input.estado, ESTADOS_DEPOSITO)?;
+
+    // 2. For retenido: pre-validate that required fields are present
+    // (full validation against deposito amount happens after reading the contrato)
+    if input.estado == "retenido" {
+        if input.monto_retenido.is_none() {
+            return Err(AppError::Validation(
+                "El monto retenido es requerido para retención".to_string(),
+            ));
+        }
+        let motivo = input.motivo_retencion.as_deref().unwrap_or("");
+        if motivo.trim().is_empty() {
+            return Err(AppError::Validation(
+                "El motivo de retención es requerido".to_string(),
+            ));
+        }
+    }
+
+    // 3. Open transaction — read and write within the same transaction for consistency
+    let txn = db.begin().await?;
+
+    // 4. Find contrato by ID, scoped to org (within transaction)
     let existing = contrato::Entity::find_by_id(contrato_id)
         .filter(contrato::Column::OrganizacionId.eq(org_id))
-        .one(db)
+        .one(&txn)
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
 
-    // 2. Validate contrato has deposito > 0
+    // 5. Validate contrato has deposito > 0
     let deposito = existing
         .deposito
         .filter(|d| *d > rust_decimal::Decimal::ZERO)
@@ -821,18 +843,15 @@ pub async fn cambiar_estado_deposito(
             AppError::Validation("El contrato no tiene depósito de garantía".to_string())
         })?;
 
-    // 3. Validate estado enum
-    validate_enum("estado de depósito", &input.estado, ESTADOS_DEPOSITO)?;
-
-    // 4. Get current estado_deposito
+    // 6. Get current estado_deposito
     let estado_actual = existing.estado_deposito.clone().ok_or_else(|| {
         AppError::Validation("El contrato no tiene depósito de garantía".to_string())
     })?;
 
-    // 5. Validate transition
+    // 7. Validate transition
     validar_transicion_deposito(&estado_actual, &input.estado)?;
 
-    // 6. For retenido: validate monto_retenido and motivo_retencion
+    // 8. For retenido: validate monto against deposito
     if input.estado == "retenido" {
         validar_retencion(
             input.monto_retenido,
@@ -841,9 +860,7 @@ pub async fn cambiar_estado_deposito(
         )?;
     }
 
-    // 7. Open transaction and update fields based on new estado
-    let txn = db.begin().await?;
-
+    // 9. Update fields based on new estado
     let mut active: contrato::ActiveModel = existing.into();
     active.estado_deposito = Set(Some(input.estado.clone()));
     active.updated_at = Set(Utc::now().into());

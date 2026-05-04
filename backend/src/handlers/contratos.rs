@@ -215,10 +215,13 @@ pub async fn generar_pagos(
         validar_dia_vencimiento(dia_vencimiento)?;
     }
 
-    // Load contrato scoped to org
+    // Open transaction — read and write within the same transaction for consistency
+    let txn = db.begin().await?;
+
+    // Load contrato scoped to org (within transaction)
     let contrato_record = contrato::Entity::find_by_id(contrato_id)
         .filter(contrato::Column::OrganizacionId.eq(org_id))
-        .one(db.get_ref())
+        .one(&txn)
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
 
@@ -238,19 +241,16 @@ pub async fn generar_pagos(
         dia_vencimiento,
     );
 
-    // Query existing pagos for this contrato
+    // Query existing pagos for this contrato (within transaction)
     let existing_pagos = pago::Entity::find()
         .filter(pago::Column::ContratoId.eq(contrato_id))
-        .all(db.get_ref())
+        .all(&txn)
         .await?;
 
     let fechas_existentes: Vec<_> = existing_pagos.iter().map(|p| p.fecha_vencimiento).collect();
 
     // Filter to get only new pagos
     let new_pagos = filtrar_existentes(&all_pagos, &fechas_existentes);
-
-    // Insert new pagos in a transaction
-    let txn = db.begin().await?;
 
     let pagos_generados = contratos::insertar_pagos_generados(
         &txn,
