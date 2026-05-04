@@ -746,7 +746,7 @@ mod pbt_async {
 #[test]
 fn test_listing_returns_only_users_notifications() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -762,7 +762,7 @@ fn test_listing_returns_only_users_notifications() {
 #[test]
 fn test_list_ordering_invariant() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -778,7 +778,7 @@ fn test_list_ordering_invariant() {
 #[test]
 fn test_filtering_returns_matching() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -794,7 +794,7 @@ fn test_filtering_returns_matching() {
 #[test]
 fn test_unread_count_consistency() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -810,7 +810,7 @@ fn test_unread_count_consistency() {
 #[test]
 fn test_mark_read_idempotent() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -826,7 +826,7 @@ fn test_mark_read_idempotent() {
 #[test]
 fn test_mark_all_updates_only_unread() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -844,7 +844,7 @@ fn test_deduplication() {
     // This test uses real data generation, so we run it fewer times
     // but still validate the deduplication property
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -860,7 +860,7 @@ fn test_deduplication() {
 #[test]
 fn test_generated_notifications_correct_fields() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -876,7 +876,7 @@ fn test_generated_notifications_correct_fields() {
 #[test]
 fn test_cross_user_isolation() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -892,7 +892,7 @@ fn test_cross_user_isolation() {
 #[test]
 fn test_new_notifications_default_unread() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner

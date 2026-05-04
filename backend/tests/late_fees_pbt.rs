@@ -724,7 +724,7 @@ fn test_calculo_recargo_correcto() {
     use rust_decimal::Decimal;
 
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -757,7 +757,7 @@ fn test_calculo_recargo_correcto() {
 #[test]
 fn test_contrato_recargo_roundtrip() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -776,7 +776,7 @@ fn test_contrato_recargo_roundtrip() {
 #[test]
 fn test_resolucion_contrato_prioridad() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -798,7 +798,7 @@ fn test_resolucion_contrato_prioridad() {
 #[test]
 fn test_resolucion_fallback_org() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -814,7 +814,7 @@ fn test_resolucion_fallback_org() {
 #[test]
 fn test_resolucion_ambos_null() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -830,7 +830,7 @@ fn test_resolucion_ambos_null() {
 #[test]
 fn test_validacion_rango_porcentaje() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -846,7 +846,7 @@ fn test_validacion_rango_porcentaje() {
 #[test]
 fn test_validacion_dias_gracia_negativo() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -862,7 +862,7 @@ fn test_validacion_dias_gracia_negativo() {
 #[test]
 fn test_periodo_gracia_retrasa_atraso() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -878,7 +878,7 @@ fn test_periodo_gracia_retrasa_atraso() {
 #[test]
 fn test_recargo_al_marcar_atrasado() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -894,7 +894,7 @@ fn test_recargo_al_marcar_atrasado() {
 #[test]
 fn test_recargo_porcentaje_cero() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner

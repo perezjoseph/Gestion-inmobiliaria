@@ -98,7 +98,7 @@ fn last_day_of_month(year: i32, month: u32) -> u32 {
 #[test]
 fn test_month_count_correctness() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -127,7 +127,7 @@ fn test_month_count_correctness() {
 #[test]
 fn test_generated_fields_match_contract() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -153,7 +153,7 @@ fn test_generated_fields_match_contract() {
 #[test]
 fn test_date_calculation_day_clamping() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -198,7 +198,7 @@ fn test_date_calculation_day_clamping() {
 #[test]
 fn test_cancellation_correctness() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -241,7 +241,7 @@ fn test_cancellation_correctness() {
 #[test]
 fn test_preview_totals_consistency() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -296,7 +296,7 @@ fn test_preview_totals_consistency() {
 #[test]
 fn test_deduplication_by_year_month() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -349,7 +349,7 @@ fn test_deduplication_by_year_month() {
 #[test]
 fn test_invalid_dia_vencimiento_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 

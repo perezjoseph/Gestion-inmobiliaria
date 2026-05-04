@@ -31,6 +31,16 @@ mod migrations;
 /// database never run concurrently — even across modules.
 pub static GLOBAL_DB_SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+/// Returns the number of PBT cases to run.
+/// Reads `PROPTEST_CASES` from the environment (set lower in CI for speed).
+/// Falls back to 100 for local development.
+pub fn pbt_cases() -> u32 {
+    std::env::var("PROPTEST_CASES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(100)
+}
+
 mod auditoria_tests;
 mod auth_tests;
 mod background_jobs_pbt;

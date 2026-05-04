@@ -789,7 +789,7 @@ mod pbt_async {
 #[test]
 fn test_idempotencia_marcar_pagos() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -815,7 +815,7 @@ fn test_idempotencia_marcar_pagos() {
 #[test]
 fn test_idempotencia_marcar_contratos() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -841,7 +841,7 @@ fn test_idempotencia_marcar_contratos() {
 #[test]
 fn test_idempotencia_marcar_documentos() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -867,7 +867,7 @@ fn test_idempotencia_marcar_documentos() {
 #[test]
 fn test_registro_ejecucion_completo() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -883,7 +883,7 @@ fn test_registro_ejecucion_completo() {
 #[test]
 fn test_nombre_tarea_invalido_404() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -899,7 +899,7 @@ fn test_nombre_tarea_invalido_404() {
 #[test]
 fn test_historial_ordenado() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -915,7 +915,7 @@ fn test_historial_ordenado() {
 #[test]
 fn test_filtrado_historial() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -937,7 +937,7 @@ fn test_filtrado_historial() {
 #[test]
 fn test_postcondicion_pagos_atrasados() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -963,7 +963,7 @@ fn test_postcondicion_pagos_atrasados() {
 #[test]
 fn test_postcondicion_contratos_vencidos() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner
@@ -989,7 +989,7 @@ fn test_postcondicion_contratos_vencidos() {
 #[test]
 fn test_postcondicion_documentos_vencidos() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
     runner

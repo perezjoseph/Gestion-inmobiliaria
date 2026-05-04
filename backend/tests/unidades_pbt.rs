@@ -825,7 +825,7 @@ mod pbt_async {
 #[test]
 fn test_creation_round_trip() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -877,7 +877,7 @@ fn test_creation_round_trip() {
 #[test]
 fn test_numero_unidad_uniqueness() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -894,7 +894,7 @@ fn test_numero_unidad_uniqueness() {
 #[test]
 fn test_list_ordering() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -915,7 +915,7 @@ fn test_list_ordering() {
 #[test]
 fn test_filtering_returns_matching() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -934,7 +934,7 @@ fn test_filtering_returns_matching() {
 #[test]
 fn test_update_preserves_and_replaces() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -983,7 +983,7 @@ fn test_update_preserves_and_replaces() {
 #[test]
 fn test_update_uniqueness() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -1004,7 +1004,7 @@ fn test_update_uniqueness() {
 #[test]
 fn test_invalid_enums_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -1016,7 +1016,7 @@ fn test_invalid_enums_rejected() {
         .unwrap();
 
     let mut runner2 = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -1033,7 +1033,7 @@ fn test_invalid_enums_rejected() {
 #[test]
 fn test_negative_price_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -1050,7 +1050,7 @@ fn test_negative_price_rejected() {
 #[test]
 fn test_nonexistent_propiedad_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -1069,7 +1069,7 @@ fn test_nonexistent_propiedad_rejected() {
 #[test]
 fn test_occupancy_counts_consistent() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 

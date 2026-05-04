@@ -765,7 +765,7 @@ mod pbt_async {
 #[test]
 fn test_deposit_status_defaults_on_creation() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -782,7 +782,7 @@ fn test_deposit_status_defaults_on_creation() {
 #[test]
 fn test_valid_transitions_set_timestamps() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -801,7 +801,7 @@ fn test_valid_transitions_set_timestamps() {
 #[test]
 fn test_invalid_transitions_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -826,7 +826,7 @@ fn test_invalid_transitions_rejected() {
 fn test_retention_validation() {
     // Part A: valid and invalid monto amounts
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -841,7 +841,7 @@ fn test_retention_validation() {
 
     // Part B: invalid motivo (empty/whitespace/missing)
     let mut runner2 = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -860,7 +860,7 @@ fn test_retention_validation() {
 #[test]
 fn test_deposit_round_trip() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -879,7 +879,7 @@ fn test_deposit_round_trip() {
 #[test]
 fn test_invalid_estado_enum_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
@@ -896,7 +896,7 @@ fn test_invalid_estado_enum_rejected() {
 #[test]
 fn test_no_deposit_operations_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::pbt_cases(),
         ..Default::default()
     });
 
