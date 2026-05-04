@@ -387,7 +387,7 @@ fn test_full_flow_pendiente_cobrado_retenido() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         assert_eq!(body["estadoDeposito"], "retenido");
         assert!(!body["fechaDevolucionDeposito"].is_null());
-        assert_eq!(body["montoRetenido"], "10000");
+        assert_eq!(body["montoRetenido"], "10000.00");
         assert_eq!(body["motivoRetencion"], "Daños en la propiedad");
     });
 }

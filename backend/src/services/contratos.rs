@@ -740,7 +740,7 @@ pub async fn terminar(
             usuario_id,
             entity_type: "contrato".to_string(),
             entity_id: contrato_id,
-            accion: "cancelar_pagos".to_string(),
+            accion: "cancelar_pagos_futuros".to_string(),
             cambios: serde_json::json!({
                 "pagos_cancelados": pagos_cancelados,
             }),
@@ -872,7 +872,7 @@ pub async fn cambiar_estado_deposito(
             usuario_id,
             entity_type: "contrato".to_string(),
             entity_id: contrato_id,
-            accion: "cambio_deposito".to_string(),
+            accion: "cambiar_estado_deposito".to_string(),
             cambios: serde_json::json!({
                 "estado_anterior": estado_actual,
                 "estado_nuevo": input.estado,

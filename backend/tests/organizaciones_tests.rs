@@ -97,6 +97,11 @@ mod db_async {
         actix_web::web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new())
     }
 
+    /// Peer address for test requests (required by actix-governor rate limiter).
+    fn test_peer() -> std::net::SocketAddr {
+        "127.0.0.1:8080".parse().unwrap()
+    }
+
     // ── persona_fisica registration creates org + admin user ──
 
     pub fn persona_fisica_registration_creates_org_and_admin() {
@@ -107,6 +112,7 @@ mod db_async {
             let email = unique_email();
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "Juan Pérez",
                     "email": email,
@@ -151,6 +157,7 @@ mod db_async {
             let email = unique_email();
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "María García",
                     "email": email,
@@ -195,6 +202,7 @@ mod db_async {
             // First registration succeeds
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "Primer Usuario",
                     "email": email,
@@ -211,6 +219,7 @@ mod db_async {
             // Second registration with same email returns 409
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "Segundo Usuario",
                     "email": email,
@@ -245,6 +254,7 @@ mod db_async {
             // First registration succeeds
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "Usuario A",
                     "email": unique_email(),
@@ -261,6 +271,7 @@ mod db_async {
             // Second registration with same cédula returns 409
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "Usuario B",
                     "email": unique_email(),
@@ -295,6 +306,7 @@ mod db_async {
             // First registration succeeds
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "Empresa A",
                     "email": unique_email(),
@@ -313,6 +325,7 @@ mod db_async {
             // Second registration with same RNC returns 409
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "Empresa B",
                     "email": unique_email(),
@@ -346,6 +359,7 @@ mod db_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "Empresa Inválida",
                     "email": unique_email(),
@@ -379,6 +393,7 @@ mod db_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "Persona Inválida",
                     "email": unique_email(),
@@ -403,6 +418,7 @@ mod db_async {
             let email = unique_email();
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "Admin User",
                     "email": email,
@@ -509,6 +525,7 @@ mod db_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "Gerente User",
                     "email": invite_email,
@@ -565,6 +582,7 @@ mod db_async {
             // Register with invitation token
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "Invited User",
                     "email": invite_email,
@@ -642,6 +660,7 @@ mod db_async {
             // Try to register with expired token
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "Expired Invite User",
                     "email": invite_email,
@@ -683,6 +702,7 @@ mod db_async {
             // First registration with token succeeds
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "First User",
                     "email": invite_email,
@@ -696,6 +716,7 @@ mod db_async {
             // Second registration with same token returns 409
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "Second User",
                     "email": unique_email(),
@@ -783,6 +804,7 @@ mod db_async {
             let email = unique_email();
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "JWT Test User",
                     "email": email,
@@ -959,6 +981,7 @@ mod db_async {
             // Register a new user (creates org)
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "nombre": "Login Test User",
                     "email": email,
@@ -981,6 +1004,7 @@ mod db_async {
             // Login with the same credentials
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/login")
+                .peer_addr(test_peer())
                 .set_json(json!({
                     "email": email,
                     "password": password

@@ -627,7 +627,9 @@ mod pbt_async {
                 }
                 _ => {
                     // cobrado → retenido
-                    let half = (deposit_amount / Decimal::new(2, 0)).max(Decimal::new(1, 2));
+                    let half = (deposit_amount / Decimal::new(2, 0))
+                        .max(Decimal::new(1, 2))
+                        .round_dp(2);
                     let motivo = "Daños verificados en inspección";
                     let req = test::TestRequest::put()
                         .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
