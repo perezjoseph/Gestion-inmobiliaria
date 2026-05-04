@@ -82,14 +82,55 @@ mod db_async {
         format!("test+{}@example.com", Uuid::new_v4())
     }
 
-    /// Valid cédula that passes Luhn check.
+    /// Valid cédula that passes Luhn check. Generates a unique value each call.
     fn valid_cedula() -> String {
-        "00114532503".to_string()
+        // Use UUID-derived digits to create a unique 10-digit prefix, then compute Luhn check digit.
+        let uuid_digits: String = Uuid::new_v4()
+            .simple()
+            .to_string()
+            .chars()
+            .filter(|c| c.is_ascii_digit())
+            .take(10)
+            .collect();
+        // Pad to 10 digits if not enough numeric chars
+        let prefix = format!("{uuid_digits:0<10}");
+        let weights = [1u32, 2, 1, 2, 1, 2, 1, 2, 1, 2];
+        let sum: u32 = prefix
+            .chars()
+            .zip(weights.iter())
+            .map(|(ch, &w)| {
+                let product = ch.to_digit(10).unwrap() * w;
+                if product > 9 {
+                    product / 10 + product % 10
+                } else {
+                    product
+                }
+            })
+            .sum();
+        let check = (10 - (sum % 10)) % 10;
+        format!("{prefix}{check}")
     }
 
-    /// Valid RNC that passes DGII weighted modulus check.
+    /// Valid RNC that passes DGII weighted modulus check. Generates a unique value each call.
     fn valid_rnc() -> String {
-        "131246753".to_string()
+        // Generate a unique 8-digit prefix from UUID, then compute DGII check digit.
+        let uuid_digits: String = Uuid::new_v4()
+            .simple()
+            .to_string()
+            .chars()
+            .filter(|c| c.is_ascii_digit())
+            .take(8)
+            .collect();
+        let prefix = format!("{uuid_digits:0<8}");
+        let weights = [7u32, 9, 8, 6, 5, 4, 3, 2];
+        let sum: u32 = prefix
+            .chars()
+            .zip(weights.iter())
+            .map(|(ch, &w)| ch.to_digit(10).unwrap() * w)
+            .sum();
+        let check = sum % 11;
+        let check_digit = (10 - check) % 9 + 1;
+        format!("{prefix}{check_digit}")
     }
 
     fn make_app_data()
