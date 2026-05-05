@@ -50,12 +50,28 @@ impl AppConfig {
             ));
         }
 
+        if jwt_secret
+            .chars()
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+            < 4
+        {
+            tracing::warn!("JWT_SECRET parece tener baja entropía. Use: openssl rand -hex 32");
+        }
+
         let server_port = std::env::var("SERVER_PORT")
             .unwrap_or_else(|_| "8080".to_string())
             .parse::<u16>()
             .map_err(|_| anyhow::anyhow!("SERVER_PORT debe ser un número válido"))?;
 
         let cors_origin = std::env::var("CORS_ORIGIN").ok().filter(|s| !s.is_empty());
+
+        let environment = std::env::var("ENVIRONMENT").unwrap_or_default();
+        if environment == "production" && cors_origin.is_none() {
+            return Err(anyhow::anyhow!(
+                "CORS_ORIGIN debe estar configurado cuando ENVIRONMENT=production"
+            ));
+        }
 
         let pool = Self::parse_pool_config()?;
 

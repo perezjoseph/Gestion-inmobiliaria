@@ -54,11 +54,13 @@ pub async fn listar(
 pub async fn cambiar_rol(
     db: &DatabaseConnection,
     id: Uuid,
+    org_id: Uuid,
     nuevo_rol: &str,
 ) -> Result<UsuarioResponse, AppError> {
     validate_enum("rol", nuevo_rol, ROLES)?;
 
     let record = usuario::Entity::find_by_id(id)
+        .filter(usuario::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Usuario no encontrado".to_string()))?;
@@ -70,8 +72,13 @@ pub async fn cambiar_rol(
     Ok(UsuarioResponse::from(updated))
 }
 
-pub async fn desactivar(db: &DatabaseConnection, id: Uuid) -> Result<UsuarioResponse, AppError> {
+pub async fn desactivar(
+    db: &DatabaseConnection,
+    id: Uuid,
+    org_id: Uuid,
+) -> Result<UsuarioResponse, AppError> {
     let record = usuario::Entity::find_by_id(id)
+        .filter(usuario::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Usuario no encontrado".to_string()))?;
@@ -83,8 +90,13 @@ pub async fn desactivar(db: &DatabaseConnection, id: Uuid) -> Result<UsuarioResp
     Ok(UsuarioResponse::from(updated))
 }
 
-pub async fn activar(db: &DatabaseConnection, id: Uuid) -> Result<UsuarioResponse, AppError> {
+pub async fn activar(
+    db: &DatabaseConnection,
+    id: Uuid,
+    org_id: Uuid,
+) -> Result<UsuarioResponse, AppError> {
     let record = usuario::Entity::find_by_id(id)
+        .filter(usuario::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Usuario no encontrado".to_string()))?;

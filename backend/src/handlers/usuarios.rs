@@ -8,6 +8,8 @@ use crate::middleware::rbac::AdminOnly;
 use crate::models::usuario::CambiarRolRequest;
 use crate::services::usuarios;
 
+const VALID_ROLES: &[&str] = &["admin", "gerente", "visualizador"];
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UsuarioListQuery {
@@ -34,27 +36,38 @@ pub async fn cambiar_rol(
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
     let dto = body.into_inner();
-    let result = usuarios::cambiar_rol(db.get_ref(), id, &dto.nuevo_rol).await?;
+
+    if !VALID_ROLES.contains(&dto.nuevo_rol.as_str()) {
+        return Err(AppError::Validation(format!(
+            "Rol inválido. Valores permitidos: {}",
+            VALID_ROLES.join(", ")
+        )));
+    }
+
+    let result =
+        usuarios::cambiar_rol(db.get_ref(), id, admin.0.organizacion_id, &dto.nuevo_rol).await?;
     tracing::info!(admin_id = %admin.0.sub, target_user_id = %id, new_role = %dto.nuevo_rol, "Role changed");
     Ok(HttpResponse::Ok().json(result))
 }
 
 pub async fn activar(
     db: web::Data<DatabaseConnection>,
-    _admin: AdminOnly,
+    admin: AdminOnly,
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
-    let result = usuarios::activar(db.get_ref(), id).await?;
+    let result = usuarios::activar(db.get_ref(), id, admin.0.organizacion_id).await?;
+    tracing::info!(admin_id = %admin.0.sub, target_user_id = %id, action = "activar", "User activated");
     Ok(HttpResponse::Ok().json(result))
 }
 
 pub async fn desactivar(
     db: web::Data<DatabaseConnection>,
-    _admin: AdminOnly,
+    admin: AdminOnly,
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
-    let result = usuarios::desactivar(db.get_ref(), id).await?;
+    let result = usuarios::desactivar(db.get_ref(), id, admin.0.organizacion_id).await?;
+    tracing::info!(admin_id = %admin.0.sub, target_user_id = %id, action = "desactivar", "User deactivated");
     Ok(HttpResponse::Ok().json(result))
 }

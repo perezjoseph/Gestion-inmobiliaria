@@ -46,7 +46,7 @@ async fn serve_upload(
 fn build_cors(config: &AppConfig) -> Cors {
     config.cors_origin.as_deref().map_or_else(
         || {
-            tracing::error!(
+            tracing::warn!(
                 "CORS_ORIGIN no configurado — usando política permisiva. No usar en producción."
             );
             Cors::permissive()
