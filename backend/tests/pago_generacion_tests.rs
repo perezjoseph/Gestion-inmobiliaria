@@ -1191,9 +1191,7 @@ fn test_auditoria_entries_for_pago_generation_and_cancellation() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let entries = body["data"].as_array().unwrap();
         assert!(
-            entries
-                .iter()
-                .any(|e| e["accion"] == "gen_pagos_manual"),
+            entries.iter().any(|e| e["accion"] == "gen_pagos_manual"),
             "Should have gen_pagos_manual audit entry"
         );
 
@@ -1218,9 +1216,7 @@ fn test_auditoria_entries_for_pago_generation_and_cancellation() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let entries = body["data"].as_array().unwrap();
         assert!(
-            entries
-                .iter()
-                .any(|e| e["accion"] == "cancelar_pagos"),
+            entries.iter().any(|e| e["accion"] == "cancelar_pagos"),
             "Should have cancelar_pagos audit entry"
         );
 

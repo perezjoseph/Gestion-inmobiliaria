@@ -1,4 +1,5 @@
 use actix_web::{HttpResponse, web};
+use rust_decimal::Decimal;
 use sea_orm::{DatabaseConnection, TransactionTrait};
 use uuid::Uuid;
 
@@ -7,6 +8,62 @@ use crate::middleware::rbac::{AdminOnly, WriteAccess};
 use crate::models::pago::{CreatePagoRequest, PagoListQuery, UpdatePagoRequest};
 use crate::services::auth::Claims;
 use crate::services::pagos;
+
+const VALID_MONEDAS: &[&str] = &["DOP", "USD"];
+const VALID_ESTADOS: &[&str] = &["pendiente", "pagado", "atrasado"];
+const VALID_METODOS_PAGO: &[&str] = &["efectivo", "transferencia", "cheque", "tarjeta"];
+
+fn validate_create_pago(dto: &CreatePagoRequest) -> Result<(), AppError> {
+    if dto.monto <= Decimal::ZERO {
+        return Err(AppError::Validation(
+            "El monto debe ser un valor positivo".into(),
+        ));
+    }
+    if let Some(ref moneda) = dto.moneda {
+        if !VALID_MONEDAS.contains(&moneda.as_str()) {
+            return Err(AppError::Validation(format!(
+                "Moneda inválida. Valores permitidos: {}",
+                VALID_MONEDAS.join(", ")
+            )));
+        }
+    }
+    if let Some(ref metodo) = dto.metodo_pago {
+        if !VALID_METODOS_PAGO.contains(&metodo.as_str()) {
+            return Err(AppError::Validation(format!(
+                "Método de pago inválido. Valores permitidos: {}",
+                VALID_METODOS_PAGO.join(", ")
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_update_pago(dto: &UpdatePagoRequest) -> Result<(), AppError> {
+    if let Some(ref monto) = dto.monto {
+        if monto <= &Decimal::ZERO {
+            return Err(AppError::Validation(
+                "El monto debe ser un valor positivo".into(),
+            ));
+        }
+    }
+    if let Some(ref estado) = dto.estado {
+        if !VALID_ESTADOS.contains(&estado.as_str()) {
+            return Err(AppError::Validation(format!(
+                "Estado inválido. Valores permitidos: {}",
+                VALID_ESTADOS.join(", ")
+            )));
+        }
+    }
+    if let Some(ref metodo) = dto.metodo_pago {
+        if !VALID_METODOS_PAGO.contains(&metodo.as_str()) {
+            return Err(AppError::Validation(format!(
+                "Método de pago inválido. Valores permitidos: {}",
+                VALID_METODOS_PAGO.join(", ")
+            )));
+        }
+    }
+    Ok(())
+}
 
 pub async fn list(
     db: web::Data<DatabaseConnection>,
@@ -33,14 +90,10 @@ pub async fn create(
     body: web::Json<CreatePagoRequest>,
 ) -> Result<HttpResponse, AppError> {
     let usuario_id = access.0.sub;
+    let dto = body.into_inner();
+    validate_create_pago(&dto)?;
     let txn = db.begin().await?;
-    let result = pagos::create(
-        &txn,
-        body.into_inner(),
-        usuario_id,
-        access.0.organizacion_id,
-    )
-    .await?;
+    let result = pagos::create(&txn, dto, usuario_id, access.0.organizacion_id).await?;
     txn.commit().await?;
     Ok(HttpResponse::Created().json(result))
 }
@@ -54,8 +107,10 @@ pub async fn update(
     let usuario_id = access.0.sub;
     let org_id = access.0.organizacion_id;
     let id = path.into_inner();
+    let dto = body.into_inner();
+    validate_update_pago(&dto)?;
     let txn = db.begin().await?;
-    let result = pagos::update(&txn, org_id, id, body.into_inner(), usuario_id).await?;
+    let result = pagos::update(&txn, org_id, id, dto, usuario_id).await?;
     txn.commit().await?;
     Ok(HttpResponse::Ok().json(result))
 }

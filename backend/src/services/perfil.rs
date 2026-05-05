@@ -24,6 +24,32 @@ pub async fn actualizar_perfil(
     nombre: Option<String>,
     email: Option<String>,
 ) -> Result<UsuarioResponse, AppError> {
+    // Validate input lengths
+    if let Some(ref name) = nombre {
+        if name.trim().is_empty() {
+            return Err(AppError::Validation(
+                "El nombre no puede estar vacío".to_string(),
+            ));
+        }
+        if name.len() > 255 {
+            return Err(AppError::Validation(
+                "El nombre no puede exceder 255 caracteres".to_string(),
+            ));
+        }
+    }
+    if let Some(ref mail) = email {
+        if mail.len() > 255 {
+            return Err(AppError::Validation(
+                "El email no puede exceder 255 caracteres".to_string(),
+            ));
+        }
+        if !mail.contains('@') || !mail.contains('.') {
+            return Err(AppError::Validation(
+                "Formato de email inválido".to_string(),
+            ));
+        }
+    }
+
     let record = usuario::Entity::find_by_id(user_id)
         .one(db)
         .await?
@@ -63,6 +89,23 @@ pub async fn cambiar_password(
     password_actual: &str,
     password_nuevo: &str,
 ) -> Result<(), AppError> {
+    // Validate password lengths to prevent DoS via Argon2 on huge inputs
+    if password_actual.len() > 128 {
+        return Err(AppError::Validation(
+            "La contraseña actual es incorrecta".to_string(),
+        ));
+    }
+    if password_nuevo.len() < 8 {
+        return Err(AppError::Validation(
+            "La contraseña debe tener al menos 8 caracteres".to_string(),
+        ));
+    }
+    if password_nuevo.len() > 128 {
+        return Err(AppError::Validation(
+            "La contraseña no puede exceder 128 caracteres".to_string(),
+        ));
+    }
+
     let record = usuario::Entity::find_by_id(user_id)
         .one(db)
         .await?

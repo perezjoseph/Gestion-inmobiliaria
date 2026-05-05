@@ -160,6 +160,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(web::scope("/auditoria").route("", web::get().to(handlers::auditoria::list)))
             .service(
                 web::scope("/usuarios")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route("", web::get().to(handlers::usuarios::list))
                     .route("/{id}/rol", web::put().to(handlers::usuarios::cambiar_rol))
                     .route("/{id}/activar", web::put().to(handlers::usuarios::activar))
@@ -170,6 +171,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             )
             .service(
                 web::scope("/perfil")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route("", web::get().to(handlers::perfil::obtener))
                     .route("", web::put().to(handlers::perfil::actualizar))
                     .route(

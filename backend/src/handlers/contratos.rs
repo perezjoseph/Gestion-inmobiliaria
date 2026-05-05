@@ -22,6 +22,50 @@ use crate::services::pago_generacion::{
     calcular_pagos, filtrar_existentes, validar_dia_vencimiento,
 };
 
+const VALID_ESTADOS: &[&str] = &["activo", "vencido", "cancelado", "finalizado", "terminado"];
+const VALID_MONEDAS: &[&str] = &["DOP", "USD"];
+
+fn validate_create_contrato(dto: &CreateContratoRequest) -> Result<(), AppError> {
+    if dto.fecha_inicio >= dto.fecha_fin {
+        return Err(AppError::Validation(
+            "La fecha de inicio debe ser anterior a la fecha de fin".into(),
+        ));
+    }
+    if dto.monto_mensual <= Decimal::ZERO {
+        return Err(AppError::Validation(
+            "El monto mensual debe ser un valor positivo".into(),
+        ));
+    }
+    if let Some(ref moneda) = dto.moneda {
+        if !VALID_MONEDAS.contains(&moneda.as_str()) {
+            return Err(AppError::Validation(format!(
+                "Moneda inválida. Valores permitidos: {}",
+                VALID_MONEDAS.join(", ")
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_update_contrato(dto: &UpdateContratoRequest) -> Result<(), AppError> {
+    if let Some(ref monto) = dto.monto_mensual {
+        if monto <= &Decimal::ZERO {
+            return Err(AppError::Validation(
+                "El monto mensual debe ser un valor positivo".into(),
+            ));
+        }
+    }
+    if let Some(ref estado) = dto.estado {
+        if !VALID_ESTADOS.contains(&estado.as_str()) {
+            return Err(AppError::Validation(format!(
+                "Estado inválido. Valores permitidos: {}",
+                VALID_ESTADOS.join(", ")
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub async fn list(
     db: web::Data<DatabaseConnection>,
     claims: Claims,
@@ -48,13 +92,9 @@ pub async fn create(
     body: web::Json<CreateContratoRequest>,
 ) -> Result<HttpResponse, AppError> {
     let usuario_id = access.0.sub;
-    let result = contratos::create(
-        db.get_ref(),
-        body.into_inner(),
-        usuario_id,
-        access.0.organizacion_id,
-    )
-    .await?;
+    let dto = body.into_inner();
+    validate_create_contrato(&dto)?;
+    let result = contratos::create(db.get_ref(), dto, usuario_id, access.0.organizacion_id).await?;
     Ok(HttpResponse::Created().json(result))
 }
 
@@ -66,14 +106,10 @@ pub async fn update(
 ) -> Result<HttpResponse, AppError> {
     let usuario_id = access.0.sub;
     let id = path.into_inner();
-    let result = contratos::update(
-        db.get_ref(),
-        access.0.organizacion_id,
-        id,
-        body.into_inner(),
-        usuario_id,
-    )
-    .await?;
+    let dto = body.into_inner();
+    validate_update_contrato(&dto)?;
+    let result =
+        contratos::update(db.get_ref(), access.0.organizacion_id, id, dto, usuario_id).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 

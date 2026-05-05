@@ -52,10 +52,15 @@ pub fn encode_jwt(claims: &Claims, secret: &str) -> Result<String, AppError> {
 }
 
 pub fn decode_jwt(token: &str, secret: &str) -> Result<Claims, AppError> {
+    let mut validation = Validation::new(jsonwebtoken::Algorithm::HS256);
+    validation.set_required_spec_claims(&["exp", "sub"]);
+    validation.leeway = 30;
+    validation.validate_nbf = true;
+
     let token_data = decode::<Claims>(
         token,
         &DecodingKey::from_secret(secret.as_bytes()),
-        &Validation::default(),
+        &validation,
     )
     .map_err(|_| AppError::Unauthorized(None))?;
     Ok(token_data.claims)
@@ -105,11 +110,56 @@ fn build_login_response(
     })
 }
 
+/// Validate common auth input fields.
+fn validate_auth_input(email: &str, password: &str, nombre: Option<&str>) -> Result<(), AppError> {
+    // Email: basic format check + length limit
+    if email.len() > 255 {
+        return Err(AppError::Validation(
+            "El email no puede exceder 255 caracteres".to_string(),
+        ));
+    }
+    if !email.contains('@') || !email.contains('.') {
+        return Err(AppError::Validation(
+            "Formato de email inválido".to_string(),
+        ));
+    }
+
+    // Password: minimum length
+    if password.len() < 8 {
+        return Err(AppError::Validation(
+            "La contraseña debe tener al menos 8 caracteres".to_string(),
+        ));
+    }
+    if password.len() > 128 {
+        return Err(AppError::Validation(
+            "La contraseña no puede exceder 128 caracteres".to_string(),
+        ));
+    }
+
+    // Name length limit
+    if let Some(name) = nombre {
+        if name.trim().is_empty() {
+            return Err(AppError::Validation(
+                "El nombre no puede estar vacío".to_string(),
+            ));
+        }
+        if name.len() > 255 {
+            return Err(AppError::Validation(
+                "El nombre no puede exceder 255 caracteres".to_string(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn register(
     db: &DatabaseConnection,
     input: RegisterRequest,
     jwt_secret: &str,
 ) -> Result<LoginResponse, AppError> {
+    validate_auth_input(&input.email, &input.password, Some(&input.nombre))?;
+
     if let Some(token_inv) = input.token_invitacion.clone() {
         register_with_invitation(db, input, &token_inv, jwt_secret).await
     } else {
@@ -325,6 +375,10 @@ pub async fn login(
     input: LoginRequest,
     jwt_secret: &str,
 ) -> Result<LoginResponse, AppError> {
+    if input.email.len() > 255 || input.password.len() > 128 {
+        return Err(AppError::Unauthorized(None));
+    }
+
     let user = usuario::Entity::find()
         .filter(usuario::Column::Email.eq(&input.email))
         .one(db)

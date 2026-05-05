@@ -1,4 +1,5 @@
 use actix_web::{HttpResponse, web};
+use rust_decimal::Decimal;
 use sea_orm::{DatabaseConnection, TransactionTrait};
 use uuid::Uuid;
 
@@ -10,6 +11,63 @@ use crate::models::gasto::{
 use crate::services::auth::Claims;
 use crate::services::gastos;
 
+const VALID_MONEDAS: &[&str] = &["DOP", "USD"];
+const VALID_ESTADOS: &[&str] = &["pendiente", "pagado", "cancelado"];
+
+fn validate_create_gasto(dto: &CreateGastoRequest) -> Result<(), AppError> {
+    if dto.monto <= Decimal::ZERO {
+        return Err(AppError::Validation(
+            "El monto debe ser un valor positivo".into(),
+        ));
+    }
+    if dto.categoria.trim().is_empty() || dto.categoria.len() > 100 {
+        return Err(AppError::Validation(
+            "La categoría no puede estar vacía ni exceder 100 caracteres".into(),
+        ));
+    }
+    if !VALID_MONEDAS.contains(&dto.moneda.as_str()) {
+        return Err(AppError::Validation(format!(
+            "Moneda inválida. Valores permitidos: {}",
+            VALID_MONEDAS.join(", ")
+        )));
+    }
+    Ok(())
+}
+
+fn validate_update_gasto(dto: &UpdateGastoRequest) -> Result<(), AppError> {
+    if let Some(ref monto) = dto.monto {
+        if monto <= &Decimal::ZERO {
+            return Err(AppError::Validation(
+                "El monto debe ser un valor positivo".into(),
+            ));
+        }
+    }
+    if let Some(ref categoria) = dto.categoria {
+        if categoria.trim().is_empty() || categoria.len() > 100 {
+            return Err(AppError::Validation(
+                "La categoría no puede estar vacía ni exceder 100 caracteres".into(),
+            ));
+        }
+    }
+    if let Some(ref moneda) = dto.moneda {
+        if !VALID_MONEDAS.contains(&moneda.as_str()) {
+            return Err(AppError::Validation(format!(
+                "Moneda inválida. Valores permitidos: {}",
+                VALID_MONEDAS.join(", ")
+            )));
+        }
+    }
+    if let Some(ref estado) = dto.estado {
+        if !VALID_ESTADOS.contains(&estado.as_str()) {
+            return Err(AppError::Validation(format!(
+                "Estado inválido. Valores permitidos: {}",
+                VALID_ESTADOS.join(", ")
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub async fn create(
     db: web::Data<DatabaseConnection>,
     access: WriteAccess,
@@ -17,8 +75,10 @@ pub async fn create(
 ) -> Result<HttpResponse, AppError> {
     let usuario_id = access.0.sub;
     let organizacion_id = access.0.organizacion_id;
+    let dto = body.into_inner();
+    validate_create_gasto(&dto)?;
     let txn = db.begin().await?;
-    let result = gastos::create(&txn, body.into_inner(), usuario_id, organizacion_id).await?;
+    let result = gastos::create(&txn, dto, usuario_id, organizacion_id).await?;
     txn.commit().await?;
     Ok(HttpResponse::Created().json(result))
 }
@@ -51,8 +111,10 @@ pub async fn update(
     let usuario_id = access.0.sub;
     let org_id = access.0.organizacion_id;
     let id = path.into_inner();
+    let dto = body.into_inner();
+    validate_update_gasto(&dto)?;
     let txn = db.begin().await?;
-    let result = gastos::update(&txn, org_id, id, body.into_inner(), usuario_id).await?;
+    let result = gastos::update(&txn, org_id, id, dto, usuario_id).await?;
     txn.commit().await?;
     Ok(HttpResponse::Ok().json(result))
 }

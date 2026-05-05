@@ -9,6 +9,96 @@ use crate::models::inquilino::{CreateInquilinoRequest, UpdateInquilinoRequest};
 use crate::services::auth::Claims;
 use crate::services::inquilinos;
 
+fn validate_nombre(nombre: &str) -> Result<(), AppError> {
+    if nombre.trim().is_empty() {
+        return Err(AppError::Validation(
+            "El nombre no puede estar vacío".into(),
+        ));
+    }
+    if nombre.len() > 100 {
+        return Err(AppError::Validation(
+            "El nombre no puede exceder 100 caracteres".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_apellido(apellido: &str) -> Result<(), AppError> {
+    if apellido.trim().is_empty() {
+        return Err(AppError::Validation(
+            "El apellido no puede estar vacío".into(),
+        ));
+    }
+    if apellido.len() > 100 {
+        return Err(AppError::Validation(
+            "El apellido no puede exceder 100 caracteres".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_cedula(cedula: &str) -> Result<(), AppError> {
+    if cedula.trim().is_empty() {
+        return Err(AppError::Validation(
+            "La cédula no puede estar vacía".into(),
+        ));
+    }
+    if cedula.len() > 20 {
+        return Err(AppError::Validation(
+            "La cédula no puede exceder 20 caracteres".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_email(email: &str) -> Result<(), AppError> {
+    if !email.contains('@') || !email.contains('.') {
+        return Err(AppError::Validation("Formato de email inválido".into()));
+    }
+    Ok(())
+}
+
+fn validate_telefono(telefono: &str) -> Result<(), AppError> {
+    if telefono.len() > 20 {
+        return Err(AppError::Validation(
+            "El teléfono no puede exceder 20 caracteres".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_create_inquilino(dto: &CreateInquilinoRequest) -> Result<(), AppError> {
+    validate_nombre(&dto.nombre)?;
+    validate_apellido(&dto.apellido)?;
+    validate_cedula(&dto.cedula)?;
+    if let Some(ref email) = dto.email {
+        validate_email(email)?;
+    }
+    if let Some(ref telefono) = dto.telefono {
+        validate_telefono(telefono)?;
+    }
+    Ok(())
+}
+
+fn validate_update_inquilino(dto: &UpdateInquilinoRequest) -> Result<(), AppError> {
+    if let Some(ref nombre) = dto.nombre {
+        validate_nombre(nombre)?;
+    }
+    if let Some(ref apellido) = dto.apellido {
+        validate_apellido(apellido)?;
+    }
+    if let Some(ref cedula) = dto.cedula {
+        validate_cedula(cedula)?;
+    }
+    if let Some(ref email) = dto.email {
+        validate_email(email)?;
+    }
+    if let Some(ref telefono) = dto.telefono {
+        validate_telefono(telefono)?;
+    }
+    Ok(())
+}
+
 pub async fn list(
     db: web::Data<DatabaseConnection>,
     claims: Claims,
@@ -44,8 +134,10 @@ pub async fn create(
 ) -> Result<HttpResponse, AppError> {
     let usuario_id = access.0.sub;
     let org_id = access.0.organizacion_id;
+    let dto = body.into_inner();
+    validate_create_inquilino(&dto)?;
     let txn = db.begin().await?;
-    let result = inquilinos::create(&txn, org_id, body.into_inner(), usuario_id).await?;
+    let result = inquilinos::create(&txn, org_id, dto, usuario_id).await?;
     txn.commit().await?;
     Ok(HttpResponse::Created().json(result))
 }
@@ -59,8 +151,10 @@ pub async fn update(
     let usuario_id = access.0.sub;
     let org_id = access.0.organizacion_id;
     let id = path.into_inner();
+    let dto = body.into_inner();
+    validate_update_inquilino(&dto)?;
     let txn = db.begin().await?;
-    let result = inquilinos::update(&txn, org_id, id, body.into_inner(), usuario_id).await?;
+    let result = inquilinos::update(&txn, org_id, id, dto, usuario_id).await?;
     txn.commit().await?;
     Ok(HttpResponse::Ok().json(result))
 }

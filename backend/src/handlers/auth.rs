@@ -20,6 +20,16 @@ pub async fn login(
     config: web::Data<AppConfig>,
     body: web::Json<LoginRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let response = auth::login(db.get_ref(), body.into_inner(), &config.jwt_secret).await?;
-    Ok(HttpResponse::Ok().json(response))
+    let input = body.into_inner();
+    let email = input.email.clone();
+    match auth::login(db.get_ref(), input, &config.jwt_secret).await {
+        Ok(response) => {
+            tracing::info!(user_id = %response.user.id, "Successful login");
+            Ok(HttpResponse::Ok().json(response))
+        }
+        Err(e) => {
+            tracing::warn!(email = %email, "Failed login attempt");
+            Err(e)
+        }
+    }
 }

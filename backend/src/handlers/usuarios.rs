@@ -28,12 +28,14 @@ pub async fn list(
 
 pub async fn cambiar_rol(
     db: web::Data<DatabaseConnection>,
-    _admin: AdminOnly,
+    admin: AdminOnly,
     path: web::Path<Uuid>,
     body: web::Json<CambiarRolRequest>,
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
-    let result = usuarios::cambiar_rol(db.get_ref(), id, &body.nuevo_rol).await?;
+    let dto = body.into_inner();
+    let result = usuarios::cambiar_rol(db.get_ref(), id, &dto.nuevo_rol).await?;
+    tracing::info!(admin_id = %admin.0.sub, target_user_id = %id, new_role = %dto.nuevo_rol, "Role changed");
     Ok(HttpResponse::Ok().json(result))
 }
 

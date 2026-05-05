@@ -52,6 +52,7 @@ pub async fn cambiar_password(
         &input.password_nuevo,
     )
     .await?;
+    tracing::info!(user_id = %claims.sub, "Password changed");
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "message": "Contraseña actualizada exitosamente"
     })))
