@@ -882,14 +882,14 @@ fn test_auditoria_entries_for_estado_changes() {
         let entries = registro_auditoria::Entity::find()
             .filter(registro_auditoria::Column::EntityType.eq("contrato"))
             .filter(registro_auditoria::Column::EntityId.eq(contrato_uuid))
-            .filter(registro_auditoria::Column::Accion.eq("cambiar_estado_deposito"))
+            .filter(registro_auditoria::Column::Accion.eq("cambio_deposito"))
             .order_by_desc(registro_auditoria::Column::CreatedAt)
             .all(&db)
             .await
             .unwrap();
         assert!(
             !entries.is_empty(),
-            "Expected audit entry for cambiar_estado_deposito"
+            "Expected audit entry for cambio_deposito"
         );
         assert_eq!(entries[0].cambios["estado_nuevo"], "cobrado");
         assert_eq!(entries[0].cambios["estado_anterior"], "pendiente");
@@ -907,7 +907,7 @@ fn test_auditoria_entries_for_estado_changes() {
         let entries = registro_auditoria::Entity::find()
             .filter(registro_auditoria::Column::EntityType.eq("contrato"))
             .filter(registro_auditoria::Column::EntityId.eq(contrato_uuid))
-            .filter(registro_auditoria::Column::Accion.eq("cambiar_estado_deposito"))
+            .filter(registro_auditoria::Column::Accion.eq("cambio_deposito"))
             .order_by_desc(registro_auditoria::Column::CreatedAt)
             .all(&db)
             .await

@@ -1197,7 +1197,7 @@ fn test_auditoria_entries_for_pago_generation_and_cancellation() {
             "Should have gen_pagos_manual audit entry"
         );
 
-        // 3. Terminate contrato → audit "cancelar_pagos_futuros"
+        // 3. Terminate contrato → audit "cancelar_pagos"
         let fecha_terminacion = future_termination_date(3);
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/contratos/{contrato_id}/terminar"))
@@ -1220,8 +1220,8 @@ fn test_auditoria_entries_for_pago_generation_and_cancellation() {
         assert!(
             entries
                 .iter()
-                .any(|e| e["accion"] == "cancelar_pagos_futuros"),
-            "Should have cancelar_pagos_futuros audit entry"
+                .any(|e| e["accion"] == "cancelar_pagos"),
+            "Should have cancelar_pagos audit entry"
         );
 
         cleanup_contrato(&db, contrato_uuid).await;
