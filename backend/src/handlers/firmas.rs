@@ -16,12 +16,13 @@ fn extract_ip(req: &HttpRequest) -> String {
         .get("X-Forwarded-For")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.split(',').next())
-        .map(|s| s.trim().to_string())
-        .unwrap_or_else(|| {
-            req.peer_addr()
-                .map(|addr| addr.ip().to_string())
-                .unwrap_or_else(|| "unknown".to_string())
-        })
+        .map_or_else(
+            || {
+                req.peer_addr()
+                    .map_or_else(|| "unknown".to_string(), |addr| addr.ip().to_string())
+            },
+            |s| s.trim().to_string(),
+        )
 }
 
 /// Extract User-Agent from request headers.
@@ -34,6 +35,7 @@ fn extract_user_agent(req: &HttpRequest) -> String {
 }
 
 /// POST `/documentos/{id}/firmar` — Authenticated manager signing.
+#[allow(clippy::future_not_send)]
 pub async fn firmar(
     db: web::Data<DatabaseConnection>,
     access: WriteAccess,
@@ -101,6 +103,7 @@ pub async fn verificar_firma_publica(
 }
 
 /// POST `/firmas/{token}/firmar` — Public tenant signing (no auth).
+#[allow(clippy::future_not_send)]
 pub async fn firmar_publica(
     db: web::Data<DatabaseConnection>,
     path: web::Path<String>,

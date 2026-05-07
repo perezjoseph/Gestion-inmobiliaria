@@ -14,7 +14,7 @@ use crate::models::firma::{
 };
 use crate::services::auth;
 
-/// Maximum decoded size for firma_imagen (500 KB).
+/// Maximum decoded size for `firma_imagen` (500 KB).
 const MAX_FIRMA_IMAGEN_BYTES: usize = 500 * 1024;
 
 /// Validate that a base64 string decodes to valid data under 500 KB.
@@ -46,7 +46,7 @@ pub(crate) fn firmante_tipo_from_rol(rol: &str) -> &'static str {
     }
 }
 
-/// Convert a firma_documento model to a FirmaResponse DTO.
+/// Convert a `firma_documento` model to a `FirmaResponse` DTO.
 fn model_to_response(m: firma_documento::Model) -> FirmaResponse {
     FirmaResponse {
         id: m.id,
@@ -148,7 +148,7 @@ pub async fn solicitar_firma(
     let inserted = firma.insert(db).await?;
 
     // Send email with link + password (log if email service unavailable)
-    let email_enviado = enviar_email_firma(&input.email, &token, &password).await;
+    let email_enviado = enviar_email_firma(&input.email, &token, &password);
 
     Ok(SolicitarFirmaResponse {
         firma_id: inserted.id,
@@ -358,7 +358,7 @@ pub(crate) fn generar_password() -> String {
 }
 
 /// Send email with signing link and password. Returns true if sent successfully.
-async fn enviar_email_firma(email: &str, token: &str, password: &str) -> bool {
+fn enviar_email_firma(email: &str, token: &str, password: &str) -> bool {
     // Log the signing link since no email service is configured
     tracing::info!(
         email = %email,

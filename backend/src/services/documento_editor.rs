@@ -544,7 +544,7 @@ pub async fn exportar_docx(
     Ok(buf)
 }
 
-/// Build a DOCX document from Block_JSON blocks.
+/// Build a DOCX document from `Block_JSON` blocks.
 pub fn build_docx(blocks: &[serde_json::Value]) -> Result<Docx, AppError> {
     // 15mm margins in twips (1mm = ~56.7 twips)
     let margin_twips = 850; // ~15mm

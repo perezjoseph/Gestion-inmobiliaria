@@ -404,16 +404,13 @@ mod pbt_async {
 
             assert!(
                 result.is_err(),
-                "Signing with estado='{}' should fail, but got Ok",
-                estado
+                "Signing with estado='{estado}' should fail, but got Ok",
             );
 
             let err = result.unwrap_err();
             assert!(
                 matches!(err, AppError::Conflict(_)),
-                "Expected AppError::Conflict for estado='{}', got: {:?}",
-                estado,
-                err
+                "Expected AppError::Conflict for estado='{estado}', got: {err:?}",
             );
 
             cleanup(&db, firma_id, documento_id).await;

@@ -55,7 +55,7 @@ fn arbitrary_user_agent() -> impl Strategy<Value = String> {
     ]
 }
 
-/// Non-empty firmante_nombre strings.
+/// Non-empty `firmante_nombre` strings.
 fn arbitrary_firmante_nombre() -> impl Strategy<Value = String> {
     "[a-zA-Z ]{2,40}"
 }
@@ -120,12 +120,12 @@ fn table_block() -> impl Strategy<Value = serde_json::Value> {
         })
 }
 
-/// Generate a page_break block.
+/// Generate a `page_break` block.
 fn page_break_block() -> impl Strategy<Value = serde_json::Value> {
     Just(serde_json::json!({ "type": "page_break" }))
 }
 
-/// Generate an arbitrary valid Block_JSON block.
+/// Generate an arbitrary valid `Block_JSON` block.
 fn arbitrary_block() -> impl Strategy<Value = serde_json::Value> {
     prop_oneof![
         heading_block(),
@@ -379,37 +379,32 @@ proptest! {
         let firmante_tipo = firmante_tipo_from_rol(&rol);
 
         // Simulate the record fields that firmar_autenticado sets:
-        let record_firma_imagen: Option<Vec<u8>> = Some(firma_bytes);
-        let record_ip_address: Option<&str> = Some(&ip_address);
-        let record_user_agent: Option<&str> = Some(&user_agent);
-        let record_firmado_at: Option<chrono::DateTime<Utc>> = Some(now);
+        let record_firma_imagen = firma_bytes;
+        let record_ip_address = &ip_address;
+        let record_user_agent = &user_agent;
+        let record_firmado_at = now;
         let record_estado: &str = "firmado";
 
-        // Verify: firma_imagen is non-null and non-empty
-        prop_assert!(record_firma_imagen.is_some(), "firma_imagen must be non-null");
+        // Verify: firma_imagen is non-empty
         prop_assert!(
-            !record_firma_imagen.as_ref().unwrap().is_empty(),
+            !record_firma_imagen.is_empty(),
             "firma_imagen must be non-empty"
         );
 
         // Verify: ip_address is non-empty
-        prop_assert!(record_ip_address.is_some(), "ip_address must be non-null");
         prop_assert!(
-            !record_ip_address.unwrap().is_empty(),
+            !record_ip_address.is_empty(),
             "ip_address must be non-empty"
         );
 
         // Verify: user_agent is non-empty
-        prop_assert!(record_user_agent.is_some(), "user_agent must be non-null");
         prop_assert!(
-            !record_user_agent.unwrap().is_empty(),
+            !record_user_agent.is_empty(),
             "user_agent must be non-empty"
         );
 
         // Verify: firmado_at is within 5 seconds of current time
-        prop_assert!(record_firmado_at.is_some(), "firmado_at must be non-null");
-        let firmado_at = record_firmado_at.unwrap();
-        let diff = (Utc::now() - firmado_at).num_seconds().unsigned_abs();
+        let diff = (Utc::now() - record_firmado_at).num_seconds().unsigned_abs();
         prop_assert!(
             diff <= 5,
             "firmado_at should be within 5s of now, but diff was {}s",

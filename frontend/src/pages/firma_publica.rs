@@ -31,7 +31,7 @@ struct FirmarConTokenRequest {
     firma_imagen: String,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 enum PageState {
     PasswordEntry,
     DocumentReview {
@@ -42,7 +42,7 @@ enum PageState {
     Expired,
 }
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct FirmaPublicaProps {
     pub token: String,
 }
@@ -80,12 +80,14 @@ pub fn FirmaPublica(props: &FirmaPublicaProps) -> Html {
                     password: pwd,
                 };
                 let json = serde_json::to_string(&body).unwrap_or_default();
-                let result = Request::post(&url)
+                let Ok(req_builder) = Request::post(&url)
                     .header("Content-Type", "application/json")
-                    .body(json)
-                    .unwrap()
-                    .send()
-                    .await;
+                    .body(json) else {
+                    error_msg.set(Some("Error al construir la solicitud.".into()));
+                    loading.set(false);
+                    return;
+                };
+                let result = req_builder.send().await;
                 loading.set(false);
                 match result {
                     Ok(resp) => match resp.status() {
@@ -125,7 +127,6 @@ pub fn FirmaPublica(props: &FirmaPublicaProps) -> Html {
         let password = password.clone();
         let error_msg = error_msg.clone();
         let loading = loading.clone();
-        let token = token.clone();
         Callback::from(move |firma_imagen: String| {
             let pwd = (*password).clone();
             let state = state.clone();
@@ -141,12 +142,14 @@ pub fn FirmaPublica(props: &FirmaPublicaProps) -> Html {
                     firma_imagen,
                 };
                 let json = serde_json::to_string(&body).unwrap_or_default();
-                let result = Request::post(&url)
+                let Ok(req_builder) = Request::post(&url)
                     .header("Content-Type", "application/json")
-                    .body(json)
-                    .unwrap()
-                    .send()
-                    .await;
+                    .body(json) else {
+                    error_msg.set(Some("Error al construir la solicitud.".into()));
+                    loading.set(false);
+                    return;
+                };
+                let result = req_builder.send().await;
                 loading.set(false);
                 match result {
                     Ok(resp) => match resp.status() {
@@ -175,7 +178,6 @@ pub fn FirmaPublica(props: &FirmaPublicaProps) -> Html {
     };
 
     let on_password_input = {
-        let password = password.clone();
         Callback::from(move |e: InputEvent| {
             let input: web_sys::HtmlInputElement = e.target_unchecked_into();
             password.set(input.value());
@@ -188,7 +190,7 @@ pub fn FirmaPublica(props: &FirmaPublicaProps) -> Html {
         PageState::PasswordEntry => render_password_form(
             &on_verify,
             &on_password_input,
-            &error_msg,
+            (*error_msg).as_ref(),
             *loading,
         ),
         PageState::DocumentReview {
@@ -198,7 +200,7 @@ pub fn FirmaPublica(props: &FirmaPublicaProps) -> Html {
             contenido,
             firmante_nombre,
             &on_sign,
-            &error_msg,
+            (*error_msg).as_ref(),
             *loading,
         ),
     }
@@ -243,7 +245,7 @@ fn render_confirmation() -> Html {
 fn render_password_form(
     on_submit: &Callback<SubmitEvent>,
     on_input: &Callback<InputEvent>,
-    error_msg: &Option<String>,
+    error_msg: Option<&String>,
     loading: bool,
 ) -> Html {
     html! {
@@ -306,7 +308,7 @@ fn render_document_review(
     contenido: &serde_json::Value,
     firmante_nombre: &str,
     on_sign: &Callback<String>,
-    error_msg: &Option<String>,
+    error_msg: Option<&String>,
     loading: bool,
 ) -> Html {
     let blocks_html = render_blocks(contenido);
@@ -350,7 +352,7 @@ fn render_document_review(
     }
 }
 
-/// Render Block_JSON content as readonly HTML
+/// Render `Block_JSON` content as readonly HTML
 fn render_blocks(contenido: &serde_json::Value) -> Html {
     let blocks = contenido
         .get("blocks")
@@ -378,7 +380,7 @@ fn render_block(block: &serde_json::Value) -> Html {
             let level = block
                 .get("data")
                 .and_then(|d| d.get("level"))
-                .and_then(|l| l.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(1);
             match level {
                 1 => html! { <h1>{text}</h1> },
