@@ -21,6 +21,44 @@ pub struct DocumentoResponse {
     pub numero_documento: Option<String>,
     pub contenido_editable: Option<serde_json::Value>,
     pub updated_at: Option<String>,
+    // Signature/sealing fields
+    #[serde(default)]
+    pub sellado: bool,
+    pub sellado_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FirmaResponse {
+    pub id: String,
+    pub documento_id: String,
+    pub firmante_tipo: String,
+    pub firmante_nombre: String,
+    pub estado: String,
+    pub firmado_at: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FirmarRequest {
+    pub firma_imagen: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SolicitarFirmaRequest {
+    pub firmante_nombre: String,
+    pub email: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SolicitarFirmaResponse {
+    pub firma_id: String,
+    pub token: String,
+    pub expira_at: String,
+    pub email_enviado: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

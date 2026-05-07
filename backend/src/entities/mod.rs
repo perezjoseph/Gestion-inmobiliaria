@@ -6,6 +6,7 @@ pub mod contrato;
 #[allow(dead_code)]
 pub mod documento;
 pub mod ejecucion_tarea;
+pub mod firma_documento;
 pub mod gasto;
 pub mod inquilino;
 pub mod invitacion;

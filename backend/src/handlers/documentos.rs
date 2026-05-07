@@ -7,7 +7,8 @@ use uuid::Uuid;
 use crate::errors::AppError;
 use crate::middleware::rbac::WriteAccess;
 use crate::models::documento::{
-    DocumentoListQuery, GuardarEditorRequest, PorVencerQuery, VerificarDocumentoRequest,
+    ActualizarPlantillaRequest, CrearPlantillaRequest, DocumentoListQuery, GuardarEditorRequest,
+    PorVencerQuery, VerificarDocumentoRequest,
 };
 use crate::services::auth::Claims;
 use crate::services::{documento_editor, documentos, plantillas};
@@ -330,4 +331,64 @@ pub async fn exportar_pdf(
             format!("attachment; filename=\"documento-{documento_id}.pdf\""),
         ))
         .body(pdf_bytes))
+}
+
+// ── Template CRUD handlers ─────────────────────────────────────
+
+pub async fn crear_plantilla(
+    db: web::Data<DatabaseConnection>,
+    _access: WriteAccess,
+    body: web::Json<CrearPlantillaRequest>,
+) -> Result<HttpResponse, AppError> {
+    let result = plantillas::crear(db.get_ref(), body.into_inner()).await?;
+    Ok(HttpResponse::Created().json(result))
+}
+
+pub async fn obtener_plantilla(
+    db: web::Data<DatabaseConnection>,
+    _claims: Claims,
+    path: web::Path<Uuid>,
+) -> Result<HttpResponse, AppError> {
+    let id = path.into_inner();
+    let result = plantillas::obtener(db.get_ref(), id).await?;
+    Ok(HttpResponse::Ok().json(result))
+}
+
+pub async fn actualizar_plantilla(
+    db: web::Data<DatabaseConnection>,
+    _access: WriteAccess,
+    path: web::Path<Uuid>,
+    body: web::Json<ActualizarPlantillaRequest>,
+) -> Result<HttpResponse, AppError> {
+    let id = path.into_inner();
+    let result = plantillas::actualizar(db.get_ref(), id, body.into_inner()).await?;
+    Ok(HttpResponse::Ok().json(result))
+}
+
+pub async fn eliminar_plantilla(
+    db: web::Data<DatabaseConnection>,
+    _access: WriteAccess,
+    path: web::Path<Uuid>,
+) -> Result<HttpResponse, AppError> {
+    let id = path.into_inner();
+    plantillas::eliminar(db.get_ref(), id).await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+// ── Exportar DOCX handler (GET /{id}/exportar-docx) ────────────
+
+pub async fn exportar_docx(
+    db: web::Data<DatabaseConnection>,
+    _claims: Claims,
+    path: web::Path<Uuid>,
+) -> Result<HttpResponse, AppError> {
+    let documento_id = path.into_inner();
+    let docx_bytes = documento_editor::exportar_docx(db.get_ref(), documento_id).await?;
+    Ok(HttpResponse::Ok()
+        .content_type("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        .insert_header((
+            "Content-Disposition",
+            format!("attachment; filename=\"documento-{documento_id}.docx\""),
+        ))
+        .body(docx_bytes))
 }

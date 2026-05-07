@@ -25,9 +25,20 @@ pub struct Model {
     #[sea_orm(column_type = "JsonBinary", nullable)]
     pub contenido_editable: Option<Json>,
     pub updated_at: Option<DateTimeWithTimeZone>,
+    pub sellado: bool,
+    pub sellado_at: Option<DateTimeWithTimeZone>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(has_many = "super::firma_documento::Entity")]
+    FirmaDocumento,
+}
+
+impl Related<super::firma_documento::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::FirmaDocumento.def()
+    }
+}
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -14,6 +14,8 @@ pub use super::contrato::Entity as Contrato;
 #[allow(unused_imports)]
 pub use super::documento::Entity as Documento;
 #[allow(unused_imports)]
+pub use super::firma_documento::Entity as FirmaDocumento;
+#[allow(unused_imports)]
 pub use super::inquilino::Entity as Inquilino;
 #[allow(unused_imports)]
 pub use super::invitacion::Entity as Invitacion;

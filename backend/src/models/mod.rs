@@ -3,6 +3,7 @@ pub mod background_jobs;
 pub mod contrato;
 pub mod dashboard;
 pub mod documento;
+pub mod firma;
 pub mod gasto;
 pub mod importacion;
 pub mod inquilino;

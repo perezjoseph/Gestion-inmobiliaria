@@ -90,6 +90,24 @@ pub struct PlantillaRellenadaResponse {
     pub contenido: serde_json::Value,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrearPlantillaRequest {
+    pub nombre: String,
+    pub tipo_documento: String,
+    pub entity_type: String,
+    pub contenido: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActualizarPlantillaRequest {
+    pub nombre: Option<String>,
+    pub tipo_documento: Option<String>,
+    pub entity_type: Option<String>,
+    pub contenido: Option<serde_json::Value>,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DigitalizarResponse {

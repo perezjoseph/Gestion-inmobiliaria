@@ -6,6 +6,9 @@ pub mod contratos;
 pub mod dashboard;
 pub mod documento_editor;
 pub mod documentos;
+pub mod firmas;
+#[cfg(test)]
+mod firmas_pbt;
 pub mod gastos;
 pub mod importacion;
 pub mod inquilinos;
@@ -14,6 +17,8 @@ pub mod mantenimiento;
 pub mod notificaciones;
 pub mod ocr_client;
 pub mod ocr_mapping;
+#[cfg(test)]
+mod documento_editor_pbt;
 #[cfg(test)]
 mod ocr_mapping_pbt;
 #[cfg(test)]
@@ -24,6 +29,8 @@ pub mod pago_generacion;
 pub mod pagos;
 pub mod perfil;
 pub mod plantillas;
+#[cfg(test)]
+mod plantillas_pbt;
 pub mod propiedades;
 pub mod recargos;
 pub mod recibos;

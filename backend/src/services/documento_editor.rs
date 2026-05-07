@@ -1,4 +1,8 @@
 use chrono::Utc;
+use docx_rs::{
+    AbstractNumbering, Docx, IndentLevel, Level, LevelJc, LevelText, NumberFormat, Numbering,
+    NumberingId, Paragraph, Run, RunFonts, Start, Table, TableAlignmentType, TableCell, TableRow,
+};
 use numaelis_rckive_genpdf::Element as _;
 use numaelis_rckive_genpdf::{elements, style};
 use sea_orm::{
@@ -257,6 +261,12 @@ pub async fn guardar_contenido(
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
 
+    if doc.sellado {
+        return Err(AppError::Forbidden(
+            "El documento está sellado y no puede ser modificado".to_string(),
+        ));
+    }
+
     let mut active: documento::ActiveModel = doc.into_active_model();
     active.contenido_editable = Set(Some(contenido.clone()));
     active.updated_at = Set(Some(Utc::now().into()));
@@ -498,6 +508,239 @@ fn render_table(doc: &mut numaelis_rckive_genpdf::Document, block: &serde_json::
 
     doc.push(table);
     doc.push(elements::Break::new(0.3));
+}
+
+// ── Exportar DOCX ──────────────────────────────────────────────
+
+/// Export a document's `contenido_editable` as a DOCX file.
+pub async fn exportar_docx(
+    db: &DatabaseConnection,
+    documento_id: Uuid,
+) -> Result<Vec<u8>, AppError> {
+    let doc = documento::Entity::find_by_id(documento_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
+
+    let contenido = doc.contenido_editable.ok_or_else(|| {
+        AppError::BadRequest(
+            "El documento no tiene contenido editable para exportar".to_string(),
+        )
+    })?;
+
+    let blocks = contenido
+        .get("blocks")
+        .and_then(|b| b.as_array())
+        .ok_or_else(|| {
+            AppError::Validation("Contenido editable sin formato válido".to_string())
+        })?;
+
+    let docx = build_docx(blocks)?;
+    let mut buf = Vec::new();
+    docx.build()
+        .pack(&mut std::io::Cursor::new(&mut buf))
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error generando DOCX: {e}")))?;
+
+    Ok(buf)
+}
+
+/// Build a DOCX document from Block_JSON blocks.
+pub fn build_docx(blocks: &[serde_json::Value]) -> Result<Docx, AppError> {
+    // 15mm margins in twips (1mm = ~56.7 twips)
+    let margin_twips = 850; // ~15mm
+
+    let mut docx = Docx::new()
+        .page_margin(
+            docx_rs::PageMargin::new()
+                .top(margin_twips)
+                .bottom(margin_twips)
+                .left(margin_twips)
+                .right(margin_twips),
+        );
+
+    // Define numbering for ordered lists (id=1)
+    docx = docx
+        .add_abstract_numbering(
+            AbstractNumbering::new(1).add_level(
+                Level::new(
+                    0,
+                    Start::new(1),
+                    NumberFormat::new("decimal"),
+                    LevelText::new("%1."),
+                    LevelJc::new("left"),
+                )
+                .indent(Some(720), Some(docx_rs::SpecialIndentType::Hanging(360)), None, None),
+            ),
+        )
+        .add_numbering(Numbering::new(1, 1));
+
+    // Define numbering for unordered/bullet lists (id=2)
+    docx = docx
+        .add_abstract_numbering(
+            AbstractNumbering::new(2).add_level(
+                Level::new(
+                    0,
+                    Start::new(1),
+                    NumberFormat::new("bullet"),
+                    LevelText::new("•"),
+                    LevelJc::new("left"),
+                )
+                .indent(Some(720), Some(docx_rs::SpecialIndentType::Hanging(360)), None, None),
+            ),
+        )
+        .add_numbering(Numbering::new(2, 2));
+
+    for block in blocks {
+        let block_type = block
+            .get("type")
+            .and_then(|t| t.as_str())
+            .unwrap_or("paragraph");
+
+        match block_type {
+            "heading" => {
+                docx = render_docx_heading(docx, block);
+            }
+            "paragraph" => {
+                docx = render_docx_paragraph(docx, block);
+            }
+            "list" => {
+                docx = render_docx_list(docx, block);
+            }
+            "table" => {
+                docx = render_docx_table(docx, block);
+            }
+            "page_break" => {
+                docx = docx.add_paragraph(Paragraph::new().page_break_before(true));
+            }
+            _ => {
+                // Unknown block type: render as paragraph
+                docx = render_docx_paragraph(docx, block);
+            }
+        }
+    }
+
+    Ok(docx)
+}
+
+// ── DOCX rendering helpers ─────────────────────────────────────
+
+fn render_docx_heading(docx: Docx, block: &serde_json::Value) -> Docx {
+    let text = block
+        .get("text")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("");
+    let level = block
+        .get("level")
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(1);
+
+    // Font sizes in half-points: level 1=36, 2=30, 3=26
+    let size_half_points = match level {
+        1 => 36,
+        2 => 30,
+        3 => 26,
+        _ => 22,
+    };
+
+    let run = Run::new()
+        .add_text(text)
+        .bold()
+        .size(size_half_points)
+        .fonts(RunFonts::new().ascii("Arial"));
+
+    docx.add_paragraph(Paragraph::new().add_run(run))
+}
+
+fn render_docx_paragraph(docx: Docx, block: &serde_json::Value) -> Docx {
+    let text = block.get("text").and_then(|t| t.as_str()).unwrap_or("");
+
+    let run = Run::new()
+        .add_text(text)
+        .size(22) // 11pt in half-points
+        .fonts(RunFonts::new().ascii("Arial"));
+
+    docx.add_paragraph(Paragraph::new().add_run(run))
+}
+
+fn render_docx_list(docx: Docx, block: &serde_json::Value) -> Docx {
+    let ordered = block
+        .get("ordered")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    let items = block.get("items").and_then(serde_json::Value::as_array);
+
+    let numbering_id = if ordered { 1 } else { 2 };
+
+    let Some(items) = items else {
+        return docx;
+    };
+
+    let mut d = docx;
+    for item in items {
+        let text = item.as_str().unwrap_or("");
+        let run = Run::new()
+            .add_text(text)
+            .size(22)
+            .fonts(RunFonts::new().ascii("Arial"));
+
+        d = d.add_paragraph(
+            Paragraph::new()
+                .add_run(run)
+                .numbering(NumberingId::new(numbering_id), IndentLevel::new(0)),
+        );
+    }
+    d
+}
+
+fn render_docx_table(docx: Docx, block: &serde_json::Value) -> Docx {
+    let headers = block.get("headers").and_then(serde_json::Value::as_array);
+    let rows = block.get("rows").and_then(serde_json::Value::as_array);
+
+    let mut table_rows: Vec<TableRow> = Vec::new();
+
+    // Header row with bold text
+    if let Some(headers) = headers {
+        let cells: Vec<TableCell> = headers
+            .iter()
+            .map(|h| {
+                let text = h.as_str().unwrap_or("");
+                let run = Run::new()
+                    .add_text(text)
+                    .bold()
+                    .size(22)
+                    .fonts(RunFonts::new().ascii("Arial"));
+                TableCell::new().add_paragraph(Paragraph::new().add_run(run))
+            })
+            .collect();
+        table_rows.push(TableRow::new(cells));
+    }
+
+    // Data rows
+    if let Some(rows) = rows {
+        for row_data in rows {
+            if let Some(cells_data) = row_data.as_array() {
+                let cells: Vec<TableCell> = cells_data
+                    .iter()
+                    .map(|c| {
+                        let text = c.as_str().unwrap_or("");
+                        let run = Run::new()
+                            .add_text(text)
+                            .size(22)
+                            .fonts(RunFonts::new().ascii("Arial"));
+                        TableCell::new().add_paragraph(Paragraph::new().add_run(run))
+                    })
+                    .collect();
+                table_rows.push(TableRow::new(cells));
+            }
+        }
+    }
+
+    if table_rows.is_empty() {
+        return docx;
+    }
+
+    let table = Table::new(table_rows).align(TableAlignmentType::Left);
+    docx.add_table(table)
 }
 
 // ── model_to_response (same pattern as documentos.rs) ──────────

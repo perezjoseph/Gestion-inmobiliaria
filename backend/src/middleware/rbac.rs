@@ -6,7 +6,7 @@ pub fn check_role(claims: &Claims, allowed_roles: &[&str]) -> Result<(), AppErro
     if allowed_roles.contains(&claims.rol.as_str()) {
         Ok(())
     } else {
-        Err(AppError::Forbidden)
+        Err(AppError::Forbidden("Acceso denegado".to_string()))
     }
 }
 
@@ -24,7 +24,7 @@ impl actix_web::FromRequest for AdminOnly {
         let claims = Claims::from_request(req, payload).into_inner();
         std::future::ready(match claims {
             Ok(c) if c.rol == "admin" => Ok(Self(c)),
-            Ok(_) => Err(AppError::Forbidden),
+            Ok(_) => Err(AppError::Forbidden("Acceso denegado".to_string())),
             Err(e) => Err(e),
         })
     }
@@ -41,7 +41,7 @@ impl actix_web::FromRequest for WriteAccess {
         let claims = Claims::from_request(req, payload).into_inner();
         std::future::ready(match claims {
             Ok(c) if c.rol == "admin" || c.rol == "gerente" => Ok(Self(c)),
-            Ok(_) => Err(AppError::Forbidden),
+            Ok(_) => Err(AppError::Forbidden("Acceso denegado".to_string())),
             Err(e) => Err(e),
         })
     }

@@ -1,9 +1,12 @@
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use uuid::Uuid;
 
 use crate::entities::{contrato, gasto, inquilino, pago, plantilla_documento, propiedad};
 use crate::errors::AppError;
-use crate::models::documento::{PlantillaRellenadaResponse, PlantillaResponse};
+use crate::models::documento::{
+    ActualizarPlantillaRequest, CrearPlantillaRequest, PlantillaRellenadaResponse,
+    PlantillaResponse,
+};
 
 // ── List templates ─────────────────────────────────────────────
 
@@ -32,6 +35,140 @@ pub async fn listar(
         .collect();
 
     Ok(responses)
+}
+
+// ── Create template ────────────────────────────────────────────
+
+pub async fn crear(
+    db: &DatabaseConnection,
+    input: CrearPlantillaRequest,
+) -> Result<PlantillaResponse, AppError> {
+    if input.nombre.trim().is_empty() {
+        return Err(AppError::Validation(
+            "El nombre de la plantilla es requerido".into(),
+        ));
+    }
+    if input.tipo_documento.trim().is_empty() {
+        return Err(AppError::Validation(
+            "El tipo de documento es requerido".into(),
+        ));
+    }
+
+    let now = chrono::Utc::now().fixed_offset();
+    let id = Uuid::new_v4();
+
+    let model = plantilla_documento::ActiveModel {
+        id: Set(id),
+        nombre: Set(input.nombre.clone()),
+        tipo_documento: Set(input.tipo_documento.clone()),
+        entity_type: Set(input.entity_type.clone()),
+        contenido: Set(input.contenido.clone()),
+        activo: Set(true),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+
+    let inserted = model.insert(db).await?;
+
+    Ok(PlantillaResponse {
+        id: inserted.id,
+        nombre: inserted.nombre,
+        tipo_documento: inserted.tipo_documento,
+        entity_type: inserted.entity_type,
+        contenido: inserted.contenido,
+    })
+}
+
+// ── Get template by ID ─────────────────────────────────────────
+
+pub async fn obtener(
+    db: &DatabaseConnection,
+    id: Uuid,
+) -> Result<PlantillaResponse, AppError> {
+    let model = plantilla_documento::Entity::find_by_id(id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Plantilla {id} no encontrada")))?;
+
+    Ok(PlantillaResponse {
+        id: model.id,
+        nombre: model.nombre,
+        tipo_documento: model.tipo_documento,
+        entity_type: model.entity_type,
+        contenido: model.contenido,
+    })
+}
+
+// ── Update template ────────────────────────────────────────────
+
+pub async fn actualizar(
+    db: &DatabaseConnection,
+    id: Uuid,
+    input: ActualizarPlantillaRequest,
+) -> Result<PlantillaResponse, AppError> {
+    let existing = plantilla_documento::Entity::find_by_id(id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Plantilla {id} no encontrada")))?;
+
+    let mut model: plantilla_documento::ActiveModel = existing.into();
+
+    if let Some(ref nombre) = input.nombre {
+        if nombre.trim().is_empty() {
+            return Err(AppError::Validation(
+                "El nombre de la plantilla es requerido".into(),
+            ));
+        }
+        model.nombre = Set(nombre.clone());
+    }
+
+    if let Some(ref tipo_documento) = input.tipo_documento {
+        if tipo_documento.trim().is_empty() {
+            return Err(AppError::Validation(
+                "El tipo de documento es requerido".into(),
+            ));
+        }
+        model.tipo_documento = Set(tipo_documento.clone());
+    }
+
+    if let Some(ref entity_type) = input.entity_type {
+        model.entity_type = Set(entity_type.clone());
+    }
+
+    if let Some(ref contenido) = input.contenido {
+        model.contenido = Set(contenido.clone());
+    }
+
+    model.updated_at = Set(chrono::Utc::now().fixed_offset());
+
+    let updated = model.update(db).await?;
+
+    Ok(PlantillaResponse {
+        id: updated.id,
+        nombre: updated.nombre,
+        tipo_documento: updated.tipo_documento,
+        entity_type: updated.entity_type,
+        contenido: updated.contenido,
+    })
+}
+
+// ── Soft-delete template ───────────────────────────────────────
+
+pub async fn eliminar(
+    db: &DatabaseConnection,
+    id: Uuid,
+) -> Result<(), AppError> {
+    let existing = plantilla_documento::Entity::find_by_id(id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Plantilla {id} no encontrada")))?;
+
+    let mut model: plantilla_documento::ActiveModel = existing.into();
+    model.activo = Set(false);
+    model.updated_at = Set(chrono::Utc::now().fixed_offset());
+    model.update(db).await?;
+
+    Ok(())
 }
 
 // ── Fill template with entity data ─────────────────────────────
@@ -67,7 +204,7 @@ pub async fn rellenar(
 /// Recursively walk a JSON value, replacing `{{entity.field}}` patterns
 /// with actual values from the replacements map. Unresolved placeholders
 /// remain as-is.
-fn resolve_placeholders(
+pub(crate) fn resolve_placeholders(
     value: &serde_json::Value,
     replacements: &std::collections::HashMap<String, String>,
 ) -> serde_json::Value {
@@ -97,7 +234,7 @@ fn resolve_placeholders(
 
 /// Replace all `{{key}}` patterns in a string with values from the map.
 /// Unresolved placeholders remain as-is.
-fn replace_in_string(
+pub(crate) fn replace_in_string(
     input: &str,
     replacements: &std::collections::HashMap<String, String>,
 ) -> String {

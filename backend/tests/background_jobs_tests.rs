@@ -291,6 +291,8 @@ async fn create_test_documento(
         numero_documento: Set(None),
         contenido_editable: Set(None),
         updated_at: Set(Some(now)),
+        sellado: Set(false),
+        sellado_at: Set(None),
     }
     .insert(db)
     .await

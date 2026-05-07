@@ -18,8 +18,27 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .finish()
         .unwrap();
 
+    #[allow(clippy::unwrap_used)]
+    let firmas_governor_conf = GovernorConfigBuilder::default()
+        .seconds_per_request(6)
+        .burst_size(5)
+        .finish()
+        .unwrap();
+
     cfg.service(
         web::scope("/api/v1")
+            .service(
+                web::scope("/firmas")
+                    .wrap(Governor::new(&firmas_governor_conf))
+                    .route(
+                        "/{token}/verificar",
+                        web::post().to(handlers::firmas::verificar_firma_publica),
+                    )
+                    .route(
+                        "/{token}/firmar",
+                        web::post().to(handlers::firmas::firmar_publica),
+                    ),
+            )
             .service(
                 web::scope("/auth")
                     .wrap(Governor::new(&auth_governor_conf))
@@ -247,6 +266,22 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                         "/plantillas",
                         web::get().to(handlers::documentos::listar_plantillas),
                     )
+                    .route(
+                        "/plantillas",
+                        web::post().to(handlers::documentos::crear_plantilla),
+                    )
+                    .route(
+                        "/plantillas/{id}",
+                        web::get().to(handlers::documentos::obtener_plantilla),
+                    )
+                    .route(
+                        "/plantillas/{id}",
+                        web::put().to(handlers::documentos::actualizar_plantilla),
+                    )
+                    .route(
+                        "/plantillas/{id}",
+                        web::delete().to(handlers::documentos::eliminar_plantilla),
+                    )
                     // Parameterized static paths
                     .route(
                         "/plantillas/{id}/rellenar/{entity_type}/{entity_id}",
@@ -276,6 +311,23 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route(
                         "/{id}/exportar-pdf",
                         web::get().to(handlers::documentos::exportar_pdf),
+                    )
+                    .route(
+                        "/{id}/exportar-docx",
+                        web::get().to(handlers::documentos::exportar_docx),
+                    )
+                    // Signature routes (authenticated)
+                    .route(
+                        "/{id}/firmar",
+                        web::post().to(handlers::firmas::firmar),
+                    )
+                    .route(
+                        "/{id}/solicitar-firma",
+                        web::post().to(handlers::firmas::solicitar_firma),
+                    )
+                    .route(
+                        "/{id}/firmas",
+                        web::get().to(handlers::firmas::listar_firmas),
                     )
                     .route("/{id}", web::delete().to(handlers::documentos::eliminar))
                     // Existing routes (most dynamic — two path segments)

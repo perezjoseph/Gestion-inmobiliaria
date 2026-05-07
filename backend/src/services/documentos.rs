@@ -273,6 +273,8 @@ pub async fn upload(
         numero_documento: Set(numero_documento),
         contenido_editable: Set(None),
         updated_at: Set(None),
+        sellado: Set(false),
+        sellado_at: Set(None),
     };
 
     let inserted = model.insert(db).await?;
@@ -976,6 +978,8 @@ mod tests {
             numero_documento: None,
             contenido_editable: None,
             updated_at: None,
+            sellado: false,
+            sellado_at: None,
         };
         let resp = model_to_response(model);
         assert_eq!(resp.id, id);
@@ -1012,6 +1016,8 @@ mod tests {
             numero_documento: Some("DOC-001".to_string()),
             contenido_editable: Some(serde_json::json!({"version": 1})),
             updated_at: Some(now),
+            sellado: false,
+            sellado_at: None,
         };
         let resp = model_to_response(model);
         assert_eq!(resp.estado_verificacion, "verificado");
@@ -1109,6 +1115,8 @@ mod tests {
             numero_documento: None,
             contenido_editable: None,
             updated_at: None,
+            sellado: false,
+            sellado_at: None,
         }
     }
 

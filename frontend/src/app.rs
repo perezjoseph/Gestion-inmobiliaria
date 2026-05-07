@@ -10,6 +10,7 @@ use crate::components::layout::sidebar::Sidebar;
 use crate::pages::auditoria::Auditoria;
 use crate::pages::configuracion::Configuracion;
 use crate::pages::contratos::Contratos;
+use crate::pages::firma_publica::FirmaPublica;
 use crate::pages::dashboard::Dashboard;
 use crate::pages::documento_editor::DocumentoEditorPage;
 use crate::pages::gastos::Gastos;
@@ -20,6 +21,7 @@ use crate::pages::mantenimiento::Mantenimiento;
 use crate::pages::notificaciones::Notificaciones;
 use crate::pages::pagos::Pagos;
 use crate::pages::perfil::Perfil;
+use crate::pages::plantillas::Plantillas;
 use crate::pages::propiedades::Propiedades;
 use crate::pages::registro::Registro;
 use crate::pages::reportes::Reportes;
@@ -122,6 +124,8 @@ pub enum Route {
     Notificaciones,
     #[at("/configuracion")]
     Configuracion,
+    #[at("/plantillas")]
+    Plantillas,
     #[at("/documentos/editor/:entity_type/:entity_id")]
     DocumentoEditor {
         entity_type: String,
@@ -133,6 +137,8 @@ pub enum Route {
         entity_id: String,
         documento_id: String,
     },
+    #[at("/firmas/:token")]
+    FirmaPublica { token: String },
     #[not_found]
     #[at("/404")]
     NotFound,
@@ -142,6 +148,7 @@ fn switch(routes: Route) -> Html {
     match routes {
         Route::Login => html! { <Login /> },
         Route::Registro => html! { <Registro /> },
+        Route::FirmaPublica { token } => html! { <FirmaPublica token={token} /> },
         Route::Dashboard => html! { <ProtectedRoute><Dashboard /></ProtectedRoute> },
         Route::Propiedades => html! { <ProtectedRoute><Propiedades /></ProtectedRoute> },
         Route::Inquilinos => html! { <ProtectedRoute><Inquilinos /></ProtectedRoute> },
@@ -156,6 +163,7 @@ fn switch(routes: Route) -> Html {
         Route::Mantenimiento => html! { <ProtectedRoute><Mantenimiento /></ProtectedRoute> },
         Route::Notificaciones => html! { <ProtectedRoute><Notificaciones /></ProtectedRoute> },
         Route::Configuracion => html! { <ProtectedRoute><Configuracion /></ProtectedRoute> },
+        Route::Plantillas => html! { <ProtectedRoute><Plantillas /></ProtectedRoute> },
         Route::DocumentoEditor {
             entity_type,
             entity_id,

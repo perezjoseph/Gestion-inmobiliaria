@@ -1,0 +1,1086 @@
+#![allow(clippy::needless_return)]
+use crate::migrations;
+
+use actix_web::http::StatusCode;
+use actix_web::web;
+use chrono::{Duration, Utc};
+use realestate_backend::app::create_app;
+use realestate_backend::config::AppConfig;
+use realestate_backend::entities::{documento, firma_documento, organizacion, usuario};
+use realestate_backend::services::auth::{Claims, encode_jwt};
+use sea_orm::{
+    ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, EntityTrait, Set,
+};
+use sea_orm_migration::MigratorTrait;
+use serde_json::{Value, json};
+use uuid::Uuid;
+
+const JWT_SECRET: &str = "test_secret_key_that_is_long_enough_for_jwt";
+
+fn db_url() -> String {
+    dotenvy::dotenv().ok();
+    std::env::var("DATABASE_URL").unwrap_or_default()
+}
+
+async fn setup_db() -> Result<DatabaseConnection, String> {
+    let url = db_url();
+    if url.is_empty() {
+        return Err("DATABASE_URL not set".to_string());
+    }
+    let mut opts = ConnectOptions::new(&url);
+    opts.max_connections(5)
+        .min_connections(1)
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .idle_timeout(std::time::Duration::from_secs(60))
+        .acquire_timeout(std::time::Duration::from_secs(30));
+    let db = Database::connect(opts)
+        .await
+        .map_err(|e| format!("Failed to connect to database: {e}"))?;
+    migrations::Migrator::up(&db, None)
+        .await
+        .map_err(|e| format!("Failed to run migrations: {e}"))?;
+    Ok(db)
+}
+
+fn shared_rt_and_db() -> Option<&'static (tokio::runtime::Runtime, DatabaseConnection)> {
+    static SHARED: std::sync::OnceLock<
+        Result<(tokio::runtime::Runtime, DatabaseConnection), String>,
+    > = std::sync::OnceLock::new();
+    SHARED
+        .get_or_init(|| {
+            let rt = tokio::runtime::Runtime::new().map_err(|e| format!("Runtime error: {e}"))?;
+            let db = rt.block_on(setup_db())?;
+            Ok((rt, db))
+        })
+        .as_ref()
+        .ok()
+}
+
+fn with_db<F, Fut>(f: F)
+where
+    F: FnOnce(DatabaseConnection) -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
+    dotenvy::dotenv().ok();
+    if std::env::var("DATABASE_URL").is_err() {
+        eprintln!("⚠ DATABASE_URL not set – skipping integration test");
+        return;
+    }
+    let _guard = crate::GLOBAL_DB_SERIAL
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let Some((rt, db)) = shared_rt_and_db() else {
+        eprintln!("⚠ DB not reachable – skipping integration test");
+        return;
+    };
+    rt.block_on(f(db.clone()));
+}
+
+fn make_config() -> AppConfig {
+    AppConfig {
+        database_url: String::new(),
+        jwt_secret: JWT_SECRET.to_string(),
+        server_port: 0,
+        cors_origin: None,
+        pool: realestate_backend::config::PoolConfig::default(),
+    }
+}
+
+fn make_token(user_id: Uuid, rol: &str, org_id: Uuid) -> String {
+    let claims = Claims {
+        sub: user_id,
+        email: format!("{rol}@test.com"),
+        rol: rol.to_string(),
+        organizacion_id: org_id,
+        exp: (Utc::now() + Duration::hours(1)).timestamp() as usize,
+    };
+    encode_jwt(&claims, JWT_SECRET).unwrap()
+}
+
+async fn create_test_organizacion(db: &DatabaseConnection) -> Uuid {
+    let id = Uuid::new_v4();
+    let now = Utc::now().into();
+    organizacion::ActiveModel {
+        id: Set(id),
+        tipo: Set("persona_fisica".to_string()),
+        nombre: Set(format!("Org Test {id}")),
+        estado: Set("activo".to_string()),
+        cedula: Set(None),
+        telefono: Set(None),
+        email_organizacion: Set(None),
+        rnc: Set(None),
+        razon_social: Set(None),
+        nombre_comercial: Set(None),
+        direccion_fiscal: Set(None),
+        representante_legal: Set(None),
+        dgii_data: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+    }
+    .insert(db)
+    .await
+    .expect("Failed to create test organizacion");
+    id
+}
+
+async fn create_test_usuario(db: &DatabaseConnection, rol: &str, org_id: Uuid) -> Uuid {
+    let id = Uuid::new_v4();
+    let now = Utc::now().into();
+    usuario::ActiveModel {
+        id: Set(id),
+        nombre: Set(format!("Test {rol}")),
+        email: Set(format!("{rol}+{id}@test.com")),
+        password_hash: Set("not_used".to_string()),
+        rol: Set(rol.to_string()),
+        activo: Set(true),
+        organizacion_id: Set(org_id),
+        created_at: Set(now),
+        updated_at: Set(now),
+    }
+    .insert(db)
+    .await
+    .expect("Failed to create test usuario");
+    id
+}
+
+/// Create a test document with editable content for signing tests.
+async fn create_test_documento(db: &DatabaseConnection, user_id: Uuid) -> Uuid {
+    let id = Uuid::new_v4();
+    let now = Utc::now().into();
+    documento::ActiveModel {
+        id: Set(id),
+        entity_type: Set("contrato".to_string()),
+        entity_id: Set(Uuid::new_v4()),
+        filename: Set("test-doc.pdf".to_string()),
+        file_path: Set("/tmp/test-doc.pdf".to_string()),
+        mime_type: Set("application/pdf".to_string()),
+        file_size: Set(1024),
+        uploaded_by: Set(user_id),
+        created_at: Set(now),
+        tipo_documento: Set("contrato".to_string()),
+        estado_verificacion: Set("pendiente".to_string()),
+        fecha_vencimiento: Set(None),
+        verificado_por: Set(None),
+        fecha_verificacion: Set(None),
+        notas_verificacion: Set(None),
+        numero_documento: Set(None),
+        contenido_editable: Set(Some(json!({
+            "version": 1,
+            "blocks": [
+                {"type": "heading", "level": 1, "text": "Contrato de Arrendamiento"},
+                {"type": "paragraph", "text": "Este es un documento de prueba."}
+            ]
+        }))),
+        updated_at: Set(Some(now)),
+        sellado: Set(false),
+        sellado_at: Set(None),
+    }
+    .insert(db)
+    .await
+    .expect("Failed to create test documento");
+    id
+}
+
+/// Helper: set up org + admin user + document for firmas tests.
+async fn setup_firmas_data(db: &DatabaseConnection) -> (Uuid, Uuid, Uuid) {
+    let org_id = create_test_organizacion(db).await;
+    let admin_id = create_test_usuario(db, "admin", org_id).await;
+    let doc_id = create_test_documento(db, admin_id).await;
+    (org_id, admin_id, doc_id)
+}
+
+fn preview_store() -> web::Data<realestate_backend::services::ocr_preview::PreviewStore> {
+    web::Data::new(realestate_backend::services::ocr_preview::PreviewStore::new())
+}
+
+/// A small valid PNG (1x1 pixel) encoded as base64 for firma_imagen.
+fn valid_firma_imagen_b64() -> String {
+    use base64::Engine;
+    // Minimal 1x1 white PNG
+    let png_bytes: &[u8] = &[
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48,
+        0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00,
+        0x00, 0x90, 0x77, 0x53, 0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, 0x08,
+        0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01, 0xE2, 0x21, 0xBC,
+        0x33, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+    ];
+    base64::engine::general_purpose::STANDARD.encode(png_bytes)
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Test: Authenticated signing flow end-to-end
+// Requirements: 4.1
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_authenticated_signing_flow_end_to_end() {
+    with_db(|db| async move {
+        let (org_id, admin_id, doc_id) = setup_firmas_data(&db).await;
+        let token = make_token(admin_id, "admin", org_id);
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        let req = actix_web::test::TestRequest::post()
+            .uri(&format!("/api/v1/documentos/{doc_id}/firmar"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .insert_header(("User-Agent", "TestAgent/1.0"))
+            .set_json(json!({ "firmaImagen": valid_firma_imagen_b64() }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK, "Expected 200 for authenticated signing");
+
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        assert_eq!(body["firmanteTipo"], "propietario");
+        assert_eq!(body["estado"], "firmado");
+        assert!(body["firmadoAt"].is_string());
+        assert_eq!(body["documentoId"], doc_id.to_string());
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Test: solicitar-firma creates pending record with valid token
+// Requirements: 5.1
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_solicitar_firma_creates_pending_record() {
+    with_db(|db| async move {
+        let (org_id, admin_id, doc_id) = setup_firmas_data(&db).await;
+        let token = make_token(admin_id, "admin", org_id);
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        let req = actix_web::test::TestRequest::post()
+            .uri(&format!("/api/v1/documentos/{doc_id}/solicitar-firma"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(json!({
+                "firmanteNombre": "Juan Pérez",
+                "email": "juan@example.com"
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::CREATED, "Expected 201 for solicitar-firma");
+
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        assert!(body["firmaId"].is_string());
+        assert!(body["token"].is_string());
+        assert!(body["expiraAt"].is_string());
+
+        // Verify the token is long enough (UUID = 36 chars with hyphens, 32 without)
+        let firma_token = body["token"].as_str().unwrap();
+        assert!(firma_token.len() >= 32, "Token should have sufficient entropy");
+
+        // Verify the record in DB is pendiente
+        let firma_id: Uuid = body["firmaId"].as_str().unwrap().parse().unwrap();
+        let firma = firma_documento::Entity::find_by_id(firma_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .expect("Firma record should exist");
+        assert_eq!(firma.estado, "pendiente");
+        assert!(firma.token.is_some());
+        assert!(firma.password_hash.is_some());
+        assert!(firma.expira_at.is_some());
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Test: Public token verification (valid, expired, wrong password)
+// Requirements: 5.7, 5.8
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_public_token_verification_valid() {
+    with_db(|db| async move {
+        let (_org_id, _admin_id, doc_id) = setup_firmas_data(&db).await;
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        // Create a firma with a known password directly for verification testing
+        use argon2::{Argon2, PasswordHasher};
+        use argon2::password_hash::SaltString;
+        use argon2::password_hash::rand_core::OsRng;
+
+        let known_password = "test_password_123";
+        let salt = SaltString::generate(&mut OsRng);
+        let hash = Argon2::default()
+            .hash_password(known_password.as_bytes(), &salt)
+            .unwrap()
+            .to_string();
+
+        // Create a firma with known password directly
+        let known_token = Uuid::new_v4().to_string();
+        let now = Utc::now();
+        firma_documento::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            documento_id: Set(doc_id),
+            firmante_tipo: Set("inquilino".to_string()),
+            firmante_nombre: Set("Test Inquilino".to_string()),
+            firma_imagen: Set(None),
+            ip_address: Set(None),
+            user_agent: Set(None),
+            firmado_at: Set(None),
+            token: Set(Some(known_token.clone())),
+            password_hash: Set(Some(hash)),
+            expira_at: Set(Some((now + Duration::hours(72)).into())),
+            estado: Set("pendiente".to_string()),
+            created_at: Set(now.into()),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
+        // Verify with correct password
+        let req = actix_web::test::TestRequest::post()
+            .uri(&format!("/api/v1/firmas/{known_token}/verificar"))
+            .set_json(json!({ "password": known_password }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK, "Valid token + password should return 200");
+
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        assert_eq!(body["documentoId"], doc_id.to_string());
+        assert!(body["contenido"].is_object());
+        assert_eq!(body["firmanteNombre"], "Test Inquilino");
+    });
+}
+
+#[test]
+fn test_public_token_verification_expired() {
+    with_db(|db| async move {
+        let (_org_id, _admin_id, doc_id) = setup_firmas_data(&db).await;
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        // Create a firma with expired token
+        use argon2::{Argon2, PasswordHasher};
+        use argon2::password_hash::SaltString;
+        use argon2::password_hash::rand_core::OsRng;
+
+        let password = "expired_test_pass";
+        let salt = SaltString::generate(&mut OsRng);
+        let hash = Argon2::default()
+            .hash_password(password.as_bytes(), &salt)
+            .unwrap()
+            .to_string();
+
+        let expired_token = Uuid::new_v4().to_string();
+        let now = Utc::now();
+        firma_documento::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            documento_id: Set(doc_id),
+            firmante_tipo: Set("inquilino".to_string()),
+            firmante_nombre: Set("Expired Inquilino".to_string()),
+            firma_imagen: Set(None),
+            ip_address: Set(None),
+            user_agent: Set(None),
+            firmado_at: Set(None),
+            token: Set(Some(expired_token.clone())),
+            password_hash: Set(Some(hash)),
+            expira_at: Set(Some((now - Duration::hours(1)).into())), // expired
+            estado: Set("pendiente".to_string()),
+            created_at: Set((now - Duration::hours(73)).into()),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
+        let req = actix_web::test::TestRequest::post()
+            .uri(&format!("/api/v1/firmas/{expired_token}/verificar"))
+            .set_json(json!({ "password": password }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::GONE, "Expired token should return 410");
+    });
+}
+
+#[test]
+fn test_public_token_verification_wrong_password() {
+    with_db(|db| async move {
+        let (_org_id, _admin_id, doc_id) = setup_firmas_data(&db).await;
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        use argon2::{Argon2, PasswordHasher};
+        use argon2::password_hash::SaltString;
+        use argon2::password_hash::rand_core::OsRng;
+
+        let correct_password = "correct_password";
+        let salt = SaltString::generate(&mut OsRng);
+        let hash = Argon2::default()
+            .hash_password(correct_password.as_bytes(), &salt)
+            .unwrap()
+            .to_string();
+
+        let token_str = Uuid::new_v4().to_string();
+        let now = Utc::now();
+        firma_documento::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            documento_id: Set(doc_id),
+            firmante_tipo: Set("inquilino".to_string()),
+            firmante_nombre: Set("Wrong Pass Inquilino".to_string()),
+            firma_imagen: Set(None),
+            ip_address: Set(None),
+            user_agent: Set(None),
+            firmado_at: Set(None),
+            token: Set(Some(token_str.clone())),
+            password_hash: Set(Some(hash)),
+            expira_at: Set(Some((now + Duration::hours(72)).into())),
+            estado: Set("pendiente".to_string()),
+            created_at: Set(now.into()),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
+        let req = actix_web::test::TestRequest::post()
+            .uri(&format!("/api/v1/firmas/{token_str}/verificar"))
+            .set_json(json!({ "password": "wrong_password" }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED, "Wrong password should return 401");
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Test: Public signing (success, already signed conflict)
+// Requirements: 5.10
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_public_signing_success() {
+    with_db(|db| async move {
+        let (_org_id, _admin_id, doc_id) = setup_firmas_data(&db).await;
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        use argon2::{Argon2, PasswordHasher};
+        use argon2::password_hash::SaltString;
+        use argon2::password_hash::rand_core::OsRng;
+
+        let password = "sign_test_password";
+        let salt = SaltString::generate(&mut OsRng);
+        let hash = Argon2::default()
+            .hash_password(password.as_bytes(), &salt)
+            .unwrap()
+            .to_string();
+
+        let token_str = Uuid::new_v4().to_string();
+        let now = Utc::now();
+        firma_documento::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            documento_id: Set(doc_id),
+            firmante_tipo: Set("inquilino".to_string()),
+            firmante_nombre: Set("Signing Inquilino".to_string()),
+            firma_imagen: Set(None),
+            ip_address: Set(None),
+            user_agent: Set(None),
+            firmado_at: Set(None),
+            token: Set(Some(token_str.clone())),
+            password_hash: Set(Some(hash)),
+            expira_at: Set(Some((now + Duration::hours(72)).into())),
+            estado: Set("pendiente".to_string()),
+            created_at: Set(now.into()),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
+        let req = actix_web::test::TestRequest::post()
+            .uri(&format!("/api/v1/firmas/{token_str}/firmar"))
+            .insert_header(("User-Agent", "TenantBrowser/1.0"))
+            .set_json(json!({
+                "password": password,
+                "firmaImagen": valid_firma_imagen_b64()
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK, "Public signing should return 200");
+
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        assert_eq!(body["estado"], "firmado");
+        assert_eq!(body["firmanteTipo"], "inquilino");
+        assert!(body["firmadoAt"].is_string());
+    });
+}
+
+#[test]
+fn test_public_signing_already_signed_conflict() {
+    with_db(|db| async move {
+        let (_org_id, _admin_id, doc_id) = setup_firmas_data(&db).await;
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        use argon2::{Argon2, PasswordHasher};
+        use argon2::password_hash::SaltString;
+        use argon2::password_hash::rand_core::OsRng;
+
+        let password = "conflict_test_pass";
+        let salt = SaltString::generate(&mut OsRng);
+        let hash = Argon2::default()
+            .hash_password(password.as_bytes(), &salt)
+            .unwrap()
+            .to_string();
+
+        let token_str = Uuid::new_v4().to_string();
+        let now = Utc::now();
+        // Create a firma that is already signed (estado = "firmado")
+        firma_documento::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            documento_id: Set(doc_id),
+            firmante_tipo: Set("inquilino".to_string()),
+            firmante_nombre: Set("Already Signed".to_string()),
+            firma_imagen: Set(Some(vec![1, 2, 3])),
+            ip_address: Set(Some("127.0.0.1".to_string())),
+            user_agent: Set(Some("Test".to_string())),
+            firmado_at: Set(Some(now.into())),
+            token: Set(Some(token_str.clone())),
+            password_hash: Set(Some(hash)),
+            expira_at: Set(Some((now + Duration::hours(72)).into())),
+            estado: Set("firmado".to_string()), // already signed
+            created_at: Set(now.into()),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
+        let req = actix_web::test::TestRequest::post()
+            .uri(&format!("/api/v1/firmas/{token_str}/firmar"))
+            .insert_header(("User-Agent", "TenantBrowser/1.0"))
+            .set_json(json!({
+                "password": password,
+                "firmaImagen": valid_firma_imagen_b64()
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::CONFLICT, "Already signed should return 409");
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Test: Document sealing after both parties sign
+// Requirements: 6.1
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_document_sealing_after_both_parties_sign() {
+    with_db(|db| async move {
+        let (org_id, admin_id, doc_id) = setup_firmas_data(&db).await;
+        let token = make_token(admin_id, "admin", org_id);
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        // Step 1: Manager signs (authenticated)
+        let req = actix_web::test::TestRequest::post()
+            .uri(&format!("/api/v1/documentos/{doc_id}/firmar"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .insert_header(("User-Agent", "ManagerApp/1.0"))
+            .set_json(json!({ "firmaImagen": valid_firma_imagen_b64() }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        // Step 2: Create tenant firma with known password and sign via public endpoint
+        use argon2::{Argon2, PasswordHasher};
+        use argon2::password_hash::SaltString;
+        use argon2::password_hash::rand_core::OsRng;
+
+        let password = "seal_test_password";
+        let salt = SaltString::generate(&mut OsRng);
+        let hash = Argon2::default()
+            .hash_password(password.as_bytes(), &salt)
+            .unwrap()
+            .to_string();
+
+        let tenant_token = Uuid::new_v4().to_string();
+        let now = Utc::now();
+        firma_documento::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            documento_id: Set(doc_id),
+            firmante_tipo: Set("inquilino".to_string()),
+            firmante_nombre: Set("Tenant Sealer".to_string()),
+            firma_imagen: Set(None),
+            ip_address: Set(None),
+            user_agent: Set(None),
+            firmado_at: Set(None),
+            token: Set(Some(tenant_token.clone())),
+            password_hash: Set(Some(hash)),
+            expira_at: Set(Some((now + Duration::hours(72)).into())),
+            estado: Set("pendiente".to_string()),
+            created_at: Set(now.into()),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
+        // Tenant signs
+        let req = actix_web::test::TestRequest::post()
+            .uri(&format!("/api/v1/firmas/{tenant_token}/firmar"))
+            .insert_header(("User-Agent", "TenantBrowser/1.0"))
+            .set_json(json!({
+                "password": password,
+                "firmaImagen": valid_firma_imagen_b64()
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        // Verify document is now sealed
+        let doc = documento::Entity::find_by_id(doc_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .expect("Document should exist");
+        assert!(doc.sellado, "Document should be sealed after both parties sign");
+        assert!(doc.sellado_at.is_some(), "sellado_at should be set");
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Test: Sealed document rejects content edits (403)
+// Requirements: 6.4
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_sealed_document_rejects_content_edits() {
+    with_db(|db| async move {
+        let (org_id, admin_id, doc_id) = setup_firmas_data(&db).await;
+        let token = make_token(admin_id, "admin", org_id);
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        // Manually seal the document
+        use sea_orm::IntoActiveModel;
+        let doc = documento::Entity::find_by_id(doc_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        let mut active = doc.into_active_model();
+        active.sellado = Set(true);
+        active.sellado_at = Set(Some(Utc::now().into()));
+        active.update(&db).await.unwrap();
+
+        // Try to update content
+        let req = actix_web::test::TestRequest::put()
+            .uri(&format!("/api/v1/documentos/{doc_id}/contenido"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(json!({
+                "contenidoEditable": {
+                    "version": 1,
+                    "blocks": [{"type": "paragraph", "text": "Modified content"}]
+                }
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN, "Sealed document should reject edits with 403");
+
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        let msg = body["message"].as_str().unwrap_or("");
+        assert!(
+            msg.contains("sellado"),
+            "Error message should mention 'sellado', got: {msg}"
+        );
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Test: DOCX export returns valid response with correct headers
+// Requirements: 1.1
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_docx_export_returns_valid_response() {
+    with_db(|db| async move {
+        let (org_id, admin_id, doc_id) = setup_firmas_data(&db).await;
+        let token = make_token(admin_id, "admin", org_id);
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        let req = actix_web::test::TestRequest::get()
+            .uri(&format!("/api/v1/documentos/{doc_id}/exportar-docx"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK, "DOCX export should return 200");
+
+        // Check content type
+        let content_type = resp
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        assert!(
+            content_type.contains("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+            "Content-Type should be DOCX MIME type, got: {content_type}"
+        );
+
+        // Check content disposition
+        let disposition = resp
+            .headers()
+            .get("content-disposition")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        assert!(
+            disposition.contains(&format!("documento-{doc_id}.docx")),
+            "Content-Disposition should contain filename, got: {disposition}"
+        );
+
+        // Check body starts with ZIP magic bytes (PK\x03\x04)
+        let body = actix_web::test::read_body(resp).await;
+        assert!(body.len() > 4, "DOCX body should not be empty");
+        assert_eq!(&body[..4], b"PK\x03\x04", "DOCX should start with ZIP magic bytes");
+    });
+}
+
+#[test]
+fn test_docx_export_no_content_returns_400() {
+    with_db(|db| async move {
+        let org_id = create_test_organizacion(&db).await;
+        let admin_id = create_test_usuario(&db, "admin", org_id).await;
+        let token = make_token(admin_id, "admin", org_id);
+
+        // Create a document without contenido_editable
+        let doc_id = Uuid::new_v4();
+        let now = Utc::now().into();
+        documento::ActiveModel {
+            id: Set(doc_id),
+            entity_type: Set("contrato".to_string()),
+            entity_id: Set(Uuid::new_v4()),
+            filename: Set("empty-doc.pdf".to_string()),
+            file_path: Set("/tmp/empty-doc.pdf".to_string()),
+            mime_type: Set("application/pdf".to_string()),
+            file_size: Set(512),
+            uploaded_by: Set(admin_id),
+            created_at: Set(now),
+            tipo_documento: Set("contrato".to_string()),
+            estado_verificacion: Set("pendiente".to_string()),
+            fecha_vencimiento: Set(None),
+            verificado_por: Set(None),
+            fecha_verificacion: Set(None),
+            notas_verificacion: Set(None),
+            numero_documento: Set(None),
+            contenido_editable: Set(None), // No content
+            updated_at: Set(Some(now)),
+            sellado: Set(false),
+            sellado_at: Set(None),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        let req = actix_web::test::TestRequest::get()
+            .uri(&format!("/api/v1/documentos/{doc_id}/exportar-docx"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST, "No content should return 400");
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Test: Template CRUD operations (create, read, update, soft-delete)
+// Requirements: 2.1, 2.3
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_template_crud_create_and_read() {
+    with_db(|db| async move {
+        let (org_id, admin_id, _doc_id) = setup_firmas_data(&db).await;
+        let token = make_token(admin_id, "admin", org_id);
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        // Create template
+        let req = actix_web::test::TestRequest::post()
+            .uri("/api/v1/documentos/plantillas")
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(json!({
+                "nombre": "Contrato Estándar",
+                "tipoDocumento": "contrato",
+                "entityType": "contrato",
+                "contenido": {
+                    "version": 1,
+                    "blocks": [
+                        {"type": "heading", "level": 1, "text": "Contrato de Arrendamiento"},
+                        {"type": "paragraph", "text": "Entre {{inquilino.nombre}} y el propietario."}
+                    ]
+                }
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::CREATED, "Template creation should return 201");
+
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        let plantilla_id = body["id"].as_str().unwrap();
+        assert_eq!(body["nombre"], "Contrato Estándar");
+        assert_eq!(body["tipoDocumento"], "contrato");
+        assert_eq!(body["entityType"], "contrato");
+
+        // Read template by ID
+        let req = actix_web::test::TestRequest::get()
+            .uri(&format!("/api/v1/documentos/plantillas/{plantilla_id}"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK, "Template read should return 200");
+
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        assert_eq!(body["nombre"], "Contrato Estándar");
+        assert_eq!(body["tipoDocumento"], "contrato");
+    });
+}
+
+#[test]
+fn test_template_crud_update() {
+    with_db(|db| async move {
+        let (org_id, admin_id, _doc_id) = setup_firmas_data(&db).await;
+        let token = make_token(admin_id, "admin", org_id);
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        // Create template first
+        let req = actix_web::test::TestRequest::post()
+            .uri("/api/v1/documentos/plantillas")
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(json!({
+                "nombre": "Template Original",
+                "tipoDocumento": "contrato",
+                "entityType": "contrato",
+                "contenido": {"version": 1, "blocks": []}
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::CREATED);
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        let plantilla_id = body["id"].as_str().unwrap().to_string();
+
+        // Update template
+        let req = actix_web::test::TestRequest::put()
+            .uri(&format!("/api/v1/documentos/plantillas/{plantilla_id}"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(json!({
+                "nombre": "Template Actualizado"
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK, "Template update should return 200");
+
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        assert_eq!(body["nombre"], "Template Actualizado");
+    });
+}
+
+#[test]
+fn test_template_crud_soft_delete() {
+    with_db(|db| async move {
+        let (org_id, admin_id, _doc_id) = setup_firmas_data(&db).await;
+        let token = make_token(admin_id, "admin", org_id);
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        // Create template
+        let req = actix_web::test::TestRequest::post()
+            .uri("/api/v1/documentos/plantillas")
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(json!({
+                "nombre": "Template Para Borrar",
+                "tipoDocumento": "contrato",
+                "entityType": "contrato",
+                "contenido": {"version": 1, "blocks": []}
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::CREATED);
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        let plantilla_id = body["id"].as_str().unwrap().to_string();
+
+        // Soft-delete template
+        let req = actix_web::test::TestRequest::delete()
+            .uri(&format!("/api/v1/documentos/plantillas/{plantilla_id}"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::NO_CONTENT, "Soft-delete should return 204");
+
+        // Verify it no longer appears in the active list
+        let req = actix_web::test::TestRequest::get()
+            .uri("/api/v1/documentos/plantillas")
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        let templates = body.as_array().unwrap();
+        let found = templates
+            .iter()
+            .any(|t| t["id"].as_str() == Some(&plantilla_id));
+        assert!(!found, "Soft-deleted template should not appear in active list");
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Test: RBAC enforcement (WriteAccess for write endpoints)
+// Requirements: 4.1, 2.1
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_rbac_firmar_rejects_unauthenticated() {
+    with_db(|db| async move {
+        let (_org_id, _admin_id, doc_id) = setup_firmas_data(&db).await;
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        let req = actix_web::test::TestRequest::post()
+            .uri(&format!("/api/v1/documentos/{doc_id}/firmar"))
+            .set_json(json!({ "firmaImagen": valid_firma_imagen_b64() }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED, "Unauthenticated should get 401");
+    });
+}
+
+#[test]
+fn test_rbac_firmar_rejects_visualizador() {
+    with_db(|db| async move {
+        let (org_id, _admin_id, doc_id) = setup_firmas_data(&db).await;
+        let viewer_id = create_test_usuario(&db, "visualizador", org_id).await;
+        let token = make_token(viewer_id, "visualizador", org_id);
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        let req = actix_web::test::TestRequest::post()
+            .uri(&format!("/api/v1/documentos/{doc_id}/firmar"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(json!({ "firmaImagen": valid_firma_imagen_b64() }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN, "Visualizador should get 403");
+    });
+}
+
+#[test]
+fn test_rbac_solicitar_firma_rejects_visualizador() {
+    with_db(|db| async move {
+        let (org_id, _admin_id, doc_id) = setup_firmas_data(&db).await;
+        let viewer_id = create_test_usuario(&db, "visualizador", org_id).await;
+        let token = make_token(viewer_id, "visualizador", org_id);
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        let req = actix_web::test::TestRequest::post()
+            .uri(&format!("/api/v1/documentos/{doc_id}/solicitar-firma"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(json!({
+                "firmanteNombre": "Test",
+                "email": "test@example.com"
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN, "Visualizador should get 403 on solicitar-firma");
+    });
+}
+
+#[test]
+fn test_rbac_plantilla_create_rejects_visualizador() {
+    with_db(|db| async move {
+        let (org_id, _admin_id, _doc_id) = setup_firmas_data(&db).await;
+        let viewer_id = create_test_usuario(&db, "visualizador", org_id).await;
+        let token = make_token(viewer_id, "visualizador", org_id);
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        let req = actix_web::test::TestRequest::post()
+            .uri("/api/v1/documentos/plantillas")
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(json!({
+                "nombre": "Forbidden Template",
+                "tipoDocumento": "contrato",
+                "entityType": "contrato",
+                "contenido": {"version": 1, "blocks": []}
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN, "Visualizador should get 403 on template create");
+    });
+}
+
+#[test]
+fn test_rbac_plantilla_delete_rejects_visualizador() {
+    with_db(|db| async move {
+        let (org_id, admin_id, _doc_id) = setup_firmas_data(&db).await;
+        let admin_token = make_token(admin_id, "admin", org_id);
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        // Create a template as admin
+        let req = actix_web::test::TestRequest::post()
+            .uri("/api/v1/documentos/plantillas")
+            .insert_header(("Authorization", format!("Bearer {admin_token}")))
+            .set_json(json!({
+                "nombre": "RBAC Delete Test",
+                "tipoDocumento": "contrato",
+                "entityType": "contrato",
+                "contenido": {"version": 1, "blocks": []}
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::CREATED);
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        let plantilla_id = body["id"].as_str().unwrap().to_string();
+
+        // Try to delete as visualizador
+        let viewer_id = create_test_usuario(&db, "visualizador", org_id).await;
+        let viewer_token = make_token(viewer_id, "visualizador", org_id);
+
+        let req = actix_web::test::TestRequest::delete()
+            .uri(&format!("/api/v1/documentos/plantillas/{plantilla_id}"))
+            .insert_header(("Authorization", format!("Bearer {viewer_token}")))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN, "Visualizador should get 403 on template delete");
+    });
+}
+
+#[test]
+fn test_rbac_gerente_can_sign() {
+    with_db(|db| async move {
+        let (org_id, _admin_id, doc_id) = setup_firmas_data(&db).await;
+        let gerente_id = create_test_usuario(&db, "gerente", org_id).await;
+        let token = make_token(gerente_id, "gerente", org_id);
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        let req = actix_web::test::TestRequest::post()
+            .uri(&format!("/api/v1/documentos/{doc_id}/firmar"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .insert_header(("User-Agent", "GerenteApp/1.0"))
+            .set_json(json!({ "firmaImagen": valid_firma_imagen_b64() }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK, "Gerente should be able to sign");
+
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        assert_eq!(body["firmanteTipo"], "propietario");
+        assert_eq!(body["estado"], "firmado");
+    });
+}
+
+#[test]
+fn test_rbac_docx_export_rejects_unauthenticated() {
+    with_db(|db| async move {
+        let (_org_id, _admin_id, doc_id) = setup_firmas_data(&db).await;
+        let app =
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+
+        let req = actix_web::test::TestRequest::get()
+            .uri(&format!("/api/v1/documentos/{doc_id}/exportar-docx"))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED, "Unauthenticated should get 401 on DOCX export");
+    });
+}

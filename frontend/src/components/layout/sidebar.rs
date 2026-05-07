@@ -248,6 +248,13 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                                 {"Importar"}
                             </Link<Route>>
                         </li>
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Plantillas}
+                                classes={classes!(link_class(&Route::Plantillas))}>
+                                {icon_contracts()}
+                                {"Plantillas"}
+                            </Link<Route>>
+                        </li>
                     }
                     if is_admin {
                         <li onclick={make_click(on_nav_click.clone())}>

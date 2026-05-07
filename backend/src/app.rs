@@ -25,7 +25,7 @@ async fn serve_upload(
 
     // Reject obvious traversal attempts before filesystem access
     if requested_path.contains("..") {
-        return Err(AppError::Forbidden);
+        return Err(AppError::Forbidden("Acceso denegado".to_string()));
     }
 
     let full_path = format!("{upload_dir}/{requested_path}");
@@ -35,7 +35,7 @@ async fn serve_upload(
         .map_err(|_| AppError::NotFound("Archivo no encontrado".to_string()))?;
 
     if !canonical_file.starts_with(&canonical_dir) {
-        return Err(AppError::Forbidden);
+        return Err(AppError::Forbidden("Acceso denegado".to_string()));
     }
 
     actix_files::NamedFile::open_async(&canonical_file)

@@ -156,7 +156,10 @@ struct EditorToolbarProps {
     on_format: Callback<String>,
     on_save: Callback<()>,
     on_export_pdf: Callback<()>,
+    on_export_docx: Callback<()>,
     exporting: bool,
+    exporting_docx: bool,
+    has_documento_id: bool,
 }
 
 #[component]
@@ -176,6 +179,13 @@ fn EditorToolbar(props: &EditorToolbarProps) -> Html {
         let on_export = props.on_export_pdf.clone();
         Callback::from(move |_: MouseEvent| on_export.emit(()))
     };
+
+    let on_export_docx_click = {
+        let on_export = props.on_export_docx.clone();
+        Callback::from(move |_: MouseEvent| on_export.emit(()))
+    };
+
+    let docx_disabled = !props.has_documento_id || props.exporting_docx;
 
     html! {
         <div class="gi-editor-toolbar" role="toolbar" aria-label="Barra de herramientas del editor">
@@ -204,6 +214,14 @@ fn EditorToolbar(props: &EditorToolbarProps) -> Html {
                 disabled={props.exporting}
             >
                 {if props.exporting { "Exportando..." } else { "Exportar PDF" }}
+            </button>
+            <button
+                class="gi-btn gi-btn-ghost"
+                style="font-size: var(--text-sm); padding: var(--space-1) var(--space-3);"
+                onclick={on_export_docx_click}
+                disabled={docx_disabled}
+            >
+                {if props.exporting_docx { "Exportando..." } else { "Exportar DOCX" }}
             </button>
         </div>
     }
@@ -525,6 +543,19 @@ fn export_pdf(documento_id: AttrValue, exporting: UseStateHandle<bool>) {
     });
 }
 
+// ── DOCX export helper ─────────────────────────────────────────────────
+
+fn export_docx(documento_id: AttrValue, exporting: UseStateHandle<bool>) {
+    spawn_local(async move {
+        exporting.set(true);
+        let url = format!("{BASE_URL}/documentos/{documento_id}/exportar-docx");
+        if let Some(win) = web_sys::window() {
+            let _ = win.open_with_url(&url);
+        }
+        exporting.set(false);
+    });
+}
+
 // ── Main DocumentEditor component ──────────────────────────────────────
 
 #[component]
@@ -533,6 +564,7 @@ pub fn DocumentEditor(props: &DocumentEditorProps) -> Html {
         contenido.as_ref().map(parse_blocks).unwrap_or_default()
     });
     let exporting = use_state(|| false);
+    let exporting_docx = use_state(|| false);
 
     let on_format = Callback::from(|cmd: String| {
         exec_format_command(&cmd);
@@ -556,6 +588,18 @@ pub fn DocumentEditor(props: &DocumentEditorProps) -> Html {
         })
     };
 
+    let on_export_docx = {
+        let documento_id = props.documento_id.clone();
+        let exporting_docx = exporting_docx.clone();
+        Callback::from(move |()| {
+            if let Some(ref doc_id) = documento_id {
+                export_docx(doc_id.clone(), exporting_docx.clone());
+            }
+        })
+    };
+
+    let has_documento_id = props.documento_id.is_some();
+
     html! {
         <div class="gi-editor">
             <EditorToolbar
@@ -563,7 +607,10 @@ pub fn DocumentEditor(props: &DocumentEditorProps) -> Html {
                 on_format={on_format}
                 on_save={on_save_click}
                 on_export_pdf={on_export_pdf}
+                on_export_docx={on_export_docx}
                 exporting={*exporting}
+                exporting_docx={*exporting_docx}
+                has_documento_id={has_documento_id}
             />
             <EditorContentArea
                 blocks={(*blocks).clone()}

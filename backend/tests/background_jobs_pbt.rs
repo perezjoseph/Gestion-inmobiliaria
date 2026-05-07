@@ -373,6 +373,8 @@ mod pbt_async {
             contenido_editable: Set(None),
             created_at: Set(now),
             updated_at: Set(None),
+            sellado: Set(false),
+            sellado_at: Set(None),
         }
         .insert(db)
         .await
