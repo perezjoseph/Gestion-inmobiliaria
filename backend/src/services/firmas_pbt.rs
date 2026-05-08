@@ -465,14 +465,13 @@ where
             sea_orm::DbBackend::Postgres,
             "SELECT 1 FROM information_schema.tables WHERE table_name = 'documentos' LIMIT 1",
         );
-        match db.query_one(check).await {
-            Ok(Some(_)) => {} // table exists
-            _ => {
-                eprintln!(
-                    "Schema not ready (documentos table missing) -- skipping DB property test"
-                );
-                return;
-            }
+        if let Ok(Some(_)) = db.query_one(check).await {
+            // table exists
+        } else {
+            eprintln!(
+                "Schema not ready (documentos table missing) -- skipping DB property test"
+            );
+            return;
         }
         f(db).await;
     });

@@ -167,7 +167,7 @@ jobs:
             trivy fs --scanners misconfig --exit-code 1 --severity CRITICAL,HIGH \
               --no-progress --format table \
               --include-non-failures \
-              infra/docker/Dockerfile.backend infra/docker/Dockerfile.frontend infra/docker/docker-compose.prod.yml infra/docker/docker-compose.dev.yml 2>&1 | tee "${RUNNER_TEMP}/trivy-iac-output.txt"
+              infra/docker/ 2>&1 | tee "${RUNNER_TEMP}/trivy-iac-output.txt"
             exit ${PIPESTATUS[0]}
 
       - name: Generate Trivy IaC SARIF report
@@ -176,7 +176,7 @@ jobs:
           umask 077
           trivy fs --scanners misconfig --severity CRITICAL,HIGH,MEDIUM \
             --no-progress --format sarif --output trivy-iac.sarif \
-            infra/docker/Dockerfile.backend infra/docker/Dockerfile.frontend infra/docker/docker-compose.prod.yml infra/docker/docker-compose.dev.yml || true
+            infra/docker/ || true
 
       - name: Upload Trivy IaC SARIF to GitHub Security
         if: "!cancelled() && steps.install_trivy.outputs.trivy-installed == 'true' && hashFiles('trivy-iac.sarif') != ''"
