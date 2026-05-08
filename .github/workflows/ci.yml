@@ -169,3 +169,30 @@ jobs:
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_DATA }}
+
+  # ── Auto-retry: re-run failed jobs on infrastructure flakiness ──
+
+  retry-on-infra-failure:
+    name: Retry Failed Jobs
+    runs-on: arc-runner-dind
+    if: >-
+      !cancelled() && github.run_attempt < 2 &&
+      (needs.build-and-test.result == 'failure' ||
+       needs.lint.result == 'failure' ||
+       needs.security.result == 'failure' ||
+       needs.containers.result == 'failure')
+    needs: [build-and-test, lint, security, containers]
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Re-run failed jobs
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            gh run rerun ${{ github.run_id }} --failed --repo ${{ github.repository }}

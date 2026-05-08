@@ -71,35 +71,34 @@ jobs:
 
       - name: Install cargo-deny
         id: install_deny
-        run: |
-          for dir in "$HOME/.cargo" "$HOME/.cargo/bin"; do
-            mkdir -p "$dir" 2>/dev/null || sudo mkdir -p "$dir"
-            if [ ! -w "$dir" ]; then
-              sudo chown -R "$(id -u):$(id -g)" "$HOME/.cargo"
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            for dir in "$HOME/.cargo" "$HOME/.cargo/bin"; do
+              mkdir -p "$dir" 2>/dev/null || sudo mkdir -p "$dir"
+              if [ ! -w "$dir" ]; then
+                sudo chown -R "$(id -u):$(id -g)" "$HOME/.cargo"
+              fi
+            done
+            export PATH="$HOME/.cargo/bin:$PATH"
+            if command -v cargo-deny &>/dev/null; then
+              echo "cargo-deny already installed: $(cargo-deny --version)"
+              echo "installed=true" >> $GITHUB_OUTPUT
+              exit 0
             fi
-          done
-          export PATH="$HOME/.cargo/bin:$PATH"
-          if command -v cargo-deny &>/dev/null; then
-            echo "cargo-deny already installed: $(cargo-deny --version)"
-            echo "installed=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          DENY_VERSION="0.19.4"
-          DENY_SHA256="3bd58b784e83715b86ddbc9deac591890372ec77fda5741bb0826970b958506f"
-          URL="https://github.com/EmbarkStudios/cargo-deny/releases/download/${DENY_VERSION}/cargo-deny-${DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz"
-          if curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 15 --max-time 120 -o "${RUNNER_TEMP}/cargo-deny.tar.gz" "$URL"; then
+            DENY_VERSION="0.19.4"
+            DENY_SHA256="3bd58b784e83715b86ddbc9deac591890372ec77fda5741bb0826970b958506f"
+            URL="https://github.com/EmbarkStudios/cargo-deny/releases/download/${DENY_VERSION}/cargo-deny-${DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+            curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 15 --max-time 120 -o "${RUNNER_TEMP}/cargo-deny.tar.gz" "$URL"
             echo "${DENY_SHA256}  ${RUNNER_TEMP}/cargo-deny.tar.gz" | sha256sum -c -
             tar xzf "${RUNNER_TEMP}/cargo-deny.tar.gz" --no-same-owner --strip-components=1 -C "$HOME/.cargo/bin/" 2>/dev/null
             chmod +x "$HOME/.cargo/bin/cargo-deny"
             rm -f "${RUNNER_TEMP}/cargo-deny.tar.gz"
-          fi
-          if command -v cargo-deny &>/dev/null; then
             cargo-deny --version
             echo "installed=true" >> $GITHUB_OUTPUT
-          else
-            echo "::warning::cargo-deny installation failed -- skipping supply chain checks"
-            echo "installed=false" >> $GITHUB_OUTPUT
-          fi
 
       - name: Run cargo-deny supply chain checks
         id: cargo_deny
@@ -160,11 +159,16 @@ jobs:
       - name: Scan Dockerfiles and docker-compose for misconfigurations
         id: trivy_iac
         if: steps.install_trivy.outputs.trivy-installed == 'true'
-        run: |
-          trivy fs --scanners misconfig --exit-code 1 --severity CRITICAL,HIGH \
-            --no-progress --format table \
-            --include-non-failures \
-            infra/docker/Dockerfile.backend infra/docker/Dockerfile.frontend infra/docker/docker-compose.prod.yml infra/docker/docker-compose.dev.yml 2>&1 | tee "${RUNNER_TEMP}/trivy-iac-output.txt"
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 2
+          command: |
+            trivy fs --scanners misconfig --exit-code 1 --severity CRITICAL,HIGH \
+              --no-progress --format table \
+              --include-non-failures \
+              infra/docker/Dockerfile.backend infra/docker/Dockerfile.frontend infra/docker/docker-compose.prod.yml infra/docker/docker-compose.dev.yml 2>&1 | tee "${RUNNER_TEMP}/trivy-iac-output.txt"
+            exit ${PIPESTATUS[0]}
 
       - name: Generate Trivy IaC SARIF report
         if: "!cancelled() && steps.install_trivy.outputs.trivy-installed == 'true'"
