@@ -134,7 +134,7 @@ mod tests {
         let result = make_result("contrato", fields);
         let extracted = map_contrato(&result).unwrap();
 
-        assert_eq!(extracted.len(), 5);
+        assert_eq!(extracted.len(), 11);
 
         let get = |name: &str| extracted.iter().find(|f| f.name == name).unwrap();
 
@@ -195,7 +195,7 @@ mod tests {
         let result = make_result("contrato", fields);
         let extracted = map_contrato(&result).unwrap();
 
-        assert_eq!(extracted.len(), 5);
+        assert_eq!(extracted.len(), 11);
 
         for field in &extracted {
             assert_eq!(field.value, "");

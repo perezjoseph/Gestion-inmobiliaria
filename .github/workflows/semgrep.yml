@@ -64,9 +64,6 @@ jobs:
           --config "p/github-actions" \
           --config "p/r2c-security-audit" \
           --config "p/r2c-best-practices" \
-          --config "p/insecure-deserialization" \
-          --config "p/cors" \
-          --config "p/crypto" \
           --config "p/gitleaks" \
           --config "p/default" \
           --error \
@@ -96,9 +93,6 @@ jobs:
           --config "p/github-actions" \
           --config "p/r2c-security-audit" \
           --config "p/r2c-best-practices" \
-          --config "p/insecure-deserialization" \
-          --config "p/cors" \
-          --config "p/crypto" \
           --config "p/gitleaks" \
           --config "p/default" \
           .

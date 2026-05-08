@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc c1906164efe3aa4952456fe83d275b8007e48d2a5841cdc94ca8559d08d2cf32 # shrinks to result = OcrResult { document_type: "contrato", lines: [OcrLine { text: "RD$", confidence: 0.5, bbox: [0.0, 0.0, 100.0, 20.0] }, OcrLine { text: "01/01/2020", confidence: 0.5, bbox: [0.0, 20.0, 100.0, 40.0] }, OcrLine { text: "01/01/2020", confidence: 0.5, bbox: [0.0, 40.0, 100.0, 60.0] }, OcrLine { text: "1.00", confidence: 0.5, bbox: [0.0, 60.0, 100.0, 80.0] }], structured_fields: {"moneda": "RD$", "deposito": "1.00", "fecha_fin": "01/01/2020", "fecha_inicio": "01/01/2020"} }
+cc f6b4270ebbb8499a2197a4f147ee3476c1ce250185625e573ba2190f9f98a3c2 # shrinks to result = OcrResult { document_type: "contrato", lines: [OcrLine { text: "RD$1.00", confidence: 0.5, bbox: [0.0, 0.0, 100.0, 20.0] }, OcrLine { text: "RD$", confidence: 0.5, bbox: [0.0, 20.0, 100.0, 40.0] }, OcrLine { text: "01/01/2020", confidence: 0.5, bbox: [0.0, 40.0, 100.0, 60.0] }, OcrLine { text: "01/01/2020", confidence: 0.5, bbox: [0.0, 60.0, 100.0, 80.0] }, OcrLine { text: "1.00", confidence: 0.5, bbox: [0.0, 80.0, 100.0, 100.0] }], structured_fields: {"deposito": "1.00", "moneda": "RD$", "monto_mensual": "RD$1.00", "fecha_inicio": "01/01/2020", "fecha_fin": "01/01/2020"} }

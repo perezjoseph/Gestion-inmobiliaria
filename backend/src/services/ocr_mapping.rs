@@ -385,7 +385,57 @@ pub fn map_contrato(result: &OcrResult) -> Result<Vec<ExtractField>, AppError> {
         }
     };
 
+    // Party information
+    let arrendador_nombre = fields.get("arrendador_nombre").map_or("", String::as_str);
+    let arrendador_cedula_raw = fields.get("arrendador_cedula").map_or("", String::as_str);
+    let arrendador_cedula = if arrendador_cedula_raw.is_empty() {
+        String::new()
+    } else {
+        normalize_cedula(arrendador_cedula_raw)
+    };
+
+    let arrendatario_nombre = fields.get("arrendatario_nombre").map_or("", String::as_str);
+    let arrendatario_cedula_raw = fields.get("arrendatario_cedula").map_or("", String::as_str);
+    let arrendatario_cedula = if arrendatario_cedula_raw.is_empty() {
+        String::new()
+    } else {
+        normalize_cedula(arrendatario_cedula_raw)
+    };
+
+    let direccion = fields.get("direccion").map_or("", String::as_str);
+    let duracion = fields.get("duracion").map_or("", String::as_str);
+
     Ok(vec![
+        ExtractField {
+            name: "arrendador_nombre".to_string(),
+            value: arrendador_nombre.to_string(),
+            label: "Nombre del Arrendador".to_string(),
+            confidence: field_confidence(result, arrendador_nombre),
+        },
+        ExtractField {
+            name: "arrendador_cedula".to_string(),
+            value: arrendador_cedula,
+            label: "Cédula del Arrendador".to_string(),
+            confidence: field_confidence(result, arrendador_cedula_raw),
+        },
+        ExtractField {
+            name: "arrendatario_nombre".to_string(),
+            value: arrendatario_nombre.to_string(),
+            label: "Nombre del Arrendatario".to_string(),
+            confidence: field_confidence(result, arrendatario_nombre),
+        },
+        ExtractField {
+            name: "arrendatario_cedula".to_string(),
+            value: arrendatario_cedula,
+            label: "Cédula del Arrendatario".to_string(),
+            confidence: field_confidence(result, arrendatario_cedula_raw),
+        },
+        ExtractField {
+            name: "direccion".to_string(),
+            value: direccion.to_string(),
+            label: "Dirección del Inmueble".to_string(),
+            confidence: field_confidence(result, direccion),
+        },
         ExtractField {
             name: "monto_mensual".to_string(),
             value: monto_value,
@@ -409,6 +459,12 @@ pub fn map_contrato(result: &OcrResult) -> Result<Vec<ExtractField>, AppError> {
             value: fecha_fin_value,
             label: "Fecha de Fin".to_string(),
             confidence: field_confidence(result, fecha_fin_raw),
+        },
+        ExtractField {
+            name: "duracion".to_string(),
+            value: duracion.to_string(),
+            label: "Duración".to_string(),
+            confidence: field_confidence(result, duracion),
         },
         ExtractField {
             name: "deposito".to_string(),

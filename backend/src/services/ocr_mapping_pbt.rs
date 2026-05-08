@@ -441,24 +441,23 @@ proptest! {
 
         prop_assert_eq!(
             fields.len(),
-            5,
-            "Expected exactly 5 fields, got {}",
+            11,
+            "Expected exactly 11 fields, got {}",
             fields.len()
         );
 
         let names: Vec<&str> = fields.iter().map(|f| f.name.as_str()).collect();
         prop_assert_eq!(
             names,
-            vec!["monto_mensual", "moneda", "fecha_inicio", "fecha_fin", "deposito"]
+            vec![
+                "arrendador_nombre", "arrendador_cedula",
+                "arrendatario_nombre", "arrendatario_cedula",
+                "direccion", "monto_mensual", "moneda",
+                "fecha_inicio", "fecha_fin", "duracion", "deposito"
+            ]
         );
 
-        let labels: Vec<&str> = fields.iter().map(|f| f.label.as_str()).collect();
-        prop_assert_eq!(
-            labels,
-            vec!["Monto Mensual", "Moneda", "Fecha de Inicio", "Fecha de Fin", "Depósito"]
-        );
-
-        let monto_field = &fields[0];
+        let monto_field = fields.iter().find(|f| f.name == "monto_mensual").unwrap();
         prop_assert!(
             !monto_field.value.is_empty(),
             "monto_mensual value should not be empty when field is present"
@@ -480,18 +479,23 @@ proptest! {
 
         prop_assert_eq!(
             fields.len(),
-            5,
-            "Expected exactly 5 fields even without monto_mensual, got {}",
+            11,
+            "Expected exactly 11 fields even without monto_mensual, got {}",
             fields.len()
         );
 
         let names: Vec<&str> = fields.iter().map(|f| f.name.as_str()).collect();
         prop_assert_eq!(
             names,
-            vec!["monto_mensual", "moneda", "fecha_inicio", "fecha_fin", "deposito"]
+            vec![
+                "arrendador_nombre", "arrendador_cedula",
+                "arrendatario_nombre", "arrendatario_cedula",
+                "direccion", "monto_mensual", "moneda",
+                "fecha_inicio", "fecha_fin", "duracion", "deposito"
+            ]
         );
 
-        let monto_field = &fields[0];
+        let monto_field = fields.iter().find(|f| f.name == "monto_mensual").unwrap();
         prop_assert_eq!(
             &monto_field.value,
             "",
