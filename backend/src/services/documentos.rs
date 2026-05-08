@@ -14,7 +14,12 @@ use crate::models::documento::{
 use crate::services::{auditoria, validacion_fiscal};
 
 const MAX_FILE_SIZE: i64 = 10 * 1024 * 1024;
-const ALLOWED_MIME_TYPES: &[&str] = &["image/jpeg", "image/png", "application/pdf"];
+const ALLOWED_MIME_TYPES: &[&str] = &[
+    "image/jpeg",
+    "image/png",
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
 const ALLOWED_ENTITY_TYPES: &[&str] = &[
     "propiedad",
     "inquilino",
@@ -105,7 +110,7 @@ fn validate_file_size(size: i64) -> Result<(), AppError> {
 fn validate_mime_type(mime_type: &str) -> Result<(), AppError> {
     if !ALLOWED_MIME_TYPES.contains(&mime_type) {
         return Err(AppError::Validation(
-            "Tipo de archivo no permitido. Tipos permitidos: JPEG, PNG, PDF".to_string(),
+            "Tipo de archivo no permitido. Tipos permitidos: JPEG, PNG, PDF, DOCX".to_string(),
         ));
     }
     Ok(())

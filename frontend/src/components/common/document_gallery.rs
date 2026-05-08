@@ -8,7 +8,12 @@ use crate::services::api::BASE_URL;
 use crate::types::documento::DocumentoResponse;
 
 const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024;
-const ALLOWED_TYPES: &[&str] = &["image/jpeg", "image/png", "application/pdf"];
+const ALLOWED_TYPES: &[&str] = &[
+    "image/jpeg",
+    "image/png",
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
 
 // ── Document type catalog per entity_type ──────────────────────────────
 
@@ -162,7 +167,7 @@ pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
 
     // Upload handler
     let on_upload = {
-        let documents = documents;
+        let documents = documents.clone();
         let error = error.clone();
         let uploading = uploading.clone();
         let entity_type = props.entity_type.clone();
@@ -188,7 +193,7 @@ pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
             let file_type = file.type_();
             if !ALLOWED_TYPES.contains(&file_type.as_str()) {
                 error.set(Some(
-                    "Tipo de archivo no permitido. Solo se aceptan JPEG, PNG y PDF.".to_string(),
+                    "Tipo de archivo no permitido. Solo se aceptan JPEG, PNG, PDF y DOCX.".to_string(),
                 ));
                 input.set_value("");
                 return;
@@ -273,8 +278,21 @@ pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
         })
     };
 
+    let on_delete = {
+        let documents = documents.clone();
+        Callback::from(move |deleted_id: String| {
+            let docs: Vec<DocumentoResponse> = documents
+                .iter()
+                .filter(|d| d.id != deleted_id)
+                .cloned()
+                .collect();
+            documents.set(docs);
+        })
+    };
+
     let entity_type_rc: AttrValue = props.entity_type.clone().into();
     let entity_id_rc: AttrValue = props.entity_id.clone().into();
+    let token_rc: AttrValue = props.token.clone().into();
 
     html! {
         <div class="flex flex-col gap-3">
@@ -332,6 +350,8 @@ pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
                     documents={filtered_docs}
                     entity_type={entity_type_rc}
                     entity_id={entity_id_rc}
+                    token={token_rc}
+                    on_delete={on_delete}
                 />
             }
         </div>
@@ -375,7 +395,7 @@ fn GalleryHeader(props: &GalleryHeaderProps) -> Html {
                     { if props.uploading { "Subiendo..." } else { "📎 Subir archivo" } }
                     <input
                         type="file"
-                        accept="image/jpeg,image/png,application/pdf"
+                        accept="image/jpeg,image/png,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         onchange={props.on_upload.clone()}
                         style="display: none;"
                     />
@@ -512,6 +532,8 @@ struct DocumentGridProps {
     documents: Rc<Vec<DocumentoResponse>>,
     entity_type: AttrValue,
     entity_id: AttrValue,
+    token: AttrValue,
+    on_delete: Callback<String>,
 }
 
 #[component]
@@ -524,6 +546,8 @@ fn DocumentGrid(props: &DocumentGridProps) -> Html {
                         doc={doc.clone()}
                         entity_type={props.entity_type.clone()}
                         entity_id={props.entity_id.clone()}
+                        token={props.token.clone()}
+                        on_delete={props.on_delete.clone()}
                     />
                 }
             })}
@@ -538,12 +562,15 @@ struct DocumentCardProps {
     doc: DocumentoResponse,
     entity_type: AttrValue,
     entity_id: AttrValue,
+    token: AttrValue,
+    on_delete: Callback<String>,
 }
 
 #[component]
 fn DocumentCard(props: &DocumentCardProps) -> Html {
     let doc = &props.doc;
     let is_image = doc.mime_type.starts_with("image/");
+    let is_pdf = doc.mime_type == "application/pdf";
     let file_url = format!("{}/{}", BASE_URL.trim_end_matches("/api"), doc.file_path);
     let size_label = format_file_size(doc.file_size);
     let estado = doc.estado_verificacion.as_deref().unwrap_or("pendiente");
@@ -554,6 +581,27 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
         props.entity_type, props.entity_id, doc.id
     );
 
+    let deleting = use_state(|| false);
+    let on_delete_click = {
+        let doc_id = doc.id.clone();
+        let token = props.token.to_string();
+        let on_delete = props.on_delete.clone();
+        let deleting = deleting.clone();
+        Callback::from(move |_: MouseEvent| {
+            let doc_id = doc_id.clone();
+            let token = token.clone();
+            let on_delete = on_delete.clone();
+            let deleting = deleting.clone();
+            deleting.set(true);
+            spawn_local(async move {
+                if delete_document(&doc_id, &token).await.is_ok() {
+                    on_delete.emit(doc_id);
+                }
+                deleting.set(false);
+            });
+        })
+    };
+
     html! {
         <div class="gi-doc-card">
             <div class="gi-doc-card-preview">
@@ -563,6 +611,14 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
                             src={file_url}
                             alt={doc.filename.clone()}
                             loading="lazy"
+                        />
+                    </a>
+                } else if is_pdf {
+                    <a href={file_url.clone()} target="_blank" rel="noopener noreferrer">
+                        <embed
+                            src={file_url}
+                            type="application/pdf"
+                            style="width: 100%; height: 120px; pointer-events: none;"
                         />
                     </a>
                 } else {
@@ -590,6 +646,14 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
                 <a href={editor_url} class="gi-btn gi-btn-sm gi-btn-secondary" style="font-size: var(--text-xs);">
                     {"✏️ Editar"}
                 </a>
+                <button
+                    class="gi-btn gi-btn-sm gi-btn-danger"
+                    style="font-size: var(--text-xs);"
+                    onclick={on_delete_click}
+                    disabled={*deleting}
+                >
+                    { if *deleting { "..." } else { "🗑️ Eliminar" } }
+                </button>
             </div>
         </div>
     }
@@ -701,4 +765,24 @@ async fn digitalizar_document(
         .json::<crate::types::documento::DigitalizarResponse>()
         .await
         .map_err(|e| format!("Error al procesar respuesta: {e}"))
+}
+
+#[allow(clippy::future_not_send)]
+async fn delete_document(doc_id: &str, token: &str) -> Result<(), String> {
+    let url = format!("{BASE_URL}/documentos/{doc_id}");
+    let response = Request::delete(&url)
+        .header("Authorization", &format!("Bearer {token}"))
+        .send()
+        .await
+        .map_err(|e| format!("Error de red: {e}"))?;
+
+    if !response.ok() {
+        let text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Error al eliminar documento".into());
+        return Err(text);
+    }
+
+    Ok(())
 }
