@@ -495,7 +495,45 @@ fn sealed_document_immutability() {
                 use uuid::Uuid;
 
                 let now = Utc::now().into();
+                let org_id = Uuid::new_v4();
                 let user_id = Uuid::new_v4();
+
+                // Create org + user to satisfy FK constraints
+                crate::entities::organizacion::ActiveModel {
+                    id: Set(org_id),
+                    tipo: Set("persona_fisica".to_string()),
+                    nombre: Set("PBT Sealed Org".to_string()),
+                    estado: Set("activo".to_string()),
+                    cedula: Set(None),
+                    telefono: Set(None),
+                    email_organizacion: Set(None),
+                    rnc: Set(None),
+                    razon_social: Set(None),
+                    nombre_comercial: Set(None),
+                    direccion_fiscal: Set(None),
+                    representante_legal: Set(None),
+                    dgii_data: Set(None),
+                    created_at: Set(now),
+                    updated_at: Set(now),
+                }
+                .insert(&db)
+                .await
+                .expect("Failed to insert test org");
+
+                crate::entities::usuario::ActiveModel {
+                    id: Set(user_id),
+                    nombre: Set("PBT Sealed User".to_string()),
+                    email: Set(format!("pbt-sealed+{user_id}@test.com")),
+                    password_hash: Set("not_used".to_string()),
+                    rol: Set("admin".to_string()),
+                    activo: Set(true),
+                    organizacion_id: Set(org_id),
+                    created_at: Set(now),
+                    updated_at: Set(now),
+                }
+                .insert(&db)
+                .await
+                .expect("Failed to insert test user");
 
                 // Create a minimal document with sellado=true
                 let doc_id = Uuid::new_v4();
@@ -552,8 +590,16 @@ fn sealed_document_immutability() {
                     "Error message should mention 'sellado', got: {err}",
                 );
 
-                // Cleanup: delete the test document
+                // Cleanup: delete the test document, user, and org
                 crate::entities::documento::Entity::delete_by_id(doc_id)
+                    .exec(&db)
+                    .await
+                    .ok();
+                crate::entities::usuario::Entity::delete_by_id(user_id)
+                    .exec(&db)
+                    .await
+                    .ok();
+                crate::entities::organizacion::Entity::delete_by_id(org_id)
                     .exec(&db)
                     .await
                     .ok();

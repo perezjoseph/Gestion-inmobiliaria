@@ -43,7 +43,7 @@ fn arbitrary_user_agent() -> impl Strategy<Value = String> {
 
 mod pbt_async {
     use chrono::{Duration, Utc};
-    use realestate_backend::entities::{documento, firma_documento};
+    use realestate_backend::entities::{documento, firma_documento, organizacion, usuario};
     use realestate_backend::errors::AppError;
     use realestate_backend::services::{auth, firmas};
     use sea_orm::{
@@ -107,6 +107,46 @@ mod pbt_async {
     async fn create_documento(db: &DatabaseConnection) -> Uuid {
         let id = Uuid::new_v4();
         let now = Utc::now().into();
+
+        // Create org + user to satisfy FK constraint on uploaded_by
+        let org_id = Uuid::new_v4();
+        organizacion::ActiveModel {
+            id: Set(org_id),
+            tipo: Set("persona_fisica".to_string()),
+            nombre: Set(format!("PBT Org {org_id}")),
+            estado: Set("activo".to_string()),
+            cedula: Set(None),
+            telefono: Set(None),
+            email_organizacion: Set(None),
+            rnc: Set(None),
+            razon_social: Set(None),
+            nombre_comercial: Set(None),
+            direccion_fiscal: Set(None),
+            representante_legal: Set(None),
+            dgii_data: Set(None),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .expect("create org for PBT");
+
+        let user_id = Uuid::new_v4();
+        usuario::ActiveModel {
+            id: Set(user_id),
+            nombre: Set("PBT User".to_string()),
+            email: Set(format!("pbt+{user_id}@test.com")),
+            password_hash: Set("not_used".to_string()),
+            rol: Set("admin".to_string()),
+            activo: Set(true),
+            organizacion_id: Set(org_id),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .expect("create user for PBT");
+
         documento::ActiveModel {
             id: Set(id),
             entity_type: Set("contrato".to_string()),
@@ -115,7 +155,7 @@ mod pbt_async {
             file_path: Set(format!("/tmp/pbt-{id}.pdf")),
             mime_type: Set("application/pdf".to_string()),
             file_size: Set(1024),
-            uploaded_by: Set(Uuid::new_v4()),
+            uploaded_by: Set(user_id),
             created_at: Set(now),
             tipo_documento: Set("contrato_arrendamiento".to_string()),
             estado_verificacion: Set("pendiente".to_string()),

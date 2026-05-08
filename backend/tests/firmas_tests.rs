@@ -13,6 +13,7 @@ use sea_orm::{
 };
 use sea_orm_migration::MigratorTrait;
 use serde_json::{Value, json};
+use std::net::SocketAddr;
 use uuid::Uuid;
 
 const JWT_SECRET: &str = "test_secret_key_that_is_long_enough_for_jwt";
@@ -84,6 +85,11 @@ fn make_config() -> AppConfig {
         cors_origin: None,
         pool: realestate_backend::config::PoolConfig::default(),
     }
+}
+
+/// Peer address for test requests (required by rate limiter middleware).
+fn test_peer() -> SocketAddr {
+    "127.0.0.1:8080".parse().unwrap()
 }
 
 fn make_token(user_id: Uuid, rol: &str, org_id: Uuid) -> String {
@@ -222,6 +228,7 @@ fn test_authenticated_signing_flow_end_to_end() {
 
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/documentos/{doc_id}/firmar"))
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .insert_header(("User-Agent", "TestAgent/1.0"))
             .set_json(json!({ "firmaImagen": valid_firma_imagen_b64() }))
@@ -252,6 +259,7 @@ fn test_solicitar_firma_creates_pending_record() {
 
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/documentos/{doc_id}/solicitar-firma"))
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "firmanteNombre": "Juan Pérez",
@@ -333,6 +341,7 @@ fn test_public_token_verification_valid() {
         // Verify with correct password
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/firmas/{known_token}/verificar"))
+            .peer_addr(test_peer())
             .set_json(json!({ "password": known_password }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -387,6 +396,7 @@ fn test_public_token_verification_expired() {
 
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/firmas/{expired_token}/verificar"))
+            .peer_addr(test_peer())
             .set_json(json!({ "password": password }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -435,6 +445,7 @@ fn test_public_token_verification_wrong_password() {
 
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/firmas/{token_str}/verificar"))
+            .peer_addr(test_peer())
             .set_json(json!({ "password": "wrong_password" }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -488,6 +499,7 @@ fn test_public_signing_success() {
 
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/firmas/{token_str}/firmar"))
+            .peer_addr(test_peer())
             .insert_header(("User-Agent", "TenantBrowser/1.0"))
             .set_json(json!({
                 "password": password,
@@ -546,6 +558,7 @@ fn test_public_signing_already_signed_conflict() {
 
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/firmas/{token_str}/firmar"))
+            .peer_addr(test_peer())
             .insert_header(("User-Agent", "TenantBrowser/1.0"))
             .set_json(json!({
                 "password": password,
@@ -573,6 +586,7 @@ fn test_document_sealing_after_both_parties_sign() {
         // Step 1: Manager signs (authenticated)
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/documentos/{doc_id}/firmar"))
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .insert_header(("User-Agent", "ManagerApp/1.0"))
             .set_json(json!({ "firmaImagen": valid_firma_imagen_b64() }))
@@ -616,6 +630,7 @@ fn test_document_sealing_after_both_parties_sign() {
         // Tenant signs
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/firmas/{tenant_token}/firmar"))
+            .peer_addr(test_peer())
             .insert_header(("User-Agent", "TenantBrowser/1.0"))
             .set_json(json!({
                 "password": password,
@@ -664,6 +679,7 @@ fn test_sealed_document_rejects_content_edits() {
         // Try to update content
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/documentos/{doc_id}/contenido"))
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "contenidoEditable": {
@@ -699,6 +715,7 @@ fn test_docx_export_returns_valid_response() {
 
         let req = actix_web::test::TestRequest::get()
             .uri(&format!("/api/v1/documentos/{doc_id}/exportar-docx"))
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -774,6 +791,7 @@ fn test_docx_export_no_content_returns_400() {
 
         let req = actix_web::test::TestRequest::get()
             .uri(&format!("/api/v1/documentos/{doc_id}/exportar-docx"))
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -797,6 +815,7 @@ fn test_template_crud_create_and_read() {
         // Create template
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/documentos/plantillas")
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "nombre": "Contrato Estándar",
@@ -823,6 +842,7 @@ fn test_template_crud_create_and_read() {
         // Read template by ID
         let req = actix_web::test::TestRequest::get()
             .uri(&format!("/api/v1/documentos/plantillas/{plantilla_id}"))
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -845,6 +865,7 @@ fn test_template_crud_update() {
         // Create template first
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/documentos/plantillas")
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "nombre": "Template Original",
@@ -861,6 +882,7 @@ fn test_template_crud_update() {
         // Update template
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/documentos/plantillas/{plantilla_id}"))
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "nombre": "Template Actualizado"
@@ -885,6 +907,7 @@ fn test_template_crud_soft_delete() {
         // Create template
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/documentos/plantillas")
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "nombre": "Template Para Borrar",
@@ -901,6 +924,7 @@ fn test_template_crud_soft_delete() {
         // Soft-delete template
         let req = actix_web::test::TestRequest::delete()
             .uri(&format!("/api/v1/documentos/plantillas/{plantilla_id}"))
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -909,6 +933,7 @@ fn test_template_crud_soft_delete() {
         // Verify it no longer appears in the active list
         let req = actix_web::test::TestRequest::get()
             .uri("/api/v1/documentos/plantillas")
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -937,6 +962,7 @@ fn test_rbac_firmar_rejects_unauthenticated() {
 
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/documentos/{doc_id}/firmar"))
+            .peer_addr(test_peer())
             .set_json(json!({ "firmaImagen": valid_firma_imagen_b64() }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -955,6 +981,7 @@ fn test_rbac_firmar_rejects_visualizador() {
 
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/documentos/{doc_id}/firmar"))
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({ "firmaImagen": valid_firma_imagen_b64() }))
             .to_request();
@@ -974,6 +1001,7 @@ fn test_rbac_solicitar_firma_rejects_visualizador() {
 
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/documentos/{doc_id}/solicitar-firma"))
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "firmanteNombre": "Test",
@@ -996,6 +1024,7 @@ fn test_rbac_plantilla_create_rejects_visualizador() {
 
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/documentos/plantillas")
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "nombre": "Forbidden Template",
@@ -1020,6 +1049,7 @@ fn test_rbac_plantilla_delete_rejects_visualizador() {
         // Create a template as admin
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/documentos/plantillas")
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {admin_token}")))
             .set_json(json!({
                 "nombre": "RBAC Delete Test",
@@ -1039,6 +1069,7 @@ fn test_rbac_plantilla_delete_rejects_visualizador() {
 
         let req = actix_web::test::TestRequest::delete()
             .uri(&format!("/api/v1/documentos/plantillas/{plantilla_id}"))
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {viewer_token}")))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -1057,6 +1088,7 @@ fn test_rbac_gerente_can_sign() {
 
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/documentos/{doc_id}/firmar"))
+            .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .insert_header(("User-Agent", "GerenteApp/1.0"))
             .set_json(json!({ "firmaImagen": valid_firma_imagen_b64() }))
@@ -1079,6 +1111,7 @@ fn test_rbac_docx_export_rejects_unauthenticated() {
 
         let req = actix_web::test::TestRequest::get()
             .uri(&format!("/api/v1/documentos/{doc_id}/exportar-docx"))
+            .peer_addr(test_peer())
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED, "Unauthenticated should get 401 on DOCX export");
