@@ -765,7 +765,7 @@ mod tests {
         let err = result.unwrap_err();
         assert_eq!(
             err.to_string(),
-            "Tipo de archivo no permitido. Tipos permitidos: JPEG, PNG, PDF"
+            "Tipo de archivo no permitido. Tipos permitidos: JPEG, PNG, PDF, DOCX"
         );
     }
 

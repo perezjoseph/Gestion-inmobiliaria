@@ -279,7 +279,7 @@ pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
     };
 
     let on_delete = {
-        let documents = documents.clone();
+        let documents = documents;
         Callback::from(move |deleted_id: String| {
             let docs: Vec<DocumentoResponse> = documents
                 .iter()
