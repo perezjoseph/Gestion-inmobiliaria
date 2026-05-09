@@ -593,7 +593,7 @@ pub struct TimestampedMessage {
 /// This mirrors the DB query: `ORDER BY created_at DESC LIMIT N`.
 pub fn window_history(messages: &[TimestampedMessage], limit: usize) -> Vec<&TimestampedMessage> {
     let mut sorted: Vec<&TimestampedMessage> = messages.iter().collect();
-    sorted.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    sorted.sort_by_key(|m| std::cmp::Reverse(m.created_at));
     sorted.truncate(limit);
     sorted
 }
