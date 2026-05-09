@@ -57,6 +57,19 @@ spec:
               value: ""
             - name: OCR_SERVICE_URL
               value: http://ocr-service:8000
+            - name: BAILEYS_SERVICE_URL
+              value: http://baileys:3100
+            - name: BAILEYS_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: realestate-chatbot-secret
+                  key: baileys-internal-token
+            - name: OVMS_ENDPOINT
+              value: http://ocr-service:8000/v1
+            - name: OVMS_CHAT_MODEL
+              value: qwen3.6
+            - name: AI_CHAT_TIMEOUT_SECS
+              value: "30"
           volumeMounts:
             - name: uploads
               mountPath: /app/uploads

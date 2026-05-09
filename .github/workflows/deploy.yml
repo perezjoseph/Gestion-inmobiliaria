@@ -12,6 +12,9 @@ on:
       ocr-service-digest:
         type: string
         required: true
+      baileys-digest:
+        type: string
+        required: true
     secrets:
       POSTGRES_PASSWORD:
         required: true
@@ -94,6 +97,21 @@ jobs:
               "oci://ghcr.io/${IMAGE_OWNER}/realestate-ocr-service@${OCR_DIGEST}" \
               --owner "${IMAGE_OWNER}"
 
+      - name: Verify Baileys attestation
+        id: verify-baileys
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BAILEYS_DIGEST: ${{ inputs.baileys-digest }}
+        with:
+          timeout_minutes: 3
+          max_attempts: 5
+          retry_wait_seconds: 10
+          command: |
+            gh attestation verify \
+              "oci://ghcr.io/${IMAGE_OWNER}/realestate-baileys@${BAILEYS_DIGEST}" \
+              --owner "${IMAGE_OWNER}"
+
       - name: Mask secrets
         run: |
           echo "::add-mask::${{ secrets.POSTGRES_PASSWORD }}"
@@ -136,6 +154,7 @@ jobs:
           BACKEND_DIGEST: ${{ inputs.backend-digest }}
           FRONTEND_DIGEST: ${{ inputs.frontend-digest }}
           OCR_DIGEST: ${{ inputs.ocr-service-digest }}
+          BAILEYS_DIGEST: ${{ inputs.baileys-digest }}
         run: |
           kubectl set image deployment/backend \
             "backend=ghcr.io/${IMAGE_OWNER}/realestate-backend@${BACKEND_DIGEST}" \
@@ -149,6 +168,10 @@ jobs:
             "ocr-service=ghcr.io/${IMAGE_OWNER}/realestate-ocr-service@${OCR_DIGEST}" \
             --namespace realestate
 
+          kubectl set image deployment/baileys \
+            "baileys=ghcr.io/${IMAGE_OWNER}/realestate-baileys@${BAILEYS_DIGEST}" \
+            --namespace realestate
+
       - name: Wait for rollout
         id: rollout
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
@@ -159,6 +182,7 @@ jobs:
             kubectl rollout status deployment/backend --namespace realestate --timeout=120s
             kubectl rollout status deployment/frontend --namespace realestate --timeout=120s
             kubectl rollout status deployment/ocr-service --namespace realestate --timeout=180s
+            kubectl rollout status deployment/baileys --namespace realestate --timeout=120s
 
       - name: Health check
         id: health-check
@@ -167,7 +191,7 @@ jobs:
           timeout_minutes: 5
           max_attempts: 5
           command: |
-            for DEPLOY in backend frontend ocr-service; do
+            for DEPLOY in backend frontend ocr-service baileys; do
               READY=$(kubectl get deployment "$DEPLOY" -n realestate \
                 -o jsonpath='{.status.readyReplicas}')
               DESIRED=$(kubectl get deployment "$DEPLOY" -n realestate \
@@ -187,6 +211,7 @@ jobs:
           kubectl rollout undo deployment/backend --namespace realestate
           kubectl rollout undo deployment/frontend --namespace realestate
           kubectl rollout undo deployment/ocr-service --namespace realestate
+          kubectl rollout undo deployment/baileys --namespace realestate
           kubectl rollout status deployment/backend --namespace realestate --timeout=120s || true
           echo "::error::Rollback attempted. Manual verification required."
 

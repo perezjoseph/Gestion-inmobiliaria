@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: baileys
+  namespace: realestate
+  labels:
+    app.kubernetes.io/name: baileys
+    app.kubernetes.io/component: whatsapp
+    app.kubernetes.io/part-of: realestate
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: baileys
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: baileys
+        app.kubernetes.io/component: whatsapp
+        app.kubernetes.io/part-of: realestate
+    spec:
+      automountServiceAccountToken: false
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: baileys
+          image: ghcr.io/perezjoseph/realestate-baileys:latest # NOSONAR — deploy.yml overrides with pinned digest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3100
+          env:
+            - name: PORT
+              value: "3100"
+            - name: MAX_CONNECTIONS
+              value: "100"
+            - name: BACKEND_WEBHOOK_URL
+              value: http://backend:8080/internal/whatsapp/incoming
+            - name: BAILEYS_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: realestate-chatbot-secret
+                  key: baileys-internal-token
+            - name: SESSION_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: realestate-chatbot-secret
+                  key: session-encryption-key
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+              ephemeral-storage: 64Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+              ephemeral-storage: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3100
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3100
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: baileys
+  namespace: realestate
+spec:
+  selector:
+    app.kubernetes.io/name: baileys
+  ports:
+    - port: 3100
+      targetPort: 3100
