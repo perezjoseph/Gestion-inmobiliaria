@@ -19,7 +19,7 @@ githubConfigSecret: arc-github-secret
 
 ## ── Scaling ────────────────────────────────────────────────────
 minRunners: 1
-maxRunners: 3
+maxRunners: 10
 
 ## ── Container mode ─────────────────────────────────────────────
 ## Per the chart docs: "If any customization is required for dind mode,
@@ -141,9 +141,18 @@ template:
         - name: attempts
           value: "3"
     affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 80
+            preference:
+              matchExpressions:
+                - key: kubernetes.io/hostname
+                  operator: In
+                  values:
+                    - inference
       podAntiAffinity:
         preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
+          - weight: 50
             podAffinityTerm:
               labelSelector:
                 matchLabels:
