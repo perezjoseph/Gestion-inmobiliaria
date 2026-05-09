@@ -48,6 +48,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
       ocr-service: ${{ steps.filter.outputs.ocr-service }}
+      baileys-service: ${{ steps.filter.outputs.baileys-service }}
       ci: ${{ steps.filter.outputs.ci }}
     steps:
       - name: Checkout
