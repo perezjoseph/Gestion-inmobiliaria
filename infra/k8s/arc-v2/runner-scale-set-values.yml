@@ -42,7 +42,7 @@ template:
       - name: init-nfs-permissions
         image: ghcr.io/perezjoseph/realestate-runner:latest
         imagePullPolicy: Always
-        command: ["sh", "-c", "find /mnt/registry /mnt/git /mnt/sccache /mnt/target -not -perm 777 -print0 2>/dev/null | xargs -0 -P4 -r chmod 777; true"]
+        command: ["sh", "-c", "find /mnt/registry /mnt/git /mnt/sccache /mnt/target /mnt/buildkit -not -perm 777 -print0 2>/dev/null | xargs -0 -P4 -r chmod 777; true"]
         securityContext:
           runAsUser: 0
         volumeMounts:
@@ -54,6 +54,8 @@ template:
             mountPath: /mnt/sccache
           - name: cargo-target
             mountPath: /mnt/target
+          - name: buildkit-cache
+            mountPath: /mnt/buildkit
       - name: dind
         image: docker:dind
         imagePullPolicy: IfNotPresent
@@ -88,6 +90,8 @@ template:
             mountPath: /var/run
           - name: dind-externals
             mountPath: /home/runner/externals
+          - name: buildkit-cache
+            mountPath: /tmp/buildkit-cache
     containers:
       - name: runner
         image: ghcr.io/perezjoseph/realestate-runner:latest
@@ -168,3 +172,7 @@ template:
         nfs:
           server: 192.168.88.22
           path: /volume1/docker/k3s-cache/cargo-target
+      - name: buildkit-cache
+        nfs:
+          server: 192.168.88.22
+          path: /volume1/docker/k3s-cache/buildkit-cache

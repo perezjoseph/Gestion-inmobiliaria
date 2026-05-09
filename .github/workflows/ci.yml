@@ -190,18 +190,8 @@ jobs:
           tags: |
             ghcr.io/${{ env.IMAGE_OWNER }}/realestate-baileys:${{ env.IMAGE_TAG }}
             ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && format('ghcr.io/{0}/realestate-baileys:latest', github.repository_owner) || '' }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-baileys:buildcache
-
-      - name: Export build cache
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6.18.0
-        continue-on-error: true
-        with:
-          context: ./baileys-service
-          file: ./baileys-service/Dockerfile
-          push: false
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-baileys:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-baileys:buildcache,mode=min
+          cache-from: type=local,src=/tmp/buildkit-cache/baileys
+          cache-to: type=local,dest=/tmp/buildkit-cache/baileys,mode=max
 
       - name: Install Trivy
         uses: ./.github/actions/install-security-tools
