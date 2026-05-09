@@ -1,5 +1,6 @@
 pub mod auditoria;
 pub mod background_jobs;
+pub mod chatbot;
 pub mod contrato;
 pub mod dashboard;
 pub mod documento;

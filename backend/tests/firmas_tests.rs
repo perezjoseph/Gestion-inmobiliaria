@@ -8,9 +8,7 @@ use realestate_backend::app::create_app;
 use realestate_backend::config::AppConfig;
 use realestate_backend::entities::{documento, firma_documento, organizacion, usuario};
 use realestate_backend::services::auth::{Claims, encode_jwt};
-use sea_orm::{
-    ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, EntityTrait, Set,
-};
+use sea_orm::{ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, EntityTrait, Set};
 use sea_orm_migration::MigratorTrait;
 use serde_json::{Value, json};
 use std::net::SocketAddr;
@@ -84,6 +82,13 @@ fn make_config() -> AppConfig {
         server_port: 0,
         cors_origin: None,
         pool: realestate_backend::config::PoolConfig::default(),
+        chatbot: realestate_backend::config::ChatbotEnvConfig {
+            baileys_service_url: "http://baileys:3100".to_string(),
+            baileys_internal_token: "a]3kF9#mP7vL2nQ8wR5xT0yU4zA1bC6dE".to_string(),
+            ovms_endpoint: "http://ovms:8000/v1".to_string(),
+            ovms_chat_model: "qwen3.6".to_string(),
+            ai_chat_timeout_secs: 30,
+        },
     }
 }
 
@@ -204,11 +209,11 @@ fn valid_firma_imagen_b64() -> String {
     use base64::Engine;
     // Minimal 1x1 white PNG
     let png_bytes: &[u8] = &[
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48,
-        0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00,
-        0x00, 0x90, 0x77, 0x53, 0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, 0x08,
-        0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01, 0xE2, 0x21, 0xBC,
-        0x33, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, 0x90,
+        0x77, 0x53, 0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, 0x08, 0xD7, 0x63, 0xF8,
+        0xCF, 0xC0, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01, 0xE2, 0x21, 0xBC, 0x33, 0x00, 0x00, 0x00,
+        0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
     ];
     base64::engine::general_purpose::STANDARD.encode(png_bytes)
 }
@@ -224,7 +229,8 @@ fn test_authenticated_signing_flow_end_to_end() {
         let (org_id, admin_id, doc_id) = setup_firmas_data(&db).await;
         let token = make_token(admin_id, "admin", org_id);
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/documentos/{doc_id}/firmar"))
@@ -234,7 +240,11 @@ fn test_authenticated_signing_flow_end_to_end() {
             .set_json(json!({ "firmaImagen": valid_firma_imagen_b64() }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK, "Expected 200 for authenticated signing");
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "Expected 200 for authenticated signing"
+        );
 
         let body: Value = actix_web::test::read_body_json(resp).await;
         assert_eq!(body["firmanteTipo"], "propietario");
@@ -255,7 +265,8 @@ fn test_solicitar_firma_creates_pending_record() {
         let (org_id, admin_id, doc_id) = setup_firmas_data(&db).await;
         let token = make_token(admin_id, "admin", org_id);
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/documentos/{doc_id}/solicitar-firma"))
@@ -267,7 +278,11 @@ fn test_solicitar_firma_creates_pending_record() {
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::CREATED, "Expected 201 for solicitar-firma");
+        assert_eq!(
+            resp.status(),
+            StatusCode::CREATED,
+            "Expected 201 for solicitar-firma"
+        );
 
         let body: Value = actix_web::test::read_body_json(resp).await;
         assert!(body["firmaId"].is_string());
@@ -276,7 +291,10 @@ fn test_solicitar_firma_creates_pending_record() {
 
         // Verify the token is long enough (UUID = 36 chars with hyphens, 32 without)
         let firma_token = body["token"].as_str().unwrap();
-        assert!(firma_token.len() >= 32, "Token should have sufficient entropy");
+        assert!(
+            firma_token.len() >= 32,
+            "Token should have sufficient entropy"
+        );
 
         // Verify the record in DB is pendiente
         let firma_id: Uuid = body["firmaId"].as_str().unwrap().parse().unwrap();
@@ -302,12 +320,13 @@ fn test_public_token_verification_valid() {
     with_db(|db| async move {
         let (_org_id, _admin_id, doc_id) = setup_firmas_data(&db).await;
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         // Create a firma with a known password directly for verification testing
-        use argon2::{Argon2, PasswordHasher};
         use argon2::password_hash::SaltString;
         use argon2::password_hash::rand_core::OsRng;
+        use argon2::{Argon2, PasswordHasher};
 
         let known_password = "test_password_123";
         let salt = SaltString::generate(&mut OsRng);
@@ -345,7 +364,11 @@ fn test_public_token_verification_valid() {
             .set_json(json!({ "password": known_password }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK, "Valid token + password should return 200");
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "Valid token + password should return 200"
+        );
 
         let body: Value = actix_web::test::read_body_json(resp).await;
         assert_eq!(body["documentoId"], doc_id.to_string());
@@ -359,12 +382,13 @@ fn test_public_token_verification_expired() {
     with_db(|db| async move {
         let (_org_id, _admin_id, doc_id) = setup_firmas_data(&db).await;
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         // Create a firma with expired token
-        use argon2::{Argon2, PasswordHasher};
         use argon2::password_hash::SaltString;
         use argon2::password_hash::rand_core::OsRng;
+        use argon2::{Argon2, PasswordHasher};
 
         let password = "expired_test_pass";
         let salt = SaltString::generate(&mut OsRng);
@@ -400,7 +424,11 @@ fn test_public_token_verification_expired() {
             .set_json(json!({ "password": password }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::GONE, "Expired token should return 410");
+        assert_eq!(
+            resp.status(),
+            StatusCode::GONE,
+            "Expired token should return 410"
+        );
     });
 }
 
@@ -409,11 +437,12 @@ fn test_public_token_verification_wrong_password() {
     with_db(|db| async move {
         let (_org_id, _admin_id, doc_id) = setup_firmas_data(&db).await;
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
-        use argon2::{Argon2, PasswordHasher};
         use argon2::password_hash::SaltString;
         use argon2::password_hash::rand_core::OsRng;
+        use argon2::{Argon2, PasswordHasher};
 
         let correct_password = "correct_password";
         let salt = SaltString::generate(&mut OsRng);
@@ -449,7 +478,11 @@ fn test_public_token_verification_wrong_password() {
             .set_json(json!({ "password": "wrong_password" }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED, "Wrong password should return 401");
+        assert_eq!(
+            resp.status(),
+            StatusCode::UNAUTHORIZED,
+            "Wrong password should return 401"
+        );
     });
 }
 
@@ -463,11 +496,12 @@ fn test_public_signing_success() {
     with_db(|db| async move {
         let (_org_id, _admin_id, doc_id) = setup_firmas_data(&db).await;
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
-        use argon2::{Argon2, PasswordHasher};
         use argon2::password_hash::SaltString;
         use argon2::password_hash::rand_core::OsRng;
+        use argon2::{Argon2, PasswordHasher};
 
         let password = "sign_test_password";
         let salt = SaltString::generate(&mut OsRng);
@@ -507,7 +541,11 @@ fn test_public_signing_success() {
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK, "Public signing should return 200");
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "Public signing should return 200"
+        );
 
         let body: Value = actix_web::test::read_body_json(resp).await;
         assert_eq!(body["estado"], "firmado");
@@ -521,11 +559,12 @@ fn test_public_signing_already_signed_conflict() {
     with_db(|db| async move {
         let (_org_id, _admin_id, doc_id) = setup_firmas_data(&db).await;
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
-        use argon2::{Argon2, PasswordHasher};
         use argon2::password_hash::SaltString;
         use argon2::password_hash::rand_core::OsRng;
+        use argon2::{Argon2, PasswordHasher};
 
         let password = "conflict_test_pass";
         let salt = SaltString::generate(&mut OsRng);
@@ -566,7 +605,11 @@ fn test_public_signing_already_signed_conflict() {
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::CONFLICT, "Already signed should return 409");
+        assert_eq!(
+            resp.status(),
+            StatusCode::CONFLICT,
+            "Already signed should return 409"
+        );
     });
 }
 
@@ -581,7 +624,8 @@ fn test_document_sealing_after_both_parties_sign() {
         let (org_id, admin_id, doc_id) = setup_firmas_data(&db).await;
         let token = make_token(admin_id, "admin", org_id);
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         // Step 1: Manager signs (authenticated)
         let req = actix_web::test::TestRequest::post()
@@ -595,9 +639,9 @@ fn test_document_sealing_after_both_parties_sign() {
         assert_eq!(resp.status(), StatusCode::OK);
 
         // Step 2: Create tenant firma with known password and sign via public endpoint
-        use argon2::{Argon2, PasswordHasher};
         use argon2::password_hash::SaltString;
         use argon2::password_hash::rand_core::OsRng;
+        use argon2::{Argon2, PasswordHasher};
 
         let password = "seal_test_password";
         let salt = SaltString::generate(&mut OsRng);
@@ -646,7 +690,10 @@ fn test_document_sealing_after_both_parties_sign() {
             .await
             .unwrap()
             .expect("Document should exist");
-        assert!(doc.sellado, "Document should be sealed after both parties sign");
+        assert!(
+            doc.sellado,
+            "Document should be sealed after both parties sign"
+        );
         assert!(doc.sellado_at.is_some(), "sellado_at should be set");
     });
 }
@@ -662,7 +709,8 @@ fn test_sealed_document_rejects_content_edits() {
         let (org_id, admin_id, doc_id) = setup_firmas_data(&db).await;
         let token = make_token(admin_id, "admin", org_id);
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         // Manually seal the document
         use sea_orm::IntoActiveModel;
@@ -689,7 +737,11 @@ fn test_sealed_document_rejects_content_edits() {
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::FORBIDDEN, "Sealed document should reject edits with 403");
+        assert_eq!(
+            resp.status(),
+            StatusCode::FORBIDDEN,
+            "Sealed document should reject edits with 403"
+        );
 
         let body: Value = actix_web::test::read_body_json(resp).await;
         let msg = body["message"].as_str().unwrap_or("");
@@ -711,7 +763,8 @@ fn test_docx_export_returns_valid_response() {
         let (org_id, admin_id, doc_id) = setup_firmas_data(&db).await;
         let token = make_token(admin_id, "admin", org_id);
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         let req = actix_web::test::TestRequest::get()
             .uri(&format!("/api/v1/documentos/{doc_id}/exportar-docx"))
@@ -719,7 +772,11 @@ fn test_docx_export_returns_valid_response() {
             .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK, "DOCX export should return 200");
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "DOCX export should return 200"
+        );
 
         // Check content type
         let content_type = resp
@@ -728,7 +785,9 @@ fn test_docx_export_returns_valid_response() {
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
         assert!(
-            content_type.contains("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+            content_type.contains(
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ),
             "Content-Type should be DOCX MIME type, got: {content_type}"
         );
 
@@ -746,7 +805,11 @@ fn test_docx_export_returns_valid_response() {
         // Check body starts with ZIP magic bytes (PK\x03\x04)
         let body = actix_web::test::read_body(resp).await;
         assert!(body.len() > 4, "DOCX body should not be empty");
-        assert_eq!(&body[..4], b"PK\x03\x04", "DOCX should start with ZIP magic bytes");
+        assert_eq!(
+            &body[..4],
+            b"PK\x03\x04",
+            "DOCX should start with ZIP magic bytes"
+        );
     });
 }
 
@@ -787,7 +850,8 @@ fn test_docx_export_no_content_returns_400() {
         .unwrap();
 
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         let req = actix_web::test::TestRequest::get()
             .uri(&format!("/api/v1/documentos/{doc_id}/exportar-docx"))
@@ -795,7 +859,11 @@ fn test_docx_export_no_content_returns_400() {
             .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::BAD_REQUEST, "No content should return 400");
+        assert_eq!(
+            resp.status(),
+            StatusCode::BAD_REQUEST,
+            "No content should return 400"
+        );
     });
 }
 
@@ -810,7 +878,8 @@ fn test_template_crud_create_and_read() {
         let (org_id, admin_id, _doc_id) = setup_firmas_data(&db).await;
         let token = make_token(admin_id, "admin", org_id);
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         // Create template
         let req = actix_web::test::TestRequest::post()
@@ -831,7 +900,11 @@ fn test_template_crud_create_and_read() {
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::CREATED, "Template creation should return 201");
+        assert_eq!(
+            resp.status(),
+            StatusCode::CREATED,
+            "Template creation should return 201"
+        );
 
         let body: Value = actix_web::test::read_body_json(resp).await;
         let plantilla_id = body["id"].as_str().unwrap();
@@ -846,7 +919,11 @@ fn test_template_crud_create_and_read() {
             .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK, "Template read should return 200");
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "Template read should return 200"
+        );
 
         let body: Value = actix_web::test::read_body_json(resp).await;
         assert_eq!(body["nombre"], "Contrato Estándar");
@@ -860,7 +937,8 @@ fn test_template_crud_update() {
         let (org_id, admin_id, _doc_id) = setup_firmas_data(&db).await;
         let token = make_token(admin_id, "admin", org_id);
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         // Create template first
         let req = actix_web::test::TestRequest::post()
@@ -889,7 +967,11 @@ fn test_template_crud_update() {
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK, "Template update should return 200");
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "Template update should return 200"
+        );
 
         let body: Value = actix_web::test::read_body_json(resp).await;
         assert_eq!(body["nombre"], "Template Actualizado");
@@ -902,7 +984,8 @@ fn test_template_crud_soft_delete() {
         let (org_id, admin_id, _doc_id) = setup_firmas_data(&db).await;
         let token = make_token(admin_id, "admin", org_id);
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         // Create template
         let req = actix_web::test::TestRequest::post()
@@ -928,7 +1011,11 @@ fn test_template_crud_soft_delete() {
             .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::NO_CONTENT, "Soft-delete should return 204");
+        assert_eq!(
+            resp.status(),
+            StatusCode::NO_CONTENT,
+            "Soft-delete should return 204"
+        );
 
         // Verify it no longer appears in the active list
         let req = actix_web::test::TestRequest::get()
@@ -944,7 +1031,10 @@ fn test_template_crud_soft_delete() {
         let found = templates
             .iter()
             .any(|t| t["id"].as_str() == Some(&plantilla_id));
-        assert!(!found, "Soft-deleted template should not appear in active list");
+        assert!(
+            !found,
+            "Soft-deleted template should not appear in active list"
+        );
     });
 }
 
@@ -958,7 +1048,8 @@ fn test_rbac_firmar_rejects_unauthenticated() {
     with_db(|db| async move {
         let (_org_id, _admin_id, doc_id) = setup_firmas_data(&db).await;
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/documentos/{doc_id}/firmar"))
@@ -966,7 +1057,11 @@ fn test_rbac_firmar_rejects_unauthenticated() {
             .set_json(json!({ "firmaImagen": valid_firma_imagen_b64() }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED, "Unauthenticated should get 401");
+        assert_eq!(
+            resp.status(),
+            StatusCode::UNAUTHORIZED,
+            "Unauthenticated should get 401"
+        );
     });
 }
 
@@ -977,7 +1072,8 @@ fn test_rbac_firmar_rejects_visualizador() {
         let viewer_id = create_test_usuario(&db, "visualizador", org_id).await;
         let token = make_token(viewer_id, "visualizador", org_id);
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/documentos/{doc_id}/firmar"))
@@ -986,7 +1082,11 @@ fn test_rbac_firmar_rejects_visualizador() {
             .set_json(json!({ "firmaImagen": valid_firma_imagen_b64() }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::FORBIDDEN, "Visualizador should get 403");
+        assert_eq!(
+            resp.status(),
+            StatusCode::FORBIDDEN,
+            "Visualizador should get 403"
+        );
     });
 }
 
@@ -997,7 +1097,8 @@ fn test_rbac_solicitar_firma_rejects_visualizador() {
         let viewer_id = create_test_usuario(&db, "visualizador", org_id).await;
         let token = make_token(viewer_id, "visualizador", org_id);
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/documentos/{doc_id}/solicitar-firma"))
@@ -1009,7 +1110,11 @@ fn test_rbac_solicitar_firma_rejects_visualizador() {
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::FORBIDDEN, "Visualizador should get 403 on solicitar-firma");
+        assert_eq!(
+            resp.status(),
+            StatusCode::FORBIDDEN,
+            "Visualizador should get 403 on solicitar-firma"
+        );
     });
 }
 
@@ -1020,7 +1125,8 @@ fn test_rbac_plantilla_create_rejects_visualizador() {
         let viewer_id = create_test_usuario(&db, "visualizador", org_id).await;
         let token = make_token(viewer_id, "visualizador", org_id);
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/documentos/plantillas")
@@ -1034,7 +1140,11 @@ fn test_rbac_plantilla_create_rejects_visualizador() {
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::FORBIDDEN, "Visualizador should get 403 on template create");
+        assert_eq!(
+            resp.status(),
+            StatusCode::FORBIDDEN,
+            "Visualizador should get 403 on template create"
+        );
     });
 }
 
@@ -1044,7 +1154,8 @@ fn test_rbac_plantilla_delete_rejects_visualizador() {
         let (org_id, admin_id, _doc_id) = setup_firmas_data(&db).await;
         let admin_token = make_token(admin_id, "admin", org_id);
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         // Create a template as admin
         let req = actix_web::test::TestRequest::post()
@@ -1073,7 +1184,11 @@ fn test_rbac_plantilla_delete_rejects_visualizador() {
             .insert_header(("Authorization", format!("Bearer {viewer_token}")))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::FORBIDDEN, "Visualizador should get 403 on template delete");
+        assert_eq!(
+            resp.status(),
+            StatusCode::FORBIDDEN,
+            "Visualizador should get 403 on template delete"
+        );
     });
 }
 
@@ -1084,7 +1199,8 @@ fn test_rbac_gerente_can_sign() {
         let gerente_id = create_test_usuario(&db, "gerente", org_id).await;
         let token = make_token(gerente_id, "gerente", org_id);
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/documentos/{doc_id}/firmar"))
@@ -1094,7 +1210,11 @@ fn test_rbac_gerente_can_sign() {
             .set_json(json!({ "firmaImagen": valid_firma_imagen_b64() }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK, "Gerente should be able to sign");
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "Gerente should be able to sign"
+        );
 
         let body: Value = actix_web::test::read_body_json(resp).await;
         assert_eq!(body["firmanteTipo"], "propietario");
@@ -1107,13 +1227,18 @@ fn test_rbac_docx_export_rejects_unauthenticated() {
     with_db(|db| async move {
         let (_org_id, _admin_id, doc_id) = setup_firmas_data(&db).await;
         let app =
-            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store())).await;
+            actix_web::test::init_service(create_app(db.clone(), make_config(), preview_store()))
+                .await;
 
         let req = actix_web::test::TestRequest::get()
             .uri(&format!("/api/v1/documentos/{doc_id}/exportar-docx"))
             .peer_addr(test_peer())
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED, "Unauthenticated should get 401 on DOCX export");
+        assert_eq!(
+            resp.status(),
+            StatusCode::UNAUTHORIZED,
+            "Unauthenticated should get 401 on DOCX export"
+        );
     });
 }

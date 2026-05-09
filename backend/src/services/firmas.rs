@@ -173,16 +173,15 @@ pub async fn verificar_token(
     // Check expiry
     if let Some(expira_at) = firma.expira_at {
         if Utc::now() > expira_at.with_timezone(&Utc) {
-            return Err(AppError::Gone(
-                "El enlace de firma ha expirado".to_string(),
-            ));
+            return Err(AppError::Gone("El enlace de firma ha expirado".to_string()));
         }
     }
 
     // Verify password
-    let hash = firma.password_hash.as_deref().ok_or_else(|| {
-        AppError::Internal(anyhow::anyhow!("Firma sin password_hash"))
-    })?;
+    let hash = firma
+        .password_hash
+        .as_deref()
+        .ok_or_else(|| AppError::Internal(anyhow::anyhow!("Firma sin password_hash")))?;
 
     let valid = auth::verify_password(hash, password)?;
     if !valid {
@@ -229,16 +228,15 @@ pub async fn firmar_con_token(
     // Check expiry
     if let Some(expira_at) = firma.expira_at {
         if Utc::now() > expira_at.with_timezone(&Utc) {
-            return Err(AppError::Gone(
-                "El enlace de firma ha expirado".to_string(),
-            ));
+            return Err(AppError::Gone("El enlace de firma ha expirado".to_string()));
         }
     }
 
     // Re-verify password
-    let hash = firma.password_hash.as_deref().ok_or_else(|| {
-        AppError::Internal(anyhow::anyhow!("Firma sin password_hash"))
-    })?;
+    let hash = firma
+        .password_hash
+        .as_deref()
+        .ok_or_else(|| AppError::Internal(anyhow::anyhow!("Firma sin password_hash")))?;
 
     let valid = auth::verify_password(hash, password)?;
     if !valid {
@@ -277,10 +275,7 @@ pub async fn firmar_con_token(
 }
 
 /// Check if all parties signed and seal if complete.
-async fn verificar_y_sellar(
-    db: &DatabaseConnection,
-    documento_id: Uuid,
-) -> Result<(), AppError> {
+async fn verificar_y_sellar(db: &DatabaseConnection, documento_id: Uuid) -> Result<(), AppError> {
     let firmas = firma_documento::Entity::find()
         .filter(firma_documento::Column::DocumentoId.eq(documento_id))
         .all(db)
@@ -298,9 +293,7 @@ async fn verificar_y_sellar(
         let doc = documento::Entity::find_by_id(documento_id)
             .one(db)
             .await?
-            .ok_or_else(|| {
-                AppError::NotFound(format!("Documento {documento_id} no encontrado"))
-            })?;
+            .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
 
         // Only seal if not already sealed
         if !doc.sellado {
@@ -372,10 +365,7 @@ fn enviar_email_firma(email: &str, token: &str, password: &str) -> bool {
 }
 
 /// Generate a sealed PDF with signature images embedded.
-async fn generar_pdf_sellado(
-    db: &DatabaseConnection,
-    documento_id: Uuid,
-) -> Result<(), AppError> {
+async fn generar_pdf_sellado(db: &DatabaseConnection, documento_id: Uuid) -> Result<(), AppError> {
     use crate::services::documento_editor;
 
     // Generate PDF using existing export function

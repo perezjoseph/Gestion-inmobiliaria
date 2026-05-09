@@ -155,9 +155,9 @@ fn UserMenu(props: &UserMenuProps) -> Html {
     };
 
     html! {
-        <div class="gi-navbar-user" style="display: flex; align-items: center; gap: var(--space-3);">
-            <div class="gi-navbar-user-info" style="text-align: right;">
-                <div class="gi-navbar-user-name gi-text-sm" style="font-weight: 600; color: var(--text-primary);">
+        <div class="gi-navbar-user">
+            <div class="gi-navbar-user-info">
+                <div class="gi-navbar-user-name">
                     {&props.user_name}
                 </div>
                 <div class="gi-badge gi-badge-info" style="font-size: 0.65rem;">
@@ -182,8 +182,8 @@ pub struct NavbarProps {
 #[component]
 pub fn Navbar(props: &NavbarProps) -> Html {
     html! {
-        <nav class="gi-navbar" style="padding: var(--space-3) var(--space-5); display: flex; justify-content: space-between; align-items: center; gap: var(--space-2);">
-            <div style="display: flex; align-items: center; gap: var(--space-3); min-width: 0;">
+        <nav class="gi-navbar">
+            <div class="gi-navbar-left">
                 <button class="gi-hamburger" onclick={props.on_toggle_sidebar.clone()}
                     aria-label="Abrir menú">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -192,11 +192,11 @@ pub fn Navbar(props: &NavbarProps) -> Html {
                         <line x1="3" y1="18" x2="21" y2="18"/>
                     </svg>
                 </button>
-                <span class="gi-navbar-title text-display" style="font-size: var(--text-lg); font-weight: 600; color: var(--text-primary);">
+                <span class="gi-navbar-title text-display">
                     {"Gestión Inmobiliaria"}
                 </span>
             </div>
-            <div style="display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0;">
+            <div class="gi-navbar-right">
                 <NavbarSearch />
                 <NotificationBell />
                 <ThemeToggle />

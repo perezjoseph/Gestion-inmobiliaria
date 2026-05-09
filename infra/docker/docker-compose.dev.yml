@@ -28,6 +28,25 @@ services:
     environment:
       - PADDLE_PDX_CACHE_HOME=/app/.paddleocr
 
+  baileys:
+    build:
+      context: ../../baileys-service
+      dockerfile: Dockerfile
+    networks:
+      - private
+    environment:
+      SESSION_ENCRYPTION_KEY: dev_session_encryption_key_32chars!!
+      MAX_CONNECTIONS: "5"
+      BACKEND_WEBHOOK_URL: http://backend:8080/api/whatsapp/webhook
+      BAILEYS_INTERNAL_TOKEN: dev_baileys_internal_token
+      PORT: "3100"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3100/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   backend:
     build:
       context: ../..
@@ -37,12 +56,16 @@ services:
         condition: service_healthy
       ocr-service:
         condition: service_healthy
+    networks:
+      - default
+      - private
     environment:
       DATABASE_URL: postgresql://realestate:realestate_dev_password@db:5432/realestate
       JWT_SECRET: local_dev_secret_key_change_in_production_32chars!
       SERVER_PORT: "8080"
       CORS_ORIGIN: http://localhost:8080
       OCR_SERVICE_URL: http://ocr-service:8000
+      BAILEYS_SERVICE_URL: http://baileys:3100
     volumes:
       - uploads:/app/uploads
 
@@ -66,3 +89,7 @@ volumes:
   uploads:
   caddy_data:
   caddy_config:
+
+networks:
+  private:
+    internal: true

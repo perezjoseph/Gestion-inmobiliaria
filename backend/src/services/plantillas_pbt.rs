@@ -30,7 +30,9 @@ fn valid_contenido() -> impl Strategy<Value = serde_json::Value> {
     prop_oneof![
         Just(serde_json::json!({"version": 1, "blocks": []})),
         Just(serde_json::json!({"version": 1, "blocks": [{"type": "paragraph", "text": "Hello"}]})),
-        Just(serde_json::json!({"version": 1, "blocks": [{"type": "heading", "text": "Title", "level": 1}]})),
+        Just(
+            serde_json::json!({"version": 1, "blocks": [{"type": "heading", "text": "Title", "level": 1}]})
+        ),
     ]
 }
 

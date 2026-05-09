@@ -68,16 +68,10 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(FirmasDocumento::FirmaImagen).binary())
                     .col(ColumnDef::new(FirmasDocumento::IpAddress).string())
                     .col(ColumnDef::new(FirmasDocumento::UserAgent).text())
-                    .col(
-                        ColumnDef::new(FirmasDocumento::FirmadoAt)
-                            .timestamp_with_time_zone(),
-                    )
+                    .col(ColumnDef::new(FirmasDocumento::FirmadoAt).timestamp_with_time_zone())
                     .col(ColumnDef::new(FirmasDocumento::Token).string())
                     .col(ColumnDef::new(FirmasDocumento::PasswordHash).string())
-                    .col(
-                        ColumnDef::new(FirmasDocumento::ExpiraAt)
-                            .timestamp_with_time_zone(),
-                    )
+                    .col(ColumnDef::new(FirmasDocumento::ExpiraAt).timestamp_with_time_zone())
                     .col(
                         ColumnDef::new(FirmasDocumento::Estado)
                             .string()
@@ -140,8 +134,7 @@ impl MigrationTrait for Migration {
                 Table::alter()
                     .table(Documentos::Table)
                     .add_column(
-                        ColumnDef::new(DocumentosSellado::SelladoAt)
-                            .timestamp_with_time_zone(),
+                        ColumnDef::new(DocumentosSellado::SelladoAt).timestamp_with_time_zone(),
                     )
                     .to_owned(),
             )

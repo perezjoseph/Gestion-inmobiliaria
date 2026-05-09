@@ -1,10 +1,17 @@
+pub mod ai_module;
 pub mod auditoria;
 pub mod auth;
 pub mod background_jobs;
+pub mod baileys_client;
+pub mod chatbot;
+#[cfg(test)]
+mod chatbot_pbt;
 pub mod configuracion;
 pub mod contratos;
 pub mod dashboard;
 pub mod documento_editor;
+#[cfg(test)]
+mod documento_editor_pbt;
 pub mod documentos;
 pub mod firmas;
 #[cfg(test)]
@@ -17,8 +24,6 @@ pub mod mantenimiento;
 pub mod notificaciones;
 pub mod ocr_client;
 pub mod ocr_mapping;
-#[cfg(test)]
-mod documento_editor_pbt;
 #[cfg(test)]
 mod ocr_mapping_pbt;
 #[cfg(test)]

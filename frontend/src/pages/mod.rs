@@ -1,4 +1,5 @@
 pub mod auditoria;
+pub mod chatbot_config;
 pub mod configuracion;
 pub mod contratos;
 pub mod dashboard;

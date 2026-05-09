@@ -27,7 +27,9 @@ fn valid_contenido() -> impl Strategy<Value = serde_json::Value> {
     prop_oneof![
         Just(serde_json::json!({"version": 1, "blocks": []})),
         Just(serde_json::json!({"version": 1, "blocks": [{"type": "paragraph", "text": "Hello"}]})),
-        Just(serde_json::json!({"version": 1, "blocks": [{"type": "heading", "text": "Title", "level": 1}]})),
+        Just(
+            serde_json::json!({"version": 1, "blocks": [{"type": "heading", "text": "Title", "level": 1}]})
+        ),
         Just(serde_json::json!({"version": 1, "blocks": [
             {"type": "paragraph", "text": "Intro"},
             {"type": "list", "ordered": true, "items": ["Item 1", "Item 2"]}
@@ -98,9 +100,7 @@ mod pbt_async {
     async fn cleanup_plantilla(db: &DatabaseConnection, id: uuid::Uuid) {
         use realestate_backend::entities::plantilla_documento;
         use sea_orm::EntityTrait;
-        let _ = plantilla_documento::Entity::delete_by_id(id)
-            .exec(db)
-            .await;
+        let _ = plantilla_documento::Entity::delete_by_id(id).exec(db).await;
     }
 
     /// Property 3: Template CRUD round-trip

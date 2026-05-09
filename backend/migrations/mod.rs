@@ -23,6 +23,7 @@ pub mod m20250601_000001_create_ejecuciones_tareas;
 pub mod m20250615_000001_add_deposit_tracking_to_contratos;
 pub mod m20250615_000002_add_recargo_fields;
 pub mod m20250620_000001_create_firmas_documento;
+pub mod m20260509_000001_create_chatbot_tables;
 
 use sea_orm_migration::prelude::*;
 
@@ -56,6 +57,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250615_000001_add_deposit_tracking_to_contratos::Migration),
             Box::new(m20250615_000002_add_recargo_fields::Migration),
             Box::new(m20250620_000001_create_firmas_documento::Migration),
+            Box::new(m20260509_000001_create_chatbot_tables::Migration),
         ]
     }
 }

@@ -180,7 +180,27 @@ h1, h2, h3, h4, h5, h6,
 /* Sidebar */
 .gi-sidebar {
   background-color: var(--surface-sidebar);
+  padding: var(--space-4);
   transition: transform var(--duration-normal) var(--ease-out);
+}
+
+.gi-sidebar-group {
+  margin-bottom: var(--space-3);
+}
+
+.gi-sidebar-group-label {
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: oklch(55% 0.01 185);
+}
+
+.gi-sidebar-divider {
+  height: 1px;
+  background-color: oklch(30% 0.015 185);
+  margin: var(--space-2) var(--space-4);
 }
 
 .gi-sidebar-link {
@@ -211,6 +231,11 @@ h1, h2, h3, h4, h5, h6,
 .gi-navbar {
   background-color: var(--surface-raised);
   border-bottom: 1px solid var(--border-default);
+  padding: var(--space-3) var(--space-5);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
   box-shadow: var(--shadow-sm);
 }
 
@@ -1873,6 +1898,122 @@ h1, h2, h3, h4, h5, h6,
   margin-left: var(--space-2);
 }
 
+/* Dashboard overdue age distribution */
+.gi-overdue-age {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.gi-overdue-age-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.gi-overdue-age-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.gi-overdue-age-dot-recent {
+  background-color: var(--color-warning);
+}
+
+.gi-overdue-age-dot-old {
+  background-color: var(--color-error);
+}
+
+/* Sidebar layout utilities (replacing inline styles) */
+.gi-sidebar-brand {
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.gi-sidebar-brand-name {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text-inverse);
+  line-height: 1.2;
+}
+
+.gi-sidebar-brand-sub {
+  font-size: 0.65rem;
+  color: var(--text-tertiary);
+  line-height: 1.2;
+}
+
+.gi-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.gi-sidebar-footer {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* Navbar layout utilities (replacing inline styles) */
+.gi-navbar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.gi-navbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.gi-navbar-title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.gi-navbar-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.gi-navbar-user-info {
+  text-align: right;
+}
+
+.gi-navbar-user-name {
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+/* Filter bar apply button */
+.gi-filter-actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.gi-filter-count {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
 /* Card section (card with padding and top margin) */
 .gi-card-section {
   background-color: var(--surface-raised);
@@ -1905,12 +2046,32 @@ h1, h2, h3, h4, h5, h6,
   align-items: center;
   justify-content: center;
   background-color: var(--surface-base);
+  position: relative;
+  overflow: hidden;
+}
+
+.gi-login-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 80%, oklch(48% 0.10 185 / 0.06), transparent),
+    radial-gradient(ellipse 60% 50% at 80% 20%, oklch(55% 0.13 30 / 0.04), transparent);
+  pointer-events: none;
+}
+
+[data-theme="dark"] .gi-login-page::before {
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 80%, oklch(30% 0.08 185 / 0.15), transparent),
+    radial-gradient(ellipse 60% 50% at 80% 20%, oklch(35% 0.08 30 / 0.08), transparent);
 }
 
 .gi-login-container {
   width: 100%;
   max-width: 420px;
   padding: var(--space-4);
+  position: relative;
+  z-index: 1;
 }
 
 .gi-login-header {

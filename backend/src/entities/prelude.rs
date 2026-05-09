@@ -8,6 +8,12 @@ pub use sea_orm::DbBackend;
 pub use sea_orm::DbErr;
 
 #[allow(unused_imports)]
+pub use super::chatbot_config::Entity as ChatbotConfig;
+#[allow(unused_imports)]
+pub use super::chatbot_conversation::Entity as ChatbotConversation;
+#[allow(unused_imports)]
+pub use super::chatbot_receipt_extraction::Entity as ChatbotReceiptExtraction;
+#[allow(unused_imports)]
 pub use super::configuracion::Entity as Configuracion;
 #[allow(unused_imports)]
 pub use super::contrato::Entity as Contrato;

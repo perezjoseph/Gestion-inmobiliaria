@@ -81,10 +81,7 @@ pub async fn crear(
 
 // ── Get template by ID ─────────────────────────────────────────
 
-pub async fn obtener(
-    db: &DatabaseConnection,
-    id: Uuid,
-) -> Result<PlantillaResponse, AppError> {
+pub async fn obtener(db: &DatabaseConnection, id: Uuid) -> Result<PlantillaResponse, AppError> {
     let model = plantilla_documento::Entity::find_by_id(id)
         .one(db)
         .await?
@@ -154,10 +151,7 @@ pub async fn actualizar(
 
 // ── Soft-delete template ───────────────────────────────────────
 
-pub async fn eliminar(
-    db: &DatabaseConnection,
-    id: Uuid,
-) -> Result<(), AppError> {
+pub async fn eliminar(db: &DatabaseConnection, id: Uuid) -> Result<(), AppError> {
     let existing = plantilla_documento::Entity::find_by_id(id)
         .one(db)
         .await?

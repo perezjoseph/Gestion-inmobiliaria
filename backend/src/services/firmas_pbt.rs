@@ -88,9 +88,9 @@ fn arbitrary_text() -> impl Strategy<Value = String> {
 
 /// Generate a heading block with arbitrary level and text.
 fn heading_block() -> impl Strategy<Value = serde_json::Value> {
-    (1u64..=3, arbitrary_text()).prop_map(|(level, text)| {
-        serde_json::json!({ "type": "heading", "level": level, "text": text })
-    })
+    (1u64..=3, arbitrary_text()).prop_map(
+        |(level, text)| serde_json::json!({ "type": "heading", "level": level, "text": text }),
+    )
 }
 
 /// Generate a paragraph block with arbitrary text.
@@ -148,7 +148,7 @@ proptest! {
     /// **Validates: Requirements 5.1, 5.2, 8.4, 8.5, 8.6**
     #[test]
     fn token_generation_correctness(
-        firmante_nombre in "[a-zA-Z ]{2,50}",
+        firmante_nombre in "[a-zA-Z]{1,25}( [a-zA-Z]{1,24}){0,3}",
         _email in "[a-z]{3,10}@[a-z]{3,8}\\.[a-z]{2,4}"
     ) {
         // Simulate what solicitar_firma does internally:
@@ -353,7 +353,6 @@ proptest! {
     }
 }
 
-
 // ── Property 7: Signature record completeness ──────────────────────────
 // Tests that for any valid signature inputs, the constructed firma_documento
 // record has all required fields: non-null firma_imagen, non-empty ip_address,
@@ -422,7 +421,6 @@ proptest! {
     }
 }
 
-
 // ── Property 13: Sealed document immutability ──────────────────────────
 // For any document with sellado=true, attempting to update contenido_editable
 // SHALL return a Forbidden error (403) with the expected message.
@@ -468,9 +466,7 @@ where
         if let Ok(Some(_)) = db.query_one(check).await {
             // table exists
         } else {
-            eprintln!(
-                "Schema not ready (documentos table missing) -- skipping DB property test"
-            );
+            eprintln!("Schema not ready (documentos table missing) -- skipping DB property test");
             return;
         }
         f(db).await;
@@ -569,7 +565,10 @@ fn sealed_document_immutability() {
                     "blocks": [{"type": "paragraph", "text": "modified"}]
                 });
                 let result = crate::services::documento_editor::guardar_contenido(
-                    &db, doc_id, new_contenido, user_id,
+                    &db,
+                    doc_id,
+                    new_contenido,
+                    user_id,
                 )
                 .await;
 

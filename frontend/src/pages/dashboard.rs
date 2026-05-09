@@ -163,8 +163,18 @@ fn StatsHeader(props: &StatsHeaderProps) -> Html {
                 <p class="gi-stat-label">{if s.pagos_atrasados > 0 { "⚠ Pagos atrasados" } else { "Pagos atrasados" }}</p>
                 <p class="gi-stat-value">{s.pagos_atrasados}</p>
                 if s.pagos_atrasados > 0 {
-                    <span class="gi-text-xs gi-mt-1">
-                        <Link<Route> to={Route::Pagos} classes="gi-btn-text">{"Ver detalles →"}</Link<Route>>
+                    <div class="gi-overdue-age">
+                        <span class="gi-overdue-age-item">
+                            <span class="gi-overdue-age-dot gi-overdue-age-dot-recent" />
+                            {"< 15 días"}
+                        </span>
+                        <span class="gi-overdue-age-item">
+                            <span class="gi-overdue-age-dot gi-overdue-age-dot-old" />
+                            {"> 30 días"}
+                        </span>
+                    </div>
+                    <span class="gi-mt-1">
+                        <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-xs">{"Ver detalles →"}</Link<Route>>
                     </span>
                 } else {
                     <p class="gi-text-xs gi-text-tertiary gi-mt-1">{"Todo al día"}</p>

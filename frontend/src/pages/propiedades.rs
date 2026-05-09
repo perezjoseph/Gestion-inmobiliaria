@@ -72,18 +72,23 @@ fn PropiedadFilterBar(props: &PropiedadFilterBarProps) -> Html {
     .filter(|&&v| v)
     .count();
 
+    let on_apply = {
+        let on_enter = props.on_enter.clone();
+        Callback::from(move |_: MouseEvent| on_enter.emit(()))
+    };
+
     html! {
         <div class="gi-filter-bar">
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); align-items: end;">
                 <div>
-                    <label class="gi-label">{"Ciudad"}</label>
-                    <input type="text" value={(*props.filter_ciudad).clone()} oninput={on_ciudad_input}
+                    <label for="filter-ciudad" class="gi-label">{"Ciudad"}</label>
+                    <input id="filter-ciudad" type="text" value={(*props.filter_ciudad).clone()} oninput={on_ciudad_input}
                         onkeydown={on_ciudad_keydown}
                         class="gi-input" placeholder="Filtrar por ciudad" />
                 </div>
                 <div>
-                    <label class="gi-label">{"Tipo"}</label>
-                    <select onchange={on_tipo_change} class="gi-input">
+                    <label for="filter-tipo" class="gi-label">{"Tipo"}</label>
+                    <select id="filter-tipo" onchange={on_tipo_change} class="gi-input" aria-label="Filtrar por tipo de propiedad">
                         <option value="" selected={props.filter_tipo.is_empty()}>{"Todos"}</option>
                         <option value="casa" selected={*props.filter_tipo == "casa"}>{"Casa"}</option>
                         <option value="apartamento" selected={*props.filter_tipo == "apartamento"}>{"Apartamento"}</option>
@@ -93,25 +98,26 @@ fn PropiedadFilterBar(props: &PropiedadFilterBarProps) -> Html {
                     </select>
                 </div>
                 <div>
-                    <label class="gi-label">{"Estado"}</label>
-                    <select onchange={on_estado_change} class="gi-input">
+                    <label for="filter-estado" class="gi-label">{"Estado"}</label>
+                    <select id="filter-estado" onchange={on_estado_change} class="gi-input" aria-label="Filtrar por estado">
                         <option value="" selected={props.filter_estado.is_empty()}>{"Todos"}</option>
                         <option value="disponible" selected={*props.filter_estado == "disponible"}>{"Disponible"}</option>
                         <option value="ocupada" selected={*props.filter_estado == "ocupada"}>{"Ocupada"}</option>
                         <option value="mantenimiento" selected={*props.filter_estado == "mantenimiento"}>{"Mantenimiento"}</option>
                     </select>
                 </div>
-                <div style="display: flex; gap: var(--space-2); align-items: center;">
+                <div class="gi-filter-actions">
+                    <button onclick={on_apply} class="gi-btn gi-btn-primary gi-btn-sm">{"Filtrar"}</button>
                     if active_count > 0 {
                         <span class="gi-badge gi-badge-info" style="font-size: var(--text-xs);">
                             {format!("{active_count} filtro{} activo{}", if active_count > 1 { "s" } else { "" }, if active_count > 1 { "s" } else { "" })}
                         </span>
                     }
-                    <button onclick={props.on_clear.clone()} class="gi-btn gi-btn-ghost">{"Limpiar"}</button>
+                    <button onclick={props.on_clear.clone()} class="gi-btn gi-btn-ghost gi-btn-sm">{"Limpiar"}</button>
                 </div>
             </div>
             if props.total > 0 || active_count > 0 {
-                <div style="margin-top: var(--space-2); font-size: var(--text-xs); color: var(--text-tertiary);">
+                <div class="gi-filter-count">
                     if active_count > 0 {
                         {format!("Mostrando {} de {} propiedades", props.showing, props.total)}
                     } else {
@@ -269,30 +275,31 @@ fn PropiedadForm(props: &PropiedadFormProps) -> Html {
                     </select>
                 </div>
                 <div style="grid-column: 1 / -1;">
-                    <button type="button" class="gi-collapsible-trigger" onclick={toggle_optional}>
+                    <button type="button" class="gi-collapsible-trigger" onclick={toggle_optional}
+                        aria-expanded={opt_open.to_string()} aria-controls="optional-fields">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                             style={if opt_open { "transform: rotate(90deg); transition: transform 0.2s;" } else { "transition: transform 0.2s;" }}>
                             <path d="M9 18l6-6-6-6"/>
                         </svg>
                         {" Campos opcionales"}
                     </button>
-                    <div class={if opt_open { "gi-collapsible-content open" } else { "gi-collapsible-content" }}>
+                    <div id="optional-fields" class={if opt_open { "gi-collapsible-content open" } else { "gi-collapsible-content" }}>
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4); padding-top: var(--space-3);">
                             <div style="grid-column: 1 / -1;">
-                                <label class="gi-label">{"Descripción"}</label>
-                                <input type="text" value={(*props.descripcion).clone()} oninput={input_cb!(props.descripcion)} class="gi-input" />
+                                <label for="prop-descripcion" class="gi-label">{"Descripción"}</label>
+                                <input id="prop-descripcion" type="text" value={(*props.descripcion).clone()} oninput={input_cb!(props.descripcion)} class="gi-input" />
                             </div>
                             <div>
-                                <label class="gi-label">{"Habitaciones"}</label>
-                                <input type="number" min="0" value={(*props.habitaciones).clone()} oninput={input_cb!(props.habitaciones)} class="gi-input" />
+                                <label for="prop-habitaciones" class="gi-label">{"Habitaciones"}</label>
+                                <input id="prop-habitaciones" type="number" min="0" value={(*props.habitaciones).clone()} oninput={input_cb!(props.habitaciones)} class="gi-input" />
                             </div>
                             <div>
-                                <label class="gi-label">{"Baños"}</label>
-                                <input type="number" min="0" value={(*props.banos).clone()} oninput={input_cb!(props.banos)} class="gi-input" />
+                                <label for="prop-banos" class="gi-label">{"Baños"}</label>
+                                <input id="prop-banos" type="number" min="0" value={(*props.banos).clone()} oninput={input_cb!(props.banos)} class="gi-input" />
                             </div>
                             <div>
-                                <label class="gi-label">{"Área (m²)"}</label>
-                                <input type="number" step="0.01" min="0" value={(*props.area_m2).clone()} oninput={input_cb!(props.area_m2)} class="gi-input" />
+                                <label for="prop-area" class="gi-label">{"Área (m²)"}</label>
+                                <input id="prop-area" type="number" step="0.01" min="0" value={(*props.area_m2).clone()} oninput={input_cb!(props.area_m2)} class="gi-input" />
                             </div>
                         </div>
                     </div>

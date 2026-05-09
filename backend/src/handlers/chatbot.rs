@@ -1,0 +1,514 @@
+use actix_web::{HttpResponse, web};
+use sea_orm::DatabaseConnection;
+use serde::Deserialize;
+use uuid::Uuid;
+
+use crate::config::AppConfig;
+use crate::errors::AppError;
+use crate::middleware::rbac::WriteAccess;
+use crate::models::chatbot::{
+    Capabilities, ChatbotConfigUpdateRequest, ClearHandoffRequest, ConversationMessage, FaqEntry,
+    HandoffStatusResponse, ReceiptConfirmRequest, ReceiptExtractionResponse, TestChatRequest,
+    TestChatResponse,
+};
+use crate::services::ai_module::{
+    AiModule, ChatbotPersona, ConversationEntry, ProcessMessageContext, UserMessage,
+};
+use crate::services::chatbot;
+
+/// GET /api/v1/chatbot/config — return chatbot config for the current org.
+pub async fn get_config(
+    db: web::Data<DatabaseConnection>,
+    claims: WriteAccess,
+) -> Result<HttpResponse, AppError> {
+    let config = chatbot::get_config(db.get_ref(), claims.0.organizacion_id).await?;
+    Ok(HttpResponse::Ok().json(config))
+}
+
+/// PUT /api/v1/chatbot/config — create or update chatbot config (validate, persist, audit).
+pub async fn update_config(
+    db: web::Data<DatabaseConnection>,
+    claims: WriteAccess,
+    body: web::Json<ChatbotConfigUpdateRequest>,
+) -> Result<HttpResponse, AppError> {
+    let result = chatbot::upsert_config(
+        db.get_ref(),
+        claims.0.organizacion_id,
+        body.into_inner(),
+        claims.0.sub,
+        &claims.0.rol,
+    )
+    .await?;
+    Ok(HttpResponse::Ok().json(result))
+}
+
+/// POST `/api/v1/chatbot/connect` — initiate connection via `Baileys` Service.
+///
+/// Calls `POST /sessions/{realmId}/start` on the `Baileys` sidecar and returns
+/// the QR code data or current connection status.
+pub async fn connect(
+    app_config: web::Data<AppConfig>,
+    claims: WriteAccess,
+) -> Result<HttpResponse, AppError> {
+    let chatbot_config = &app_config.chatbot;
+
+    let realm_id = claims.0.organizacion_id;
+    let url = format!(
+        "{}/sessions/{}/start",
+        chatbot_config.baileys_service_url, realm_id
+    );
+
+    let client = reqwest::Client::new();
+    let response = client.post(&url).send().await.map_err(|e| {
+        AppError::Internal(anyhow::anyhow!("Error conectando al servicio Baileys: {e}"))
+    })?;
+
+    let status = response.status();
+    let body: serde_json::Value = response.json().await.map_err(|e| {
+        AppError::Internal(anyhow::anyhow!(
+            "Error procesando respuesta de Baileys: {e}"
+        ))
+    })?;
+
+    if status.is_success() {
+        Ok(HttpResponse::Ok().json(body))
+    } else {
+        Err(AppError::Internal(anyhow::anyhow!(
+            "Baileys respondió con estado {status}"
+        )))
+    }
+}
+
+/// POST `/api/v1/chatbot/disconnect` — disconnect `WhatsApp` session via `Baileys` Service.
+///
+/// Calls `POST /sessions/{realmId}/stop` on the `Baileys` sidecar.
+pub async fn disconnect(
+    app_config: web::Data<AppConfig>,
+    claims: WriteAccess,
+) -> Result<HttpResponse, AppError> {
+    let chatbot_config = &app_config.chatbot;
+
+    let realm_id = claims.0.organizacion_id;
+    let url = format!(
+        "{}/sessions/{}/stop",
+        chatbot_config.baileys_service_url, realm_id
+    );
+
+    let client = reqwest::Client::new();
+    let response = client.post(&url).send().await.map_err(|e| {
+        AppError::Internal(anyhow::anyhow!("Error conectando al servicio Baileys: {e}"))
+    })?;
+
+    let status = response.status();
+    let body: serde_json::Value = response.json().await.map_err(|e| {
+        AppError::Internal(anyhow::anyhow!(
+            "Error procesando respuesta de Baileys: {e}"
+        ))
+    })?;
+
+    if status.is_success() {
+        Ok(HttpResponse::Ok().json(body))
+    } else {
+        Err(AppError::Internal(anyhow::anyhow!(
+            "Baileys respondió con estado {status}"
+        )))
+    }
+}
+
+/// GET `/api/v1/chatbot/status` — get current `WhatsApp` connection status.
+///
+/// Calls `GET /sessions/{realmId}/status` on the `Baileys` sidecar.
+pub async fn status(
+    app_config: web::Data<AppConfig>,
+    claims: WriteAccess,
+) -> Result<HttpResponse, AppError> {
+    let chatbot_config = &app_config.chatbot;
+
+    let realm_id = claims.0.organizacion_id;
+    let url = format!(
+        "{}/sessions/{}/status",
+        chatbot_config.baileys_service_url, realm_id
+    );
+
+    let client = reqwest::Client::new();
+    let response = client.get(&url).send().await.map_err(|e| {
+        AppError::Internal(anyhow::anyhow!("Error conectando al servicio Baileys: {e}"))
+    })?;
+
+    let status_code = response.status();
+    let body: serde_json::Value = response.json().await.map_err(|e| {
+        AppError::Internal(anyhow::anyhow!(
+            "Error procesando respuesta de Baileys: {e}"
+        ))
+    })?;
+
+    if status_code.is_success() {
+        Ok(HttpResponse::Ok().json(body))
+    } else {
+        Err(AppError::Internal(anyhow::anyhow!(
+            "Baileys respondió con estado {status_code}"
+        )))
+    }
+}
+
+// --- Conversation Query Params ---
+
+#[derive(Debug, Deserialize)]
+pub struct ConversationListQuery {
+    pub page: Option<u64>,
+    pub per_page: Option<u64>,
+}
+
+// --- Conversation Handlers ---
+
+/// GET `/api/v1/chatbot/conversations` — list recent conversations (paginated).
+///
+/// Returns distinct sender phones with their latest message and message count.
+pub async fn list_conversations(
+    db: web::Data<DatabaseConnection>,
+    claims: WriteAccess,
+    query: web::Query<ConversationListQuery>,
+) -> Result<HttpResponse, AppError> {
+    let org_id = claims.0.organizacion_id;
+    let page = query.page.unwrap_or(1).max(1);
+    let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
+
+    let result = chatbot::list_conversations(db.get_ref(), org_id, page, per_page).await?;
+    Ok(HttpResponse::Ok().json(result))
+}
+
+/// GET `/api/v1/chatbot/conversations/{phone}` — get conversation history for a phone.
+pub async fn get_conversation_history(
+    db: web::Data<DatabaseConnection>,
+    claims: WriteAccess,
+    path: web::Path<String>,
+    query: web::Query<ConversationListQuery>,
+) -> Result<HttpResponse, AppError> {
+    let org_id = claims.0.organizacion_id;
+    let phone = path.into_inner();
+    let limit = query.per_page.unwrap_or(50).clamp(1, 100);
+
+    let messages = chatbot::load_history(db.get_ref(), org_id, &phone, limit).await?;
+
+    let response: Vec<ConversationMessage> = messages
+        .into_iter()
+        .map(|m| ConversationMessage {
+            id: m.id,
+            sender_phone: m.sender_phone,
+            inquilino_id: m.inquilino_id,
+            role: m.role,
+            content: m.content,
+            message_type: m.message_type,
+            created_at: m.created_at.into(),
+        })
+        .collect();
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+// --- Receipt Handlers ---
+
+/// GET `/api/v1/chatbot/receipts/pending` — list pending receipt confirmations.
+pub async fn list_pending_receipts(
+    db: web::Data<DatabaseConnection>,
+    claims: WriteAccess,
+) -> Result<HttpResponse, AppError> {
+    let org_id = claims.0.organizacion_id;
+    let records = chatbot::list_pending_receipts(db.get_ref(), org_id).await?;
+
+    let response: Vec<ReceiptExtractionResponse> =
+        records.into_iter().map(extraction_to_response).collect();
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// POST `/api/v1/chatbot/receipts/{id}/confirm` — confirm a receipt extraction.
+pub async fn confirm_receipt(
+    db: web::Data<DatabaseConnection>,
+    claims: WriteAccess,
+    path: web::Path<Uuid>,
+) -> Result<HttpResponse, AppError> {
+    let extraction_id = path.into_inner();
+    let user_id = claims.0.sub;
+
+    let updated = chatbot::confirm_receipt(db.get_ref(), extraction_id, user_id).await?;
+    Ok(HttpResponse::Ok().json(extraction_to_response(updated)))
+}
+
+/// POST `/api/v1/chatbot/receipts/{id}/reject` — reject a receipt extraction.
+pub async fn reject_receipt(
+    db: web::Data<DatabaseConnection>,
+    claims: WriteAccess,
+    path: web::Path<Uuid>,
+    body: web::Json<ReceiptConfirmRequest>,
+) -> Result<HttpResponse, AppError> {
+    let extraction_id = path.into_inner();
+    let user_id = claims.0.sub;
+    let reason = body.rejection_reason.as_deref();
+
+    let updated = chatbot::reject_receipt(db.get_ref(), extraction_id, user_id, reason).await?;
+    Ok(HttpResponse::Ok().json(extraction_to_response(updated)))
+}
+
+// --- Helpers ---
+
+/// Converts a `chatbot_receipt_extraction::Model` to the API response DTO.
+fn extraction_to_response(
+    model: crate::entities::chatbot_receipt_extraction::Model,
+) -> ReceiptExtractionResponse {
+    let data = &model.extracted_data;
+
+    let amount = data
+        .get("amount")
+        .and_then(|v| {
+            v.as_f64().map_or_else(
+                || {
+                    v.as_str()
+                        .and_then(|s| rust_decimal::Decimal::from_str_exact(s).ok())
+                },
+                |f| rust_decimal::Decimal::from_str_exact(&format!("{f:.2}")).ok(),
+            )
+        })
+        .unwrap_or(rust_decimal::Decimal::ZERO);
+
+    ReceiptExtractionResponse {
+        id: model.id,
+        organizacion_id: model.organizacion_id,
+        conversation_id: model.conversation_id,
+        inquilino_id: model.inquilino_id,
+        contrato_id: model.contrato_id,
+        bank: data.get("bank").and_then(|v| v.as_str()).map(String::from),
+        amount,
+        currency: data
+            .get("currency")
+            .and_then(|v| v.as_str())
+            .unwrap_or("DOP")
+            .to_string(),
+        date: data.get("date").and_then(|v| v.as_str()).map(String::from),
+        reference: data
+            .get("reference")
+            .and_then(|v| v.as_str())
+            .map(String::from),
+        sender_name: data
+            .get("sender_name")
+            .and_then(|v| v.as_str())
+            .map(String::from),
+        recipient: data
+            .get("recipient")
+            .and_then(|v| v.as_str())
+            .map(String::from),
+        confidence: data
+            .get("confidence")
+            .and_then(|v| v.as_str())
+            .unwrap_or("low")
+            .to_string(),
+        status: model.status,
+        confirmed_by: model.confirmed_by,
+        created_at: model.created_at.into(),
+        updated_at: model.updated_at.into(),
+    }
+}
+
+// --- Test Chat Handler ---
+
+/// POST `/api/v1/chatbot/test` — process a test message through the full AI pipeline.
+///
+/// Uses the current (possibly unsaved draft) configuration from the request body.
+/// Does NOT persist messages in the production `chatbot_conversation` table.
+/// Does NOT send via `Baileys`.
+/// Returns the AI response or an error indication.
+pub async fn test_chat(
+    db: web::Data<DatabaseConnection>,
+    app_config: web::Data<AppConfig>,
+    claims: WriteAccess,
+    body: web::Json<TestChatRequest>,
+) -> Result<HttpResponse, AppError> {
+    let chatbot_env = &app_config.chatbot;
+
+    let org_id = claims.0.organizacion_id;
+    let request = body.into_inner();
+
+    // Load the saved config as a baseline
+    let saved_config = chatbot::get_config_model(db.get_ref(), org_id).await?;
+
+    // Determine effective persona — use override if provided, else saved config
+    let (persona, faqs, policies, capabilities, handoff_keywords, _) =
+        if let Some(overrides) = &request.config_override {
+            let persona = ChatbotPersona {
+                tone: overrides.tone.clone().or_else(|| saved_config.tone.clone()),
+                greeting: overrides
+                    .greeting
+                    .clone()
+                    .or_else(|| saved_config.greeting.clone()),
+                system_prompt: overrides
+                    .system_prompt
+                    .clone()
+                    .or_else(|| saved_config.system_prompt.clone()),
+                language: overrides
+                    .language
+                    .clone()
+                    .unwrap_or_else(|| saved_config.language.clone()),
+            };
+
+            let faqs: Vec<FaqEntry> = overrides.faqs.clone().unwrap_or_else(|| {
+                saved_config
+                    .faqs
+                    .as_ref()
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default()
+            });
+
+            let policies = overrides
+                .policies
+                .clone()
+                .or_else(|| saved_config.policies.clone());
+
+            let capabilities: Capabilities = overrides.capabilities.clone().unwrap_or_else(|| {
+                saved_config
+                    .capabilities
+                    .as_ref()
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or(Capabilities {
+                        receipt_ocr: false,
+                        balance_queries: false,
+                        payment_reminders: false,
+                        maintenance_requests: false,
+                        human_handoff: false,
+                    })
+            });
+
+            let handoff_keywords: Vec<String> =
+                overrides.handoff_keywords.clone().unwrap_or_else(|| {
+                    saved_config
+                        .handoff_keywords
+                        .as_ref()
+                        .and_then(|v| serde_json::from_value(v.clone()).ok())
+                        .unwrap_or_default()
+                });
+
+            let history_limit = overrides
+                .history_limit
+                .unwrap_or(saved_config.history_limit) as u64;
+
+            (
+                persona,
+                faqs,
+                policies,
+                capabilities,
+                handoff_keywords,
+                history_limit,
+            )
+        } else {
+            let persona = ChatbotPersona {
+                tone: saved_config.tone.clone(),
+                greeting: saved_config.greeting.clone(),
+                system_prompt: saved_config.system_prompt.clone(),
+                language: saved_config.language.clone(),
+            };
+
+            let faqs: Vec<FaqEntry> = saved_config
+                .faqs
+                .as_ref()
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+
+            let policies = saved_config.policies.clone();
+
+            let capabilities: Capabilities = saved_config
+                .capabilities
+                .as_ref()
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or(Capabilities {
+                    receipt_ocr: false,
+                    balance_queries: false,
+                    payment_reminders: false,
+                    maintenance_requests: false,
+                    human_handoff: false,
+                });
+
+            let handoff_keywords: Vec<String> = saved_config
+                .handoff_keywords
+                .as_ref()
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+
+            let history_limit = saved_config.history_limit as u64;
+
+            (
+                persona,
+                faqs,
+                policies,
+                capabilities,
+                handoff_keywords,
+                history_limit,
+            )
+        };
+
+    // For test chat, we use an empty history (no production conversation loaded)
+    let history: Vec<ConversationEntry> = vec![];
+
+    let user_message = UserMessage {
+        content: request.message,
+        image_base64: None,
+    };
+
+    // Initialize AI module and process the message
+    let ai_module = AiModule::new(chatbot_env)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error inicializando AI module: {e}")))?;
+
+    let ctx = ProcessMessageContext {
+        config: &persona,
+        tenant_context: None, // No tenant context in test mode
+        faqs: &faqs,
+        policies: policies.as_deref(),
+        handoff_keywords: &handoff_keywords,
+        capabilities: &capabilities,
+        history: &history,
+        user_message: &user_message,
+        db: db.get_ref(),
+        organizacion_id: org_id,
+        sender_phone: "test",
+    };
+
+    match ai_module.process_message(&ctx).await {
+        Ok(response) => Ok(HttpResponse::Ok().json(TestChatResponse {
+            reply: response.reply,
+            tools_invoked: response.tools_invoked,
+        })),
+        Err(e) => {
+            tracing::error!(
+                organizacion_id = %org_id,
+                error = %e,
+                "Error en test chat AI pipeline"
+            );
+            // Return error indication per Requirement 12.5
+            Ok(HttpResponse::Ok().json(TestChatResponse {
+                reply: format!("Error en el pipeline AI: {e}"),
+                tools_invoked: vec![],
+            }))
+        }
+    }
+}
+
+// --- Handoff Handlers ---
+
+/// POST `/api/v1/chatbot/handoff/clear` — clear human handoff for a conversation.
+///
+/// Resumes AI processing for the specified sender phone.
+/// Only `admin` or `gerente` roles may call this.
+pub async fn clear_handoff(
+    db: web::Data<DatabaseConnection>,
+    claims: WriteAccess,
+    body: web::Json<ClearHandoffRequest>,
+) -> Result<HttpResponse, AppError> {
+    let org_id = claims.0.organizacion_id;
+    let role = &claims.0.rol;
+
+    chatbot::clear_handoff(db.get_ref(), org_id, &body.sender_phone, role).await?;
+
+    Ok(HttpResponse::Ok().json(HandoffStatusResponse {
+        organizacion_id: org_id,
+        sender_phone: body.sender_phone.clone(),
+        handoff_status: "none".to_string(),
+    }))
+}

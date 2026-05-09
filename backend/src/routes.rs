@@ -25,6 +25,22 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .finish()
         .unwrap();
 
+    #[allow(clippy::unwrap_used)]
+    let webhook_governor_conf = GovernorConfigBuilder::default()
+        .seconds_per_request(1)
+        .burst_size(30)
+        .finish()
+        .unwrap();
+
+    cfg.service(
+        web::scope("/internal/whatsapp")
+            .wrap(Governor::new(&webhook_governor_conf))
+            .route(
+                "/incoming",
+                web::post().to(handlers::chatbot_internal::incoming_webhook),
+            ),
+    );
+
     cfg.service(
         web::scope("/api/v1")
             .service(
@@ -317,10 +333,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                         web::get().to(handlers::documentos::exportar_docx),
                     )
                     // Signature routes (authenticated)
-                    .route(
-                        "/{id}/firmar",
-                        web::post().to(handlers::firmas::firmar),
-                    )
+                    .route("/{id}/firmar", web::post().to(handlers::firmas::firmar))
                     .route(
                         "/{id}/solicitar-firma",
                         web::post().to(handlers::firmas::solicitar_firma),
@@ -338,6 +351,40 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route(
                         "/{entity_type}/{entity_id}",
                         web::get().to(handlers::documentos::listar),
+                    ),
+            )
+            .service(
+                web::scope("/chatbot")
+                    .wrap(Governor::new(&write_governor_conf))
+                    .route("/config", web::get().to(handlers::chatbot::get_config))
+                    .route("/config", web::put().to(handlers::chatbot::update_config))
+                    .route("/connect", web::post().to(handlers::chatbot::connect))
+                    .route("/disconnect", web::post().to(handlers::chatbot::disconnect))
+                    .route("/status", web::get().to(handlers::chatbot::status))
+                    .route("/test", web::post().to(handlers::chatbot::test_chat))
+                    .route(
+                        "/handoff/clear",
+                        web::post().to(handlers::chatbot::clear_handoff),
+                    )
+                    .route(
+                        "/conversations",
+                        web::get().to(handlers::chatbot::list_conversations),
+                    )
+                    .route(
+                        "/conversations/{phone}",
+                        web::get().to(handlers::chatbot::get_conversation_history),
+                    )
+                    .route(
+                        "/receipts/pending",
+                        web::get().to(handlers::chatbot::list_pending_receipts),
+                    )
+                    .route(
+                        "/receipts/{id}/confirm",
+                        web::post().to(handlers::chatbot::confirm_receipt),
+                    )
+                    .route(
+                        "/receipts/{id}/reject",
+                        web::post().to(handlers::chatbot::reject_receipt),
                     ),
             )
             .service(

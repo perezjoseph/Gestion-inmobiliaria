@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod chatbot;
 pub mod common;
 pub mod contratos;
 pub mod importacion;

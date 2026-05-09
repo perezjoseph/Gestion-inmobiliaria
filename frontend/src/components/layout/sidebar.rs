@@ -165,8 +165,8 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
 
     html! {
         <aside class={format!("gi-sidebar w-64 min-h-screen flex flex-col{open_class}")}
-               style="padding: var(--space-4);" role="navigation" aria-label="Menú principal">
-            <div style="padding: var(--space-3) var(--space-4); margin-bottom: var(--space-5); display: flex; align-items: center; gap: var(--space-3);">
+               role="navigation" aria-label="Menú principal">
+            <div class="gi-sidebar-brand">
                 <div class="gi-logo-mark gi-logo-mark-sm">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M3 21V9l9-7 9 7v12"/>
@@ -174,121 +174,139 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                     </svg>
                 </div>
                 <div>
-                    <span class="text-display" style="font-size: var(--text-base); font-weight: 700; color: var(--text-inverse); line-height: 1.2;">
+                    <span class="text-display gi-sidebar-brand-name">
                         {"GI"}
                     </span>
-                    <p style="font-size: 0.65rem; color: var(--text-tertiary); line-height: 1.2;">
+                    <p class="gi-sidebar-brand-sub">
                         {"Rep. Dominicana"}
                     </p>
                 </div>
             </div>
             <nav class="flex-1">
-                <ul style="display: flex; flex-direction: column; gap: var(--space-1); list-style: none; padding: 0; margin: 0;">
-                    <li onclick={make_click(on_nav_click.clone())}>
-                        <Link<Route> to={Route::Dashboard}
-                            classes={classes!(link_class(&Route::Dashboard))}>
-                            {icon_dashboard()}
-                            {"Panel de Control"}
-                        </Link<Route>>
-                    </li>
-                    <li onclick={make_click(on_nav_click.clone())}>
-                        <Link<Route> to={Route::Propiedades}
-                            classes={classes!(link_class(&Route::Propiedades))}>
-                            {icon_properties()}
-                            {"Propiedades"}
-                        </Link<Route>>
-                    </li>
-                    <li onclick={make_click(on_nav_click.clone())}>
-                        <Link<Route> to={Route::Inquilinos}
-                            classes={classes!(link_class(&Route::Inquilinos))}>
-                            {icon_tenants()}
-                            {"Inquilinos"}
-                        </Link<Route>>
-                    </li>
-                    <li onclick={make_click(on_nav_click.clone())}>
-                        <Link<Route> to={Route::Contratos}
-                            classes={classes!(link_class(&Route::Contratos))}>
-                            {icon_contracts()}
-                            {"Contratos"}
-                        </Link<Route>>
-                    </li>
-                    <li onclick={make_click(on_nav_click.clone())}>
-                        <Link<Route> to={Route::Pagos}
-                            classes={classes!(link_class(&Route::Pagos))}>
-                            {icon_payments()}
-                            {"Pagos"}
-                        </Link<Route>>
-                    </li>
-                    <li onclick={make_click(on_nav_click.clone())}>
-                        <Link<Route> to={Route::Gastos}
-                            classes={classes!(link_class(&Route::Gastos))}>
-                            {icon_expenses()}
-                            {"Gastos"}
-                        </Link<Route>>
-                    </li>
-                    <li onclick={make_click(on_nav_click.clone())}>
-                        <Link<Route> to={Route::Mantenimiento}
-                            classes={classes!(link_class(&Route::Mantenimiento))}>
-                            {icon_maintenance()}
-                            {"Mantenimiento"}
-                        </Link<Route>>
-                    </li>
-                    <li onclick={make_click(on_nav_click.clone())}>
-                        <Link<Route> to={Route::Reportes}
-                            classes={classes!(link_class(&Route::Reportes))}>
-                            {icon_reports()}
-                            {"Reportes"}
-                        </Link<Route>>
-                    </li>
-                    if can_write {
+                // Operaciones
+                <div class="gi-sidebar-group">
+                    <div class="gi-sidebar-group-label">{"Operaciones"}</div>
+                    <ul class="gi-sidebar-nav">
                         <li onclick={make_click(on_nav_click.clone())}>
-                            <Link<Route> to={Route::Importar}
-                                classes={classes!(link_class(&Route::Importar))}>
-                                {icon_import()}
-                                {"Importar"}
+                            <Link<Route> to={Route::Dashboard}
+                                classes={classes!(link_class(&Route::Dashboard))}>
+                                {icon_dashboard()}
+                                {"Panel de Control"}
                             </Link<Route>>
                         </li>
                         <li onclick={make_click(on_nav_click.clone())}>
-                            <Link<Route> to={Route::Plantillas}
-                                classes={classes!(link_class(&Route::Plantillas))}>
+                            <Link<Route> to={Route::Propiedades}
+                                classes={classes!(link_class(&Route::Propiedades))}>
+                                {icon_properties()}
+                                {"Propiedades"}
+                            </Link<Route>>
+                        </li>
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Inquilinos}
+                                classes={classes!(link_class(&Route::Inquilinos))}>
+                                {icon_tenants()}
+                                {"Inquilinos"}
+                            </Link<Route>>
+                        </li>
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Contratos}
+                                classes={classes!(link_class(&Route::Contratos))}>
                                 {icon_contracts()}
-                                {"Plantillas"}
-                            </Link<Route>>
-                        </li>
-                    }
-                    if is_admin {
-                        <li onclick={make_click(on_nav_click.clone())}>
-                            <Link<Route> to={Route::UsuariosPage}
-                                classes={classes!(link_class(&Route::UsuariosPage))}>
-                                {icon_users()}
-                                {"Usuarios"}
+                                {"Contratos"}
                             </Link<Route>>
                         </li>
                         <li onclick={make_click(on_nav_click.clone())}>
-                            <Link<Route> to={Route::AuditoriaPage}
-                                classes={classes!(link_class(&Route::AuditoriaPage))}>
-                                {icon_audit()}
-                                {"Auditoría"}
+                            <Link<Route> to={Route::Pagos}
+                                classes={classes!(link_class(&Route::Pagos))}>
+                                {icon_payments()}
+                                {"Pagos"}
                             </Link<Route>>
                         </li>
-                    }
-                    <li onclick={make_click(on_nav_click.clone())}>
-                        <Link<Route> to={Route::Configuracion}
-                            classes={classes!(link_class(&Route::Configuracion))}>
-                            {icon_settings()}
-                            {"Configuración"}
-                        </Link<Route>>
-                    </li>
-                    <li onclick={make_click(on_nav_click.clone())}>
-                        <Link<Route> to={Route::Perfil}
-                            classes={classes!(link_class(&Route::Perfil))}>
-                            {icon_profile()}
-                            {"Mi Perfil"}
-                        </Link<Route>>
-                    </li>
-                </ul>
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Gastos}
+                                classes={classes!(link_class(&Route::Gastos))}>
+                                {icon_expenses()}
+                                {"Gastos"}
+                            </Link<Route>>
+                        </li>
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Mantenimiento}
+                                classes={classes!(link_class(&Route::Mantenimiento))}>
+                                {icon_maintenance()}
+                                {"Mantenimiento"}
+                            </Link<Route>>
+                        </li>
+                    </ul>
+                </div>
+                // Herramientas
+                <div class="gi-sidebar-group">
+                    <div class="gi-sidebar-divider" />
+                    <div class="gi-sidebar-group-label">{"Herramientas"}</div>
+                    <ul class="gi-sidebar-nav">
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Reportes}
+                                classes={classes!(link_class(&Route::Reportes))}>
+                                {icon_reports()}
+                                {"Reportes"}
+                            </Link<Route>>
+                        </li>
+                        if can_write {
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::Importar}
+                                    classes={classes!(link_class(&Route::Importar))}>
+                                    {icon_import()}
+                                    {"Importar"}
+                                </Link<Route>>
+                            </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::Plantillas}
+                                    classes={classes!(link_class(&Route::Plantillas))}>
+                                    {icon_contracts()}
+                                    {"Plantillas"}
+                                </Link<Route>>
+                            </li>
+                        }
+                    </ul>
+                </div>
+                // Sistema
+                <div class="gi-sidebar-group">
+                    <div class="gi-sidebar-divider" />
+                    <div class="gi-sidebar-group-label">{"Sistema"}</div>
+                    <ul class="gi-sidebar-nav">
+                        if is_admin {
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::UsuariosPage}
+                                    classes={classes!(link_class(&Route::UsuariosPage))}>
+                                    {icon_users()}
+                                    {"Usuarios"}
+                                </Link<Route>>
+                            </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::AuditoriaPage}
+                                    classes={classes!(link_class(&Route::AuditoriaPage))}>
+                                    {icon_audit()}
+                                    {"Auditoría"}
+                                </Link<Route>>
+                            </li>
+                        }
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Configuracion}
+                                classes={classes!(link_class(&Route::Configuracion))}>
+                                {icon_settings()}
+                                {"Configuración"}
+                            </Link<Route>>
+                        </li>
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Perfil}
+                                classes={classes!(link_class(&Route::Perfil))}>
+                                {icon_profile()}
+                                {"Mi Perfil"}
+                            </Link<Route>>
+                        </li>
+                    </ul>
+                </div>
             </nav>
-            <div style="padding: var(--space-3) var(--space-4); font-size: var(--text-xs); color: var(--text-tertiary);">
+            <div class="gi-sidebar-footer">
                 {"Gestión Inmobiliaria RD"}
             </div>
         </aside>

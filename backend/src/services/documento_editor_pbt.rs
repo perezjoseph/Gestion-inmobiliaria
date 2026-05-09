@@ -31,17 +31,13 @@ fn arb_paragraph_block() -> impl Strategy<Value = serde_json::Value> {
 }
 
 fn arb_list_block() -> impl Strategy<Value = serde_json::Value> {
-    (
-        prop::collection::vec(arb_text(), 1..=5),
-        any::<bool>(),
-    )
-        .prop_map(|(items, ordered)| {
-            serde_json::json!({
-                "type": "list",
-                "items": items,
-                "ordered": ordered
-            })
+    (prop::collection::vec(arb_text(), 1..=5), any::<bool>()).prop_map(|(items, ordered)| {
+        serde_json::json!({
+            "type": "list",
+            "items": items,
+            "ordered": ordered
         })
+    })
 }
 
 fn arb_table_block() -> impl Strategy<Value = serde_json::Value> {
@@ -79,11 +75,7 @@ fn arb_blocks() -> impl Strategy<Value = Vec<serde_json::Value>> {
 /// Blocks that always contain text (heading, paragraph, list only).
 fn arb_text_blocks() -> impl Strategy<Value = Vec<serde_json::Value>> {
     prop::collection::vec(
-        prop_oneof![
-            arb_heading_block(),
-            arb_paragraph_block(),
-            arb_list_block(),
-        ],
+        prop_oneof![arb_heading_block(), arb_paragraph_block(), arb_list_block(),],
         1..=8,
     )
 }

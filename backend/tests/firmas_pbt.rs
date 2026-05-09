@@ -30,8 +30,7 @@ fn valid_firma_b64() -> impl Strategy<Value = String> {
 
 /// Arbitrary IP address string.
 fn arbitrary_ip() -> impl Strategy<Value = String> {
-    (1u8..255, 0u8..255, 0u8..255, 1u8..255)
-        .prop_map(|(a, b, c, d)| format!("{a}.{b}.{c}.{d}"))
+    (1u8..255, 0u8..255, 0u8..255, 1u8..255).prop_map(|(a, b, c, d)| format!("{a}.{b}.{c}.{d}"))
 }
 
 /// Arbitrary user agent string.
@@ -179,9 +178,7 @@ mod pbt_async {
         let _ = firma_documento::Entity::delete_by_id(firma_id)
             .exec(db)
             .await;
-        let _ = documento::Entity::delete_by_id(documento_id)
-            .exec(db)
-            .await;
+        let _ = documento::Entity::delete_by_id(documento_id).exec(db).await;
     }
 
     /// Property 12: Document sealing triggers on complete signatures.

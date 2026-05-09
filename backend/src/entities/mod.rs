@@ -1,5 +1,8 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
+pub mod chatbot_config;
+pub mod chatbot_conversation;
+pub mod chatbot_receipt_extraction;
 #[allow(dead_code)]
 pub mod configuracion;
 pub mod contrato;

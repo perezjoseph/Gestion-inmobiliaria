@@ -523,17 +523,13 @@ pub async fn exportar_docx(
         .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
 
     let contenido = doc.contenido_editable.ok_or_else(|| {
-        AppError::BadRequest(
-            "El documento no tiene contenido editable para exportar".to_string(),
-        )
+        AppError::BadRequest("El documento no tiene contenido editable para exportar".to_string())
     })?;
 
     let blocks = contenido
         .get("blocks")
         .and_then(|b| b.as_array())
-        .ok_or_else(|| {
-            AppError::Validation("Contenido editable sin formato válido".to_string())
-        })?;
+        .ok_or_else(|| AppError::Validation("Contenido editable sin formato válido".to_string()))?;
 
     let docx = build_docx(blocks)?;
     let mut buf = Vec::new();
@@ -549,14 +545,13 @@ pub fn build_docx(blocks: &[serde_json::Value]) -> Result<Docx, AppError> {
     // 15mm margins in twips (1mm = ~56.7 twips)
     let margin_twips = 850; // ~15mm
 
-    let mut docx = Docx::new()
-        .page_margin(
-            docx_rs::PageMargin::new()
-                .top(margin_twips)
-                .bottom(margin_twips)
-                .left(margin_twips)
-                .right(margin_twips),
-        );
+    let mut docx = Docx::new().page_margin(
+        docx_rs::PageMargin::new()
+            .top(margin_twips)
+            .bottom(margin_twips)
+            .left(margin_twips)
+            .right(margin_twips),
+    );
 
     // Define numbering for ordered lists (id=1)
     docx = docx
@@ -569,7 +564,12 @@ pub fn build_docx(blocks: &[serde_json::Value]) -> Result<Docx, AppError> {
                     LevelText::new("%1."),
                     LevelJc::new("left"),
                 )
-                .indent(Some(720), Some(docx_rs::SpecialIndentType::Hanging(360)), None, None),
+                .indent(
+                    Some(720),
+                    Some(docx_rs::SpecialIndentType::Hanging(360)),
+                    None,
+                    None,
+                ),
             ),
         )
         .add_numbering(Numbering::new(1, 1));
@@ -585,7 +585,12 @@ pub fn build_docx(blocks: &[serde_json::Value]) -> Result<Docx, AppError> {
                     LevelText::new("•"),
                     LevelJc::new("left"),
                 )
-                .indent(Some(720), Some(docx_rs::SpecialIndentType::Hanging(360)), None, None),
+                .indent(
+                    Some(720),
+                    Some(docx_rs::SpecialIndentType::Hanging(360)),
+                    None,
+                    None,
+                ),
             ),
         )
         .add_numbering(Numbering::new(2, 2));

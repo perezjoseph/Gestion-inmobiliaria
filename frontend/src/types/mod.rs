@@ -1,4 +1,6 @@
 pub mod auditoria;
+#[allow(dead_code)]
+pub mod chatbot;
 pub mod configuracion;
 pub mod contrato;
 pub mod dashboard_extra;

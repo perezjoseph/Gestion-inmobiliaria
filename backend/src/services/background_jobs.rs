@@ -20,6 +20,7 @@ pub const TAREAS_VALIDAS: &[&str] = &[
     "marcar_contratos_vencidos",
     "marcar_documentos_vencidos",
     "generar_notificaciones",
+    "limpiar_conversaciones_chatbot",
 ];
 
 const INTERVALO_POR_DEFECTO_SECS: u64 = 86_400;
@@ -132,6 +133,7 @@ async fn ejecutar_tarea_con_registro(
         "marcar_contratos_vencidos" => ejecutar_marcar_contratos_vencidos(&db).await,
         "marcar_documentos_vencidos" => ejecutar_marcar_documentos_vencidos(&db).await,
         "generar_notificaciones" => ejecutar_generar_notificaciones(&db).await,
+        "limpiar_conversaciones_chatbot" => ejecutar_limpiar_conversaciones_chatbot(&db).await,
         _ => {
             return Err(AppError::NotFound(format!("Tarea no encontrada: {nombre}")));
         }
@@ -177,6 +179,25 @@ async fn ejecutar_generar_notificaciones(db: &DatabaseConnection) -> Result<i64,
     Ok(total)
 }
 
+async fn ejecutar_limpiar_conversaciones_chatbot(db: &DatabaseConnection) -> Result<i64, AppError> {
+    use crate::entities::chatbot_config;
+
+    let configs = chatbot_config::Entity::find().all(db).await?;
+
+    let mut total: i64 = 0;
+    for config in &configs {
+        let deleted = super::chatbot::cleanup_expired(
+            db,
+            config.organizacion_id,
+            i64::from(config.retention_days),
+        )
+        .await?;
+        total += i64::try_from(deleted).unwrap_or(i64::MAX);
+    }
+
+    Ok(total)
+}
+
 async fn registrar_ejecucion(
     db: &DatabaseConnection,
     nombre: &str,
@@ -208,11 +229,12 @@ mod tests {
 
     #[test]
     fn tareas_validas_contains_expected_names() {
-        assert_eq!(TAREAS_VALIDAS.len(), 4);
+        assert_eq!(TAREAS_VALIDAS.len(), 5);
         assert!(TAREAS_VALIDAS.contains(&"marcar_pagos_atrasados"));
         assert!(TAREAS_VALIDAS.contains(&"marcar_contratos_vencidos"));
         assert!(TAREAS_VALIDAS.contains(&"marcar_documentos_vencidos"));
         assert!(TAREAS_VALIDAS.contains(&"generar_notificaciones"));
+        assert!(TAREAS_VALIDAS.contains(&"limpiar_conversaciones_chatbot"));
     }
 
     #[test]

@@ -3,6 +3,56 @@ use std::time::Duration;
 use sea_orm::ConnectOptions;
 
 #[derive(Clone)]
+pub struct ChatbotEnvConfig {
+    pub baileys_service_url: String,
+    pub baileys_internal_token: String,
+    pub ovms_endpoint: String,
+    pub ovms_chat_model: String,
+    pub ai_chat_timeout_secs: u64,
+}
+
+impl ChatbotEnvConfig {
+    pub fn from_env() -> Result<Self, anyhow::Error> {
+        let baileys_internal_token = match std::env::var("BAILEYS_INTERNAL_TOKEN") {
+            Ok(val) if !val.is_empty() => val,
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "BAILEYS_INTERNAL_TOKEN no está configurado o está vacío"
+                ));
+            }
+        };
+
+        if baileys_internal_token.len() < 32 {
+            return Err(anyhow::anyhow!(
+                "BAILEYS_INTERNAL_TOKEN debe tener al menos 32 caracteres"
+            ));
+        }
+
+        let baileys_service_url = std::env::var("BAILEYS_SERVICE_URL")
+            .unwrap_or_else(|_| "http://baileys:3100".to_string());
+
+        let ovms_endpoint =
+            std::env::var("OVMS_ENDPOINT").unwrap_or_else(|_| "http://ovms:8000/v1".to_string());
+
+        let ovms_chat_model =
+            std::env::var("OVMS_CHAT_MODEL").unwrap_or_else(|_| "qwen3.6".to_string());
+
+        let ai_chat_timeout_secs = std::env::var("AI_CHAT_TIMEOUT_SECS")
+            .unwrap_or_else(|_| "30".to_string())
+            .parse::<u64>()
+            .map_err(|_| anyhow::anyhow!("AI_CHAT_TIMEOUT_SECS debe ser un número válido"))?;
+
+        Ok(Self {
+            baileys_service_url,
+            baileys_internal_token,
+            ovms_endpoint,
+            ovms_chat_model,
+            ai_chat_timeout_secs,
+        })
+    }
+}
+
+#[derive(Clone)]
 pub struct PoolConfig {
     pub max_connections: u32,
     pub min_connections: u32,
@@ -32,6 +82,7 @@ pub struct AppConfig {
     pub server_port: u16,
     pub cors_origin: Option<String>,
     pub pool: PoolConfig,
+    pub chatbot: ChatbotEnvConfig,
 }
 
 impl AppConfig {
@@ -74,6 +125,7 @@ impl AppConfig {
         }
 
         let pool = Self::parse_pool_config()?;
+        let chatbot = ChatbotEnvConfig::from_env()?;
 
         Ok(Self {
             database_url,
@@ -81,6 +133,7 @@ impl AppConfig {
             server_port,
             cors_origin,
             pool,
+            chatbot,
         })
     }
 
@@ -157,6 +210,22 @@ mod tests {
             env::remove_var("DB_IDLE_TIMEOUT_SECS");
             env::remove_var("DB_MAX_LIFETIME_SECS");
             env::remove_var("DB_SQLX_LOGGING");
+            env::remove_var("BAILEYS_INTERNAL_TOKEN");
+            env::remove_var("BAILEYS_SERVICE_URL");
+            env::remove_var("OVMS_ENDPOINT");
+            env::remove_var("OVMS_CHAT_MODEL");
+            env::remove_var("AI_CHAT_TIMEOUT_SECS");
+        }
+    }
+
+    /// Sets the minimum env vars needed for chatbot config to pass validation.
+    #[allow(unsafe_code)]
+    unsafe fn set_chatbot_env_vars() {
+        unsafe {
+            env::set_var(
+                "BAILEYS_INTERNAL_TOKEN",
+                "test_token_that_is_at_least_32_characters_long!",
+            );
         }
     }
 
@@ -171,6 +240,7 @@ mod tests {
             env::set_var("JWT_SECRET", "supersecretkeythatis32charslong!");
             env::set_var("SERVER_PORT", "3000");
             env::set_var("CORS_ORIGIN", "http://localhost:3000");
+            set_chatbot_env_vars();
         }
 
         let config = AppConfig::from_env().unwrap();
@@ -191,6 +261,7 @@ mod tests {
             clear_env_vars();
             env::set_var("DATABASE_URL", "postgres://localhost/test");
             env::set_var("JWT_SECRET", "supersecretkeythatis32charslong!");
+            set_chatbot_env_vars();
         }
 
         // dotenvy may load SERVER_PORT from .env; just verify it parses successfully
@@ -227,6 +298,7 @@ mod tests {
             clear_env_vars();
             env::set_var("DATABASE_URL", "postgres://localhost/test");
             env::set_var("JWT_SECRET", "supersecretkeythatis32charslong!");
+            set_chatbot_env_vars();
         }
 
         let config = AppConfig::from_env().unwrap();
@@ -255,6 +327,7 @@ mod tests {
             env::set_var("DB_IDLE_TIMEOUT_SECS", "600");
             env::set_var("DB_MAX_LIFETIME_SECS", "3600");
             env::set_var("DB_SQLX_LOGGING", "true");
+            set_chatbot_env_vars();
         }
 
         let config = AppConfig::from_env().unwrap();
@@ -300,6 +373,13 @@ mod tests {
                 idle_timeout_secs: 120,
                 max_lifetime_secs: 900,
                 sqlx_logging: true,
+            },
+            chatbot: ChatbotEnvConfig {
+                baileys_service_url: "http://baileys:3100".to_string(),
+                baileys_internal_token: "a]3kF9#mP7$vL2nQ8wR5xT0yU4zA1bC6d".to_string(),
+                ovms_endpoint: "http://ovms:8000/v1".to_string(),
+                ovms_chat_model: "qwen3.6".to_string(),
+                ai_chat_timeout_secs: 30,
             },
         };
 

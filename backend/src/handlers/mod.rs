@@ -1,6 +1,8 @@
 pub mod auditoria;
 pub mod auth;
 pub mod background_jobs;
+pub mod chatbot;
+pub mod chatbot_internal;
 pub mod configuracion;
 pub mod contratos;
 pub mod dashboard;
