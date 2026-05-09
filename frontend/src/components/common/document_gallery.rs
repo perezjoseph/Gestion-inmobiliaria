@@ -299,6 +299,7 @@ pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
             <GalleryHeader
                 uploading={*uploading}
                 digitalizing={*digitalizing}
+                tipo_selected={!selected_tipo_doc.is_empty()}
                 on_upload={on_upload}
                 on_digitalizar={on_digitalizar}
             />
@@ -364,12 +365,15 @@ pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
 struct GalleryHeaderProps {
     uploading: bool,
     digitalizing: bool,
+    tipo_selected: bool,
     on_upload: Callback<Event>,
     on_digitalizar: Callback<Event>,
 }
 
 #[component]
 fn GalleryHeader(props: &GalleryHeaderProps) -> Html {
+    let upload_disabled = props.uploading || !props.tipo_selected;
+
     html! {
         <div class="flex items-center justify-between">
             <h4 style="font-weight: 600; font-size: var(--text-sm); color: var(--text-primary);">
@@ -380,7 +384,11 @@ fn GalleryHeader(props: &GalleryHeaderProps) -> Html {
                     class="gi-btn gi-btn-sm gi-btn-secondary"
                     style={if props.digitalizing { "opacity: 0.5; pointer-events: none;" } else { "" }}
                 >
-                    { if props.digitalizing { "Digitalizando..." } else { "📷 Digitalizar" } }
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                        <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                    { if props.digitalizing { " Digitalizando..." } else { " Digitalizar" } }
                     <input
                         type="file"
                         accept="image/jpeg,image/png,application/pdf"
@@ -390,14 +398,19 @@ fn GalleryHeader(props: &GalleryHeaderProps) -> Html {
                 </label>
                 <label
                     class="gi-btn gi-btn-sm gi-btn-secondary"
-                    style={if props.uploading { "opacity: 0.5; pointer-events: none;" } else { "" }}
+                    style={if upload_disabled { "opacity: 0.5; pointer-events: none;" } else { "" }}
+                    title={if props.tipo_selected { "" } else { "Seleccione un tipo de documento primero" }}
                 >
-                    { if props.uploading { "Subiendo..." } else { "📎 Subir archivo" } }
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                    </svg>
+                    { if props.uploading { " Subiendo..." } else { " Subir archivo" } }
                     <input
                         type="file"
                         accept="image/jpeg,image/png,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         onchange={props.on_upload.clone()}
                         style="display: none;"
+                        disabled={upload_disabled}
                     />
                 </label>
             </div>
@@ -582,16 +595,34 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
     );
 
     let deleting = use_state(|| false);
-    let on_delete_click = {
+    let confirm_delete = use_state(|| false);
+
+    let on_request_delete = {
+        let confirm_delete = confirm_delete.clone();
+        Callback::from(move |_: MouseEvent| {
+            confirm_delete.set(true);
+        })
+    };
+
+    let on_cancel_delete = {
+        let confirm_delete = confirm_delete.clone();
+        Callback::from(move |_: MouseEvent| {
+            confirm_delete.set(false);
+        })
+    };
+
+    let on_confirm_delete = {
         let doc_id = doc.id.clone();
         let token = props.token.to_string();
         let on_delete = props.on_delete.clone();
         let deleting = deleting.clone();
+        let confirm_delete = confirm_delete.clone();
         Callback::from(move |_: MouseEvent| {
             let doc_id = doc_id.clone();
             let token = token.clone();
             let on_delete = on_delete.clone();
             let deleting = deleting.clone();
+            confirm_delete.set(false);
             deleting.set(true);
             spawn_local(async move {
                 if delete_document(&doc_id, &token).await.is_ok() {
@@ -623,8 +654,11 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
                     </a>
                 } else {
                     <a href={file_url} target="_blank" rel="noopener noreferrer"
-                       style="font-size: 2rem; text-decoration: none;">
-                        {"📄"}
+                       class="flex items-center justify-center h-full">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                        </svg>
                     </a>
                 }
             </div>
@@ -632,7 +666,7 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
                 <div class="gi-doc-card-name" title={doc.filename.clone()}>
                     {&doc.filename}
                 </div>
-                <div style="font-size: var(--text-xs); color: var(--text-secondary);">
+                <div class="text-xs text-[var(--text-secondary)]">
                     {tipo_label}
                 </div>
                 <div class="gi-doc-card-meta">
@@ -643,17 +677,47 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
                 </div>
             </div>
             <div class="gi-doc-card-actions">
-                <a href={editor_url} class="gi-btn gi-btn-sm gi-btn-secondary" style="font-size: var(--text-xs);">
-                    {"✏️ Editar"}
-                </a>
-                <button
-                    class="gi-btn gi-btn-sm gi-btn-danger"
-                    style="font-size: var(--text-xs);"
-                    onclick={on_delete_click}
-                    disabled={*deleting}
-                >
-                    { if *deleting { "..." } else { "🗑️ Eliminar" } }
-                </button>
+                if *confirm_delete {
+                    <span class="text-xs text-[var(--text-secondary)]">{"¿Eliminar?"}</span>
+                    <button
+                        class="gi-btn gi-btn-sm gi-btn-danger"
+                        style="font-size: var(--text-xs);"
+                        onclick={on_confirm_delete}
+                    >
+                        {"Sí"}
+                    </button>
+                    <button
+                        class="gi-btn gi-btn-sm gi-btn-secondary"
+                        style="font-size: var(--text-xs);"
+                        onclick={on_cancel_delete}
+                    >
+                        {"No"}
+                    </button>
+                } else {
+                    <a href={editor_url} class="gi-btn gi-btn-sm gi-btn-secondary" style="font-size: var(--text-xs);">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        {" Editar"}
+                    </a>
+                    <button
+                        class="gi-btn gi-btn-sm gi-btn-danger"
+                        style="font-size: var(--text-xs);"
+                        onclick={on_request_delete}
+                        disabled={*deleting}
+                    >
+                        if *deleting {
+                            {"..."}
+                        } else {
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                            {" Eliminar"}
+                        }
+                    </button>
+                }
             </div>
         </div>
     }

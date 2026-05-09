@@ -142,6 +142,16 @@ fn icon_chatbot() -> Html {
     }
 }
 
+fn icon_plantillas() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <path d="M3 9h18"/>
+            <path d="M9 21V9"/>
+        </svg>
+    }
+}
+
 #[component]
 pub fn Sidebar(props: &SidebarProps) -> Html {
     let current_route = use_route::<Route>();
@@ -177,8 +187,10 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
             <div class="gi-sidebar-brand">
                 <div class="gi-logo-mark gi-logo-mark-sm">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 21V9l9-7 9 7v12"/>
-                        <path d="M9 21V12h6v9"/>
+                        <rect x="3" y="3" width="7" height="9" rx="1"/>
+                        <rect x="14" y="3" width="7" height="5" rx="1"/>
+                        <rect x="3" y="15" width="7" height="6" rx="1"/>
+                        <rect x="14" y="11" width="7" height="10" rx="1"/>
                     </svg>
                 </div>
                 <div>
@@ -249,7 +261,9 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                 // Herramientas
                 <div class="gi-sidebar-group">
                     <div class="gi-sidebar-divider" />
-                    <div class="gi-sidebar-group-label">{"Herramientas"}</div>
+                    if can_write {
+                        <div class="gi-sidebar-group-label">{"Herramientas"}</div>
+                    }
                     <ul class="gi-sidebar-nav">
                         <li onclick={make_click(on_nav_click.clone())}>
                             <Link<Route> to={Route::Reportes}
@@ -269,7 +283,7 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                             <li onclick={make_click(on_nav_click.clone())}>
                                 <Link<Route> to={Route::Plantillas}
                                     classes={classes!(link_class(&Route::Plantillas))}>
-                                    {icon_contracts()}
+                                    {icon_plantillas()}
                                     {"Plantillas"}
                                 </Link<Route>>
                             </li>

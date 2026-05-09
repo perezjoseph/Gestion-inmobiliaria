@@ -2532,6 +2532,13 @@ h1, h2, h3, h4, h5, h6,
   display: flex;
   gap: var(--space-1);
   padding: var(--space-1) var(--space-3) var(--space-2);
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.gi-doc-card:hover .gi-doc-card-actions,
+.gi-doc-card:focus-within .gi-doc-card-actions {
+  opacity: 1;
 }
 
 /* Editor — contenteditable surface */

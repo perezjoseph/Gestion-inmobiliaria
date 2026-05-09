@@ -17,6 +17,18 @@ pub fn TestChatStep() -> Html {
     let input = use_state(String::new);
     let loading = use_state(|| false);
     let error = use_state(|| Option::<String>::None);
+    let chat_ref = use_node_ref();
+
+    // Scroll to bottom when messages change
+    {
+        let chat_ref = chat_ref.clone();
+        let msg_len = messages.len();
+        use_effect_with(msg_len, move |_| {
+            if let Some(el) = chat_ref.cast::<web_sys::HtmlElement>() {
+                el.set_scroll_top(el.scroll_height());
+            }
+        });
+    }
 
     let on_input = {
         let input = input.clone();
@@ -76,7 +88,7 @@ pub fn TestChatStep() -> Html {
 
     html! {
         <div class="gi-card" style="padding: var(--space-5);">
-            <h3 style="font-size: var(--text-base); font-weight: 600; margin-bottom: var(--space-4);">
+            <h3 class="text-base font-semibold mb-4">
                 {"Probar Chatbot"}
             </h3>
 
@@ -86,42 +98,37 @@ pub fn TestChatStep() -> Html {
                 })} />
             }
 
-            <div style="border: 1px solid var(--border-default); border-radius: var(--radius-md); height: 300px; overflow-y: auto; padding: var(--space-3); margin-bottom: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2);">
+            <div
+                ref={chat_ref}
+                class="flex flex-col gap-2 mb-3 overflow-y-auto"
+                style="border: 1px solid var(--border-default); border-radius: var(--radius-md); height: 300px; padding: var(--space-3);"
+            >
                 if messages.is_empty() {
-                    <p style="font-size: var(--text-sm); color: var(--text-tertiary); text-align: center; margin: auto;">
+                    <p class="text-sm text-[var(--text-tertiary)] text-center m-auto">
                         {"Envíe un mensaje para probar el chatbot"}
                     </p>
                 }
                 {for (*messages).iter().map(|msg| {
                     let is_user = msg.role == "user";
                     html! {
-                        <div style={format!(
-                            "max-width: 80%; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); font-size: var(--text-sm); {}",
-                            if is_user {
-                                "align-self: flex-end; background: var(--color-primary); color: white;"
-                            } else {
-                                "align-self: flex-start; background: var(--surface-raised); color: var(--text-primary);"
-                            }
-                        )}>
-                            {msg.content.clone()}
-                        </div>
+                        <ChatBubble is_user={is_user} content={AttrValue::from(msg.content.clone())} />
                     }
                 })}
                 if *loading {
-                    <div style="align-self: flex-start; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--surface-raised); font-size: var(--text-sm); color: var(--text-tertiary);">
+                    <div class="self-start rounded-lg text-sm"
+                        style="padding: var(--space-2) var(--space-3); background: var(--surface-raised); color: var(--text-tertiary);">
                         {"Escribiendo..."}
                     </div>
                 }
             </div>
 
-            <form onsubmit={on_send} style="display: flex; gap: var(--space-2);">
+            <form onsubmit={on_send} class="flex gap-2">
                 <input
                     type="text"
-                    class="gi-input"
+                    class="gi-input flex-1"
                     placeholder="Escriba un mensaje de prueba..."
                     value={(*input).clone()}
                     oninput={on_input}
-                    style="flex: 1;"
                 />
                 <button
                     type="submit"
@@ -131,6 +138,34 @@ pub fn TestChatStep() -> Html {
                     {"Enviar"}
                 </button>
             </form>
+        </div>
+    }
+}
+
+// Sub-component for chat bubbles
+#[derive(Properties, PartialEq)]
+struct ChatBubbleProps {
+    is_user: bool,
+    content: AttrValue,
+}
+
+#[component]
+fn ChatBubble(props: &ChatBubbleProps) -> Html {
+    let class = if props.is_user {
+        "self-end rounded-lg text-sm max-w-[80%]"
+    } else {
+        "self-start rounded-lg text-sm max-w-[80%]"
+    };
+
+    let style = if props.is_user {
+        "padding: var(--space-2) var(--space-3); background: var(--color-primary-500); color: white;"
+    } else {
+        "padding: var(--space-2) var(--space-3); background: var(--surface-raised); color: var(--text-primary);"
+    };
+
+    html! {
+        <div class={class} style={style}>
+            {&props.content}
         </div>
     }
 }

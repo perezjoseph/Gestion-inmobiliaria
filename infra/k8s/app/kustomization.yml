@@ -9,6 +9,7 @@ resources:
   - baileys.yml
   - backend.yml
   - frontend.yml
+  - fdroid-repo.yml
   - ingress.yml
 
 # Image tags are overridden by the CI/CD pipeline via:

@@ -1,0 +1,173 @@
+name: Android F-Droid Repo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: android-fdroid-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  JAVA_HOME: ${{ github.workspace }}/android/.jdk/jdk-17.0.18+8
+
+jobs:
+  build-and-publish:
+    name: Build APK & Update F-Droid Repo
+    runs-on: arc-runner-dind
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Android SDK
+        run: |
+          export ANDROID_HOME="${HOME}/android-sdk"
+          mkdir -p "${ANDROID_HOME}/cmdline-tools"
+          curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" \
+            -o /tmp/cmdline-tools.zip
+          unzip -q /tmp/cmdline-tools.zip -d "${ANDROID_HOME}/cmdline-tools"
+          mv "${ANDROID_HOME}/cmdline-tools/cmdline-tools" "${ANDROID_HOME}/cmdline-tools/latest"
+          yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+          "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" "build-tools;36.0.0" > /dev/null 2>&1
+          echo "ANDROID_HOME=${ANDROID_HOME}" >> "${GITHUB_ENV}"
+          echo "${ANDROID_HOME}/cmdline-tools/latest/bin" >> "${GITHUB_PATH}"
+          echo "${ANDROID_HOME}/build-tools/36.0.0" >> "${GITHUB_PATH}"
+
+      - name: Build release APK
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 30
+          max_attempts: 2
+          command: |
+            cd android
+            chmod +x gradlew
+            ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Extract version info
+        id: version
+        run: |
+          VERSION_CODE=$(grep -oP 'versionCode\s*=\s*\K\d+' android/app/build.gradle.kts)
+          VERSION_NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' android/app/build.gradle.kts)
+          echo "code=${VERSION_CODE}" >> "${GITHUB_OUTPUT}"
+          echo "name=${VERSION_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "Version: ${VERSION_NAME} (${VERSION_CODE})"
+
+      - name: Install fdroidserver
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            pip install --quiet fdroidserver
+
+      - name: Configure F-Droid repo
+        run: |
+          mkdir -p fdroid-repo/repo
+          cp android/app/build/outputs/apk/release/app-release.apk \
+            "fdroid-repo/repo/com.propmanager_${{ steps.version.outputs.code }}.apk"
+
+          cat > fdroid-repo/config.yml <<'EOF'
+          repo_url: https://fdroid.local/repo
+          repo_name: PropManager Dev
+          repo_description: PropManager development builds
+          archive_older: 3
+          repo_icon: icon.png
+          archive_url: https://fdroid.local/archive
+          archive_name: PropManager Dev Archive
+          archive_description: Older PropManager builds
+          EOF
+
+      - name: Initialize repo keystore
+        env:
+          FDROID_KEYSTORE_PASS: ${{ secrets.FDROID_KEYSTORE_PASS }}
+        run: |
+          cd fdroid-repo
+          if [ ! -f keystore.p12 ]; then
+            keytool -genkeypair \
+              -alias fdroid-repo \
+              -keyalg EC \
+              -groupname secp256r1 \
+              -validity 10000 \
+              -keystore keystore.p12 \
+              -storetype PKCS12 \
+              -storepass "${FDROID_KEYSTORE_PASS}" \
+              -keypass "${FDROID_KEYSTORE_PASS}" \
+              -dname "CN=PropManager F-Droid Repo, O=PropManager"
+          fi
+
+          cat >> config.yml <<EOF
+          keystore: keystore.p12
+          keystorepass: "${FDROID_KEYSTORE_PASS}"
+          keypass: "${FDROID_KEYSTORE_PASS}"
+          repo_keyalias: fdroid-repo
+          keydname: CN=PropManager F-Droid Repo, O=PropManager
+          EOF
+
+      - name: Update F-Droid repo index
+        run: |
+          cd fdroid-repo
+          fdroid update --create-metadata --rename-apks
+
+      - name: Configure kubeconfig
+        env:
+          KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_DATA }}
+        run: |
+          umask 077
+          mkdir -p "${HOME}/.kube"
+          echo "${KUBECONFIG_DATA}" | base64 -d > "${HOME}/.kube/config"
+
+      - name: Upload repo to PVC
+        run: |
+          # Create a temporary pod to copy files into the PVC
+          kubectl run fdroid-upload --rm -i --restart=Never \
+            --namespace realestate \
+            --image=busybox:1.37 \
+            --overrides='{
+              "spec": {
+                "containers": [{
+                  "name": "fdroid-upload",
+                  "image": "busybox:1.37",
+                  "command": ["sleep", "300"],
+                  "volumeMounts": [{
+                    "name": "repo",
+                    "mountPath": "/repo"
+                  }]
+                }],
+                "volumes": [{
+                  "name": "repo",
+                  "persistentVolumeClaim": {
+                    "claimName": "fdroid-repo-pvc"
+                  }
+                }]
+              }
+            }' &
+
+          # Wait for pod to be ready
+          kubectl wait --for=condition=Ready pod/fdroid-upload \
+            --namespace realestate --timeout=60s
+
+          # Copy repo files
+          kubectl cp fdroid-repo/repo realestate/fdroid-upload:/repo/
+
+          # Terminate the upload pod
+          kubectl delete pod fdroid-upload --namespace realestate --force
+
+      - name: Restart F-Droid nginx to pick up changes
+        run: |
+          kubectl rollout restart deployment/fdroid-repo --namespace realestate
+          kubectl rollout status deployment/fdroid-repo --namespace realestate --timeout=60s
+
+      - name: Credential cleanup
+        if: always()
+        run: rm -f "${HOME}/.kube/config"

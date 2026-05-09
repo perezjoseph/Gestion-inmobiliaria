@@ -66,24 +66,17 @@ pub fn ConnectionStep(props: &ConnectionStepProps) -> Html {
         })
     };
 
-    let status_color = match props.connection_status.as_str() {
-        "connected" => "var(--color-success)",
-        "qr_pending" => "var(--color-warning)",
-        "logged_out" => "var(--color-error)",
-        _ => "var(--text-tertiary)",
-    };
-
-    let status_label = match props.connection_status.as_str() {
-        "connected" => "Conectado",
-        "qr_pending" => "Esperando escaneo QR",
-        "disconnected" => "Desconectado",
-        "logged_out" => "Sesión cerrada",
-        _ => "Desconocido",
+    let (dot_class, status_label) = match props.connection_status.as_str() {
+        "connected" => ("bg-emerald-500", "Conectado"),
+        "qr_pending" => ("bg-amber-400", "Esperando escaneo QR"),
+        "disconnected" => ("bg-red-500", "Desconectado"),
+        "logged_out" => ("bg-red-500", "Sesión cerrada"),
+        _ => ("bg-gray-400", "Desconocido"),
     };
 
     html! {
         <div class="gi-card" style="padding: var(--space-5);">
-            <h3 style="font-size: var(--text-base); font-weight: 600; margin-bottom: var(--space-4);">
+            <h3 class="text-base font-semibold mb-4">
                 {"Conexión WhatsApp"}
             </h3>
 
@@ -93,27 +86,28 @@ pub fn ConnectionStep(props: &ConnectionStepProps) -> Html {
                 })} />
             }
 
-            <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-4);">
-                <span style={format!("width: 10px; height: 10px; border-radius: 50%; background: {status_color};")}></span>
-                <span style="font-size: var(--text-sm); color: var(--text-secondary);">
+            <div class="flex items-center gap-2 mb-4">
+                <span class={classes!("w-2.5", "h-2.5", "rounded-full", dot_class)} />
+                <span class="text-sm text-[var(--text-secondary)]">
                     {status_label}
                 </span>
             </div>
 
             if let Some(qr) = (*qr_code).as_ref() {
-                <div style="display: flex; justify-content: center; margin-bottom: var(--space-4);">
+                <div class="flex justify-center mb-4">
                     <img
                         src={format!("data:image/png;base64,{qr}")}
                         alt="Código QR de WhatsApp"
-                        style="width: 256px; height: 256px; border-radius: var(--radius-md);"
+                        class="rounded-lg"
+                        style="width: 256px; height: 256px;"
                     />
                 </div>
-                <p style="font-size: var(--text-xs); color: var(--text-tertiary); text-align: center;">
+                <p class="text-xs text-[var(--text-tertiary)] text-center">
                     {"Escanee el código QR con WhatsApp para conectar."}
                 </p>
             }
 
-            <div style="display: flex; gap: var(--space-3); margin-top: var(--space-4);">
+            <div class="flex gap-3 mt-4">
                 if props.connection_status != "connected" {
                     <button
                         class="gi-btn gi-btn-primary"

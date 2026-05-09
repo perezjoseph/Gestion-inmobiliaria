@@ -51,3 +51,36 @@ metadata:
   namespace: realestate
 spec:
   insecureSkipVerify: true
+---
+# F-Droid repo: https://fdroid.gestion.local
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: fdroid-repo
+  namespace: realestate
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`fdroid.local`)
+      kind: Rule
+      services:
+        - name: fdroid-repo
+          port: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: fdroid-repo-http
+  namespace: realestate
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`fdroid.local`)
+      kind: Rule
+      middlewares:
+        - name: redirect-https
+      services:
+        - name: fdroid-repo
+          port: 80
