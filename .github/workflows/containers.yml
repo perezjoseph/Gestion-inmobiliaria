@@ -74,8 +74,8 @@ jobs:
             GH_RUN_ID=${{ github.run_id }}
           secrets: |
             gh_token=${{ secrets.GITHUB_TOKEN }}
-          cache-from: type=local,src=/tmp/buildkit-cache/backend
-          cache-to: type=local,dest=/tmp/buildkit-cache/backend,mode=max
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-backend:buildcache
+          cache-to: ${{ inputs.is-production && format('type=registry,ref=ghcr.io/{0}/realestate-backend:buildcache,mode=max', github.repository_owner) || '' }}
 
       - name: Install Trivy
         uses: ./.github/actions/install-security-tools
@@ -200,8 +200,8 @@ jobs:
             ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }}
             ${{ inputs.is-production && format('ghcr.io/{0}/realestate-frontend:latest', github.repository_owner) || '' }}
           build-args: MODE=prebuilt
-          cache-from: type=local,src=/tmp/buildkit-cache/frontend
-          cache-to: type=local,dest=/tmp/buildkit-cache/frontend,mode=max
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-frontend:buildcache
+          cache-to: ${{ inputs.is-production && format('type=registry,ref=ghcr.io/{0}/realestate-frontend:buildcache,mode=max', github.repository_owner) || '' }}
 
       - name: Install Trivy
         uses: ./.github/actions/install-security-tools
@@ -316,8 +316,8 @@ jobs:
           tags: |
             ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service:${{ env.IMAGE_TAG }}
             ${{ inputs.is-production && format('ghcr.io/{0}/realestate-ocr-service:latest', github.repository_owner) || '' }}
-          cache-from: type=local,src=/tmp/buildkit-cache/ocr-service
-          cache-to: type=local,dest=/tmp/buildkit-cache/ocr-service,mode=max
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-ocr-service:buildcache
+          cache-to: ${{ inputs.is-production && format('type=registry,ref=ghcr.io/{0}/realestate-ocr-service:buildcache,mode=max', github.repository_owner) || '' }}
           outputs: type=registry,compression=zstd,compression-level=3,force-compression=true
 
       - name: Install Trivy

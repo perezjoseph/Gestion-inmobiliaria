@@ -49,8 +49,8 @@ jobs:
           tags: |
             ghcr.io/${{ env.IMAGE_OWNER }}/realestate-runner:latest
             ghcr.io/${{ env.IMAGE_OWNER }}/realestate-runner:${{ github.sha }}
-          cache-from: type=local,src=/tmp/buildkit-cache/runner
-          cache-to: type=local,dest=/tmp/buildkit-cache/runner,mode=max
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-runner:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-runner:buildcache,mode=max
 
       - name: Credential cleanup
         if: always()

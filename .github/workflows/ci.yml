@@ -190,8 +190,8 @@ jobs:
           tags: |
             ghcr.io/${{ env.IMAGE_OWNER }}/realestate-baileys:${{ env.IMAGE_TAG }}
             ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && format('ghcr.io/{0}/realestate-baileys:latest', github.repository_owner) || '' }}
-          cache-from: type=local,src=/tmp/buildkit-cache/baileys
-          cache-to: type=local,dest=/tmp/buildkit-cache/baileys,mode=max
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-baileys:buildcache
+          cache-to: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && format('type=registry,ref=ghcr.io/{0}/realestate-baileys:buildcache,mode=max', github.repository_owner) || '' }}
 
       - name: Install Trivy
         uses: ./.github/actions/install-security-tools
