@@ -49,5 +49,8 @@ k3s/
 *.log
 *.cache
 
+# State store (redb)
+data/state_store.db
+
 # Kiro MCP Manager - Sensitive configuration files
 .kiro/settings/

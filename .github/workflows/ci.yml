@@ -149,7 +149,7 @@ jobs:
       id-token: write
       attestations: write
     runs-on: arc-runner-dind
-    timeout-minutes: 15
+    timeout-minutes: 30
     outputs:
       digest: ${{ steps.push.outputs.digest }}
     env:
