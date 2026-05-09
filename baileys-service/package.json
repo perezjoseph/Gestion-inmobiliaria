@@ -10,8 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "6.7.16",
-    "express": "4.21.2",
+    "@whiskeysockets/baileys": "6.7.21",
+    "express": "4.22.1",
     "qrcode": "1.5.4",
     "pino": "9.6.0"
   },
