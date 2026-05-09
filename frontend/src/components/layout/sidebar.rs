@@ -134,6 +134,14 @@ fn icon_settings() -> Html {
     }
 }
 
+fn icon_chatbot() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+    }
+}
+
 #[component]
 pub fn Sidebar(props: &SidebarProps) -> Html {
     let current_route = use_route::<Route>();
@@ -263,6 +271,13 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                                     classes={classes!(link_class(&Route::Plantillas))}>
                                     {icon_contracts()}
                                     {"Plantillas"}
+                                </Link<Route>>
+                            </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::ConfiguracionChatbot}
+                                    classes={classes!(link_class(&Route::ConfiguracionChatbot))}>
+                                    {icon_chatbot()}
+                                    {"Chatbot WhatsApp"}
                                 </Link<Route>>
                             </li>
                         }

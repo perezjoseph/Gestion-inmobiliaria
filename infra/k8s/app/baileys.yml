@@ -78,10 +78,15 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: sessions
+              mountPath: /app/sessions
       volumes:
         - name: tmp
           emptyDir:
             sizeLimit: 64Mi
+        - name: sessions
+          emptyDir:
+            sizeLimit: 128Mi
 ---
 apiVersion: v1
 kind: Service
