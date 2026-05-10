@@ -103,7 +103,7 @@ mod pbt_async {
         rt.block_on(f(db.clone()));
     }
 
-    async fn create_documento(db: &DatabaseConnection) -> Uuid {
+    async fn create_documento(db: &DatabaseConnection) -> (Uuid, Uuid) {
         let id = Uuid::new_v4();
         let now = Utc::now().into();
 
@@ -171,7 +171,7 @@ mod pbt_async {
         .insert(db)
         .await
         .expect("create documento for PBT");
-        id
+        (id, org_id)
     }
 
     async fn cleanup(db: &DatabaseConnection, firma_id: Uuid, documento_id: Uuid) {
@@ -194,7 +194,7 @@ mod pbt_async {
         ua_inq: String,
     ) {
         with_db(|db| async move {
-            let documento_id = create_documento(&db).await;
+            let (documento_id, org_id) = create_documento(&db).await;
 
             // Sign as propietario (admin role)
             let result = firmas::firmar_autenticado(
@@ -205,6 +205,7 @@ mod pbt_async {
                 &firma_b64_prop,
                 ip_prop,
                 ua_prop,
+                org_id,
             )
             .await;
             assert!(
@@ -240,6 +241,7 @@ mod pbt_async {
                 &firma_b64_inq,
                 ip_inq,
                 ua_inq,
+                org_id,
             )
             .await;
             assert!(
@@ -282,8 +284,8 @@ mod pbt_async {
     ) {
         with_db(|db| async move {
             // Create two documents with identical content
-            let doc_a_id = create_documento(&db).await;
-            let doc_b_id = create_documento(&db).await;
+            let (doc_a_id, org_a_id) = create_documento(&db).await;
+            let (doc_b_id, org_b_id) = create_documento(&db).await;
 
             // Document A: propietario first, then inquilino
             let result = firmas::firmar_autenticado(
@@ -294,6 +296,7 @@ mod pbt_async {
                 &firma_b64_prop,
                 ip_prop.clone(),
                 ua_prop.clone(),
+                org_a_id,
             )
             .await;
             assert!(
@@ -310,6 +313,7 @@ mod pbt_async {
                 &firma_b64_inq,
                 ip_inq.clone(),
                 ua_inq.clone(),
+                org_a_id,
             )
             .await;
             assert!(
@@ -327,6 +331,7 @@ mod pbt_async {
                 &firma_b64_inq,
                 ip_inq,
                 ua_inq,
+                org_b_id,
             )
             .await;
             assert!(
@@ -343,6 +348,7 @@ mod pbt_async {
                 &firma_b64_prop,
                 ip_prop,
                 ua_prop,
+                org_b_id,
             )
             .await;
             assert!(
@@ -395,7 +401,7 @@ mod pbt_async {
     /// For firma with estado != "pendiente", verify signing attempt returns 409.
     pub fn p11_signing_state_guard(estado: String) {
         with_db(|db| async move {
-            let documento_id = create_documento(&db).await;
+            let (documento_id, _org_id) = create_documento(&db).await;
 
             // Generate a token and password for the firma
             let token = Uuid::new_v4().to_string();
