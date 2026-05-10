@@ -12,8 +12,6 @@ export interface ConnectionCounts {
     connected: number;
     logged_out: number;
 }
-export declare function encrypt(plaintext: Buffer): Buffer;
-export declare function decrypt(data: Buffer): Buffer;
 export declare function getSession(realmId: string): SessionInfo | undefined;
 export declare function getConnectionCounts(): ConnectionCounts;
 export declare function getActiveConnectionCount(): number;
@@ -38,4 +36,9 @@ export declare function getStatus(realmId: string): {
  * Send a message through an active session.
  */
 export declare function sendMessage(realmId: string, recipientPhone: string, content: string): Promise<void>;
+/**
+ * Restore all sessions that have stored credentials in the database.
+ * Called on startup to reconnect previously authenticated sessions.
+ */
+export declare function restoreSessions(): Promise<void>;
 //# sourceMappingURL=session-manager.d.ts.map

@@ -98,8 +98,8 @@ pub fn ConnectionStep(props: &ConnectionStepProps) -> Html {
                     <img
                         src={format!("data:image/png;base64,{qr}")}
                         alt="Código QR de WhatsApp"
-                        class="rounded-lg"
-                        style="width: 256px; height: 256px;"
+                        class="rounded-lg bg-white p-2"
+                        style="width: 256px; height: 256px; image-rendering: pixelated;"
                     />
                 </div>
                 <p class="text-xs text-[var(--text-tertiary)] text-center">

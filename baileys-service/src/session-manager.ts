@@ -7,6 +7,9 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import { usePostgresAuthState, deleteAuthState, listStoredRealms } from './pg-auth-state';
+import { isRecoverableDisconnect } from './reconnect';
+
+const RECONNECT_DELAY_MS = 1000;
 
 const logger = pino({ name: 'session-manager' });
 
@@ -206,6 +209,19 @@ export async function startSession(realmId: string): Promise<SessionInfo> {
         deleteAuthState(realmId).catch((err) =>
           logger.error({ realmId, err }, 'Failed to delete auth state on logout')
         );
+      } else if (typeof statusCode === 'number' && isRecoverableDisconnect(statusCode)) {
+        // Recoverable disconnects include 515 (restartRequired) emitted right after QR scan
+        // success, plus transient codes 408/428/440/411. Reconnect using the creds persisted
+        // via `creds.update` so pairing can complete.
+        sessionInfo.status = 'disconnected';
+        sessionInfo.socket = null;
+        sessionInfo.qrCode = null;
+        logger.info({ realmId, statusCode }, 'Recoverable disconnect, reconnecting');
+        setTimeout(() => {
+          startSession(realmId).catch((err) =>
+            logger.error({ realmId, err: err.message }, 'Failed to reconnect session')
+          );
+        }, RECONNECT_DELAY_MS);
       } else {
         sessionInfo.status = 'disconnected';
         sessionInfo.socket = null;

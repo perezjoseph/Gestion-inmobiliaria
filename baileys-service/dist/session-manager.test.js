@@ -35,7 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const vitest_1 = require("vitest");
 const fc = __importStar(require("fast-check"));
-const session_manager_1 = require("./session-manager");
+const pg_auth_state_1 = require("./pg-auth-state");
 /**
  * Property 1: Session Encryption Round-Trip
  *
@@ -54,8 +54,8 @@ const session_manager_1 = require("./session-manager");
     (0, vitest_1.it)('encrypting then decrypting produces the original data for any Buffer input', () => {
         fc.assert(fc.property(fc.uint8Array({ minLength: 1, maxLength: 4096 }), (bytes) => {
             const plaintext = Buffer.from(bytes);
-            const ciphertext = (0, session_manager_1.encrypt)(plaintext);
-            const decrypted = (0, session_manager_1.decrypt)(ciphertext);
+            const ciphertext = (0, pg_auth_state_1.encrypt)(plaintext);
+            const decrypted = (0, pg_auth_state_1.decrypt)(ciphertext);
             // Round-trip: decrypt(encrypt(data)) === data
             (0, vitest_1.expect)(decrypted).toEqual(plaintext);
         }), { numRuns: 200 });
@@ -63,7 +63,7 @@ const session_manager_1 = require("./session-manager");
     (0, vitest_1.it)('ciphertext differs from plaintext for any non-empty Buffer input', () => {
         fc.assert(fc.property(fc.uint8Array({ minLength: 1, maxLength: 4096 }), (bytes) => {
             const plaintext = Buffer.from(bytes);
-            const ciphertext = (0, session_manager_1.encrypt)(plaintext);
+            const ciphertext = (0, pg_auth_state_1.encrypt)(plaintext);
             // Ciphertext must differ from plaintext
             (0, vitest_1.expect)(ciphertext.equals(plaintext)).toBe(false);
         }), { numRuns: 200 });
@@ -71,7 +71,7 @@ const session_manager_1 = require("./session-manager");
     (0, vitest_1.it)('ciphertext length is always plaintext + IV (12) + auth tag (16)', () => {
         fc.assert(fc.property(fc.uint8Array({ minLength: 1, maxLength: 4096 }), (bytes) => {
             const plaintext = Buffer.from(bytes);
-            const ciphertext = (0, session_manager_1.encrypt)(plaintext);
+            const ciphertext = (0, pg_auth_state_1.encrypt)(plaintext);
             // AES-256-GCM output: IV (12) + AuthTag (16) + ciphertext (same length as plaintext)
             (0, vitest_1.expect)(ciphertext.length).toBe(plaintext.length + 12 + 16);
         }), { numRuns: 100 });

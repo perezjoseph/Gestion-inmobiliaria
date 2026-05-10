@@ -1,11 +1,21 @@
 import express, { Request, Response } from 'express';
 import pino from 'pino';
-import QRCode from 'qrcode';
+import QRCode, { QRCodeToDataURLOptions } from 'qrcode';
 import { getConnectionCounts, startSession, stopSession, getStatus, sendMessage, restoreSessions } from './session-manager';
 
 const logger = pino({ name: 'baileys-service' });
 
 const PORT = Number.parseInt(process.env.PORT || '3100', 10);
+
+// Render QR at 2x the displayed 256px size for crisp scanning on high-DPI screens,
+// with a proper quiet zone margin and medium error correction (WhatsApp's QR payload
+// is large enough that 'H' would overflow).
+const QR_OPTIONS: QRCodeToDataURLOptions = {
+  width: 512,
+  margin: 4,
+  errorCorrectionLevel: 'M',
+  color: { dark: '#000000', light: '#FFFFFF' },
+};
 
 const app = express();
 app.use(express.json());
@@ -33,7 +43,7 @@ app.post('/sessions/:realmId/start', async (req: Request, res: Response) => {
     const session = await startSession(realmId);
     let qr: string | null = null;
     if (session.qrCode) {
-      qr = await QRCode.toDataURL(session.qrCode, { width: 256 });
+      qr = await QRCode.toDataURL(session.qrCode, QR_OPTIONS);
     }
     res.json({
       realmId: session.realmId,
@@ -94,7 +104,7 @@ app.get('/sessions/:realmId/status', async (req: Request, res: Response) => {
   const sessionStatus = getStatus(realmId);
   let qr: string | null = null;
   if (sessionStatus.qrCode) {
-    qr = await QRCode.toDataURL(sessionStatus.qrCode, { width: 256 });
+    qr = await QRCode.toDataURL(sessionStatus.qrCode, QR_OPTIONS);
   }
   res.json({
     realmId,

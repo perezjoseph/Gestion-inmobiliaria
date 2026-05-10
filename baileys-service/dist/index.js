@@ -6,9 +6,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.app = void 0;
 const express_1 = __importDefault(require("express"));
 const pino_1 = __importDefault(require("pino"));
+const qrcode_1 = __importDefault(require("qrcode"));
 const session_manager_1 = require("./session-manager");
 const logger = (0, pino_1.default)({ name: 'baileys-service' });
 const PORT = Number.parseInt(process.env.PORT || '3100', 10);
+// Render QR at 2x the displayed 256px size for crisp scanning on high-DPI screens,
+// with a proper quiet zone margin and medium error correction (WhatsApp's QR payload
+// is large enough that 'H' would overflow).
+const QR_OPTIONS = {
+    width: 512,
+    margin: 4,
+    errorCorrectionLevel: 'M',
+    color: { dark: '#000000', light: '#FFFFFF' },
+};
 const app = (0, express_1.default)();
 exports.app = app;
 app.use(express_1.default.json());
@@ -30,10 +40,14 @@ app.post('/sessions/:realmId/start', async (req, res) => {
     const realmId = req.params.realmId;
     try {
         const session = await (0, session_manager_1.startSession)(realmId);
+        let qr = null;
+        if (session.qrCode) {
+            qr = await qrcode_1.default.toDataURL(session.qrCode, QR_OPTIONS);
+        }
         res.json({
             realmId: session.realmId,
             status: session.status,
-            qrCode: session.qrCode,
+            qr,
         });
     }
     catch (err) {
@@ -82,16 +96,23 @@ app.post('/sessions/:realmId/stop', async (req, res) => {
  * GET /sessions/:realmId/status
  * Return the current connection status for the organization.
  */
-app.get('/sessions/:realmId/status', (req, res) => {
+app.get('/sessions/:realmId/status', async (req, res) => {
     const realmId = req.params.realmId;
     const sessionStatus = (0, session_manager_1.getStatus)(realmId);
+    let qr = null;
+    if (sessionStatus.qrCode) {
+        qr = await qrcode_1.default.toDataURL(sessionStatus.qrCode, QR_OPTIONS);
+    }
     res.json({
         realmId,
         status: sessionStatus.status,
-        qrCode: sessionStatus.qrCode,
+        qr,
     });
 });
 app.listen(PORT, () => {
     logger.info({ port: PORT }, 'Baileys service started');
+    (0, session_manager_1.restoreSessions)().catch((err) => {
+        logger.error({ err: err.message }, 'Failed to restore sessions on startup');
+    });
 });
 //# sourceMappingURL=index.js.map
