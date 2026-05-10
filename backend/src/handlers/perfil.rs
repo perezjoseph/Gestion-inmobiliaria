@@ -34,6 +34,30 @@ pub async fn actualizar(
     body: web::Json<ActualizarPerfilRequest>,
 ) -> Result<HttpResponse, AppError> {
     let input = body.into_inner();
+    if let Some(ref nombre) = input.nombre {
+        if nombre.trim().is_empty() {
+            return Err(AppError::Validation(
+                "El nombre no puede estar vacío".to_string(),
+            ));
+        }
+        if nombre.len() > 255 {
+            return Err(AppError::Validation(
+                "El nombre no puede exceder 255 caracteres".to_string(),
+            ));
+        }
+    }
+    if let Some(ref email) = input.email {
+        if email.len() > 255 {
+            return Err(AppError::Validation(
+                "El email no puede exceder 255 caracteres".to_string(),
+            ));
+        }
+        if !email.contains('@') || !email.contains('.') {
+            return Err(AppError::Validation(
+                "Formato de email inválido".to_string(),
+            ));
+        }
+    }
     let result =
         perfil::actualizar_perfil(db.get_ref(), claims.sub, input.nombre, input.email).await?;
     Ok(HttpResponse::Ok().json(result))

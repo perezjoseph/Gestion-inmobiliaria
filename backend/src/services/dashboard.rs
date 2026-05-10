@@ -60,8 +60,6 @@ pub async fn get_stats(db: &DatabaseConnection, org_id: Uuid) -> Result<Dashboar
         ingreso_result,
         pagos_atrasados,
         gastos_result,
-        documentos_vencidos,
-        documentos_por_vencer,
     ) = tokio::try_join!(
         propiedad::Entity::find()
             .filter(propiedad::Column::OrganizacionId.eq(org_id))
@@ -90,15 +88,73 @@ pub async fn get_stats(db: &DatabaseConnection, org_id: Uuid) -> Result<Dashboar
             .filter(gasto::Column::FechaGasto.lte(ultimo_dia_mes))
             .into_model::<SumResult>()
             .one(db),
+    )?;
+
+    // Org-scoped document counts: documents are polymorphic (entity_type/entity_id),
+    // so we must join through parent entities that have organizacion_id.
+    let (org_propiedad_ids, org_inquilino_ids, org_contrato_ids) = tokio::try_join!(
+        async {
+            Ok::<Vec<Uuid>, AppError>(
+                propiedad::Entity::find()
+                    .filter(propiedad::Column::OrganizacionId.eq(org_id))
+                    .all(db)
+                    .await?
+                    .iter()
+                    .map(|p| p.id)
+                    .collect(),
+            )
+        },
+        async {
+            Ok::<Vec<Uuid>, AppError>(
+                inquilino::Entity::find()
+                    .filter(inquilino::Column::OrganizacionId.eq(org_id))
+                    .all(db)
+                    .await?
+                    .iter()
+                    .map(|i| i.id)
+                    .collect(),
+            )
+        },
+        async {
+            Ok::<Vec<Uuid>, AppError>(
+                contrato::Entity::find()
+                    .filter(contrato::Column::OrganizacionId.eq(org_id))
+                    .all(db)
+                    .await?
+                    .iter()
+                    .map(|c| c.id)
+                    .collect(),
+            )
+        },
+    )?;
+
+    let all_org_entity_ids: Vec<Uuid> = org_propiedad_ids
+        .into_iter()
+        .chain(org_inquilino_ids)
+        .chain(org_contrato_ids)
+        .collect();
+
+    let documentos_vencidos = if all_org_entity_ids.is_empty() {
+        0u64
+    } else {
         documento::Entity::find()
+            .filter(documento::Column::EntityId.is_in(all_org_entity_ids.clone()))
             .filter(documento::Column::EstadoVerificacion.eq("vencido"))
-            .count(db),
+            .count(db)
+            .await?
+    };
+
+    let documentos_por_vencer = if all_org_entity_ids.is_empty() {
+        0u64
+    } else {
         documento::Entity::find()
+            .filter(documento::Column::EntityId.is_in(all_org_entity_ids))
             .filter(documento::Column::EstadoVerificacion.eq("verificado"))
             .filter(documento::Column::FechaVencimiento.gte(today))
             .filter(documento::Column::FechaVencimiento.lte(fecha_limite_vencimiento))
-            .count(db),
-    )?;
+            .count(db)
+            .await?
+    };
 
     let tasa_ocupacion = if total_propiedades > 0 {
         (ocupadas as f64 / total_propiedades as f64) * 100.0

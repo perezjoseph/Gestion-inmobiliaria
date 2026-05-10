@@ -3492,6 +3492,7 @@ dependencies = [
  "lazy_static",
  "memchr",
  "parking_lot",
+ "protobuf",
  "thiserror 1.0.69",
 ]
 
@@ -3513,6 +3514,12 @@ dependencies = [
  "tempfile",
  "unarray",
 ]
+
+[[package]]
+name = "protobuf"
+version = "2.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 
 [[package]]
 name = "ptr_meta"
@@ -3787,6 +3794,7 @@ dependencies = [
  "infer",
  "jsonwebtoken",
  "numaelis-rckive-genpdf",
+ "prometheus",
  "proptest",
  "rand 0.8.6",
  "reqwest 0.12.28",

@@ -72,6 +72,17 @@ pub async fn historial_pagos(
     query: web::Query<HistorialPagosQuery>,
 ) -> Result<HttpResponse, AppError> {
     let params = query.into_inner();
+    if params.fecha_hasta < params.fecha_desde {
+        return Err(AppError::Validation(
+            "fecha_hasta debe ser mayor o igual a fecha_desde".to_string(),
+        ));
+    }
+    let max_days = 365 * 2; // 2 years max
+    if (params.fecha_hasta - params.fecha_desde).num_days() > max_days {
+        return Err(AppError::Validation(
+            "El rango de fechas no puede exceder 2 años".to_string(),
+        ));
+    }
     let entries = reportes::historial_pagos(
         db.get_ref(),
         claims.organizacion_id,

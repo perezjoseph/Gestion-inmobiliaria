@@ -59,6 +59,11 @@ pub async fn upload(
                 let chunk = chunk
                     .map_err(|e| AppError::Internal(anyhow::anyhow!("Error leyendo chunk: {e}")))?;
                 data.extend_from_slice(&chunk);
+                if data.len() > 10 * 1024 * 1024 {
+                    return Err(AppError::Validation(
+                        "El archivo excede el tamaño máximo de 10 MB".to_string(),
+                    ));
+                }
             }
             file_data = Some(data);
         } else {
@@ -290,6 +295,11 @@ pub async fn digitalizar(
                 let chunk = chunk
                     .map_err(|e| AppError::Internal(anyhow::anyhow!("Error leyendo chunk: {e}")))?;
                 data.extend_from_slice(&chunk);
+                if data.len() > 10 * 1024 * 1024 {
+                    return Err(AppError::Validation(
+                        "El archivo excede el tamaño máximo de 10 MB".to_string(),
+                    ));
+                }
             }
             file_data = Some(data);
         }

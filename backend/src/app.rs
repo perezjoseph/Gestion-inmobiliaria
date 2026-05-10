@@ -17,6 +17,19 @@ async fn health() -> HttpResponse {
     HttpResponse::Ok().json(serde_json::json!({"status": "ok"}))
 }
 
+async fn metrics_handler(
+    _claims: crate::services::auth::Claims,
+) -> HttpResponse {
+    use prometheus::Encoder;
+    let encoder = prometheus::TextEncoder::new();
+    let metric_families = prometheus::default_registry().gather();
+    let mut buffer = Vec::new();
+    encoder.encode(&metric_families, &mut buffer).unwrap_or_default();
+    HttpResponse::Ok()
+        .content_type("text/plain; version=0.0.4")
+        .body(buffer)
+}
+
 async fn serve_upload(
     _claims: crate::services::auth::Claims,
     path: web::Path<String>,
@@ -78,10 +91,10 @@ pub fn create_app(
 > {
     let cors = build_cors(&config);
 
+    #[allow(clippy::panic)] // Fatal: app cannot start without metrics middleware
     let prometheus = PrometheusMetricsBuilder::new("api")
-        .endpoint("/metrics")
         .build()
-        .expect("Error inicializando métricas Prometheus");
+        .unwrap_or_else(|e| panic!("Error inicializando métricas Prometheus: {e}"));
 
     let json_cfg = JsonConfig::default()
         .limit(1_048_576) // 1 MB
@@ -95,7 +108,7 @@ pub fn create_app(
         });
 
     actix_web::App::new()
-        .wrap(prometheus.clone())
+        .wrap(prometheus)
         .wrap(crate::middleware::security_headers::SecurityHeaders)
         .wrap(TracingLogger::default())
         .wrap(cors)
@@ -104,6 +117,7 @@ pub fn create_app(
         .app_data(preview_store)
         .app_data(json_cfg)
         .route("/health", web::get().to(health))
+        .route("/metrics", web::get().to(metrics_handler))
         .configure(routes::configure)
         .route("/uploads/{path:.*}", web::get().to(serve_upload))
 }

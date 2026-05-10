@@ -35,6 +35,16 @@ fn validate_costo(costo: &Decimal) -> Result<(), AppError> {
 }
 
 fn validate_create_solicitud(dto: &CreateSolicitudRequest) -> Result<(), AppError> {
+    if dto.titulo.trim().is_empty() {
+        return Err(AppError::Validation(
+            "El título es requerido".to_string(),
+        ));
+    }
+    if dto.titulo.len() > 255 {
+        return Err(AppError::Validation(
+            "El título no puede exceder 255 caracteres".to_string(),
+        ));
+    }
     if let Some(ref descripcion) = dto.descripcion {
         validate_descripcion(descripcion)?;
     }
@@ -188,6 +198,17 @@ pub async fn agregar_nota(
     let usuario_id = access.0.sub;
     let org_id = access.0.organizacion_id;
     let solicitud_id = path.into_inner();
+    let contenido = &body.contenido;
+    if contenido.trim().is_empty() {
+        return Err(AppError::Validation(
+            "El contenido de la nota es requerido".to_string(),
+        ));
+    }
+    if contenido.len() > 2000 {
+        return Err(AppError::Validation(
+            "El contenido de la nota no puede exceder 2000 caracteres".to_string(),
+        ));
+    }
     let txn = db.begin().await?;
     let result = mantenimiento::agregar_nota(
         &txn,
