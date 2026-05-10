@@ -200,6 +200,8 @@ impl AiModule {
         // a dynamic tool set approach.
         let agent = self
             .client
+            .clone()
+            .completions_api()
             .agent(&self.model_name)
             .preamble(system_prompt)
             .build();
