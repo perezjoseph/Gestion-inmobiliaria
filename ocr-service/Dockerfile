@@ -2,7 +2,9 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Upgrade base packages to pick up latest Debian security patches before
+# installing our own dependencies.
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \
@@ -14,7 +16,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Upgrade pip before installing to pick up CVE fixes (CVE-2025-8869, CVE-2026-6357, CVE-2026-3219)
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
 # Download PaddleOCR models and convert to OpenVINO IR format
 RUN pip install --no-cache-dir paddleocr==3.5.0 paddlepaddle==3.2.2
@@ -39,7 +43,10 @@ WORKDIR /app
 # Install system deps, Intel compute runtime (OpenCL for all Intel GPUs: HD 530+, UHD,
 # Iris Xe, Arc) from GitHub releases, and create non-root user with GPU access.
 # Uses legacy1 packages for Skylake/Kaby Lake support (Gen9).
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# apt-get upgrade pulls the latest Debian security patches for the base image
+# (libgnutls30t64, libssh2-1t64, libcurl4t64, libxml2, libc6, krb5, util-linux,
+# sed, etc.) so Trivy image scans don't flag the base OS packages.
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \

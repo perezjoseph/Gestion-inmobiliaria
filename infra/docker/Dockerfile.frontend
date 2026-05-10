@@ -7,7 +7,8 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY backend/ backend/
 COPY frontend/ frontend/
-RUN cd frontend && trunk build --release
+WORKDIR /app/frontend
+RUN trunk build --release
 RUN cp -r /app/frontend/dist /app/dist
 
 FROM alpine:3.23 AS prebuilt
@@ -21,14 +22,14 @@ RUN apk add --no-cache git
 WORKDIR /build
 RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && \
     XCADDY_SKIP_CLEANUP=1 xcaddy build v2.11.2 || true
-RUN cd /tmp/buildenv_* && \
-    go get github.com/go-jose/go-jose/v3@v3.0.5 && \
-    go get github.com/go-jose/go-jose/v4@v4.1.4 && \
-    go get github.com/smallstep/certificates@v0.30.0 && \
-    go get go.opentelemetry.io/otel/sdk@v1.43.0 && \
-    go get google.golang.org/grpc@v1.79.3 && \
-    go mod tidy && \
-    go build -o /usr/bin/caddy -ldflags "-w -s" -trimpath -tags nobadger,nomysql,nopgx
+RUN BUILDENV=$(ls -d /tmp/buildenv_*) && \
+    go -C "$BUILDENV" get github.com/go-jose/go-jose/v3@v3.0.5 && \
+    go -C "$BUILDENV" get github.com/go-jose/go-jose/v4@v4.1.4 && \
+    go -C "$BUILDENV" get github.com/smallstep/certificates@v0.30.0 && \
+    go -C "$BUILDENV" get go.opentelemetry.io/otel/sdk@v1.43.0 && \
+    go -C "$BUILDENV" get google.golang.org/grpc@v1.79.3 && \
+    go -C "$BUILDENV" mod tidy && \
+    go -C "$BUILDENV" build -o /usr/bin/caddy -ldflags "-w -s" -trimpath -tags nobadger,nomysql,nopgx
 
 FROM alpine:3.23
 

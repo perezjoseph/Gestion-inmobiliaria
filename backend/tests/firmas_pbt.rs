@@ -479,10 +479,12 @@ mod pbt_async {
         with_db(|db| async move {
             let (documento_id, _org_id) = create_documento(&db).await;
 
-            // Generate a token and password for the firma
+            // Generate a token and password for the firma.
+            // Randomize the password per run to avoid a hard-coded cryptographic
+            // value (CodeQL rust/hard-coded-cryptographic-value).
             let token = Uuid::new_v4().to_string();
-            let password = "TestPassword1234";
-            let password_hash = auth::hash_password(password).expect("hash password");
+            let password = Uuid::new_v4().to_string();
+            let password_hash = auth::hash_password(&password).expect("hash password");
 
             let now = Utc::now();
             let expira_at = now + Duration::hours(72);
@@ -514,7 +516,7 @@ mod pbt_async {
             let result = firmas::firmar_con_token(
                 &db,
                 &token,
-                password,
+                &password,
                 &firma_imagen_b64,
                 "127.0.0.1".to_string(),
                 "PBT-Agent/1.0".to_string(),

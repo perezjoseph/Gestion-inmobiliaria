@@ -1,11 +1,14 @@
 # Stage 1: Install dependencies
-FROM node:20-alpine AS deps
+# node:24-alpine ships npm 11 which patches the bundled-npm CVEs
+# (tar, minimatch, glob, cross-spawn, brace-expansion, ip-address)
+# that ship inside node:20-alpine's older npm 10.x.
+FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
 
 # Stage 2: Build TypeScript
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json* tsconfig.json ./
 RUN npm ci
@@ -13,7 +16,7 @@ COPY src/ ./src/
 RUN npm run build
 
 # Stage 3: Production image
-FROM node:20-alpine AS runtime
+FROM node:24-alpine AS runtime
 WORKDIR /app
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
