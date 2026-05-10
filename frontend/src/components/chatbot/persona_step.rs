@@ -122,7 +122,7 @@ pub fn PersonaStep(props: &PersonaStepProps) -> Html {
     let current_greeting = (*greeting).clone();
 
     html! {
-        <div class="grid gap-5" style="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);">
+        <div class="grid gap-5" style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);">
             <div class="flex flex-col gap-4">
                 <div>
                     <label for="persona-name" class="gi-label">

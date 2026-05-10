@@ -105,8 +105,8 @@ pub fn BotStateCard(props: &BotStateCardProps) -> Html {
             }
 
             <div
-                class="grid mt-4"
-                style="grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); border-top: 1px solid var(--border-subtle); padding-top: var(--space-4);"
+                class="mt-4"
+                style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); border-top: 1px solid var(--border-subtle); padding-top: var(--space-4);"
             >
                 <StatChip
                     label="Capacidades activas"

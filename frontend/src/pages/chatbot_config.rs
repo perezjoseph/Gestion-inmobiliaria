@@ -341,8 +341,8 @@ impl PartialEq for ControlPanelLayoutProps {
 fn ControlPanelLayout(props: &ControlPanelLayoutProps) -> Html {
     html! {
         <div
-            class="grid gap-5"
-            style="grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);"
+            class="gap-5"
+            style="display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);"
         >
             <SettingsColumn
                 cfg={props.cfg.clone()}
@@ -356,7 +356,7 @@ fn ControlPanelLayout(props: &ControlPanelLayoutProps) -> Html {
             />
 
             <div
-                class="rounded-lg p-4 gi-chatbot-preview"
+                class="rounded-lg p-4"
                 style="background: var(--surface-raised); border: 1px solid var(--border-default); position: sticky; top: var(--space-4); align-self: flex-start; max-height: calc(100vh - 120px); overflow-y: auto;"
             >
                 <TestChatStep />

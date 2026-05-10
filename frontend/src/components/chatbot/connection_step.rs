@@ -209,7 +209,7 @@ fn QrScanPanel(props: &QrScanPanelProps) -> Html {
     );
 
     html! {
-        <div class="grid gap-5" style="grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);">
+        <div class="grid gap-5" style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);">
             <div class="flex flex-col items-center gap-2">
                 {qr_visual}
                 <p class="text-xs" style="color: var(--color-warning-dark);">
