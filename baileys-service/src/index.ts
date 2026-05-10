@@ -49,6 +49,8 @@ app.post('/sessions/:realmId/start', async (req: Request, res: Response) => {
       realmId: session.realmId,
       status: session.status,
       qr,
+      connectedPhone: session.connectedPhone,
+      connectedAt: session.connectedAt,
     });
   } catch (err: any) {
     logger.error({ realmId, err: err.message }, 'Failed to start session');
@@ -110,6 +112,8 @@ app.get('/sessions/:realmId/status', async (req: Request, res: Response) => {
     realmId,
     status: sessionStatus.status,
     qr,
+    connectedPhone: sessionStatus.connectedPhone,
+    connectedAt: sessionStatus.connectedAt,
   });
 });
 

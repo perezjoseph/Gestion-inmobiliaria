@@ -27,6 +27,8 @@ export interface SessionInfo {
   status: ConnectionStatus;
   qrCode: string | null;
   socket: WASocket | null;
+  connectedPhone: string | null;
+  connectedAt: string | null;
   reconnectAttempts: number;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
 }
@@ -104,6 +106,8 @@ function handleConnectionClose(sessionInfo: SessionInfo, statusCode: number | un
     sessionInfo.status = 'logged_out';
     sessionInfo.socket = null;
     sessionInfo.qrCode = null;
+    sessionInfo.connectedPhone = null;
+    sessionInfo.connectedAt = null;
     sessionInfo.reconnectAttempts = 0;
     logger.info({ realmId }, 'Session logged out remotely');
     deleteAuthState(realmId).catch((err) =>
@@ -254,6 +258,8 @@ export async function startSession(realmId: string): Promise<SessionInfo> {
     status: 'disconnected',
     qrCode: null,
     socket: null,
+    connectedPhone: null,
+    connectedAt: null,
     reconnectAttempts: 0,
     reconnectTimer: null,
   };
@@ -264,6 +270,13 @@ export async function startSession(realmId: string): Promise<SessionInfo> {
 
   // Load auth state from PostgreSQL
   const { state, saveCreds } = await usePostgresAuthState(realmId);
+
+  // If creds already have a paired identity, pre-populate the phone number
+  // (happens on session restore after pod restart)
+  if (state.creds.me?.id) {
+    const phone = '+' + state.creds.me.id.replace(/:.*$/, '').replace('@s.whatsapp.net', '');
+    sessionInfo.connectedPhone = phone;
+  }
 
   // Wrap keys with in-memory cache to minimize DB round-trips
   const cachedKeys = makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }) as any);
@@ -295,7 +308,19 @@ export async function startSession(realmId: string): Promise<SessionInfo> {
         clearTimeout(sessionInfo.reconnectTimer);
         sessionInfo.reconnectTimer = null;
       }
-      logger.info({ realmId }, 'Connection established');
+
+      // Extract connected phone from creds.me (populated after pairing)
+      const me = state.creds.me;
+      if (me?.id) {
+        // me.id format: "18091234567:123@s.whatsapp.net" or "18091234567@s.whatsapp.net"
+        const phone = '+' + me.id.replace(/:.*$/, '').replace('@s.whatsapp.net', '');
+        sessionInfo.connectedPhone = phone;
+      }
+      if (!sessionInfo.connectedAt) {
+        sessionInfo.connectedAt = new Date().toISOString();
+      }
+
+      logger.info({ realmId, phone: sessionInfo.connectedPhone }, 'Connection established');
     }
 
     if (connection === 'close') {
@@ -355,18 +380,20 @@ export async function stopSession(realmId: string): Promise<void> {
   session.status = 'disconnected';
   session.socket = null;
   session.qrCode = null;
+  session.connectedPhone = null;
+  session.connectedAt = null;
   logger.info({ realmId }, 'Session stopped');
 }
 
 /**
  * Get the current status of a session.
  */
-export function getStatus(realmId: string): { status: ConnectionStatus; qrCode: string | null } {
+export function getStatus(realmId: string): { status: ConnectionStatus; qrCode: string | null; connectedPhone: string | null; connectedAt: string | null } {
   const session = sessions.get(realmId);
   if (!session) {
-    return { status: 'disconnected', qrCode: null };
+    return { status: 'disconnected', qrCode: null, connectedPhone: null, connectedAt: null };
   }
-  return { status: session.status, qrCode: session.qrCode };
+  return { status: session.status, qrCode: session.qrCode, connectedPhone: session.connectedPhone, connectedAt: session.connectedAt };
 }
 
 /**

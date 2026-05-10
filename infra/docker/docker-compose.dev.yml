@@ -37,7 +37,7 @@ services:
     environment:
       SESSION_ENCRYPTION_KEY: dev_session_encryption_key_32chars!!
       MAX_CONNECTIONS: "5"
-      BACKEND_WEBHOOK_URL: http://backend:8080/api/whatsapp/webhook
+      BACKEND_WEBHOOK_URL: http://backend:8080
       BAILEYS_INTERNAL_TOKEN: dev_baileys_internal_token
       WA_DATABASE_URL: postgres://whatsapp_session_rw:dev_password@postgres:5432/realestate
       PORT: "3100"
