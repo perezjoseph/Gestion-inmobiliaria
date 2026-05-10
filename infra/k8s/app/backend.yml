@@ -39,7 +39,7 @@ spec:
       containers:
         - name: backend
           image: ghcr.io/perezjoseph/realestate-backend:latest # NOSONAR — deploy.yml overrides with pinned digest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           envFrom:

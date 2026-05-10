@@ -177,12 +177,12 @@ jobs:
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 10
-          max_attempts: 5
+          max_attempts: 2
           command: |
-            kubectl rollout status deployment/backend --namespace realestate --timeout=120s
-            kubectl rollout status deployment/frontend --namespace realestate --timeout=120s
-            kubectl rollout status deployment/ocr-service --namespace realestate --timeout=180s
-            kubectl rollout status deployment/baileys --namespace realestate --timeout=120s
+            kubectl rollout status deployment/backend --namespace realestate --timeout=300s
+            kubectl rollout status deployment/frontend --namespace realestate --timeout=300s
+            kubectl rollout status deployment/ocr-service --namespace realestate --timeout=300s
+            kubectl rollout status deployment/baileys --namespace realestate --timeout=300s
 
       - name: Health check
         id: health-check
@@ -207,11 +207,19 @@ jobs:
       - name: Rollback on failure
         if: failure() && steps.deploy.outcome == 'success'
         run: |
-          echo "::warning::Deployment health check failed -- rolling back"
-          kubectl rollout undo deployment/backend --namespace realestate
-          kubectl rollout undo deployment/frontend --namespace realestate
-          kubectl rollout undo deployment/ocr-service --namespace realestate
-          kubectl rollout undo deployment/baileys --namespace realestate
+          echo "::warning::Deployment health check failed -- rolling back only unhealthy deployments"
+          for DEPLOY in backend frontend ocr-service baileys; do
+            READY=$(kubectl get deployment "$DEPLOY" -n realestate \
+              -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo 0)
+            DESIRED=$(kubectl get deployment "$DEPLOY" -n realestate \
+              -o jsonpath='{.spec.replicas}' 2>/dev/null || echo 1)
+            if [ "${READY:-0}" -lt "${DESIRED:-1}" ]; then
+              echo "::warning::${DEPLOY} is unhealthy (${READY:-0}/${DESIRED:-1}) -- rolling back"
+              kubectl rollout undo "deployment/${DEPLOY}" --namespace realestate || true
+            else
+              echo "${DEPLOY} is healthy (${READY}/${DESIRED}) -- leaving at new revision"
+            fi
+          done
           kubectl rollout status deployment/backend --namespace realestate --timeout=120s || true
           echo "::error::Rollback attempted. Manual verification required."
 

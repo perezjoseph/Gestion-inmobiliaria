@@ -31,7 +31,7 @@ spec:
       containers:
         - name: ocr-service
           image: ghcr.io/perezjoseph/realestate-ocr-service:latest # NOSONAR — deploy.yml overrides with pinned digest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
           env:
