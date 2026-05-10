@@ -155,13 +155,90 @@ async fn create_test_usuario(db: &DatabaseConnection, rol: &str, org_id: Uuid) -
 }
 
 /// Create a test document with editable content for signing tests.
-async fn create_test_documento(db: &DatabaseConnection, user_id: Uuid) -> Uuid {
+/// Also creates propiedad + inquilino + contrato so the document's entity_id
+/// references a real entity in the org (required by multi-tenancy check).
+async fn create_test_documento(db: &DatabaseConnection, user_id: Uuid, org_id: Uuid) -> Uuid {
+    use realestate_backend::entities::{contrato, inquilino, propiedad};
+    use chrono::NaiveDate;
+    use rust_decimal::Decimal;
+
     let id = Uuid::new_v4();
     let now = Utc::now().into();
+
+    let propiedad_id = Uuid::new_v4();
+    propiedad::ActiveModel {
+        id: Set(propiedad_id),
+        titulo: Set("Propiedad Firmas Test".to_string()),
+        descripcion: Set(None),
+        direccion: Set("Calle Test 1".to_string()),
+        ciudad: Set("Santo Domingo".to_string()),
+        provincia: Set("Distrito Nacional".to_string()),
+        tipo_propiedad: Set("apartamento".to_string()),
+        habitaciones: Set(Some(2)),
+        banos: Set(Some(1)),
+        area_m2: Set(Some(Decimal::new(8000, 2))),
+        precio: Set(Decimal::new(2500000, 2)),
+        moneda: Set("DOP".to_string()),
+        estado: Set("disponible".to_string()),
+        imagenes: Set(None),
+        organizacion_id: Set(org_id),
+        created_at: Set(now),
+        updated_at: Set(now),
+    }
+    .insert(db)
+    .await
+    .expect("Failed to create test propiedad");
+
+    let inquilino_id = Uuid::new_v4();
+    inquilino::ActiveModel {
+        id: Set(inquilino_id),
+        nombre: Set("Inquilino".to_string()),
+        apellido: Set("Firmas".to_string()),
+        email: Set(Some(format!("inq+{inquilino_id}@test.com"))),
+        telefono: Set(None),
+        cedula: Set(format!("C{}", &inquilino_id.simple().to_string()[..19])),
+        contacto_emergencia: Set(None),
+        notas: Set(None),
+        documentos: Set(None),
+        organizacion_id: Set(org_id),
+        created_at: Set(now),
+        updated_at: Set(now),
+    }
+    .insert(db)
+    .await
+    .expect("Failed to create test inquilino");
+
+    let contrato_id = Uuid::new_v4();
+    contrato::ActiveModel {
+        id: Set(contrato_id),
+        propiedad_id: Set(propiedad_id),
+        inquilino_id: Set(inquilino_id),
+        fecha_inicio: Set(NaiveDate::from_ymd_opt(2024, 1, 1).expect("valid date")),
+        fecha_fin: Set(NaiveDate::from_ymd_opt(2025, 1, 1).expect("valid date")),
+        monto_mensual: Set(Decimal::new(25000, 0)),
+        deposito: Set(None),
+        moneda: Set("DOP".to_string()),
+        estado: Set("activo".to_string()),
+        documentos: Set(None),
+        organizacion_id: Set(org_id),
+        estado_deposito: Set(None),
+        fecha_cobro_deposito: Set(None),
+        fecha_devolucion_deposito: Set(None),
+        monto_retenido: Set(None),
+        motivo_retencion: Set(None),
+        recargo_porcentaje: Set(None),
+        dias_gracia: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+    }
+    .insert(db)
+    .await
+    .expect("Failed to create test contrato");
+
     documento::ActiveModel {
         id: Set(id),
         entity_type: Set("contrato".to_string()),
-        entity_id: Set(Uuid::new_v4()),
+        entity_id: Set(contrato_id),
         filename: Set("test-doc.pdf".to_string()),
         file_path: Set("/tmp/test-doc.pdf".to_string()),
         mime_type: Set("application/pdf".to_string()),
@@ -196,7 +273,7 @@ async fn create_test_documento(db: &DatabaseConnection, user_id: Uuid) -> Uuid {
 async fn setup_firmas_data(db: &DatabaseConnection) -> (Uuid, Uuid, Uuid) {
     let org_id = create_test_organizacion(db).await;
     let admin_id = create_test_usuario(db, "admin", org_id).await;
-    let doc_id = create_test_documento(db, admin_id).await;
+    let doc_id = create_test_documento(db, admin_id, org_id).await;
     (org_id, admin_id, doc_id)
 }
 
@@ -816,17 +893,93 @@ fn test_docx_export_returns_valid_response() {
 #[test]
 fn test_docx_export_no_content_returns_400() {
     with_db(|db| async move {
+        use realestate_backend::entities::{contrato, inquilino, propiedad};
+        use chrono::NaiveDate;
+        use rust_decimal::Decimal;
+
         let org_id = create_test_organizacion(&db).await;
         let admin_id = create_test_usuario(&db, "admin", org_id).await;
         let token = make_token(admin_id, "admin", org_id);
 
+        // Create propiedad + inquilino + contrato so the documento's entity_id
+        // references a real entity (required by multi-tenancy check).
+        let now = Utc::now().into();
+        let propiedad_id = Uuid::new_v4();
+        propiedad::ActiveModel {
+            id: Set(propiedad_id),
+            titulo: Set("Propiedad DocX Test".to_string()),
+            descripcion: Set(None),
+            direccion: Set("Calle Test 1".to_string()),
+            ciudad: Set("Santo Domingo".to_string()),
+            provincia: Set("Distrito Nacional".to_string()),
+            tipo_propiedad: Set("apartamento".to_string()),
+            habitaciones: Set(Some(2)),
+            banos: Set(Some(1)),
+            area_m2: Set(Some(Decimal::new(8000, 2))),
+            precio: Set(Decimal::new(2500000, 2)),
+            moneda: Set("DOP".to_string()),
+            estado: Set("disponible".to_string()),
+            imagenes: Set(None),
+            organizacion_id: Set(org_id),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
+        let inquilino_id = Uuid::new_v4();
+        inquilino::ActiveModel {
+            id: Set(inquilino_id),
+            nombre: Set("Inquilino".to_string()),
+            apellido: Set("DocX".to_string()),
+            email: Set(Some(format!("inq+{inquilino_id}@test.com"))),
+            telefono: Set(None),
+            cedula: Set(format!("C{}", &inquilino_id.simple().to_string()[..19])),
+            contacto_emergencia: Set(None),
+            notas: Set(None),
+            documentos: Set(None),
+            organizacion_id: Set(org_id),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
+        let contrato_id = Uuid::new_v4();
+        contrato::ActiveModel {
+            id: Set(contrato_id),
+            propiedad_id: Set(propiedad_id),
+            inquilino_id: Set(inquilino_id),
+            fecha_inicio: Set(NaiveDate::from_ymd_opt(2024, 1, 1).expect("valid date")),
+            fecha_fin: Set(NaiveDate::from_ymd_opt(2025, 1, 1).expect("valid date")),
+            monto_mensual: Set(Decimal::new(25000, 0)),
+            deposito: Set(None),
+            moneda: Set("DOP".to_string()),
+            estado: Set("activo".to_string()),
+            documentos: Set(None),
+            organizacion_id: Set(org_id),
+            estado_deposito: Set(None),
+            fecha_cobro_deposito: Set(None),
+            fecha_devolucion_deposito: Set(None),
+            monto_retenido: Set(None),
+            motivo_retencion: Set(None),
+            recargo_porcentaje: Set(None),
+            dias_gracia: Set(None),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
         // Create a document without contenido_editable
         let doc_id = Uuid::new_v4();
-        let now = Utc::now().into();
         documento::ActiveModel {
             id: Set(doc_id),
             entity_type: Set("contrato".to_string()),
-            entity_id: Set(Uuid::new_v4()),
+            entity_id: Set(contrato_id),
             filename: Set("empty-doc.pdf".to_string()),
             file_path: Set("/tmp/empty-doc.pdf".to_string()),
             mime_type: Set("application/pdf".to_string()),
