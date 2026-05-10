@@ -65,7 +65,7 @@ spec:
                   name: realestate-chatbot-secret
                   key: baileys-internal-token
             - name: OVMS_ENDPOINT
-              value: http://ovms:8000/v3
+              value: http://ovms:8000/v1
             - name: OVMS_CHAT_MODEL
               value: Qwen3-30B-A3B
             - name: AI_CHAT_TIMEOUT_SECS

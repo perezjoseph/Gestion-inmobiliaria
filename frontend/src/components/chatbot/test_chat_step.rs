@@ -41,6 +41,17 @@ pub fn TestChatStep() -> Html {
         })
     };
 
+    let on_reset = {
+        let messages = messages.clone();
+        let input = input.clone();
+        let error = error.clone();
+        Callback::from(move |_: MouseEvent| {
+            messages.set(Vec::new());
+            input.set(String::new());
+            error.set(None);
+        })
+    };
+
     let on_send = {
         let messages = messages.clone();
         let input = input.clone();
@@ -58,13 +69,11 @@ pub fn TestChatStep() -> Html {
             let loading = loading.clone();
             let error = error.clone();
 
-            // Add user message immediately
             let mut new_msgs = (*messages).clone();
             new_msgs.push(ChatMessage {
                 role: "user".to_string(),
                 content: msg.clone(),
             });
-            // Add empty assistant message that will be filled by streaming
             new_msgs.push(ChatMessage {
                 role: "assistant".to_string(),
                 content: String::new(),
@@ -79,7 +88,6 @@ pub fn TestChatStep() -> Html {
                         consume_stream(receiver, messages.clone(), error.clone()).await;
                     }
                     Err(e) => {
-                        // Remove the empty assistant message on connection error
                         let mut updated = (*messages).clone();
                         if let Some(last) = updated.last() {
                             if last.role == "assistant" && last.content.is_empty() {
@@ -95,11 +103,30 @@ pub fn TestChatStep() -> Html {
         })
     };
 
+    let has_messages = !messages.is_empty();
+
     html! {
-        <div class="gi-card" style="padding: var(--space-5);">
-            <h3 class="text-base font-semibold mb-4">
-                {"Probar Chatbot"}
-            </h3>
+        <section class="flex flex-col" style="height: 100%; min-height: 420px;">
+            <header class="flex items-center justify-between mb-3">
+                <div>
+                    <h3 class="text-sm font-semibold text-[var(--text-primary)]">
+                        {"Probar conversación"}
+                    </h3>
+                    <p class="text-xs text-[var(--text-tertiary)] mt-0.5">
+                        {"Simule un mensaje de inquilino con la configuración actual."}
+                    </p>
+                </div>
+                if has_messages {
+                    <button
+                        type="button"
+                        class="gi-btn gi-btn-secondary text-xs"
+                        onclick={on_reset}
+                        aria-label="Reiniciar conversación"
+                    >
+                        {"Reiniciar"}
+                    </button>
+                }
+            </header>
 
             if let Some(err) = (*error).as_ref() {
                 <ErrorBanner message={err.clone()} onclose={Callback::from({
@@ -109,13 +136,21 @@ pub fn TestChatStep() -> Html {
 
             <div
                 ref={chat_ref}
-                class="flex flex-col gap-2 mb-3 overflow-y-auto"
-                style="border: 1px solid var(--border-default); border-radius: var(--radius-md); height: 300px; padding: var(--space-3);"
+                class="flex flex-col gap-2 mb-3 overflow-y-auto rounded-lg flex-1"
+                style="border: 1px solid var(--border-default); background: var(--surface-raised); padding: var(--space-3); min-height: 260px;"
             >
                 if messages.is_empty() {
-                    <p class="text-sm text-[var(--text-tertiary)] text-center m-auto">
-                        {"Envíe un mensaje para probar el chatbot"}
-                    </p>
+                    <div class="flex flex-col items-center justify-center gap-2 m-auto text-center" style="max-width: 260px;">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-tertiary);">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <p class="text-sm text-[var(--text-secondary)]">
+                            {"Escriba un mensaje de ejemplo"}
+                        </p>
+                        <p class="text-xs text-[var(--text-tertiary)]">
+                            {"Ej: ¿Cuánto debo este mes? o ¿Cuándo vence mi pago?"}
+                        </p>
+                    </div>
                 }
                 {for (*messages).iter().map(|msg| {
                     let is_user = msg.role == "user";
@@ -124,9 +159,13 @@ pub fn TestChatStep() -> Html {
                     }
                 })}
                 if *loading {
-                    <div class="self-start rounded-lg text-sm"
-                        style="padding: var(--space-2) var(--space-3); background: var(--surface-raised); color: var(--text-tertiary);">
-                        {"Escribiendo..."}
+                    <div
+                        class="self-start rounded-lg text-sm inline-flex items-center gap-1"
+                        style="padding: var(--space-2) var(--space-3); background: var(--surface-base); border: 1px solid var(--border-subtle); color: var(--text-tertiary);"
+                    >
+                        <TypingDot delay={0} />
+                        <TypingDot delay={160} />
+                        <TypingDot delay={320} />
                     </div>
                 }
             </div>
@@ -135,9 +174,10 @@ pub fn TestChatStep() -> Html {
                 <input
                     type="text"
                     class="gi-input flex-1"
-                    placeholder="Escriba un mensaje de prueba..."
+                    placeholder="Escriba como si fuera un inquilino"
                     value={(*input).clone()}
                     oninput={on_input}
+                    aria-label="Mensaje de prueba"
                 />
                 <button
                     type="submit"
@@ -147,9 +187,67 @@ pub fn TestChatStep() -> Html {
                     {"Enviar"}
                 </button>
             </form>
+        </section>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Typing indicator dot
+// ---------------------------------------------------------------------------
+
+#[derive(Properties, PartialEq)]
+struct TypingDotProps {
+    delay: u32,
+}
+
+#[component]
+fn TypingDot(props: &TypingDotProps) -> Html {
+    html! {
+        <span
+            class="inline-block rounded-full"
+            style={format!(
+                "width: 6px; height: 6px; background: var(--text-tertiary); animation: gi-pulse 1.4s {}ms infinite ease-in-out;",
+                props.delay,
+            )}
+            aria-hidden="true"
+        />
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatBubble
+// ---------------------------------------------------------------------------
+
+#[derive(Properties, PartialEq)]
+struct ChatBubbleProps {
+    is_user: bool,
+    content: AttrValue,
+}
+
+#[component]
+fn ChatBubble(props: &ChatBubbleProps) -> Html {
+    let (align, style) = if props.is_user {
+        (
+            "self-end",
+            "padding: var(--space-2) var(--space-3); background: var(--color-primary-500); color: var(--text-on-primary); max-width: 80%;",
+        )
+    } else {
+        (
+            "self-start",
+            "padding: var(--space-2) var(--space-3); background: var(--surface-base); color: var(--text-primary); max-width: 80%; border: 1px solid var(--border-subtle);",
+        )
+    };
+
+    html! {
+        <div class={classes!(align, "rounded-lg", "text-sm", "leading-relaxed")} style={style}>
+            {&props.content}
         </div>
     }
 }
+
+// ---------------------------------------------------------------------------
+// Streaming plumbing
+// ---------------------------------------------------------------------------
 
 /// Initiates the streaming fetch request and returns the Response object.
 #[allow(clippy::future_not_send)]
@@ -202,8 +300,7 @@ async fn stream_chat_response(message: &str) -> Result<Response, String> {
     Ok(response)
 }
 
-/// Consumes the SSE stream from the response, parsing tokens and appending them
-/// to the last assistant message in state.
+/// Consumes the SSE stream from the response.
 #[allow(clippy::future_not_send)]
 async fn consume_stream(
     response: Response,
@@ -253,7 +350,6 @@ async fn consume_stream(
 
         buffer.push_str(&chunk_text);
 
-        // Process complete SSE lines from the buffer
         while let Some(newline_pos) = buffer.find('\n') {
             let line = buffer[..newline_pos].trim().to_string();
             buffer = buffer[newline_pos + 1..].to_string();
@@ -268,7 +364,6 @@ async fn consume_stream(
                 }
 
                 if let Some(token) = parse_sse_token(data) {
-                    // Append token to the last assistant message
                     let mut updated = (*messages).clone();
                     if let Some(last) = updated.last_mut() {
                         if last.role == "assistant" {
@@ -283,7 +378,6 @@ async fn consume_stream(
 }
 
 /// Parses a single SSE data payload and extracts the content delta token.
-/// Expected format: `{"choices":[{"delta":{"content":"token"}}]}`
 fn parse_sse_token(data: &str) -> Option<String> {
     let parsed: serde_json::Value = serde_json::from_str(data).ok()?;
     parsed
@@ -293,32 +387,4 @@ fn parse_sse_token(data: &str) -> Option<String> {
         .get("content")?
         .as_str()
         .map(String::from)
-}
-
-// Sub-component for chat bubbles
-#[derive(Properties, PartialEq)]
-struct ChatBubbleProps {
-    is_user: bool,
-    content: AttrValue,
-}
-
-#[component]
-fn ChatBubble(props: &ChatBubbleProps) -> Html {
-    let class = if props.is_user {
-        "self-end rounded-lg text-sm max-w-[80%]"
-    } else {
-        "self-start rounded-lg text-sm max-w-[80%]"
-    };
-
-    let style = if props.is_user {
-        "padding: var(--space-2) var(--space-3); background: var(--color-primary-500); color: white;"
-    } else {
-        "padding: var(--space-2) var(--space-3); background: var(--surface-raised); color: var(--text-primary);"
-    };
-
-    html! {
-        <div class={class} style={style}>
-            {&props.content}
-        </div>
-    }
 }

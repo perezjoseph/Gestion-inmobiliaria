@@ -7,9 +7,14 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import { usePostgresAuthState, deleteAuthState, listStoredRealms } from './pg-auth-state';
-import { isRecoverableDisconnect } from './reconnect';
+import { calculateBackoffDelay, isRecoverableDisconnect } from './reconnect';
 
-const RECONNECT_DELAY_MS = 1000;
+const RECONNECT_INITIAL_DELAY_MS = Number.parseInt(
+  process.env.RECONNECT_INITIAL_DELAY_MS || '2000',
+  10,
+);
+const RECONNECT_MAX_DELAY_MS = Number.parseInt(process.env.RECONNECT_MAX_DELAY_MS || '60000', 10);
+const RECONNECT_MAX_ATTEMPTS = Number.parseInt(process.env.RECONNECT_MAX_ATTEMPTS || '5', 10);
 
 const logger = pino({ name: 'session-manager' });
 
@@ -22,6 +27,8 @@ export interface SessionInfo {
   status: ConnectionStatus;
   qrCode: string | null;
   socket: WASocket | null;
+  reconnectAttempts: number;
+  reconnectTimer: ReturnType<typeof setTimeout> | null;
 }
 
 export interface ConnectionCounts {
@@ -38,6 +45,89 @@ const BACKEND_WEBHOOK_URL = process.env.BACKEND_WEBHOOK_URL || 'http://backend:8
 const INTERNAL_TOKEN = process.env.BAILEYS_INTERNAL_TOKEN || '';
 
 const sessions: Map<string, SessionInfo> = new Map();
+
+/**
+ * Handle a recoverable disconnect with capped exponential backoff.
+ * Extracted to keep the connection.update handler under complexity limits.
+ */
+function scheduleReconnect(sessionInfo: SessionInfo, statusCode: number): void {
+  const { realmId } = sessionInfo;
+
+  // Don't stack reconnect timers if one is already pending.
+  if (sessionInfo.reconnectTimer) {
+    logger.debug({ realmId, statusCode }, 'Reconnect already scheduled, skipping');
+    return;
+  }
+
+  if (sessionInfo.reconnectAttempts >= RECONNECT_MAX_ATTEMPTS) {
+    logger.warn(
+      { realmId, statusCode, attempts: sessionInfo.reconnectAttempts },
+      'Max reconnection attempts reached, giving up',
+    );
+    sessionInfo.reconnectAttempts = 0;
+    return;
+  }
+
+  const delayMs = calculateBackoffDelay(
+    sessionInfo.reconnectAttempts,
+    RECONNECT_INITIAL_DELAY_MS,
+    RECONNECT_MAX_DELAY_MS,
+  );
+  sessionInfo.reconnectAttempts += 1;
+
+  logger.info(
+    {
+      realmId,
+      statusCode,
+      attempt: sessionInfo.reconnectAttempts,
+      maxAttempts: RECONNECT_MAX_ATTEMPTS,
+      delayMs,
+    },
+    'Recoverable disconnect, scheduling reconnect',
+  );
+
+  sessionInfo.reconnectTimer = setTimeout(() => {
+    sessionInfo.reconnectTimer = null;
+    startSession(realmId).catch((err) =>
+      logger.error({ realmId, err: err.message }, 'Failed to reconnect session'),
+    );
+  }, delayMs);
+}
+
+/**
+ * Route a close event to the appropriate handler (logout / recoverable / fatal).
+ */
+function handleConnectionClose(sessionInfo: SessionInfo, statusCode: number | undefined): void {
+  const { realmId } = sessionInfo;
+
+  if (statusCode === DisconnectReason.loggedOut) {
+    sessionInfo.status = 'logged_out';
+    sessionInfo.socket = null;
+    sessionInfo.qrCode = null;
+    sessionInfo.reconnectAttempts = 0;
+    logger.info({ realmId }, 'Session logged out remotely');
+    deleteAuthState(realmId).catch((err) =>
+      logger.error({ realmId, err }, 'Failed to delete auth state on logout'),
+    );
+    return;
+  }
+
+  if (typeof statusCode === 'number' && isRecoverableDisconnect(statusCode)) {
+    // Recoverable disconnects include 515 (restartRequired) emitted right after QR scan
+    // success, plus transient codes 408/428/411. Reconnect using the creds persisted
+    // via `creds.update` so pairing can complete.
+    sessionInfo.status = 'disconnected';
+    sessionInfo.socket = null;
+    sessionInfo.qrCode = null;
+    scheduleReconnect(sessionInfo, statusCode);
+    return;
+  }
+
+  sessionInfo.status = 'disconnected';
+  sessionInfo.socket = null;
+  sessionInfo.qrCode = null;
+  logger.info({ realmId, statusCode }, 'Connection closed');
+}
 
 /**
  * Forward an incoming WhatsApp message to the backend webhook.
@@ -157,13 +247,19 @@ export async function startSession(realmId: string): Promise<SessionInfo> {
     throw new Error(`Maximum concurrent connections reached (${MAX_CONNECTIONS})`);
   }
 
-  // Initialize session info
-  const sessionInfo: SessionInfo = {
+  // Reuse existing session info across reconnect attempts so the backoff counter
+  // isn't reset. Only create a fresh one if this is the first start for the realm.
+  const sessionInfo: SessionInfo = existing ?? {
     realmId,
     status: 'disconnected',
     qrCode: null,
     socket: null,
+    reconnectAttempts: 0,
+    reconnectTimer: null,
   };
+  sessionInfo.status = 'disconnected';
+  sessionInfo.qrCode = null;
+  sessionInfo.socket = null;
   sessions.set(realmId, sessionInfo);
 
   // Load auth state from PostgreSQL
@@ -194,45 +290,33 @@ export async function startSession(realmId: string): Promise<SessionInfo> {
     if (connection === 'open') {
       sessionInfo.status = 'connected';
       sessionInfo.qrCode = null;
+      sessionInfo.reconnectAttempts = 0;
+      if (sessionInfo.reconnectTimer) {
+        clearTimeout(sessionInfo.reconnectTimer);
+        sessionInfo.reconnectTimer = null;
+      }
       logger.info({ realmId }, 'Connection established');
     }
 
     if (connection === 'close') {
       const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
-
-      if (statusCode === DisconnectReason.loggedOut) {
-        sessionInfo.status = 'logged_out';
-        sessionInfo.socket = null;
-        sessionInfo.qrCode = null;
-        logger.info({ realmId }, 'Session logged out remotely');
-        // Clean up auth state from database on logout
-        deleteAuthState(realmId).catch((err) =>
-          logger.error({ realmId, err }, 'Failed to delete auth state on logout')
-        );
-      } else if (typeof statusCode === 'number' && isRecoverableDisconnect(statusCode)) {
-        // Recoverable disconnects include 515 (restartRequired) emitted right after QR scan
-        // success, plus transient codes 408/428/440/411. Reconnect using the creds persisted
-        // via `creds.update` so pairing can complete.
-        sessionInfo.status = 'disconnected';
-        sessionInfo.socket = null;
-        sessionInfo.qrCode = null;
-        logger.info({ realmId, statusCode }, 'Recoverable disconnect, reconnecting');
-        setTimeout(() => {
-          startSession(realmId).catch((err) =>
-            logger.error({ realmId, err: err.message }, 'Failed to reconnect session')
-          );
-        }, RECONNECT_DELAY_MS);
-      } else {
-        sessionInfo.status = 'disconnected';
-        sessionInfo.socket = null;
-        sessionInfo.qrCode = null;
-        logger.info({ realmId, statusCode }, 'Connection closed');
-      }
+      handleConnectionClose(sessionInfo, statusCode);
     }
   });
 
-  // Persist credentials on update
-  socket.ev.on('creds.update', saveCreds);
+  // Persist credentials on update. A transient PG pool timeout must not crash
+  // the process — Baileys emits creds.update from inside socket event handlers,
+  // so an unhandled rejection here takes down the pod.
+  socket.ev.on('creds.update', async () => {
+    try {
+      await saveCreds();
+    } catch (err) {
+      logger.error(
+        { realmId, err: (err as Error).message },
+        'Failed to persist creds (will retry on next update)',
+      );
+    }
+  });
 
   // Forward incoming messages to backend webhook
   socket.ev.on('messages.upsert', async ({ messages: incomingMessages }) => {
@@ -252,6 +336,12 @@ export async function startSession(realmId: string): Promise<SessionInfo> {
 export async function stopSession(realmId: string): Promise<void> {
   const session = sessions.get(realmId);
   if (!session) return;
+
+  if (session.reconnectTimer) {
+    clearTimeout(session.reconnectTimer);
+    session.reconnectTimer = null;
+  }
+  session.reconnectAttempts = 0;
 
   if (session.socket) {
     try {

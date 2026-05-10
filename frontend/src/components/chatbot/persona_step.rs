@@ -2,6 +2,16 @@ use yew::prelude::*;
 
 use crate::types::chatbot::ChatbotConfigResponse;
 
+/// Predefined tone presets. The last value (`""`) allows the user to clear back
+/// to a custom free-text tone typed in the override field.
+const TONE_PRESETS: &[(&str, &str)] = &[
+    ("Formal", "formal, profesional, usted"),
+    ("Cercano", "cercano, amable, tú"),
+    ("Directo", "directo, breve, sin rodeos"),
+    ("Cordial", "cordial, respetuoso, servicial"),
+    ("Amistoso", "amistoso, cálido, conversacional"),
+];
+
 #[derive(Properties, PartialEq)]
 pub struct PersonaStepProps {
     pub config: ChatbotConfigResponse,
@@ -24,10 +34,10 @@ pub fn PersonaStep(props: &PersonaStepProps) -> Html {
     let initial_greeting = props.config.greeting.clone().unwrap_or_default();
     let initial_prompt = props.config.system_prompt.clone().unwrap_or_default();
 
-    let display_name = use_state(|| initial_name.clone());
-    let tone = use_state(|| initial_tone.clone());
-    let greeting = use_state(|| initial_greeting.clone());
-    let system_prompt = use_state(|| initial_prompt.clone());
+    let display_name = use_state(|| initial_name);
+    let tone = use_state(|| initial_tone);
+    let greeting = use_state(|| initial_greeting);
+    let system_prompt = use_state(|| initial_prompt);
     let dirty = use_state(|| false);
 
     let mark_dirty = {
@@ -67,7 +77,7 @@ pub fn PersonaStep(props: &PersonaStepProps) -> Html {
 
     let on_prompt_input = {
         let system_prompt = system_prompt.clone();
-        let mark_dirty = mark_dirty;
+        let mark_dirty = mark_dirty.clone();
         Callback::from(move |e: InputEvent| {
             let el: web_sys::HtmlTextAreaElement = e.target_unchecked_into();
             system_prompt.set(el.value());
@@ -94,42 +104,83 @@ pub fn PersonaStep(props: &PersonaStepProps) -> Html {
         })
     };
 
-    html! {
-        <div class="gi-card" style="padding: var(--space-5);">
-            <h3 class="text-base font-semibold mb-4">
-                {"Personalidad del Chatbot"}
-            </h3>
+    let on_chip_click = {
+        let tone = tone.clone();
+        let mark_dirty = mark_dirty;
+        move |value: &'static str| {
+            let tone = tone.clone();
+            let mark_dirty = mark_dirty.clone();
+            Callback::from(move |_: MouseEvent| {
+                tone.set(value.to_string());
+                mark_dirty();
+            })
+        }
+    };
 
+    let current_tone = (*tone).clone();
+    let current_name = (*display_name).clone();
+    let current_greeting = (*greeting).clone();
+
+    html! {
+        <div class="grid gap-5" style="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);">
             <div class="flex flex-col gap-4">
                 <div>
-                    <label class="gi-label">{"Nombre del Bot (1-100 caracteres)"}</label>
+                    <label for="persona-name" class="gi-label">
+                        {"Nombre del bot"}
+                    </label>
                     <input
+                        id="persona-name"
                         type="text"
                         class="gi-input"
                         maxlength="100"
-                        placeholder="Ej: Asistente de Pagos"
+                        placeholder="Ej: Asistente de Rent-DR"
                         value={(*display_name).clone()}
                         oninput={on_name_input}
                     />
+                    <p class="text-xs text-[var(--text-tertiary)] mt-1">
+                        {"Así se presentará en el primer mensaje."}
+                    </p>
                 </div>
 
                 <div>
-                    <label class="gi-label">{"Tono (1-50 caracteres)"}</label>
+                    <span class="gi-label">{"Tono"}</span>
+                    <div class="flex flex-wrap gap-2 mb-2">
+                        {for TONE_PRESETS.iter().map(|(label, value)| {
+                            let selected = current_tone == *value;
+                            html! {
+                                <button
+                                    type="button"
+                                    class={classes!(
+                                        "gi-chip",
+                                        selected.then_some("gi-chip-selected"),
+                                    )}
+                                    aria-pressed={selected.to_string()}
+                                    onclick={on_chip_click(value)}
+                                >
+                                    {label}
+                                </button>
+                            }
+                        })}
+                    </div>
                     <input
                         type="text"
                         class="gi-input"
-                        maxlength="50"
-                        placeholder="Ej: profesional, amigable"
+                        maxlength="200"
+                        placeholder="O escriba un tono propio"
                         value={(*tone).clone()}
                         oninput={on_tone_input}
                     />
                 </div>
 
                 <div>
-                    <label class="gi-label">{"Saludo Inicial"}</label>
+                    <label for="persona-greeting" class="gi-label">
+                        {"Saludo inicial"}
+                    </label>
                     <textarea
+                        id="persona-greeting"
                         class="gi-input"
                         rows="3"
+                        maxlength="500"
                         placeholder="Mensaje de bienvenida para nuevos contactos"
                         value={(*greeting).clone()}
                         oninput={on_greeting_input}
@@ -137,28 +188,168 @@ pub fn PersonaStep(props: &PersonaStepProps) -> Html {
                 </div>
 
                 <div>
-                    <label class="gi-label">{"Prompt del Sistema (opcional)"}</label>
+                    <label for="persona-prompt" class="gi-label">
+                        {"Instrucciones adicionales (opcional)"}
+                    </label>
                     <textarea
+                        id="persona-prompt"
                         class="gi-input"
-                        rows="5"
-                        placeholder="Instrucciones personalizadas para el comportamiento del bot"
+                        rows="4"
+                        maxlength="2000"
+                        placeholder="Ej: Evite dar cifras exactas sin verificar. Use RD$ para montos en pesos."
                         value={(*system_prompt).clone()}
                         oninput={on_prompt_input}
                     />
                 </div>
+
+                if *dirty {
+                    <div class="flex justify-end">
+                        <button
+                            type="button"
+                            class="gi-btn gi-btn-primary"
+                            onclick={on_save}
+                        >
+                            {"Guardar personalidad"}
+                        </button>
+                    </div>
+                }
             </div>
 
-            if *dirty {
-                <div class="flex justify-end mt-4">
-                    <button
-                        type="button"
-                        class="gi-btn gi-btn-primary"
-                        onclick={on_save}
-                    >
-                        {"Guardar"}
-                    </button>
-                </div>
-            }
+            <PersonaPreview
+                name={current_name}
+                tone={current_tone}
+                greeting={current_greeting}
+            />
         </div>
     }
+}
+
+// ---------------------------------------------------------------------------
+// PersonaPreview — WhatsApp-style conversation preview
+// ---------------------------------------------------------------------------
+
+#[derive(Properties, PartialEq)]
+struct PersonaPreviewProps {
+    name: String,
+    tone: String,
+    greeting: String,
+}
+
+#[component]
+fn PersonaPreview(props: &PersonaPreviewProps) -> Html {
+    let display_name = if props.name.trim().is_empty() {
+        "Asistente".to_string()
+    } else {
+        props.name.clone()
+    };
+
+    let greeting = if props.greeting.trim().is_empty() {
+        format!("Hola, soy {display_name}. ¿En qué puedo ayudarle?")
+    } else {
+        props.greeting.clone()
+    };
+
+    let sample_reply = sample_reply_for_tone(&props.tone, &display_name);
+
+    html! {
+        <aside
+            class="rounded-lg flex flex-col"
+            style="background: var(--surface-raised); border: 1px solid var(--border-default); min-height: 320px;"
+            aria-label="Vista previa del tono del bot"
+        >
+            <header class="flex items-center gap-3 px-4 py-3" style="border-bottom: 1px solid var(--border-subtle);">
+                <div
+                    class="flex items-center justify-center rounded-full text-xs font-semibold"
+                    style="width: 32px; height: 32px; background: var(--color-primary-500); color: var(--text-on-primary);"
+                    aria-hidden="true"
+                >
+                    {initials_of(&display_name)}
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-sm font-semibold text-[var(--text-primary)]">
+                        {display_name.clone()}
+                    </span>
+                    <span class="text-xs text-[var(--text-tertiary)]">
+                        {"Vista previa"}
+                    </span>
+                </div>
+            </header>
+
+            <div class="flex flex-col gap-2 px-4 py-4 flex-1">
+                <PreviewBubble
+                    from_user={true}
+                    text={AttrValue::from("¿Cuánto debo este mes?")}
+                />
+                <PreviewBubble
+                    from_user={false}
+                    text={AttrValue::from(greeting)}
+                />
+                <PreviewBubble
+                    from_user={false}
+                    text={AttrValue::from(sample_reply)}
+                />
+            </div>
+
+            <footer class="px-4 py-2 text-xs text-[var(--text-tertiary)]" style="border-top: 1px solid var(--border-subtle);">
+                {"Los mensajes reales pueden variar según la pregunta del inquilino."}
+            </footer>
+        </aside>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct PreviewBubbleProps {
+    from_user: bool,
+    text: AttrValue,
+}
+
+#[component]
+fn PreviewBubble(props: &PreviewBubbleProps) -> Html {
+    let (align, style) = if props.from_user {
+        (
+            "self-end",
+            "padding: var(--space-2) var(--space-3); background: var(--color-primary-500); color: var(--text-on-primary); max-width: 85%;",
+        )
+    } else {
+        (
+            "self-start",
+            "padding: var(--space-2) var(--space-3); background: var(--surface-base); color: var(--text-primary); max-width: 85%; border: 1px solid var(--border-subtle);",
+        )
+    };
+
+    html! {
+        <div class={classes!(align, "rounded-lg", "text-sm", "leading-relaxed")} style={style}>
+            {&props.text}
+        </div>
+    }
+}
+
+/// Pick a sample reply that reflects the tone. The match is heuristic: looks for
+/// keywords in the tone string. Falls back to a neutral reply.
+fn sample_reply_for_tone(tone: &str, name: &str) -> String {
+    let t = tone.to_lowercase();
+    if t.contains("formal") || t.contains("usted") {
+        "Con gusto le ayudo. Según nuestro sistema, su saldo pendiente al día de hoy es de RD$ 18,500.00. ¿Desea que le envíe el recibo correspondiente?".to_string()
+    } else if t.contains("directo") || t.contains("breve") {
+        "Debe RD$ 18,500.00. Vence el 15 de este mes.".to_string()
+    } else if t.contains("cercano")
+        || t.contains("amistoso")
+        || t.contains("amable")
+        || t.contains("tú")
+        || t.contains("tu")
+    {
+        "¡Hola! Claro, revisé tu cuenta y tienes pendiente RD$ 18,500.00 para este mes. ¿Te envío los datos para pagar?".to_string()
+    } else {
+        format!(
+            "Su saldo pendiente es de RD$ 18,500.00 con vencimiento el 15 de este mes. Dígame si necesita los datos bancarios o puedo ayudarle con algo más. {name} a la orden."
+        )
+    }
+}
+
+fn initials_of(name: &str) -> String {
+    name.split_whitespace()
+        .take(2)
+        .filter_map(|word| word.chars().next())
+        .collect::<String>()
+        .to_uppercase()
 }

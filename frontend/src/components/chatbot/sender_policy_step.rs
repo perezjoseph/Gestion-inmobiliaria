@@ -68,34 +68,28 @@ pub fn SenderPolicyStep(props: &SenderPolicyStepProps) -> Html {
     };
 
     html! {
-        <div class="gi-card" style="padding: var(--space-5);">
-            <h3 class="text-base font-semibold mb-4">
-                {"Política de Remitentes"}
-            </h3>
-
-            <div class="flex flex-col gap-3 mb-4">
-                <RadioOption
-                    value="tenants_only"
-                    label="Solo Inquilinos"
-                    description="Solo los inquilinos registrados pueden interactuar con el bot"
-                    selected={*policy == "tenants_only"}
-                    on_select={on_policy_select("tenants_only")}
-                />
-                <RadioOption
-                    value="tenants_and_prospects"
-                    label="Inquilinos y Prospectos"
-                    description="Cualquier persona puede enviar mensajes al bot"
-                    selected={*policy == "tenants_and_prospects"}
-                    on_select={on_policy_select("tenants_and_prospects")}
-                />
-                <RadioOption
-                    value="allowlist"
-                    label="Lista Permitida"
-                    description="Solo los números en la lista pueden interactuar"
-                    selected={*policy == "allowlist"}
-                    on_select={on_policy_select("allowlist")}
-                />
-            </div>
+        <div class="flex flex-col gap-3">
+            <RadioOption
+                value="tenants_only"
+                label="Solo inquilinos"
+                description="Solo los números registrados como inquilinos reciben respuesta."
+                selected={*policy == "tenants_only"}
+                on_select={on_policy_select("tenants_only")}
+            />
+            <RadioOption
+                value="tenants_and_prospects"
+                label="Inquilinos y prospectos"
+                description="Cualquier persona puede escribir al bot (útil para consultas de alquiler)."
+                selected={*policy == "tenants_and_prospects"}
+                on_select={on_policy_select("tenants_and_prospects")}
+            />
+            <RadioOption
+                value="allowlist"
+                label="Solo números permitidos"
+                description="Únicamente los números de la lista reciben respuesta."
+                selected={*policy == "allowlist"}
+                on_select={on_policy_select("allowlist")}
+            />
 
             if *policy == "allowlist" {
                 <AllowlistEditor
@@ -125,26 +119,31 @@ struct RadioOptionProps {
 
 #[component]
 fn RadioOption(props: &RadioOptionProps) -> Html {
-    let border_class = if props.selected {
-        "border-[var(--color-primary-500)]"
+    let (border_color, bg) = if props.selected {
+        ("var(--color-primary-500)", "var(--color-primary-50)")
     } else {
-        "border-[var(--border-default)]"
+        ("var(--border-default)", "var(--surface-raised)")
     };
 
     html! {
-        <label class={classes!("flex", "items-start", "gap-3", "cursor-pointer", "p-3", "rounded-lg", "border", border_class)}>
+        <label
+            class="flex items-start gap-3 cursor-pointer p-3 rounded-lg"
+            style={format!("border: 1.5px solid {border_color}; background: {bg};")}
+        >
             <input
                 type="radio"
                 name="sender_policy"
+                value={props.value}
                 checked={props.selected}
                 oninput={props.on_select.clone()}
                 class="mt-0.5"
+                style="accent-color: var(--color-primary-500);"
             />
-            <div>
+            <div class="flex-1 min-w-0">
                 <div class="text-sm font-medium text-[var(--text-primary)]">
                     {props.label}
                 </div>
-                <div class="text-xs text-[var(--text-tertiary)]">
+                <div class="text-xs text-[var(--text-tertiary)] mt-0.5">
                     {props.description}
                 </div>
             </div>
@@ -169,11 +168,12 @@ struct AllowlistEditorProps {
 #[component]
 fn AllowlistEditor(props: &AllowlistEditorProps) -> Html {
     html! {
-        <div class="border-t border-[var(--border-default)] pt-4">
-            <label class="gi-label">{"Números Permitidos"}</label>
+        <div class="pt-3" style="border-top: 1px solid var(--border-subtle);">
+            <label class="gi-label" for="allowlist-phone">{"Números permitidos"}</label>
             <div class="flex gap-2 mb-3">
                 <input
-                    type="text"
+                    id="allowlist-phone"
+                    type="tel"
                     class="gi-input flex-1"
                     placeholder="+18091234567"
                     value={props.new_phone.clone()}
@@ -188,7 +188,11 @@ fn AllowlistEditor(props: &AllowlistEditorProps) -> Html {
                 </button>
             </div>
 
-            if !props.allowlist.is_empty() {
+            if props.allowlist.is_empty() {
+                <p class="text-xs text-[var(--text-tertiary)]">
+                    {"Aún no hay números en la lista. Agregue al menos uno para activar esta política."}
+                </p>
+            } else {
                 <div class="flex flex-wrap gap-2">
                     {for props.allowlist.iter().enumerate().map(|(idx, phone)| {
                         let on_remove = props.on_remove_phone.clone();
@@ -196,16 +200,22 @@ fn AllowlistEditor(props: &AllowlistEditorProps) -> Html {
                             on_remove.emit(idx);
                         });
                         html! {
-                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs"
-                                style="background: var(--surface-raised);">
+                            <span
+                                class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs"
+                                style="background: var(--surface-raised); border: 1px solid var(--border-default); color: var(--text-primary);"
+                            >
                                 {phone.clone()}
                                 <button
                                     type="button"
-                                    class="bg-transparent border-none cursor-pointer text-[var(--text-tertiary)] text-xs"
+                                    class="bg-transparent border-none cursor-pointer text-xs p-0 ml-1"
+                                    style="color: var(--text-tertiary); line-height: 1;"
                                     onclick={on_click}
                                     aria-label={format!("Eliminar {phone}")}
                                 >
-                                    {"✕"}
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"/>
+                                        <line x1="6" y1="6" x2="18" y2="18"/>
+                                    </svg>
                                 </button>
                             </span>
                         }
