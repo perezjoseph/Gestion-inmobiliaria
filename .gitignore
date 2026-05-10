@@ -3,6 +3,7 @@
 *.rs.bk
 .DS_Store
 node_modules/
+baileys-service/dist/
 .kiro*
 .impeccable.md
 .claude/

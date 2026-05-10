@@ -32,11 +32,47 @@ jobs:
         id: fmt
         run: cargo fmt --all -- --check 2>&1 | tee "${RUNNER_TEMP}/fmt-output.txt"
 
+  baileys-typecheck:
+    name: Type Check (baileys-service)
+    runs-on: arc-runner-dind
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: baileys-service
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: baileys-service/package-lock.json
+
+      - name: Install dependencies
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: cd baileys-service && npm ci
+
+      - name: TypeScript compile check
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+
   gate:
     name: Lint Gate
     runs-on: arc-runner-dind
     if: "!cancelled() && !inputs.is-fork-pr"
-    needs: [fmt]
+    needs: [fmt, baileys-typecheck]
     permissions:
       contents: read
     steps:
@@ -55,8 +91,9 @@ jobs:
             echo "| Check | Status |"
             echo "|-------|--------|"
             echo "| rustfmt | ${{ needs.fmt.result == 'success' && '✅ Pass' || (needs.fmt.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
+            echo "| baileys tsc | ${{ needs.baileys-typecheck.result == 'success' && '✅ Pass' || (needs.baileys-typecheck.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail if any lint job failed
-        if: "!cancelled() && needs.fmt.result == 'failure'"
+        if: "!cancelled() && (needs.fmt.result == 'failure' || needs.baileys-typecheck.result == 'failure')"
         run: exit 1
