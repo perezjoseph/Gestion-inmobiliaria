@@ -50,6 +50,7 @@ pub async fn create<C: ConnectionTrait>(
     }
 
     contrato::Entity::find_by_id(input.contrato_id)
+        .filter(contrato::Column::OrganizacionId.eq(organizacion_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;

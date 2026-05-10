@@ -116,6 +116,30 @@ fn validate_mime_type(mime_type: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+fn validate_magic_bytes(data: &[u8], declared_mime: &str) -> Result<(), AppError> {
+    // For small files (< 4 bytes), skip magic byte check — infer needs minimum bytes
+    if data.len() < 4 {
+        return Ok(());
+    }
+    let detected = infer::get(data);
+    let valid = match declared_mime {
+        "image/jpeg" => detected.is_some_and(|t| t.mime_type() == "image/jpeg"),
+        "image/png" => detected.is_some_and(|t| t.mime_type() == "image/png"),
+        "application/pdf" => detected.is_some_and(|t| t.mime_type() == "application/pdf"),
+        // DOCX is a ZIP archive — infer detects it as application/zip
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => {
+            detected.is_some_and(|t| t.mime_type() == "application/zip")
+        }
+        _ => false,
+    };
+    if !valid {
+        return Err(AppError::Validation(
+            "El contenido del archivo no coincide con el tipo declarado".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 fn validate_entity_type(entity_type: &str) -> Result<(), AppError> {
     if !ALLOWED_ENTITY_TYPES.contains(&entity_type) {
         return Err(AppError::Validation(format!(
@@ -176,6 +200,7 @@ pub async fn upload(
     filename: &str,
     mime_type: &str,
     uploaded_by: Uuid,
+    organizacion_id: Uuid,
     tipo_documento: &str,
     fecha_vencimiento: Option<NaiveDate>,
     numero_documento: Option<String>,
@@ -184,11 +209,13 @@ pub async fn upload(
     let file_size = file_data.len() as i64;
     validate_file_size(file_size)?;
     validate_mime_type(mime_type)?;
+    validate_magic_bytes(file_data, mime_type)?;
     validate_entity_type(entity_type)?;
     validate_tipo_documento(entity_type, tipo_documento)?;
     let safe_filename = sanitize_filename(filename)?;
 
-    // ── NCF validation for comprobante_fiscal_ncf ──────────────
+    // Verify the target entity belongs to the caller's organization
+    verificar_entidad_pertenece_a_org(db, entity_type, entity_id, organizacion_id).await?;
     if tipo_documento == "comprobante_fiscal_ncf" {
         let ncf = numero_documento.as_deref().ok_or_else(|| {
             AppError::Validation(
@@ -310,7 +337,11 @@ pub async fn listar_documentos(
     entity_type: &str,
     entity_id: Uuid,
     filters: Option<DocumentoListQuery>,
+    organizacion_id: Uuid,
 ) -> Result<Vec<DocumentoResponse>, AppError> {
+    // Verify entity belongs to caller's org
+    verificar_entidad_pertenece_a_org(db, entity_type, entity_id, organizacion_id).await?;
+
     // Ensure expired docs are flagged before listing
     marcar_vencidos(db).await?;
 
@@ -350,6 +381,7 @@ pub async fn verificar(
     documento_id: Uuid,
     request: VerificarDocumentoRequest,
     usuario_id: Uuid,
+    organizacion_id: Uuid,
 ) -> Result<DocumentoResponse, AppError> {
     // Validate the new status
     if !VALID_ESTADOS_VERIFICACION.contains(&request.estado_verificacion.as_str()) {
@@ -377,6 +409,9 @@ pub async fn verificar(
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
+
+    // Verify the document's parent entity belongs to the caller's org
+    verificar_entidad_pertenece_a_org(db, &doc.entity_type, doc.entity_id, organizacion_id).await?;
 
     let old_status = doc.estado_verificacion.clone();
     let now = Utc::now().into();
@@ -433,11 +468,15 @@ pub async fn eliminar(
     db: &DatabaseConnection,
     documento_id: Uuid,
     usuario_id: Uuid,
+    organizacion_id: Uuid,
 ) -> Result<(), AppError> {
     let doc = documento::Entity::find_by_id(documento_id)
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
+
+    // Verify the document's parent entity belongs to the caller's org
+    verificar_entidad_pertenece_a_org(db, &doc.entity_type, doc.entity_id, organizacion_id).await?;
 
     // Delete file from disk (best-effort — don't fail if file is already gone)
     let upload_dir = get_upload_dir();
@@ -566,52 +605,62 @@ fn estado_for_tipo(docs: &[documento::Model], tipo: &str) -> &'static str {
     "pendiente"
 }
 
-/// Check that the entity exists. For pago/gasto we just check if any documents exist.
-async fn verificar_entidad_existe(
+/// Verify that the entity referenced by a document belongs to the given organization.
+/// Returns `NotFound` (not `Forbidden`) to avoid revealing resource existence to other tenants.
+pub(crate) async fn verificar_entidad_pertenece_a_org(
     db: &DatabaseConnection,
     entity_type: &str,
     entity_id: Uuid,
+    organizacion_id: Uuid,
 ) -> Result<(), AppError> {
     match entity_type {
         "propiedad" => {
             propiedad::Entity::find_by_id(entity_id)
+                .filter(propiedad::Column::OrganizacionId.eq(organizacion_id))
                 .one(db)
                 .await?
-                .ok_or_else(|| {
-                    AppError::NotFound(format!("Propiedad {entity_id} no encontrada"))
-                })?;
+                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
         }
         "inquilino" => {
             inquilino::Entity::find_by_id(entity_id)
+                .filter(inquilino::Column::OrganizacionId.eq(organizacion_id))
                 .one(db)
                 .await?
-                .ok_or_else(|| {
-                    AppError::NotFound(format!("Inquilino {entity_id} no encontrado"))
-                })?;
+                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
         }
         "contrato" => {
             contrato::Entity::find_by_id(entity_id)
+                .filter(contrato::Column::OrganizacionId.eq(organizacion_id))
                 .one(db)
                 .await?
-                .ok_or_else(|| AppError::NotFound(format!("Contrato {entity_id} no encontrado")))?;
+                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
         }
-        // For pago/gasto, just check if any documents exist for this entity
-        "pago" | "gasto" => {
-            let count = documento::Entity::find()
-                .filter(documento::Column::EntityType.eq(entity_type))
-                .filter(documento::Column::EntityId.eq(entity_id))
-                .count(db)
-                .await?;
-            if count == 0 {
-                return Err(AppError::NotFound(format!(
-                    "No se encontraron documentos para {entity_type} {entity_id}"
-                )));
-            }
+        "pago" => {
+            use crate::entities::pago;
+            pago::Entity::find_by_id(entity_id)
+                .filter(pago::Column::OrganizacionId.eq(organizacion_id))
+                .one(db)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
+        }
+        "gasto" => {
+            use crate::entities::gasto;
+            gasto::Entity::find_by_id(entity_id)
+                .filter(gasto::Column::OrganizacionId.eq(organizacion_id))
+                .one(db)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
+        }
+        "mantenimiento" => {
+            use crate::entities::solicitud_mantenimiento;
+            solicitud_mantenimiento::Entity::find_by_id(entity_id)
+                .filter(solicitud_mantenimiento::Column::OrganizacionId.eq(organizacion_id))
+                .one(db)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
         }
         _ => {
-            return Err(AppError::Validation(format!(
-                "Tipo de entidad '{entity_type}' no soporta perfil de cumplimiento"
-            )));
+            return Err(AppError::Validation("Tipo de entidad no válido".to_string()));
         }
     }
     Ok(())
@@ -624,6 +673,7 @@ pub async fn cumplimiento(
     db: &DatabaseConnection,
     entity_type: &str,
     entity_id: Uuid,
+    organizacion_id: Uuid,
 ) -> Result<CumplimientoResponse, AppError> {
     // Validate entity_type has a document catalog
     let all_tipos = tipos_for_entity(entity_type).ok_or_else(|| {
@@ -633,8 +683,8 @@ pub async fn cumplimiento(
         ))
     })?;
 
-    // Verify entity exists
-    verificar_entidad_existe(db, entity_type, entity_id).await?;
+    // Verify entity belongs to caller's org
+    verificar_entidad_pertenece_a_org(db, entity_type, entity_id, organizacion_id).await?;
 
     // Ensure expired docs are flagged
     marcar_vencidos(db).await?;
@@ -686,6 +736,7 @@ pub async fn cumplimiento(
 pub async fn por_vencer(
     db: &DatabaseConnection,
     dias: Option<i64>,
+    organizacion_id: Uuid,
 ) -> Result<Vec<DocumentoResponse>, AppError> {
     let dias = dias.unwrap_or(30);
     if !(1..=365).contains(&dias) {
@@ -705,7 +756,18 @@ pub async fn por_vencer(
         .all(db)
         .await?;
 
-    Ok(docs.into_iter().map(model_to_response).collect())
+    // Filter documents by org ownership through parent entities
+    let mut owned_docs = Vec::new();
+    for doc in docs {
+        if verificar_entidad_pertenece_a_org(db, &doc.entity_type, doc.entity_id, organizacion_id)
+            .await
+            .is_ok()
+        {
+            owned_docs.push(model_to_response(doc));
+        }
+    }
+
+    Ok(owned_docs)
 }
 
 #[cfg(test)]

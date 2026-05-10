@@ -109,6 +109,7 @@ pub async fn upload(
         &filename,
         &mime_type,
         claims.sub,
+        claims.organizacion_id,
         &tipo_doc,
         fecha_vencimiento,
         numero_documento,
@@ -121,7 +122,7 @@ pub async fn upload(
 
 pub async fn listar(
     db: web::Data<DatabaseConnection>,
-    _claims: Claims,
+    claims: Claims,
     path: web::Path<DocumentoPath>,
     query: web::Query<DocumentoListQuery>,
 ) -> Result<HttpResponse, AppError> {
@@ -131,6 +132,7 @@ pub async fn listar(
         &path.entity_type,
         path.entity_id,
         Some(query.into_inner()),
+        claims.organizacion_id,
     )
     .await?;
     Ok(HttpResponse::Ok().json(docs))
@@ -145,8 +147,14 @@ pub async fn verificar(
     body: web::Json<VerificarDocumentoRequest>,
 ) -> Result<HttpResponse, AppError> {
     let documento_id = path.into_inner();
-    let result =
-        documentos::verificar(db.get_ref(), documento_id, body.into_inner(), access.0.sub).await?;
+    let result = documentos::verificar(
+        db.get_ref(),
+        documento_id,
+        body.into_inner(),
+        access.0.sub,
+        access.0.organizacion_id,
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
@@ -158,7 +166,8 @@ pub async fn eliminar(
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
     let documento_id = path.into_inner();
-    documentos::eliminar(db.get_ref(), documento_id, access.0.sub).await?;
+    documentos::eliminar(db.get_ref(), documento_id, access.0.sub, access.0.organizacion_id)
+        .await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -166,10 +175,10 @@ pub async fn eliminar(
 
 pub async fn por_vencer(
     db: web::Data<DatabaseConnection>,
-    _claims: Claims,
+    claims: Claims,
     query: web::Query<PorVencerQuery>,
 ) -> Result<HttpResponse, AppError> {
-    let docs = documentos::por_vencer(db.get_ref(), query.dias).await?;
+    let docs = documentos::por_vencer(db.get_ref(), query.dias, claims.organizacion_id).await?;
     Ok(HttpResponse::Ok().json(docs))
 }
 
@@ -177,11 +186,17 @@ pub async fn por_vencer(
 
 pub async fn cumplimiento(
     db: web::Data<DatabaseConnection>,
-    _claims: Claims,
+    claims: Claims,
     path: web::Path<DocumentoPath>,
 ) -> Result<HttpResponse, AppError> {
     let path = path.into_inner();
-    let result = documentos::cumplimiento(db.get_ref(), &path.entity_type, path.entity_id).await?;
+    let result = documentos::cumplimiento(
+        db.get_ref(),
+        &path.entity_type,
+        path.entity_id,
+        claims.organizacion_id,
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
@@ -222,12 +237,18 @@ pub struct RellenarPlantillaPath {
 
 pub async fn rellenar_plantilla(
     db: web::Data<DatabaseConnection>,
-    _claims: Claims,
+    claims: Claims,
     path: web::Path<RellenarPlantillaPath>,
 ) -> Result<HttpResponse, AppError> {
     let path = path.into_inner();
-    let result =
-        plantillas::rellenar(db.get_ref(), path.id, &path.entity_type, path.entity_id).await?;
+    let result = plantillas::rellenar(
+        db.get_ref(),
+        path.id,
+        &path.entity_type,
+        path.entity_id,
+        claims.organizacion_id,
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
@@ -290,6 +311,7 @@ pub async fn digitalizar(
         &filename,
         &mime_type,
         access.0.sub,
+        access.0.organizacion_id,
     )
     .await?;
 
@@ -310,6 +332,7 @@ pub async fn guardar_contenido(
         documento_id,
         body.into_inner().contenido_editable,
         access.0.sub,
+        access.0.organizacion_id,
     )
     .await?;
     Ok(HttpResponse::Ok().json(result))
@@ -319,11 +342,12 @@ pub async fn guardar_contenido(
 
 pub async fn exportar_pdf(
     db: web::Data<DatabaseConnection>,
-    _claims: Claims,
+    claims: Claims,
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
     let documento_id = path.into_inner();
-    let pdf_bytes = documento_editor::exportar_pdf(db.get_ref(), documento_id).await?;
+    let pdf_bytes =
+        documento_editor::exportar_pdf(db.get_ref(), documento_id, claims.organizacion_id).await?;
     Ok(HttpResponse::Ok()
         .content_type("application/pdf")
         .insert_header((
@@ -379,11 +403,13 @@ pub async fn eliminar_plantilla(
 
 pub async fn exportar_docx(
     db: web::Data<DatabaseConnection>,
-    _claims: Claims,
+    claims: Claims,
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
     let documento_id = path.into_inner();
-    let docx_bytes = documento_editor::exportar_docx(db.get_ref(), documento_id).await?;
+    let docx_bytes =
+        documento_editor::exportar_docx(db.get_ref(), documento_id, claims.organizacion_id)
+            .await?;
     Ok(HttpResponse::Ok()
         .content_type("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
         .insert_header((

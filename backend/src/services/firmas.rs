@@ -68,12 +68,20 @@ pub async fn firmar_autenticado(
     firma_imagen_b64: &str,
     ip_address: String,
     user_agent: String,
+    organizacion_id: Uuid,
 ) -> Result<FirmaResponse, AppError> {
-    // Validate document exists
-    documento::Entity::find_by_id(documento_id)
+    // Validate document exists and belongs to caller's org
+    let doc = documento::Entity::find_by_id(documento_id)
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
+    crate::services::documentos::verificar_entidad_pertenece_a_org(
+        db,
+        &doc.entity_type,
+        doc.entity_id,
+        organizacion_id,
+    )
+    .await?;
 
     // Validate and decode firma_imagen
     let firma_bytes = validar_firma_imagen(firma_imagen_b64)?;
@@ -110,12 +118,20 @@ pub async fn solicitar_firma(
     db: &DatabaseConnection,
     documento_id: Uuid,
     input: &SolicitarFirmaRequest,
+    organizacion_id: Uuid,
 ) -> Result<SolicitarFirmaResponse, AppError> {
-    // Validate document exists
-    documento::Entity::find_by_id(documento_id)
+    // Validate document exists and belongs to caller's org
+    let doc = documento::Entity::find_by_id(documento_id)
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
+    crate::services::documentos::verificar_entidad_pertenece_a_org(
+        db,
+        &doc.entity_type,
+        doc.entity_id,
+        organizacion_id,
+    )
+    .await?;
 
     // Generate token (UUID v4 = 122 bits of randomness, exceeds 32-byte minimum)
     let token = Uuid::new_v4().to_string();
@@ -321,12 +337,20 @@ async fn verificar_y_sellar(db: &DatabaseConnection, documento_id: Uuid) -> Resu
 pub async fn listar_firmas(
     db: &DatabaseConnection,
     documento_id: Uuid,
+    organizacion_id: Uuid,
 ) -> Result<Vec<FirmaResponse>, AppError> {
-    // Validate document exists
-    documento::Entity::find_by_id(documento_id)
+    // Validate document exists and belongs to caller's org
+    let doc = documento::Entity::find_by_id(documento_id)
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
+    crate::services::documentos::verificar_entidad_pertenece_a_org(
+        db,
+        &doc.entity_type,
+        doc.entity_id,
+        organizacion_id,
+    )
+    .await?;
 
     let firmas = firma_documento::Entity::find()
         .filter(firma_documento::Column::DocumentoId.eq(documento_id))
@@ -364,12 +388,80 @@ fn enviar_email_firma(email: &str, token: &str, password: &str) -> bool {
     false
 }
 
+/// Resolve the `organizacion_id` from a document's parent entity.
+async fn resolver_org_de_entidad(
+    db: &DatabaseConnection,
+    entity_type: &str,
+    entity_id: Uuid,
+) -> Result<Uuid, AppError> {
+    match entity_type {
+        "propiedad" => {
+            use crate::entities::propiedad;
+            let e = propiedad::Entity::find_by_id(entity_id)
+                .one(db)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
+            Ok(e.organizacion_id)
+        }
+        "inquilino" => {
+            use crate::entities::inquilino;
+            let e = inquilino::Entity::find_by_id(entity_id)
+                .one(db)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
+            Ok(e.organizacion_id)
+        }
+        "contrato" => {
+            use crate::entities::contrato;
+            let e = contrato::Entity::find_by_id(entity_id)
+                .one(db)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
+            Ok(e.organizacion_id)
+        }
+        "pago" => {
+            use crate::entities::pago;
+            let e = pago::Entity::find_by_id(entity_id)
+                .one(db)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
+            Ok(e.organizacion_id)
+        }
+        "gasto" => {
+            use crate::entities::gasto;
+            let e = gasto::Entity::find_by_id(entity_id)
+                .one(db)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
+            Ok(e.organizacion_id)
+        }
+        "mantenimiento" => {
+            use crate::entities::solicitud_mantenimiento;
+            let e = solicitud_mantenimiento::Entity::find_by_id(entity_id)
+                .one(db)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
+            Ok(e.organizacion_id)
+        }
+        _ => Err(AppError::Validation("Tipo de entidad no válido".to_string())),
+    }
+}
+
 /// Generate a sealed PDF with signature images embedded.
 async fn generar_pdf_sellado(db: &DatabaseConnection, documento_id: Uuid) -> Result<(), AppError> {
     use crate::services::documento_editor;
 
+    // Look up the document to find its parent entity and resolve org
+    let doc = documento::Entity::find_by_id(documento_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
+
+    // Resolve organizacion_id from the parent entity
+    let organizacion_id = resolver_org_de_entidad(db, &doc.entity_type, doc.entity_id).await?;
+
     // Generate PDF using existing export function
-    let _pdf_bytes = documento_editor::exportar_pdf(db, documento_id).await?;
+    let _pdf_bytes = documento_editor::exportar_pdf(db, documento_id, organizacion_id).await?;
 
     // In a full implementation, we would embed signature images into the PDF
     // and store it as a new documento record. For now, the PDF is generated

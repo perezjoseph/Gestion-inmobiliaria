@@ -35,6 +35,7 @@ pub async fn digitalizar(
     filename: &str,
     mime_type: &str,
     uploaded_by: Uuid,
+    organizacion_id: Uuid,
 ) -> Result<DigitalizarResponse, AppError> {
     // 1. Store the original file as a Documento with tipo_documento="otro"
     let doc_response = documentos::upload(
@@ -45,6 +46,7 @@ pub async fn digitalizar(
         filename,
         mime_type,
         uploaded_by,
+        organizacion_id,
         "otro",
         None, // fecha_vencimiento
         None, // numero_documento
@@ -255,6 +257,7 @@ pub async fn guardar_contenido(
     documento_id: Uuid,
     contenido: serde_json::Value,
     usuario_id: Uuid,
+    organizacion_id: Uuid,
 ) -> Result<DocumentoResponse, AppError> {
     let doc = documento::Entity::find_by_id(documento_id)
         .one(db)
@@ -266,6 +269,15 @@ pub async fn guardar_contenido(
             "El documento está sellado y no puede ser modificado".to_string(),
         ));
     }
+
+    // Verify the document's parent entity belongs to the caller's org
+    crate::services::documentos::verificar_entidad_pertenece_a_org(
+        db,
+        &doc.entity_type,
+        doc.entity_id,
+        organizacion_id,
+    )
+    .await?;
 
     let mut active: documento::ActiveModel = doc.into_active_model();
     active.contenido_editable = Set(Some(contenido.clone()));
@@ -297,11 +309,21 @@ pub async fn guardar_contenido(
 pub async fn exportar_pdf(
     db: &DatabaseConnection,
     documento_id: Uuid,
+    organizacion_id: Uuid,
 ) -> Result<Vec<u8>, AppError> {
     let doc = documento::Entity::find_by_id(documento_id)
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
+
+    // Verify the document's parent entity belongs to the caller's org
+    crate::services::documentos::verificar_entidad_pertenece_a_org(
+        db,
+        &doc.entity_type,
+        doc.entity_id,
+        organizacion_id,
+    )
+    .await?;
 
     let contenido = doc.contenido_editable.ok_or_else(|| {
         AppError::Validation("El documento no tiene contenido editable para exportar".to_string())
@@ -516,11 +538,21 @@ fn render_table(doc: &mut numaelis_rckive_genpdf::Document, block: &serde_json::
 pub async fn exportar_docx(
     db: &DatabaseConnection,
     documento_id: Uuid,
+    organizacion_id: Uuid,
 ) -> Result<Vec<u8>, AppError> {
     let doc = documento::Entity::find_by_id(documento_id)
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
+
+    // Verify the document's parent entity belongs to the caller's org
+    crate::services::documentos::verificar_entidad_pertenece_a_org(
+        db,
+        &doc.entity_type,
+        doc.entity_id,
+        organizacion_id,
+    )
+    .await?;
 
     let contenido = doc.contenido_editable.ok_or_else(|| {
         AppError::BadRequest("El documento no tiene contenido editable para exportar".to_string())

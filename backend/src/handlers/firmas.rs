@@ -56,6 +56,7 @@ pub async fn firmar(
         &body.firma_imagen,
         ip_address,
         user_agent,
+        claims.organizacion_id,
     )
     .await?;
 
@@ -65,13 +66,15 @@ pub async fn firmar(
 /// POST `/documentos/{id}/solicitar-firma` — Request tenant signature.
 pub async fn solicitar_firma(
     db: web::Data<DatabaseConnection>,
-    _access: WriteAccess,
+    access: WriteAccess,
     path: web::Path<Uuid>,
     body: web::Json<SolicitarFirmaRequest>,
 ) -> Result<HttpResponse, AppError> {
     let documento_id = path.into_inner();
 
-    let result = firmas::solicitar_firma(db.get_ref(), documento_id, &body).await?;
+    let result =
+        firmas::solicitar_firma(db.get_ref(), documento_id, &body, access.0.organizacion_id)
+            .await?;
 
     Ok(HttpResponse::Created().json(result))
 }
@@ -79,12 +82,12 @@ pub async fn solicitar_firma(
 /// GET `/documentos/{id}/firmas` — List all signatures for a document.
 pub async fn listar_firmas(
     db: web::Data<DatabaseConnection>,
-    _claims: Claims,
+    claims: Claims,
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
     let documento_id = path.into_inner();
 
-    let result = firmas::listar_firmas(db.get_ref(), documento_id).await?;
+    let result = firmas::listar_firmas(db.get_ref(), documento_id, claims.organizacion_id).await?;
 
     Ok(HttpResponse::Ok().json(result))
 }

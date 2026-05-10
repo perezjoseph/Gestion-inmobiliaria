@@ -172,7 +172,17 @@ pub async fn rellenar(
     plantilla_id: Uuid,
     entity_type: &str,
     entity_id: Uuid,
+    organizacion_id: Uuid,
 ) -> Result<PlantillaRellenadaResponse, AppError> {
+    // Verify the target entity belongs to the caller's organization
+    crate::services::documentos::verificar_entidad_pertenece_a_org(
+        db,
+        entity_type,
+        entity_id,
+        organizacion_id,
+    )
+    .await?;
+
     // Load template
     let plantilla = plantilla_documento::Entity::find_by_id(plantilla_id)
         .one(db)

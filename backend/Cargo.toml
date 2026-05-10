@@ -41,6 +41,7 @@ dashmap = "6"
 docx-rs = "0.4"
 rand = "0.8"
 base64 = "0.22"
+infer = "0.16"
 tokio-util = { version = "0.7", features = ["rt"] }
 
 [[test]]

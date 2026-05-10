@@ -569,6 +569,7 @@ fn sealed_document_immutability() {
                     doc_id,
                     new_contenido,
                     user_id,
+                    org_id,
                 )
                 .await;
 
