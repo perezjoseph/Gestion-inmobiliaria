@@ -71,7 +71,7 @@ pub async fn connect(
     })?;
 
     if status.is_success() {
-        Ok(HttpResponse::Ok().json(body))
+        Ok(HttpResponse::Ok().json(normalize_baileys_response(&body)))
     } else {
         Err(AppError::Internal(anyhow::anyhow!(
             "Baileys respondió con estado {status}"
@@ -107,7 +107,7 @@ pub async fn disconnect(
     })?;
 
     if status.is_success() {
-        Ok(HttpResponse::Ok().json(body))
+        Ok(HttpResponse::Ok().json(normalize_baileys_response(&body)))
     } else {
         Err(AppError::Internal(anyhow::anyhow!(
             "Baileys respondió con estado {status}"
@@ -143,7 +143,7 @@ pub async fn status(
     })?;
 
     if status_code.is_success() {
-        Ok(HttpResponse::Ok().json(body))
+        Ok(HttpResponse::Ok().json(normalize_baileys_response(&body)))
     } else {
         Err(AppError::Internal(anyhow::anyhow!(
             "Baileys respondió con estado {status_code}"
@@ -251,6 +251,41 @@ pub async fn reject_receipt(
 }
 
 // --- Helpers ---
+
+/// Normalizes a Baileys sidecar JSON response to the shape the frontend expects.
+///
+/// Baileys returns `{ "realmId": "...", "status": "...", "qr": "data:image/png;base64,..." }`.
+/// The frontend expects `{ "status": "...", "qrCode": "<base64 only>" }`.
+fn normalize_baileys_response(body: &serde_json::Value) -> serde_json::Value {
+    let status = body
+        .get("status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("disconnected");
+
+    // Strip the data URI prefix if present — frontend adds it back.
+    let qr_code = body.get("qr").and_then(|v| v.as_str()).map(|raw| {
+        raw.strip_prefix("data:image/png;base64,")
+            .unwrap_or(raw)
+            .to_string()
+    });
+
+    let connected_phone = body
+        .get("connectedPhone")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    let connected_at = body
+        .get("connectedAt")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    serde_json::json!({
+        "status": status,
+        "qrCode": qr_code,
+        "connectedPhone": connected_phone,
+        "connectedAt": connected_at,
+    })
+}
 
 /// Converts a `chatbot_receipt_extraction::Model` to the API response DTO.
 fn extraction_to_response(

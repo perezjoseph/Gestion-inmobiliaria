@@ -29,10 +29,11 @@ spec:
               # Use PV for HuggingFace cache to avoid ephemeral storage eviction
               export HF_HOME=/models/.hf_cache
               export PIP_CACHE_DIR=/models/.pip_cache
-              mkdir -p "$HF_HOME" "$PIP_CACHE_DIR"
+              export TMPDIR=/models/.tmp
+              mkdir -p "$HF_HOME" "$PIP_CACHE_DIR" "$TMPDIR"
 
               echo "Installing dependencies..."
-              pip install --no-cache-dir optimum[openvino] openvino-tokenizers transformers torch --extra-index-url https://download.pytorch.org/whl/cpu
+              pip install --cache-dir="$PIP_CACHE_DIR" optimum[openvino] openvino-tokenizers transformers torch --extra-index-url https://download.pytorch.org/whl/cpu
 
               echo "Installing git..."
               apt-get update && apt-get install -y --no-install-recommends git
@@ -62,11 +63,11 @@ spec:
             requests:
               cpu: 8000m
               memory: 32Gi
-              ephemeral-storage: 4Gi
+              ephemeral-storage: 20Gi
             limits:
               cpu: 20000m
               memory: 48Gi
-              ephemeral-storage: 10Gi
+              ephemeral-storage: 50Gi
           volumeMounts:
             - name: models
               mountPath: /models
