@@ -134,13 +134,7 @@ fn icon_settings() -> Html {
     }
 }
 
-fn icon_chatbot() -> Html {
-    html! {
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
-    }
-}
+
 
 fn icon_plantillas() -> Html {
     html! {
@@ -165,7 +159,14 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
     let can_write = user_rol == "admin" || user_rol == "gerente";
 
     let link_class = |route: &Route| -> String {
-        let is_active = current_route.as_ref() == Some(route);
+        let is_active = match route {
+            // Configuración highlights for both /configuracion and /configuracion/chatbot
+            Route::Configuracion => matches!(
+                current_route.as_ref(),
+                Some(Route::Configuracion | Route::ConfiguracionChatbot)
+            ),
+            _ => current_route.as_ref() == Some(route),
+        };
         if is_active {
             "gi-sidebar-link gi-sidebar-link-active".to_string()
         } else {
@@ -318,15 +319,6 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                                 {"Configuración"}
                             </Link<Route>>
                         </li>
-                        if can_write {
-                            <li onclick={make_click(on_nav_click.clone())}>
-                                <Link<Route> to={Route::ConfiguracionChatbot}
-                                    classes={classes!(link_class(&Route::ConfiguracionChatbot))}>
-                                    {icon_chatbot()}
-                                    {"Chatbot WhatsApp"}
-                                </Link<Route>>
-                            </li>
-                        }
                         <li onclick={make_click(on_nav_click.clone())}>
                             <Link<Route> to={Route::Perfil}
                                 classes={classes!(link_class(&Route::Perfil))}>

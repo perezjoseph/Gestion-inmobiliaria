@@ -8,7 +8,6 @@ use crate::components::layout::footer::Footer;
 use crate::components::layout::navbar::Navbar;
 use crate::components::layout::sidebar::Sidebar;
 use crate::pages::auditoria::Auditoria;
-use crate::pages::chatbot_config::ChatbotConfig;
 use crate::pages::configuracion::Configuracion;
 use crate::pages::contratos::Contratos;
 use crate::pages::firma_publica::FirmaPublica;
@@ -166,7 +165,7 @@ fn switch(routes: Route) -> Html {
         Route::Mantenimiento => html! { <ProtectedRoute><Mantenimiento /></ProtectedRoute> },
         Route::Notificaciones => html! { <ProtectedRoute><Notificaciones /></ProtectedRoute> },
         Route::Configuracion => html! { <ProtectedRoute><Configuracion /></ProtectedRoute> },
-        Route::ConfiguracionChatbot => html! { <ProtectedRoute><ChatbotConfig /></ProtectedRoute> },
+        Route::ConfiguracionChatbot => html! { <ProtectedRoute><Configuracion /></ProtectedRoute> },
         Route::Plantillas => html! { <ProtectedRoute><Plantillas /></ProtectedRoute> },
         Route::DocumentoEditor {
             entity_type,

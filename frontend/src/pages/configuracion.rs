@@ -1,11 +1,90 @@
-use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
+use yew_router::prelude::*;
 
-use crate::app::AuthContext;
+use crate::app::{AuthContext, Route};
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
+use crate::pages::chatbot_config::ChatbotConfig;
 use crate::services::api::{api_get, api_put};
 use crate::types::configuracion::{RecargoDefectoConfig, UpdateRecargoDefectoRequest};
+use wasm_bindgen_futures::spawn_local;
+
+// ---------------------------------------------------------------------------
+// Tab definitions
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ConfigTab {
+    General,
+    Chatbot,
+}
+
+// ---------------------------------------------------------------------------
+// ConfigTabNav — horizontal tab navigation
+// ---------------------------------------------------------------------------
+
+#[derive(Properties, PartialEq)]
+struct ConfigTabNavProps {
+    pub active: ConfigTab,
+    pub on_tab: Callback<ConfigTab>,
+    pub can_write: bool,
+}
+
+#[component]
+fn ConfigTabNav(props: &ConfigTabNavProps) -> Html {
+    let tab_btn = |tab: ConfigTab, label: &'static str, icon: Html| {
+        let is_active = props.active == tab;
+        let on_click = {
+            let on_tab = props.on_tab.clone();
+            Callback::from(move |_: MouseEvent| on_tab.emit(tab))
+        };
+
+        let class = if is_active {
+            "gi-config-tab gi-config-tab-active"
+        } else {
+            "gi-config-tab"
+        };
+
+        html! {
+            <button
+                type="button"
+                role="tab"
+                aria-selected={is_active.to_string()}
+                class={class}
+                onclick={on_click}
+            >
+                {icon}
+                <span>{label}</span>
+            </button>
+        }
+    };
+
+    let general_icon = html! {
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+    };
+
+    let chatbot_icon = html! {
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+    };
+
+    html! {
+        <div role="tablist" aria-label="Secciones de configuración" class="gi-config-tabs">
+            {tab_btn(ConfigTab::General, "General", general_icon)}
+            if props.can_write {
+                {tab_btn(ConfigTab::Chatbot, "Chatbot WhatsApp", chatbot_icon)}
+            }
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RecargoSection — late fee configuration
+// ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct RecargoSectionProps {
@@ -157,8 +236,12 @@ fn RecargoSection(props: &RecargoSectionProps) -> Html {
     }
 }
 
+// ---------------------------------------------------------------------------
+// GeneralTab — general settings content
+// ---------------------------------------------------------------------------
+
 #[component]
-pub fn Configuracion() -> Html {
+fn GeneralTab() -> Html {
     let auth = use_context::<AuthContext>();
     let is_admin = auth
         .as_ref()
@@ -166,13 +249,59 @@ pub fn Configuracion() -> Html {
         .is_some_and(|u| u.rol == "admin");
 
     html! {
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: var(--space-5);">
+            <RecargoSection is_admin={is_admin} />
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Configuracion — main page with tabs
+// ---------------------------------------------------------------------------
+
+#[component]
+pub fn Configuracion() -> Html {
+    let route = use_route::<Route>();
+    let navigator = use_navigator();
+    let auth = use_context::<AuthContext>();
+
+    let can_write = auth
+        .as_ref()
+        .and_then(|a| a.user.as_ref())
+        .is_some_and(|u| u.rol == "admin" || u.rol == "gerente");
+
+    // Determine active tab from route
+    let active_tab = if route.as_ref() == Some(&Route::ConfiguracionChatbot) {
+        ConfigTab::Chatbot
+    } else {
+        ConfigTab::General
+    };
+
+    let on_tab = {
+        let navigator = navigator;
+        Callback::from(move |tab: ConfigTab| {
+            if let Some(nav) = &navigator {
+                match tab {
+                    ConfigTab::General => nav.push(&Route::Configuracion),
+                    ConfigTab::Chatbot => nav.push(&Route::ConfiguracionChatbot),
+                }
+            }
+        })
+    };
+
+    html! {
         <div>
             <div class="gi-page-header">
                 <h1 class="gi-page-title">{"Configuración"}</h1>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: var(--space-5);">
-                <RecargoSection is_admin={is_admin} />
+            <ConfigTabNav active={active_tab} on_tab={on_tab} can_write={can_write} />
+
+            <div class="gi-config-content">
+                {match active_tab {
+                    ConfigTab::General => html! { <GeneralTab /> },
+                    ConfigTab::Chatbot => html! { <ChatbotConfig /> },
+                }}
             </div>
         </div>
     }

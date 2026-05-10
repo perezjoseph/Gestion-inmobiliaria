@@ -444,9 +444,6 @@ pub fn ChatbotConfig() -> Html {
         None => {
             return html! {
                 <div>
-                    <div class="gi-page-header">
-                        <h1 class="gi-page-title">{"Configuración del Chatbot"}</h1>
-                    </div>
                     if let Some(err) = (*error).as_ref() {
                         <ErrorBanner message={err.clone()} onclose={Callback::from({
                             let error = error.clone(); move |_: MouseEvent| error.set(None)
@@ -664,10 +661,6 @@ pub fn ChatbotConfig() -> Html {
 
     html! {
         <div>
-            <div class="gi-page-header">
-                <h1 class="gi-page-title">{"Configuración del Chatbot"}</h1>
-            </div>
-
             if let Some(err) = (*error).as_ref() {
                 <ErrorBanner message={err.clone()} onclose={Callback::from({
                     let error = error.clone(); move |_: MouseEvent| error.set(None)
@@ -675,7 +668,7 @@ pub fn ChatbotConfig() -> Html {
             }
 
             <StatusBar
-                connection_status={AttrValue::from(connection_status)}
+                connection_status={AttrValue::from(connection_status.clone())}
                 message_count={*message_count}
                 pending_receipts={*pending_receipts}
             />
