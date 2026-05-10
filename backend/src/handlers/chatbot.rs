@@ -1,4 +1,7 @@
+use std::time::Duration;
+
 use actix_web::{HttpResponse, web};
+use futures_util::StreamExt;
 use sea_orm::DatabaseConnection;
 use serde::Deserialize;
 use uuid::Uuid;
@@ -13,6 +16,7 @@ use crate::models::chatbot::{
 };
 use crate::services::ai_module::{
     AiModule, ChatbotPersona, ConversationEntry, ProcessMessageContext, UserMessage,
+    compose_system_prompt,
 };
 use crate::services::chatbot;
 
@@ -523,6 +527,164 @@ pub async fn test_chat(
             }))
         }
     }
+}
+
+/// POST `/api/v1/chatbot/test/stream` — streaming version of test chat.
+///
+/// Proxies the SSE stream from the OVMS endpoint directly to the client.
+/// Uses the same auth and config resolution as `test_chat`.
+pub async fn test_chat_stream(
+    db: web::Data<DatabaseConnection>,
+    app_config: web::Data<AppConfig>,
+    claims: WriteAccess,
+    body: web::Json<TestChatRequest>,
+) -> Result<HttpResponse, AppError> {
+    let chatbot_env = &app_config.chatbot;
+    let org_id = claims.0.organizacion_id;
+    let request = body.into_inner();
+
+    // Load the saved config as a baseline
+    let saved_config = chatbot::get_config_model(db.get_ref(), org_id).await?;
+
+    // Determine effective persona — same logic as test_chat
+    let (persona, faqs, policies, handoff_keywords) =
+        if let Some(overrides) = &request.config_override {
+            let persona = ChatbotPersona {
+                tone: overrides.tone.clone().or_else(|| saved_config.tone.clone()),
+                greeting: overrides
+                    .greeting
+                    .clone()
+                    .or_else(|| saved_config.greeting.clone()),
+                system_prompt: overrides
+                    .system_prompt
+                    .clone()
+                    .or_else(|| saved_config.system_prompt.clone()),
+                language: overrides
+                    .language
+                    .clone()
+                    .unwrap_or_else(|| saved_config.language.clone()),
+            };
+
+            let faqs: Vec<FaqEntry> = overrides.faqs.clone().unwrap_or_else(|| {
+                saved_config
+                    .faqs
+                    .as_ref()
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default()
+            });
+
+            let policies = overrides
+                .policies
+                .clone()
+                .or_else(|| saved_config.policies.clone());
+
+            let handoff_keywords: Vec<String> =
+                overrides.handoff_keywords.clone().unwrap_or_else(|| {
+                    saved_config
+                        .handoff_keywords
+                        .as_ref()
+                        .and_then(|v| serde_json::from_value(v.clone()).ok())
+                        .unwrap_or_default()
+                });
+
+            (persona, faqs, policies, handoff_keywords)
+        } else {
+            let persona = ChatbotPersona {
+                tone: saved_config.tone.clone(),
+                greeting: saved_config.greeting.clone(),
+                system_prompt: saved_config.system_prompt.clone(),
+                language: saved_config.language.clone(),
+            };
+
+            let faqs: Vec<FaqEntry> = saved_config
+                .faqs
+                .as_ref()
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+
+            let policies = saved_config.policies.clone();
+
+            let handoff_keywords: Vec<String> = saved_config
+                .handoff_keywords
+                .as_ref()
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+
+            (persona, faqs, policies, handoff_keywords)
+        };
+
+    // Compose system prompt
+    let system_prompt = compose_system_prompt(
+        &persona,
+        None,
+        &faqs,
+        policies.as_deref(),
+        &handoff_keywords,
+    );
+
+    // Build messages array for the OpenAI-compatible API
+    let messages = {
+        let mut msgs = vec![serde_json::json!({
+            "role": "system",
+            "content": system_prompt,
+        })];
+        msgs.push(serde_json::json!({
+            "role": "user",
+            "content": request.message,
+        }));
+        msgs
+    };
+
+    // Build the request body for OVMS streaming endpoint
+    let ovms_body = serde_json::json!({
+        "model": chatbot_env.ovms_chat_model,
+        "messages": messages,
+        "stream": true,
+        "temperature": 0.7,
+        "max_tokens": 1024
+    });
+
+    let timeout = Duration::from_secs(chatbot_env.ai_chat_timeout_secs);
+
+    // Make the streaming request to OVMS
+    let client = reqwest::Client::new();
+    let ovms_url = format!("{}/chat/completions", chatbot_env.ovms_endpoint);
+
+    let ovms_response = client
+        .post(&ovms_url)
+        .json(&ovms_body)
+        .timeout(timeout)
+        .send()
+        .await
+        .map_err(|e| {
+            tracing::error!(organizacion_id = %org_id, error = %e, "Error conectando a OVMS stream");
+            AppError::Internal(anyhow::anyhow!("Error conectando al servicio AI: {e}"))
+        })?;
+
+    if !ovms_response.status().is_success() {
+        let status = ovms_response.status();
+        let body_text = ovms_response.text().await.unwrap_or_default();
+        tracing::error!(
+            organizacion_id = %org_id,
+            status = %status,
+            body = %body_text,
+            "OVMS stream returned error"
+        );
+        return Err(AppError::Internal(anyhow::anyhow!(
+            "Error del servicio AI (status {status})"
+        )));
+    }
+
+    // Proxy the SSE stream back to the client
+    let byte_stream = ovms_response.bytes_stream().map(|result| {
+        result.map_err(|e| actix_web::error::ErrorInternalServerError(format!("Stream error: {e}")))
+    });
+
+    Ok(HttpResponse::Ok()
+        .content_type("text/event-stream")
+        .insert_header(("Cache-Control", "no-cache"))
+        .insert_header(("Connection", "keep-alive"))
+        .streaming(byte_stream))
 }
 
 // --- Handoff Handlers ---

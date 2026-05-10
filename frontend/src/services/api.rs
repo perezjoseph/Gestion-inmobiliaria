@@ -6,7 +6,7 @@ use web_sys::window;
 pub const BASE_URL: &str = "/api/v1";
 const TOKEN_KEY: &str = "jwt_token";
 
-fn get_token() -> Option<String> {
+pub fn get_token() -> Option<String> {
     window()?
         .local_storage()
         .ok()

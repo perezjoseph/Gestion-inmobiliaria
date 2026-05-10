@@ -76,13 +76,12 @@ pub fn FirmaPublica(props: &FirmaPublicaProps) -> Html {
             error_msg.set(None);
             spawn_local(async move {
                 let url = format!("{BASE_URL}/firmas/{token}/verificar");
-                let body = VerificarRequest {
-                    password: pwd,
-                };
+                let body = VerificarRequest { password: pwd };
                 let json = serde_json::to_string(&body).unwrap_or_default();
                 let Ok(req_builder) = Request::post(&url)
                     .header("Content-Type", "application/json")
-                    .body(json) else {
+                    .body(json)
+                else {
                     error_msg.set(Some("Error al construir la solicitud.".into()));
                     loading.set(false);
                     return;
@@ -144,7 +143,8 @@ pub fn FirmaPublica(props: &FirmaPublicaProps) -> Html {
                 let json = serde_json::to_string(&body).unwrap_or_default();
                 let Ok(req_builder) = Request::post(&url)
                     .header("Content-Type", "application/json")
-                    .body(json) else {
+                    .body(json)
+                else {
                     error_msg.set(Some("Error al construir la solicitud.".into()));
                     loading.set(false);
                     return;

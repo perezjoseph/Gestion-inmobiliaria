@@ -193,7 +193,8 @@ pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
             let file_type = file.type_();
             if !ALLOWED_TYPES.contains(&file_type.as_str()) {
                 error.set(Some(
-                    "Tipo de archivo no permitido. Solo se aceptan JPEG, PNG, PDF y DOCX.".to_string(),
+                    "Tipo de archivo no permitido. Solo se aceptan JPEG, PNG, PDF y DOCX."
+                        .to_string(),
                 ));
                 input.set_value("");
                 return;

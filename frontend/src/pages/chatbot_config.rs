@@ -99,7 +99,11 @@ fn StepperNav(props: &StepperNavProps) -> Html {
             let next = match e.key().as_str() {
                 "ArrowRight" | "ArrowDown" => {
                     e.prevent_default();
-                    if current < STEPS.len() - 1 { Some(current + 1) } else { None }
+                    if current < STEPS.len() - 1 {
+                        Some(current + 1)
+                    } else {
+                        None
+                    }
                 }
                 "ArrowLeft" | "ArrowUp" => {
                     e.prevent_default();

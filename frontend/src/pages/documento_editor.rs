@@ -234,11 +234,8 @@ pub fn DocumentoEditorPage(props: &DocumentoEditorPageProps) -> Html {
             let doc_id = doc.id.clone();
             spawn_local(async move {
                 let body = FirmarRequest { firma_imagen };
-                match api_post::<FirmaResponse, _>(
-                    &format!("/documentos/{doc_id}/firmar"),
-                    &body,
-                )
-                .await
+                match api_post::<FirmaResponse, _>(&format!("/documentos/{doc_id}/firmar"), &body)
+                    .await
                 {
                     Ok(_) => {
                         show_signature_modal.set(false);

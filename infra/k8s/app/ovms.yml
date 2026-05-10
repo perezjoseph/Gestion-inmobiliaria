@@ -33,26 +33,6 @@ spec:
       automountServiceAccountToken: false
       nodeSelector:
         kubernetes.io/hostname: inference
-      initContainers:
-        - name: init-config
-          image: busybox:1.36
-          command:
-            - sh
-            - -c
-            - |
-              cp /config-src/config.json /models/config.json
-              mkdir -p /models/Qwen3-30B-A3B
-              cp /config-src/graph.pbtxt /models/Qwen3-30B-A3B/graph.pbtxt
-          volumeMounts:
-            - name: models
-              mountPath: /models
-            - name: ovms-config
-              mountPath: /config-src
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 5000
-            runAsGroup: 44
-            allowPrivilegeEscalation: false
       containers:
         - name: ovms
           image: openvino/model_server:latest-gpu
@@ -60,6 +40,8 @@ spec:
             - "--config_path"
             - "/models/config.json"
             - "--port"
+            - "9000"
+            - "--rest_port"
             - "8000"
           ports:
             - containerPort: 8000
@@ -101,9 +83,6 @@ spec:
         - name: models
           persistentVolumeClaim:
             claimName: ovms-models-pvc
-        - name: ovms-config
-          configMap:
-            name: ovms-config
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -139,12 +118,12 @@ data:
       }
       node_options: {
         [type.googleapis.com/mediapipe.LLMCalculatorOptions]: {
-          models_path: "/models/Qwen3-30B-A3B/1/model"
+          models_path: "/models/Qwen3-30B-A3B"
           device: "GPU"
           enable_prefix_caching: true
           max_num_batched_tokens: 4096
           cache_size: 8
-          plugin_config: "{\"NUM_STREAMS\": 1}"
+          plugin_config: "{}"
         }
       }
       input_stream_handler {

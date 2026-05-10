@@ -64,7 +64,10 @@ fn blocks_to_text(contenido: &Value) -> String {
 
     let mut lines = Vec::new();
     for block in &blocks {
-        let block_type = block.get("type").and_then(Value::as_str).unwrap_or("paragraph");
+        let block_type = block
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or("paragraph");
         match block_type {
             "heading" => {
                 let level = block.get("level").and_then(Value::as_u64).unwrap_or(1);
@@ -73,7 +76,10 @@ fn blocks_to_text(contenido: &Value) -> String {
                 lines.push(format!("{prefix} {text}"));
             }
             "list" => {
-                let ordered = block.get("ordered").and_then(Value::as_bool).unwrap_or(false);
+                let ordered = block
+                    .get("ordered")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
                 let items = block.get("items").and_then(Value::as_array);
                 if let Some(items) = items {
                     for (i, item) in items.iter().enumerate() {
@@ -140,11 +146,21 @@ fn text_to_blocks(text: &str) -> Value {
     for block in blocks {
         let is_list = block.get("type").and_then(Value::as_str) == Some("list");
         if is_list {
-            let ordered = block.get("ordered").and_then(Value::as_bool).unwrap_or(false);
-            let items = block.get("items").and_then(Value::as_array).cloned().unwrap_or_default();
+            let ordered = block
+                .get("ordered")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let items = block
+                .get("items")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
             if let Some(last) = merged.last_mut() {
                 let last_is_list = last.get("type").and_then(Value::as_str) == Some("list");
-                let last_ordered = last.get("ordered").and_then(Value::as_bool).unwrap_or(false);
+                let last_ordered = last
+                    .get("ordered")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
                 if last_is_list && last_ordered == ordered {
                     if let Some(last_items) = last.get_mut("items").and_then(Value::as_array_mut) {
                         last_items.extend(items);
@@ -269,12 +285,9 @@ pub fn Plantillas() -> Html {
                         entity_type: Some(entity),
                         contenido: Some(contenido),
                     };
-                    api_put::<PlantillaResponse, _>(
-                        &format!("/documentos/plantillas/{id}"),
-                        &body,
-                    )
-                    .await
-                    .map(|_| "Plantilla actualizada")
+                    api_put::<PlantillaResponse, _>(&format!("/documentos/plantillas/{id}"), &body)
+                        .await
+                        .map(|_| "Plantilla actualizada")
                 } else {
                     let body = CrearPlantillaBody {
                         nombre,

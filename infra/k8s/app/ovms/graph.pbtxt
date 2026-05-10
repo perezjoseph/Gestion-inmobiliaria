@@ -15,12 +15,12 @@ node: {
   }
   node_options: {
     [type.googleapis.com/mediapipe.LLMCalculatorOptions]: {
-      models_path: "/models/Qwen3-30B-A3B/1/model"
+      models_path: "/models/Qwen3-30B-A3B"
       device: "GPU"
       enable_prefix_caching: true
       max_num_batched_tokens: 4096
       cache_size: 8
-      plugin_config: "{\"NUM_STREAMS\": 1}"
+      plugin_config: "{}"
     }
   }
   input_stream_handler {

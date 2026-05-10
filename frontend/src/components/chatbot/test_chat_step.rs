@@ -1,8 +1,11 @@
-use wasm_bindgen_futures::spawn_local;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::{JsFuture, spawn_local};
+use web_sys::{Headers, Request, RequestInit, Response};
 use yew::prelude::*;
 
 use crate::components::common::error_banner::ErrorBanner;
-use crate::services::chatbot;
+use crate::services::api::get_token;
+use crate::services::chatbot::test_chat_stream_url;
 use crate::types::chatbot::TestChatRequest;
 
 #[derive(Clone, PartialEq)]
@@ -55,31 +58,37 @@ pub fn TestChatStep() -> Html {
             let loading = loading.clone();
             let error = error.clone();
 
+            // Add user message immediately
             let mut new_msgs = (*messages).clone();
             new_msgs.push(ChatMessage {
                 role: "user".to_string(),
                 content: msg.clone(),
+            });
+            // Add empty assistant message that will be filled by streaming
+            new_msgs.push(ChatMessage {
+                role: "assistant".to_string(),
+                content: String::new(),
             });
             messages.set(new_msgs);
             input.set(String::new());
             loading.set(true);
 
             spawn_local(async move {
-                let request = TestChatRequest {
-                    message: msg,
-                    config_override: None,
-                };
-                match chatbot::test_chat(&request).await {
-                    Ok(resp) => {
-                        let mut updated = (*messages).clone();
-                        updated.push(ChatMessage {
-                            role: "assistant".to_string(),
-                            content: resp.reply,
-                        });
-                        messages.set(updated);
-                        error.set(None);
+                match stream_chat_response(&msg).await {
+                    Ok(receiver) => {
+                        consume_stream(receiver, messages.clone(), error.clone()).await;
                     }
-                    Err(e) => error.set(Some(e)),
+                    Err(e) => {
+                        // Remove the empty assistant message on connection error
+                        let mut updated = (*messages).clone();
+                        if let Some(last) = updated.last() {
+                            if last.role == "assistant" && last.content.is_empty() {
+                                updated.pop();
+                            }
+                        }
+                        messages.set(updated);
+                        error.set(Some(e));
+                    }
                 }
                 loading.set(false);
             });
@@ -140,6 +149,150 @@ pub fn TestChatStep() -> Html {
             </form>
         </div>
     }
+}
+
+/// Initiates the streaming fetch request and returns the Response object.
+#[allow(clippy::future_not_send)]
+async fn stream_chat_response(message: &str) -> Result<Response, String> {
+    let url = test_chat_stream_url();
+
+    let request_body = TestChatRequest {
+        message: message.to_string(),
+        config_override: None,
+    };
+    let body_json =
+        serde_json::to_string(&request_body).map_err(|e| format!("Error serializando: {e}"))?;
+
+    let opts = RequestInit::new();
+    opts.set_method("POST");
+    opts.set_body(&JsValue::from_str(&body_json));
+
+    let headers = Headers::new().map_err(|_| "Error creando headers".to_string())?;
+    headers
+        .set("Content-Type", "application/json")
+        .map_err(|_| "Error configurando headers".to_string())?;
+
+    if let Some(token) = get_token() {
+        headers
+            .set("Authorization", &format!("Bearer {token}"))
+            .map_err(|_| "Error configurando auth".to_string())?;
+    }
+    opts.set_headers(&headers);
+
+    let request = Request::new_with_str_and_init(&url, &opts)
+        .map_err(|_| "Error creando request".to_string())?;
+
+    let window = web_sys::window().ok_or("No window disponible")?;
+    let resp_value = JsFuture::from(window.fetch_with_request(&request))
+        .await
+        .map_err(|_| "Error de red al conectar con el servidor".to_string())?;
+
+    let response: Response = resp_value
+        .dyn_into()
+        .map_err(|_| "Respuesta inválida".to_string())?;
+
+    if !response.ok() {
+        let status = response.status();
+        if status == 401 {
+            return Err("Sesión expirada. Redirigiendo al inicio de sesión.".to_string());
+        }
+        return Err(format!("Error del servidor (código {status})"));
+    }
+
+    Ok(response)
+}
+
+/// Consumes the SSE stream from the response, parsing tokens and appending them
+/// to the last assistant message in state.
+#[allow(clippy::future_not_send)]
+async fn consume_stream(
+    response: Response,
+    messages: UseStateHandle<Vec<ChatMessage>>,
+    error: UseStateHandle<Option<String>>,
+) {
+    let Some(body) = response.body() else {
+        error.set(Some("Respuesta sin cuerpo".to_string()));
+        return;
+    };
+
+    let reader: web_sys::ReadableStreamDefaultReader = body.get_reader().unchecked_into();
+
+    let Ok(decoder) =
+        web_sys::TextDecoder::new().or_else(|_| web_sys::TextDecoder::new_with_label("utf-8"))
+    else {
+        error.set(Some("Error creando TextDecoder".to_string()));
+        return;
+    };
+
+    let mut buffer = String::new();
+
+    loop {
+        let Ok(result) = JsFuture::from(reader.read()).await else {
+            error.set(Some("Error leyendo stream".to_string()));
+            break;
+        };
+
+        let done = js_sys::Reflect::get(&result, &JsValue::from_str("done"))
+            .unwrap_or(JsValue::TRUE)
+            .as_bool()
+            .unwrap_or(true);
+
+        if done {
+            break;
+        }
+
+        let Ok(value) = js_sys::Reflect::get(&result, &JsValue::from_str("value")) else {
+            break;
+        };
+
+        let chunk_text = if let Some(uint8) = value.dyn_ref::<js_sys::Uint8Array>() {
+            decoder.decode_with_buffer_source(uint8).unwrap_or_default()
+        } else {
+            continue;
+        };
+
+        buffer.push_str(&chunk_text);
+
+        // Process complete SSE lines from the buffer
+        while let Some(newline_pos) = buffer.find('\n') {
+            let line = buffer[..newline_pos].trim().to_string();
+            buffer = buffer[newline_pos + 1..].to_string();
+
+            if line.is_empty() {
+                continue;
+            }
+
+            if let Some(data) = line.strip_prefix("data: ") {
+                if data.trim() == "[DONE]" {
+                    return;
+                }
+
+                if let Some(token) = parse_sse_token(data) {
+                    // Append token to the last assistant message
+                    let mut updated = (*messages).clone();
+                    if let Some(last) = updated.last_mut() {
+                        if last.role == "assistant" {
+                            last.content.push_str(&token);
+                        }
+                    }
+                    messages.set(updated);
+                }
+            }
+        }
+    }
+}
+
+/// Parses a single SSE data payload and extracts the content delta token.
+/// Expected format: `{"choices":[{"delta":{"content":"token"}}]}`
+fn parse_sse_token(data: &str) -> Option<String> {
+    let parsed: serde_json::Value = serde_json::from_str(data).ok()?;
+    parsed
+        .get("choices")?
+        .get(0)?
+        .get("delta")?
+        .get("content")?
+        .as_str()
+        .map(String::from)
 }
 
 // Sub-component for chat bubbles

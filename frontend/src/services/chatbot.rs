@@ -1,4 +1,4 @@
-use crate::services::api::{api_get, api_post, api_put};
+use crate::services::api::{BASE_URL, api_get, api_post, api_put};
 use crate::types::chatbot::{
     ChatbotConfigResponse, ChatbotConfigUpdateRequest, ConnectionStatusResponse,
     ConversationListItem, ReceiptConfirmRequest, ReceiptExtractionResponse, ReceiptRejectRequest,
@@ -6,6 +6,11 @@ use crate::types::chatbot::{
 };
 
 const CHATBOT_PATH: &str = "/chatbot";
+
+/// Returns the full URL for the streaming test chat endpoint.
+pub fn test_chat_stream_url() -> String {
+    format!("{BASE_URL}{CHATBOT_PATH}/test/stream")
+}
 
 #[allow(clippy::future_not_send)]
 pub async fn get_config() -> Result<ChatbotConfigResponse, String> {
@@ -54,11 +59,7 @@ pub async fn confirm_receipt(
     id: &str,
     request: &ReceiptConfirmRequest,
 ) -> Result<ReceiptExtractionResponse, String> {
-    api_post(
-        &format!("{CHATBOT_PATH}/receipts/{id}/confirm"),
-        request,
-    )
-    .await
+    api_post(&format!("{CHATBOT_PATH}/receipts/{id}/confirm"), request).await
 }
 
 #[allow(clippy::future_not_send)]
@@ -66,9 +67,5 @@ pub async fn reject_receipt(
     id: &str,
     request: &ReceiptRejectRequest,
 ) -> Result<ReceiptExtractionResponse, String> {
-    api_post(
-        &format!("{CHATBOT_PATH}/receipts/{id}/reject"),
-        request,
-    )
-    .await
+    api_post(&format!("{CHATBOT_PATH}/receipts/{id}/reject"), request).await
 }

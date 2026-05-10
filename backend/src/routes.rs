@@ -363,6 +363,10 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route("/status", web::get().to(handlers::chatbot::status))
                     .route("/test", web::post().to(handlers::chatbot::test_chat))
                     .route(
+                        "/test/stream",
+                        web::post().to(handlers::chatbot::test_chat_stream),
+                    )
+                    .route(
                         "/handoff/clear",
                         web::post().to(handlers::chatbot::clear_handoff),
                     )
