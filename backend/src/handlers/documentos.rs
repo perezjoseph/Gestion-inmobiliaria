@@ -171,8 +171,13 @@ pub async fn eliminar(
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
     let documento_id = path.into_inner();
-    documentos::eliminar(db.get_ref(), documento_id, access.0.sub, access.0.organizacion_id)
-        .await?;
+    documentos::eliminar(
+        db.get_ref(),
+        documento_id,
+        access.0.sub,
+        access.0.organizacion_id,
+    )
+    .await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -418,8 +423,7 @@ pub async fn exportar_docx(
 ) -> Result<HttpResponse, AppError> {
     let documento_id = path.into_inner();
     let docx_bytes =
-        documento_editor::exportar_docx(db.get_ref(), documento_id, claims.organizacion_id)
-            .await?;
+        documento_editor::exportar_docx(db.get_ref(), documento_id, claims.organizacion_id).await?;
     Ok(HttpResponse::Ok()
         .content_type("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
         .insert_header((

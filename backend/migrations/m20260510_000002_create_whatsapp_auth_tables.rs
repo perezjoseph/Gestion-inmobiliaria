@@ -131,16 +131,12 @@ impl MigrationTrait for Migration {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .get_connection()
-            .execute_unprepared(
-                "REVOKE ALL ON whatsapp_auth_creds FROM whatsapp_session_rw;",
-            )
+            .execute_unprepared("REVOKE ALL ON whatsapp_auth_creds FROM whatsapp_session_rw;")
             .await?;
 
         manager
             .get_connection()
-            .execute_unprepared(
-                "REVOKE ALL ON whatsapp_auth_keys FROM whatsapp_session_rw;",
-            )
+            .execute_unprepared("REVOKE ALL ON whatsapp_auth_keys FROM whatsapp_session_rw;")
             .await?;
 
         manager

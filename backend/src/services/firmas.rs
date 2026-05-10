@@ -443,7 +443,9 @@ async fn resolver_org_de_entidad(
                 .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
             Ok(e.organizacion_id)
         }
-        _ => Err(AppError::Validation("Tipo de entidad no válido".to_string())),
+        _ => Err(AppError::Validation(
+            "Tipo de entidad no válido".to_string(),
+        )),
     }
 }
 

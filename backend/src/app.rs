@@ -17,14 +17,14 @@ async fn health() -> HttpResponse {
     HttpResponse::Ok().json(serde_json::json!({"status": "ok"}))
 }
 
-async fn metrics_handler(
-    _claims: crate::services::auth::Claims,
-) -> HttpResponse {
+async fn metrics_handler(_claims: crate::services::auth::Claims) -> HttpResponse {
     use prometheus::Encoder;
     let encoder = prometheus::TextEncoder::new();
     let metric_families = prometheus::default_registry().gather();
     let mut buffer = Vec::new();
-    encoder.encode(&metric_families, &mut buffer).unwrap_or_default();
+    encoder
+        .encode(&metric_families, &mut buffer)
+        .unwrap_or_default();
     HttpResponse::Ok()
         .content_type("text/plain; version=0.0.4")
         .body(buffer)

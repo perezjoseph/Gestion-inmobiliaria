@@ -41,6 +41,7 @@ pub fn pbt_cases() -> u32 {
         .unwrap_or(100)
 }
 
+mod architecture_tests;
 mod auditoria_tests;
 mod auth_tests;
 mod background_jobs_pbt;

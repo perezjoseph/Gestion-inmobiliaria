@@ -36,9 +36,7 @@ fn validate_costo(costo: &Decimal) -> Result<(), AppError> {
 
 fn validate_create_solicitud(dto: &CreateSolicitudRequest) -> Result<(), AppError> {
     if dto.titulo.trim().is_empty() {
-        return Err(AppError::Validation(
-            "El título es requerido".to_string(),
-        ));
+        return Err(AppError::Validation("El título es requerido".to_string()));
     }
     if dto.titulo.len() > 255 {
         return Err(AppError::Validation(

@@ -215,7 +215,7 @@ fn TypingDot(props: &TypingDotProps) -> Html {
 }
 
 // ---------------------------------------------------------------------------
-// ChatBubble
+// ChatBubble — renders thinking blocks as collapsible "Pensando" sections
 // ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
@@ -238,11 +238,107 @@ fn ChatBubble(props: &ChatBubbleProps) -> Html {
         )
     };
 
+    // For user messages or messages without <think>, render plain
+    if props.is_user || !props.content.contains("<think>") {
+        return html! {
+            <div class={classes!(align, "rounded-lg", "text-sm", "leading-relaxed")} style={style}>
+                {&props.content}
+            </div>
+        };
+    }
+
+    // Parse thinking and visible content
+    let (thinking, visible) = split_think_content(&props.content);
+
     html! {
         <div class={classes!(align, "rounded-lg", "text-sm", "leading-relaxed")} style={style}>
-            {&props.content}
+            if !thinking.is_empty() {
+                <ThinkingDisclosure content={AttrValue::from(thinking)} />
+            }
+            if !visible.is_empty() {
+                <span>{visible}</span>
+            }
         </div>
     }
+}
+
+// ---------------------------------------------------------------------------
+// ThinkingDisclosure — collapsible "Pensando" section
+// ---------------------------------------------------------------------------
+
+#[derive(Properties, PartialEq)]
+struct ThinkingDisclosureProps {
+    content: AttrValue,
+}
+
+#[component]
+fn ThinkingDisclosure(props: &ThinkingDisclosureProps) -> Html {
+    let expanded = use_state(|| false);
+
+    let on_toggle = {
+        let expanded = expanded.clone();
+        Callback::from(move |_: MouseEvent| {
+            expanded.set(!*expanded);
+        })
+    };
+
+    html! {
+        <div class="mb-2" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: var(--space-2);">
+            <button
+                type="button"
+                class="flex items-center gap-1 bg-transparent border-none cursor-pointer p-0"
+                style="color: var(--text-tertiary); font-size: var(--text-xs);"
+                onclick={on_toggle}
+                aria-expanded={(*expanded).to_string()}
+            >
+                <svg
+                    width="12" height="12" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    style={if *expanded { "transform: rotate(90deg); transition: transform 150ms;" } else { "transition: transform 150ms;" }}
+                >
+                    <polyline points="9 18 15 12 9 6"/>
+                </svg>
+                {"Pensando"}
+            </button>
+            if *expanded {
+                <div
+                    class="mt-1 text-xs leading-relaxed"
+                    style="color: var(--text-tertiary); white-space: pre-wrap; max-height: 200px; overflow-y: auto;"
+                >
+                    {&props.content}
+                </div>
+            }
+        </div>
+    }
+}
+
+/// Splits content into (`thinking_text`, `visible_text`).
+/// Handles both complete `<think>...</think>` and unclosed `<think>...` (still streaming).
+fn split_think_content(text: &str) -> (String, String) {
+    let mut thinking = String::new();
+    let mut visible = String::new();
+    let mut remaining: &str = text;
+
+    loop {
+        if let Some(start) = remaining.find("<think>") {
+            visible.push_str(&remaining[..start]);
+            remaining = &remaining[start + 7..];
+
+            if let Some(end) = remaining.find("</think>") {
+                thinking.push_str(&remaining[..end]);
+                remaining = &remaining[end + 8..];
+            } else {
+                // Unclosed — still streaming thinking
+                thinking.push_str(remaining);
+                break;
+            }
+        } else {
+            visible.push_str(remaining);
+            break;
+        }
+    }
+
+    (thinking.trim().to_string(), visible.trim().to_string())
 }
 
 // ---------------------------------------------------------------------------

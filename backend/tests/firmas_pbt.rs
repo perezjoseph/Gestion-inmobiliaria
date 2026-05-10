@@ -104,8 +104,8 @@ mod pbt_async {
     }
 
     async fn create_documento(db: &DatabaseConnection) -> (Uuid, Uuid) {
-        use realestate_backend::entities::{contrato, inquilino, propiedad};
         use chrono::NaiveDate;
+        use realestate_backend::entities::{contrato, inquilino, propiedad};
         use rust_decimal::Decimal;
 
         let id = Uuid::new_v4();

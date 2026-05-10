@@ -54,13 +54,7 @@ pub async fn get_stats(db: &DatabaseConnection, org_id: Uuid) -> Result<Dashboar
 
     let fecha_limite_vencimiento = today + chrono::Days::new(30);
 
-    let (
-        total_propiedades,
-        ocupadas,
-        ingreso_result,
-        pagos_atrasados,
-        gastos_result,
-    ) = tokio::try_join!(
+    let (total_propiedades, ocupadas, ingreso_result, pagos_atrasados, gastos_result) = tokio::try_join!(
         propiedad::Entity::find()
             .filter(propiedad::Column::OrganizacionId.eq(org_id))
             .count(db),

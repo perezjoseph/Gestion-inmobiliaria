@@ -158,8 +158,8 @@ async fn create_test_usuario(db: &DatabaseConnection, rol: &str, org_id: Uuid) -
 /// Also creates propiedad + inquilino + contrato so the document's entity_id
 /// references a real entity in the org (required by multi-tenancy check).
 async fn create_test_documento(db: &DatabaseConnection, user_id: Uuid, org_id: Uuid) -> Uuid {
-    use realestate_backend::entities::{contrato, inquilino, propiedad};
     use chrono::NaiveDate;
+    use realestate_backend::entities::{contrato, inquilino, propiedad};
     use rust_decimal::Decimal;
 
     let id = Uuid::new_v4();
@@ -893,8 +893,8 @@ fn test_docx_export_returns_valid_response() {
 #[test]
 fn test_docx_export_no_content_returns_400() {
     with_db(|db| async move {
-        use realestate_backend::entities::{contrato, inquilino, propiedad};
         use chrono::NaiveDate;
+        use realestate_backend::entities::{contrato, inquilino, propiedad};
         use rust_decimal::Decimal;
 
         let org_id = create_test_organizacion(&db).await;

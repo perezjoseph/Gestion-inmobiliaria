@@ -660,7 +660,9 @@ pub(crate) async fn verificar_entidad_pertenece_a_org(
                 .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
         }
         _ => {
-            return Err(AppError::Validation("Tipo de entidad no válido".to_string()));
+            return Err(AppError::Validation(
+                "Tipo de entidad no válido".to_string(),
+            ));
         }
     }
     Ok(())
