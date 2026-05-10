@@ -193,8 +193,8 @@ jobs:
           tags: |
             ghcr.io/${{ env.IMAGE_OWNER }}/realestate-baileys:${{ env.IMAGE_TAG }}
             ${{ inputs.is-production && format('ghcr.io/{0}/realestate-baileys:latest', github.repository_owner) || '' }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-baileys:buildcache
-          cache-to: ${{ inputs.is-production && format('type=registry,ref=ghcr.io/{0}/realestate-baileys:buildcache,mode=max', github.repository_owner) || '' }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-baileys:buildcache-node24
+          cache-to: ${{ inputs.is-production && format('type=registry,ref=ghcr.io/{0}/realestate-baileys:buildcache-node24,mode=max', github.repository_owner) || '' }}
 
       - name: Install Trivy
         uses: ./.github/actions/install-security-tools
