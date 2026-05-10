@@ -20,99 +20,57 @@ spec:
         kubernetes.io/hostname: inference
       containers:
         - name: export
-          image: openvino/model_server:latest-gpu
+          image: python:3.13-slim
           command:
-            - python3
-            - /export/export_model.py
-          env:
-            - name: MODEL_ID
-              value: Qwen/Qwen3-30B-A3B
-            - name: OUTPUT_DIR
-              value: /models/Qwen3-30B-A3B/1/model
-            - name: WEIGHT_FORMAT
-              value: int4
-            - name: TARGET_DEVICE
-              value: GPU
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              # Use PV for HuggingFace cache to avoid ephemeral storage eviction
+              export HF_HOME=/models/.hf_cache
+              export PIP_CACHE_DIR=/models/.pip_cache
+              mkdir -p "$HF_HOME" "$PIP_CACHE_DIR"
+
+              echo "Installing dependencies..."
+              pip install --no-cache-dir optimum[openvino] openvino-tokenizers transformers torch --extra-index-url https://download.pytorch.org/whl/cpu
+
+              echo "Installing git..."
+              apt-get update && apt-get install -y --no-install-recommends git
+
+              echo "Cloning export script..."
+              git clone --depth 1 https://github.com/openvinotoolkit/model_server.git /tmp/ovms
+
+              echo "Running export..."
+              python /tmp/ovms/demos/common/export_models/export_model.py text_generation \
+                --source_model Qwen/Qwen3-30B-A3B \
+                --weight-format int4 \
+                --model_repository_path /models \
+                --model_name Qwen3-30B-A3B \
+                --target_device GPU \
+                --config_file_path /models/config.json \
+                --cache_size 8 \
+                --enable_prefix_caching true \
+                --max_num_batched_tokens 4096 \
+                --overwrite_models
+
+              # Clean up HuggingFace cache from PV after export
+              echo "Cleaning up cache..."
+              rm -rf /models/.hf_cache /models/.pip_cache
+
+              echo "Export complete."
           resources:
             requests:
-              cpu: 2000m
-              memory: 32Gi
-              ephemeral-storage: 1Gi
-              gpu.intel.com/xe: "1"
-            limits:
               cpu: 8000m
+              memory: 32Gi
+              ephemeral-storage: 4Gi
+            limits:
+              cpu: 20000m
               memory: 48Gi
-              ephemeral-storage: 2Gi
-              gpu.intel.com/xe: "1"
+              ephemeral-storage: 10Gi
           volumeMounts:
             - name: models
               mountPath: /models
-            - name: export-script
-              mountPath: /export
       volumes:
         - name: models
           persistentVolumeClaim:
             claimName: ovms-models-pvc
-        - name: export-script
-          configMap:
-            name: ovms-export-script
-            defaultMode: 0755
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: ovms-export-script
-  namespace: realestate
-data:
-  export_model.py: |
-    """Export Qwen3-30B-A3B with INT4 quantization for OpenVINO GPU inference."""
-    import os
-    import sys
-    from pathlib import Path
-
-    def main():
-        model_id = os.environ.get("MODEL_ID", "Qwen/Qwen3-30B-A3B")
-        output_dir = Path(os.environ.get("OUTPUT_DIR", "/models/Qwen3-30B-A3B/1/model"))
-        weight_format = os.environ.get("WEIGHT_FORMAT", "int4")
-
-        # Write to a temporary directory first to avoid corrupting existing files on failure
-        tmp_dir = output_dir.parent / "model_tmp"
-        tmp_dir.mkdir(parents=True, exist_ok=True)
-
-        try:
-            from optimum.intel import OVModelForCausalLM
-            from transformers import AutoTokenizer
-
-            print(f"Exporting {model_id} with {weight_format} quantization...")
-            print(f"Temporary output: {tmp_dir}")
-
-            model = OVModelForCausalLM.from_pretrained(
-                model_id,
-                export=True,
-                weight_format=weight_format,
-            )
-            model.save_pretrained(str(tmp_dir))
-
-            tokenizer = AutoTokenizer.from_pretrained(model_id)
-            tokenizer_dir = output_dir.parent / "tokenizer"
-            tokenizer_dir.mkdir(parents=True, exist_ok=True)
-            tokenizer.save_pretrained(str(tokenizer_dir))
-
-            # Atomic swap: remove old model dir and rename tmp to final
-            import shutil
-            if output_dir.exists():
-                shutil.rmtree(output_dir)
-            tmp_dir.rename(output_dir)
-
-            print(f"Export complete: {output_dir}")
-
-        except Exception as e:
-            print(f"Export failed: {e}", file=sys.stderr)
-            # Clean up temporary files but leave existing model intact
-            import shutil
-            if tmp_dir.exists():
-                shutil.rmtree(tmp_dir)
-            sys.exit(1)
-
-    if __name__ == "__main__":
-        main()
