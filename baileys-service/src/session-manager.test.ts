@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import * as fc from 'fast-check';
-import { encrypt, decrypt } from './session-manager';
+import { encrypt, decrypt } from './pg-auth-state';
 
 /**
  * Property 1: Session Encryption Round-Trip

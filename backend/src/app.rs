@@ -4,6 +4,7 @@ use actix_web::error::ResponseError;
 use actix_web::http::header;
 use actix_web::web;
 use actix_web::web::JsonConfig;
+use actix_web_prom::PrometheusMetricsBuilder;
 use sea_orm::DatabaseConnection;
 use tracing_actix_web::TracingLogger;
 
@@ -77,6 +78,11 @@ pub fn create_app(
 > {
     let cors = build_cors(&config);
 
+    let prometheus = PrometheusMetricsBuilder::new("api")
+        .endpoint("/metrics")
+        .build()
+        .expect("Error inicializando métricas Prometheus");
+
     let json_cfg = JsonConfig::default()
         .limit(1_048_576) // 1 MB
         .error_handler(|err, _req| {
@@ -89,6 +95,7 @@ pub fn create_app(
         });
 
     actix_web::App::new()
+        .wrap(prometheus.clone())
         .wrap(crate::middleware::security_headers::SecurityHeaders)
         .wrap(TracingLogger::default())
         .wrap(cors)

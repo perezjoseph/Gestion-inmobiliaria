@@ -25,6 +25,7 @@ pub mod m20250615_000002_add_recargo_fields;
 pub mod m20250620_000001_create_firmas_documento;
 pub mod m20260509_000001_create_chatbot_tables;
 pub mod m20260510_000001_make_auditoria_usuario_nullable;
+pub mod m20260510_000002_create_whatsapp_auth_tables;
 
 use sea_orm_migration::prelude::*;
 
@@ -60,6 +61,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250620_000001_create_firmas_documento::Migration),
             Box::new(m20260509_000001_create_chatbot_tables::Migration),
             Box::new(m20260510_000001_make_auditoria_usuario_nullable::Migration),
+            Box::new(m20260510_000002_create_whatsapp_auth_tables::Migration),
         ]
     }
 }

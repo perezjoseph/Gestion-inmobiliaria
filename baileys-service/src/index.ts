@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import pino from 'pino';
 import QRCode from 'qrcode';
-import { getConnectionCounts, startSession, stopSession, getStatus, sendMessage } from './session-manager';
+import { getConnectionCounts, startSession, stopSession, getStatus, sendMessage, restoreSessions } from './session-manager';
 
 const logger = pino({ name: 'baileys-service' });
 
@@ -105,6 +105,9 @@ app.get('/sessions/:realmId/status', async (req: Request, res: Response) => {
 
 app.listen(PORT, () => {
   logger.info({ port: PORT }, 'Baileys service started');
+  restoreSessions().catch((err) => {
+    logger.error({ err: err.message }, 'Failed to restore sessions on startup');
+  });
 });
 
 export { app };

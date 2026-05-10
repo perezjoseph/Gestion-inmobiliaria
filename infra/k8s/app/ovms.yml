@@ -43,6 +43,7 @@ spec:
             - "9000"
             - "--rest_port"
             - "8000"
+            - "--metrics_enable"
           ports:
             - containerPort: 8000
           resources:
