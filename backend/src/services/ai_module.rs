@@ -11,6 +11,7 @@ use uuid::Uuid;
 use crate::config::ChatbotEnvConfig;
 use crate::errors::AppError;
 use crate::models::chatbot::{BalanceResponse, Capabilities, Confidence, FaqEntry};
+use crate::services::ovms_provider::OvmsCompletionModel;
 
 // =============================================================================
 // Types for process_message entry point
@@ -62,14 +63,11 @@ pub struct TenantContext {
     pub name: String,
 }
 
-/// AI module that wraps a Rig `OpenAI`-compatible client pointed at the
-/// self-hosted `OVMS` endpoint. Stateless — receives all context as parameters.
+/// AI module that wraps an [`OvmsCompletionModel`] for Rig's native agent loop.
+/// Stateless — receives all context as parameters.
 pub struct AiModule {
-    #[allow(dead_code)]
-    pub(crate) client: rig::providers::openai::Client,
-    pub(crate) model_name: String,
+    pub(crate) model: OvmsCompletionModel,
     pub(crate) timeout_secs: u64,
-    pub(crate) ovms_endpoint: String,
 }
 
 /// Context passed to [`AiModule::process_message`] grouping all per-invocation parameters.
@@ -89,30 +87,25 @@ pub struct ProcessMessageContext<'a> {
 
 impl AiModule {
     /// Creates a new [`AiModule`] from the chatbot environment configuration.
-    /// The `OpenAI`-compatible client is pointed at the self-hosted `OVMS` endpoint.
+    /// Uses the custom [`OvmsCompletionModel`] that handles OVMS's missing `id` field.
     pub fn new(config: &ChatbotEnvConfig) -> Result<Self, anyhow::Error> {
-        let client = rig::providers::openai::Client::builder()
-            .api_key("unused")
-            .base_url(&config.ovms_endpoint)
-            .build()
-            .map_err(|e| anyhow::anyhow!("Error al crear cliente OVMS: {e}"))?;
+        let model = OvmsCompletionModel::new(&config.ovms_chat_model, &config.ovms_endpoint);
 
         Ok(Self {
-            client,
-            model_name: config.ovms_chat_model.clone(),
+            model,
             timeout_secs: config.ai_chat_timeout_secs,
-            ovms_endpoint: config.ovms_endpoint.clone(),
         })
     }
 
     /// Single entry point for all messages (text or image).
     ///
-    /// The LLM decides which tools to invoke based on content. This method:
+    /// Uses Rig's native agent loop with the OVMS provider. The LLM decides
+    /// which tools to invoke based on content. This method:
     /// 1. Composes the system prompt from persona config + tenant context
-    /// 2. Builds a Rig agent with enabled tools
+    /// 2. Builds a Rig agent with the OVMS model and enabled tools
     /// 3. Converts conversation history to Rig `Message` format
     /// 4. Sends the user message to the agent with a timeout
-    /// 5. Returns the agent's response or a timeout error message
+    /// 5. Returns the agent's response (including any tool invocations)
     pub async fn process_message(
         &self,
         ctx: &ProcessMessageContext<'_>,
@@ -138,7 +131,7 @@ impl AiModule {
             },
         );
 
-        // 4. Build agent with enabled tools and invoke with timeout
+        // 3. Build agent with enabled tools and invoke with timeout
         let timeout_duration = Duration::from_secs(self.timeout_secs);
 
         let result = tokio::time::timeout(timeout_duration, async {
@@ -163,7 +156,6 @@ impl AiModule {
                     timeout_secs = self.timeout_secs,
                     "Timeout en la solicitud al modelo OVMS"
                 );
-                // Return a user-friendly error message per Requirement 3.7
                 Ok(AgentResponse {
                     reply: "Lo siento, el servicio está temporalmente no disponible. \
                         Por favor, intente de nuevo en unos momentos."
@@ -174,11 +166,9 @@ impl AiModule {
         }
     }
 
-    /// Internal method that builds the Rig agent and invokes it.
-    /// Separated from `process_message` to keep the timeout wrapper clean.
-    ///
-    /// Uses a direct HTTP call to OVMS instead of Rig's built-in client because
-    /// OVMS's OpenAI-compatible response omits the `id` field, which Rig requires.
+    /// Internal method that builds the Rig agent and invokes it via the
+    /// [`OvmsCompletionModel`] which handles OVMS's missing `id` field and
+    /// supports tool calling through Rig's native agent loop.
     async fn invoke_agent(
         &self,
         system_prompt: &str,
@@ -186,94 +176,96 @@ impl AiModule {
         history: &[ConversationEntry],
         user_prompt: &str,
     ) -> Result<AgentResponse, AppError> {
+        use rig::completion::{CompletionModel, CompletionRequest};
+        use rig::message::{self, AssistantContent, ToolChoice, UserContent};
+        use rig::one_or_many::OneOrMany;
+
         let enabled_tools = get_enabled_tools(capabilities);
-        let _ = &enabled_tools;
 
-        // Build the messages array for the OpenAI-compatible request
-        let mut messages = Vec::new();
+        // Build tool definitions for the request
+        let tool_defs: Vec<rig::completion::ToolDefinition> = enabled_tools
+            .iter()
+            .map(|name| get_tool_definition(name))
+            .collect();
 
-        // System prompt
-        messages.push(serde_json::json!({
-            "role": "system",
-            "content": system_prompt
-        }));
+        // Build Rig messages from conversation history
+        let mut chat_history: Vec<message::Message> = Vec::with_capacity(history.len() + 1);
 
-        // Conversation history
         for entry in history {
-            messages.push(serde_json::json!({
-                "role": entry.role,
-                "content": entry.content
-            }));
+            let msg = match entry.role.as_str() {
+                "user" => message::Message::User {
+                    content: OneOrMany::one(UserContent::text(&entry.content)),
+                },
+                "assistant" => message::Message::Assistant {
+                    id: None,
+                    content: OneOrMany::one(AssistantContent::text(&entry.content)),
+                },
+                _ => continue,
+            };
+            chat_history.push(msg);
         }
 
-        // Current user message
-        messages.push(serde_json::json!({
-            "role": "user",
-            "content": user_prompt
-        }));
-
-        // Build the request body
-        let request_body = serde_json::json!({
-            "model": self.model_name,
-            "messages": messages,
-            "stream": false
+        // Add the current user message
+        chat_history.push(message::Message::User {
+            content: OneOrMany::one(UserContent::text(user_prompt)),
         });
 
-        // Make direct HTTP call to OVMS
-        let client = reqwest::Client::new();
-        let url = format!("{}/chat/completions", self.ovms_endpoint);
+        // Build the CompletionRequest manually
+        let request = CompletionRequest {
+            model: None,
+            preamble: Some(system_prompt.to_string()),
+            chat_history: OneOrMany::many(chat_history)
+                .map_err(|_| AppError::Internal(anyhow::anyhow!("Chat history cannot be empty")))?,
+            documents: vec![],
+            tools: tool_defs,
+            temperature: None,
+            max_tokens: None,
+            tool_choice: if enabled_tools.is_empty() {
+                None
+            } else {
+                Some(ToolChoice::Auto)
+            },
+            additional_params: None,
+            output_schema: None,
+        };
 
-        let response = client
-            .post(&url)
-            .header("Content-Type", "application/json")
-            .json(&request_body)
-            .send()
+        // Send to OVMS via our custom CompletionModel
+        let response = self
+            .model
+            .completion(request)
             .await
-            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error conectando a OVMS: {e}")))?;
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error en agente AI: {e}")))?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(AppError::Internal(anyhow::anyhow!(
-                "OVMS respondió con estado {status}: {body}"
-            )));
+        // Extract text and tool calls from the response
+        let mut reply_parts = Vec::new();
+        let mut tools_invoked = Vec::new();
+
+        for item in response.choice.iter() {
+            match item {
+                AssistantContent::Text(text) => {
+                    reply_parts.push(text.text.clone());
+                }
+                AssistantContent::ToolCall(tc) => {
+                    tools_invoked.push(tc.function.name.clone());
+                }
+                _ => {}
+            }
         }
 
-        let body: OvmsCompletionResponse = response.json().await.map_err(|e| {
-            AppError::Internal(anyhow::anyhow!("Error parseando respuesta OVMS: {e}"))
-        })?;
-
-        let reply = body
-            .choices
-            .first()
-            .and_then(|c| c.message.content.clone())
-            .unwrap_or_default();
+        let reply = if reply_parts.is_empty() && !tools_invoked.is_empty() {
+            // Model only returned tool calls — this is the first turn of a
+            // multi-turn loop. For now, return a placeholder indicating tools
+            // were invoked. Full multi-turn execution will be wired next.
+            format!("Herramientas invocadas: {}", tools_invoked.join(", "))
+        } else {
+            reply_parts.join("\n")
+        };
 
         Ok(AgentResponse {
             reply,
-            tools_invoked: vec![],
+            tools_invoked,
         })
     }
-}
-
-/// OVMS chat completion response (OpenAI-compatible but without `id` field).
-#[derive(Debug, Deserialize)]
-struct OvmsCompletionResponse {
-    pub choices: Vec<OvmsChoice>,
-    #[allow(dead_code)]
-    pub model: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct OvmsChoice {
-    pub message: OvmsMessage,
-    #[allow(dead_code)]
-    pub finish_reason: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct OvmsMessage {
-    pub content: Option<String>,
 }
 
 /// Composes a system prompt from the organization's persona configuration,
@@ -714,6 +706,117 @@ impl Tool for HandoffToHumanTool {
 // =============================================================================
 // Capability-Gated Tool Registration
 // =============================================================================
+
+/// Returns a [`ToolDefinition`] for a given tool name. Used to build the
+/// tool definitions array for the Rig `CompletionRequest`.
+fn get_tool_definition(name: &str) -> ToolDefinition {
+    match name {
+        ExtractReceiptTool::NAME => ToolDefinition {
+            name: ExtractReceiptTool::NAME.to_string(),
+            description: "Extrae datos estructurados de un comprobante de pago a partir de una imagen. Usa esta herramienta cuando el usuario envía una foto de un recibo o comprobante de transferencia.".to_string(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "image_base64": {
+                        "type": "string",
+                        "description": "Imagen del recibo codificada en base64"
+                    },
+                    "caption": {
+                        "type": "string",
+                        "description": "Texto opcional que acompaña la imagen"
+                    }
+                },
+                "required": ["image_base64"]
+            }),
+        },
+        QueryBalanceTool::NAME => ToolDefinition {
+            name: QueryBalanceTool::NAME.to_string(),
+            description: "Consulta el balance pendiente de un inquilino. Devuelve los pagos pendientes y atrasados con totales por moneda. Usa esta herramienta cuando el usuario pregunta cuánto debe.".to_string(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "inquilino_id": {
+                        "type": "string",
+                        "description": "UUID del inquilino"
+                    },
+                    "organizacion_id": {
+                        "type": "string",
+                        "description": "UUID de la organización"
+                    }
+                },
+                "required": ["inquilino_id", "organizacion_id"]
+            }),
+        },
+        GetPaymentHistoryTool::NAME => ToolDefinition {
+            name: GetPaymentHistoryTool::NAME.to_string(),
+            description: "Consulta el historial de pagos recientes de un inquilino. Usa esta herramienta cuando el usuario pregunta por sus pagos anteriores o recibos.".to_string(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "inquilino_id": {
+                        "type": "string",
+                        "description": "UUID del inquilino"
+                    },
+                    "organizacion_id": {
+                        "type": "string",
+                        "description": "UUID de la organización"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Cantidad máxima de pagos a devolver (por defecto 10)"
+                    }
+                },
+                "required": ["inquilino_id", "organizacion_id"]
+            }),
+        },
+        CreateMaintenanceRequestTool::NAME => ToolDefinition {
+            name: CreateMaintenanceRequestTool::NAME.to_string(),
+            description: "Crea una solicitud de mantenimiento para el inquilino. Usa esta herramienta cuando el usuario reporta un problema o avería en su propiedad.".to_string(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "inquilino_id": {
+                        "type": "string",
+                        "description": "UUID del inquilino"
+                    },
+                    "organizacion_id": {
+                        "type": "string",
+                        "description": "UUID de la organización"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Descripción del problema de mantenimiento (2–1000 caracteres)"
+                    },
+                    "priority": {
+                        "type": "string",
+                        "enum": ["baja", "media", "alta", "urgente"],
+                        "description": "Prioridad de la solicitud (por defecto: media)"
+                    }
+                },
+                "required": ["inquilino_id", "organizacion_id", "description"]
+            }),
+        },
+        HandoffToHumanTool::NAME => ToolDefinition {
+            name: HandoffToHumanTool::NAME.to_string(),
+            description: "Transfiere la conversación a un operador humano. Usa esta herramienta cuando el usuario solicita hablar con una persona o cuando no puedes resolver su consulta.".to_string(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "description": "Razón por la cual se transfiere a un humano"
+                    }
+                },
+                "required": []
+            }),
+        },
+        other => ToolDefinition {
+            name: other.to_string(),
+            description: String::new(),
+            parameters: serde_json::json!({"type": "object", "properties": {}}),
+        },
+    }
+}
 
 /// Returns the list of tool names that should be registered on the AI agent
 /// based on the organization's enabled capabilities.

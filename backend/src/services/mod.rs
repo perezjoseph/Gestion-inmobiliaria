@@ -31,6 +31,7 @@ mod ocr_mapping_pbt;
 mod ocr_mapping_tests;
 pub mod ocr_preview;
 pub mod organizaciones;
+pub mod ovms_provider;
 pub mod pago_generacion;
 pub mod pagos;
 pub mod perfil;
