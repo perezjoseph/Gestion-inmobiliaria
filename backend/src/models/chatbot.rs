@@ -279,6 +279,18 @@ pub struct TestChatRequest {
     /// Optional config override — if provided, the test uses these settings
     /// instead of the persisted org config.
     pub config_override: Option<TestChatConfigOverride>,
+    /// Conversation history from the test UI (role + content pairs).
+    /// Allows multi-turn context in the test chat sandbox.
+    #[serde(default)]
+    pub history: Vec<TestChatHistoryEntry>,
+}
+
+/// A single message in the test chat conversation history.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TestChatHistoryEntry {
+    pub role: String,
+    pub content: String,
 }
 
 /// Optional configuration override for test chat.

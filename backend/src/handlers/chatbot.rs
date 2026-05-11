@@ -483,8 +483,15 @@ pub async fn test_chat(
             )
         };
 
-    // For test chat, we use an empty history (no production conversation loaded)
-    let history: Vec<ConversationEntry> = vec![];
+    // For test chat, use the history provided by the frontend (multi-turn sandbox)
+    let history: Vec<ConversationEntry> = request
+        .history
+        .iter()
+        .map(|h| ConversationEntry {
+            role: h.role.clone(),
+            content: h.content.clone(),
+        })
+        .collect();
 
     let user_message = UserMessage {
         content: request.message,
@@ -628,6 +635,13 @@ pub async fn test_chat_stream(
             "role": "system",
             "content": system_prompt,
         })];
+        // Include conversation history from the test UI
+        for h in &request.history {
+            msgs.push(serde_json::json!({
+                "role": h.role,
+                "content": h.content,
+            }));
+        }
         msgs.push(serde_json::json!({
             "role": "user",
             "content": request.message,

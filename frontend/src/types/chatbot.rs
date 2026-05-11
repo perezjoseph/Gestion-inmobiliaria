@@ -122,6 +122,17 @@ pub struct TestChatRequest {
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub config_override: Option<TestChatConfigOverride>,
+    /// Conversation history for multi-turn context in the test sandbox.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub history: Vec<TestChatHistoryEntry>,
+}
+
+/// A single message in the test chat conversation history.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TestChatHistoryEntry {
+    pub role: String,
+    pub content: String,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]

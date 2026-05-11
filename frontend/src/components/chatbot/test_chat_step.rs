@@ -6,7 +6,7 @@ use yew::prelude::*;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::services::api::get_token;
 use crate::services::chatbot::test_chat_stream_url;
-use crate::types::chatbot::TestChatRequest;
+use crate::types::chatbot::{TestChatHistoryEntry, TestChatRequest};
 
 #[derive(Clone, PartialEq)]
 struct ChatMessage {
@@ -69,6 +69,26 @@ pub fn TestChatStep() -> Html {
             let loading = loading.clone();
             let error = error.clone();
 
+            // Build history from existing completed messages BEFORE adding the new ones
+            let history: Vec<TestChatHistoryEntry> = (*messages)
+                .iter()
+                .filter(|m| !m.content.is_empty())
+                .map(|m| {
+                    // Strip <think> blocks from assistant messages — only send visible content
+                    let content = if m.role == "assistant" && m.content.contains("<think>") {
+                        let (_, visible) = split_think_content(&m.content);
+                        visible
+                    } else {
+                        m.content.clone()
+                    };
+                    TestChatHistoryEntry {
+                        role: m.role.clone(),
+                        content,
+                    }
+                })
+                .filter(|h| !h.content.is_empty())
+                .collect();
+
             let mut new_msgs = (*messages).clone();
             new_msgs.push(ChatMessage {
                 role: "user".to_string(),
@@ -83,7 +103,7 @@ pub fn TestChatStep() -> Html {
             loading.set(true);
 
             spawn_local(async move {
-                match stream_chat_response(&msg).await {
+                match stream_chat_response(&msg, &history).await {
                     Ok(receiver) => {
                         consume_stream(receiver, messages.clone(), error.clone()).await;
                     }
@@ -347,12 +367,16 @@ fn split_think_content(text: &str) -> (String, String) {
 
 /// Initiates the streaming fetch request and returns the Response object.
 #[allow(clippy::future_not_send)]
-async fn stream_chat_response(message: &str) -> Result<Response, String> {
+async fn stream_chat_response(
+    message: &str,
+    history: &[TestChatHistoryEntry],
+) -> Result<Response, String> {
     let url = test_chat_stream_url();
 
     let request_body = TestChatRequest {
         message: message.to_string(),
         config_override: None,
+        history: history.to_vec(),
     };
     let body_json =
         serde_json::to_string(&request_body).map_err(|e| format!("Error serializando: {e}"))?;
