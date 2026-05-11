@@ -36,7 +36,7 @@ futures-util.workspace = true
 numaelis-rckive-genpdf = "0.4"
 rust_xlsxwriter = "0.94"
 csv = "1"
-calamine = "0.34"
+calamine = "0.35"
 reqwest = { version = "0.12", default-features = false, features = ["charset", "http2", "multipart", "json", "rustls-tls", "stream"] }
 rig-core = { version = "0.36", default-features = false, features = ["rustls"] }
 dashmap = "6"
