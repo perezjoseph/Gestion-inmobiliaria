@@ -8,6 +8,7 @@ pub mod chatbot;
 mod chatbot_pbt;
 pub mod configuracion;
 pub mod contratos;
+pub mod crypto;
 pub mod dashboard;
 pub mod documento_editor;
 #[cfg(test)]

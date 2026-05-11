@@ -402,6 +402,78 @@ pub async fn get_by_id(
     Ok(ContratoResponse::from(record))
 }
 
+/// Data needed by the pago generation/preview pipeline.
+pub struct ContratoForPagos {
+    pub fecha_inicio: NaiveDate,
+    pub fecha_fin: NaiveDate,
+    pub monto_mensual: Decimal,
+    pub moneda: String,
+    pub estado: String,
+    pub organizacion_id: Uuid,
+}
+
+/// Load a contrato's raw fields needed for pago generation, scoped to org.
+pub async fn get_contrato_for_pagos<C: ConnectionTrait>(
+    db: &C,
+    org_id: Uuid,
+    contrato_id: Uuid,
+) -> Result<ContratoForPagos, AppError> {
+    let record = contrato::Entity::find_by_id(contrato_id)
+        .filter(contrato::Column::OrganizacionId.eq(org_id))
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
+
+    Ok(ContratoForPagos {
+        fecha_inicio: record.fecha_inicio,
+        fecha_fin: record.fecha_fin,
+        monto_mensual: record.monto_mensual,
+        moneda: record.moneda,
+        estado: record.estado,
+        organizacion_id: record.organizacion_id,
+    })
+}
+
+/// Load all pago due dates for a given contrato.
+pub async fn get_pago_fechas_for_contrato<C: ConnectionTrait>(
+    db: &C,
+    contrato_id: Uuid,
+) -> Result<Vec<NaiveDate>, AppError> {
+    let existing_pagos = pago::Entity::find()
+        .filter(pago::Column::ContratoId.eq(contrato_id))
+        .all(db)
+        .await?;
+
+    Ok(existing_pagos.iter().map(|p| p.fecha_vencimiento).collect())
+}
+
+/// Load pagos for a contrato filtered to those whose (year, month) matches any in `new_pagos`.
+pub async fn get_pagos_by_months(
+    db: &DatabaseConnection,
+    contrato_id: Uuid,
+    new_pagos: &[PagoGenerado],
+) -> Result<Vec<crate::models::pago::PagoResponse>, AppError> {
+    use chrono::Datelike;
+
+    let all_contrato_pagos = pago::Entity::find()
+        .filter(pago::Column::ContratoId.eq(contrato_id))
+        .all(db)
+        .await?;
+
+    let generated_pagos = all_contrato_pagos
+        .into_iter()
+        .filter(|p| {
+            new_pagos.iter().any(|np| {
+                np.fecha_vencimiento.year() == p.fecha_vencimiento.year()
+                    && np.fecha_vencimiento.month() == p.fecha_vencimiento.month()
+            })
+        })
+        .map(crate::models::pago::PagoResponse::from)
+        .collect();
+
+    Ok(generated_pagos)
+}
+
 pub async fn list(
     db: &DatabaseConnection,
     org_id: Uuid,

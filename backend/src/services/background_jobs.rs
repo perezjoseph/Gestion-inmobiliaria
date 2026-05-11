@@ -15,6 +15,20 @@ use crate::errors::AppError;
 use crate::models::PaginatedResponse;
 use crate::models::background_jobs::{EjecucionTareaResponse, HistorialQuery};
 
+impl From<ejecucion_tarea::Model> for EjecucionTareaResponse {
+    fn from(model: ejecucion_tarea::Model) -> Self {
+        Self {
+            id: model.id,
+            nombre_tarea: model.nombre_tarea,
+            iniciado_en: model.iniciado_en.with_timezone(&Utc),
+            duracion_ms: model.duracion_ms,
+            exitosa: model.exitosa,
+            registros_afectados: model.registros_afectados,
+            mensaje_error: model.mensaje_error,
+        }
+    }
+}
+
 pub const TAREAS_VALIDAS: &[&str] = &[
     "marcar_pagos_atrasados",
     "marcar_contratos_vencidos",

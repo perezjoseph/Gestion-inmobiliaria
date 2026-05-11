@@ -1,29 +1,14 @@
 use actix_web::{HttpRequest, HttpResponse, web};
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use sea_orm::DatabaseConnection;
 
 use crate::config::AppConfig;
-use crate::entities::{chatbot_config, inquilino};
 use crate::errors::AppError;
 use crate::models::chatbot::{Capabilities, FaqEntry, IncomingWebhookPayload, SendMessageRequest};
 use crate::services::ai_module::{
     AiModule, ChatbotPersona, ConversationEntry, ProcessMessageContext, TenantContext, UserMessage,
 };
 use crate::services::chatbot;
-
-/// Constant-time comparison of two byte slices.
-/// Always compares all bytes regardless of mismatch position.
-pub(crate) fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-
-    let mut result: u8 = 0;
-    for (x, y) in a.iter().zip(b.iter()) {
-        result |= x ^ y;
-    }
-
-    result == 0
-}
+use crate::services::crypto::constant_time_eq;
 
 /// Hash a phone number for safe logging (no PII in logs).
 fn hash_phone(phone: &str) -> String {
@@ -80,16 +65,7 @@ pub async fn incoming_webhook(
     let org_id = payload.realm_id;
 
     // Step 1: Load ChatbotConfig for the org
-    let chatbot_config_record = chatbot_config::Entity::find()
-        .filter(chatbot_config::Column::OrganizacionId.eq(org_id))
-        .one(db.get_ref())
-        .await?;
-
-    let Some(cfg) = chatbot_config_record else {
-        // No config exists for this org — silently discard
-        tracing::debug!(organizacion_id = %org_id, "No chatbot config found, discarding message");
-        return Ok(HttpResponse::Ok().json(serde_json::json!({"status": "discarded"})));
-    };
+    let cfg = chatbot::get_config_model(db.get_ref(), org_id).await?;
 
     // Step 2: Check config.activo — if false, silently discard (Requirement 9.7)
     if !cfg.activo {
@@ -124,11 +100,7 @@ pub async fn incoming_webhook(
     }
 
     // Step 4: Resolve tenant by phone + org_id
-    let tenant = inquilino::Entity::find()
-        .filter(inquilino::Column::Telefono.eq(&payload.sender_phone))
-        .filter(inquilino::Column::OrganizacionId.eq(org_id))
-        .one(db.get_ref())
-        .await?;
+    let tenant = chatbot::find_tenant_by_phone(db.get_ref(), &payload.sender_phone, org_id).await?;
 
     let tenant_context = tenant.as_ref().map(|t| TenantContext {
         name: format!("{} {}", t.nombre, t.apellido),

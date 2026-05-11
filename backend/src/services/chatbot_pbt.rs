@@ -2951,7 +2951,7 @@ fn enabled_capabilities_always_produce_tools() {
 // Feature: whatsapp-ai-assistant, Property 19: Internal Webhook Authentication
 // **Validates: Requirements 10.1, 10.2**
 
-use crate::handlers::chatbot_internal::constant_time_eq;
+use crate::services::crypto::constant_time_eq;
 
 /// Authentication decision result.
 #[derive(Debug, Clone, PartialEq)]

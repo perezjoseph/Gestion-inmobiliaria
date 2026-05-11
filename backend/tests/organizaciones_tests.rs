@@ -858,7 +858,7 @@ mod db_async {
                     "email": email,
                     "password": "SecurePass789!",
                     "tipo": "persona_fisica",
-                    "cedula": "22400022111",
+                    "cedula": valid_cedula(),
                     "telefono": "809-555-0007",
                     "nombreOrganizacion": "Org JWT Test"
                 }))

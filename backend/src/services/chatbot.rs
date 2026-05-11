@@ -460,6 +460,35 @@ async fn tenant_exists_by_phone<C: ConnectionTrait>(phone: &str, org_id: Uuid, d
         .is_some()
 }
 
+/// Resolved tenant info for the incoming webhook pipeline.
+pub struct ResolvedTenant {
+    pub id: Uuid,
+    pub nombre: String,
+    pub apellido: String,
+}
+
+/// Find a tenant by phone number and organization.
+/// Returns `None` if no tenant matches.
+pub async fn find_tenant_by_phone<C: ConnectionTrait>(
+    db: &C,
+    phone: &str,
+    org_id: Uuid,
+) -> Result<Option<ResolvedTenant>, AppError> {
+    use crate::entities::inquilino;
+
+    let record = inquilino::Entity::find()
+        .filter(inquilino::Column::Telefono.eq(phone))
+        .filter(inquilino::Column::OrganizacionId.eq(org_id))
+        .one(db)
+        .await?;
+
+    Ok(record.map(|t| ResolvedTenant {
+        id: t.id,
+        nombre: t.nombre,
+        apellido: t.apellido,
+    }))
+}
+
 // --- Phone Number Validation & Normalization ---
 
 /// Validates that a phone number conforms to E.164 format.

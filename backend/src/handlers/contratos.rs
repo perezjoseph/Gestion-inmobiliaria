@@ -1,17 +1,14 @@
 use actix_web::{HttpResponse, web};
-use chrono::Datelike;
 use rust_decimal::Decimal;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, TransactionTrait};
+use sea_orm::{DatabaseConnection, TransactionTrait};
 use uuid::Uuid;
 
-use crate::entities::{contrato, pago};
 use crate::errors::AppError;
 use crate::middleware::rbac::{AdminOnly, WriteAccess};
 use crate::models::contrato::{
     CambiarEstadoDepositoRequest, ContratoListQuery, CreateContratoRequest, PorVencerQuery,
     RenovarContratoRequest, TerminarContratoRequest, UpdateContratoRequest,
 };
-use crate::models::pago::PagoResponse;
 use crate::models::pago_generacion::{
     GenerarPagosRequest, GenerarPagosResponse, PagoPreview, PreviewPagosQuery, PreviewPagosResponse,
 };
@@ -183,11 +180,9 @@ pub async fn preview_pagos(
     let dia_vencimiento = query.into_inner().dia_vencimiento.unwrap_or(1);
 
     // Load contrato scoped to org
-    let contrato_record = contrato::Entity::find_by_id(contrato_id)
-        .filter(contrato::Column::OrganizacionId.eq(claims.organizacion_id))
-        .one(db.get_ref())
-        .await?
-        .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
+    let contrato_record =
+        contratos::get_contrato_for_pagos(db.get_ref(), claims.organizacion_id, contrato_id)
+            .await?;
 
     // Calculate all pagos for the contract period
     let all_pagos = calcular_pagos(
@@ -199,12 +194,8 @@ pub async fn preview_pagos(
     );
 
     // Query existing pagos for this contrato
-    let existing_pagos = pago::Entity::find()
-        .filter(pago::Column::ContratoId.eq(contrato_id))
-        .all(db.get_ref())
-        .await?;
-
-    let fechas_existentes: Vec<_> = existing_pagos.iter().map(|p| p.fecha_vencimiento).collect();
+    let fechas_existentes =
+        contratos::get_pago_fechas_for_contrato(db.get_ref(), contrato_id).await?;
 
     // Filter to get only new pagos
     let new_pagos = filtrar_existentes(&all_pagos, &fechas_existentes);
@@ -255,11 +246,7 @@ pub async fn generar_pagos(
     let txn = db.begin().await?;
 
     // Load contrato scoped to org (within transaction)
-    let contrato_record = contrato::Entity::find_by_id(contrato_id)
-        .filter(contrato::Column::OrganizacionId.eq(org_id))
-        .one(&txn)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
+    let contrato_record = contratos::get_contrato_for_pagos(&txn, org_id, contrato_id).await?;
 
     // Validate contrato is active
     if contrato_record.estado != "activo" {
@@ -278,12 +265,7 @@ pub async fn generar_pagos(
     );
 
     // Query existing pagos for this contrato (within transaction)
-    let existing_pagos = pago::Entity::find()
-        .filter(pago::Column::ContratoId.eq(contrato_id))
-        .all(&txn)
-        .await?;
-
-    let fechas_existentes: Vec<_> = existing_pagos.iter().map(|p| p.fecha_vencimiento).collect();
+    let fechas_existentes = contratos::get_pago_fechas_for_contrato(&txn, contrato_id).await?;
 
     // Filter to get only new pagos
     let new_pagos = filtrar_existentes(&all_pagos, &fechas_existentes);
@@ -315,22 +297,8 @@ pub async fn generar_pagos(
     txn.commit().await?;
 
     // Query the newly inserted pagos to build PagoResponse list
-    let all_contrato_pagos = pago::Entity::find()
-        .filter(pago::Column::ContratoId.eq(contrato_id))
-        .all(db.get_ref())
-        .await?;
-
-    // Filter to only the newly generated pagos by matching (year, month) with new_pagos
-    let generated_pagos: Vec<PagoResponse> = all_contrato_pagos
-        .into_iter()
-        .filter(|p| {
-            new_pagos.iter().any(|np| {
-                np.fecha_vencimiento.year() == p.fecha_vencimiento.year()
-                    && np.fecha_vencimiento.month() == p.fecha_vencimiento.month()
-            })
-        })
-        .map(PagoResponse::from)
-        .collect();
+    let generated_pagos =
+        contratos::get_pagos_by_months(db.get_ref(), contrato_id, &new_pagos).await?;
 
     let response = GenerarPagosResponse {
         contrato_id,

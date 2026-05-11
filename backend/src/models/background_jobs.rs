@@ -2,8 +2,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::entities::ejecucion_tarea;
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EjecucionTareaResponse {
@@ -29,20 +27,6 @@ pub struct HistorialQuery {
 #[serde(rename_all = "camelCase")]
 pub struct EjecutarTareaResponse {
     pub ejecucion: EjecucionTareaResponse,
-}
-
-impl From<ejecucion_tarea::Model> for EjecucionTareaResponse {
-    fn from(model: ejecucion_tarea::Model) -> Self {
-        Self {
-            id: model.id,
-            nombre_tarea: model.nombre_tarea,
-            iniciado_en: model.iniciado_en.with_timezone(&Utc),
-            duracion_ms: model.duracion_ms,
-            exitosa: model.exitosa,
-            registros_afectados: model.registros_afectados,
-            mensaje_error: model.mensaje_error,
-        }
-    }
 }
 
 #[cfg(test)]
@@ -114,32 +98,5 @@ mod tests {
         assert!(json.get("ejecucion").is_some());
         let ejecucion = json.get("ejecucion").unwrap();
         assert!(ejecucion.get("nombreTarea").is_some());
-    }
-
-    #[test]
-    fn from_entity_model_converts_correctly() {
-        use chrono::FixedOffset;
-
-        let model = ejecucion_tarea::Model {
-            id: Uuid::nil(),
-            nombre_tarea: "marcar_contratos_vencidos".to_string(),
-            iniciado_en: DateTime::<FixedOffset>::from(
-                DateTime::from_timestamp(1_700_000_000, 0).unwrap(),
-            ),
-            duracion_ms: 250,
-            exitosa: false,
-            registros_afectados: 0,
-            mensaje_error: Some("db connection error".to_string()),
-        };
-
-        let response = EjecucionTareaResponse::from(model);
-        assert_eq!(response.nombre_tarea, "marcar_contratos_vencidos");
-        assert_eq!(response.duracion_ms, 250);
-        assert!(!response.exitosa);
-        assert_eq!(response.registros_afectados, 0);
-        assert_eq!(
-            response.mensaje_error.as_deref(),
-            Some("db connection error")
-        );
     }
 }

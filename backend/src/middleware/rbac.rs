@@ -1,5 +1,5 @@
+use super::Claims;
 use crate::errors::AppError;
-use crate::services::auth::Claims;
 
 #[allow(dead_code)]
 pub fn check_role(claims: &Claims, allowed_roles: &[&str]) -> Result<(), AppError> {
