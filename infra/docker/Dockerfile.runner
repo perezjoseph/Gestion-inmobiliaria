@@ -2,16 +2,26 @@ FROM ghcr.io/actions/actions-runner:2.334.0
 
 USER root
 
-# Pre-install build tools needed by every Rust CI job so the
-# rust-setup action's "command -v cc" / "pkg-config --exists openssl"
-# checks pass immediately and skip the slow apt-get install.
+# Pre-install build tools needed by every Rust CI job and Amazon
+# Corretto 17 (JDK for Android/Kotlin builds).
 RUN apt-get update -qq \
     && apt-get install -y -qq --no-install-recommends \
        build-essential \
        pkg-config \
        libssl-dev \
        musl-tools \
-    && rm -rf /var/lib/apt/lists/*
+    && curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors \
+       --connect-timeout 15 --max-time 60 \
+       -o /tmp/corretto-key.pub \
+       "https://apt.corretto.aws/corretto.key" \
+    && gpg --dearmor -o /usr/share/keyrings/corretto-keyring.gpg /tmp/corretto-key.pub \
+    && echo "deb [signed-by=/usr/share/keyrings/corretto-keyring.gpg] https://apt.corretto.aws stable main" \
+       > /etc/apt/sources.list.d/corretto.list \
+    && apt-get update -qq \
+    && apt-get install -y -qq --no-install-recommends java-21-amazon-corretto-jdk \
+    && rm -rf /var/lib/apt/lists/* /tmp/corretto-key.pub
+
+ENV JAVA_HOME=/usr/lib/jvm/java-21-amazon-corretto
 
 # ── Static binaries (musl, no runtime deps) ────────────────────
 # All downloads are checksum-verified. Versions are pinned as ARGs

@@ -13,9 +13,6 @@ concurrency:
   group: android-fdroid-${{ github.ref }}
   cancel-in-progress: false
 
-env:
-  JAVA_HOME: ${{ github.workspace }}/android/.jdk/jdk-17.0.18+8
-
 jobs:
   build-and-publish:
     name: Build APK & Update F-Droid Repo
