@@ -41,7 +41,7 @@ reqwest = { version = "0.12", default-features = false, features = ["charset", "
 rig-core = { version = "0.36", default-features = false, features = ["rustls"] }
 dashmap = "6"
 docx-rs = "0.4"
-rand = "0.8"
+rand = "0.10"
 base64 = "0.22"
 infer = "0.19"
 tokio-util = { version = "0.7", features = ["rt"] }
