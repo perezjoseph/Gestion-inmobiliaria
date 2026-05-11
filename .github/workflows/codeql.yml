@@ -146,6 +146,8 @@ jobs:
               - android
 
       - name: Build Android project
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-21-amazon-corretto
         run: |
           cd android
           chmod +x gradlew

@@ -354,7 +354,19 @@ export async function startSession(realmId: string): Promise<SessionInfo> {
       const { messages: incomingMessages, type } = events['messages.upsert'];
       if (type === 'notify') {
         for (const msg of incomingMessages) {
-          if (msg.key.fromMe) continue;
+          const remoteJid = msg.key?.remoteJid;
+
+          // For self-messages (messaging your own number), Baileys delivers
+          // with fromMe=true. Allow these through so the bot can respond.
+          if (msg.key.fromMe) {
+            const isSelfChat =
+              remoteJid &&
+              sessionInfo.connectedPhone &&
+              '+' + remoteJid.replace(/:.*$/, '').replace('@s.whatsapp.net', '') ===
+                sessionInfo.connectedPhone;
+            if (!isSelfChat) continue;
+          }
+
           await forwardToBackend(realmId, msg);
         }
       }
