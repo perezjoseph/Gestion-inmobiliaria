@@ -1,6 +1,7 @@
 use base64::Engine;
 use chrono::{Duration, Utc};
-use rand::Rng;
+use rand::RngExt;
+use rand::rng;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, IntoActiveModel, QueryFilter,
     Set,
@@ -364,11 +365,11 @@ pub async fn listar_firmas(
 
 /// Generate a random 16-character alphanumeric password.
 pub(crate) fn generar_password() -> String {
-    let mut rng = rand::thread_rng();
+    let mut rng = rng();
     const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     (0..16)
         .map(|_| {
-            let idx = rng.gen_range(0..CHARSET.len());
+            let idx = rng.random_range(0..CHARSET.len());
             CHARSET[idx] as char
         })
         .collect()
