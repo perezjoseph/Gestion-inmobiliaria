@@ -14,7 +14,11 @@
 use rig::completion::{self, CompletionError, CompletionRequest};
 use rig::message::{self, AssistantContent, UserContent};
 use rig::one_or_many::OneOrMany;
+use rig::streaming::{RawStreamingChoice, StreamingCompletionResponse, StreamingResult};
 use serde::{Deserialize, Serialize};
+
+use eventsource_stream::Eventsource;
+use futures_util::StreamExt;
 
 // =============================================================================
 // OVMS-specific request/response types
@@ -212,12 +216,51 @@ impl completion::CompletionModel for OvmsCompletionModel {
 
     async fn stream(
         &self,
-        _request: CompletionRequest,
-    ) -> Result<rig::streaming::StreamingCompletionResponse<Self::StreamingResponse>, CompletionError>
-    {
-        Err(CompletionError::ProviderError(
-            "OVMS streaming not implemented — use non-streaming completion".to_string(),
-        ))
+        request: CompletionRequest,
+    ) -> Result<StreamingCompletionResponse<Self::StreamingResponse>, CompletionError> {
+        let mut ovms_request = build_ovms_request(&self.model_name, &request);
+        ovms_request.stream = true;
+
+        let url = format!("{}/chat/completions", self.endpoint);
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .json(&ovms_request)
+            .send()
+            .await
+            .map_err(|e| {
+                CompletionError::ProviderError(format!("Error conectando a OVMS stream: {e}"))
+            })?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(CompletionError::ProviderError(format!(
+                "OVMS stream respondió con estado {status}: {body}"
+            )));
+        }
+
+        let event_stream = response.bytes_stream().eventsource();
+
+        let stream = event_stream.filter_map(|event_result| async move {
+            match event_result {
+                Ok(event) => {
+                    let data = event.data.trim().to_string();
+                    if data == "[DONE]" {
+                        return None;
+                    }
+                    Some(parse_sse_chunk(&data))
+                }
+                Err(e) => Some(Err(CompletionError::ProviderError(format!(
+                    "Error en SSE stream: {e}"
+                )))),
+            }
+        });
+
+        let pinned: StreamingResult<OvmsCompletionResponse> = Box::pin(stream);
+        Ok(StreamingCompletionResponse::stream(pinned))
     }
 }
 
@@ -396,6 +439,41 @@ fn user_content_to_json(content: &OneOrMany<UserContent>) -> serde_json::Value {
 }
 
 // =============================================================================
+// SSE streaming chunk parsing
+// =============================================================================
+
+#[derive(Debug, Deserialize)]
+struct OvmsStreamChunk {
+    choices: Vec<OvmsStreamChoice>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OvmsStreamChoice {
+    delta: OvmsStreamDelta,
+}
+
+#[derive(Debug, Deserialize)]
+struct OvmsStreamDelta {
+    #[serde(default)]
+    content: Option<String>,
+}
+
+fn parse_sse_chunk(
+    data: &str,
+) -> Result<RawStreamingChoice<OvmsCompletionResponse>, CompletionError> {
+    let chunk: OvmsStreamChunk = serde_json::from_str(data)
+        .map_err(|e| CompletionError::ProviderError(format!("Error parseando chunk SSE: {e}")))?;
+
+    let text = chunk
+        .choices
+        .first()
+        .and_then(|c| c.delta.content.clone())
+        .unwrap_or_default();
+
+    Ok(RawStreamingChoice::Message(text))
+}
+
+// =============================================================================
 // Conversion: OVMS Response → Rig CompletionResponse
 // =============================================================================
 
@@ -489,7 +567,7 @@ where
 // =============================================================================
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::unreadable_literal)]
+#[allow(clippy::unwrap_used, clippy::unreadable_literal, clippy::panic)]
 mod tests {
     use super::*;
 

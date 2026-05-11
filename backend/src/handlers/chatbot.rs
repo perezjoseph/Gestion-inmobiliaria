@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use actix_web::{HttpResponse, web};
 use futures_util::StreamExt;
 use sea_orm::DatabaseConnection;
@@ -19,6 +17,7 @@ use crate::services::ai_module::{
     compose_system_prompt,
 };
 use crate::services::chatbot;
+use crate::services::ovms_provider::OvmsCompletionModel;
 
 /// GET /api/v1/chatbot/config — return chatbot config for the current org.
 pub async fn get_config(
@@ -538,7 +537,7 @@ pub async fn test_chat(
 
 /// POST `/api/v1/chatbot/test/stream` — streaming version of test chat.
 ///
-/// Proxies the SSE stream from the OVMS endpoint directly to the client.
+/// Streams AI responses via SSE using Rig's `CompletionModel` streaming interface.
 /// Uses the same auth and config resolution as `test_chat`.
 pub async fn test_chat_stream(
     db: web::Data<DatabaseConnection>,
@@ -550,10 +549,8 @@ pub async fn test_chat_stream(
     let org_id = claims.0.organizacion_id;
     let request = body.into_inner();
 
-    // Load the saved config as a baseline
     let saved_config = chatbot::get_config_model(db.get_ref(), org_id).await?;
 
-    // Determine effective persona — same logic as test_chat
     let (persona, faqs, policies, handoff_keywords) =
         if let Some(overrides) = &request.config_override {
             let persona = ChatbotPersona {
@@ -620,7 +617,6 @@ pub async fn test_chat_stream(
             (persona, faqs, policies, handoff_keywords)
         };
 
-    // Compose system prompt
     let system_prompt = compose_system_prompt(
         &persona,
         None,
@@ -629,76 +625,74 @@ pub async fn test_chat_stream(
         &handoff_keywords,
     );
 
-    // Build messages array for the OpenAI-compatible API
-    let messages = {
-        let mut msgs = vec![serde_json::json!({
-            "role": "system",
-            "content": system_prompt,
-        })];
-        // Include conversation history from the test UI
-        for h in &request.history {
-            msgs.push(serde_json::json!({
-                "role": h.role,
-                "content": h.content,
-            }));
-        }
-        msgs.push(serde_json::json!({
-            "role": "user",
-            "content": request.message,
-        }));
-        msgs
-    };
-
-    // Build the request body for OVMS streaming endpoint
-    let ovms_body = serde_json::json!({
-        "model": chatbot_env.ovms_chat_model,
-        "messages": messages,
-        "stream": true,
-        "temperature": 0.7,
-        "max_tokens": 1024
-    });
-
-    let timeout = Duration::from_secs(chatbot_env.ai_chat_timeout_secs);
-
-    // Make the streaming request to OVMS
-    let client = reqwest::Client::new();
-    let ovms_url = format!("{}/chat/completions", chatbot_env.ovms_endpoint);
-
-    let ovms_response = client
-        .post(&ovms_url)
-        .json(&ovms_body)
-        .timeout(timeout)
-        .send()
-        .await
-        .map_err(|e| {
-            tracing::error!(organizacion_id = %org_id, error = %e, "Error conectando a OVMS stream");
-            AppError::Internal(anyhow::anyhow!("Error conectando al servicio AI: {e}"))
-        })?;
-
-    if !ovms_response.status().is_success() {
-        let status = ovms_response.status();
-        let body_text = ovms_response.text().await.unwrap_or_default();
-        tracing::error!(
-            organizacion_id = %org_id,
-            status = %status,
-            body = %body_text,
-            "OVMS stream returned error"
-        );
-        return Err(AppError::Internal(anyhow::anyhow!(
-            "Error del servicio AI (status {status})"
-        )));
+    let mut chat_history: Vec<rig::completion::Message> = Vec::with_capacity(request.history.len());
+    for h in &request.history {
+        let msg = match h.role.as_str() {
+            "assistant" => rig::completion::Message::assistant(&h.content),
+            _ => rig::completion::Message::user(&h.content),
+        };
+        chat_history.push(msg);
     }
 
-    // Proxy the SSE stream back to the client
-    let byte_stream = ovms_response.bytes_stream().map(|result| {
-        result.map_err(|e| actix_web::error::ErrorInternalServerError(format!("Stream error: {e}")))
-    });
+    let user_msg = rig::completion::Message::user(&request.message);
+    chat_history.push(user_msg);
+
+    let chat_history_one_or_many = rig::one_or_many::OneOrMany::many(chat_history)
+        .map_err(|_| AppError::Validation("Se requiere al menos un mensaje".to_string()))?;
+
+    let completion_request = rig::completion::CompletionRequest {
+        model: None,
+        preamble: Some(system_prompt),
+        chat_history: chat_history_one_or_many,
+        documents: vec![],
+        tools: vec![],
+        temperature: Some(0.7),
+        max_tokens: Some(1024),
+        tool_choice: None,
+        additional_params: None,
+        output_schema: None,
+    };
+
+    let model = OvmsCompletionModel::new(&chatbot_env.ovms_chat_model, &chatbot_env.ovms_endpoint);
+
+    let mut streaming_response =
+        rig::completion::CompletionModel::stream(&model, completion_request)
+            .await
+            .map_err(|e| {
+                tracing::error!(organizacion_id = %org_id, error = %e, "Error en OVMS stream");
+                AppError::Internal(anyhow::anyhow!("Error conectando al servicio AI: {e}"))
+            })?;
+
+    let sse_stream = async_stream::stream! {
+        while let Some(chunk) = streaming_response.next().await {
+            match chunk {
+                Ok(rig::streaming::StreamedAssistantContent::Text(text)) => {
+                    let data = serde_json::json!({
+                        "choices": [{
+                            "delta": { "content": text.text },
+                            "index": 0,
+                            "finish_reason": serde_json::Value::Null
+                        }]
+                    });
+                    let event = format!("data: {data}\n\n");
+                    yield Ok::<_, actix_web::Error>(actix_web::web::Bytes::from(event));
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    tracing::error!(organizacion_id = %org_id, error = %e, "Error en stream chunk");
+                    break;
+                }
+            }
+        }
+        let done = "data: [DONE]\n\n".to_string();
+        yield Ok::<_, actix_web::Error>(actix_web::web::Bytes::from(done));
+    };
 
     Ok(HttpResponse::Ok()
         .content_type("text/event-stream")
         .insert_header(("Cache-Control", "no-cache"))
         .insert_header(("Connection", "keep-alive"))
-        .streaming(byte_stream))
+        .streaming(sse_stream))
 }
 
 // --- Handoff Handlers ---
