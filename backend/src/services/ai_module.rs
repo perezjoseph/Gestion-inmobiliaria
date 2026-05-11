@@ -1,9 +1,7 @@
 use std::fmt::Write as _;
 use std::time::Duration;
 
-use rig::client::CompletionClient;
-use rig::completion::{Chat, ToolDefinition};
-use rig::message::Message;
+use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use rust_decimal::Decimal;
 use sea_orm::DatabaseConnection;
@@ -67,9 +65,11 @@ pub struct TenantContext {
 /// AI module that wraps a Rig `OpenAI`-compatible client pointed at the
 /// self-hosted `OVMS` endpoint. Stateless — receives all context as parameters.
 pub struct AiModule {
+    #[allow(dead_code)]
     pub(crate) client: rig::providers::openai::Client,
     pub(crate) model_name: String,
     pub(crate) timeout_secs: u64,
+    pub(crate) ovms_endpoint: String,
 }
 
 /// Context passed to [`AiModule::process_message`] grouping all per-invocation parameters.
@@ -101,6 +101,7 @@ impl AiModule {
             client,
             model_name: config.ovms_chat_model.clone(),
             timeout_secs: config.ai_chat_timeout_secs,
+            ovms_endpoint: config.ovms_endpoint.clone(),
         })
     }
 
@@ -125,17 +126,7 @@ impl AiModule {
             ctx.handoff_keywords,
         );
 
-        // 2. Build conversation history in Rig Message format
-        let rig_history: Vec<Message> = ctx
-            .history
-            .iter()
-            .map(|entry| match entry.role.as_str() {
-                "assistant" => Message::assistant(&entry.content),
-                _ => Message::user(&entry.content),
-            })
-            .collect();
-
-        // 3. Compose the user prompt (include image reference if present)
+        // 2. Compose the user prompt (include image reference if present)
         let user_prompt = ctx.user_message.image_base64.as_ref().map_or_else(
             || ctx.user_message.content.clone(),
             |_| {
@@ -151,7 +142,7 @@ impl AiModule {
         let timeout_duration = Duration::from_secs(self.timeout_secs);
 
         let result = tokio::time::timeout(timeout_duration, async {
-            self.invoke_agent(&system_prompt, ctx.capabilities, &rig_history, &user_prompt)
+            self.invoke_agent(&system_prompt, ctx.capabilities, ctx.history, &user_prompt)
                 .await
         })
         .await;
@@ -185,47 +176,104 @@ impl AiModule {
 
     /// Internal method that builds the Rig agent and invokes it.
     /// Separated from `process_message` to keep the timeout wrapper clean.
+    ///
+    /// Uses a direct HTTP call to OVMS instead of Rig's built-in client because
+    /// OVMS's OpenAI-compatible response omits the `id` field, which Rig requires.
     async fn invoke_agent(
         &self,
         system_prompt: &str,
         capabilities: &Capabilities,
-        history: &[Message],
+        history: &[ConversationEntry],
         user_prompt: &str,
     ) -> Result<AgentResponse, AppError> {
-        // Determine which tools are enabled
         let enabled_tools = get_enabled_tools(capabilities);
-
-        // Build the agent dynamically based on enabled capabilities.
-        // Since Rig's builder pattern requires static tool types, we use
-        // a dynamic tool set approach.
-        let agent = self
-            .client
-            .clone()
-            .completions_api()
-            .agent(&self.model_name)
-            .preamble(system_prompt)
-            .build();
-
-        // Full tool registration requires the Rig `tools(Vec<Box<dyn ToolDyn>>)` API
-        // which will be wired when the pipeline is fully assembled (task 8.3).
-        // The structural pattern is correct — tools are gated by capabilities.
         let _ = &enabled_tools;
 
-        let reply = if history.is_empty() {
-            Chat::chat(&agent, user_prompt, Vec::<Message>::new())
-                .await
-                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error OVMS: {e}")))?
-        } else {
-            Chat::chat(&agent, user_prompt, history.to_vec())
-                .await
-                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error OVMS: {e}")))?
-        };
+        // Build the messages array for the OpenAI-compatible request
+        let mut messages = Vec::new();
+
+        // System prompt
+        messages.push(serde_json::json!({
+            "role": "system",
+            "content": system_prompt
+        }));
+
+        // Conversation history
+        for entry in history {
+            messages.push(serde_json::json!({
+                "role": entry.role,
+                "content": entry.content
+            }));
+        }
+
+        // Current user message
+        messages.push(serde_json::json!({
+            "role": "user",
+            "content": user_prompt
+        }));
+
+        // Build the request body
+        let request_body = serde_json::json!({
+            "model": self.model_name,
+            "messages": messages,
+            "stream": false
+        });
+
+        // Make direct HTTP call to OVMS
+        let client = reqwest::Client::new();
+        let url = format!("{}/chat/completions", self.ovms_endpoint);
+
+        let response = client
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error conectando a OVMS: {e}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(AppError::Internal(anyhow::anyhow!(
+                "OVMS respondió con estado {status}: {body}"
+            )));
+        }
+
+        let body: OvmsCompletionResponse = response.json().await.map_err(|e| {
+            AppError::Internal(anyhow::anyhow!("Error parseando respuesta OVMS: {e}"))
+        })?;
+
+        let reply = body
+            .choices
+            .first()
+            .and_then(|c| c.message.content.clone())
+            .unwrap_or_default();
 
         Ok(AgentResponse {
             reply,
             tools_invoked: vec![],
         })
     }
+}
+
+/// OVMS chat completion response (OpenAI-compatible but without `id` field).
+#[derive(Debug, Deserialize)]
+struct OvmsCompletionResponse {
+    pub choices: Vec<OvmsChoice>,
+    #[allow(dead_code)]
+    pub model: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct OvmsChoice {
+    pub message: OvmsMessage,
+    #[allow(dead_code)]
+    pub finish_reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OvmsMessage {
+    pub content: Option<String>,
 }
 
 /// Composes a system prompt from the organization's persona configuration,

@@ -2,7 +2,6 @@ import makeWASocket, {
   DisconnectReason,
   makeCacheableSignalKeyStore,
   WASocket,
-  ConnectionState,
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
@@ -131,6 +130,50 @@ function handleConnectionClose(sessionInfo: SessionInfo, statusCode: number | un
   sessionInfo.socket = null;
   sessionInfo.qrCode = null;
   logger.info({ realmId, statusCode }, 'Connection closed');
+}
+
+/**
+ * Handle a connection.update event: QR generation, connection open, connection close.
+ */
+function handleConnectionUpdate(
+  update: { connection?: string; lastDisconnect?: any; qr?: string },
+  sessionInfo: SessionInfo,
+  state: { creds: { me?: { id: string } } },
+): void {
+  const { connection, lastDisconnect, qr } = update;
+  const { realmId } = sessionInfo;
+
+  if (qr) {
+    sessionInfo.status = 'qr_pending';
+    sessionInfo.qrCode = qr;
+    logger.info({ realmId }, 'QR code generated');
+  }
+
+  if (connection === 'open') {
+    sessionInfo.status = 'connected';
+    sessionInfo.qrCode = null;
+    sessionInfo.reconnectAttempts = 0;
+    if (sessionInfo.reconnectTimer) {
+      clearTimeout(sessionInfo.reconnectTimer);
+      sessionInfo.reconnectTimer = null;
+    }
+
+    const me = state.creds.me;
+    if (me?.id) {
+      const phone = '+' + me.id.replace(/:.*$/, '').replace('@s.whatsapp.net', '');
+      sessionInfo.connectedPhone = phone;
+    }
+    if (!sessionInfo.connectedAt) {
+      sessionInfo.connectedAt = new Date().toISOString();
+    }
+
+    logger.info({ realmId, phone: sessionInfo.connectedPhone }, 'Connection established');
+  }
+
+  if (connection === 'close') {
+    const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+    handleConnectionClose(sessionInfo, statusCode);
+  }
 }
 
 /**
@@ -290,65 +333,31 @@ export async function startSession(realmId: string): Promise<SessionInfo> {
 
   sessionInfo.socket = socket;
 
-  // Handle connection updates
-  socket.ev.on('connection.update', (update: Partial<ConnectionState>) => {
-    const { connection, lastDisconnect, qr } = update;
-
-    if (qr) {
-      sessionInfo.status = 'qr_pending';
-      sessionInfo.qrCode = qr;
-      logger.info({ realmId }, 'QR code generated');
+  // Use batch event processing (recommended by Baileys for production)
+  socket.ev.process(async (events) => {
+    if (events['connection.update']) {
+      handleConnectionUpdate(events['connection.update'], sessionInfo, state);
     }
 
-    if (connection === 'open') {
-      sessionInfo.status = 'connected';
-      sessionInfo.qrCode = null;
-      sessionInfo.reconnectAttempts = 0;
-      if (sessionInfo.reconnectTimer) {
-        clearTimeout(sessionInfo.reconnectTimer);
-        sessionInfo.reconnectTimer = null;
+    if (events['creds.update']) {
+      try {
+        await saveCreds();
+      } catch (err) {
+        logger.error(
+          { realmId, err: (err as Error).message },
+          'Failed to persist creds (will retry on next update)',
+        );
       }
+    }
 
-      // Extract connected phone from creds.me (populated after pairing)
-      const me = state.creds.me;
-      if (me?.id) {
-        // me.id format: "18091234567:123@s.whatsapp.net" or "18091234567@s.whatsapp.net"
-        const phone = '+' + me.id.replace(/:.*$/, '').replace('@s.whatsapp.net', '');
-        sessionInfo.connectedPhone = phone;
+    if (events['messages.upsert']) {
+      const { messages: incomingMessages, type } = events['messages.upsert'];
+      if (type === 'notify') {
+        for (const msg of incomingMessages) {
+          if (msg.key.fromMe) continue;
+          await forwardToBackend(realmId, msg);
+        }
       }
-      if (!sessionInfo.connectedAt) {
-        sessionInfo.connectedAt = new Date().toISOString();
-      }
-
-      logger.info({ realmId, phone: sessionInfo.connectedPhone }, 'Connection established');
-    }
-
-    if (connection === 'close') {
-      const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
-      handleConnectionClose(sessionInfo, statusCode);
-    }
-  });
-
-  // Persist credentials on update. A transient PG pool timeout must not crash
-  // the process — Baileys emits creds.update from inside socket event handlers,
-  // so an unhandled rejection here takes down the pod.
-  socket.ev.on('creds.update', async () => {
-    try {
-      await saveCreds();
-    } catch (err) {
-      logger.error(
-        { realmId, err: (err as Error).message },
-        'Failed to persist creds (will retry on next update)',
-      );
-    }
-  });
-
-  // Forward incoming messages to backend webhook
-  socket.ev.on('messages.upsert', async ({ messages: incomingMessages }) => {
-    for (const msg of incomingMessages) {
-      // Skip messages sent by us
-      if (msg.key.fromMe) continue;
-      await forwardToBackend(realmId, msg);
     }
   });
 
