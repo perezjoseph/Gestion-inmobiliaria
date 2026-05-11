@@ -11,7 +11,6 @@ permissions: {}
 
 jobs:
   # ── Rust: build-mode none (no build needed, uses rust-analyzer internally) ──
-  # Requires rustup and cargo on PATH. Cargo.toml must be present.
   analyze-rust:
     name: CodeQL (Rust)
     runs-on: arc-runner-dind
@@ -38,3 +37,94 @@ jobs:
         uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
         with:
           category: codeql-rust
+
+  # ── JavaScript/TypeScript: build-mode none (interpreted, no build needed) ──
+  # Covers baileys-service (Node.js + TypeScript)
+  analyze-javascript:
+    name: CodeQL (JavaScript/TypeScript)
+    runs-on: arc-runner-dind
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        with:
+          languages: javascript-typescript
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        with:
+          category: codeql-javascript
+
+  # ── Python: build-mode none (interpreted, no build needed) ──
+  # Covers ocr-service (FastAPI + PaddleOCR)
+  analyze-python:
+    name: CodeQL (Python)
+    runs-on: arc-runner-dind
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        with:
+          languages: python
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        with:
+          category: codeql-python
+
+  # ── Java/Kotlin: build-mode autobuild (Kotlin requires compilation) ──
+  # Covers android/ multi-module project. Autobuild detects Gradle and runs it.
+  # Note: build-mode "none" only supports Java, not Kotlin. Kotlin files require
+  # a build to be traced. See: https://docs.github.com/en/code-security/code-scanning/
+  # troubleshooting-code-scanning/kotlin-detected-in-no-build
+  analyze-kotlin:
+    name: CodeQL (Java/Kotlin)
+    runs-on: arc-runner-dind
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        with:
+          languages: java-kotlin
+          build-mode: autobuild
+          # Scope to android/ directory to avoid scanning unrelated Java/Kotlin
+          config: |
+            paths:
+              - android
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        with:
+          category: codeql-kotlin
