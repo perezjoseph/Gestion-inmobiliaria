@@ -1,8 +1,16 @@
+use gloo_timers::callback::Interval;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use crate::components::common::error_banner::ErrorBanner;
 use crate::services::chatbot;
+
+/// Polling interval when disconnected/reconnecting (fast recovery detection).
+const POLL_INTERVAL_RECOVERING_MS: u32 = 5_000;
+/// Polling interval when connected (heartbeat to detect drops).
+const POLL_INTERVAL_CONNECTED_MS: u32 = 30_000;
+/// Polling interval while QR is pending (check if scan completed).
+const POLL_INTERVAL_QR_MS: u32 = 3_000;
 
 #[derive(Properties, PartialEq)]
 pub struct ConnectionStepProps {
@@ -17,6 +25,40 @@ pub fn ConnectionStep(props: &ConnectionStepProps) -> Html {
     let error = use_state(|| Option::<String>::None);
     let loading = use_state(|| false);
     let qr_code = use_state(|| Option::<String>::None);
+
+    // --- Status polling ---
+    // Poll the baileys-service status to detect reconnections after refresh
+    // and connection drops while the page is open.
+    {
+        let on_status_change = props.on_status_change.clone();
+        let qr_code = qr_code.clone();
+        let connection_status = props.connection_status.clone();
+        use_effect_with(connection_status.clone(), move |status| {
+            let interval_ms = match status.as_str() {
+                "connected" => POLL_INTERVAL_CONNECTED_MS,
+                "qr_pending" => POLL_INTERVAL_QR_MS,
+                _ => POLL_INTERVAL_RECOVERING_MS,
+            };
+
+            let interval = Interval::new(interval_ms, move || {
+                let on_status_change = on_status_change.clone();
+                let qr_code = qr_code.clone();
+                spawn_local(async move {
+                    if let Ok(resp) = chatbot::status().await {
+                        qr_code.set(resp.qr_code.clone());
+                        on_status_change.emit((
+                            resp.status,
+                            resp.connected_phone,
+                            resp.connected_at,
+                        ));
+                    }
+                });
+            });
+
+            // Cleanup: drop the interval when status changes or component unmounts
+            move || drop(interval)
+        });
+    }
 
     let on_connect = {
         let error = error.clone();
