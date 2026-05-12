@@ -56,16 +56,18 @@ spec:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 60
+            initialDelaySeconds: 90
             periodSeconds: 30
             timeoutSeconds: 10
+            failureThreshold: 5
           livenessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 90
+            initialDelaySeconds: 120
             periodSeconds: 30
             timeoutSeconds: 10
+            failureThreshold: 3
           securityContext:
             runAsNonRoot: true
             runAsUser: 999
@@ -77,6 +79,8 @@ spec:
               mountPath: /tmp
             - name: openvino-cache
               mountPath: /app/.cache
+            - name: pycache
+              mountPath: /app/__pycache__
       volumes:
         - name: tmp
           emptyDir:
@@ -84,6 +88,9 @@ spec:
         - name: openvino-cache
           emptyDir:
             sizeLimit: 256Mi
+        - name: pycache
+          emptyDir:
+            sizeLimit: 32Mi
 ---
 apiVersion: v1
 kind: Service

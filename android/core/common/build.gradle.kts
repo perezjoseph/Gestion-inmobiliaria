@@ -1,4 +1,4 @@
-﻿plugins {
+plugins {
     alias(libs.plugins.android.library)
 }
 
@@ -12,8 +12,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-
-    kotlinOptions { jvmTarget = "11" }
 
     @Suppress("UnstableApiUsage") testOptions { unitTests.all { it.useJUnitPlatform() } }
 }

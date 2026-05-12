@@ -48,6 +48,13 @@ subprojects {
         }
         dependencies { add("coreLibraryDesugaring", "com.android.tools:desugar_jdk_libs:2.1.5") }
     }
+    plugins.withId("org.jetbrains.kotlin.android") {
+        configure<org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension> {
+            compilerOptions {
+                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+            }
+        }
+    }
 }
 
 spotless {
