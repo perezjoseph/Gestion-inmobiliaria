@@ -42,7 +42,7 @@ WORKDIR /app
 
 # Install system deps, Intel compute runtime (OpenCL for all Intel GPUs: HD 530+, UHD,
 # Iris Xe, Arc) from GitHub releases, and create non-root user with GPU access.
-# Uses legacy1 packages for Skylake/Kaby Lake support (Gen9).
+# compute-runtime 26.09+ bundles legacy platform support (Gen9) in the main package.
 # apt-get upgrade pulls the latest Debian security patches for the base image
 # (libgnutls30t64, libssh2-1t64, libcurl4t64, libxml2, libc6, krb5, util-linux,
 # sed, etc.) so Trivy image scans don't flag the base OS packages.
@@ -57,15 +57,13 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     ocl-icd-libopencl1 \
     && mkdir -p /tmp/gpu \
     && curl -fsSL -o /tmp/gpu/intel-igc-core.deb \
-    https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.17537.20/intel-igc-core_1.0.17537.20_amd64.deb \
+    https://github.com/intel/intel-graphics-compiler/releases/download/v2.30.1/intel-igc-core-2_2.30.1+20950_amd64.deb \
     && curl -fsSL -o /tmp/gpu/intel-igc-opencl.deb \
-    https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.17537.20/intel-igc-opencl_1.0.17537.20_amd64.deb \
+    https://github.com/intel/intel-graphics-compiler/releases/download/v2.30.1/intel-igc-opencl-2_2.30.1+20950_amd64.deb \
     && curl -fsSL -o /tmp/gpu/libigdgmm12.deb \
-    https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/libigdgmm12_22.5.0_amd64.deb \
+    https://github.com/intel/compute-runtime/releases/download/26.09.37435.1/libigdgmm12_22.9.0_amd64.deb \
     && curl -fsSL -o /tmp/gpu/intel-opencl-icd.deb \
-    https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/intel-opencl-icd_24.35.30872.22_amd64.deb \
-    && curl -fsSL -o /tmp/gpu/intel-opencl-icd-legacy1.deb \
-    https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/intel-opencl-icd-legacy1_24.35.30872.22_amd64.deb \
+    https://github.com/intel/compute-runtime/releases/download/26.09.37435.1/intel-opencl-icd_26.09.37435.1-0_amd64.deb \
     && dpkg -i /tmp/gpu/*.deb || apt-get install -f -y --no-install-recommends \
     && rm -rf /tmp/gpu /var/lib/apt/lists/* \
     && groupadd -r ocruser \
