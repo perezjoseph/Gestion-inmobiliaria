@@ -47,6 +47,10 @@ const INTERNAL_TOKEN = process.env.BAILEYS_INTERNAL_TOKEN || '';
 
 const sessions: Map<string, SessionInfo> = new Map();
 
+// Track message IDs sent by the bot to avoid re-processing echoed self-messages
+const sentMessageIds: Set<string> = new Set();
+const SENT_IDS_MAX_SIZE = 500;
+
 /**
  * Handle a recoverable disconnect with capped exponential backoff.
  * Extracted to keep the connection.update handler under complexity limits.
@@ -177,6 +181,32 @@ function handleConnectionUpdate(
 }
 
 /**
+ * Determine whether an incoming message should be forwarded to the backend.
+ * Filters out bot-sent echoes and non-self fromMe messages.
+ */
+function shouldForwardMessage(msg: any, sessionInfo: SessionInfo): boolean {
+  // Skip messages we sent programmatically (bot replies echoing back)
+  if (msg.key?.id && sentMessageIds.has(msg.key.id)) {
+    sentMessageIds.delete(msg.key.id);
+    return false;
+  }
+
+  // For self-messages (messaging your own number), Baileys delivers
+  // with fromMe=true. Allow these through so the bot can respond.
+  if (msg.key.fromMe) {
+    const remoteJid = msg.key?.remoteJid;
+    const isSelfChat =
+      remoteJid &&
+      sessionInfo.connectedPhone &&
+      '+' + remoteJid.replace(/:.*$/, '').replace('@s.whatsapp.net', '') ===
+        sessionInfo.connectedPhone;
+    return !!isSelfChat;
+  }
+
+  return true;
+}
+
+/**
  * Forward an incoming WhatsApp message to the backend webhook.
  */
 async function forwardToBackend(realmId: string, message: any): Promise<void> {
@@ -192,7 +222,8 @@ async function forwardToBackend(realmId: string, message: any): Promise<void> {
   }
 
   // Extract sender phone from JID (format: 18091234567@s.whatsapp.net)
-  const senderPhone = '+' + remoteJid.replace('@s.whatsapp.net', '');
+  // Self-chat JIDs may include a device suffix (e.g. 18091234567:0@s.whatsapp.net)
+  const senderPhone = '+' + remoteJid.replace(/:.*$/, '').replace('@s.whatsapp.net', '');
 
   // Determine message type and content
   let messageType: 'text' | 'image' = 'text';
@@ -354,20 +385,9 @@ export async function startSession(realmId: string): Promise<SessionInfo> {
       const { messages: incomingMessages, type } = events['messages.upsert'];
       if (type === 'notify') {
         for (const msg of incomingMessages) {
-          const remoteJid = msg.key?.remoteJid;
-
-          // For self-messages (messaging your own number), Baileys delivers
-          // with fromMe=true. Allow these through so the bot can respond.
-          if (msg.key.fromMe) {
-            const isSelfChat =
-              remoteJid &&
-              sessionInfo.connectedPhone &&
-              '+' + remoteJid.replace(/:.*$/, '').replace('@s.whatsapp.net', '') ===
-                sessionInfo.connectedPhone;
-            if (!isSelfChat) continue;
+          if (shouldForwardMessage(msg, sessionInfo)) {
+            await forwardToBackend(realmId, msg);
           }
-
-          await forwardToBackend(realmId, msg);
         }
       }
     }
@@ -431,7 +451,17 @@ export async function sendMessage(
   }
 
   const jid = `${recipientPhone.replace('+', '')}@s.whatsapp.net`;
-  await session.socket.sendMessage(jid, { text: content });
+  const sent = await session.socket.sendMessage(jid, { text: content });
+
+  // Track the sent message ID so we don't re-process it when it echoes back
+  if (sent?.key?.id) {
+    sentMessageIds.add(sent.key.id);
+    // Evict oldest entries if the set grows too large
+    if (sentMessageIds.size > SENT_IDS_MAX_SIZE) {
+      const first = sentMessageIds.values().next().value;
+      if (first) sentMessageIds.delete(first);
+    }
+  }
 }
 
 /**
