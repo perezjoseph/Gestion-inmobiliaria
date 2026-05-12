@@ -28,8 +28,11 @@ spec:
                       - inference
       containers:
         - name: intel-gpu-plugin
-          image: intel/intel-gpu-plugin:0.31.1
+          image: intel/intel-gpu-plugin:0.35.0
           imagePullPolicy: IfNotPresent
+          args:
+            - -shared-dev-num=2
+            - -bypath=none
           resources:
             requests:
               cpu: 50m
