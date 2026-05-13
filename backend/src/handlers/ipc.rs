@@ -12,20 +12,22 @@ pub async fn obtener_ipc(
 ) -> Result<HttpResponse, AppError> {
     let result = ipc::obtener_ipc_actual(db.get_ref()).await?;
 
-    match result {
-        Some(data) => {
+    result.map_or_else(
+        || {
+            Ok(HttpResponse::NotFound().json(serde_json::json!({
+                "error": "not_found",
+                "message": "IPC no configurado"
+            })))
+        },
+        |data| {
             let response = IpcResponse {
                 valor_ipc: data.valor_ipc,
                 fecha_efectiva: data.fecha_efectiva,
                 ultimo_fetch_exitoso: data.ultimo_fetch_exitoso,
             };
             Ok(HttpResponse::Ok().json(response))
-        }
-        None => Ok(HttpResponse::NotFound().json(serde_json::json!({
-            "error": "not_found",
-            "message": "IPC no configurado"
-        }))),
-    }
+        },
+    )
 }
 
 pub async fn actualizar_ipc(

@@ -73,7 +73,7 @@ pub async fn consultar_rnc(
     // Cache miss — call megaplus API
     let base_url = get_base_url();
     let client = build_client()?;
-    let url = format!("{}/api/rnc?rnc={}", base_url, normalized);
+    let url = format!("{base_url}/api/rnc?rnc={normalized}");
 
     let api_result = client.get(&url).send().await;
 
@@ -106,7 +106,7 @@ pub async fn consultar_rnc(
             let nombre_comercial = data
                 .get("nombre_comercial")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
+                .map(std::string::ToString::to_string);
             let estado = data
                 .get("estado")
                 .and_then(|v| v.as_str())
@@ -115,11 +115,11 @@ pub async fn consultar_rnc(
             let regimen_de_pagos = data
                 .get("regimen_de_pagos")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
+                .map(std::string::ToString::to_string);
             let actividad_economica = data
                 .get("actividad_economica")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
+                .map(std::string::ToString::to_string);
 
             // Upsert cache
             let cached_at = Utc::now().fixed_offset();
@@ -218,7 +218,7 @@ async fn try_stale_cache_or_error(
 pub async fn consultar_nombre(buscar: &str) -> Result<DgiiNombreResponse, AppError> {
     let base_url = get_base_url();
     let client = build_client()?;
-    let url = format!("{}/api/rnc?name={}", base_url, buscar);
+    let url = format!("{base_url}/api/rnc?name={buscar}");
 
     let response =
         client.get(&url).send().await.map_err(|e| {
@@ -250,7 +250,7 @@ pub async fn consultar_nombre(buscar: &str) -> Result<DgiiNombreResponse, AppErr
                     let nombre_comercial = item
                         .get("nombre_comercial")
                         .and_then(|v| v.as_str())
-                        .map(|s| s.to_string());
+                        .map(std::string::ToString::to_string);
                     let estado = item.get("estado")?.as_str()?.to_string();
                     Some(DgiiNombreItem {
                         cedula_rnc,
@@ -266,7 +266,7 @@ pub async fn consultar_nombre(buscar: &str) -> Result<DgiiNombreResponse, AppErr
     Ok(DgiiNombreResponse { resultados: items })
 }
 
-/// Invalidate a specific cache entry by cedula_rnc + organizacion_id.
+/// Invalidate a specific cache entry by `cedula_rnc` + `organizacion_id`.
 pub async fn invalidar_cache(
     db: &DatabaseConnection,
     organizacion_id: Uuid,

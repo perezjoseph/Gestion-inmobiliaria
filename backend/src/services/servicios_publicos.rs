@@ -68,7 +68,7 @@ pub async fn obtener_responsabilidades(
     Ok(results)
 }
 
-/// Update unit-level default responsibilities (contrato_id = NULL).
+/// Update unit-level default responsibilities (`contrato_id` = NULL).
 pub async fn actualizar_responsabilidad_unidad(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -244,8 +244,8 @@ pub fn es_consumo_anormal(historico: &[Decimal], consumo_nuevo: Decimal) -> Opti
     Some(consumo_nuevo > umbral)
 }
 
-/// Upsert a responsabilidad_servicios record.
-/// Finds by (unidad_id, proveedor_servicio, contrato_id) — updates if found, inserts if not.
+/// Upsert a `responsabilidad_servicios` record.
+/// Finds by (`unidad_id`, `proveedor_servicio`, `contrato_id`) — updates if found, inserts if not.
 async fn upsert_responsabilidad<C: ConnectionTrait>(
     db: &C,
     org_id: Uuid,
@@ -268,26 +268,23 @@ async fn upsert_responsabilidad<C: ConnectionTrait>(
 
     let existing = query.one(db).await?;
 
-    match existing {
-        Some(record) => {
-            let mut active: responsabilidad_servicio::ActiveModel = record.into();
-            active.responsable = Set(responsable.to_string());
-            active.updated_at = Set(now.into());
-            active.update(db).await?;
-        }
-        None => {
-            let model = responsabilidad_servicio::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                unidad_id: Set(unidad_id),
-                proveedor_servicio: Set(proveedor_servicio.to_string()),
-                responsable: Set(responsable.to_string()),
-                contrato_id: Set(contrato_id),
-                organizacion_id: Set(org_id),
-                created_at: Set(now.into()),
-                updated_at: Set(now.into()),
-            };
-            model.insert(db).await?;
-        }
+    if let Some(record) = existing {
+        let mut active: responsabilidad_servicio::ActiveModel = record.into();
+        active.responsable = Set(responsable.to_string());
+        active.updated_at = Set(now.into());
+        active.update(db).await?;
+    } else {
+        let model = responsabilidad_servicio::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            unidad_id: Set(unidad_id),
+            proveedor_servicio: Set(proveedor_servicio.to_string()),
+            responsable: Set(responsable.to_string()),
+            contrato_id: Set(contrato_id),
+            organizacion_id: Set(org_id),
+            created_at: Set(now.into()),
+            updated_at: Set(now.into()),
+        };
+        model.insert(db).await?;
     }
 
     Ok(())

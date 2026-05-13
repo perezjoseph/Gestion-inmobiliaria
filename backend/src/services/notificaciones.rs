@@ -682,7 +682,7 @@ pub(crate) async fn generar_deposito_devolucion(
             let active = notificacion::ActiveModel {
                 id: Set(Uuid::new_v4()),
                 tipo: Set(tipo.to_string()),
-                titulo: Set(format!("Depósito pendiente de devolución")),
+                titulo: Set("Depósito pendiente de devolución".to_string()),
                 mensaje: Set(mensaje),
                 leida: Set(false),
                 entity_type: Set("contrato".to_string()),

@@ -116,7 +116,7 @@ pub async fn fetch_ipc_from_bcrd(db: &DatabaseConnection) -> Result<i64, AppErro
         .and_then(|v| v.as_array())
         .and_then(|arr| arr.first())
         .and_then(|item| item.get("value"))
-        .and_then(|v| v.as_f64())
+        .and_then(serde_json::Value::as_f64)
         .ok_or_else(|| {
             AppError::Internal(anyhow::anyhow!(
                 "No se pudo extraer valor IPC de la respuesta BCRD"

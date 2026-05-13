@@ -177,11 +177,11 @@ pub async fn list(
 }
 
 /// Validate state transitions for desahucio.
-/// Valid transitions: iniciado→en_progreso, en_progreso→completado, iniciado→completado
+/// Valid transitions: `iniciado→en_progreso`, `en_progreso→completado`, `iniciado→completado`
 pub fn validate_estado_transition(from: &str, to: &str) -> Result<(), AppError> {
     let valid = matches!(
         (from, to),
-        ("iniciado", "en_progreso") | ("en_progreso", "completado") | ("iniciado", "completado")
+        ("iniciado", "en_progreso" | "completado") | ("en_progreso", "completado")
     );
 
     if !valid {
