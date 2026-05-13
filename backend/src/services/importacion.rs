@@ -414,6 +414,12 @@ fn process_gasto_row(row: &[String], idx: &GastoIndices) -> Result<CreateGastoRe
         proveedor: non_empty_to_option(get_field(row, idx.proveedor)),
         numero_factura: non_empty_to_option(get_field(row, idx.numero_factura)),
         notas: non_empty_to_option(get_field(row, idx.notas)),
+        nic_contrato: None,
+        proveedor_servicio: None,
+        consumo: None,
+        unidad_consumo: None,
+        periodo_desde: None,
+        periodo_hasta: None,
     })
 }
 

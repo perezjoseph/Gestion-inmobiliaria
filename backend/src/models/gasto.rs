@@ -16,6 +16,12 @@ pub struct CreateGastoRequest {
     pub proveedor: Option<String>,
     pub numero_factura: Option<String>,
     pub notas: Option<String>,
+    pub nic_contrato: Option<String>,
+    pub proveedor_servicio: Option<String>,
+    pub consumo: Option<Decimal>,
+    pub unidad_consumo: Option<String>,
+    pub periodo_desde: Option<NaiveDate>,
+    pub periodo_hasta: Option<NaiveDate>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -31,6 +37,12 @@ pub struct UpdateGastoRequest {
     pub numero_factura: Option<String>,
     pub estado: Option<String>,
     pub notas: Option<String>,
+    pub nic_contrato: Option<String>,
+    pub proveedor_servicio: Option<String>,
+    pub consumo: Option<Decimal>,
+    pub unidad_consumo: Option<String>,
+    pub periodo_desde: Option<NaiveDate>,
+    pub periodo_hasta: Option<NaiveDate>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -44,6 +56,9 @@ pub struct GastoListQuery {
     pub fecha_hasta: Option<NaiveDate>,
     pub page: Option<u64>,
     pub per_page: Option<u64>,
+    pub proveedor_servicio: Option<String>,
+    pub periodo_desde: Option<NaiveDate>,
+    pub periodo_hasta: Option<NaiveDate>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -71,6 +86,12 @@ pub struct GastoResponse {
     pub notas: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub nic_contrato: Option<String>,
+    pub proveedor_servicio: Option<String>,
+    pub consumo: Option<Decimal>,
+    pub unidad_consumo: Option<String>,
+    pub periodo_desde: Option<NaiveDate>,
+    pub periodo_hasta: Option<NaiveDate>,
 }
 
 #[derive(Debug, Serialize)]
@@ -208,6 +229,12 @@ mod tests {
             notas: None,
             created_at: Utc.with_ymd_and_hms(2025, 4, 1, 10, 0, 0).unwrap(),
             updated_at: Utc.with_ymd_and_hms(2025, 4, 1, 10, 0, 0).unwrap(),
+            nic_contrato: None,
+            proveedor_servicio: None,
+            consumo: None,
+            unidad_consumo: None,
+            periodo_desde: None,
+            periodo_hasta: None,
         };
         let json = serde_json::to_value(&response).unwrap();
         assert!(json.get("propiedadId").is_some());

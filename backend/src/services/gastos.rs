@@ -14,6 +14,7 @@ use crate::models::gasto::{
     UpdateGastoRequest,
 };
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
+use crate::services::servicios_publicos::PROVEEDORES_SERVICIO;
 use crate::services::validation::{MONEDAS, validate_enum};
 
 pub const CATEGORIAS_GASTO: &[&str] = &[
@@ -45,6 +46,12 @@ impl From<gasto::Model> for GastoResponse {
             notas: m.notas,
             created_at: m.created_at.into(),
             updated_at: m.updated_at.into(),
+            nic_contrato: m.nic_contrato,
+            proveedor_servicio: m.proveedor_servicio,
+            consumo: m.consumo,
+            unidad_consumo: m.unidad_consumo,
+            periodo_desde: m.periodo_desde,
+            periodo_hasta: m.periodo_hasta,
         }
     }
 }
@@ -81,6 +88,34 @@ pub async fn create<C: ConnectionTrait>(
         }
     }
 
+    // Utility field validation when categoria == "servicio_publico"
+    if input.categoria == "servicio_publico" || input.categoria == "servicios_publicos" {
+        if input.proveedor_servicio.is_none() {
+            return Err(AppError::Validation(
+                "proveedor_servicio es requerido para gastos de servicio público".to_string(),
+            ));
+        }
+        validate_enum(
+            "proveedor_servicio",
+            input.proveedor_servicio.as_deref().unwrap_or_default(),
+            PROVEEDORES_SERVICIO,
+        )?;
+        if let Some(consumo) = input.consumo {
+            if consumo <= Decimal::ZERO {
+                return Err(AppError::Validation(
+                    "El consumo debe ser mayor que cero".to_string(),
+                ));
+            }
+        }
+        if let (Some(desde), Some(hasta)) = (input.periodo_desde, input.periodo_hasta) {
+            if desde >= hasta {
+                return Err(AppError::Validation(
+                    "periodo_desde debe ser anterior a periodo_hasta".to_string(),
+                ));
+            }
+        }
+    }
+
     let now = Utc::now().into();
     let id = Uuid::new_v4();
 
@@ -98,6 +133,12 @@ pub async fn create<C: ConnectionTrait>(
         numero_factura: Set(input.numero_factura),
         notas: Set(input.notas),
         organizacion_id: Set(organizacion_id),
+        nic_contrato: Set(input.nic_contrato),
+        proveedor_servicio: Set(input.proveedor_servicio),
+        consumo: Set(input.consumo),
+        unidad_consumo: Set(input.unidad_consumo),
+        periodo_desde: Set(input.periodo_desde),
+        periodo_hasta: Set(input.periodo_hasta),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -115,6 +156,15 @@ pub async fn create<C: ConnectionTrait>(
         },
     )
     .await;
+
+    // Best-effort anomaly detection for utility gastos
+    if record.categoria == "servicio_publico" || record.categoria == "servicios_publicos" {
+        if let Err(e) =
+            super::servicios_publicos::verificar_consumo_anormal(db, &record, organizacion_id).await
+        {
+            tracing::warn!(gasto_id = %id, error = %e, "Error en verificación de consumo anormal");
+        }
+    }
 
     Ok(GastoResponse::from(record))
 }
@@ -159,6 +209,15 @@ pub async fn list(
     }
     if let Some(fecha_hasta) = query.fecha_hasta {
         select = select.filter(gasto::Column::FechaGasto.lte(fecha_hasta));
+    }
+    if let Some(ref proveedor_servicio) = query.proveedor_servicio {
+        select = select.filter(gasto::Column::ProveedorServicio.eq(proveedor_servicio));
+    }
+    if let Some(periodo_desde) = query.periodo_desde {
+        select = select.filter(gasto::Column::PeriodoDesde.gte(periodo_desde));
+    }
+    if let Some(periodo_hasta) = query.periodo_hasta {
+        select = select.filter(gasto::Column::PeriodoHasta.lte(periodo_hasta));
     }
 
     let paginator = select
@@ -374,6 +433,12 @@ mod tests {
             numero_factura: Some("FAC-001".to_string()),
             notas: Some("Nota de prueba".to_string()),
             organizacion_id: Uuid::new_v4(),
+            nic_contrato: None,
+            proveedor_servicio: None,
+            consumo: None,
+            unidad_consumo: None,
+            periodo_desde: None,
+            periodo_hasta: None,
             created_at: Utc::now().fixed_offset(),
             updated_at: Utc::now().fixed_offset(),
         }

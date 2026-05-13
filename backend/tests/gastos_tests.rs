@@ -1083,3 +1083,467 @@ fn dashboard_stats_includes_total_gastos_mes() {
 fn gastos_comparacion_returns_correct_structure() {
     db_async::gastos_comparacion();
 }
+
+/// Integration tests for utility gasto validation (DR Legal Compliance).
+mod gastos_utility_db_tests {
+    use actix_web::test;
+    use chrono::Utc;
+    use realestate_backend::app::create_app;
+    use realestate_backend::config::AppConfig;
+    use realestate_backend::services::auth::{Claims, encode_jwt};
+    use rust_decimal::Decimal;
+    use sea_orm::{ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, Set};
+    use sea_orm_migration::MigratorTrait;
+    use serde_json::{Value, json};
+    use uuid::Uuid;
+
+    const JWT_SECRET: &str = "test_secret_key_that_is_long_enough_for_jwt";
+
+    fn db_url() -> String {
+        dotenvy::dotenv().ok();
+        std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for integration tests")
+    }
+
+    async fn setup_db() -> Result<DatabaseConnection, String> {
+        let mut opts = ConnectOptions::new(db_url());
+        opts.max_connections(5)
+            .min_connections(1)
+            .connect_timeout(std::time::Duration::from_secs(30))
+            .idle_timeout(std::time::Duration::from_secs(60))
+            .acquire_timeout(std::time::Duration::from_secs(30));
+        let db = Database::connect(opts)
+            .await
+            .map_err(|e| format!("Failed to connect to database: {e}"))?;
+        super::migrations::Migrator::up(&db, None)
+            .await
+            .map_err(|e| format!("Failed to run migrations: {e}"))?;
+        Ok(db)
+    }
+
+    fn shared_rt_and_db() -> Option<&'static (tokio::runtime::Runtime, DatabaseConnection)> {
+        static SHARED: std::sync::OnceLock<
+            Result<(tokio::runtime::Runtime, DatabaseConnection), String>,
+        > = std::sync::OnceLock::new();
+        SHARED
+            .get_or_init(|| {
+                let rt =
+                    tokio::runtime::Runtime::new().map_err(|e| format!("Runtime error: {e}"))?;
+                let db = rt.block_on(setup_db())?;
+                Ok((rt, db))
+            })
+            .as_ref()
+            .ok()
+    }
+
+    fn with_db<F, Fut>(f: F)
+    where
+        F: FnOnce(DatabaseConnection) -> Fut,
+        Fut: std::future::Future<Output = ()>,
+    {
+        dotenvy::dotenv().ok();
+        if std::env::var("DATABASE_URL").is_err() {
+            eprintln!("DATABASE_URL not set -- skipping DB integration test");
+            return;
+        }
+        let _guard = crate::GLOBAL_DB_SERIAL
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let Some((rt, db)) = shared_rt_and_db() else {
+            eprintln!("Database not reachable -- skipping DB integration test");
+            return;
+        };
+        rt.block_on(f(db.clone()));
+    }
+
+    fn make_config() -> AppConfig {
+        AppConfig {
+            pool: realestate_backend::config::PoolConfig::default(),
+            chatbot: realestate_backend::config::ChatbotEnvConfig {
+                baileys_service_url: "http://baileys:3100".to_string(),
+                baileys_internal_token: "a]3kF9#mP7vL2nQ8wR5xT0yU4zA1bC6dE".to_string(),
+                ovms_endpoint: "http://ovms:8000/v1".to_string(),
+                ovms_chat_model: "qwen3.6".to_string(),
+                ai_chat_timeout_secs: 30,
+            },
+            database_url: String::new(),
+            jwt_secret: JWT_SECRET.to_string(),
+            server_port: 0,
+            cors_origin: None,
+        }
+    }
+
+    fn make_token(user_id: Uuid, rol: &str, org_id: Uuid) -> String {
+        let claims = Claims {
+            sub: user_id,
+            email: format!("{rol}@test.com"),
+            rol: rol.to_string(),
+            organizacion_id: org_id,
+            exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
+        };
+        encode_jwt(&claims, JWT_SECRET).unwrap()
+    }
+
+    async fn create_test_organizacion(db: &DatabaseConnection) -> Uuid {
+        use realestate_backend::entities::organizacion;
+        let id = Uuid::new_v4();
+        let now = Utc::now().into();
+        organizacion::ActiveModel {
+            id: Set(id),
+            tipo: Set("persona_fisica".to_string()),
+            nombre: Set(format!("Org Utility Test {id}")),
+            estado: Set("activo".to_string()),
+            cedula: Set(None),
+            telefono: Set(None),
+            email_organizacion: Set(None),
+            rnc: Set(None),
+            razon_social: Set(None),
+            nombre_comercial: Set(None),
+            direccion_fiscal: Set(None),
+            representante_legal: Set(None),
+            dgii_data: Set(None),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .expect("Failed to create test organizacion");
+        id
+    }
+
+    async fn create_test_usuario(db: &DatabaseConnection, rol: &str, org_id: Uuid) -> Uuid {
+        use realestate_backend::entities::usuario;
+        let id = Uuid::new_v4();
+        let now = Utc::now().into();
+        usuario::ActiveModel {
+            id: Set(id),
+            nombre: Set(format!("Test {rol}")),
+            email: Set(format!("{rol}+{id}@test.com")),
+            password_hash: Set("not_used".to_string()),
+            rol: Set(rol.to_string()),
+            activo: Set(true),
+            organizacion_id: Set(org_id),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .expect("Failed to create test usuario");
+        id
+    }
+
+    async fn create_test_propiedad(db: &DatabaseConnection, org_id: Uuid) -> Uuid {
+        use realestate_backend::entities::propiedad;
+        let id = Uuid::new_v4();
+        let now = Utc::now().into();
+        propiedad::ActiveModel {
+            id: Set(id),
+            titulo: Set("Propiedad Utility Test".to_string()),
+            descripcion: Set(None),
+            direccion: Set("Calle Utility 123".to_string()),
+            ciudad: Set("Santo Domingo".to_string()),
+            provincia: Set("Distrito Nacional".to_string()),
+            tipo_propiedad: Set("apartamento".to_string()),
+            habitaciones: Set(Some(2)),
+            banos: Set(Some(1)),
+            area_m2: Set(Some(Decimal::new(8000, 2))),
+            precio: Set(Decimal::new(2500000, 2)),
+            moneda: Set("DOP".to_string()),
+            estado: Set("disponible".to_string()),
+            imagenes: Set(None),
+            organizacion_id: Set(org_id),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .expect("Failed to create test propiedad");
+        id
+    }
+
+    /// Test: proveedor_servicio required when categoria=servicio_publico
+    pub fn proveedor_servicio_required_for_servicio_publico() {
+        with_db(|db| async move {
+            let config = make_config();
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
+            let token = make_token(admin_id, "admin", org_id);
+            let propiedad_id = create_test_propiedad(&db, org_id).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
+
+            // Missing proveedorServicio when categoria=servicio_publico
+            let req = test::TestRequest::post()
+                .uri("/api/v1/gastos")
+                .insert_header(("Authorization", format!("Bearer {token}")))
+                .set_json(json!({
+                    "propiedadId": propiedad_id,
+                    "categoria": "servicio_publico",
+                    "descripcion": "Electricidad sin proveedor",
+                    "monto": "2500",
+                    "moneda": "DOP",
+                    "fechaGasto": "2025-04-01"
+                }))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 422);
+        });
+    }
+
+    /// Test: consumo must be > 0 when provided
+    pub fn consumo_must_be_positive() {
+        with_db(|db| async move {
+            let config = make_config();
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
+            let token = make_token(admin_id, "admin", org_id);
+            let propiedad_id = create_test_propiedad(&db, org_id).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
+
+            // consumo = 0 should be rejected
+            let req = test::TestRequest::post()
+                .uri("/api/v1/gastos")
+                .insert_header(("Authorization", format!("Bearer {token}")))
+                .set_json(json!({
+                    "propiedadId": propiedad_id,
+                    "categoria": "servicio_publico",
+                    "descripcion": "Electricidad consumo cero",
+                    "monto": "2500",
+                    "moneda": "DOP",
+                    "fechaGasto": "2025-04-01",
+                    "proveedorServicio": "EDENORTE",
+                    "consumo": "0",
+                    "unidadConsumo": "kWh"
+                }))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 422);
+        });
+    }
+
+    /// Test: periodo_desde must be before periodo_hasta
+    pub fn periodo_ordering_validation() {
+        with_db(|db| async move {
+            let config = make_config();
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
+            let token = make_token(admin_id, "admin", org_id);
+            let propiedad_id = create_test_propiedad(&db, org_id).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
+
+            // periodo_desde > periodo_hasta should be rejected
+            let req = test::TestRequest::post()
+                .uri("/api/v1/gastos")
+                .insert_header(("Authorization", format!("Bearer {token}")))
+                .set_json(json!({
+                    "propiedadId": propiedad_id,
+                    "categoria": "servicio_publico",
+                    "descripcion": "Electricidad periodo invertido",
+                    "monto": "2500",
+                    "moneda": "DOP",
+                    "fechaGasto": "2025-04-01",
+                    "proveedorServicio": "EDENORTE",
+                    "consumo": "100",
+                    "unidadConsumo": "kWh",
+                    "periodoDesde": "2025-04-30",
+                    "periodoHasta": "2025-04-01"
+                }))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 422);
+        });
+    }
+
+    /// Test: Filter gastos by proveedor_servicio
+    pub fn filter_by_proveedor_servicio() {
+        with_db(|db| async move {
+            let config = make_config();
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
+            let token = make_token(admin_id, "admin", org_id);
+            let propiedad_id = create_test_propiedad(&db, org_id).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
+
+            // Create EDENORTE gasto
+            let req = test::TestRequest::post()
+                .uri("/api/v1/gastos")
+                .insert_header(("Authorization", format!("Bearer {token}")))
+                .set_json(json!({
+                    "propiedadId": propiedad_id,
+                    "categoria": "servicio_publico",
+                    "descripcion": "Electricidad EDENORTE",
+                    "monto": "2500",
+                    "moneda": "DOP",
+                    "fechaGasto": "2025-04-01",
+                    "proveedorServicio": "EDENORTE",
+                    "consumo": "100",
+                    "unidadConsumo": "kWh",
+                    "periodoDesde": "2025-03-01",
+                    "periodoHasta": "2025-03-31"
+                }))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 201);
+
+            // Create CAASD gasto
+            let req = test::TestRequest::post()
+                .uri("/api/v1/gastos")
+                .insert_header(("Authorization", format!("Bearer {token}")))
+                .set_json(json!({
+                    "propiedadId": propiedad_id,
+                    "categoria": "servicio_publico",
+                    "descripcion": "Agua CAASD",
+                    "monto": "800",
+                    "moneda": "DOP",
+                    "fechaGasto": "2025-04-01",
+                    "proveedorServicio": "CAASD",
+                    "consumo": "15",
+                    "unidadConsumo": "m3",
+                    "periodoDesde": "2025-03-01",
+                    "periodoHasta": "2025-03-31"
+                }))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 201);
+
+            // Filter by proveedorServicio=EDENORTE
+            let req = test::TestRequest::get()
+                .uri(&format!(
+                    "/api/v1/gastos?propiedadId={propiedad_id}&proveedorServicio=EDENORTE"
+                ))
+                .insert_header(("Authorization", format!("Bearer {token}")))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 200);
+            let body: Value = test::read_body_json(resp).await;
+            for item in body["data"].as_array().unwrap() {
+                assert_eq!(item["proveedorServicio"], "EDENORTE");
+            }
+        });
+    }
+
+    /// Test: Filter gastos by periodo date range
+    pub fn filter_by_periodo_date_range() {
+        with_db(|db| async move {
+            let config = make_config();
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
+            let token = make_token(admin_id, "admin", org_id);
+            let propiedad_id = create_test_propiedad(&db, org_id).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
+
+            // Create gastos with different periodos
+            let req = test::TestRequest::post()
+                .uri("/api/v1/gastos")
+                .insert_header(("Authorization", format!("Bearer {token}")))
+                .set_json(json!({
+                    "propiedadId": propiedad_id,
+                    "categoria": "servicio_publico",
+                    "descripcion": "Electricidad enero",
+                    "monto": "2500",
+                    "moneda": "DOP",
+                    "fechaGasto": "2025-01-15",
+                    "proveedorServicio": "EDENORTE",
+                    "consumo": "100",
+                    "unidadConsumo": "kWh",
+                    "periodoDesde": "2025-01-01",
+                    "periodoHasta": "2025-01-31"
+                }))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 201);
+
+            let req = test::TestRequest::post()
+                .uri("/api/v1/gastos")
+                .insert_header(("Authorization", format!("Bearer {token}")))
+                .set_json(json!({
+                    "propiedadId": propiedad_id,
+                    "categoria": "servicio_publico",
+                    "descripcion": "Electricidad abril",
+                    "monto": "2800",
+                    "moneda": "DOP",
+                    "fechaGasto": "2025-04-15",
+                    "proveedorServicio": "EDENORTE",
+                    "consumo": "110",
+                    "unidadConsumo": "kWh",
+                    "periodoDesde": "2025-04-01",
+                    "periodoHasta": "2025-04-30"
+                }))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 201);
+
+            // Filter by periodo range that includes only April
+            let req = test::TestRequest::get()
+                .uri(&format!(
+                    "/api/v1/gastos?propiedadId={propiedad_id}&periodoDesde=2025-03-01&periodoHasta=2025-05-01"
+                ))
+                .insert_header(("Authorization", format!("Bearer {token}")))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 200);
+            let body: Value = test::read_body_json(resp).await;
+            // Should contain at least the April gasto
+            assert!(body["data"].as_array().unwrap().len() >= 1);
+        });
+    }
+}
+
+// Task 14.6: Utility gasto validation tests
+#[test]
+fn utility_gasto_proveedor_servicio_required() {
+    gastos_utility_db_tests::proveedor_servicio_required_for_servicio_publico();
+}
+
+#[test]
+fn utility_gasto_consumo_must_be_positive() {
+    gastos_utility_db_tests::consumo_must_be_positive();
+}
+
+#[test]
+fn utility_gasto_periodo_ordering_validation() {
+    gastos_utility_db_tests::periodo_ordering_validation();
+}
+
+#[test]
+fn utility_gasto_filter_by_proveedor_servicio() {
+    gastos_utility_db_tests::filter_by_proveedor_servicio();
+}
+
+#[test]
+fn utility_gasto_filter_by_periodo_date_range() {
+    gastos_utility_db_tests::filter_by_periodo_date_range();
+}

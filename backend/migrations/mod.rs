@@ -26,6 +26,10 @@ pub mod m20250620_000001_create_firmas_documento;
 pub mod m20260509_000001_create_chatbot_tables;
 pub mod m20260510_000001_make_auditoria_usuario_nullable;
 pub mod m20260510_000002_create_whatsapp_auth_tables;
+pub mod m20260512_000001_add_utility_fields_to_gastos;
+pub mod m20260512_000002_create_desahucios;
+pub mod m20260512_000003_create_responsabilidad_servicios;
+pub mod m20260512_000004_create_cache_dgii;
 
 use sea_orm_migration::prelude::*;
 
@@ -62,6 +66,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20260509_000001_create_chatbot_tables::Migration),
             Box::new(m20260510_000001_make_auditoria_usuario_nullable::Migration),
             Box::new(m20260510_000002_create_whatsapp_auth_tables::Migration),
+            Box::new(m20260512_000001_add_utility_fields_to_gastos::Migration),
+            Box::new(m20260512_000002_create_desahucios::Migration),
+            Box::new(m20260512_000003_create_responsabilidad_servicios::Migration),
+            Box::new(m20260512_000004_create_cache_dgii::Migration),
         ]
     }
 }

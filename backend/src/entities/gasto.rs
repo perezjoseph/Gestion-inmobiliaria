@@ -21,6 +21,13 @@ pub struct Model {
     #[sea_orm(column_type = "Text", nullable)]
     pub notas: Option<String>,
     pub organizacion_id: Uuid,
+    pub nic_contrato: Option<String>,
+    pub proveedor_servicio: Option<String>,
+    #[sea_orm(column_type = "Decimal(Some((12, 4)))", nullable)]
+    pub consumo: Option<Decimal>,
+    pub unidad_consumo: Option<String>,
+    pub periodo_desde: Option<Date>,
+    pub periodo_hasta: Option<Date>,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }

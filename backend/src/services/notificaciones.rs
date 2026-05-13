@@ -504,6 +504,201 @@ pub(crate) async fn generar_documentos_vencidos(
     Ok(count)
 }
 
+/// Pure helper: given days remaining until contract expiration,
+/// returns which reminder thresholds (90, 60, 30) should fire.
+pub fn thresholds_for_days(days_remaining: i64) -> Vec<i64> {
+    [90i64, 60, 30]
+        .iter()
+        .filter(|&&t| days_remaining <= t)
+        .copied()
+        .collect()
+}
+
+pub(crate) async fn generar_renovacion_reminders(
+    db: &DatabaseConnection,
+    organizacion_id: Uuid,
+) -> Result<u64, AppError> {
+    let today = Utc::now().date_naive();
+    let limit_date = today + chrono::Duration::days(90);
+
+    let contratos = contrato::Entity::find()
+        .filter(contrato::Column::OrganizacionId.eq(organizacion_id))
+        .filter(contrato::Column::Estado.eq("activo"))
+        .filter(contrato::Column::FechaFin.gte(today))
+        .filter(contrato::Column::FechaFin.lte(limit_date))
+        .all(db)
+        .await?;
+
+    if contratos.is_empty() {
+        return Ok(0);
+    }
+
+    let usuario_ids = usuarios_activos_organizacion(db, organizacion_id).await?;
+    if usuario_ids.is_empty() {
+        return Ok(0);
+    }
+
+    // Batch-fetch existing renewal notifications for dedup
+    let contrato_ids: Vec<Uuid> = contratos.iter().map(|c| c.id).collect();
+    let existing_notifs = notificacion::Entity::find()
+        .filter(notificacion::Column::Tipo.eq("contrato_renovacion"))
+        .filter(notificacion::Column::EntityType.eq("contrato"))
+        .filter(notificacion::Column::EntityId.is_in(contrato_ids))
+        .all(db)
+        .await?;
+
+    let now = Utc::now().into();
+    let mut count: u64 = 0;
+
+    for contrato_model in &contratos {
+        let days_remaining = (contrato_model.fecha_fin - today).num_days();
+        let thresholds = thresholds_for_days(days_remaining);
+
+        for threshold in &thresholds {
+            let marker = format!("[{threshold}d]");
+
+            for &uid in &usuario_ids {
+                // Dedup: check if notification with this marker already exists
+                let already_exists = existing_notifs.iter().any(|n| {
+                    n.entity_id == contrato_model.id
+                        && n.usuario_id == uid
+                        && n.mensaje.contains(&marker)
+                });
+                if already_exists {
+                    continue;
+                }
+
+                let active = notificacion::ActiveModel {
+                    id: Set(Uuid::new_v4()),
+                    tipo: Set("contrato_renovacion".to_string()),
+                    titulo: Set(format!("Renovación de contrato - {threshold} días")),
+                    mensaje: Set(format!(
+                        "{marker} El contrato vence el {} ({days_remaining} días restantes)",
+                        contrato_model.fecha_fin.format("%d/%m/%Y")
+                    )),
+                    leida: Set(false),
+                    entity_type: Set("contrato".to_string()),
+                    entity_id: Set(contrato_model.id),
+                    usuario_id: Set(uid),
+                    organizacion_id: Set(organizacion_id),
+                    created_at: Set(now),
+                };
+                active.insert(db).await?;
+                count += 1;
+            }
+        }
+    }
+
+    Ok(count)
+}
+
+pub(crate) async fn generar_deposito_devolucion(
+    db: &DatabaseConnection,
+    organizacion_id: Uuid,
+) -> Result<u64, AppError> {
+    use sea_orm::Condition;
+
+    let contratos = contrato::Entity::find()
+        .filter(contrato::Column::OrganizacionId.eq(organizacion_id))
+        .filter(
+            Condition::any()
+                .add(contrato::Column::Estado.eq("terminado"))
+                .add(contrato::Column::Estado.eq("finalizado")),
+        )
+        .filter(contrato::Column::EstadoDeposito.eq("cobrado"))
+        .all(db)
+        .await?;
+
+    if contratos.is_empty() {
+        return Ok(0);
+    }
+
+    let usuario_ids = usuarios_activos_organizacion(db, organizacion_id).await?;
+    if usuario_ids.is_empty() {
+        return Ok(0);
+    }
+
+    let contrato_ids: Vec<Uuid> = contratos.iter().map(|c| c.id).collect();
+
+    // Batch-fetch existing deposit notifications for dedup
+    let existing_pending = notificacion::Entity::find()
+        .filter(notificacion::Column::Tipo.eq("deposito_devolucion_pendiente"))
+        .filter(notificacion::Column::EntityType.eq("contrato"))
+        .filter(notificacion::Column::EntityId.is_in(contrato_ids.clone()))
+        .all(db)
+        .await?;
+
+    let existing_overdue = notificacion::Entity::find()
+        .filter(notificacion::Column::Tipo.eq("deposito_devolucion_vencida"))
+        .filter(notificacion::Column::EntityType.eq("contrato"))
+        .filter(notificacion::Column::EntityId.is_in(contrato_ids))
+        .all(db)
+        .await?;
+
+    let pending_set: HashSet<(Uuid, Uuid)> = existing_pending
+        .into_iter()
+        .map(|n| (n.entity_id, n.usuario_id))
+        .collect();
+    let overdue_set: HashSet<(Uuid, Uuid)> = existing_overdue
+        .into_iter()
+        .map(|n| (n.entity_id, n.usuario_id))
+        .collect();
+
+    let today = Utc::now();
+    let now = today.into();
+    let mut count: u64 = 0;
+
+    for contrato_model in &contratos {
+        // Use updated_at as proxy for termination date
+        let termination_date = contrato_model.updated_at;
+        let days_since = (today - termination_date.with_timezone(&Utc)).num_days();
+
+        let (tipo, dedup_set) = if days_since > 15 {
+            ("deposito_devolucion_vencida", &overdue_set)
+        } else if days_since >= 10 {
+            ("deposito_devolucion_pendiente", &pending_set)
+        } else {
+            continue;
+        };
+
+        for &uid in &usuario_ids {
+            if dedup_set.contains(&(contrato_model.id, uid)) {
+                continue;
+            }
+
+            let mensaje = if tipo == "deposito_devolucion_vencida" {
+                format!(
+                    "Han pasado {days_since} días desde la terminación del contrato. \
+                     El depósito debe ser devuelto (plazo legal: 15 días, Ley 4314)"
+                )
+            } else {
+                let dias_restantes = 15 - days_since;
+                format!(
+                    "Quedan {dias_restantes} días para devolver el depósito \
+                     (plazo legal: 15 días, Ley 4314)"
+                )
+            };
+
+            let active = notificacion::ActiveModel {
+                id: Set(Uuid::new_v4()),
+                tipo: Set(tipo.to_string()),
+                titulo: Set(format!("Depósito pendiente de devolución")),
+                mensaje: Set(mensaje),
+                leida: Set(false),
+                entity_type: Set("contrato".to_string()),
+                entity_id: Set(contrato_model.id),
+                usuario_id: Set(uid),
+                organizacion_id: Set(organizacion_id),
+                created_at: Set(now),
+            };
+            active.insert(db).await?;
+            count += 1;
+        }
+    }
+
+    Ok(count)
+}
+
 pub async fn generar_notificaciones(
     db: &DatabaseConnection,
     organizacion_id: Uuid,
@@ -511,12 +706,20 @@ pub async fn generar_notificaciones(
     let pago_vencido = generar_pagos_vencidos(db, organizacion_id).await?;
     let contrato_por_vencer = generar_contratos_por_vencer(db, organizacion_id).await?;
     let documento_vencido = generar_documentos_vencidos(db, organizacion_id).await?;
+    let contrato_renovacion = generar_renovacion_reminders(db, organizacion_id).await?;
+    let deposito_devolucion = generar_deposito_devolucion(db, organizacion_id).await?;
 
     Ok(GenerarNotificacionesResponse {
         pago_vencido,
         contrato_por_vencer,
         documento_vencido,
-        total: pago_vencido + contrato_por_vencer + documento_vencido,
+        contrato_renovacion,
+        deposito_devolucion,
+        total: pago_vencido
+            + contrato_por_vencer
+            + documento_vencido
+            + contrato_renovacion
+            + deposito_devolucion,
     })
 }
 

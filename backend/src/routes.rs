@@ -85,7 +85,18 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                             .route("", web::post().to(handlers::unidades::create))
                             .route("/{id}", web::get().to(handlers::unidades::get_by_id))
                             .route("/{id}", web::put().to(handlers::unidades::update))
-                            .route("/{id}", web::delete().to(handlers::unidades::delete)),
+                            .route("/{id}", web::delete().to(handlers::unidades::delete))
+                            .route(
+                                "/{id}/servicios",
+                                web::get()
+                                    .to(handlers::servicios_publicos::obtener_responsabilidades),
+                            )
+                            .route(
+                                "/{id}/servicios",
+                                web::put().to(
+                                    handlers::servicios_publicos::actualizar_responsabilidad_unidad,
+                                ),
+                            ),
                     ),
             )
             .service(
@@ -126,6 +137,11 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route(
                         "/{id}/pagos/generar",
                         web::post().to(handlers::contratos::generar_pagos),
+                    )
+                    .route(
+                        "/{id}/servicios",
+                        web::put()
+                            .to(handlers::servicios_publicos::actualizar_responsabilidad_contrato),
                     ),
             )
             .service(
@@ -408,7 +424,9 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route(
                         "/recargo",
                         web::put().to(handlers::configuracion::actualizar_recargo_defecto),
-                    ),
+                    )
+                    .route("/ipc", web::get().to(handlers::ipc::obtener_ipc))
+                    .route("/ipc", web::put().to(handlers::ipc::actualizar_ipc)),
             )
             .service(
                 web::scope("/importar")
@@ -455,6 +473,24 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route(
                         "/{nombre}/ejecutar",
                         web::post().to(handlers::background_jobs::ejecutar_tarea),
+                    ),
+            )
+            .service(
+                web::scope("/desahucios")
+                    .route("", web::get().to(handlers::desahucios::list))
+                    .route("", web::post().to(handlers::desahucios::create))
+                    .route("/{id}", web::put().to(handlers::desahucios::update)),
+            )
+            .service(
+                web::scope("/dgii")
+                    .route("/consulta", web::get().to(handlers::dgii::consultar_rnc))
+                    .route(
+                        "/consulta/nombre",
+                        web::get().to(handlers::dgii::consultar_nombre),
+                    )
+                    .route(
+                        "/cache/{rnc}",
+                        web::delete().to(handlers::dgii::invalidar_cache),
                     ),
             ),
     );

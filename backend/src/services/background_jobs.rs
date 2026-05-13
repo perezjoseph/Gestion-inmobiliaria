@@ -35,6 +35,7 @@ pub const TAREAS_VALIDAS: &[&str] = &[
     "marcar_documentos_vencidos",
     "generar_notificaciones",
     "limpiar_conversaciones_chatbot",
+    "actualizar_ipc",
 ];
 
 const INTERVALO_POR_DEFECTO_SECS: u64 = 86_400;
@@ -148,6 +149,7 @@ async fn ejecutar_tarea_con_registro(
         "marcar_documentos_vencidos" => ejecutar_marcar_documentos_vencidos(&db).await,
         "generar_notificaciones" => ejecutar_generar_notificaciones(&db).await,
         "limpiar_conversaciones_chatbot" => ejecutar_limpiar_conversaciones_chatbot(&db).await,
+        "actualizar_ipc" => ejecutar_actualizar_ipc(&db).await,
         _ => {
             return Err(AppError::NotFound(format!("Tarea no encontrada: {nombre}")));
         }
@@ -212,6 +214,11 @@ async fn ejecutar_limpiar_conversaciones_chatbot(db: &DatabaseConnection) -> Res
     Ok(total)
 }
 
+async fn ejecutar_actualizar_ipc(db: &DatabaseConnection) -> Result<i64, AppError> {
+    let rows = super::ipc::fetch_ipc_from_bcrd(db).await?;
+    Ok(rows)
+}
+
 async fn registrar_ejecucion(
     db: &DatabaseConnection,
     nombre: &str,
@@ -243,12 +250,13 @@ mod tests {
 
     #[test]
     fn tareas_validas_contains_expected_names() {
-        assert_eq!(TAREAS_VALIDAS.len(), 5);
+        assert_eq!(TAREAS_VALIDAS.len(), 6);
         assert!(TAREAS_VALIDAS.contains(&"marcar_pagos_atrasados"));
         assert!(TAREAS_VALIDAS.contains(&"marcar_contratos_vencidos"));
         assert!(TAREAS_VALIDAS.contains(&"marcar_documentos_vencidos"));
         assert!(TAREAS_VALIDAS.contains(&"generar_notificaciones"));
         assert!(TAREAS_VALIDAS.contains(&"limpiar_conversaciones_chatbot"));
+        assert!(TAREAS_VALIDAS.contains(&"actualizar_ipc"));
     }
 
     #[test]

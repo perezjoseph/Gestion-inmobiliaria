@@ -1,5 +1,8 @@
+#![allow(clippy::needless_return)]
+use crate::migrations;
+
 #[cfg(test)]
-mod contratos_lifecycle_tests {
+mod desahucios_rbac_tests {
     use actix_web::http::StatusCode;
     use actix_web::{App, HttpResponse, test, web};
     use chrono::Utc;
@@ -40,7 +43,14 @@ mod contratos_lifecycle_tests {
         encode_jwt(&claims, JWT_SECRET).unwrap()
     }
 
-    async fn write_access_stub_with_path_and_body(
+    async fn write_access_stub(
+        _access: WriteAccess,
+        _body: web::Json<serde_json::Value>,
+    ) -> Result<HttpResponse, AppError> {
+        Ok(HttpResponse::Created().finish())
+    }
+
+    async fn write_access_path_body_stub(
         _access: WriteAccess,
         _path: web::Path<Uuid>,
         _body: web::Json<serde_json::Value>,
@@ -48,228 +58,191 @@ mod contratos_lifecycle_tests {
         Ok(HttpResponse::Ok().finish())
     }
 
-    async fn claims_stub(_claims: Claims) -> Result<HttpResponse, AppError> {
+    async fn write_access_query_stub(_access: WriteAccess) -> Result<HttpResponse, AppError> {
         Ok(HttpResponse::Ok().finish())
     }
 
-    // --- POST /api/contratos/{id}/renovar (WriteAccess) ---
+    // --- POST /api/v1/desahucios (WriteAccess) ---
 
     #[actix_web::test]
-    async fn renovar_rejects_unauthenticated() {
-        let id = Uuid::new_v4();
-        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
-            "/api/contratos/{id}/renovar",
-            web::post().to(write_access_stub_with_path_and_body),
-        ))
+    async fn create_desahucio_rejects_unauthenticated() {
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(test_config()))
+                .route("/api/v1/desahucios", web::post().to(write_access_stub)),
+        )
         .await;
 
         let req = test::TestRequest::post()
-            .uri(&format!("/api/contratos/{id}/renovar"))
-            .set_json(serde_json::json!({"fechaFin":"2026-12-31","montoMensual":"25000"}))
+            .uri("/api/v1/desahucios")
+            .set_json(serde_json::json!({"contratoId": Uuid::new_v4(), "motivo": "Falta de pago"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[actix_web::test]
-    async fn renovar_rejects_visualizador() {
-        let id = Uuid::new_v4();
-        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
-            "/api/contratos/{id}/renovar",
-            web::post().to(write_access_stub_with_path_and_body),
-        ))
+    async fn create_desahucio_rejects_visualizador() {
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(test_config()))
+                .route("/api/v1/desahucios", web::post().to(write_access_stub)),
+        )
         .await;
 
         let token = make_token("visualizador");
         let req = test::TestRequest::post()
-            .uri(&format!("/api/contratos/{id}/renovar"))
+            .uri("/api/v1/desahucios")
             .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(serde_json::json!({"fechaFin":"2026-12-31","montoMensual":"25000"}))
+            .set_json(serde_json::json!({"contratoId": Uuid::new_v4(), "motivo": "Falta de pago"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
     }
 
     #[actix_web::test]
-    async fn renovar_allows_admin() {
-        let id = Uuid::new_v4();
-        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
-            "/api/contratos/{id}/renovar",
-            web::post().to(write_access_stub_with_path_and_body),
-        ))
+    async fn create_desahucio_allows_admin() {
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(test_config()))
+                .route("/api/v1/desahucios", web::post().to(write_access_stub)),
+        )
         .await;
 
         let token = make_token("admin");
         let req = test::TestRequest::post()
-            .uri(&format!("/api/contratos/{id}/renovar"))
+            .uri("/api/v1/desahucios")
             .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(serde_json::json!({"fechaFin":"2026-12-31","montoMensual":"25000"}))
+            .set_json(serde_json::json!({"contratoId": Uuid::new_v4(), "motivo": "Falta de pago"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.status(), StatusCode::CREATED);
     }
 
     #[actix_web::test]
-    async fn renovar_allows_gerente() {
-        let id = Uuid::new_v4();
-        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
-            "/api/contratos/{id}/renovar",
-            web::post().to(write_access_stub_with_path_and_body),
-        ))
+    async fn create_desahucio_allows_gerente() {
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(test_config()))
+                .route("/api/v1/desahucios", web::post().to(write_access_stub)),
+        )
         .await;
 
         let token = make_token("gerente");
         let req = test::TestRequest::post()
-            .uri(&format!("/api/contratos/{id}/renovar"))
+            .uri("/api/v1/desahucios")
             .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(serde_json::json!({"fechaFin":"2026-12-31","montoMensual":"25000"}))
+            .set_json(serde_json::json!({"contratoId": Uuid::new_v4(), "motivo": "Falta de pago"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.status(), StatusCode::CREATED);
     }
 
-    // --- POST /api/contratos/{id}/terminar (WriteAccess) ---
+    // --- PUT /api/v1/desahucios/{id} (WriteAccess) ---
 
     #[actix_web::test]
-    async fn terminar_rejects_unauthenticated() {
+    async fn update_desahucio_rejects_unauthenticated() {
         let id = Uuid::new_v4();
         let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
-            "/api/contratos/{id}/terminar",
-            web::post().to(write_access_stub_with_path_and_body),
+            "/api/v1/desahucios/{id}",
+            web::put().to(write_access_path_body_stub),
         ))
         .await;
 
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/contratos/{id}/terminar"))
-            .set_json(serde_json::json!({"fechaTerminacion":"2025-06-15"}))
+        let req = test::TestRequest::put()
+            .uri(&format!("/api/v1/desahucios/{id}"))
+            .set_json(serde_json::json!({"estado": "en_progreso"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[actix_web::test]
-    async fn terminar_rejects_visualizador() {
+    async fn update_desahucio_rejects_visualizador() {
         let id = Uuid::new_v4();
         let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
-            "/api/contratos/{id}/terminar",
-            web::post().to(write_access_stub_with_path_and_body),
+            "/api/v1/desahucios/{id}",
+            web::put().to(write_access_path_body_stub),
         ))
         .await;
 
         let token = make_token("visualizador");
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/contratos/{id}/terminar"))
+        let req = test::TestRequest::put()
+            .uri(&format!("/api/v1/desahucios/{id}"))
             .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(serde_json::json!({"fechaTerminacion":"2025-06-15"}))
+            .set_json(serde_json::json!({"estado": "en_progreso"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
     }
 
     #[actix_web::test]
-    async fn terminar_allows_admin() {
+    async fn update_desahucio_allows_admin() {
         let id = Uuid::new_v4();
         let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
-            "/api/contratos/{id}/terminar",
-            web::post().to(write_access_stub_with_path_and_body),
+            "/api/v1/desahucios/{id}",
+            web::put().to(write_access_path_body_stub),
         ))
         .await;
 
         let token = make_token("admin");
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/contratos/{id}/terminar"))
+        let req = test::TestRequest::put()
+            .uri(&format!("/api/v1/desahucios/{id}"))
             .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(serde_json::json!({"fechaTerminacion":"2025-06-15"}))
+            .set_json(serde_json::json!({"estado": "en_progreso"}))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
-    #[actix_web::test]
-    async fn terminar_allows_gerente() {
-        let id = Uuid::new_v4();
-        let app = test::init_service(App::new().app_data(web::Data::new(test_config())).route(
-            "/api/contratos/{id}/terminar",
-            web::post().to(write_access_stub_with_path_and_body),
-        ))
-        .await;
-
-        let token = make_token("gerente");
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/contratos/{id}/terminar"))
-            .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(serde_json::json!({"fechaTerminacion":"2025-06-15"}))
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK);
-    }
-
-    // --- GET /api/contratos/por-vencer (any authenticated user via Claims) ---
+    // --- GET /api/v1/desahucios (WriteAccess) ---
 
     #[actix_web::test]
-    async fn por_vencer_rejects_unauthenticated() {
+    async fn list_desahucios_rejects_unauthenticated() {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(test_config()))
-                .route("/api/contratos/por-vencer", web::get().to(claims_stub)),
+                .route("/api/v1/desahucios", web::get().to(write_access_query_stub)),
         )
         .await;
 
         let req = test::TestRequest::get()
-            .uri("/api/contratos/por-vencer")
+            .uri("/api/v1/desahucios")
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[actix_web::test]
-    async fn por_vencer_allows_visualizador() {
+    async fn list_desahucios_rejects_visualizador() {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(test_config()))
-                .route("/api/contratos/por-vencer", web::get().to(claims_stub)),
+                .route("/api/v1/desahucios", web::get().to(write_access_query_stub)),
         )
         .await;
 
         let token = make_token("visualizador");
         let req = test::TestRequest::get()
-            .uri("/api/contratos/por-vencer")
+            .uri("/api/v1/desahucios")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
     }
 
     #[actix_web::test]
-    async fn por_vencer_allows_admin() {
+    async fn list_desahucios_allows_gerente() {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(test_config()))
-                .route("/api/contratos/por-vencer", web::get().to(claims_stub)),
-        )
-        .await;
-
-        let token = make_token("admin");
-        let req = test::TestRequest::get()
-            .uri("/api/contratos/por-vencer")
-            .insert_header(("Authorization", format!("Bearer {token}")))
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK);
-    }
-
-    #[actix_web::test]
-    async fn por_vencer_allows_gerente() {
-        let app = test::init_service(
-            App::new()
-                .app_data(web::Data::new(test_config()))
-                .route("/api/contratos/por-vencer", web::get().to(claims_stub)),
+                .route("/api/v1/desahucios", web::get().to(write_access_query_stub)),
         )
         .await;
 
         let token = make_token("gerente");
         let req = test::TestRequest::get()
-            .uri("/api/contratos/por-vencer")
+            .uri("/api/v1/desahucios")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .to_request();
         let resp = test::call_service(&app, req).await;
@@ -277,8 +250,8 @@ mod contratos_lifecycle_tests {
     }
 }
 
-/// Integration tests for deposit cap and IPC renewal validation (requires database).
-mod contratos_dr_legal_db_tests {
+/// Integration tests that require a running database.
+mod desahucios_db_tests {
     use actix_web::test;
     use chrono::Utc;
     use realestate_backend::app::create_app;
@@ -307,7 +280,7 @@ mod contratos_dr_legal_db_tests {
         let db = Database::connect(opts)
             .await
             .map_err(|e| format!("Failed to connect to database: {e}"))?;
-        crate::migrations::Migrator::up(&db, None)
+        super::migrations::Migrator::up(&db, None)
             .await
             .map_err(|e| format!("Failed to run migrations: {e}"))?;
         Ok(db)
@@ -383,7 +356,7 @@ mod contratos_dr_legal_db_tests {
         organizacion::ActiveModel {
             id: Set(id),
             tipo: Set("persona_fisica".to_string()),
-            nombre: Set(format!("Org Contrato DR Test {id}")),
+            nombre: Set(format!("Org Desahucio Test {id}")),
             estado: Set("activo".to_string()),
             cedula: Set(None),
             telefono: Set(None),
@@ -430,9 +403,9 @@ mod contratos_dr_legal_db_tests {
         let now = Utc::now().into();
         propiedad::ActiveModel {
             id: Set(id),
-            titulo: Set("Propiedad Contrato DR Test".to_string()),
+            titulo: Set("Propiedad Desahucio Test".to_string()),
             descripcion: Set(None),
-            direccion: Set("Calle Test 789".to_string()),
+            direccion: Set("Calle Test 123".to_string()),
             ciudad: Set("Santo Domingo".to_string()),
             provincia: Set("Distrito Nacional".to_string()),
             tipo_propiedad: Set("apartamento".to_string()),
@@ -441,7 +414,7 @@ mod contratos_dr_legal_db_tests {
             area_m2: Set(Some(Decimal::new(8000, 2))),
             precio: Set(Decimal::new(2500000, 2)),
             moneda: Set("DOP".to_string()),
-            estado: Set("disponible".to_string()),
+            estado: Set("ocupada".to_string()),
             imagenes: Set(None),
             organizacion_id: Set(org_id),
             created_at: Set(now),
@@ -459,11 +432,11 @@ mod contratos_dr_legal_db_tests {
         let now = Utc::now().into();
         inquilino::ActiveModel {
             id: Set(id),
-            nombre: Set("Carlos".to_string()),
-            apellido: Set("Deposit Test".to_string()),
-            cedula: Set(format!("003-{}-0001", &Uuid::new_v4().to_string()[..7])),
-            telefono: Set(Some("809-555-0002".to_string())),
-            email: Set(Some(format!("deposit+{id}@test.com"))),
+            nombre: Set("Juan".to_string()),
+            apellido: Set("Pérez".to_string()),
+            cedula: Set(format!("001-{}-0001", Uuid::new_v4().as_simple())[..13].to_string()),
+            telefono: Set(Some("809-555-0001".to_string())),
+            email: Set(Some(format!("inquilino+{id}@test.com"))),
             contacto_emergencia: Set(None),
             notas: Set(None),
             documentos: Set(None),
@@ -477,8 +450,45 @@ mod contratos_dr_legal_db_tests {
         id
     }
 
-    /// Test: Deposit exceeding monto_mensual is rejected (422)
-    pub fn deposit_exceeding_monto_mensual_rejected() {
+    async fn create_active_contrato(
+        db: &DatabaseConnection,
+        org_id: Uuid,
+        propiedad_id: Uuid,
+        inquilino_id: Uuid,
+    ) -> Uuid {
+        use realestate_backend::entities::contrato;
+        let id = Uuid::new_v4();
+        let now = Utc::now().into();
+        contrato::ActiveModel {
+            id: Set(id),
+            propiedad_id: Set(propiedad_id),
+            inquilino_id: Set(inquilino_id),
+            fecha_inicio: Set(chrono::NaiveDate::from_ymd_opt(2025, 1, 1).unwrap()),
+            fecha_fin: Set(chrono::NaiveDate::from_ymd_opt(2026, 1, 1).unwrap()),
+            monto_mensual: Set(Decimal::new(25000, 0)),
+            moneda: Set("DOP".to_string()),
+            deposito: Set(Some(Decimal::new(25000, 0))),
+            estado: Set("activo".to_string()),
+            estado_deposito: Set(Some("cobrado".to_string())),
+            documentos: Set(None),
+            fecha_cobro_deposito: Set(None),
+            fecha_devolucion_deposito: Set(None),
+            monto_retenido: Set(None),
+            motivo_retencion: Set(None),
+            recargo_porcentaje: Set(None),
+            dias_gracia: Set(None),
+            organizacion_id: Set(org_id),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .expect("Failed to create test contrato");
+        id
+    }
+
+    /// Test: Full CRUD lifecycle for desahucios
+    pub fn desahucio_crud_lifecycle() {
         with_db(|db| async move {
             let config = make_config();
             let org_id = create_test_organizacion(&db).await;
@@ -486,6 +496,7 @@ mod contratos_dr_legal_db_tests {
             let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let inquilino_id = create_test_inquilino(&db, org_id).await;
+            let contrato_id = create_active_contrato(&db, org_id, propiedad_id, inquilino_id).await;
             let app = test::init_service(create_app(
                 db.clone(),
                 config,
@@ -495,35 +506,96 @@ mod contratos_dr_legal_db_tests {
             ))
             .await;
 
-            // Create contract with deposito > monto_mensual — should be rejected
+            // Create desahucio
             let req = test::TestRequest::post()
-                .uri("/api/v1/contratos")
+                .uri("/api/v1/desahucios")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
-                    "propiedadId": propiedad_id,
-                    "inquilinoId": inquilino_id,
-                    "fechaInicio": "2025-07-01",
-                    "fechaFin": "2026-07-01",
-                    "montoMensual": "25000",
-                    "moneda": "DOP",
-                    "deposito": "30000",
-                    "diaCobro": 1
+                    "contratoId": contrato_id,
+                    "motivo": "Falta de pago por 3 meses"
                 }))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 201);
+            let body: Value = test::read_body_json(resp).await;
+            let desahucio_id = body["id"].as_str().unwrap().to_string();
+            assert_eq!(body["estado"], "iniciado");
+            assert_eq!(body["motivo"], "Falta de pago por 3 meses");
+
+            // Update state to en_progreso
+            let req = test::TestRequest::put()
+                .uri(&format!("/api/v1/desahucios/{desahucio_id}"))
+                .insert_header(("Authorization", format!("Bearer {token}")))
+                .set_json(json!({"estado": "en_progreso"}))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 200);
+            let body: Value = test::read_body_json(resp).await;
+            assert_eq!(body["estado"], "en_progreso");
+
+            // List desahucios
+            let req = test::TestRequest::get()
+                .uri("/api/v1/desahucios")
+                .insert_header(("Authorization", format!("Bearer {token}")))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 200);
+            let body: Value = test::read_body_json(resp).await;
+            assert!(body["total"].as_u64().unwrap() >= 1);
+        });
+    }
+
+    /// Test: completado without fecha_resolucion returns 422
+    pub fn completado_without_fecha_resolucion_returns_422() {
+        with_db(|db| async move {
+            let config = make_config();
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
+            let token = make_token(admin_id, "admin", org_id);
+            let propiedad_id = create_test_propiedad(&db, org_id).await;
+            let inquilino_id = create_test_inquilino(&db, org_id).await;
+            let contrato_id = create_active_contrato(&db, org_id, propiedad_id, inquilino_id).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
+
+            // Create desahucio
+            let req = test::TestRequest::post()
+                .uri("/api/v1/desahucios")
+                .insert_header(("Authorization", format!("Bearer {token}")))
+                .set_json(json!({
+                    "contratoId": contrato_id,
+                    "motivo": "Falta de pago"
+                }))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 201);
+            let body: Value = test::read_body_json(resp).await;
+            let desahucio_id = body["id"].as_str().unwrap().to_string();
+
+            // Try to set completado without fecha_resolucion
+            let req = test::TestRequest::put()
+                .uri(&format!("/api/v1/desahucios/{desahucio_id}"))
+                .insert_header(("Authorization", format!("Bearer {token}")))
+                .set_json(json!({"estado": "completado"}))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 422);
         });
     }
 
-    /// Test: Deposit equal to monto_mensual is accepted
-    pub fn deposit_equal_to_monto_mensual_accepted() {
+    /// Test: Creating desahucio on non-active contract returns 422
+    pub fn create_desahucio_non_active_contract_returns_422() {
         with_db(|db| async move {
             let config = make_config();
             let org_id = create_test_organizacion(&db).await;
             let admin_id = create_test_usuario(&db, "admin", org_id).await;
             let token = make_token(admin_id, "admin", org_id);
-            let propiedad_id = create_test_propiedad(&db, org_id).await;
-            let inquilino_id = create_test_inquilino(&db, org_id).await;
             let app = test::init_service(create_app(
                 db.clone(),
                 config,
@@ -533,28 +605,24 @@ mod contratos_dr_legal_db_tests {
             ))
             .await;
 
-            // Create contract with deposito == monto_mensual — should be accepted
+            // Use a non-existent contract ID (will fail validation)
+            let fake_contrato_id = Uuid::new_v4();
             let req = test::TestRequest::post()
-                .uri("/api/v1/contratos")
+                .uri("/api/v1/desahucios")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
-                    "propiedadId": propiedad_id,
-                    "inquilinoId": inquilino_id,
-                    "fechaInicio": "2025-07-01",
-                    "fechaFin": "2026-07-01",
-                    "montoMensual": "25000",
-                    "moneda": "DOP",
-                    "deposito": "25000",
-                    "diaCobro": 1
+                    "contratoId": fake_contrato_id,
+                    "motivo": "Falta de pago"
                 }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
-            assert_eq!(resp.status(), 201);
+            // Should be 422 (contract not found or not active) or 404
+            assert!(resp.status() == 422 || resp.status() == 404);
         });
     }
 
-    /// Test: Renewal with IPC cap — amount within cap accepted
-    pub fn renewal_within_ipc_cap_accepted() {
+    /// Test: Audit trail is created on desahucio create/update
+    pub fn desahucio_creates_audit_trail() {
         with_db(|db| async move {
             let config = make_config();
             let org_id = create_test_organizacion(&db).await;
@@ -562,6 +630,7 @@ mod contratos_dr_legal_db_tests {
             let token = make_token(admin_id, "admin", org_id);
             let propiedad_id = create_test_propiedad(&db, org_id).await;
             let inquilino_id = create_test_inquilino(&db, org_id).await;
+            let contrato_id = create_active_contrato(&db, org_id, propiedad_id, inquilino_id).await;
             let app = test::init_service(create_app(
                 db.clone(),
                 config,
@@ -571,142 +640,91 @@ mod contratos_dr_legal_db_tests {
             ))
             .await;
 
-            // Set IPC to 5%
-            let req = test::TestRequest::put()
-                .uri("/api/v1/configuracion/ipc")
-                .insert_header(("Authorization", format!("Bearer {token}")))
-                .set_json(json!({
-                    "valorIpc": "5.00",
-                    "fechaEfectiva": "2025-01-01"
-                }))
-                .to_request();
-            let resp = test::call_service(&app, req).await;
-            assert_eq!(resp.status(), 200);
-
-            // Create active contract with monto_mensual = 25000
+            // Create desahucio
             let req = test::TestRequest::post()
-                .uri("/api/v1/contratos")
+                .uri("/api/v1/desahucios")
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
-                    "propiedadId": propiedad_id,
-                    "inquilinoId": inquilino_id,
-                    "fechaInicio": "2025-01-01",
-                    "fechaFin": "2025-12-31",
-                    "montoMensual": "25000",
-                    "moneda": "DOP",
-                    "deposito": "25000",
-                    "diaCobro": 1
+                    "contratoId": contrato_id,
+                    "motivo": "Falta de pago"
                 }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 201);
             let body: Value = test::read_body_json(resp).await;
-            let contrato_id = body["id"].as_str().unwrap().to_string();
+            let desahucio_id = body["id"].as_str().unwrap().to_string();
 
-            // Renew with amount within IPC cap: 25000 * 1.05 = 26250 max
-            let req = test::TestRequest::post()
-                .uri(&format!("/api/v1/contratos/{contrato_id}/renovar"))
+            // Check audit trail exists
+            let req = test::TestRequest::get()
+                .uri("/api/v1/auditoria")
                 .insert_header(("Authorization", format!("Bearer {token}")))
-                .set_json(json!({
-                    "fechaFin": "2026-12-31",
-                    "montoMensual": "26000"
-                }))
-                .to_request();
-            let resp = test::call_service(&app, req).await;
-            // Should be accepted (26000 <= 26250)
-            assert_eq!(resp.status(), 200);
-        });
-    }
-
-    /// Test: Renewal exceeding IPC cap is rejected with max_allowed in response
-    pub fn renewal_exceeding_ipc_cap_rejected() {
-        with_db(|db| async move {
-            let config = make_config();
-            let org_id = create_test_organizacion(&db).await;
-            let admin_id = create_test_usuario(&db, "admin", org_id).await;
-            let token = make_token(admin_id, "admin", org_id);
-            let propiedad_id = create_test_propiedad(&db, org_id).await;
-            let inquilino_id = create_test_inquilino(&db, org_id).await;
-            let app = test::init_service(create_app(
-                db.clone(),
-                config,
-                actix_web::web::Data::new(
-                    realestate_backend::services::ocr_preview::PreviewStore::new(),
-                ),
-            ))
-            .await;
-
-            // Set IPC to 5%
-            let req = test::TestRequest::put()
-                .uri("/api/v1/configuracion/ipc")
-                .insert_header(("Authorization", format!("Bearer {token}")))
-                .set_json(json!({
-                    "valorIpc": "5.00",
-                    "fechaEfectiva": "2025-01-01"
-                }))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 200);
-
-            // Create active contract with monto_mensual = 25000
-            let req = test::TestRequest::post()
-                .uri("/api/v1/contratos")
-                .insert_header(("Authorization", format!("Bearer {token}")))
-                .set_json(json!({
-                    "propiedadId": propiedad_id,
-                    "inquilinoId": inquilino_id,
-                    "fechaInicio": "2025-01-01",
-                    "fechaFin": "2025-12-31",
-                    "montoMensual": "25000",
-                    "moneda": "DOP",
-                    "deposito": "25000",
-                    "diaCobro": 1
-                }))
-                .to_request();
-            let resp = test::call_service(&app, req).await;
-            assert_eq!(resp.status(), 201);
             let body: Value = test::read_body_json(resp).await;
-            let contrato_id = body["id"].as_str().unwrap().to_string();
-
-            // Renew with amount exceeding IPC cap: 25000 * 1.05 = 26250 max, try 28000
-            let req = test::TestRequest::post()
-                .uri(&format!("/api/v1/contratos/{contrato_id}/renovar"))
-                .insert_header(("Authorization", format!("Bearer {token}")))
-                .set_json(json!({
-                    "fechaFin": "2026-12-31",
-                    "montoMensual": "28000"
-                }))
-                .to_request();
-            let resp = test::call_service(&app, req).await;
-            // Should be rejected (28000 > 26250)
-            assert_eq!(resp.status(), 422);
-            let body: Value = test::read_body_json(resp).await;
-            // Response should include max_allowed
+            let entries = body["data"].as_array().unwrap();
+            let has_desahucio_entry = entries
+                .iter()
+                .any(|e| e["entidadId"].as_str() == Some(&desahucio_id));
             assert!(
-                body["maxAllowed"].is_string() || body["max_allowed"].is_string(),
-                "Response should include max_allowed field"
+                has_desahucio_entry,
+                "Audit trail should contain desahucio entry"
             );
         });
     }
+
+    /// Test: List desahucios with pagination
+    pub fn list_desahucios_with_pagination() {
+        with_db(|db| async move {
+            let config = make_config();
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
+            let token = make_token(admin_id, "admin", org_id);
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
+
+            // List with pagination params
+            let req = test::TestRequest::get()
+                .uri("/api/v1/desahucios?page=1&perPage=5")
+                .insert_header(("Authorization", format!("Bearer {token}")))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 200);
+            let body: Value = test::read_body_json(resp).await;
+            assert!(body["page"].as_u64().is_some());
+            assert!(body["perPage"].as_u64().is_some());
+        });
+    }
 }
 
-// Task 14.5: DR Legal deposit cap and IPC renewal tests
+// Task 14.2: DB-backed desahucio tests
 #[test]
-fn contrato_deposit_exceeding_monto_mensual_rejected() {
-    contratos_dr_legal_db_tests::deposit_exceeding_monto_mensual_rejected();
+fn desahucio_crud_lifecycle_test() {
+    desahucios_db_tests::desahucio_crud_lifecycle();
 }
 
 #[test]
-fn contrato_deposit_equal_to_monto_mensual_accepted() {
-    contratos_dr_legal_db_tests::deposit_equal_to_monto_mensual_accepted();
+fn desahucio_completado_without_fecha_resolucion() {
+    desahucios_db_tests::completado_without_fecha_resolucion_returns_422();
 }
 
 #[test]
-fn contrato_renewal_within_ipc_cap_accepted() {
-    contratos_dr_legal_db_tests::renewal_within_ipc_cap_accepted();
+fn desahucio_non_active_contract() {
+    desahucios_db_tests::create_desahucio_non_active_contract_returns_422();
 }
 
 #[test]
-fn contrato_renewal_exceeding_ipc_cap_rejected() {
-    contratos_dr_legal_db_tests::renewal_exceeding_ipc_cap_rejected();
+fn desahucio_audit_trail() {
+    desahucios_db_tests::desahucio_creates_audit_trail();
+}
+
+#[test]
+fn desahucio_list_pagination() {
+    desahucios_db_tests::list_desahucios_with_pagination();
 }

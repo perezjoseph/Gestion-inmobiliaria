@@ -78,6 +78,22 @@ pub async fn create<C: ConnectionTrait>(
     )
     .await?;
 
+    // Best-effort DGII cédula validation (never blocks creation)
+    let cedula = record.cedula.clone();
+    match super::dgii::validar_cedula_inquilino(db, org_id, &cedula).await {
+        Some(resp) => {
+            tracing::info!(
+                cedula = %cedula,
+                nombre_dgii = %resp.nombre_razon_social,
+                estado_dgii = %resp.estado,
+                "Validación DGII exitosa para inquilino"
+            );
+        }
+        None => {
+            tracing::debug!(cedula = %cedula, "Validación DGII no disponible para inquilino");
+        }
+    }
+
     Ok(InquilinoResponse::from(record))
 }
 
@@ -181,6 +197,22 @@ pub async fn update<C: ConnectionTrait>(
         },
     )
     .await?;
+
+    // Best-effort DGII cédula validation (never blocks update)
+    let cedula = updated.cedula.clone();
+    match super::dgii::validar_cedula_inquilino(db, org_id, &cedula).await {
+        Some(resp) => {
+            tracing::info!(
+                cedula = %cedula,
+                nombre_dgii = %resp.nombre_razon_social,
+                estado_dgii = %resp.estado,
+                "Validación DGII exitosa para inquilino"
+            );
+        }
+        None => {
+            tracing::debug!(cedula = %cedula, "Validación DGII no disponible para inquilino");
+        }
+    }
 
     Ok(InquilinoResponse::from(updated))
 }

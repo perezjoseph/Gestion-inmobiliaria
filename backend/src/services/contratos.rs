@@ -290,6 +290,15 @@ pub async fn create(
         validate_enum("moneda", moneda, MONEDAS)?;
     }
 
+    // Deposit cap validation (Ley 4314)
+    if let Some(deposito) = input.deposito {
+        if deposito > input.monto_mensual {
+            return Err(AppError::Validation(
+                "El depósito no puede exceder un mes de renta (Ley 4314)".to_string(),
+            ));
+        }
+    }
+
     inquilino::Entity::find_by_id(input.inquilino_id)
         .one(db)
         .await?
@@ -518,6 +527,16 @@ pub async fn update(
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
 
+    // Deposit cap validation (Ley 4314)
+    if let Some(deposito) = input.deposito {
+        let monto_ref = input.monto_mensual.unwrap_or(existing.monto_mensual);
+        if deposito > monto_ref {
+            return Err(AppError::Validation(
+                "El depósito no puede exceder un mes de renta (Ley 4314)".to_string(),
+            ));
+        }
+    }
+
     let is_terminating = input
         .estado
         .as_ref()
@@ -642,6 +661,22 @@ pub async fn renovar(
         return Err(AppError::Validation(
             "Solo se pueden renovar contratos activos".to_string(),
         ));
+    }
+
+    // IPC cap validation (Ley 4314)
+    match super::ipc::obtener_ipc_actual(db).await? {
+        Some(ipc_data) => {
+            let max_allowed =
+                super::ipc::calcular_monto_maximo(original.monto_mensual, ipc_data.valor_ipc);
+            if input.monto_mensual > max_allowed {
+                return Err(AppError::Validation(format!(
+                    "El monto mensual excede el máximo permitido por IPC: {max_allowed}"
+                )));
+            }
+        }
+        None => {
+            tracing::warn!("IPC no configurado, omitiendo validación de tope de renta");
+        }
     }
 
     let new_fecha_inicio = original
