@@ -32,8 +32,7 @@ pub fn ConnectionStep(props: &ConnectionStepProps) -> Html {
     {
         let on_status_change = props.on_status_change.clone();
         let qr_code = qr_code.clone();
-        let connection_status = props.connection_status.clone();
-        use_effect_with(connection_status.clone(), move |status| {
+        use_effect_with(props.connection_status.clone(), move |status| {
             let interval_ms = match status.as_str() {
                 "connected" => POLL_INTERVAL_CONNECTED_MS,
                 "qr_pending" => POLL_INTERVAL_QR_MS,
