@@ -504,11 +504,12 @@ mod tests {
         assert!(CATEGORIAS_GASTO.contains(&"impuestos"));
         assert!(CATEGORIAS_GASTO.contains(&"seguros"));
         assert!(CATEGORIAS_GASTO.contains(&"servicios_publicos"));
+        assert!(CATEGORIAS_GASTO.contains(&"servicio_publico"));
         assert!(CATEGORIAS_GASTO.contains(&"administracion"));
         assert!(CATEGORIAS_GASTO.contains(&"legal"));
         assert!(CATEGORIAS_GASTO.contains(&"mejoras"));
         assert!(CATEGORIAS_GASTO.contains(&"otro"));
-        assert_eq!(CATEGORIAS_GASTO.len(), 8);
+        assert_eq!(CATEGORIAS_GASTO.len(), 9);
     }
 
     #[test]
