@@ -225,7 +225,7 @@ fn contrato_body(propiedad_id: Uuid, inquilino_id: Uuid, deposito: Option<&str>)
         "inquilinoId": inquilino_id,
         "fechaInicio": fecha_inicio,
         "fechaFin": fecha_fin,
-        "montoMensual": "15000",
+        "montoMensual": "30000",
         "moneda": "DOP"
     });
     if let Some(dep) = deposito {

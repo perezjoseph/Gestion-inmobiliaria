@@ -14,6 +14,11 @@ pub enum AppError {
     Forbidden(String),
     #[error("{0}")]
     Validation(String),
+    #[error("{message}")]
+    ValidationWithFields {
+        message: String,
+        fields: serde_json::Value,
+    },
     #[error("Conflicto: {0}")]
     Conflict(String),
     #[error("Recurso expirado: {0}")]
@@ -29,7 +34,9 @@ impl actix_web::error::ResponseError for AppError {
             Self::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             Self::BadRequest(_) => StatusCode::BAD_REQUEST,
             Self::Forbidden(_) => StatusCode::FORBIDDEN,
-            Self::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            Self::Validation(_) | Self::ValidationWithFields { .. } => {
+                StatusCode::UNPROCESSABLE_ENTITY
+            }
             Self::Conflict(_) => StatusCode::CONFLICT,
             Self::Gone(_) => StatusCode::GONE,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -37,21 +44,39 @@ impl actix_web::error::ResponseError for AppError {
     }
 
     fn error_response(&self) -> HttpResponse {
-        let (error_type, message) = match self {
-            Self::NotFound(msg) => ("not_found", msg.clone()),
-            Self::Unauthorized(_) => ("unauthorized", self.to_string()),
-            Self::BadRequest(msg) => ("bad_request", msg.clone()),
-            Self::Forbidden(msg) => ("forbidden", msg.clone()),
-            Self::Validation(msg) => ("validation", msg.clone()),
-            Self::Conflict(msg) => ("conflict", msg.clone()),
-            Self::Gone(msg) => ("gone", msg.clone()),
-            Self::Internal(_) => ("internal", "Error interno del servidor".to_string()),
+        let body = match self {
+            Self::ValidationWithFields { message, fields } => {
+                let mut obj = json!({
+                    "error": "validation",
+                    "message": message,
+                });
+                if let Some(map) = fields.as_object() {
+                    for (k, v) in map {
+                        obj[k] = v.clone();
+                    }
+                }
+                obj
+            }
+            _ => {
+                let (error_type, message) = match self {
+                    Self::NotFound(msg) => ("not_found", msg.clone()),
+                    Self::Unauthorized(_) => ("unauthorized", self.to_string()),
+                    Self::BadRequest(msg) => ("bad_request", msg.clone()),
+                    Self::Forbidden(msg) => ("forbidden", msg.clone()),
+                    Self::Validation(msg) => ("validation", msg.clone()),
+                    Self::Conflict(msg) => ("conflict", msg.clone()),
+                    Self::Gone(msg) => ("gone", msg.clone()),
+                    Self::Internal(_) => ("internal", "Error interno del servidor".to_string()),
+                    Self::ValidationWithFields { .. } => unreachable!(),
+                };
+                json!({
+                    "error": error_type,
+                    "message": message,
+                })
+            }
         };
 
-        HttpResponse::build(self.status_code()).json(json!({
-            "error": error_type,
-            "message": message,
-        }))
+        HttpResponse::build(self.status_code()).json(body)
     }
 }
 

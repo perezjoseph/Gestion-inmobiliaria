@@ -298,7 +298,7 @@ mod pbt_async {
             "inquilinoId": inquilino_id,
             "fechaInicio": fecha_inicio,
             "fechaFin": fecha_fin,
-            "montoMensual": "15000",
+            "montoMensual": "30000",
             "moneda": "DOP"
         });
         if let Some(dep) = deposito {

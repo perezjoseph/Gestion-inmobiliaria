@@ -22,6 +22,7 @@ pub const CATEGORIAS_GASTO: &[&str] = &[
     "impuestos",
     "seguros",
     "servicios_publicos",
+    "servicio_publico",
     "administracion",
     "legal",
     "mejoras",

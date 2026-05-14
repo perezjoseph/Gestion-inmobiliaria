@@ -505,6 +505,15 @@ fn test_renovar_contrato_generates_pagos_for_new_period() {
         let propiedad_id = create_test_propiedad(&db, org_id).await;
         let inquilino_id = create_test_inquilino(&db, org_id).await;
 
+        // Clear any IPC config from prior tests so renewal is not capped
+        {
+            use realestate_backend::entities::configuracion;
+            use sea_orm::EntityTrait;
+            let _ = configuracion::Entity::delete_by_id("ipc_banco_central")
+                .exec(&db)
+                .await;
+        }
+
         let app = actix_web::test::init_service(create_app(
             db.clone(),
             config,
@@ -544,7 +553,7 @@ fn test_renovar_contrato_generates_pagos_for_new_period() {
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 201);
+        assert_eq!(resp.status(), 200);
         let body: Value = actix_web::test::read_body_json(resp).await;
         let new_id: Uuid = body["id"].as_str().unwrap().parse().unwrap();
 

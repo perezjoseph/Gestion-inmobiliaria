@@ -669,9 +669,14 @@ pub async fn renovar(
             let max_allowed =
                 super::ipc::calcular_monto_maximo(original.monto_mensual, ipc_data.valor_ipc);
             if input.monto_mensual > max_allowed {
-                return Err(AppError::Validation(format!(
-                    "El monto mensual excede el máximo permitido por IPC: {max_allowed}"
-                )));
+                return Err(AppError::ValidationWithFields {
+                    message: format!(
+                        "El monto mensual excede el máximo permitido por IPC: {max_allowed}"
+                    ),
+                    fields: serde_json::json!({
+                        "maxAllowed": max_allowed.to_string()
+                    }),
+                });
             }
         }
         None => {

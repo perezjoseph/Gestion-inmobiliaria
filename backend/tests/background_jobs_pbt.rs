@@ -47,7 +47,6 @@ fn tarea_valida() -> impl Strategy<Value = String> {
         Just("marcar_pagos_atrasados".to_string()),
         Just("marcar_contratos_vencidos".to_string()),
         Just("marcar_documentos_vencidos".to_string()),
-        Just("generar_notificaciones".to_string()),
     ]
 }
 

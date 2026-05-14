@@ -138,7 +138,7 @@ pub async fn renovar(
         usuario_id,
     )
     .await?;
-    Ok(HttpResponse::Created().json(result))
+    Ok(HttpResponse::Ok().json(result))
 }
 
 pub async fn terminar(

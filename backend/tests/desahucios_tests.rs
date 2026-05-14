@@ -665,7 +665,7 @@ mod desahucios_db_tests {
             let entries = body["data"].as_array().unwrap();
             let has_desahucio_entry = entries
                 .iter()
-                .any(|e| e["entidadId"].as_str() == Some(&desahucio_id));
+                .any(|e| e["entityId"].as_str() == Some(&desahucio_id));
             assert!(
                 has_desahucio_entry,
                 "Audit trail should contain desahucio entry"

@@ -361,7 +361,16 @@ mod ipc_db_tests {
             ))
             .await;
 
-            // Ensure no IPC is configured (fresh DB)
+            // Delete any existing IPC config from prior tests (global, not per-org)
+            {
+                use realestate_backend::entities::configuracion;
+                use sea_orm::EntityTrait;
+                let _ = configuracion::Entity::delete_by_id("ipc_banco_central")
+                    .exec(&db)
+                    .await;
+            }
+
+            // Ensure no IPC is configured
             let req = test::TestRequest::get()
                 .uri("/api/v1/configuracion/ipc")
                 .insert_header(("Authorization", format!("Bearer {token}")))
