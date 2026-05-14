@@ -44,36 +44,33 @@ impl actix_web::error::ResponseError for AppError {
     }
 
     fn error_response(&self) -> HttpResponse {
-        let body = match self {
-            Self::ValidationWithFields { message, fields } => {
-                let mut obj = json!({
-                    "error": "validation",
-                    "message": message,
-                });
-                if let Some(map) = fields.as_object() {
-                    for (k, v) in map {
-                        obj[k] = v.clone();
-                    }
+        let body = if let Self::ValidationWithFields { message, fields } = self {
+            let mut obj = json!({
+                "error": "validation",
+                "message": message,
+            });
+            if let Some(map) = fields.as_object() {
+                for (k, v) in map {
+                    obj[k] = v.clone();
                 }
-                obj
             }
-            _ => {
-                let (error_type, message) = match self {
-                    Self::NotFound(msg) => ("not_found", msg.clone()),
-                    Self::Unauthorized(_) => ("unauthorized", self.to_string()),
-                    Self::BadRequest(msg) => ("bad_request", msg.clone()),
-                    Self::Forbidden(msg) => ("forbidden", msg.clone()),
-                    Self::Validation(msg) => ("validation", msg.clone()),
-                    Self::Conflict(msg) => ("conflict", msg.clone()),
-                    Self::Gone(msg) => ("gone", msg.clone()),
-                    Self::Internal(_) => ("internal", "Error interno del servidor".to_string()),
-                    Self::ValidationWithFields { .. } => unreachable!(),
-                };
-                json!({
-                    "error": error_type,
-                    "message": message,
-                })
-            }
+            obj
+        } else {
+            let (error_type, message) = match self {
+                Self::NotFound(msg) => ("not_found", msg.clone()),
+                Self::Unauthorized(_) => ("unauthorized", self.to_string()),
+                Self::BadRequest(msg) => ("bad_request", msg.clone()),
+                Self::Forbidden(msg) => ("forbidden", msg.clone()),
+                Self::Validation(msg) => ("validation", msg.clone()),
+                Self::Conflict(msg) => ("conflict", msg.clone()),
+                Self::Gone(msg) => ("gone", msg.clone()),
+                Self::Internal(_) => ("internal", "Error interno del servidor".to_string()),
+                Self::ValidationWithFields { .. } => unreachable!(),
+            };
+            json!({
+                "error": error_type,
+                "message": message,
+            })
         };
 
         HttpResponse::build(self.status_code()).json(body)
