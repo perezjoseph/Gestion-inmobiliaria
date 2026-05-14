@@ -223,6 +223,70 @@ jobs:
           kubectl rollout status deployment/backend --namespace realestate --timeout=120s || true
           echo "::error::Rollback attempted. Manual verification required."
 
+      - name: Collect deployment diagnostics
+        if: failure()
+        run: |
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/diag"
+          OUT="${RUNNER_TEMP}/diag/context.txt"
+          NS=realestate
+
+          {
+            echo "=== DEPLOYMENT STATUS (kubectl get) ==="
+            kubectl get deployments,pods,services,events -n "$NS" -o wide 2>&1 || true
+            echo ""
+
+            echo "=== RECENT EVENTS (sorted by time, last 50) ==="
+            kubectl get events -n "$NS" \
+              --sort-by='.lastTimestamp' \
+              -o custom-columns=TIME:.lastTimestamp,TYPE:.type,REASON:.reason,OBJECT:.involvedObject.name,MESSAGE:.message \
+              2>&1 | tail -50 || true
+            echo ""
+
+            for DEPLOY in backend frontend ocr-service baileys; do
+              echo "=== DEPLOYMENT: ${DEPLOY} ==="
+              kubectl describe deployment "$DEPLOY" -n "$NS" 2>&1 || true
+              echo ""
+
+              echo "--- Pods for ${DEPLOY} ---"
+              kubectl get pods -n "$NS" -l "app.kubernetes.io/name=${DEPLOY}" -o wide 2>&1 || true
+              echo ""
+
+              for POD in $(kubectl get pods -n "$NS" \
+                  -l "app.kubernetes.io/name=${DEPLOY}" \
+                  -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+                echo "--- describe pod/${POD} ---"
+                kubectl describe pod "$POD" -n "$NS" 2>&1 | tail -80 || true
+                echo ""
+
+                echo "--- logs pod/${POD} (current, last 200 lines) ---"
+                kubectl logs "$POD" -n "$NS" --tail=200 2>&1 || true
+                echo ""
+
+                echo "--- logs pod/${POD} (previous if any, last 200 lines) ---"
+                kubectl logs "$POD" -n "$NS" --previous --tail=200 2>&1 || true
+                echo ""
+              done
+              echo ""
+            done
+
+            echo "=== ROLLOUT HISTORY ==="
+            for DEPLOY in backend frontend ocr-service baileys; do
+              echo "--- ${DEPLOY} ---"
+              kubectl rollout history "deployment/${DEPLOY}" -n "$NS" 2>&1 || true
+            done
+          } > "$OUT"
+
+          echo "Wrote $(wc -l < "$OUT") lines to $OUT"
+
+      - name: Upload deployment diagnostics
+        if: failure()
+        uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8 # v4.6.2
+        with:
+          name: kiro-deploy-diagnostics
+          path: ${{ runner.temp }}/diag/context.txt
+          retention-days: 7
+
       - name: Credential cleanup
         if: always()
         run: rm -f "${HOME}/.kube/config"

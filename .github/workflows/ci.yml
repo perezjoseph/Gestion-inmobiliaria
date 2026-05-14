@@ -198,7 +198,7 @@ jobs:
       - name: Install Trivy
         uses: ./.github/actions/install-security-tools
         with:
-          trivy: 'true'
+          trivy: "true"
 
       - name: Scan container image for vulnerabilities
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
@@ -288,7 +288,7 @@ jobs:
       - name: Install Trivy
         uses: ./.github/actions/install-security-tools
         with:
-          trivy: 'true'
+          trivy: "true"
 
       - name: Scan container image for vulnerabilities
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
@@ -389,3 +389,118 @@ jobs:
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_DATA }}
+
+  # ── Stage 4: Kiro Autofix (only on failure, non-main branches) ──
+  # Two-job flow: collect-build-diagnostics gathers fresh cargo output into
+  # an artifact; kiro-autofix is the reusable workflow that consumes it and
+  # invokes kiro-cli. See .github/workflows/kiro-autofix.yml for details.
+
+  collect-build-diagnostics:
+    name: Collect Build Diagnostics
+    needs:
+      [
+        changes,
+        security,
+        codeql,
+        lint,
+        build-and-test,
+        baileys-container,
+        ocr-container,
+        containers,
+      ]
+    if: >-
+      always() &&
+      github.ref != 'refs/heads/main' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+      contains(needs.*.result, 'failure')
+    runs-on: arc-runner-dind
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          persist-credentials: false
+
+      - name: Rust setup
+        uses: ./.github/actions/rust-setup
+        with:
+          components: rustfmt,clippy
+          targets: x86_64-unknown-linux-musl,wasm32-unknown-unknown
+
+      - name: Collect rustfmt / clippy / test failures
+        run: |
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/diag"
+          OUT="${RUNNER_TEMP}/diag/context.txt"
+
+          {
+            echo "=== RUSTFMT CHECK ==="
+            cargo fmt --all -- --check 2>&1 || true
+            echo ""
+            echo "=== CLIPPY BACKEND ==="
+            cargo clippy --locked -p realestate-backend -- -D warnings 2>&1 || true
+            echo ""
+            echo "=== CLIPPY FRONTEND ==="
+            cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings 2>&1 || true
+            echo ""
+            echo "=== CARGO TEST BACKEND (last 150 lines) ==="
+            cargo test --locked -p realestate-backend --no-fail-fast 2>&1 | tail -150 || true
+            echo ""
+            echo "=== CARGO TEST FRONTEND (last 150 lines) ==="
+            cargo test --locked -p realestate-frontend --no-fail-fast 2>&1 | tail -150 || true
+          } > "$OUT"
+
+          echo "Wrote $(wc -l < "$OUT") lines to $OUT"
+
+      - name: Upload diagnostics artifact
+        uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8 # v4.6.2
+        with:
+          name: kiro-build-diagnostics
+          path: ${{ runner.temp }}/diag/context.txt
+          retention-days: 1
+
+  kiro-autofix:
+    name: Kiro Autofix
+    needs: [collect-build-diagnostics]
+    if: needs.collect-build-diagnostics.result == 'success'
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: ./.github/workflows/kiro-autofix.yml
+    with:
+      stage: build
+      branch: ${{ github.head_ref || github.ref_name }}
+      context-artifact: kiro-build-diagnostics
+      run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    secrets:
+      kiro-api: ${{ secrets.KIRO_API }}
+      github-token: ${{ secrets.KIRO_GITHUB_TOKEN }}
+
+  # -- Stage 5: Kiro Autofix for Deploy Failures (main only, direct push) --
+  # When the deploy job fails on main, Kiro receives the K8s diagnostics
+  # artifact uploaded by deploy.yml and pushes a fix directly to main.
+  # Capped at 5 consecutive auto-fix commits at HEAD.
+
+  kiro-deploy-autofix:
+    name: Kiro Deploy Autofix
+    needs: [deploy]
+    if: >-
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' &&
+      needs.deploy.result == 'failure'
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: ./.github/workflows/kiro-autofix.yml
+    with:
+      stage: deploy
+      branch: main
+      context-artifact: kiro-deploy-diagnostics
+      run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    secrets:
+      kiro-api: ${{ secrets.KIRO_API }}
+      github-token: ${{ secrets.KIRO_GITHUB_TOKEN }}
