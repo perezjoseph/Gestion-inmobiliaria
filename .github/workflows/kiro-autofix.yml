@@ -1,7 +1,9 @@
 name: Kiro Autofix
 run-name: "Kiro Autofix [${{ github.event_name }}] ${{ github.ref_name }}"
 
-# Triggered when the main CI workflow fails on a PR
+# Triggered when the main CI workflow fails on a PR branch (non-main).
+# Self-heals up to MAX_ATTEMPTS times by counting consecutive kiro-bot
+# commits at HEAD; on overflow, fails loudly and pings the PR for a human.
 on:
   workflow_run:
     workflows: ["CI"]
@@ -14,6 +16,9 @@ concurrency:
   group: kiro-autofix-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
+env:
+  MAX_ATTEMPTS: "5"
+
 jobs:
   autofix:
     name: Kiro Autofix
@@ -24,6 +29,7 @@ jobs:
       github.event.workflow_run.head_repository.full_name == github.repository
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - name: Checkout branch that failed
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -31,14 +37,78 @@ jobs:
           ref: ${{ github.event.workflow_run.head_branch }}
           fetch-depth: 0
           token: ${{ secrets.KIRO_GITHUB_TOKEN }}
+          persist-credentials: true
+
+      - name: Count prior autofix attempts on this branch
+        id: attempts
+        run: |
+          umask 077
+          count=0
+          while [ "$count" -lt 50 ]; do
+            email=$(git log --format='%ae' -n 1 "HEAD~$count" 2>/dev/null || true)
+            if [ -z "$email" ]; then
+              break
+            fi
+            case "$email" in
+              kiro-bot@*) count=$((count + 1)) ;;
+              *) break ;;
+            esac
+          done
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          if [ "$count" -ge "${MAX_ATTEMPTS}" ]; then
+            echo "exceeded=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Kiro Autofix attempt limit reached: $count consecutive auto-fix commits at HEAD (max: ${MAX_ATTEMPTS})."
+          else
+            echo "exceeded=false" >> "$GITHUB_OUTPUT"
+            echo "Autofix attempt $((count + 1)) of ${MAX_ATTEMPTS}"
+          fi
+
+      - name: Find related PR
+        id: pr
+        if: steps.attempts.outputs.exceeded == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+        run: |
+          umask 077
+          pr_number=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --head "${{ github.event.workflow_run.head_branch }}" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+          echo "number=${pr_number}" >> "$GITHUB_OUTPUT"
+
+      - name: Notify human on PR (max attempts reached)
+        if: steps.attempts.outputs.exceeded == 'true' && steps.pr.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+        run: |
+          gh pr comment "${{ steps.pr.outputs.number }}" \
+            --repo "${{ github.repository }}" \
+            --body "🤖 **Kiro Autofix gave up.**
+
+          Attempted ${{ env.MAX_ATTEMPTS }} consecutive automated fixes without restoring CI to green. Manual intervention is required.
+
+          - Failed CI run: ${{ github.event.workflow_run.html_url }}
+          - Branch: \`${{ github.event.workflow_run.head_branch }}\`
+
+          To resume autofix, push a non-bot commit to this branch (the counter resets on any human commit at HEAD)."
+
+      - name: Stop if max attempts exceeded
+        if: steps.attempts.outputs.exceeded == 'true'
+        run: |
+          echo "::error::Kiro Autofix has attempted ${{ env.MAX_ATTEMPTS }} fixes without success. Manual intervention required."
+          exit 1
 
       - name: Rust setup
+        if: steps.attempts.outputs.exceeded == 'false'
         uses: ./.github/actions/rust-setup
         with:
           components: rustfmt,clippy
           targets: x86_64-unknown-linux-musl,wasm32-unknown-unknown
 
       - name: Install Kiro CLI
+        if: steps.attempts.outputs.exceeded == 'false'
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 10
@@ -46,8 +116,36 @@ jobs:
           retry_wait_seconds: 10
           command: curl -fsSL https://cli.kiro.dev/install | bash
 
+      - name: Collect git history of prior attempts
+        id: history
+        if: steps.attempts.outputs.exceeded == 'false'
+        env:
+          ATTEMPT_COUNT: ${{ steps.attempts.outputs.count }}
+        run: |
+          umask 077
+          HISTORY_LOG="${RUNNER_TEMP}/git-history.txt"
+          {
+            echo "=== RECENT COMMITS (last 10) ==="
+            git log --format='%h %ae %s%n%b%n---' -n 10
+            echo ""
+            echo "=== CONSECUTIVE PRIOR KIRO-BOT ATTEMPTS AT HEAD: ${ATTEMPT_COUNT} ==="
+            if [ "${ATTEMPT_COUNT}" -gt 0 ]; then
+              echo ""
+              echo "=== DIFFS FROM EACH PRIOR KIRO-BOT ATTEMPT ==="
+              i=0
+              while [ "$i" -lt "${ATTEMPT_COUNT}" ]; do
+                echo "--- Attempt commit HEAD~${i} ---"
+                git show --stat --format='%h %ae %s%n%b' "HEAD~${i}"
+                echo ""
+                i=$((i + 1))
+              done
+            fi
+          } > "$HISTORY_LOG"
+          echo "history_log=$HISTORY_LOG" >> "$GITHUB_OUTPUT"
+
       - name: Collect error context
         id: errors
+        if: steps.attempts.outputs.exceeded == 'false'
         run: |
           umask 077
           ERROR_LOG="${RUNNER_TEMP}/ci-errors.txt"
@@ -73,23 +171,74 @@ jobs:
           echo "error_log=$ERROR_LOG" >> "$GITHUB_OUTPUT"
 
       - name: Run Kiro CLI to fix errors
+        if: steps.attempts.outputs.exceeded == 'false'
         env:
-          KIRO_API_KEY: ${{ secrets.KIRO_API_KEY }}
+          KIRO_API_KEY: ${{ secrets.KIRO_API }}
+          ATTEMPT_NUM: ${{ steps.attempts.outputs.count }}
+          MAX_ATTEMPTS: ${{ env.MAX_ATTEMPTS }}
         run: |
+          umask 077
           ERROR_CONTEXT=$(cat "${{ steps.errors.outputs.error_log }}")
+          GIT_HISTORY=$(cat "${{ steps.history.outputs.history_log }}")
+          COMMIT_MSG_FILE="${RUNNER_TEMP}/kiro-commit-message.txt"
+          ATTEMPT_DISPLAY=$((ATTEMPT_NUM + 1))
+
+          export KIRO_COMMIT_MSG_FILE="$COMMIT_MSG_FILE"
 
           kiro-cli chat --no-interactive --trust-all-tools \
-            "The CI pipeline failed on this branch. Here are the errors:
+            "You are running in CI as automated remediation for a failed pipeline.
+          This is autofix attempt ${ATTEMPT_DISPLAY} of ${MAX_ATTEMPTS} on this branch.
 
+          STEP 1 — Review prior history before changing anything.
+          Inspect the git history below. If there are prior kiro-bot attempts at HEAD,
+          read what they tried and DO NOT repeat the same change. If a previous
+          attempt's approach clearly failed, try a fundamentally different approach
+          rather than tweaking incrementally.
+
+          === GIT HISTORY (recent commits + prior autofix attempts) ===
+          ${GIT_HISTORY}
+
+          STEP 2 — Diagnose the failures.
+          Below are the current rustfmt, clippy, and cargo test failures. Identify
+          the root cause for each before editing.
+
+          === CI ERROR OUTPUT ===
           ${ERROR_CONTEXT}
 
-          Fix all compilation errors, clippy warnings, test failures, and formatting issues.
-          Run 'cargo fmt --all' after making changes.
-          Run 'cargo clippy -p realestate-backend -- -D warnings' and 'cargo clippy --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings' to verify fixes.
-          Do NOT add new features or refactor unrelated code. Only fix what is broken."
+          STEP 3 — Fix only what is broken.
+          - Fix all compilation errors, clippy warnings, test failures, and formatting issues.
+          - Do NOT add new features or refactor unrelated code.
+          - After editing, run 'cargo fmt --all' and confirm clippy passes for both
+            'cargo clippy -p realestate-backend -- -D warnings' and
+            'cargo clippy --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings'.
+
+          STEP 4 — Write a descriptive commit message.
+          After all fixes are in place, write a commit message to the file at the
+          path stored in the environment variable KIRO_COMMIT_MSG_FILE
+          ('${COMMIT_MSG_FILE}'). The message must follow this exact format:
+
+              fix(ci): <one-line subject under 70 chars summarizing the fix>
+
+              Attempt ${ATTEMPT_DISPLAY} of ${MAX_ATTEMPTS}.
+
+              Root cause:
+              - <what was actually wrong; cite test names, lint IDs, or file:line>
+
+              Changes:
+              - <bullet per file or logical change, naming the symbol or file>
+
+              Verification:
+              - <which commands you ran and what they showed>
+
+              Workflow run: ${{ github.event.workflow_run.html_url }}
+
+          Be specific. Reference exact test names, clippy lint IDs, file paths, and
+          symbols. Avoid filler like 'various fixes' or 'minor improvements'.
+          Do NOT run 'git commit' or 'git push' yourself; the workflow handles that."
 
       - name: Check for changes
         id: changes
+        if: steps.attempts.outputs.exceeded == 'false'
         run: |
           if git diff --quiet && git diff --cached --quiet; then
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
@@ -99,13 +248,28 @@ jobs:
           fi
 
       - name: Commit and push fixes
-        if: steps.changes.outputs.has_changes == 'true'
+        if: steps.attempts.outputs.exceeded == 'false' && steps.changes.outputs.has_changes == 'true'
+        env:
+          ATTEMPT: ${{ steps.attempts.outputs.count }}
         run: |
+          umask 077
+          COMMIT_MSG_FILE="${RUNNER_TEMP}/kiro-commit-message.txt"
+          attempt_num=$((ATTEMPT + 1))
+
           git config user.name "kiro-bot"
           git config user.email "kiro-bot@users.noreply.github.com"
           git add -A
-          git commit -m "fix: auto-fix CI errors via Kiro CLI
 
-          Automated fix applied by Kiro CLI in response to CI failure.
+          if [ -s "$COMMIT_MSG_FILE" ]; then
+            echo "Using Kiro-generated commit message:"
+            cat "$COMMIT_MSG_FILE"
+            git commit -F "$COMMIT_MSG_FILE"
+          else
+            echo "::warning::Kiro did not produce a commit message; using fallback."
+            git commit -m "fix(ci): auto-fix CI errors via Kiro CLI (attempt ${attempt_num}/${{ env.MAX_ATTEMPTS }})
+
+          Kiro did not write a descriptive commit message. Inspect the diff for details.
           Workflow run: ${{ github.event.workflow_run.html_url }}"
-          git push origin ${{ github.event.workflow_run.head_branch }}
+          fi
+
+          git push origin "${{ github.event.workflow_run.head_branch }}"
