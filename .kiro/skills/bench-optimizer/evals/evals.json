@@ -1,0 +1,53 @@
+{
+    "skill_name": "bench-optimizer",
+    "evals": [
+        {
+            "id": 1,
+            "prompt": "This dashboard aggregation function is called on every page load. The team suspects it could be faster but hasn't measured. Optimize it with empirical evidence.",
+            "expected_output": "The skill should produce: (1) a criterion benchmark file that tests the current implementation at production-representative sizes (~2000 pagos), (2) at least 2 alternative implementations to compare (e.g., BTreeMap for sorted output vs HashMap+sort, pre-grouped by propiedad vs nested HashMap), (3) all approaches benchmarked in the same group for direct comparison, (4) a decision based on the benchmark results, not just theory.",
+            "files": [
+                "evals/files/eval1_dashboard_aggregation.rs"
+            ],
+            "expectations": [
+                "A criterion benchmark file is produced (contains criterion_group! and criterion_main! macros)",
+                "The benchmark generates realistic test data at production scale (~2000 items, not toy sizes like 10)",
+                "At least 2 alternative implementations are written as separate functions",
+                "All approaches are benchmarked in the same benchmark group for direct comparison",
+                "Data generation happens OUTSIDE the benchmark loop (not inside b.iter())",
+                "The output includes a decision/recommendation based on expected benchmark results, not just theory"
+            ]
+        },
+        {
+            "id": 2,
+            "prompt": "This overlap detection is O(n²). During normal use n=5-15 but during bulk import n can be 200. Should we optimize it? Prove it with benchmarks.",
+            "expected_output": "The skill should: (1) benchmark the current O(n²) approach at BOTH sizes (n=10 and n=200), (2) write a sort-then-scan alternative, (3) benchmark both at both sizes, (4) recognize that for n=10 the pairwise approach might actually win due to sort overhead, but for n=200 the sort approach should win. The key insight is testing at MULTIPLE sizes to find the crossover point.",
+            "files": [
+                "evals/files/eval2_overlap_detection.rs"
+            ],
+            "expectations": [
+                "A criterion benchmark file is produced with benchmarks at multiple dataset sizes (at least small n~10 AND large n~200)",
+                "At least 2 implementations are compared (current pairwise vs sort-then-scan or similar)",
+                "The benchmark uses BenchmarkId or similar to parameterize by size for scaling analysis",
+                "The output acknowledges that the winner may differ by dataset size (crossover point analysis)",
+                "The benchmark generates realistic contract data (proper date ranges, mixed propiedades)",
+                "A clear recommendation is made that accounts for BOTH the normal case (n=5-15) and bulk import case (n=200)"
+            ]
+        },
+        {
+            "id": 3,
+            "prompt": "The payment search function is a hot path (called on every page load of the payments list). The team wants to know if pre-indexing by contrato_id would be faster than the current linear scan. Benchmark it.",
+            "expected_output": "The skill should: (1) benchmark the current linear scan, (2) write an indexed version (HashMap<Uuid, Vec<&Pago>> pre-built), (3) benchmark BOTH the index build + query time (amortized) and query-only time, (4) test with the most common query pattern (filter by contrato_id, ~80% of queries), (5) recognize that the index only helps if it's built once and queried multiple times — if rebuilt per request, it might be slower.",
+            "files": [
+                "evals/files/eval3_payment_search.rs"
+            ],
+            "expectations": [
+                "A criterion benchmark file is produced testing both linear scan and indexed approaches",
+                "The indexed approach uses HashMap<Uuid, Vec<&Pago>> or similar pre-built index",
+                "The benchmark tests the most common query pattern (filter by contrato_id)",
+                "The benchmark accounts for index construction cost (not just query time in isolation)",
+                "Test data is generated at production scale (~5000 pagos)",
+                "The output discusses the amortization tradeoff: index build cost vs number of queries before rebuild"
+            ]
+        }
+    ]
+}

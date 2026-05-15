@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
@@ -22,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -44,6 +46,40 @@ internal fun KnowledgeStep(
 ) {
     var faqs by remember(config.id) { mutableStateOf(config.faqs.orEmpty()) }
     var policies by remember(config.id) { mutableStateOf(config.policies.orEmpty()) }
+    var deleteConfirmIndex by remember { mutableIntStateOf(-1) }
+
+    if (deleteConfirmIndex >= 0) {
+        val faqToDelete = faqs.getOrNull(deleteConfirmIndex)
+        if (faqToDelete != null) {
+            AlertDialog(
+                onDismissRequest = { deleteConfirmIndex = -1 },
+                title = { Text(stringResource(R.string.confirm_delete_title)) },
+                text = {
+                    Text(
+                        stringResource(
+                            R.string.confirm_delete_message,
+                            faqToDelete.question.ifBlank { "FAQ" },
+                        ),
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            faqs = faqs.toMutableList().also { it.removeAt(deleteConfirmIndex) }
+                            deleteConfirmIndex = -1
+                        },
+                    ) {
+                        Text(stringResource(R.string.delete))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { deleteConfirmIndex = -1 }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                },
+            )
+        }
+    }
 
     Column(
         modifier = modifier
@@ -76,9 +112,7 @@ internal fun KnowledgeStep(
                         it[index] = it[index].copy(answer = newAnswer)
                     }
                 },
-                onDelete = {
-                    faqs = faqs.toMutableList().also { it.removeAt(index) }
-                },
+                onDelete = { deleteConfirmIndex = index },
             )
         }
 

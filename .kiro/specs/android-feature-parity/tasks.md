@@ -139,22 +139,22 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Save button that calls updateConfig with persona fields
     - _Requirements: 3.4_
 
-  - [~] 5.7 Create CapabilitiesStep composable
+  - [x] 5.7 Create CapabilitiesStep composable
     - Toggle switches for: receipt_ocr, balance_queries, payment_reminders, maintenance_requests, human_handoff
     - Save on toggle change
     - _Requirements: 3.5_
 
-  - [~] 5.8 Create KnowledgeStep composable
+  - [x] 5.8 Create KnowledgeStep composable
     - FAQ list with add/edit/remove (question + answer pairs)
     - Policies text field (multiline)
     - _Requirements: 3.6_
 
-  - [~] 5.9 Create SenderPolicyStep composable
+  - [x] 5.9 Create SenderPolicyStep composable
     - Radio buttons: all, allowlist, inquilinos_only
     - When allowlist selected: show phone number list with add/remove
     - _Requirements: 3.7_
 
-  - [~] 5.10 Create TestChatStep composable
+  - [x] 5.10 Create TestChatStep composable
     - Chat-like interface: message input + send button
     - Display AI response and tools_invoked list
     - Scrollable message history for the test session
