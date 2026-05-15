@@ -80,7 +80,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Add to NetworkModule DI
     - _Requirements: 2.7_
 
-  - [~] 4.3 Create Usuario DTOs in `core/model`
+  - [x] 4.3 Create Usuario DTOs in `core/model`
     - Add `UsuarioDtos.kt` with `UserListDto`, `ChangeRoleRequest`, pagination response types
     - Reuse existing `UserDto` if compatible, or create admin-specific DTO
     - _Requirements: 2.2_

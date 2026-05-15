@@ -1,17 +1,14 @@
 package com.propmanager.core.network.api
 
+import com.propmanager.core.model.dto.ChangeRoleRequest
 import com.propmanager.core.model.dto.PaginatedResponse
 import com.propmanager.core.model.dto.UserDto
-import kotlinx.serialization.Serializable
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
-
-@Serializable
-data class ChangeRoleRequest(val rol: String)
 
 interface UsuariosApiService {
     @GET("api/usuarios")
