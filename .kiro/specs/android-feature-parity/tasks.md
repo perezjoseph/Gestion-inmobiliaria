@@ -197,7 +197,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Add to NetworkModule DI
     - _Requirements: 4.9_
 
-  - [~] 6.3 Create Plantilla DTOs in `core/model`
+  - [x] 6.3 Create Plantilla DTOs in `core/model`
     - Add `PlantillaDtos.kt` with: PlantillaResponse, CrearPlantillaRequest, ActualizarPlantillaRequest
     - contenido field as `JsonElement` (kotlinx.serialization)
     - _Requirements: 4.3_
