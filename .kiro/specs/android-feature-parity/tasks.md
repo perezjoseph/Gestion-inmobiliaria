@@ -21,7 +21,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Add route for `inquilinos/form?id={id}` with `InquilinoFormScreen` if separate, or handle inline
     - _Requirements: 1.2, 1.7, 1.8_
 
-  - [~] 1.3 Wire Contratos screens (list, detail, form)
+  - [x] 1.3 Wire Contratos screens (list, detail, form)
     - Replace placeholder comment with `ContratosScreen`, `ContratoDetailScreen`, `ContratoFormScreen` composables
     - Wire navigation callbacks: onNavigateToDetail, onNavigateToForm, onNavigateBack
     - Handle route arguments for `contratos/{id}` and `contratos/form?id={id}`

@@ -29,6 +29,10 @@ import com.propmanager.feature.perfil.PerfilScreen
 import com.propmanager.feature.perfil.PerfilViewModel
 import com.propmanager.feature.reportes.ReportesScreen
 import com.propmanager.feature.reportes.ReportesViewModel
+import com.propmanager.feature.contratos.ContratoDetailScreen
+import com.propmanager.feature.contratos.ContratoFormScreen
+import com.propmanager.feature.contratos.ContratosListScreen
+import com.propmanager.feature.contratos.ContratosViewModel
 import com.propmanager.feature.propiedades.PropiedadDetailScreen
 import com.propmanager.feature.propiedades.PropiedadFormScreen
 import com.propmanager.feature.propiedades.PropiedadesListScreen
@@ -129,7 +133,37 @@ fun PropManagerNavHost(
                     onScanCedula = { navController.navigate(Routes.SCANNER_CEDULA) },
                 )
             }
-            composable(Routes.CONTRATOS) { /* ContratosListScreen */ }
+            composable(Routes.CONTRATOS) {
+                val vm: ContratosViewModel = hiltViewModel()
+                ContratosListScreen(
+                    viewModel = vm,
+                    onNavigateToCreate = {
+                        vm.initCreateForm()
+                        navController.navigate(Routes.contratoForm())
+                    },
+                    onNavigateToDetail = { id -> navController.navigate(Routes.contratoDetail(id)) },
+                )
+            }
+            composable(Routes.CONTRATO_DETAIL) { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("id") ?: return@composable
+                val vm: ContratosViewModel = hiltViewModel()
+                ContratoDetailScreen(
+                    viewModel = vm,
+                    contratoId = id,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToEdit = { navController.navigate(Routes.contratoForm(id)) },
+                )
+            }
+            composable(Routes.CONTRATO_FORM) { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("id")?.takeIf { it.isNotEmpty() }
+                val vm: ContratosViewModel = hiltViewModel()
+                LaunchedEffect(id) { id?.let { vm.loadEdit(it) } }
+                ContratoFormScreen(
+                    viewModel = vm,
+                    isEditing = id != null,
+                    onNavigateBack = { navController.popBackStack() },
+                )
+            }
             composable(Routes.PAGOS) { /* PagosListScreen */ }
             composable(Routes.GASTOS) { /* GastosListScreen */ }
             composable(Routes.MANTENIMIENTO) { /* MantenimientoListScreen */ }

@@ -184,6 +184,16 @@ constructor(
         }
     }
 
+    fun loadEdit(id: String) {
+        viewModelScope.launch {
+            contratosRepository.observeById(id).collect { contrato ->
+                if (contrato != null) {
+                    initEditForm(contrato)
+                }
+            }
+        }
+    }
+
     fun initCreateForm() {
         editingId = null
         _formState.value = ContratoFormState()

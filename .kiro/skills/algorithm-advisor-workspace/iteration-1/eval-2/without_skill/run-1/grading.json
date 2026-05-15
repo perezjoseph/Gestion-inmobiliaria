@@ -1,0 +1,82 @@
+{
+    "expectations": [
+        {
+            "text": "generar_resumen is refactored to build lookup maps (HashMap) before iterating, eliminating the triple nested loop",
+            "passed": true,
+            "evidence": "In optimized_code.rs, generar_resumen builds two HashMaps before the main iteration: `pagos_por_contrato: HashMap<Uuid, (f64, f64)>` (line: 'let mut pagos_por_contrato: HashMap<Uuid, (f64, f64)> = HashMap::with_capacity(contratos.len())') and `contratos_por_propiedad: HashMap<Uuid, Vec<&Contrato>>`. The main loop then uses .get() for O(1) lookups. No triple nested loop exists."
+        },
+        {
+            "text": "propiedades_con_atrasos is refactored to use precomputed lookup structures instead of nested scanning",
+            "passed": true,
+            "evidence": "In optimized_code.rs, propiedades_con_atrasos precomputes `contratos_con_atraso: HashSet<Uuid>` from pagos with estado 'atrasado', and `contratos_activos_por_propiedad: HashMap<Uuid, Vec<&Contrato>>` from active contratos. The final filter uses .get() and .contains() for O(1) lookups instead of nested scanning."
+        },
+        {
+            "text": "ocupacion_por_ciudad is refactored to use a single-pass grouping approach instead of per-city rescanning",
+            "passed": true,
+            "evidence": "In optimized_code.rs, ocupacion_por_ciudad uses a single `for propiedad in propiedades` loop accumulating into `por_ciudad: HashMap<&str, (usize, usize)>`, incrementing total and ocupadas counts in one pass. No per-city rescanning pattern exists."
+        },
+        {
+            "text": "The code still compiles (no syntax errors introduced)",
+            "passed": true,
+            "evidence": "The code is syntactically valid Rust: correct use of HashMap/HashSet with proper type annotations, valid iterator chains (.iter(), .map(), .filter(), .collect()), proper pattern matching, correct borrowing (&[T] parameters, &str keys), and idiomatic Rust 2024 patterns. Note: no actual cargo check was run, but no syntax errors are apparent upon inspection."
+        },
+        {
+            "text": "The output includes before/after Big-O complexity for each change",
+            "passed": true,
+            "evidence": "report.md contains 'Original Complexity' table (generar_resumen: O(p × c × g), propiedades_con_atrasos: O(p × c × g), ocupacion_por_ciudad: O(cities × n)) and 'Optimized Complexity' table (generar_resumen: O(p + c + g), propiedades_con_atrasos: O(p + c + g), ocupacion_por_ciudad: O(n)). All three functions have explicit before/after."
+        },
+        {
+            "text": "The Space-Time Tradeoff paradigm is identified as the primary technique used",
+            "passed": false,
+            "evidence": "The report identifies 'Transform and Conquer' as the primary paradigm in the summary: 'All three were reduced to O(n) overall by applying the **transform and conquer** paradigm'. Space-time tradeoff is mentioned only as a secondary observation in the Space Complexity section: 'This is a standard and worthwhile space-time tradeoff'. The expectation requires Space-Time Tradeoff to be identified as the PRIMARY technique, but it is not."
+        }
+    ],
+    "summary": {
+        "passed": 5,
+        "failed": 1,
+        "total": 6,
+        "pass_rate": 0.83
+    },
+    "timing": {
+        "total_duration_seconds": 42.0
+    },
+    "claims": [
+        {
+            "claim": "All three functions were reduced to O(n) overall",
+            "type": "factual",
+            "verified": true,
+            "evidence": "The optimized code uses single-pass HashMap construction (O(n) per collection) followed by O(1) lookups, resulting in linear overall complexity for each function."
+        },
+        {
+            "claim": "Transform and Conquer paradigm was applied",
+            "type": "process",
+            "verified": true,
+            "evidence": "The code pre-transforms input data into HashMap/HashSet structures before the main computation, which is the Transform and Conquer pattern (transform data into a form that makes the problem easier to solve)."
+        },
+        {
+            "claim": "No unwrap()/expect() in logic paths",
+            "type": "quality",
+            "verified": false,
+            "evidence": "The code uses `.unwrap_or((0.0, 0.0))` and `.unwrap_or((0, 0.0, 0.0))` which are safe defaults, not panicking unwrap(). However, the claim in the Style Compliance section says 'No unwrap()/expect() in logic paths' — technically unwrap_or is not unwrap(), so the claim is borderline accurate but misleading since unwrap_or does appear."
+        },
+        {
+            "claim": "Uses Vec::with_capacity for pre-sized allocations",
+            "type": "quality",
+            "verified": false,
+            "evidence": "The code uses HashMap::with_capacity but does NOT use Vec::with_capacity anywhere. The Style Compliance section claims this but it's not present in the actual code."
+        }
+    ],
+    "eval_feedback": {
+        "suggestions": [
+            {
+                "assertion": "The code still compiles (no syntax errors introduced)",
+                "reason": "This assertion cannot be truly verified without running cargo check. The code looks correct on inspection but could have subtle type errors (e.g., is_some_and requires Rust 1.70+). Consider requiring actual compilation output as evidence."
+            },
+            {
+                "assertion": "The Space-Time Tradeoff paradigm is identified as the primary technique used",
+                "reason": "This is a reasonable discriminating assertion — it tests whether the skill correctly categorizes the optimization paradigm. However, 'Transform and Conquer' is arguably also a valid classification for HashMap pre-indexing. The eval might benefit from accepting either paradigm or specifying more precisely what's expected."
+            }
+        ],
+        "overall": "Assertions are generally well-targeted. The paradigm identification assertion is the most discriminating — it caught a genuine difference in how the agent classified the technique. The compilation assertion would be stronger with actual build verification."
+    }
+}
