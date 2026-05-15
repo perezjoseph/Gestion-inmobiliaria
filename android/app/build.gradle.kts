@@ -50,6 +50,7 @@ dependencies {
     implementation(project(":feature:configuracion"))
     implementation(project(":feature:importacion"))
     implementation(project(":feature:scanner"))
+    implementation(project(":feature:usuarios"))
 
     // Core modules
     implementation(project(":core:ui"))

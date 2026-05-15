@@ -69,7 +69,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
 - [ ] 4. Usuarios feature module
-  - [~] 4.1 Create `feature/usuarios` module scaffolding
+  - [x] 4.1 Create `feature/usuarios` module scaffolding
     - Create `android/feature/usuarios/build.gradle.kts` with standard feature module dependencies
     - Register module in `settings.gradle.kts`
     - Add dependency in `:app` module's `build.gradle.kts`
