@@ -14,7 +14,7 @@ frontend/dist/
 
 kiro-debug.log
 kiro-debug.log
-
+.kiro\skills\bench-optimizer-works*
 # Android build artifacts
 android/.gradle/
 android/.jdk/
