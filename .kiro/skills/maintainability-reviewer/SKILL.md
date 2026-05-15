@@ -17,7 +17,7 @@ metadata:
   role: specialist
   scope: analysis
   output-format: report
-  related-skills: perf-optimizer, algorithm-advisor, code-reviewer
+  related-skills: bench-optimizer, lint-fixer, code-reviewer
 ---
 
 # Maintainability Reviewer

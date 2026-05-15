@@ -17,7 +17,7 @@ metadata:
   role: specialist
   scope: implementation
   output-format: code
-  related-skills: perf-optimizer, maintainability-reviewer, code-reviewer
+  related-skills: bench-optimizer, maintainability-reviewer, code-reviewer
 ---
 
 # Lint Fixer

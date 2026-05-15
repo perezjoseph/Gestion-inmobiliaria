@@ -121,7 +121,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - All with `@Serializable` and `@SerialName("camelCase")` annotations
     - _Requirements: 3.2_
 
-  - [~] 5.4 Create ChatbotConfigViewModel
+  - [x] 5.4 Create ChatbotConfigViewModel
     - Sealed `ChatbotConfigUiState` with Loading, Success (config + status + currentStep), Error
     - Step navigation: next/previous with validation
     - Actions: loadConfig, updateConfig, connect, disconnect, testChat, loadPendingReceipts, confirmReceipt, rejectReceipt
