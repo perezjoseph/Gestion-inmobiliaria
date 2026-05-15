@@ -9,6 +9,7 @@ import com.propmanager.core.network.api.AuditoriaApiService
 import com.propmanager.core.network.api.AuthApiService
 import com.propmanager.core.network.api.ChatbotApiService
 import com.propmanager.core.network.api.ConfiguracionApiService
+import com.propmanager.core.network.api.PlantillasApiService
 import com.propmanager.core.network.api.ContratosApiService
 import com.propmanager.core.network.api.DashboardApiService
 import com.propmanager.core.network.api.DocumentosApiService
@@ -169,4 +170,9 @@ object NetworkModule {
     @Singleton
     fun provideChatbotApiService(retrofit: Retrofit): ChatbotApiService =
         retrofit.create(ChatbotApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun providePlantillasApiService(retrofit: Retrofit): PlantillasApiService =
+        retrofit.create(PlantillasApiService::class.java)
 }

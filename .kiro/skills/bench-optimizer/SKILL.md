@@ -24,8 +24,9 @@ metadata:
 # Bench Optimizer
 
 Performance optimization through measurement, not guessing. The model already knows
-algorithm theory — this skill's value is in the *workflow*: write multiple implementations,
-benchmark them under realistic conditions, and keep the empirically fastest one.
+algorithm theory — this skill's value is in the *workflow*: write competing implementations,
+benchmark them under realistic conditions, **actually run the benchmarks**, and keep
+the empirically fastest one.
 
 ## Why This Exists
 
@@ -37,6 +38,25 @@ asymptotic complexity and general knowledge. But real performance depends on:
 - Compiler optimizations that eliminate theoretical differences
 
 The only way to know is to measure. This skill forces that discipline.
+
+## Critical Rule: No Predictions
+
+**NEVER produce "expected results" or "predicted speedup" sections.** Your theoretical
+predictions are frequently wrong by 5-20x (e.g., predicting 200x speedup when reality
+is 30x, or predicting 50µs when reality is 1ms). If you cannot run the benchmark,
+say so explicitly and leave the recommendation blank until real data exists.
+
+The whole point of this skill is to replace theory with measurement. Writing
+"Expected improvement: 20-40%" is exactly the behavior this skill exists to prevent.
+
+## Valid Outcome: Don't Optimize
+
+"Don't optimize" is a perfectly valid benchmark conclusion. If the current code runs
+in 218µs and the surrounding DB queries take 50ms, the optimization is pointless
+regardless of how much faster the alternative is. Always consider:
+- Absolute time vs system-level latency budget
+- How often the code runs (once daily vs every request)
+- Complexity cost of the optimization vs the gain
 
 ## Workflow
 
@@ -149,6 +169,10 @@ fn bench_scaling(c: &mut Criterion) {
 cargo bench --bench target_bench
 ```
 
+**You MUST actually run this command.** Do not skip this step. Do not write
+"expected results" based on theory. If the benchmark fails to compile or run,
+fix it until it works. The entire value of this workflow is in the real numbers.
+
 Read the output. Criterion reports:
 - Mean execution time with confidence interval
 - Throughput (if configured)
@@ -159,6 +183,7 @@ Read the output. Criterion reports:
 - If the winner is 10-50% faster: adopt it if readability is comparable
 - If the winner is > 50% faster: adopt it, document the tradeoff
 - If results are noisy (wide confidence intervals): increase sample size or reduce system load
+- If the absolute time is negligible vs system latency (e.g., 200µs function in a 50ms request): **don't optimize** — document why and move on
 
 ### Step 6: Adopt the Winner
 
@@ -242,16 +267,21 @@ fn generate_realistic_pagos(n: usize) -> Vec<Pago> {
 
 ### MUST DO
 - Write a criterion benchmark BEFORE optimizing
+- **Actually run `cargo bench --release`** — do not skip this step
 - Test at production-representative data sizes
 - Write at least 2 competing approaches
-- Run benchmarks with `--release`
 - Keep the benchmark file after adopting the winner (regression detection)
 - Verify correctness with `cargo test` after swapping implementations
-- Document the benchmark result in a code comment
+- Document the **measured** result in a code comment (actual timings, not predictions)
+- Consider absolute time vs system latency — "don't optimize" is a valid conclusion
+- Produce a self-contained, runnable benchmark (include Cargo.toml setup if needed)
 
 ### MUST NOT DO
+- **Produce "expected results" or "predicted speedup" without running benchmarks** — this is the #1 anti-pattern this skill exists to prevent
+- Recommend an approach based on theoretical analysis alone
 - Guess which approach is faster without measuring
 - Optimize code that isn't on a hot path
+- Optimize when absolute time is negligible vs surrounding I/O latency
 - Delete benchmark files after optimization (they prevent regressions)
 - Use `#[bench]` (unstable) — always use criterion
 - Benchmark in debug mode

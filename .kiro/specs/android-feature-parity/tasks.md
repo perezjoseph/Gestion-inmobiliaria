@@ -192,7 +192,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Add dependency in `:app` module
     - _Requirements: 4.1_
 
-  - [~] 6.2 Create PlantillasApiService in `core/network/api/`
+  - [x] 6.2 Create PlantillasApiService in `core/network/api/`
     - Implement `getPlantillas()`, `createPlantilla(request)`, `updatePlantilla(id, request)`, `deletePlantilla(id)`
     - Add to NetworkModule DI
     - _Requirements: 4.9_

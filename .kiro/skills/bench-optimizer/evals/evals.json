@@ -3,50 +3,50 @@
     "evals": [
         {
             "id": 1,
-            "prompt": "This dashboard aggregation function is called on every page load. The team suspects it could be faster but hasn't measured. Optimize it with empirical evidence.",
-            "expected_output": "The skill should produce: (1) a criterion benchmark file that tests the current implementation at production-representative sizes (~2000 pagos), (2) at least 2 alternative implementations to compare (e.g., BTreeMap for sorted output vs HashMap+sort, pre-grouped by propiedad vs nested HashMap), (3) all approaches benchmarked in the same group for direct comparison, (4) a decision based on the benchmark results, not just theory.",
+            "prompt": "This dashboard aggregation function is called on every page load. The team suspects it could be faster. Optimize it.",
+            "expected_output": "With the skill: writes a criterion benchmark, runs it, reports actual timings, and makes a data-driven recommendation. Without the skill: likely just refactors based on theory (replace String keys with numeric, add with_capacity) without measuring whether it actually helps.",
             "files": [
                 "evals/files/eval1_dashboard_aggregation.rs"
             ],
             "expectations": [
                 "A criterion benchmark file is produced (contains criterion_group! and criterion_main! macros)",
-                "The benchmark generates realistic test data at production scale (~2000 items, not toy sizes like 10)",
-                "At least 2 alternative implementations are written as separate functions",
-                "All approaches are benchmarked in the same benchmark group for direct comparison",
+                "The benchmark is actually run (cargo bench output or measured timings appear in the report)",
+                "At least 2 alternative implementations are written and benchmarked",
+                "The report contains actual measured timings (specific µs/ns values from benchmark runs), not theoretical predictions",
                 "Data generation happens OUTSIDE the benchmark loop (not inside b.iter())",
-                "The output includes a decision/recommendation based on expected benchmark results, not just theory"
+                "The recommendation cites specific measured numbers as justification, not asymptotic complexity"
             ]
         },
         {
             "id": 2,
-            "prompt": "This overlap detection is O(n²). During normal use n=5-15 but during bulk import n can be 200. Should we optimize it? Prove it with benchmarks.",
-            "expected_output": "The skill should: (1) benchmark the current O(n²) approach at BOTH sizes (n=10 and n=200), (2) write a sort-then-scan alternative, (3) benchmark both at both sizes, (4) recognize that for n=10 the pairwise approach might actually win due to sort overhead, but for n=200 the sort approach should win. The key insight is testing at MULTIPLE sizes to find the crossover point.",
+            "prompt": "This overlap detection is O(n²). During normal use n=5-15 but during bulk import n can be 200. Should we optimize it?",
+            "expected_output": "With the skill: benchmarks at both sizes, finds the crossover point empirically, and potentially recommends NOT optimizing if absolute times are negligible. Without the skill: likely just implements the O(n log n) sort-then-scan without measuring whether it's actually faster at n=10.",
             "files": [
                 "evals/files/eval2_overlap_detection.rs"
             ],
             "expectations": [
-                "A criterion benchmark file is produced with benchmarks at multiple dataset sizes (at least small n~10 AND large n~200)",
-                "At least 2 implementations are compared (current pairwise vs sort-then-scan or similar)",
-                "The benchmark uses BenchmarkId or similar to parameterize by size for scaling analysis",
-                "The output acknowledges that the winner may differ by dataset size (crossover point analysis)",
-                "The benchmark generates realistic contract data (proper date ranges, mixed propiedades)",
-                "A clear recommendation is made that accounts for BOTH the normal case (n=5-15) and bulk import case (n=200)"
+                "A criterion benchmark is produced testing at multiple dataset sizes (at least n~10 AND n~200)",
+                "The benchmark is actually run and real timing data is reported",
+                "The output acknowledges that the winner may differ by dataset size (crossover analysis with real numbers)",
+                "The recommendation considers absolute time vs system context (is 200µs worth optimizing when DB queries take 50ms?)",
+                "The output does NOT just blindly optimize — it considers whether optimization is warranted at all",
+                "If recommending to keep the original, the justification includes measured data showing the optimization gain is negligible"
             ]
         },
         {
             "id": 3,
-            "prompt": "The payment search function is a hot path (called on every page load of the payments list). The team wants to know if pre-indexing by contrato_id would be faster than the current linear scan. Benchmark it.",
-            "expected_output": "The skill should: (1) benchmark the current linear scan, (2) write an indexed version (HashMap<Uuid, Vec<&Pago>> pre-built), (3) benchmark BOTH the index build + query time (amortized) and query-only time, (4) test with the most common query pattern (filter by contrato_id, ~80% of queries), (5) recognize that the index only helps if it's built once and queried multiple times — if rebuilt per request, it might be slower.",
+            "prompt": "The payment search function is a hot path. The team wants to know if pre-indexing by contrato_id would be faster than the current linear scan. Figure it out.",
+            "expected_output": "With the skill: benchmarks both approaches, measures index build cost separately, discusses amortization with real numbers. Without the skill: likely just implements the index and asserts it's faster based on O(1) vs O(n) theory.",
             "files": [
                 "evals/files/eval3_payment_search.rs"
             ],
             "expectations": [
-                "A criterion benchmark file is produced testing both linear scan and indexed approaches",
-                "The indexed approach uses HashMap<Uuid, Vec<&Pago>> or similar pre-built index",
-                "The benchmark tests the most common query pattern (filter by contrato_id)",
-                "The benchmark accounts for index construction cost (not just query time in isolation)",
+                "A criterion benchmark is produced testing both linear scan and indexed approaches",
+                "The benchmark is actually run and reports real measured timings",
+                "Index construction cost is measured separately (not just query time)",
+                "The report discusses amortization with actual numbers (e.g., 'build costs Xms, each query saves Yµs, breaks even after Z queries')",
                 "Test data is generated at production scale (~5000 pagos)",
-                "The output discusses the amortization tradeoff: index build cost vs number of queries before rebuild"
+                "The recommendation is backed by measured data, not theoretical O(1) vs O(n) reasoning"
             ]
         }
     ]
