@@ -53,6 +53,9 @@ import com.propmanager.feature.scanner.ScannerMode
 import com.propmanager.feature.scanner.ScannerScreen
 import com.propmanager.feature.scanner.ScannerViewModel
 import com.propmanager.feature.auth.AuthState
+import com.propmanager.feature.chatbot.ChatbotConfigScreen
+import com.propmanager.feature.chatbot.ChatbotConfigViewModel
+import com.propmanager.feature.chatbot.PendingReceiptsScreen
 import com.propmanager.feature.usuarios.UsuariosScreen
 import com.propmanager.feature.usuarios.UsuariosViewModel
 
@@ -307,9 +310,14 @@ fun PropManagerNavHost(
 
             composable(Routes.CONFIGURACION) {
                 val vm: ConfiguracionViewModel = hiltViewModel()
+                val chatbotVm: ChatbotConfigViewModel = hiltViewModel()
+                val pendingReceiptsCount by chatbotVm.pendingReceiptsCount.collectAsStateWithLifecycle()
+                LaunchedEffect(Unit) { chatbotVm.loadPendingReceipts() }
                 ConfiguracionScreen(
                     viewModel = vm,
                     onNavigateBack = { navController.popBackStack() },
+                    onNavigateToChatbot = { navController.navigate(Routes.CHATBOT_CONFIG) },
+                    pendingReceiptsCount = pendingReceiptsCount,
                 )
             }
 
@@ -335,6 +343,42 @@ fun PropManagerNavHost(
                     LaunchedEffect(Unit) {
                         navController.navigate(Routes.DASHBOARD) {
                             popUpTo(Routes.USUARIOS) { inclusive = true }
+                        }
+                    }
+                }
+            }
+
+            composable(Routes.CHATBOT_CONFIG) {
+                val authState by authViewModel.authState.collectAsStateWithLifecycle()
+                val isAdmin = (authState as? AuthState.Authenticated)?.user?.rol == "admin"
+                if (isAdmin) {
+                    val vm: ChatbotConfigViewModel = hiltViewModel()
+                    ChatbotConfigScreen(
+                        viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() },
+                    )
+                } else {
+                    LaunchedEffect(Unit) {
+                        navController.navigate(Routes.DASHBOARD) {
+                            popUpTo(Routes.CHATBOT_CONFIG) { inclusive = true }
+                        }
+                    }
+                }
+            }
+
+            composable(Routes.CHATBOT_RECEIPTS) {
+                val authState by authViewModel.authState.collectAsStateWithLifecycle()
+                val isAdmin = (authState as? AuthState.Authenticated)?.user?.rol == "admin"
+                if (isAdmin) {
+                    val vm: ChatbotConfigViewModel = hiltViewModel()
+                    PendingReceiptsScreen(
+                        viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() },
+                    )
+                } else {
+                    LaunchedEffect(Unit) {
+                        navController.navigate(Routes.DASHBOARD) {
+                            popUpTo(Routes.CHATBOT_RECEIPTS) { inclusive = true }
                         }
                     }
                 }

@@ -300,6 +300,22 @@
     <string name="chatbot_next">Siguiente</string>
     <string name="chatbot_previous">Anterior</string>
     <string name="chatbot_step_indicator">Paso %1$d de %2$d</string>
+    <string name="chatbot_pending_receipts_title">Recibos Pendientes</string>
+    <string name="chatbot_pending_receipts_empty">No hay recibos pendientes de confirmación</string>
+    <string name="chatbot_config_subtitle">Configurar asistente de WhatsApp</string>
+    <string name="chatbot_receipt_unknown_sender">Remitente desconocido</string>
+    <string name="chatbot_receipt_bank">Banco</string>
+    <string name="chatbot_receipt_date">Fecha</string>
+    <string name="chatbot_receipt_reference">Referencia</string>
+    <string name="chatbot_receipt_confirm">Confirmar</string>
+    <string name="chatbot_receipt_reject">Rechazar</string>
+    <string name="chatbot_receipt_confirm_title">Confirmar recibo</string>
+    <string name="chatbot_receipt_confirm_message">¿Confirmar el pago de %1$s %2$s?</string>
+    <string name="chatbot_receipt_contrato_id">ID de contrato</string>
+    <string name="chatbot_receipt_contrato_optional">Opcional: asociar a un contrato existente</string>
+    <string name="chatbot_receipt_reject_title">Rechazar recibo</string>
+    <string name="chatbot_receipt_reject_message">¿Está seguro de rechazar este recibo?</string>
+    <string name="chatbot_receipt_reject_reason">Motivo del rechazo</string>
 
     <!-- Importación -->
     <string name="importacion_title">Importación</string>

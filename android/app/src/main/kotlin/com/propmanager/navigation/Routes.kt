@@ -29,6 +29,8 @@ object Routes {
     const val CONFIGURACION = "configuracion"
     const val IMPORTACION = "importacion"
     const val USUARIOS = "usuarios"
+    const val CHATBOT_CONFIG = "chatbot/config"
+    const val CHATBOT_RECEIPTS = "chatbot/receipts"
     const val SCANNER_CEDULA = "scanner/cedula"
     const val SCANNER_RECEIPT = "scanner/receipt"
     const val MAS = "mas"

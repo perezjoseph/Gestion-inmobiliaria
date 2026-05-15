@@ -1,13 +1,17 @@
 package com.propmanager.feature.configuracion
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -35,6 +39,8 @@ import com.propmanager.core.ui.components.PropManagerTopAppBar
 fun ConfiguracionScreen(
     viewModel: ConfiguracionViewModel,
     onNavigateBack: () -> Unit,
+    onNavigateToChatbot: () -> Unit = {},
+    pendingReceiptsCount: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -69,11 +75,38 @@ fun ConfiguracionScreen(
                         onRetry = viewModel::loadMoneda,
                     )
                 else ->
-                    ConfiguracionForm(
-                        uiState = uiState,
-                        onTasaChange = viewModel::onTasaChange,
-                        onSave = viewModel::saveMoneda,
-                    )
+                    Column {
+                        ConfiguracionForm(
+                            uiState = uiState,
+                            onTasaChange = viewModel::onTasaChange,
+                            onSave = viewModel::saveMoneda,
+                        )
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = stringResource(R.string.nav_chatbot),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            },
+                            supportingContent = {
+                                Text(
+                                    text = stringResource(R.string.chatbot_config_subtitle),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            },
+                            trailingContent = if (pendingReceiptsCount > 0) {
+                                {
+                                    Badge { Text(pendingReceiptsCount.toString()) }
+                                }
+                            } else {
+                                null
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onNavigateToChatbot() },
+                        )
+                    }
             }
         }
     }

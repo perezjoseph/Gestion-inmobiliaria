@@ -17,8 +17,11 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 sealed interface ChatbotConfigUiState {
@@ -51,6 +54,10 @@ constructor(
 
     private val _pendingReceipts = MutableStateFlow<ImmutableList<ReceiptExtractionResponse>>(persistentListOf())
     val pendingReceipts: StateFlow<ImmutableList<ReceiptExtractionResponse>> = _pendingReceipts.asStateFlow()
+
+    val pendingReceiptsCount: StateFlow<Int> = _pendingReceipts
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     private val _chatMessages = MutableStateFlow<ImmutableList<ChatMessage>>(persistentListOf())
     val chatMessages: StateFlow<ImmutableList<ChatMessage>> = _chatMessages.asStateFlow()

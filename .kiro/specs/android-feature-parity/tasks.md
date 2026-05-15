@@ -105,7 +105,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - _Requirements: 2.5, 2.6_
 
 - [ ] 5. Chatbot configuration feature module
-  - [~] 5.1 Create `feature/chatbot` module scaffolding
+  - [x] 5.1 Create `feature/chatbot` module scaffolding
     - Create `android/feature/chatbot/build.gradle.kts`
     - Register module in `settings.gradle.kts`
     - Add dependency in `:app` module
