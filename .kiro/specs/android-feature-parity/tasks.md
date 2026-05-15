@@ -91,7 +91,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Handle loading/error states for each action
     - _Requirements: 2.2, 2.3, 2.4_
 
-  - [~] 4.5 Create UsuariosScreen composable
+  - [x] 4.5 Create UsuariosScreen composable
     - Paginated list with nombre, email, rol dropdown, activo toggle
     - Role dropdown: admin, gerente, visualizador
     - Active toggle with confirmation

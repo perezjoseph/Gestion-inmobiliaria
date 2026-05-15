@@ -233,6 +233,18 @@
     <string name="perfil_password_nueva">Nueva contraseña</string>
     <string name="perfil_password_changed">Contraseña actualizada correctamente</string>
 
+    <!-- Usuarios -->
+    <string name="nav_usuarios">Usuarios</string>
+    <string name="usuarios_empty">No hay usuarios registrados</string>
+    <string name="usuarios_rol">Rol</string>
+    <string name="usuarios_activo">Activo</string>
+    <string name="usuarios_pagina_anterior">Página anterior</string>
+    <string name="usuarios_pagina_siguiente">Página siguiente</string>
+    <string name="usuarios_pagina_info">Página %1$d de %2$d</string>
+    <string name="usuarios_confirm_toggle_title">Confirmar cambio de estado</string>
+    <string name="usuarios_confirm_deactivate">¿Está seguro de que desea desactivar al usuario \"%1$s\"?</string>
+    <string name="usuarios_confirm_activate">¿Está seguro de que desea activar al usuario \"%1$s\"?</string>
+
     <!-- Configuración -->
     <string name="configuracion_title">Configuración</string>
     <string name="configuracion_moneda">Moneda predeterminada</string>
