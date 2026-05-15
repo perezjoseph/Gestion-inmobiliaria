@@ -54,7 +54,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Add `Unidad.kt` data class with: id, propiedadId, numeroUnidad, piso, habitaciones, banos, areaM2, precio (BigDecimal), moneda, estado, descripcion
     - _Requirements: 6.6_
 
-  - [~] 3.2 Create Unidad DTOs in `core/model`
+  - [x] 3.2 Create Unidad DTOs in `core/model`
     - Add `UnidadDtos.kt` with `UnidadDto`, `CreateUnidadRequest`, `UpdateUnidadRequest` using `@Serializable` and `@SerialName` for camelCase mapping
     - _Requirements: 6.7_
 
