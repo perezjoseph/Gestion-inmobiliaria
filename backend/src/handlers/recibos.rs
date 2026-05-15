@@ -8,11 +8,11 @@ use crate::services::recibos;
 
 pub async fn generar_recibo(
     db: web::Data<DatabaseConnection>,
-    _claims: Claims,
+    claims: Claims,
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
     let pago_id = path.into_inner();
-    let bytes = recibos::generar_recibo(db.get_ref(), pago_id).await?;
+    let bytes = recibos::generar_recibo(db.get_ref(), pago_id, claims.organizacion_id).await?;
     Ok(HttpResponse::Ok()
         .content_type("application/pdf")
         .insert_header((

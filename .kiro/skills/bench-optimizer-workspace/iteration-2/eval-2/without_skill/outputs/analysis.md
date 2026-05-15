@@ -1,55 +1,52 @@
 # Overlap Detection Performance Analysis
 
 ## Question
+The overlap detection is O(n²). During normal use n=5-15 but during bulk import n can be 200. Should we optimize it?
 
-The `detectar_solapamientos` function uses O(n²) pairwise comparison. Normal use has n=5-15, but bulk import can hit n=200. Should we optimize?
-
-## Analysis
+## Answer: Yes, but the optimization is straightforward and low-risk.
 
 ### Current Complexity
 
-- **Normal case (n=15):** ~105 comparisons. Trivial — sub-microsecond.
-- **Bulk import (n=200):** ~19,900 comparisons. Still very fast — likely under 100μs on modern hardware.
+The current implementation does pairwise comparison: O(n²) comparisons with constant-time overlap checks per pair.
 
-### Is O(n²) a problem at n=200?
+| n | Comparisons (n*(n-1)/2) |
+|---|---|
+| 5 | 10 |
+| 15 | 105 |
+| 200 | 19,900 |
 
-**No.** 19,900 comparisons with simple field checks (two UUID comparisons, two string comparisons, two date comparisons) is well within "instant" territory. Each comparison involves:
-- 2 UUID equality checks (128-bit compare)
-- 2 string equality checks (short strings: "activo")
-- 2 date comparisons (NaiveDate is just an i32 internally)
+### Is 19,900 comparisons a problem?
 
-This is cache-friendly, branch-predictor-friendly work. Even pessimistically at 50ns per iteration, n=200 takes ~1ms. In practice it's much less.
+For a single call with n=200, 19,900 comparisons of simple date ranges is **not a performance bottleneck** in absolute terms — it completes in microseconds on modern hardware. The comparisons are cheap (two integer comparisons for dates, a string equality check, and a UUID equality check).
 
-### When would optimization matter?
+However, there are good reasons to optimize anyway:
 
-An O(n log n) sort-then-scan approach would only show measurable benefit at n > ~1000-2000 for this kind of lightweight comparison. The sort itself has overhead (allocation, moves of the `Contrato` struct or index array) that makes it slower than brute-force for small n.
+1. **During bulk import, this function may be called repeatedly** — once per contract being validated. If you're importing 200 contracts and validating after each insertion, you get O(n³) total work.
+2. **The optimized version is equally readable** and actually expresses the intent more clearly.
+3. **It filters by `propiedad_id` first**, which the current version checks inside the inner loop — grouping by property first eliminates most comparisons entirely.
 
-### Verdict: Don't optimize
+### Recommended Approach
 
-The O(n²) approach is:
-1. **Fast enough** — even at n=200, it's sub-millisecond
-2. **Correct** — finds ALL overlapping pairs, not just adjacent ones after sorting
-3. **Simple** — easy to read, easy to verify against the business invariant
-4. **Maintainable** — no sorting assumptions to document or break
+Sort contracts by `(propiedad_id, fecha_inicio)`, then scan adjacent pairs within each property group. This gives O(n log n) from the sort, plus O(n) for the scan.
 
-### Important correctness note
+For the bulk import case (n=200), if contracts span multiple properties (likely), the per-group sizes are much smaller, making the scan trivially fast.
 
-A sort-by-start-date + adjacent-scan approach would be **incorrect** here anyway. Sorting by `fecha_inicio` and only checking adjacent pairs misses non-adjacent overlaps. For example:
+### Key Insight
 
-```
-Contract A: Jan 1 - Dec 31
-Contract B: Feb 1 - Mar 31
-Contract C: Apr 1 - May 31
-```
+The biggest win isn't sort-vs-pairwise — it's **grouping by `propiedad_id` first**. The current code compares contracts across different properties (wasted work). A `HashMap` grouping eliminates cross-property comparisons entirely.
 
-Sorted by start: A, B, C. Adjacent scan finds (A,B) and (B,C) — but misses (A,C), which also overlaps. You'd need a sweep-line algorithm to handle this correctly, which adds complexity for no practical gain at n=200.
+After grouping, within each property:
+- If groups are small (5-15), pairwise is fine.
+- If a single property has 200 contracts, sort + sweep is better.
 
-## Recommendation
+The hybrid approach (group first, then sort+sweep within each group) handles both cases optimally.
 
-**Keep the current implementation as-is.** The code is correct, readable, and fast enough for the stated workload. The O(n²) label sounds scary but the actual wall-clock time at n=200 is negligible.
+### Correctness Note
 
-If bulk import sizes ever grow to n > 1000, revisit with a sweep-line algorithm (sort by start, maintain active set, O(n log n) with correct overlap detection). But that's a premature optimization today.
+**Important**: Sort + adjacent-pair scan only detects overlaps between consecutive intervals. It does NOT detect all overlapping pairs when intervals can overlap non-adjacent entries (e.g., a long interval overlapping multiple short ones). 
 
-## Code Improvements (non-performance)
+For correctness, we need a **sweep-line algorithm**: sort by start date, maintain a set of "active" intervals, and check each new interval against all currently active ones. This is O(n log n) for the sort + O(n * k) where k is the average number of concurrent active intervals (typically small for real estate contracts).
 
-The current code could benefit from minor idiomatic improvements per the project's code style guidelines (iterator chains over loops, `&str` comparison), but these don't affect performance. See `optimized.rs` for a lightly cleaned-up version that follows project conventions without changing the algorithm.
+## Verdict
+
+Optimize with: group by `propiedad_id` → sort by `fecha_inicio` → sweep-line within each group. The code is cleaner, correct for all cases, and handles the bulk import scenario efficiently.

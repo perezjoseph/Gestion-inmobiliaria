@@ -22,6 +22,9 @@ pub struct CreateGastoRequest {
     pub unidad_consumo: Option<String>,
     pub periodo_desde: Option<NaiveDate>,
     pub periodo_hasta: Option<NaiveDate>,
+    pub numero_cuenta: Option<String>,
+    pub periodo_inicio: Option<NaiveDate>,
+    pub periodo_fin: Option<NaiveDate>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -43,6 +46,9 @@ pub struct UpdateGastoRequest {
     pub unidad_consumo: Option<String>,
     pub periodo_desde: Option<NaiveDate>,
     pub periodo_hasta: Option<NaiveDate>,
+    pub numero_cuenta: Option<String>,
+    pub periodo_inicio: Option<NaiveDate>,
+    pub periodo_fin: Option<NaiveDate>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -92,6 +98,9 @@ pub struct GastoResponse {
     pub unidad_consumo: Option<String>,
     pub periodo_desde: Option<NaiveDate>,
     pub periodo_hasta: Option<NaiveDate>,
+    pub numero_cuenta: Option<String>,
+    pub periodo_inicio: Option<NaiveDate>,
+    pub periodo_fin: Option<NaiveDate>,
 }
 
 #[derive(Debug, Serialize)]
@@ -235,6 +244,9 @@ mod tests {
             unidad_consumo: None,
             periodo_desde: None,
             periodo_hasta: None,
+            numero_cuenta: None,
+            periodo_inicio: None,
+            periodo_fin: None,
         };
         let json = serde_json::to_value(&response).unwrap();
         assert!(json.get("propiedadId").is_some());

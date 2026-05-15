@@ -245,6 +245,13 @@
     <string name="usuarios_confirm_deactivate">¿Está seguro de que desea desactivar al usuario \"%1$s\"?</string>
     <string name="usuarios_confirm_activate">¿Está seguro de que desea activar al usuario \"%1$s\"?</string>
 
+    <!-- Plantillas -->
+    <string name="plantillas_title">Plantillas</string>
+    <string name="plantilla_create">Nueva Plantilla</string>
+    <string name="plantilla_empty">No hay plantillas registradas</string>
+    <string name="plantilla_tipo_documento">Tipo: %1$s</string>
+    <string name="plantilla_entity_type">Entidad: %1$s</string>
+
     <!-- Configuración -->
     <string name="configuracion_title">Configuración</string>
     <string name="configuracion_moneda">Moneda predeterminada</string>

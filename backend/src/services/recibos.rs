@@ -1,6 +1,6 @@
 use numaelis_rckive_genpdf::Element as _;
 use numaelis_rckive_genpdf::{elements, style};
-use sea_orm::{DatabaseConnection, EntityTrait};
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 use uuid::Uuid;
 
 use crate::entities::{contrato, inquilino, pago, propiedad};
@@ -65,22 +65,34 @@ fn format_currency_dr(monto: rust_decimal::Decimal, moneda: &str) -> String {
     format!("{sign}{moneda} {formatted},{decimal_part}")
 }
 
-pub async fn generar_recibo(db: &DatabaseConnection, pago_id: Uuid) -> Result<Vec<u8>, AppError> {
-    let pago_model = pago::Entity::find_by_id(pago_id)
+pub async fn generar_recibo(
+    db: &DatabaseConnection,
+    pago_id: Uuid,
+    organizacion_id: Uuid,
+) -> Result<Vec<u8>, AppError> {
+    let (pago_model, maybe_contrato) = pago::Entity::find_by_id(pago_id)
+        .find_also_related(contrato::Entity)
+        .filter(contrato::Column::OrganizacionId.eq(organizacion_id))
         .one(db)
         .await?
-        .ok_or_else(|| AppError::NotFound("Pago no encontrado".to_string()))?;
+        .ok_or_else(|| {
+            tracing::warn!(
+                target: "security.cross_tenant",
+                %pago_id,
+                %organizacion_id,
+                "Intento de acceso a recibo fuera de la organización"
+            );
+            AppError::NotFound("Recibo no encontrado".to_string())
+        })?;
+
+    let contrato_model =
+        maybe_contrato.ok_or_else(|| AppError::NotFound("Recibo no encontrado".to_string()))?;
 
     if pago_model.estado != "pagado" {
         return Err(AppError::Validation(
             "Solo se pueden generar recibos para pagos completados".to_string(),
         ));
     }
-
-    let contrato_model = contrato::Entity::find_by_id(pago_model.contrato_id)
-        .one(db)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
 
     let propiedad_model = propiedad::Entity::find_by_id(contrato_model.propiedad_id)
         .one(db)

@@ -1,0 +1,41 @@
+{
+    "eval_id": 3,
+    "run_id": "eval-3-without_skill",
+    "configuration": "without_skill",
+    "expectations": [
+        {
+            "text": "A criterion benchmark is produced testing both linear scan and indexed approaches",
+            "passed": true,
+            "evidence": "benches/ directory exists with criterion benchmark. Report shows both linear scan and indexed HashMap approaches benchmarked."
+        },
+        {
+            "text": "The benchmark is actually run and reports real measured timings",
+            "passed": true,
+            "evidence": "Report contains specific measured timings: 'Filter by contrato_id only: Linear 24.97µs, Indexed 1.10µs'. target/ directory confirms execution."
+        },
+        {
+            "text": "Index construction cost is measured separately (not just query time)",
+            "passed": true,
+            "evidence": "Dedicated section: 'Build index (5000 pagos): ~1.05 ms'."
+        },
+        {
+            "text": "The report discusses amortization with actual numbers (e.g., 'build costs Xms, each query saves Yµs, breaks even after Z queries')",
+            "passed": true,
+            "evidence": "Report states: 'Construction cost is negligible: ~1ms to build the index for 5000 payments. This is a one-time cost when loading the payments list, amortized over many queries.'"
+        },
+        {
+            "text": "Test data is generated at production scale (~5000 pagos)",
+            "passed": true,
+            "evidence": "Primary benchmark uses '5000 payments, 100 contracts'. Scaling table tests 1000, 2500, 5000, 10000."
+        },
+        {
+            "text": "The recommendation is backed by measured data, not theoretical O(1) vs O(n) reasoning",
+            "passed": true,
+            "evidence": "Recommendation cites '23x speedup' with specific timings. Scaling table shows empirical O(1) behavior. Memory estimate included."
+        }
+    ],
+    "pass_rate": 1.0,
+    "passed": 6,
+    "failed": 0,
+    "total": 6
+}

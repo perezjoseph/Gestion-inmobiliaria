@@ -202,13 +202,13 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - contenido field as `JsonElement` (kotlinx.serialization)
     - _Requirements: 4.3_
 
-  - [~] 6.4 Create PlantillasViewModel
+  - [x] 6.4 Create PlantillasViewModel
     - Sealed `PlantillasUiState` (Loading, Success with ImmutableList, Error)
     - Sealed `PlantillaFormUiState` for create/edit form state
     - Actions: loadPlantillas, createPlantilla, updatePlantilla, deletePlantilla
     - _Requirements: 4.2 through 4.6_
 
-  - [~] 6.5 Create PlantillasScreen composable
+  - [-] 6.5 Create PlantillasScreen composable
     - List of plantillas with nombre, tipo_documento, entity_type
     - FAB for create new
     - Swipe-to-delete or long-press menu with delete confirmation

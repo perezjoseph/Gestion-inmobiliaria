@@ -16,6 +16,16 @@ use crate::errors::AppError;
 use crate::models::usuario::{LoginRequest, LoginResponse, RegisterRequest, UserResponse};
 use crate::services::{invitaciones, validacion_fiscal};
 
+/// Result of the public register endpoint.
+/// New-org registrations return only the `User` DTO (no token).
+/// Invitation registrations return the full login response (token + user).
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum RegisterResult {
+    User(UserResponse),
+    Login(LoginResponse),
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: Uuid,
@@ -75,7 +85,7 @@ async fn check_email_unique<C: ConnectionTrait>(db: &C, email: &str) -> Result<(
 
     if existing.is_some() {
         return Err(AppError::Conflict(
-            "El email ya está registrado".to_string(),
+            "El correo ya está registrado".to_string(),
         ));
     }
     Ok(())
@@ -157,22 +167,24 @@ pub async fn register(
     db: &DatabaseConnection,
     input: RegisterRequest,
     jwt_secret: &str,
-) -> Result<LoginResponse, AppError> {
+) -> Result<RegisterResult, AppError> {
     validate_auth_input(&input.email, &input.password, Some(&input.nombre))?;
 
     if let Some(token_inv) = input.token_invitacion.clone() {
-        register_with_invitation(db, input, &token_inv, jwt_secret).await
+        let login = register_with_invitation(db, input, &token_inv, jwt_secret).await?;
+        Ok(RegisterResult::Login(login))
     } else {
-        register_new_org(db, input, jwt_secret).await
+        let user = register_new_org(db, input).await?;
+        Ok(RegisterResult::User(user))
     }
 }
 
 /// New org flow: validate tipo, validate fiscal ID, check uniqueness, create org + user.
+/// Returns the `UserResponse` DTO only (no token, no session).
 async fn register_new_org(
     db: &DatabaseConnection,
     input: RegisterRequest,
-    jwt_secret: &str,
-) -> Result<LoginResponse, AppError> {
+) -> Result<UserResponse, AppError> {
     let tipo = input
         .tipo
         .as_deref()
@@ -311,10 +323,10 @@ async fn register_new_org(
     let user_id = Uuid::new_v4();
     let user_model = usuario::ActiveModel {
         id: Set(user_id),
-        nombre: Set(input.nombre),
-        email: Set(input.email),
+        nombre: Set(input.nombre.clone()),
+        email: Set(input.email.clone()),
         password_hash: Set(password_hash),
-        rol: Set("admin".to_string()),
+        rol: Set("gerente".to_string()),
         activo: Set(true),
         organizacion_id: Set(org_id),
         created_at: Set(now),
@@ -324,7 +336,15 @@ async fn register_new_org(
 
     txn.commit().await?;
 
-    build_login_response(&user, jwt_secret)
+    Ok(UserResponse {
+        id: user.id,
+        nombre: user.nombre,
+        email: user.email,
+        rol: user.rol,
+        activo: user.activo,
+        organizacion_id: user.organizacion_id,
+        created_at: user.created_at.into(),
+    })
 }
 
 /// Invitation flow: validate token, check email, create user, mark invitation used.

@@ -22,7 +22,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
 ## Tasks
 
 - [ ] 1. Scope receipt PDF generation by `organizacion_id` (Requirement 1)
-  - [ ] 1.1 Update `Receipt_Service::generar_recibo` to require `organizacion_id`
+  - [x] 1.1 Update `Receipt_Service::generar_recibo` to require `organizacion_id`
     - Edit `backend/src/services/recibos.rs` to add `organizacion_id: Uuid` parameter
     - Join `pago` through `contrato` and filter `contrato::Column::OrganizacionId.eq(organizacion_id)`
     - Return `AppError::NotFound("Recibo no encontrado")` on miss
@@ -47,7 +47,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - _Requirements: 1.2, 1.3, 1.5_
 
 - [ ] 2. Self-registration role and `User` response contract (Requirement 2)
-  - [ ] 2.1 Persist self-registered users with `rol = "gerente"` and a fresh `Organizacion`
+  - [-] 2.1 Persist self-registered users with `rol = "gerente"` and a fresh `Organizacion`
     - Edit `backend/src/services/auth.rs::register_new_org` to run inside a single transaction
     - Create `Organizacion` first, then `Usuario` with `rol: Set("gerente".into())` and `organizacion_id: Set(org.id)`
     - Return `User` DTO from `services::auth`; reject duplicate email with `AppError::Conflict("El correo ya está registrado")`
@@ -71,7 +71,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - _Requirements: 2.1, 2.3, 2.5_
 
 - [ ] 3. Maintenance list `unidad_id` filter (Requirement 10)
-  - [ ] 3.1 Add `unidad_id: Option<Uuid>` to `SolicitudListQuery`
+  - [-] 3.1 Add `unidad_id: Option<Uuid>` to `SolicitudListQuery`
     - Edit `backend/src/models/mantenimiento.rs` to extend the existing `SolicitudListQuery` DTO
     - _Requirements: 10.1_
 
@@ -92,7 +92,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - _Requirements: 10.2, 10.3, 10.4_
 
 - [ ] 4. Restore Yew bootstrap `[INIT]` logs and write the Bug_Condition_PBT (Requirement 7)
-  - [ ] 4.1 Emit pre-renderer marker in `frontend/src/main.rs`
+  - [-] 4.1 Emit pre-renderer marker in `frontend/src/main.rs`
     - `web_sys::console::log_1(&"[INIT] pre-renderer".into());` before `yew::Renderer::<App>::new().render()`
     - Keep the log in production builds; do not gate behind `cfg(debug_assertions)`
     - _Requirements: 7.1, 7.4_
@@ -123,7 +123,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
 
   > **Deviation note**: Requirement 3.3 specifies HTTP `409 Conflict` for sealed-document delete attempts. The design overrides this with HTTP `403 Forbidden` (`AppError::Forbidden("No se puede eliminar un documento sellado")`). Per user guidance the design wins. Implementation in 6.3 and tests in 6.9 MUST assert `403`, not `409`. See the Note section at the bottom of this file.
 
-  - [ ] 6.1 Add the `documento_origen_id` column migration
+  - [-] 6.1 Add the `documento_origen_id` column migration
     - Create `backend/src/migrations/m20260415_001_add_documento_origen_id.rs`
     - Add nullable `documento_origen_id UUID` to `documentos` with FK `fk_documento_origen_contrato → contratos.id ON DELETE SET NULL`
     - Re-export from `backend/src/migrations/mod.rs` and append to the migrator vector
@@ -141,7 +141,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - **Implementation MUST return 403 per design, not 409 from the requirements text** (see deviation note above)
     - _Requirements: 3.3_
 
-  - [ ] 6.4 Define the `MailClient` trait, `OutgoingMail`, and `SmtpConfig`
+  - [-] 6.4 Define the `MailClient` trait, `OutgoingMail`, and `SmtpConfig`
     - Create `backend/src/services/mail/mod.rs`, `client.rs`, `message.rs`
     - `client.rs`: `#[async_trait] pub trait MailClient: Send + Sync { async fn send(&self, msg: OutgoingMail) -> Result<(), AppError>; }` plus `pub struct OutgoingMail { to, subject, body_html, body_text }`
     - `message.rs`: Spanish builder `signature_link_mail(contrato, link) -> OutgoingMail`
@@ -228,7 +228,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - In `confirmar_preview`, fail with `AppError::UnprocessableEntity("Datos de OCR inválidos")` when extraction values fail validation; do not insert any row
     - _Requirements: 5.7_
 
-  - [ ] 9.4 Pin OVMS to CPU-only in the K8s manifest
+  - [-] 9.4 Pin OVMS to CPU-only in the K8s manifest
     - Edit `infra/k8s/app/ovms.yaml`: remove the `gpu.intel.com/i915` resource request and any reference to the `i915` device-plugin DaemonSet
     - Set `env: [{ name: OPENVINO_DEVICE, value: "CPU" }, { name: TARGET_DEVICE, value: "CPU" }]`
     - _Requirements: 5.6_
@@ -276,7 +276,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - _Requirements: 8.3, 8.5_
 
 - [ ] 11. Gastos completion (Requirement 9)
-  - [ ] 11.1 Add `Utility_Service_Fields` to the `Gasto` entity, DTOs, and migration
+  - [-] 11.1 Add `Utility_Service_Fields` to the `Gasto` entity, DTOs, and migration
     - Add a migration `m20260415_002_add_gasto_utility_fields.rs` with nullable `proveedor TEXT`, `numero_cuenta TEXT`, `periodo_inicio DATE`, `periodo_fin DATE` columns
     - Regenerate `backend/src/entities/gasto.rs` (or hand-add columns to match)
     - Extend `backend/src/models/gasto.rs::CreateGasto` and `UpdateGasto` with the four optional fields
@@ -293,7 +293,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - Apply `apply_if(filter.fecha_desde, |q, d| q.filter(Column::FechaGasto.gte(d)))` and analogous `lte` for `fecha_hasta`, after the org-scope filter
     - _Requirements: 9.6, 9.7_
 
-  - [ ] 11.4 Fix the `gastos.rs:48` enum-tuple typo on the frontend
+  - [-] 11.4 Fix the `gastos.rs:48` enum-tuple typo on the frontend
     - Edit `frontend/src/pages/gastos.rs` line 48: change to `("servicio_publico", "Servicio Público")`
     - _Requirements: 9.4_
 
@@ -395,7 +395,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - `wasm-bindgen-test` cases asserting `manifest.webmanifest` ships with the required fields, the SW registers, `use_online` reflects toggled events, and `offline_guard` disables buttons when offline
     - _Requirements: 6.5, 6.6, 6.8, 6.9_
 
-- [ ] 14. Final checkpoint — full workspace verification
+- [~] 14. Final checkpoint — full workspace verification
   - Run `cargo test --workspace` and the frontend test runner one last time
   - Verify K8s manifests parse (`kubectl --dry-run=client apply -f infra/k8s/app/`) and that the OVMS endpoint is `/v3` with `OPENVINO_DEVICE=CPU`
   - Ensure all tests pass, ask the user if questions arise.

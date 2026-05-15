@@ -1,0 +1,13 @@
+{
+    "eval_id": 1,
+    "eval_name": "dashboard-aggregation",
+    "prompt": "This dashboard aggregation function is called on every page load. The team suspects it could be faster. Optimize it.",
+    "assertions": [
+        "A criterion benchmark file is produced (contains criterion_group! and criterion_main! macros)",
+        "The benchmark is actually run (cargo bench output or measured timings appear in the report)",
+        "At least 2 alternative implementations are written and benchmarked",
+        "The report contains actual measured timings (specific µs/ns values from benchmark runs), not theoretical predictions",
+        "Data generation happens OUTSIDE the benchmark loop (not inside b.iter())",
+        "The recommendation cites specific measured numbers as justification, not asymptotic complexity"
+    ]
+}

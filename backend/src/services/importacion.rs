@@ -420,6 +420,9 @@ fn process_gasto_row(row: &[String], idx: &GastoIndices) -> Result<CreateGastoRe
         unidad_consumo: None,
         periodo_desde: None,
         periodo_hasta: None,
+        numero_cuenta: None,
+        periodo_inicio: None,
+        periodo_fin: None,
     })
 }
 

@@ -28,6 +28,9 @@ pub struct Model {
     pub unidad_consumo: Option<String>,
     pub periodo_desde: Option<Date>,
     pub periodo_hasta: Option<Date>,
+    pub numero_cuenta: Option<String>,
+    pub periodo_inicio: Option<Date>,
+    pub periodo_fin: Option<Date>,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }

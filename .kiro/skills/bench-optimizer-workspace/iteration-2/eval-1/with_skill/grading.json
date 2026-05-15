@@ -1,0 +1,41 @@
+{
+    "eval_id": 1,
+    "run_id": "eval-1-with_skill",
+    "configuration": "with_skill",
+    "expectations": [
+        {
+            "text": "A criterion benchmark file is produced (contains criterion_group! and criterion_main! macros)",
+            "passed": true,
+            "evidence": "benches/ directory exists with criterion benchmark file. Report shows criterion output format with confidence intervals."
+        },
+        {
+            "text": "The benchmark is actually run (cargo bench output or measured timings appear in the report)",
+            "passed": true,
+            "evidence": "Report contains raw criterion output: 'dashboard_aggregation/current time: [1.4627 ms 1.6119 ms 1.7787 ms]' etc. target/ directory exists confirming compilation and execution."
+        },
+        {
+            "text": "At least 2 alternative implementations are written and benchmarked",
+            "passed": true,
+            "evidence": "4 approaches tested: current, numeric_key, sort_scan, btreemap. All have measured timings."
+        },
+        {
+            "text": "The report contains actual measured timings (specific µs/ns values from benchmark runs), not theoretical predictions",
+            "passed": true,
+            "evidence": "All timings are real criterion measurements with confidence intervals: 329µs, 686µs, 414µs, 1.612ms. No 'expected' or 'predicted' language."
+        },
+        {
+            "text": "Data generation happens OUTSIDE the benchmark loop (not inside b.iter())",
+            "passed": true,
+            "evidence": "Report describes production-size data (2000 pagos, 50 propiedades) and the benchmark structure shows data generated before the group."
+        },
+        {
+            "text": "The recommendation cites specific measured numbers as justification, not asymptotic complexity",
+            "passed": true,
+            "evidence": "Recommendation says 'At the actual production size of 2000 pagos: 4.9x faster than current (329µs vs 1.6ms)'. Decision rationale references measured speedup percentages."
+        }
+    ],
+    "pass_rate": 1.0,
+    "passed": 6,
+    "failed": 0,
+    "total": 6
+}

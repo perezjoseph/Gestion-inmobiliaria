@@ -1,0 +1,41 @@
+{
+    "eval_id": 3,
+    "run_id": "eval-3-with_skill",
+    "configuration": "with_skill",
+    "expectations": [
+        {
+            "text": "A criterion benchmark is produced testing both linear scan and indexed approaches",
+            "passed": true,
+            "evidence": "Benchmark tests linear_scan, hashmap_index, and ref_index across multiple scenarios. bench_project/ directory with criterion setup exists."
+        },
+        {
+            "text": "The benchmark is actually run and reports real measured timings",
+            "passed": true,
+            "evidence": "Raw criterion output included: 'filter_by_contrato_id/linear_scan time: [28.817 µs 32.050 µs 36.084 µs]' etc. target/ directory confirms execution."
+        },
+        {
+            "text": "Index construction cost is measured separately (not just query time)",
+            "passed": true,
+            "evidence": "Dedicated 'Index build cost' section: 'build_hashmap_index time: [301.20 µs 332.43 µs 368.95 µs]' and 'build_ref_index time: [291.21 µs 308.62 µs 330.59 µs]'."
+        },
+        {
+            "text": "The report discusses amortization with actual numbers (e.g., 'build costs Xms, each query saves Yµs, breaks even after Z queries')",
+            "passed": true,
+            "evidence": "Report states: 'The index costs ~332µs to build. At 700ns per lookup, the break-even point is: 332µs / (32µs - 0.7µs) ≈ 11 queries to recoup the build cost.'"
+        },
+        {
+            "text": "Test data is generated at production scale (~5000 pagos)",
+            "passed": true,
+            "evidence": "Primary benchmark uses '5000 pagos, 200 contratos'. Scaling table tests 500, 1000, 2500, 5000."
+        },
+        {
+            "text": "The recommendation is backed by measured data, not theoretical O(1) vs O(n) reasoning",
+            "passed": true,
+            "evidence": "Recommendation cites '~40-45x faster' with specific timings (32µs → 708ns). Scaling table shows constant-time behavior empirically. Amortization uses measured build cost."
+        }
+    ],
+    "pass_rate": 1.0,
+    "passed": 6,
+    "failed": 0,
+    "total": 6
+}

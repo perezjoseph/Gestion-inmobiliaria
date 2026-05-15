@@ -23,6 +23,8 @@ pub mod m20250601_000001_create_ejecuciones_tareas;
 pub mod m20250615_000001_add_deposit_tracking_to_contratos;
 pub mod m20250615_000002_add_recargo_fields;
 pub mod m20250620_000001_create_firmas_documento;
+pub mod m20260415_001_add_documento_origen_id;
+pub mod m20260415_002_add_gasto_utility_fields;
 pub mod m20260509_000001_create_chatbot_tables;
 pub mod m20260510_000001_make_auditoria_usuario_nullable;
 pub mod m20260510_000002_create_whatsapp_auth_tables;
@@ -63,6 +65,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250615_000001_add_deposit_tracking_to_contratos::Migration),
             Box::new(m20250615_000002_add_recargo_fields::Migration),
             Box::new(m20250620_000001_create_firmas_documento::Migration),
+            Box::new(m20260415_001_add_documento_origen_id::Migration),
             Box::new(m20260509_000001_create_chatbot_tables::Migration),
             Box::new(m20260510_000001_make_auditoria_usuario_nullable::Migration),
             Box::new(m20260510_000002_create_whatsapp_auth_tables::Migration),
@@ -70,6 +73,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260512_000002_create_desahucios::Migration),
             Box::new(m20260512_000003_create_responsabilidad_servicios::Migration),
             Box::new(m20260512_000004_create_cache_dgii::Migration),
+            Box::new(m20260415_002_add_gasto_utility_fields::Migration),
         ]
     }
 }

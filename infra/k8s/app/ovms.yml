@@ -35,7 +35,7 @@ spec:
         kubernetes.io/hostname: inference
       containers:
         - name: ovms
-          image: openvino/model_server:latest-gpu
+          image: openvino/model_server:latest
           args:
             - "--config_path"
             - "/models/config.json"
@@ -46,17 +46,20 @@ spec:
             - "--metrics_enable"
           ports:
             - containerPort: 8000
+          env:
+            - name: OPENVINO_DEVICE
+              value: "CPU"
+            - name: TARGET_DEVICE
+              value: "CPU"
           resources:
             requests:
               cpu: 500m
               memory: 16Gi
               ephemeral-storage: 128Mi
-              gpu.intel.com/xe: "1"
             limits:
               cpu: 4000m
               memory: 20Gi
               ephemeral-storage: 512Mi
-              gpu.intel.com/xe: "1"
           volumeMounts:
             - name: models
               mountPath: /models
@@ -120,7 +123,7 @@ data:
       node_options: {
         [type.googleapis.com/mediapipe.LLMCalculatorOptions]: {
           models_path: "/models/Qwen3-30B-A3B"
-          device: "GPU"
+          device: "CPU"
           enable_prefix_caching: true
           max_num_batched_tokens: 4096
           cache_size: 8

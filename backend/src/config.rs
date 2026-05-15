@@ -2,6 +2,41 @@ use std::time::Duration;
 
 use sea_orm::ConnectOptions;
 
+use crate::errors::AppError;
+
+#[derive(Clone, Debug)]
+pub struct SmtpConfig {
+    pub host: String,
+    pub port: u16,
+    pub user: String,
+    pub pass: String,
+    pub from: String,
+}
+
+impl SmtpConfig {
+    pub fn from_env() -> Result<Self, AppError> {
+        let host = std::env::var("SMTP_HOST")
+            .map_err(|_| AppError::BadRequest("SMTP_HOST no está configurado".into()))?;
+        let port = std::env::var("SMTP_PORT")
+            .unwrap_or_else(|_| "587".into())
+            .parse::<u16>()
+            .map_err(|_| AppError::BadRequest("SMTP_PORT debe ser un número válido".into()))?;
+        let user = std::env::var("SMTP_USER")
+            .map_err(|_| AppError::BadRequest("SMTP_USER no está configurado".into()))?;
+        let pass = std::env::var("SMTP_PASS")
+            .map_err(|_| AppError::BadRequest("SMTP_PASS no está configurado".into()))?;
+        let from = std::env::var("SMTP_FROM").unwrap_or_else(|_| "no-reply@myhomeva.us".into());
+
+        Ok(Self {
+            host,
+            port,
+            user,
+            pass,
+            from,
+        })
+    }
+}
+
 #[derive(Clone)]
 pub struct ChatbotEnvConfig {
     pub baileys_service_url: String,

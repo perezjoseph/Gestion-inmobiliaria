@@ -53,6 +53,9 @@ impl From<gasto::Model> for GastoResponse {
             unidad_consumo: m.unidad_consumo,
             periodo_desde: m.periodo_desde,
             periodo_hasta: m.periodo_hasta,
+            numero_cuenta: m.numero_cuenta,
+            periodo_inicio: m.periodo_inicio,
+            periodo_fin: m.periodo_fin,
         }
     }
 }
@@ -140,6 +143,9 @@ pub async fn create<C: ConnectionTrait>(
         unidad_consumo: Set(input.unidad_consumo),
         periodo_desde: Set(input.periodo_desde),
         periodo_hasta: Set(input.periodo_hasta),
+        numero_cuenta: Set(input.numero_cuenta),
+        periodo_inicio: Set(input.periodo_inicio),
+        periodo_fin: Set(input.periodo_fin),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -440,6 +446,9 @@ mod tests {
             unidad_consumo: None,
             periodo_desde: None,
             periodo_hasta: None,
+            numero_cuenta: None,
+            periodo_inicio: None,
+            periodo_fin: None,
             created_at: Utc::now().fixed_offset(),
             updated_at: Utc::now().fixed_offset(),
         }

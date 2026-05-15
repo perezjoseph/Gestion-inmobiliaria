@@ -24,6 +24,7 @@ pub mod importacion;
 pub mod inquilinos;
 pub mod invitaciones;
 pub mod ipc;
+pub mod mail;
 pub mod mantenimiento;
 pub mod notificaciones;
 pub mod ocr_client;
