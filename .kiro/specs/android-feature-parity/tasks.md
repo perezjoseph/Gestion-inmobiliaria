@@ -166,7 +166,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Warning text when activating
     - _Requirements: 3.9_
 
-  - [~] 5.12 Create ChatbotConfigScreen (wizard container)
+  - [x] 5.12 Create ChatbotConfigScreen (wizard container)
     - Step indicator (horizontal stepper showing 7 steps)
     - Content area rendering current step composable
     - Next/Previous navigation buttons
