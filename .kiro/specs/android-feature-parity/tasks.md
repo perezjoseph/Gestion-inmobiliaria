@@ -172,7 +172,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Next/Previous navigation buttons
     - _Requirements: 3.1_
 
-  - [~] 5.13 Create PendingReceiptsScreen composable
+  - [x] 5.13 Create PendingReceiptsScreen composable
     - List of pending receipt extractions with bank, amount, currency, date, confidence
     - Confirm action: optional contrato selector → POST confirm
     - Reject action: optional reason text field → POST reject
