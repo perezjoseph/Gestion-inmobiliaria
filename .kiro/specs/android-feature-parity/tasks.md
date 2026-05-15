@@ -111,7 +111,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Add dependency in `:app` module
     - _Requirements: 3.1_
 
-  - [~] 5.2 Create ChatbotApiService in `core/network/api/`
+  - [x] 5.2 Create ChatbotApiService in `core/network/api/`
     - Implement all chatbot endpoints: getConfig, updateConfig, getStatus, connect, disconnect, testChat, listConversations, getPendingReceipts, confirmReceipt, rejectReceipt
     - Add to NetworkModule DI
     - _Requirements: 3.10_
