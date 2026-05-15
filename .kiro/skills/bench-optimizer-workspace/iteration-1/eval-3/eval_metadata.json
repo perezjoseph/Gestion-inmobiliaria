@@ -1,0 +1,13 @@
+{
+    "eval_id": 3,
+    "eval_name": "payment-search-index-amortization",
+    "prompt": "The payment search function is a hot path (called on every page load of the payments list). The team wants to know if pre-indexing by contrato_id would be faster than the current linear scan. Benchmark it.",
+    "assertions": [
+        "A criterion benchmark file is produced testing both linear scan and indexed approaches",
+        "The indexed approach uses HashMap<Uuid, Vec<&Pago>> or similar pre-built index",
+        "The benchmark tests the most common query pattern (filter by contrato_id)",
+        "The benchmark accounts for index construction cost (not just query time in isolation)",
+        "Test data is generated at production scale (~5000 pagos)",
+        "The output discusses the amortization tradeoff: index build cost vs number of queries before rebuild"
+    ]
+}

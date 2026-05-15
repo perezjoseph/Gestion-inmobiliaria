@@ -1,0 +1,13 @@
+{
+    "eval_id": 1,
+    "eval_name": "dashboard-aggregation-benchmark",
+    "prompt": "This dashboard aggregation function is called on every page load. The team suspects it could be faster but hasn't measured. Optimize it with empirical evidence.",
+    "assertions": [
+        "A criterion benchmark file is produced (contains criterion_group! and criterion_main! macros)",
+        "The benchmark generates realistic test data at production scale (~2000 items, not toy sizes like 10)",
+        "At least 2 alternative implementations are written as separate functions",
+        "All approaches are benchmarked in the same benchmark group for direct comparison",
+        "Data generation happens OUTSIDE the benchmark loop (not inside b.iter())",
+        "The output includes a decision/recommendation based on expected benchmark results, not just theory"
+    ]
+}

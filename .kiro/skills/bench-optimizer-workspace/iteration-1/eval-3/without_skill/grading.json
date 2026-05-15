@@ -1,0 +1,43 @@
+{
+    "expectations": [
+        {
+            "text": "A criterion benchmark file is produced testing both linear scan and indexed approaches",
+            "passed": true,
+            "evidence": "benches/payment_search.rs contains 6 benchmark groups comparing linear_scan vs indexed_hashmap across multiple query patterns and scaling."
+        },
+        {
+            "text": "The indexed approach uses HashMap<Uuid, Vec<&Pago>> or similar pre-built index",
+            "passed": true,
+            "evidence": "src/lib.rs defines PagoIndex with `by_contrato: HashMap<Uuid, Vec<usize>>` mapping contrato_id to indices into the pagos vec."
+        },
+        {
+            "text": "The benchmark tests the most common query pattern (filter by contrato_id)",
+            "passed": true,
+            "evidence": "bench_search_by_contrato_id is the first benchmark group, testing with `Some(target_contrato)` as the filter."
+        },
+        {
+            "text": "The benchmark accounts for index construction cost (not just query time in isolation)",
+            "passed": true,
+            "evidence": "bench_index_construction group explicitly benchmarks `PagoIndex::new(black_box(pagos.clone()))` separately."
+        },
+        {
+            "text": "Test data is generated at production scale (~5000 pagos)",
+            "passed": true,
+            "evidence": "generate_test_data(5000, 100) is used for all main benchmarks. Scaling also tests 1000, 2500, 5000, 10000."
+        },
+        {
+            "text": "The output discusses the amortization tradeoff: index build cost vs number of queries before rebuild",
+            "passed": true,
+            "evidence": "ANALYSIS.md states: 'Construction cost is negligible: 1ms to build the index for 5000 payments. This is a one-time cost when loading the payments list, amortized over many queries (pagination, filtering, sorting all trigger re-queries).'"
+        }
+    ],
+    "summary": {
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "pass_rate": 1.0
+    },
+    "timing": {
+        "total_duration_seconds": 48.0
+    }
+}

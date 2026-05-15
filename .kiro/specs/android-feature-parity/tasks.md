@@ -160,7 +160,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Scrollable message history for the test session
     - _Requirements: 3.8_
 
-  - [~] 5.11 Create ActivationStep composable
+  - [x] 5.11 Create ActivationStep composable
     - Large toggle switch for activo status
     - Summary of current configuration
     - Warning text when activating

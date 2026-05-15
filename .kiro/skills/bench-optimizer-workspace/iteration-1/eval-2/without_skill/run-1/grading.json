@@ -1,0 +1,43 @@
+{
+    "expectations": [
+        {
+            "text": "A criterion benchmark file is produced with benchmarks at multiple dataset sizes (at least small n~10 AND large n~200)",
+            "passed": true,
+            "evidence": "benches/overlap_benchmark.rs has bench_normal_use (n=5,10,15), bench_bulk_import (n=200), and bench_scaling (n=10,50,100,200,500)."
+        },
+        {
+            "text": "At least 2 implementations are compared (current pairwise vs sort-then-scan or similar)",
+            "passed": true,
+            "evidence": "src/lib.rs contains 3 implementations: detectar_solapamientos_original, detectar_solapamientos_optimized (sort+scan with HashMap), detectar_solapamientos_sort_only."
+        },
+        {
+            "text": "The benchmark uses BenchmarkId or similar to parameterize by size for scaling analysis",
+            "passed": true,
+            "evidence": "bench_normal_use and bench_scaling use `BenchmarkId::new(\"original_O(n²)\", n)` parameterized over multiple sizes."
+        },
+        {
+            "text": "The output acknowledges that the winner may differ by dataset size (crossover point analysis)",
+            "passed": true,
+            "evidence": "ANALYSIS.md explicitly identifies: 'Crossover point: ~n=80-100 — below this the original wins, above it the optimized version wins.' Includes a scaling table showing the ratio flip."
+        },
+        {
+            "text": "The benchmark generates realistic contract data (proper date ranges, mixed propiedades)",
+            "passed": true,
+            "evidence": "generate_contratos uses multiple propiedades, 80% active ratio, random start dates in 2024, 30-180 day durations. Also has generate_single_propiedad for worst-case testing."
+        },
+        {
+            "text": "A clear recommendation is made that accounts for BOTH the normal case (n=5-15) and bulk import case (n=200)",
+            "passed": true,
+            "evidence": "ANALYSIS.md recommends: 'Keep the original O(n²) implementation' with 5 reasons: normal use dominates, bulk gains are modest (57µs savings), absolute times are tiny (218µs), complexity cost, and the real optimization is at the batch level."
+        }
+    ],
+    "summary": {
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "pass_rate": 1.0
+    },
+    "timing": {
+        "total_duration_seconds": 52.0
+    }
+}
