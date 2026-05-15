@@ -116,7 +116,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Add to NetworkModule DI
     - _Requirements: 3.10_
 
-  - [~] 5.3 Create Chatbot DTOs in `core/model`
+  - [x] 5.3 Create Chatbot DTOs in `core/model`
     - Add `ChatbotDtos.kt` with: ChatbotConfigResponse, ChatbotConfigUpdateRequest, ConnectionStatusResponse, Capabilities, FaqEntry, TestChatRequest, TestChatResponse, ConversationListItem, ReceiptExtractionResponse, ReceiptConfirmRequest, ReceiptRejectRequest
     - All with `@Serializable` and `@SerialName("camelCase")` annotations
     - _Requirements: 3.2_
