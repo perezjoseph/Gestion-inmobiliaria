@@ -148,13 +148,13 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - Add `SmtpConfig::from_env()` to `backend/src/config.rs` reading `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
     - _Requirements: 3.4_
 
-  - [-] 6.5 Implement `SmtpMailClient` via `lettre`
+  - [x] 6.5 Implement `SmtpMailClient` via `lettre`
     - Create `backend/src/services/mail/smtp.rs` with `pub struct SmtpMailClient { transport: AsyncSmtpTransport<Tokio1Executor>, from: Mailbox }`
     - `from_config(cfg)` builds `starttls_relay(host).port(port).credentials(creds).build()`
     - `MailClient::send` builds a multipart-alternative message and maps SMTP errors to `AppError::BadGateway("No se pudo enviar el correo")` while logging without echoing credentials
     - _Requirements: 3.4, 3.6_
 
-  - [-] 6.6 Wire `MailClient` into `AppState` and the signing flow
+  - [x] 6.6 Wire `MailClient` into `AppState` and the signing flow
     - Edit `backend/src/app.rs` to construct `Arc<dyn MailClient + Send + Sync>` from `SmtpConfig::from_env()` and store it on `AppState`
     - Edit `backend/src/services/firmas.rs::enviar_email_firma(mail: &dyn MailClient, inquilino, contrato, link)` to call `mail.send(signature_link_mail(...))` with Spanish subject/body
     - Wire the call site in the signing handler to use the trait object from `AppState`
