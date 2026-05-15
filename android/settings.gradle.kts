@@ -73,3 +73,5 @@ include(":feature:scanner")
 include(":feature:usuarios")
 
 include(":feature:chatbot")
+
+include(":feature:plantillas")

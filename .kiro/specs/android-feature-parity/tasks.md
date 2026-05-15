@@ -186,7 +186,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - _Requirements: 3.11, 3.12, 9.5_
 
 - [ ] 6. Plantillas feature module
-  - [~] 6.1 Create `feature/plantillas` module scaffolding
+  - [x] 6.1 Create `feature/plantillas` module scaffolding
     - Create `android/feature/plantillas/build.gradle.kts`
     - Register module in `settings.gradle.kts`
     - Add dependency in `:app` module

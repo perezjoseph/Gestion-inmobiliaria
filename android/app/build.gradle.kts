@@ -52,6 +52,7 @@ dependencies {
     implementation(project(":feature:scanner"))
     implementation(project(":feature:usuarios"))
     implementation(project(":feature:chatbot"))
+    implementation(project(":feature:plantillas"))
 
     // Core modules
     implementation(project(":core:ui"))
