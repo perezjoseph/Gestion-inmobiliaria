@@ -1,0 +1,13 @@
+{
+    "eval_id": 1,
+    "eval_name": "pago-generacion-optimization",
+    "prompt": "Optimize the algorithm efficiency in this Rust file. It has several functions with suboptimal time complexity — nested iterations that could use hash lookups, unnecessary sorting, and repeated recomputation. Apply the appropriate algorithm design paradigms to reduce complexity.",
+    "assertions": [
+        "filtrar_existentes is refactored to use a HashSet (or similar O(1) lookup structure) instead of nested .any() iteration",
+        "ultimo_pago is refactored to use .max_by_key() or equivalent single-pass O(n) approach instead of sorting",
+        "totales_por_mes is refactored to use a single-pass grouping (HashMap) instead of rescanning pagos for each month",
+        "The code still compiles (no syntax errors introduced)",
+        "The output includes before/after Big-O complexity for each change",
+        "The output identifies which algorithm paradigm was applied for each fix"
+    ]
+}

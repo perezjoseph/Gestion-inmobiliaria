@@ -45,7 +45,7 @@ use serde::{Deserialize, Serialize};
 
 const CATEGORIAS: &[(&str, &str)] = &[
     ("mantenimiento", "Mantenimiento"),
-    ("servicios", "Servicios"),
+    ("servicio_publico", "Servicio Público"),
     ("impuestos", "Impuestos"),
     ("seguros", "Seguros"),
     ("administracion", "Administración"),

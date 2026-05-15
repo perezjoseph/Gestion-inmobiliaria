@@ -1,0 +1,13 @@
+{
+    "eval_id": 2,
+    "eval_name": "dashboard-nested-loops",
+    "prompt": "This dashboard code has O(n²) and O(n³) patterns from nested loops matching propiedades, contratos, and pagos. Optimize the algorithm efficiency by applying appropriate data structure and algorithm paradigms.",
+    "assertions": [
+        "generar_resumen is refactored to build lookup maps (HashMap) before iterating, eliminating the triple nested loop",
+        "propiedades_con_atrasos is refactored to use precomputed lookup structures instead of nested scanning",
+        "ocupacion_por_ciudad is refactored to use a single-pass grouping approach instead of per-city rescanning",
+        "The code still compiles (no syntax errors introduced)",
+        "The output includes before/after Big-O complexity for each change",
+        "The Space-Time Tradeoff paradigm is identified as the primary technique used"
+    ]
+}

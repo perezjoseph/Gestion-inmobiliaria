@@ -26,6 +26,10 @@ import com.propmanager.feature.perfil.PerfilScreen
 import com.propmanager.feature.perfil.PerfilViewModel
 import com.propmanager.feature.reportes.ReportesScreen
 import com.propmanager.feature.reportes.ReportesViewModel
+import com.propmanager.feature.propiedades.PropiedadDetailScreen
+import com.propmanager.feature.propiedades.PropiedadFormScreen
+import com.propmanager.feature.propiedades.PropiedadesListScreen
+import com.propmanager.feature.propiedades.PropiedadesViewModel
 import com.propmanager.feature.scanner.ScannerMode
 import com.propmanager.feature.scanner.ScannerScreen
 import com.propmanager.feature.scanner.ScannerViewModel
@@ -54,10 +58,35 @@ fun PropManagerNavHost(
                 DashboardScreen(viewModel = vm)
             }
 
-            // Placeholder routes for offline-first CRUD features
-            // (Propiedades, Inquilinos, Contratos, Pagos, Gastos, Mantenimiento)
-            // These will be wired to their respective screens with full navigation
-            composable(Routes.PROPIEDADES) { /* PropiedadesListScreen */ }
+            // CRUD feature screens
+            composable(Routes.PROPIEDADES) {
+                val vm: PropiedadesViewModel = hiltViewModel()
+                PropiedadesListScreen(
+                    viewModel = vm,
+                    onNavigateToCreate = { navController.navigate(Routes.propiedadForm()) },
+                    onNavigateToDetail = { id -> navController.navigate(Routes.propiedadDetail(id)) },
+                )
+            }
+            composable(Routes.PROPIEDAD_DETAIL) { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("id") ?: return@composable
+                val vm: PropiedadesViewModel = hiltViewModel()
+                PropiedadDetailScreen(
+                    viewModel = vm,
+                    propiedadId = id,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToEdit = { navController.navigate(Routes.propiedadForm(id)) },
+                )
+            }
+            composable(Routes.PROPIEDAD_FORM) { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("id")?.takeIf { it.isNotEmpty() }
+                val vm: PropiedadesViewModel = hiltViewModel()
+                LaunchedEffect(id) { id?.let { vm.loadDetail(it) } }
+                PropiedadFormScreen(
+                    viewModel = vm,
+                    isEditing = id != null,
+                    onNavigateBack = { navController.popBackStack() },
+                )
+            }
             composable(Routes.INQUILINOS) { /* InquilinosListScreen */ }
             composable(Routes.CONTRATOS) { /* ContratosListScreen */ }
             composable(Routes.PAGOS) { /* PagosListScreen */ }

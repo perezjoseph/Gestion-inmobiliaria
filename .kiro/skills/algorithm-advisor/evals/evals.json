@@ -1,0 +1,53 @@
+{
+    "skill_name": "algorithm-advisor",
+    "evals": [
+        {
+            "id": 1,
+            "prompt": "Optimize the algorithm efficiency in this Rust file. It has several functions with suboptimal time complexity — nested iterations that could use hash lookups, unnecessary sorting, and repeated recomputation. Apply the appropriate algorithm design paradigms to reduce complexity.",
+            "expected_output": "The skill should identify 3 issues: (1) filtrar_existentes uses O(n*m) nested iteration — fix with HashSet for O(n+m), (2) ultimo_pago sorts O(n log n) just to get max — fix with iterator .max_by_key() for O(n), (3) totales_por_mes rescans all pagos for each month — fix with a single-pass grouping into HashMap for O(n). Each fix should be applied directly to the file with before/after complexity noted.",
+            "files": [
+                "evals/files/eval1_pago_generacion.rs"
+            ],
+            "expectations": [
+                "filtrar_existentes is refactored to use a HashSet (or similar O(1) lookup structure) instead of nested .any() iteration",
+                "ultimo_pago is refactored to use .max_by_key() or equivalent single-pass O(n) approach instead of sorting",
+                "totales_por_mes is refactored to use a single-pass grouping (HashMap) instead of rescanning pagos for each month",
+                "The code still compiles (no syntax errors introduced)",
+                "The output includes before/after Big-O complexity for each change",
+                "The output identifies which algorithm paradigm was applied for each fix"
+            ]
+        },
+        {
+            "id": 2,
+            "prompt": "This dashboard code has O(n²) and O(n³) patterns from nested loops matching propiedades, contratos, and pagos. Optimize the algorithm efficiency by applying appropriate data structure and algorithm paradigms.",
+            "expected_output": "The skill should identify: (1) generar_resumen has O(p*c*g) triple nested loop — fix by building HashMap lookups for contratos-by-propiedad and pagos-by-contrato, reducing to O(p+c+g), (2) propiedades_con_atrasos has same triple-nested pattern — fix with HashSet of contrato IDs that have atrasado pagos, (3) ocupacion_por_ciudad rescans propiedades for each city — fix with single-pass grouping. All fixes applied directly.",
+            "files": [
+                "evals/files/eval2_dashboard_matching.rs"
+            ],
+            "expectations": [
+                "generar_resumen is refactored to build lookup maps (HashMap) before iterating, eliminating the triple nested loop",
+                "propiedades_con_atrasos is refactored to use precomputed lookup structures instead of nested scanning",
+                "ocupacion_por_ciudad is refactored to use a single-pass grouping approach instead of per-city rescanning",
+                "The code still compiles (no syntax errors introduced)",
+                "The output includes before/after Big-O complexity for each change",
+                "The Space-Time Tradeoff paradigm is identified as the primary technique used"
+            ]
+        },
+        {
+            "id": 3,
+            "prompt": "Review this Rust code for suboptimal data structure choices and algorithm inefficiencies. Fix the collection types and algorithm patterns to match the actual access patterns.",
+            "expected_output": "The skill should identify: (1) cedulas_duplicadas uses O(n*m) linear scan — fix with HashSet, (2) BTreeMap usage where HashMap suffices (contratos_por_inquilino, ingreso_por_propiedad), (3) ingreso_por_propiedad has O(n²) inner loop recalculating per-propiedad totals — fix with single-pass accumulation, (4) ColaSolicitudes uses Vec::insert(0) which is O(n) — fix with VecDeque. All fixes applied directly.",
+            "files": [
+                "evals/files/eval3_collection_choice.rs"
+            ],
+            "expectations": [
+                "cedulas_duplicadas is refactored to use a HashSet for O(1) membership testing",
+                "BTreeMap is replaced with HashMap where ordering is not needed",
+                "ingreso_por_propiedad is refactored to eliminate the O(n²) inner loop with a single-pass accumulation",
+                "ColaSolicitudes is refactored to use VecDeque instead of Vec with insert(0)",
+                "The code still compiles (no syntax errors introduced)",
+                "The output identifies the Transform and Conquer (representation change) paradigm for the collection swaps"
+            ]
+        }
+    ]
+}

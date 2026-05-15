@@ -52,6 +52,7 @@ pub struct SolicitudListQuery {
     pub estado: Option<String>,
     pub prioridad: Option<String>,
     pub propiedad_id: Option<Uuid>,
+    pub unidad_id: Option<Uuid>,
     pub page: Option<u64>,
     pub per_page: Option<u64>,
 }

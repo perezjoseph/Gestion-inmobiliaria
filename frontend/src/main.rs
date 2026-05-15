@@ -7,6 +7,7 @@ mod utils;
 
 fn main() {
     console_error_panic_hook::set_once();
+    web_sys::console::log_1(&"[INIT] pre-renderer".into());
     yew::Renderer::<app::App>::new().render();
 
     if let Some(window) = web_sys::window()

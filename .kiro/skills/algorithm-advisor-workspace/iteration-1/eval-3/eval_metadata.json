@@ -1,0 +1,13 @@
+{
+    "eval_id": 3,
+    "eval_name": "collection-choice-optimization",
+    "prompt": "Review this Rust code for suboptimal data structure choices and algorithm inefficiencies. Fix the collection types and algorithm patterns to match the actual access patterns.",
+    "assertions": [
+        "cedulas_duplicadas is refactored to use a HashSet for O(1) membership testing",
+        "BTreeMap is replaced with HashMap where ordering is not needed",
+        "ingreso_por_propiedad is refactored to eliminate the O(n²) inner loop with a single-pass accumulation",
+        "ColaSolicitudes is refactored to use VecDeque instead of Vec with insert(0)",
+        "The code still compiles (no syntax errors introduced)",
+        "The output identifies the Transform and Conquer (representation change) paradigm for the collection swaps"
+    ]
+}
