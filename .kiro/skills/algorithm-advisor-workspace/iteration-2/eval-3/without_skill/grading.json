@@ -1,0 +1,43 @@
+{
+    "expectations": [
+        {
+            "text": "aplicar_pago_parcial is identified as NOT needing optimization (n=1-12 is too small, sort is appropriate for the greedy allocation)",
+            "passed": true,
+            "evidence": "Report states: 'With n=1-12 items, O(n log n) sort + O(n) greedy scan is optimal. A min-heap would be O(n) to build but O(n log n) to extract all elements, and we need to process ALL items in order.' Code preserved unchanged."
+        },
+        {
+            "text": "rentabilidad_por_propiedad_mes is refactored with multi-level pre-indexing (contrato-to-propiedad mapping AND pagos grouped by contrato AND gastos grouped by propiedad+month)",
+            "passed": true,
+            "evidence": "Code builds: (1) contrato_to_propiedad HashMap, (2) ingresos_index keyed by (Uuid, String), (3) egresos_index keyed by (Uuid, String). Report confirms: 'Pre-index with HashMaps... Build a contrato_id → propiedad_id lookup map, Group pagos by (propiedad_id, month), Group gastos by (propiedad_id, month).'"
+        },
+        {
+            "text": "mejor_mes_mantenimiento is identified as already O(n) (12 is a constant) and left unchanged or noted as not needing optimization",
+            "passed": true,
+            "evidence": "Report states: 'The outer loop is fixed at 12 iterations. The inner scan is O(n) over ~200 contracts. Total work: 12 × 200 = 2400 comparisons. An interval tree or sweep line would add O(n log n) construction overhead.' Code preserved unchanged."
+        },
+        {
+            "text": "cascada_morosidad is fixed using a prefix sum or running total approach (group by month first, then accumulate) rather than just HashMap grouping",
+            "passed": true,
+            "evidence": "Code groups delinquent counts into BTreeMap per month, then computes prefix sum: 'let mut acumulado: usize = 0; for mes in &meses { resultado.push((mes.clone(), acumulado)); acumulado += impagos_por_mes.get(mes)... }'. Report identifies this as 'Decrease and Conquer (prefix sum)'."
+        },
+        {
+            "text": "The output correctly rejects at least one 'clever' suggestion (min-heap, interval tree) as over-engineering with clear reasoning about why",
+            "passed": true,
+            "evidence": "Report rejects both: (1) min-heap: 'A min-heap would be O(n) to build but O(n log n) to extract all elements... no advantage', (2) interval tree: 'An interval tree or sweep line would add O(n log n) construction overhead for a problem that's already O(n) with a tiny constant factor.' Clear reasoning provided."
+        },
+        {
+            "text": "Different paradigms are selected for different functions — not everything is solved with Space-Time Tradeoff",
+            "passed": true,
+            "evidence": "Report identifies distinct paradigms: (1) Greedy for aplicar_pago_parcial, (2) Transform and Conquer for rentabilidad_por_propiedad_mes, (3) Brute Force (keep) for mejor_mes_mantenimiento, (4) Decrease and Conquer (prefix sum) for cascada_morosidad. Summary table shows 4 different paradigm labels."
+        }
+    ],
+    "summary": {
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "pass_rate": 1.0
+    },
+    "timing": {
+        "total_duration_seconds": 48.0
+    }
+}

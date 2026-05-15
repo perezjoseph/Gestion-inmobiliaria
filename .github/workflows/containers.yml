@@ -78,7 +78,7 @@ jobs:
       - name: Install Trivy
         uses: ./.github/actions/install-security-tools
         with:
-          trivy: 'true'
+          trivy: "true"
 
       - name: Scan container image for vulnerabilities
         id: trivy-scan
@@ -129,6 +129,35 @@ jobs:
           subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+
+      - name: Collect backend container diagnostics on failure
+        if: failure()
+        run: |
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/diag"
+          OUT="${RUNNER_TEMP}/diag/context.txt"
+          {
+            echo "=== JOB: containers / container-image-backend ==="
+            echo "=== FAILED STEPS: push=${{ steps.push.outcome }} trivy-scan=${{ steps.trivy-scan.outcome }} ==="
+            echo ""
+            echo "=== DOCKER BUILD LOGS ==="
+            docker buildx du 2>&1 || true
+            echo ""
+            if [ -s "${RUNNER_TEMP}/trivy-backend-image.txt" ]; then
+              echo "=== TRIVY SCAN OUTPUT ==="
+              cat "${RUNNER_TEMP}/trivy-backend-image.txt"
+              echo ""
+            fi
+          } > "$OUT"
+          echo "Wrote $(wc -l < "$OUT") lines to $OUT"
+
+      - name: Upload backend container diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: diag-container-backend
+          path: ${{ runner.temp }}/diag/context.txt
+          retention-days: 1
 
       - name: Credential cleanup
         if: always()
@@ -204,7 +233,7 @@ jobs:
       - name: Install Trivy
         uses: ./.github/actions/install-security-tools
         with:
-          trivy: 'true'
+          trivy: "true"
 
       - name: Scan container image for vulnerabilities
         id: trivy-scan
@@ -256,6 +285,35 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
+      - name: Collect frontend container diagnostics on failure
+        if: failure()
+        run: |
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/diag"
+          OUT="${RUNNER_TEMP}/diag/context.txt"
+          {
+            echo "=== JOB: containers / container-image-frontend ==="
+            echo "=== FAILED STEPS: push=${{ steps.push.outcome }} trivy-scan=${{ steps.trivy-scan.outcome }} ==="
+            echo ""
+            echo "=== DOCKER BUILD LOGS ==="
+            docker buildx du 2>&1 || true
+            echo ""
+            if [ -s "${RUNNER_TEMP}/trivy-frontend-image.txt" ]; then
+              echo "=== TRIVY SCAN OUTPUT ==="
+              cat "${RUNNER_TEMP}/trivy-frontend-image.txt"
+              echo ""
+            fi
+          } > "$OUT"
+          echo "Wrote $(wc -l < "$OUT") lines to $OUT"
+
+      - name: Upload frontend container diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: diag-container-frontend
+          path: ${{ runner.temp }}/diag/context.txt
+          retention-days: 1
+
       - name: Credential cleanup
         if: always()
         run: |
@@ -263,5 +321,3 @@ jobs:
           rm -f "${HOME}/.docker/config.json" 2>/dev/null || true
           rm -f frontend-image.sarif frontend-container-sbom.cdx.json 2>/dev/null || true
           rm -rf dist 2>/dev/null || true
-
-

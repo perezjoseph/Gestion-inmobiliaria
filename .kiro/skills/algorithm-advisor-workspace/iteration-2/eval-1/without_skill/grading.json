@@ -1,0 +1,43 @@
+{
+    "expectations": [
+        {
+            "text": "validar_solapamiento_contratos is identified as NOT needing optimization due to small n (3-8 contracts per propiedad)",
+            "passed": true,
+            "evidence": "Report states: 'O(n²) on n=8 means at most 28 comparisons — trivially fast... Premature optimization here would reduce readability for zero measurable gain.' Code preserved unchanged."
+        },
+        {
+            "text": "generar_rol_cobros is identified as already efficient (O(n) with HashMap pre-indexing) and left unchanged",
+            "passed": true,
+            "evidence": "Report states: 'Total complexity: O(n + m) where n = contracts, m = properties. This is already optimal... The HashMap ensures no redundant scanning.' Code preserved unchanged."
+        },
+        {
+            "text": "propiedades_completamente_ocupadas is identified as already optimal and left unchanged",
+            "passed": true,
+            "evidence": "Report states: '.all() short-circuits on the first non-occupied unit, so average case is much better. A pre-indexed approach would add allocation overhead and complexity for no measurable benefit.' Code preserved unchanged."
+        },
+        {
+            "text": "contratos_por_vencer is identified as already efficient O(n) and the BTreeMap suggestion is rejected as over-engineering",
+            "passed": true,
+            "evidence": "Report states: 'A BTreeMap indexed by fecha_fin would... only pay off if you query the same dataset many times without rebuilding. Since this is called once daily, you'd rebuild every time anyway... The suggestion to use a BTreeMap is a classic case of over-engineering for small datasets.' Code preserved unchanged."
+        },
+        {
+            "text": "ingreso_mensual_por_moneda is identified as already optimal and left unchanged",
+            "passed": true,
+            "evidence": "Report states: 'Single O(n) pass over ~200 contracts, accumulating into a HashMap with at most 2 entries (DOP and USD)... textbook optimal.' Code preserved unchanged."
+        },
+        {
+            "text": "The output does NOT blindly optimize every function — at least 3 functions are explicitly left unchanged with justification",
+            "passed": true,
+            "evidence": "All 5 functions are explicitly left unchanged. Report concludes: 'No changes warranted. All five functions are appropriate for their dataset sizes and access patterns.'"
+        }
+    ],
+    "summary": {
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "pass_rate": 1.0
+    },
+    "timing": {
+        "total_duration_seconds": 45.0
+    }
+}

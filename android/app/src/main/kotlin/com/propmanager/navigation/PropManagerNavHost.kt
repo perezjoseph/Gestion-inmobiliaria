@@ -2,7 +2,9 @@ package com.propmanager.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -50,6 +52,9 @@ import com.propmanager.feature.propiedades.PropiedadesViewModel
 import com.propmanager.feature.scanner.ScannerMode
 import com.propmanager.feature.scanner.ScannerScreen
 import com.propmanager.feature.scanner.ScannerViewModel
+import com.propmanager.feature.auth.AuthState
+import com.propmanager.feature.usuarios.UsuariosScreen
+import com.propmanager.feature.usuarios.UsuariosViewModel
 
 @Composable
 fun PropManagerNavHost(
@@ -317,6 +322,24 @@ fun PropManagerNavHost(
                 )
             }
 
+            composable(Routes.USUARIOS) {
+                val authState by authViewModel.authState.collectAsStateWithLifecycle()
+                val isAdmin = (authState as? AuthState.Authenticated)?.user?.rol == "admin"
+                if (isAdmin) {
+                    val vm: UsuariosViewModel = hiltViewModel()
+                    UsuariosScreen(
+                        viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() },
+                    )
+                } else {
+                    LaunchedEffect(Unit) {
+                        navController.navigate(Routes.DASHBOARD) {
+                            popUpTo(Routes.USUARIOS) { inclusive = true }
+                        }
+                    }
+                }
+            }
+
             composable("documentos/{entityType}/{entityId}") { backStackEntry ->
                 val entityType =
                     backStackEntry.arguments?.getString("entityType") ?: return@composable
@@ -370,9 +393,12 @@ fun PropManagerNavHost(
 
             // "Más" overflow menu screen
             composable(Routes.MAS) {
+                val authState by authViewModel.authState.collectAsStateWithLifecycle()
+                val userRole = (authState as? AuthState.Authenticated)?.user?.rol
                 MasMenuScreen(
                     onNavigate = { route -> navController.navigate(route) },
                     onNavigateBack = { navController.popBackStack() },
+                    userRole = userRole,
                 )
             }
         }

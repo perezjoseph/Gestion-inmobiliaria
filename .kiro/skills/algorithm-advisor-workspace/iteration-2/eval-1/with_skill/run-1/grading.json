@@ -1,0 +1,43 @@
+{
+    "expectations": [
+        {
+            "text": "validar_solapamiento_contratos is identified as NOT needing optimization due to small n (3-8 contracts per propiedad)",
+            "passed": true,
+            "evidence": "Report states: 'With n ≤ 8, the O(n²) pairwise comparison performs at most 28 comparisons. This is trivially fast.' Code is preserved unchanged."
+        },
+        {
+            "text": "generar_rol_cobros is identified as already efficient (O(n) with HashMap pre-indexing) and left unchanged",
+            "passed": true,
+            "evidence": "Report states: 'Already applies the Space-Time Tradeoff paradigm correctly... Total complexity: O(n + m). This is optimal for this problem.' Code preserved unchanged."
+        },
+        {
+            "text": "propiedades_completamente_ocupadas is identified as already optimal and left unchanged",
+            "passed": true,
+            "evidence": "Report states: 'Already optimal for this dataset size — pre-indexing would add complexity without benefit.' Code preserved unchanged."
+        },
+        {
+            "text": "contratos_por_vencer is identified as already efficient O(n) and the BTreeMap suggestion is rejected as over-engineering",
+            "passed": true,
+            "evidence": "Report states: 'Optimal for this dataset size and call frequency. A BTreeMap index would be over-engineering.' Explicitly rejects the BTreeMap suggestion with reasoning about O(n log n) build cost vs single daily query."
+        },
+        {
+            "text": "ingreso_mensual_por_moneda is identified as already optimal and left unchanged",
+            "passed": true,
+            "evidence": "Report states: 'O(n) single pass with HashMap accumulation. Already optimal — textbook aggregation pattern.' Code preserved unchanged."
+        },
+        {
+            "text": "The output does NOT blindly optimize every function — at least 3 functions are explicitly left unchanged with justification",
+            "passed": true,
+            "evidence": "All 5 functions are explicitly left unchanged with individual justifications. Report concludes: 'No code changes are warranted. The output file is identical to the input.'"
+        }
+    ],
+    "summary": {
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "pass_rate": 1.0
+    },
+    "timing": {
+        "total_duration_seconds": 52.0
+    }
+}

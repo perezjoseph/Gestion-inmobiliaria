@@ -1,0 +1,43 @@
+{
+    "expectations": [
+        {
+            "text": "aplicar_pago_parcial is identified as NOT needing optimization (n=1-12 is too small, sort is appropriate for the greedy allocation)",
+            "passed": true,
+            "evidence": "Report states: 'With n = 1-12 elements, the sort is essentially free. The greedy approach is provably correct... The min-heap suggestion is a false optimization — it doesn't improve complexity and hurts readability for tiny n.' Code preserved unchanged."
+        },
+        {
+            "text": "rentabilidad_por_propiedad_mes is refactored with multi-level pre-indexing (contrato-to-propiedad mapping AND pagos grouped by contrato AND gastos grouped by propiedad+month)",
+            "passed": true,
+            "evidence": "Code builds: (1) contrato_to_propiedad HashMap, (2) ingresos_map keyed by (propiedad_id, month), (3) egresos_map keyed by (propiedad_id, month). Report confirms: 'Build three lookup structures in single passes... Then assembly is O(P × M) with O(1) lookups.'"
+        },
+        {
+            "text": "mejor_mes_mantenimiento is identified as already O(n) (12 is a constant) and left unchanged or noted as not needing optimization",
+            "passed": true,
+            "evidence": "Report states: 'The outer loop runs exactly 12 times (fixed constant). The inner loop scans ~200 contracts. Total work: 12 × 200 = 2,400 comparisons. This is O(n).' Explicitly rejects interval tree and sweep line. Code preserved unchanged."
+        },
+        {
+            "text": "cascada_morosidad is fixed using a prefix sum or running total approach (group by month first, then accumulate) rather than just HashMap grouping",
+            "passed": true,
+            "evidence": "Code groups unpaid counts per month, then computes prefix sum: 'let mut acumulado: usize = 0; meses.iter().map(|mes| { let resultado = (mes.clone(), acumulado); acumulado += impagos_por_mes.get(mes)...; resultado })'. Report identifies this as 'Dynamic Programming (prefix sum / cumulative computation)'."
+        },
+        {
+            "text": "The output correctly rejects at least one 'clever' suggestion (min-heap, interval tree) as over-engineering with clear reasoning about why",
+            "passed": true,
+            "evidence": "Report rejects BOTH: (1) min-heap for aplicar_pago_parcial: 'heap extraction is O(n log n) total, same as sort... sort produces a contiguous sorted slice — better cache locality', (2) interval tree for mejor_mes_mantenimiento: 'construction cost O(n log n)... For 12 queries on 200 contracts, the construction overhead exceeds the brute-force cost.'"
+        },
+        {
+            "text": "Different paradigms are selected for different functions — not everything is solved with Space-Time Tradeoff",
+            "passed": true,
+            "evidence": "Report identifies 4 distinct paradigms: (1) Greedy for aplicar_pago_parcial, (2) Space-Time Tradeoff for rentabilidad_por_propiedad_mes, (3) 'None needed' for mejor_mes_mantenimiento, (4) Dynamic Programming (prefix sum) for cascada_morosidad. Explicitly explains why each paradigm fits and why alternatives don't."
+        }
+    ],
+    "summary": {
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "pass_rate": 1.0
+    },
+    "timing": {
+        "total_duration_seconds": 60.0
+    }
+}

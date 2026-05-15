@@ -1,0 +1,43 @@
+{
+    "expectations": [
+        {
+            "text": "reporte_envejecimiento's BTreeMap is preserved (not replaced with HashMap) because sorted output order is required",
+            "passed": true,
+            "evidence": "Report states: 'BTreeMap is intentional here: only 4 buckets, and sorted output is required for the report. No optimization needed.' Code preserves BTreeMap."
+        },
+        {
+            "text": "inquilinos_sin_atrasos is refactored to use HashMap/HashSet lookups eliminating the triple nested loop",
+            "passed": true,
+            "evidence": "Code builds HashSet<Uuid> of contratos_con_atraso and HashMap<Uuid, Vec<Uuid>> of contratos_por_inquilino. Report confirms: 'Optimized from O(inquilinos × contratos × pagos) to O(inquilinos + contratos + pagos) by pre-building lookup indexes.'"
+        },
+        {
+            "text": "tendencia_pagos_acumulados is fixed with a cumulative/running total approach (not just HashMap grouping) to handle the prefix sum correctly",
+            "passed": true,
+            "evidence": "Code groups into HashMap, sorts months, then computes running sum: 'let mut acumulado = 0.0; meses.into_iter().map(|mes| { acumulado += totales_por_mes[&mes]; (mes, acumulado) })'. Report confirms: 'Single pass to compute running cumulative sum.'"
+        },
+        {
+            "text": "detectar_pagos_duplicados is refactored to use a composite key (contrato_id + fecha_vencimiento + monto) for grouping instead of O(n²) pairwise comparison",
+            "passed": true,
+            "evidence": "Code uses: 'let key = (pago.contrato_id, pago.fecha_vencimiento, pago.monto.to_bits())' as HashMap key. Report confirms: 'Optimized from O(n²) to O(n) by grouping payments into buckets keyed by (contrato_id, fecha_vencimiento, monto_bits).'"
+        },
+        {
+            "text": "resumen_metodos_pago is identified as already efficient and its BTreeMap is preserved for chronological ordering",
+            "passed": true,
+            "evidence": "Report states: 'BTreeMap is intentional here: months must be in sorted order for the chart. Single-pass aggregation is already optimal — no changes needed.' Code preserves BTreeMap."
+        },
+        {
+            "text": "The output explains WHY each BTreeMap is kept or replaced, not just mechanically swapping all BTreeMaps for HashMaps",
+            "passed": true,
+            "evidence": "Report explains for reporte_envejecimiento: 'BTreeMap is intentional here: only 4 buckets, and sorted output is required' and for resumen_metodos_pago: 'months must be in sorted order for the chart'. Each BTreeMap decision has explicit reasoning."
+        }
+    ],
+    "summary": {
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "pass_rate": 1.0
+    },
+    "timing": {
+        "total_duration_seconds": 50.0
+    }
+}

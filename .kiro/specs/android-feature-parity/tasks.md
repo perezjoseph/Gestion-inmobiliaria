@@ -98,7 +98,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Loading/error states
     - _Requirements: 2.2, 2.3, 2.4_
 
-  - [~] 4.6 Add Usuarios to navigation
+  - [x] 4.6 Add Usuarios to navigation
     - Add `USUARIOS` route to `Routes.kt`
     - Add composable to NavHost with role guard (redirect non-admin)
     - Add conditional menu item to `MasMenuScreen` (visible only for admin role)

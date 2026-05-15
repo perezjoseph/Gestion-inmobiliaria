@@ -15,6 +15,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
@@ -23,7 +24,7 @@ import com.propmanager.core.ui.components.PropManagerTopAppBar
 
 private data class MenuItem(val labelResId: Int, val route: String)
 
-private val menuItems =
+private val baseMenuItems =
     listOf(
         MenuItem(R.string.nav_pagos, Routes.PAGOS),
         MenuItem(R.string.nav_gastos, Routes.GASTOS),
@@ -37,14 +38,27 @@ private val menuItems =
         MenuItem(R.string.nav_importacion, Routes.IMPORTACION),
     )
 
+private val adminOnlyItems =
+    listOf(
+        MenuItem(R.string.nav_usuarios, Routes.USUARIOS),
+    )
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MasMenuScreen(
     onNavigate: (String) -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
+    userRole: String? = null,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val items = remember(userRole) {
+        if (userRole == "admin") {
+            adminOnlyItems + baseMenuItems
+        } else {
+            baseMenuItems
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -60,7 +74,7 @@ fun MasMenuScreen(
             modifier =
                 Modifier.fillMaxSize().padding(paddingValues).verticalScroll(rememberScrollState())
         ) {
-            menuItems.forEach { item ->
+            items.forEach { item ->
                 ListItem(
                     headlineContent = {
                         Text(

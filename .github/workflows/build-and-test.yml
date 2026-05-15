@@ -183,7 +183,7 @@ jobs:
         if: inputs.is-production
         uses: ./.github/actions/install-security-tools
         with:
-          trivy: 'true'
+          trivy: "true"
 
       - name: Generate SBOM
         if: inputs.is-production
@@ -212,6 +212,47 @@ jobs:
         with:
           subject-path: ${{ env.CARGO_TARGET_DIR || 'target' }}/x86_64-unknown-linux-musl/ci-release/realestate-backend
           push-to-registry: false
+
+      - name: Collect backend diagnostics on failure
+        if: failure()
+        run: |
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/diag"
+          OUT="${RUNNER_TEMP}/diag/context.txt"
+          {
+            echo "=== JOB: build-and-test / backend ==="
+            echo "=== FAILED STEPS: clippy=${{ steps.clippy.outcome }} tests=${{ steps.tests.outcome }} build=${{ steps.build.outcome }} ==="
+            echo ""
+            if [ -s "${RUNNER_TEMP}/clippy-backend-output.txt" ]; then
+              echo "=== CLIPPY BACKEND (rendered messages) ==="
+              cat "${RUNNER_TEMP}/clippy-backend-output.txt"
+              echo ""
+            fi
+            if [ -s "${RUNNER_TEMP}/clippy-backend-stderr.txt" ]; then
+              echo "=== CLIPPY BACKEND STDERR ==="
+              cat "${RUNNER_TEMP}/clippy-backend-stderr.txt"
+              echo ""
+            fi
+            if [ -s "${RUNNER_TEMP}/test-backend-output.txt" ]; then
+              echo "=== CARGO TEST BACKEND (last 200 lines) ==="
+              tail -200 "${RUNNER_TEMP}/test-backend-output.txt"
+              echo ""
+            fi
+            if [ -s "${RUNNER_TEMP}/build-backend-output.txt" ]; then
+              echo "=== CARGO BUILD BACKEND (last 200 lines) ==="
+              tail -200 "${RUNNER_TEMP}/build-backend-output.txt"
+              echo ""
+            fi
+          } > "$OUT"
+          echo "Wrote $(wc -l < "$OUT") lines to $OUT"
+
+      - name: Upload backend diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: diag-build-backend
+          path: ${{ runner.temp }}/diag/context.txt
+          retention-days: 1
 
       - name: Write backend summary
         if: "!cancelled()"
@@ -342,7 +383,7 @@ jobs:
         if: inputs.is-production
         uses: ./.github/actions/install-security-tools
         with:
-          trivy: 'true'
+          trivy: "true"
 
       - name: Generate SBOM
         if: inputs.is-production
@@ -371,6 +412,47 @@ jobs:
         with:
           subject-path: frontend/dist/
           push-to-registry: false
+
+      - name: Collect frontend diagnostics on failure
+        if: failure()
+        run: |
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/diag"
+          OUT="${RUNNER_TEMP}/diag/context.txt"
+          {
+            echo "=== JOB: build-and-test / frontend ==="
+            echo "=== FAILED STEPS: clippy=${{ steps.clippy.outcome }} tests=${{ steps.tests.outcome }} build=${{ steps.build.outcome }} ==="
+            echo ""
+            if [ -s "${RUNNER_TEMP}/clippy-frontend-output.txt" ]; then
+              echo "=== CLIPPY FRONTEND (rendered messages) ==="
+              cat "${RUNNER_TEMP}/clippy-frontend-output.txt"
+              echo ""
+            fi
+            if [ -s "${RUNNER_TEMP}/clippy-frontend-stderr.txt" ]; then
+              echo "=== CLIPPY FRONTEND STDERR ==="
+              cat "${RUNNER_TEMP}/clippy-frontend-stderr.txt"
+              echo ""
+            fi
+            if [ -s "${RUNNER_TEMP}/test-frontend-output.txt" ]; then
+              echo "=== CARGO TEST FRONTEND (last 200 lines) ==="
+              tail -200 "${RUNNER_TEMP}/test-frontend-output.txt"
+              echo ""
+            fi
+            if [ -s "${RUNNER_TEMP}/build-frontend-output.txt" ]; then
+              echo "=== TRUNK BUILD FRONTEND (last 200 lines) ==="
+              tail -200 "${RUNNER_TEMP}/build-frontend-output.txt"
+              echo ""
+            fi
+          } > "$OUT"
+          echo "Wrote $(wc -l < "$OUT") lines to $OUT"
+
+      - name: Upload frontend diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: diag-build-frontend
+          path: ${{ runner.temp }}/diag/context.txt
+          retention-days: 1
 
       - name: Write frontend summary
         if: "!cancelled()"

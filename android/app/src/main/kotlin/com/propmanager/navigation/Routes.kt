@@ -28,6 +28,7 @@ object Routes {
     const val PERFIL = "perfil"
     const val CONFIGURACION = "configuracion"
     const val IMPORTACION = "importacion"
+    const val USUARIOS = "usuarios"
     const val SCANNER_CEDULA = "scanner/cedula"
     const val SCANNER_RECEIPT = "scanner/receipt"
     const val MAS = "mas"

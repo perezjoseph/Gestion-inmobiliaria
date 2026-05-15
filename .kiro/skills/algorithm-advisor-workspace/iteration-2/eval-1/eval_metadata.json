@@ -1,0 +1,13 @@
+{
+    "eval_id": 1,
+    "eval_name": "subtle-tradeoffs-resist-premature-optimization",
+    "prompt": "Analyze this Rust file for algorithm efficiency. Some functions have genuine performance problems, but others are already optimal or operate on small datasets where optimization would be premature. For each function: decide whether it needs optimization, explain why or why not, and only apply changes where genuinely warranted. Do NOT optimize code that is already efficient or where n is too small to matter.",
+    "assertions": [
+        "validar_solapamiento_contratos is identified as NOT needing optimization due to small n (3-8 contracts per propiedad)",
+        "generar_rol_cobros is identified as already efficient (O(n) with HashMap pre-indexing) and left unchanged",
+        "propiedades_completamente_ocupadas is identified as already optimal and left unchanged",
+        "contratos_por_vencer is identified as already efficient O(n) and the BTreeMap suggestion is rejected as over-engineering",
+        "ingreso_mensual_por_moneda is identified as already optimal and left unchanged",
+        "The output does NOT blindly optimize every function — at least 3 functions are explicitly left unchanged with justification"
+    ]
+}

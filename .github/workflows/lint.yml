@@ -32,6 +32,29 @@ jobs:
         id: fmt
         run: cargo fmt --all -- --check 2>&1 | tee "${RUNNER_TEMP}/fmt-output.txt"
 
+      - name: Collect fmt diagnostics on failure
+        if: failure()
+        run: |
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/diag"
+          OUT="${RUNNER_TEMP}/diag/context.txt"
+          {
+            echo "=== JOB: lint / fmt (rustfmt) ==="
+            echo "=== FAILED STEP: fmt=${{ steps.fmt.outcome }} ==="
+            echo ""
+            echo "=== RUSTFMT CHECK OUTPUT ==="
+            cat "${RUNNER_TEMP}/fmt-output.txt" 2>/dev/null || echo "(no output captured)"
+          } > "$OUT"
+          echo "Wrote $(wc -l < "$OUT") lines to $OUT"
+
+      - name: Upload fmt diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: diag-lint-fmt
+          path: ${{ runner.temp }}/diag/context.txt
+          retention-days: 1
+
   baileys-typecheck:
     name: Type Check (baileys-service)
     runs-on: arc-runner-dind
@@ -63,10 +86,43 @@ jobs:
           command: cd baileys-service && npm ci
 
       - name: TypeScript compile check
-        run: npm run build
+        id: typecheck
+        run: npm run build 2>&1 | tee "${RUNNER_TEMP}/baileys-tsc-output.txt"
 
       - name: Run tests
-        run: npm test
+        id: tests
+        run: npm test 2>&1 | tee "${RUNNER_TEMP}/baileys-test-output.txt"
+
+      - name: Collect baileys diagnostics on failure
+        if: failure()
+        run: |
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/diag"
+          OUT="${RUNNER_TEMP}/diag/context.txt"
+          {
+            echo "=== JOB: lint / baileys-typecheck ==="
+            echo "=== FAILED STEPS: typecheck=${{ steps.typecheck.outcome }} tests=${{ steps.tests.outcome }} ==="
+            echo ""
+            if [ -s "${RUNNER_TEMP}/baileys-tsc-output.txt" ]; then
+              echo "=== TSC BUILD OUTPUT (last 200 lines) ==="
+              tail -200 "${RUNNER_TEMP}/baileys-tsc-output.txt"
+              echo ""
+            fi
+            if [ -s "${RUNNER_TEMP}/baileys-test-output.txt" ]; then
+              echo "=== NPM TEST OUTPUT (last 200 lines) ==="
+              tail -200 "${RUNNER_TEMP}/baileys-test-output.txt"
+              echo ""
+            fi
+          } > "$OUT"
+          echo "Wrote $(wc -l < "$OUT") lines to $OUT"
+
+      - name: Upload baileys diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: diag-lint-baileys
+          path: ${{ runner.temp }}/diag/context.txt
+          retention-days: 1
 
   gate:
     name: Lint Gate

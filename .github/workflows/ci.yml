@@ -218,7 +218,36 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
-      - name: Credential cleanup
+      - name: Collect baileys container diagnostics on failure
+        if: failure()
+        run: |
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/diag"
+          OUT="${RUNNER_TEMP}/diag/context.txt"
+          {
+            echo "=== JOB: baileys-container ==="
+            echo "=== FAILED STEP: push=${{ steps.push.outcome }} ==="
+            echo ""
+            echo "=== DOCKER BUILD LOGS ==="
+            docker buildx du 2>&1 || true
+            echo ""
+            if [ -s "${RUNNER_TEMP}/trivy-baileys-image.txt" ]; then
+              echo "=== TRIVY SCAN OUTPUT ==="
+              cat "${RUNNER_TEMP}/trivy-baileys-image.txt"
+              echo ""
+            fi
+          } > "$OUT"
+          echo "Wrote $(wc -l < "$OUT") lines to $OUT"
+
+      - name: Upload baileys container diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: diag-container-baileys
+          path: ${{ runner.temp }}/diag/context.txt
+          retention-days: 1
+
+      - name: Credential cleanup (baileys)
         if: always()
         run: |
           docker logout ghcr.io 2>/dev/null || true
@@ -339,7 +368,36 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
-      - name: Credential cleanup
+      - name: Collect OCR container diagnostics on failure
+        if: failure()
+        run: |
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/diag"
+          OUT="${RUNNER_TEMP}/diag/context.txt"
+          {
+            echo "=== JOB: ocr-container ==="
+            echo "=== FAILED STEP: push=${{ steps.push.outcome }} ==="
+            echo ""
+            echo "=== DOCKER BUILD LOGS ==="
+            docker buildx du 2>&1 || true
+            echo ""
+            if [ -s "${RUNNER_TEMP}/trivy-ocr-service-image.txt" ]; then
+              echo "=== TRIVY SCAN OUTPUT ==="
+              cat "${RUNNER_TEMP}/trivy-ocr-service-image.txt"
+              echo ""
+            fi
+          } > "$OUT"
+          echo "Wrote $(wc -l < "$OUT") lines to $OUT"
+
+      - name: Upload OCR container diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: diag-container-ocr
+          path: ${{ runner.temp }}/diag/context.txt
+          retention-days: 1
+
+      - name: Credential cleanup (ocr)
         if: always()
         run: |
           docker logout ghcr.io 2>/dev/null || true
@@ -424,34 +482,78 @@ jobs:
           ref: ${{ github.head_ref || github.ref_name }}
           persist-credentials: false
 
-      - name: Rust setup
+      - name: Download all diagnostics artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: diag-*
+          path: ${{ runner.temp }}/all-diag
+          merge-multiple: false
+        continue-on-error: true
+
+      - name: Check if diagnostics were downloaded
+        id: check-diag
+        run: |
+          if find "${RUNNER_TEMP}/all-diag" -name "*.txt" -size +0c 2>/dev/null | grep -q .; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Rust setup (fallback only)
+        if: steps.check-diag.outputs.found == 'false'
         uses: ./.github/actions/rust-setup
         with:
           components: rustfmt,clippy
           targets: x86_64-unknown-linux-musl,wasm32-unknown-unknown
 
-      - name: Collect rustfmt / clippy / test failures
+      - name: Merge diagnostics into single context file
+        env:
+          DIAG_FOUND: ${{ steps.check-diag.outputs.found }}
         run: |
           umask 077
           mkdir -p "${RUNNER_TEMP}/diag"
           OUT="${RUNNER_TEMP}/diag/context.txt"
 
           {
-            echo "=== RUSTFMT CHECK ==="
-            cargo fmt --all -- --check 2>&1 || true
+            echo "=== CI FAILURE DIAGNOSTICS ==="
+            echo "=== Failed jobs: security=${{ needs.security.result }} codeql=${{ needs.codeql.result }} lint=${{ needs.lint.result }} build-and-test=${{ needs.build-and-test.result }} baileys-container=${{ needs.baileys-container.result }} ocr-container=${{ needs.ocr-container.result }} containers=${{ needs.containers.result }} ==="
             echo ""
-            echo "=== CLIPPY BACKEND ==="
-            cargo clippy --locked -p realestate-backend -- -D warnings 2>&1 || true
-            echo ""
-            echo "=== CLIPPY FRONTEND ==="
-            cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings 2>&1 || true
-            echo ""
-            echo "=== CARGO TEST BACKEND (last 150 lines) ==="
-            cargo test --locked -p realestate-backend --no-fail-fast 2>&1 | tail -150 || true
-            echo ""
-            echo "=== CARGO TEST FRONTEND (last 150 lines) ==="
-            cargo test --locked -p realestate-frontend --no-fail-fast 2>&1 | tail -150 || true
           } > "$OUT"
+
+          if [ "$DIAG_FOUND" = "true" ]; then
+            # Append all downloaded diagnostics
+            for dir in "${RUNNER_TEMP}/all-diag"/diag-*/; do
+              if [ -d "$dir" ]; then
+                for f in "$dir"*.txt; do
+                  if [ -s "$f" ]; then
+                    cat "$f" >> "$OUT"
+                    echo "" >> "$OUT"
+                  fi
+                done
+              fi
+            done
+          else
+            # Fallback: no job uploaded diagnostics, run cargo checks to collect fresh output
+            echo "::warning::No job-level diagnostics found. Running cargo checks as fallback."
+            {
+              echo "=== FALLBACK: No per-job diagnostics uploaded. Running cargo checks. ==="
+              echo ""
+              echo "=== RUSTFMT CHECK ==="
+              cargo fmt --all -- --check 2>&1 || true
+              echo ""
+              echo "=== CLIPPY BACKEND ==="
+              cargo clippy --locked -p realestate-backend -- -D warnings 2>&1 || true
+              echo ""
+              echo "=== CLIPPY FRONTEND ==="
+              cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings 2>&1 || true
+              echo ""
+              echo "=== CARGO TEST BACKEND (last 150 lines) ==="
+              cargo test --locked -p realestate-backend --no-fail-fast 2>&1 | tail -150 || true
+              echo ""
+              echo "=== CARGO TEST FRONTEND (last 150 lines) ==="
+              cargo test --locked -p realestate-frontend --no-fail-fast 2>&1 | tail -150 || true
+            } >> "$OUT"
+          fi
 
           echo "Wrote $(wc -l < "$OUT") lines to $OUT"
 

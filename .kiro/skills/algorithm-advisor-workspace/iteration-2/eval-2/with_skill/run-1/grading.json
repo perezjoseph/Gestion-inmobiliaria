@@ -1,0 +1,43 @@
+{
+    "expectations": [
+        {
+            "text": "reporte_envejecimiento's BTreeMap is preserved (not replaced with HashMap) because sorted output order is required",
+            "passed": true,
+            "evidence": "Report states: 'The BTreeMap holds only 4 entries (the aging buckets) and ensures they appear in sorted order... Replacing BTreeMap with HashMap would break the sorted output requirement.' Code preserves BTreeMap."
+        },
+        {
+            "text": "inquilinos_sin_atrasos is refactored to use HashMap/HashSet lookups eliminating the triple nested loop",
+            "passed": true,
+            "evidence": "Code builds HashSet<Uuid> of contratos_con_atraso from pagos, then HashMap<Uuid, Vec<Uuid>> of contratos_por_inquilino. Report confirms: 'O(n × m × p) → O(n + m + p) using Space-Time Tradeoff.'"
+        },
+        {
+            "text": "tendencia_pagos_acumulados is fixed with a cumulative/running total approach (not just HashMap grouping) to handle the prefix sum correctly",
+            "passed": true,
+            "evidence": "Code uses BTreeMap for grouping PLUS a running cumulative sum: 'let mut acumulado = 0.0; totales_por_mes.into_iter().map(|(mes, total_mes)| { acumulado += total_mes; (mes, acumulado) })'. Report identifies this as 'Transform and Conquer + Space-Time Tradeoff' with running total."
+        },
+        {
+            "text": "detectar_pagos_duplicados is refactored to use a composite key (contrato_id + fecha_vencimiento + monto) for grouping instead of O(n²) pairwise comparison",
+            "passed": true,
+            "evidence": "Code uses: 'let key = (pago.contrato_id, pago.fecha_vencimiento, pago.monto.to_bits())' as HashMap key. Report confirms: 'Group payments by composite key... Only payments in the same bucket can be duplicates.'"
+        },
+        {
+            "text": "resumen_metodos_pago is identified as already efficient and its BTreeMap is preserved for chronological ordering",
+            "passed": true,
+            "evidence": "Report states: 'Already optimal. Single pass over payments, O(1) amortized insertion into nested maps. The outer BTreeMap ensures months appear in chronological order for the stacked bar chart.' Code preserves BTreeMap."
+        },
+        {
+            "text": "The output explains WHY each BTreeMap is kept or replaced, not just mechanically swapping all BTreeMaps for HashMaps",
+            "passed": true,
+            "evidence": "Report has a dedicated 'Key Decisions Explained' section: 'Why BTreeMap was kept in functions 1 and 5 — Both functions produce output for UI rendering that requires chronological/sorted ordering.' Also explains why tendencia uses BTreeMap instead of sort+dedup."
+        }
+    ],
+    "summary": {
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "pass_rate": 1.0
+    },
+    "timing": {
+        "total_duration_seconds": 58.0
+    }
+}

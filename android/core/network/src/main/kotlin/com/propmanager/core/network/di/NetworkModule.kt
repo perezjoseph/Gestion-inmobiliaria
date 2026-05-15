@@ -7,6 +7,7 @@ import com.propmanager.core.network.NetworkMonitor
 import com.propmanager.core.network.TokenProvider
 import com.propmanager.core.network.api.AuditoriaApiService
 import com.propmanager.core.network.api.AuthApiService
+import com.propmanager.core.network.api.ChatbotApiService
 import com.propmanager.core.network.api.ConfiguracionApiService
 import com.propmanager.core.network.api.ContratosApiService
 import com.propmanager.core.network.api.DashboardApiService
@@ -163,4 +164,9 @@ object NetworkModule {
     @Singleton
     fun provideUsuariosApiService(retrofit: Retrofit): UsuariosApiService =
         retrofit.create(UsuariosApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideChatbotApiService(retrofit: Retrofit): ChatbotApiService =
+        retrofit.create(ChatbotApiService::class.java)
 }

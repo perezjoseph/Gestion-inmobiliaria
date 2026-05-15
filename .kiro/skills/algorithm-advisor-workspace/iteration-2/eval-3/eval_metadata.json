@@ -1,0 +1,13 @@
+{
+    "eval_id": 3,
+    "eval_name": "paradigm-selection-reject-over-engineering",
+    "prompt": "Optimize this Rust file for algorithm efficiency. Each function requires a different optimization strategy — simple HashMap lookup won't work for all of them. Identify the correct paradigm for each and explain why that paradigm fits better than alternatives.",
+    "assertions": [
+        "aplicar_pago_parcial is identified as NOT needing optimization (n=1-12 is too small, sort is appropriate for the greedy allocation)",
+        "rentabilidad_por_propiedad_mes is refactored with multi-level pre-indexing (contrato-to-propiedad mapping AND pagos grouped by contrato AND gastos grouped by propiedad+month)",
+        "mejor_mes_mantenimiento is identified as already O(n) (12 is a constant) and left unchanged or noted as not needing optimization",
+        "cascada_morosidad is fixed using a prefix sum or running total approach (group by month first, then accumulate) rather than just HashMap grouping",
+        "The output correctly rejects at least one 'clever' suggestion (min-heap, interval tree) as over-engineering with clear reasoning about why",
+        "Different paradigms are selected for different functions — not everything is solved with Space-Time Tradeoff"
+    ]
+}
