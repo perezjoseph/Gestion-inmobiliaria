@@ -58,7 +58,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Add `UnidadDtos.kt` with `UnidadDto`, `CreateUnidadRequest`, `UpdateUnidadRequest` using `@Serializable` and `@SerialName` for camelCase mapping
     - _Requirements: 6.7_
 
-  - [~] 3.3 Extend PropiedadesApiService with unidad endpoints
+  - [x] 3.3 Extend PropiedadesApiService with unidad endpoints
     - Add `getUnidades(propiedadId)`, `createUnidad(propiedadId, request)`, `updateUnidad(propiedadId, unidadId, request)`, `deleteUnidad(propiedadId, unidadId)`
     - _Requirements: 6.8_
 

@@ -1,9 +1,12 @@
 package com.propmanager.core.network.api
 
 import com.propmanager.core.model.dto.CreatePropiedadRequest
+import com.propmanager.core.model.dto.CreateUnidadRequest
 import com.propmanager.core.model.dto.PaginatedResponse
 import com.propmanager.core.model.dto.PropiedadDto
+import com.propmanager.core.model.dto.UnidadDto
 import com.propmanager.core.model.dto.UpdatePropiedadRequest
+import com.propmanager.core.model.dto.UpdateUnidadRequest
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -31,4 +34,26 @@ interface PropiedadesApiService {
     ): Response<PropiedadDto>
 
     @DELETE("api/propiedades/{id}") suspend fun delete(@Path("id") id: String): Response<Unit>
+
+    @GET("api/propiedades/{id}/unidades")
+    suspend fun getUnidades(@Path("id") propiedadId: String): Response<List<UnidadDto>>
+
+    @POST("api/propiedades/{id}/unidades")
+    suspend fun createUnidad(
+        @Path("id") propiedadId: String,
+        @Body request: CreateUnidadRequest,
+    ): Response<UnidadDto>
+
+    @PUT("api/propiedades/{id}/unidades/{unidadId}")
+    suspend fun updateUnidad(
+        @Path("id") propiedadId: String,
+        @Path("unidadId") unidadId: String,
+        @Body request: UpdateUnidadRequest,
+    ): Response<UnidadDto>
+
+    @DELETE("api/propiedades/{id}/unidades/{unidadId}")
+    suspend fun deleteUnidad(
+        @Path("id") propiedadId: String,
+        @Path("unidadId") unidadId: String,
+    ): Response<Unit>
 }
