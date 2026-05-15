@@ -85,7 +85,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Reuse existing `UserDto` if compatible, or create admin-specific DTO
     - _Requirements: 2.2_
 
-  - [~] 4.4 Create UsuariosViewModel
+  - [x] 4.4 Create UsuariosViewModel
     - Implement sealed `UsuariosUiState` (Loading, Success with ImmutableList + pagination, Error)
     - Implement `loadUsuarios(page)`, `changeRole(userId, newRole)`, `toggleActivo(userId)`
     - Handle loading/error states for each action
