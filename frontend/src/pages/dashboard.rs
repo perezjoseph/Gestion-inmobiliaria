@@ -191,6 +191,7 @@ fn StatsHeader(props: &StatsHeaderProps) -> Html {
                     </p>
                 </div>
             }
+            <ComplianceCounters stats={s.clone()} />
         </div>
     }
 }
@@ -230,6 +231,37 @@ fn OverdueSection(props: &OverdueSectionProps) -> Html {
                     })}
                 </div>
             }
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct ComplianceCountersProps {
+    stats: DashboardStats,
+}
+
+#[component]
+fn ComplianceCounters(props: &ComplianceCountersProps) -> Html {
+    let s = &props.stats;
+    html! {
+        <div class="gi-card-section">
+            <div class="gi-section-header">
+                <h2 class="gi-section-header-title">{"Cumplimiento Documental"}</h2>
+            </div>
+            <div class="gi-dashboard-header">
+                <div class={if s.documentos_vencidos > 0 { "gi-dashboard-secondary gi-dashboard-alert" } else { "gi-dashboard-secondary" }}>
+                    <p class="gi-stat-label">{"Documentos vencidos"}</p>
+                    <p class="gi-stat-value">{s.documentos_vencidos}</p>
+                </div>
+                <div class={if s.documentos_por_vencer > 0 { "gi-dashboard-secondary gi-dashboard-alert" } else { "gi-dashboard-secondary" }}>
+                    <p class="gi-stat-label">{"Por vencer"}</p>
+                    <p class="gi-stat-value">{s.documentos_por_vencer}</p>
+                </div>
+                <div class={if s.entidades_incompletas > 0 { "gi-dashboard-secondary gi-dashboard-alert" } else { "gi-dashboard-secondary" }}>
+                    <p class="gi-stat-label">{"Entidades incompletas"}</p>
+                    <p class="gi-stat-value">{s.entidades_incompletas}</p>
+                </div>
+            </div>
         </div>
     }
 }

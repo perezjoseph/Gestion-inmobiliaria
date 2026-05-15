@@ -27,6 +27,7 @@ pub struct Model {
     pub updated_at: Option<DateTimeWithTimeZone>,
     pub sellado: bool,
     pub sellado_at: Option<DateTimeWithTimeZone>,
+    pub documento_origen_id: Option<Uuid>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

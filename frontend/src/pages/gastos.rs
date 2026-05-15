@@ -87,6 +87,8 @@ struct GastoFilterBarProps {
     filter_propiedad: UseStateHandle<String>,
     filter_categoria: UseStateHandle<String>,
     filter_estado: UseStateHandle<String>,
+    filter_fecha_desde: UseStateHandle<String>,
+    filter_fecha_hasta: UseStateHandle<String>,
     propiedades: Vec<Propiedad>,
     on_apply: Callback<MouseEvent>,
     on_clear: Callback<MouseEvent>,

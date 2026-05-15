@@ -124,4 +124,10 @@ pub struct DashboardStats {
     #[serde(deserialize_with = "deserialize_f64_from_any")]
     pub ingreso_mensual: f64,
     pub pagos_atrasados: u64,
+    #[serde(default)]
+    pub documentos_vencidos: i64,
+    #[serde(default)]
+    pub documentos_por_vencer: i64,
+    #[serde(default)]
+    pub entidades_incompletas: i64,
 }

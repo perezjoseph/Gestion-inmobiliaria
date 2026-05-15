@@ -48,6 +48,22 @@
                 "Test data is generated at production scale (~5000 pagos)",
                 "The recommendation is backed by measured data, not theoretical O(1) vs O(n) reasoning"
             ]
+        },
+        {
+            "id": 4,
+            "prompt": "This endpoint is slow (~300ms). It enriches 20 contracts with data from 3 DB queries each. The team asked if we should optimize the Rust code that processes the results — maybe use iterators more efficiently or avoid allocations in the mapping logic.",
+            "expected_output": "With the skill: identifies that the function is IO-bound (60 DB queries × 2-8ms each dominate latency), recommends NOT benchmarking the Rust mapping code, and instead suggests batching queries or using JOINs. Without the skill: likely benchmarks the mapping logic or rewrites it with zero-copy patterns, missing that DB round-trips are 99% of the time.",
+            "files": [
+                "evals/files/eval4_io_bound_enrichment.rs"
+            ],
+            "expectations": [
+                "The output identifies that the function is IO-bound (DB queries dominate, not CPU work)",
+                "The output does NOT produce a criterion benchmark of the mapping/allocation logic",
+                "The recommendation focuses on reducing DB round-trips (batching, JOINs, or concurrent queries) rather than optimizing Rust code",
+                "The output explicitly states that benchmarking the CPU portion is pointless because it's <1% of total latency",
+                "If any optimization is suggested, it targets the IO pattern (e.g., try_join!, batch queries, single JOIN query) not the Rust code style",
+                "The output does not waste time writing competing implementations of the mapping logic"
+            ]
         }
     ]
 }

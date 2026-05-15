@@ -205,6 +205,7 @@ pub struct ProtectedRouteProps {
 
 #[component]
 pub fn ProtectedRoute(props: &ProtectedRouteProps) -> Html {
+    web_sys::console::log_1(&"[INIT] auth check".into());
     let Some(navigator) = use_navigator() else {
         return html! {};
     };
@@ -257,6 +258,8 @@ pub fn ProtectedRoute(props: &ProtectedRouteProps) -> Html {
             sidebar_open.set(false);
         })
     };
+
+    web_sys::console::log_1(&"[INIT] first route rendered".into());
 
     html! {
         <div class="flex min-h-screen" style="background-color: var(--surface-base);">

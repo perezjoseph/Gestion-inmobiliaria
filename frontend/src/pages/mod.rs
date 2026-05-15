@@ -1,9 +1,11 @@
 pub mod auditoria;
+pub mod categorias_gastos;
 pub mod chatbot_config;
 pub mod configuracion;
 pub mod contratos;
 pub mod dashboard;
 pub mod documento_editor;
+pub mod documentos_por_vencer;
 pub mod firma_publica;
 pub mod gastos;
 pub mod importar;

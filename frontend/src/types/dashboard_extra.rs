@@ -5,6 +5,16 @@ use crate::types::deserialize_f64_from_any;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct GastosComparacion {
+    #[serde(deserialize_with = "deserialize_f64_from_any")]
+    pub mes_actual: f64,
+    #[serde(deserialize_with = "deserialize_f64_from_any")]
+    pub mes_anterior: f64,
+    pub porcentaje_cambio: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct OcupacionMensual {
     pub mes: u32,
     pub anio: i32,

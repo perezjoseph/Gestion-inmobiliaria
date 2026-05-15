@@ -483,29 +483,83 @@ async fn resolver_org_de_entidad(
     }
 }
 
-/// Generate a sealed PDF with signature images embedded.
-async fn generar_pdf_sellado(db: &DatabaseConnection, documento_id: Uuid) -> Result<(), AppError> {
+/// Generate a sealed PDF and persist it as a new `Documento` record.
+///
+/// Renders the contract document as PDF via `documento_editor::exportar_pdf`,
+/// writes the file to `uploads/contratos/{contrato_id}/sellado.pdf`, and inserts
+/// a `Documento` row with `sellado = true` and `documento_origen_id = contrato.id`.
+pub async fn generar_pdf_sellado(
+    db: &DatabaseConnection,
+    contrato: &crate::entities::contrato::Model,
+    organizacion_id: Uuid,
+) -> Result<documento::Model, AppError> {
     use crate::services::documento_editor;
 
-    // Look up the document to find its parent entity and resolve org
-    let doc = documento::Entity::find_by_id(documento_id)
+    // Find the source document for this contract
+    let source_doc = documento::Entity::find()
+        .filter(documento::Column::EntityType.eq("contrato"))
+        .filter(documento::Column::EntityId.eq(contrato.id))
+        .filter(documento::Column::Sellado.eq(true))
         .one(db)
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
-
-    // Resolve organizacion_id from the parent entity
-    let organizacion_id = resolver_org_de_entidad(db, &doc.entity_type, doc.entity_id).await?;
+        .ok_or_else(|| {
+            AppError::NotFound(format!(
+                "Documento sellado del contrato {} no encontrado",
+                contrato.id
+            ))
+        })?;
 
     // Generate PDF using existing export function
-    let _pdf_bytes = documento_editor::exportar_pdf(db, documento_id, organizacion_id).await?;
+    let pdf_bytes = documento_editor::exportar_pdf(db, source_doc.id, organizacion_id).await?;
 
-    // In a full implementation, we would embed signature images into the PDF
-    // and store it as a new documento record. For now, the PDF is generated
-    // using the existing export logic.
+    // Write to uploads/contratos/{contrato_id}/sellado.pdf
+    let dest = std::path::PathBuf::from("uploads/contratos")
+        .join(contrato.id.to_string())
+        .join("sellado.pdf");
+    if let Some(parent) = dest.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error creando directorio: {e}")))?;
+    }
+    tokio::fs::write(&dest, &pdf_bytes)
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error escribiendo PDF sellado: {e}")))?;
+
+    let now = Utc::now();
+    let file_size = pdf_bytes.len() as i64;
+
+    // Insert a new Documento record for the sealed PDF
+    let doc = documento::ActiveModel {
+        id: Set(Uuid::new_v4()),
+        entity_type: Set("contrato".to_string()),
+        entity_id: Set(contrato.id),
+        filename: Set("contrato_sellado.pdf".to_string()),
+        file_path: Set(dest.to_string_lossy().into_owned()),
+        mime_type: Set("application/pdf".to_string()),
+        file_size: Set(file_size),
+        uploaded_by: Set(source_doc.uploaded_by),
+        created_at: Set(now.into()),
+        tipo_documento: Set("contrato_sellado".to_string()),
+        estado_verificacion: Set("verificado".to_string()),
+        fecha_vencimiento: Set(None),
+        verificado_por: Set(None),
+        fecha_verificacion: Set(None),
+        notas_verificacion: Set(None),
+        numero_documento: Set(None),
+        contenido_editable: Set(None),
+        updated_at: Set(None),
+        sellado: Set(true),
+        sellado_at: Set(Some(now.into())),
+        documento_origen_id: Set(Some(contrato.id)),
+    };
+
+    let inserted = doc.insert(db).await?;
+
     tracing::info!(
-        documento_id = %documento_id,
-        "PDF sellado generado exitosamente"
+        documento_id = %inserted.id,
+        contrato_id = %contrato.id,
+        "PDF sellado generado y persistido exitosamente"
     );
 
-    Ok(())
+    Ok(inserted)
 }

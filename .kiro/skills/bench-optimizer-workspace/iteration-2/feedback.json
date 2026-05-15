@@ -1,0 +1,35 @@
+{
+  "reviews": [
+    {
+      "run_id": "eval-1-with_skill",
+      "feedback": "The report is exactly what you'd want from a performance investigation. Four approaches tested, real criterion output with confidence intervals, scaling table showing crossover behavior, root cause analysis identifying chrono::format as the bottleneck, and a clear recommendation citing \"329µs vs 1.6ms = 4.9x faster.\" The observation that sort_scan wins at n=2000 but btreemap catches up at n=5000 shows genuine analytical depth.",
+      "timestamp": "2026-05-15T04:37:34.341Z"
+    },
+    {
+      "run_id": "eval-1-without_skill",
+      "feedback": " \"Overall estimate: 2-4x faster\" with zero measurement. The analysis is technically correct (the bottlenecks identified are real) but the whole point is that you can't know the actual speedup without measuring. The without-skill output is a textbook example of what this skill exists to prevent.",
+      "timestamp": "2026-05-15T04:37:34.341Z"
+    },
+    {
+      "run_id": "eval-2-with_skill",
+      "feedback": " This is the skill's strongest showing. The agent correctly concludes \"Don't Optimize\" and backs it with:\n\nOriginal is faster at typical n=10 (430ns vs 1.5µs)\nAt n=200, the absolute time (33µs) is 0.1% of request latency\nEven 200 calls during bulk import = 6.6ms total, negligible vs DB ops\nCrossover analysis with real numbers (n=50 original still wins)\nThis is exactly the kind of nuanced, data-backed reasoning that LLMs typically fail at. Without the skill, the agent sees \"O(n²)\" and reflexively optimizes.",
+      "timestamp": "2026-05-15T04:37:34.341Z"
+    },
+    {
+      "run_id": "eval-2-without_skill",
+      "feedback": "Passes 2/6 assertions — it correctly considers whether optimization is warranted (good) but then recommends optimizing anyway without measured data (bad). The skill's \"Valid Outcome: Don't Optimize\" section is doing heavy lifting here.",
+      "timestamp": "2026-05-15T04:37:34.341Z"
+    },
+    {
+      "run_id": "eval-3-with_skill",
+      "feedback": "Comprehensive report covering:\n\nPrimary query (45x speedup), combined filter (103x), date-range fallback (no benefit — correctly identified)\nIndex build cost measured separately (332µs)\nAmortization: \"332µs / (32µs - 0.7µs) ≈ 11 queries to recoup\"\nScaling table confirming O(1) vs O(n) behavior\nPractical recommendation choosing HashMap indices over ref index for flexibility",
+      "timestamp": "2026-05-15T04:37:34.341Z"
+    },
+    {
+      "run_id": "eval-3-without_skill",
+      "feedback": " Also passes 6/6. The prompt (\"figure it out\") strongly implies benchmarking, so the agent benchmarks independently. This confirms the skill's value is highest on ambiguous prompts, not explicit ones.\n\nOne minor note: The with-skill report includes a \"Context: Is this worth optimizing?\" section that acknowledges 32µs is only 0.2-0.6% of request time but still recommends optimizing because the index is simple and prevents future scaling issues. Good judgment call — shows the skill doesn't blindly say \"don't optimize\" for everything.",
+      "timestamp": "2026-05-15T04:37:34.341Z"
+    }
+  ],
+  "status": "complete"
+}

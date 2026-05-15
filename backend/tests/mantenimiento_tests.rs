@@ -1030,3 +1030,267 @@ fn test_default_prioridad() {
         cleanup_solicitud(&db, body["id"].as_str().unwrap().parse().unwrap()).await;
     });
 }
+
+/// Validates: Requirements 10.2, 10.4, 10.5
+/// Seeds solicitudes across two organizations and two unidades;
+/// asserts filter returns only matching rows scoped to caller's `organizacion_id`.
+#[test]
+fn test_unidad_id_filter_scoped_to_org() {
+    with_db(|db| async move {
+        let config = make_config();
+
+        // --- Org A setup ---
+        let org_a = create_test_organizacion(&db).await;
+        let admin_a = create_test_usuario(&db, "admin", org_a).await;
+        let token_a = make_token(admin_a, "admin", org_a);
+        let propiedad_a = create_test_propiedad(&db, org_a).await;
+        let unidad_a1 = create_test_unidad(&db, propiedad_a).await;
+        let unidad_a2 = create_test_unidad(&db, propiedad_a).await;
+
+        // --- Org B setup ---
+        let org_b = create_test_organizacion(&db).await;
+        let admin_b = create_test_usuario(&db, "admin", org_b).await;
+        let token_b = make_token(admin_b, "admin", org_b);
+        let propiedad_b = create_test_propiedad(&db, org_b).await;
+        let unidad_b1 = create_test_unidad(&db, propiedad_b).await;
+
+        let app = actix_web::test::init_service(create_app(
+            db.clone(),
+            config,
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
+        ))
+        .await;
+
+        // Create solicitudes in Org A: one for unidad_a1, one for unidad_a2, one without unidad
+        let req = actix_web::test::TestRequest::post()
+            .uri("/api/v1/mantenimiento")
+            .insert_header(("Authorization", format!("Bearer {token_a}")))
+            .set_json(json!({
+                "propiedadId": propiedad_a,
+                "unidadId": unidad_a1,
+                "titulo": "OrgA Unidad A1 solicitud"
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        let sol_a1: Uuid = body["id"].as_str().unwrap().parse().unwrap();
+
+        let req = actix_web::test::TestRequest::post()
+            .uri("/api/v1/mantenimiento")
+            .insert_header(("Authorization", format!("Bearer {token_a}")))
+            .set_json(json!({
+                "propiedadId": propiedad_a,
+                "unidadId": unidad_a2,
+                "titulo": "OrgA Unidad A2 solicitud"
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        let sol_a2: Uuid = body["id"].as_str().unwrap().parse().unwrap();
+
+        let req = actix_web::test::TestRequest::post()
+            .uri("/api/v1/mantenimiento")
+            .insert_header(("Authorization", format!("Bearer {token_a}")))
+            .set_json(json!({
+                "propiedadId": propiedad_a,
+                "titulo": "OrgA sin unidad"
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        let sol_a_no_unit: Uuid = body["id"].as_str().unwrap().parse().unwrap();
+
+        // Create solicitud in Org B for unidad_b1
+        let req = actix_web::test::TestRequest::post()
+            .uri("/api/v1/mantenimiento")
+            .insert_header(("Authorization", format!("Bearer {token_b}")))
+            .set_json(json!({
+                "propiedadId": propiedad_b,
+                "unidadId": unidad_b1,
+                "titulo": "OrgB Unidad B1 solicitud"
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        let sol_b1: Uuid = body["id"].as_str().unwrap().parse().unwrap();
+
+        // --- Filter by unidad_a1 as Org A user → only sol_a1 ---
+        let req = actix_web::test::TestRequest::get()
+            .uri(&format!("/api/v1/mantenimiento?unidadId={unidad_a1}"))
+            .insert_header(("Authorization", format!("Bearer {token_a}")))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 200);
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        let data = body["data"].as_array().unwrap();
+        assert!(
+            data.iter()
+                .all(|item| item["unidadId"] == unidad_a1.to_string()),
+            "All returned rows must have unidadId == unidad_a1"
+        );
+        assert!(
+            data.iter().any(|item| item["id"] == sol_a1.to_string()),
+            "sol_a1 must be in the results"
+        );
+        assert!(
+            !data.iter().any(|item| item["id"] == sol_a2.to_string()),
+            "sol_a2 must NOT be in the results"
+        );
+        assert!(
+            !data
+                .iter()
+                .any(|item| item["id"] == sol_a_no_unit.to_string()),
+            "sol without unidad must NOT be in the results"
+        );
+
+        // --- Filter by unidad_a2 as Org A user → only sol_a2 ---
+        let req = actix_web::test::TestRequest::get()
+            .uri(&format!("/api/v1/mantenimiento?unidadId={unidad_a2}"))
+            .insert_header(("Authorization", format!("Bearer {token_a}")))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 200);
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        let data = body["data"].as_array().unwrap();
+        assert!(
+            data.iter()
+                .all(|item| item["unidadId"] == unidad_a2.to_string()),
+            "All returned rows must have unidadId == unidad_a2"
+        );
+        assert!(
+            data.iter().any(|item| item["id"] == sol_a2.to_string()),
+            "sol_a2 must be in the results"
+        );
+
+        // --- No unidad_id filter as Org A → returns all Org A solicitudes (not Org B) ---
+        let req = actix_web::test::TestRequest::get()
+            .uri("/api/v1/mantenimiento")
+            .insert_header(("Authorization", format!("Bearer {token_a}")))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 200);
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        let data = body["data"].as_array().unwrap();
+        // Must contain all three Org A solicitudes
+        assert!(data.iter().any(|item| item["id"] == sol_a1.to_string()));
+        assert!(data.iter().any(|item| item["id"] == sol_a2.to_string()));
+        assert!(
+            data.iter()
+                .any(|item| item["id"] == sol_a_no_unit.to_string())
+        );
+        // Must NOT contain Org B solicitud
+        assert!(
+            !data.iter().any(|item| item["id"] == sol_b1.to_string()),
+            "Org B solicitud must NOT appear in Org A listing"
+        );
+
+        // Cleanup
+        cleanup_solicitud(&db, sol_a1).await;
+        cleanup_solicitud(&db, sol_a2).await;
+        cleanup_solicitud(&db, sol_a_no_unit).await;
+        cleanup_solicitud(&db, sol_b1).await;
+    });
+}
+
+/// Validates: Requirements 10.4, 10.5
+/// Asserts that filtering by a `unidad_id` from another organization returns
+/// an empty list (no existence leak).
+#[test]
+fn test_unidad_id_from_another_org_returns_empty() {
+    with_db(|db| async move {
+        let config = make_config();
+
+        // --- Org A setup ---
+        let org_a = create_test_organizacion(&db).await;
+        let admin_a = create_test_usuario(&db, "admin", org_a).await;
+        let token_a = make_token(admin_a, "admin", org_a);
+        let propiedad_a = create_test_propiedad(&db, org_a).await;
+        let unidad_a1 = create_test_unidad(&db, propiedad_a).await;
+
+        // --- Org B setup ---
+        let org_b = create_test_organizacion(&db).await;
+        let admin_b = create_test_usuario(&db, "admin", org_b).await;
+        let token_b = make_token(admin_b, "admin", org_b);
+        let propiedad_b = create_test_propiedad(&db, org_b).await;
+        let unidad_b1 = create_test_unidad(&db, propiedad_b).await;
+
+        let app = actix_web::test::init_service(create_app(
+            db.clone(),
+            config,
+            actix_web::web::Data::new(
+                realestate_backend::services::ocr_preview::PreviewStore::new(),
+            ),
+        ))
+        .await;
+
+        // Create a solicitud in Org A for unidad_a1
+        let req = actix_web::test::TestRequest::post()
+            .uri("/api/v1/mantenimiento")
+            .insert_header(("Authorization", format!("Bearer {token_a}")))
+            .set_json(json!({
+                "propiedadId": propiedad_a,
+                "unidadId": unidad_a1,
+                "titulo": "OrgA solicitud con unidad"
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        let sol_a: Uuid = body["id"].as_str().unwrap().parse().unwrap();
+
+        // Create a solicitud in Org B for unidad_b1
+        let req = actix_web::test::TestRequest::post()
+            .uri("/api/v1/mantenimiento")
+            .insert_header(("Authorization", format!("Bearer {token_b}")))
+            .set_json(json!({
+                "propiedadId": propiedad_b,
+                "unidadId": unidad_b1,
+                "titulo": "OrgB solicitud con unidad"
+            }))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        let sol_b: Uuid = body["id"].as_str().unwrap().parse().unwrap();
+
+        // --- Org A user filters by unidad_b1 (belongs to Org B) → empty list ---
+        let req = actix_web::test::TestRequest::get()
+            .uri(&format!("/api/v1/mantenimiento?unidadId={unidad_b1}"))
+            .insert_header(("Authorization", format!("Bearer {token_a}")))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 200);
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        let data = body["data"].as_array().unwrap();
+        assert!(
+            data.is_empty(),
+            "Filtering by unidad_id from another org must return empty list, got {} items",
+            data.len()
+        );
+
+        // --- Org B user filters by unidad_a1 (belongs to Org A) → empty list ---
+        let req = actix_web::test::TestRequest::get()
+            .uri(&format!("/api/v1/mantenimiento?unidadId={unidad_a1}"))
+            .insert_header(("Authorization", format!("Bearer {token_b}")))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 200);
+        let body: Value = actix_web::test::read_body_json(resp).await;
+        let data = body["data"].as_array().unwrap();
+        assert!(
+            data.is_empty(),
+            "Filtering by unidad_id from another org must return empty list, got {} items",
+            data.len()
+        );
+
+        // Cleanup
+        cleanup_solicitud(&db, sol_a).await;
+        cleanup_solicitud(&db, sol_b).await;
+    });
+}

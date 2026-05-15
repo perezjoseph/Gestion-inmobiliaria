@@ -307,6 +307,7 @@ pub async fn upload(
         updated_at: Set(None),
         sellado: Set(false),
         sellado_at: Set(None),
+        documento_origen_id: Set(None),
     };
 
     let inserted = model.insert(db).await?;
@@ -477,6 +478,13 @@ pub async fn eliminar(
 
     // Verify the document's parent entity belongs to the caller's org
     verificar_entidad_pertenece_a_org(db, &doc.entity_type, doc.entity_id, organizacion_id).await?;
+
+    // Reject deletion of sealed documents (signed contracts)
+    if doc.sellado || doc.documento_origen_id.is_some() {
+        return Err(AppError::Forbidden(
+            "No se puede eliminar un documento sellado".into(),
+        ));
+    }
 
     // Delete file from disk (best-effort — don't fail if file is already gone)
     let upload_dir = get_upload_dir();
@@ -1049,6 +1057,7 @@ mod tests {
             updated_at: None,
             sellado: false,
             sellado_at: None,
+            documento_origen_id: None,
         };
         let resp = model_to_response(model);
         assert_eq!(resp.id, id);
@@ -1087,6 +1096,7 @@ mod tests {
             updated_at: Some(now),
             sellado: false,
             sellado_at: None,
+            documento_origen_id: None,
         };
         let resp = model_to_response(model);
         assert_eq!(resp.estado_verificacion, "verificado");
@@ -1186,6 +1196,7 @@ mod tests {
             updated_at: None,
             sellado: false,
             sellado_at: None,
+            documento_origen_id: None,
         }
     }
 
