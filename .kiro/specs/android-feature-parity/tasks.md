@@ -50,7 +50,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
   - Build the app and verify all 6 CRUD features navigate correctly between list, detail, and form screens. Ask user to confirm on device if needed.
 
 - [ ] 3. Add Unidad model and API support
-  - [~] 3.1 Create Unidad domain model in `core/model`
+  - [x] 3.1 Create Unidad domain model in `core/model`
     - Add `Unidad.kt` data class with: id, propiedadId, numeroUnidad, piso, habitaciones, banos, areaM2, precio (BigDecimal), moneda, estado, descripcion
     - _Requirements: 6.6_
 
