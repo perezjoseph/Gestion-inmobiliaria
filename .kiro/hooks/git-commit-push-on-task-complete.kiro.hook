@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Git Commit & Push on Task Complete",
+  "description": "Stages all changes, commits with a task-completion message, and pushes to the current branch when a spec task is marked completed.",
+  "version": "1",
+  "when": {
+    "type": "postTaskExecution"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "git add -A && (git diff --cached --quiet || git commit -m \"chore: complete spec task\") && git push"
+  }
+}

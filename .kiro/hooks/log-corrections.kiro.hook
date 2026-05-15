@@ -1,0 +1,15 @@
+{
+  "enabled": false,
+  "name": "Log Human Corrections",
+  "description": "When the user corrects a mistake or provides feedback on an error, append a concise entry to .kiro/steering/corrections.md. Keep the file under 200 words total.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Check if the user's message is correcting a mistake you made or giving feedback about something you did wrong. If it IS a correction: append a one-line entry to realestate/.kiro/steering/corrections.md using format `- **Topic**: correction`. Before appending, read the file and count total words — if adding the new entry would exceed 200 words, remove the oldest entry first. If the message is NOT a correction (just a normal request), do nothing."
+  },
+  "workspaceFolderName": "realestate",
+  "shortName": "log-corrections"
+}

@@ -1,0 +1,484 @@
+# Implementation Plan: Platform Enhancements
+
+## Overview
+
+Incremental implementation of 19 platform enhancements for the Gestión Inmobiliaria application. Tasks are organized to build foundational infrastructure first (database migrations, entities, shared components), then layer features on top. Each task builds on previous work, and checkpoints ensure incremental validation. All UI text is in Spanish. Backend uses Actix-web with SeaORM; frontend uses Yew + WASM with Tailwind CSS.
+
+## Tasks
+
+- [x] 1. Database migrations and SeaORM entities for new tables
+  - [x] 1.1 Create migration for `registros_auditoria` table
+    - Create `backend/migrations/m20250409_000001_create_registros_auditoria.rs`
+    - Columns: `id` (UUID PK), `usuario_id` (UUID FK → usuarios, NOT NULL, INDEXED), `entity_type` (VARCHAR(50) NOT NULL, INDEXED), `entity_id` (UUID NOT NULL, INDEXED), `accion` (VARCHAR(20) NOT NULL), `cambios` (JSONB NOT NULL), `created_at` (TIMESTAMPTZ NOT NULL DEFAULT NOW(), INDEXED)
+    - Register migration in `backend/migrations/mod.rs`
+    - _Requirements: 12.4_
+  - [x] 1.2 Create migration for `documentos` table
+    - Create `backend/migrations/m20250409_000002_create_documentos.rs`
+    - Columns: `id` (UUID PK), `entity_type` (VARCHAR(50) NOT NULL, INDEXED), `entity_id` (UUID NOT NULL, INDEXED), `filename` (VARCHAR(255) NOT NULL), `file_path` (VARCHAR(500) NOT NULL), `mime_type` (VARCHAR(100) NOT NULL), `file_size` (BIGINT NOT NULL), `uploaded_by` (UUID FK → usuarios, NOT NULL), `created_at` (TIMESTAMPTZ NOT NULL DEFAULT NOW())
+    - Register migration in `backend/migrations/mod.rs`
+    - _Requirements: 14.1, 14.2, 14.3_
+  - [x] 1.3 Create migration for `configuracion` table
+    - Create `backend/migrations/m20250409_000003_create_configuracion.rs`
+    - Columns: `clave` (VARCHAR(100) PK), `valor` (JSONB NOT NULL), `updated_at` (TIMESTAMPTZ NOT NULL), `updated_by` (UUID FK → usuarios, NULL)
+    - Seed with `clave = "tasa_cambio_dop_usd"`, `valor = {"tasa": 58.50, "actualizado": "2025-01-01"}`
+    - Register migration in `backend/migrations/mod.rs`
+    - _Requirements: 16.3_
+  - [x] 1.4 Create migration to add `documentos` JSONB column to `inquilinos` and `contratos`
+    - Create `backend/migrations/m20250409_000004_add_documentos_columns.rs`
+    - `ALTER TABLE inquilinos ADD COLUMN documentos JSONB DEFAULT '[]'::jsonb`
+    - `ALTER TABLE contratos ADD COLUMN documentos JSONB DEFAULT '[]'::jsonb`
+    - Register migration in `backend/migrations/mod.rs`
+    - _Requirements: 14.2, 14.3_
+  - [x] 1.5 Generate SeaORM entities for new tables
+    - Create `backend/src/entities/registro_auditoria.rs` with Model struct for `registros_auditoria`
+    - Create `backend/src/entities/documento.rs` with Model struct for `documentos`
+    - Create `backend/src/entities/configuracion.rs` with Model struct for `configuracion`
+    - Update `backend/src/entities/mod.rs` to export new modules
+    - Update `backend/src/entities/prelude.rs` to include new entities
+    - _Requirements: 12.4, 14.1, 16.3_
+
+- [x] 2. Add new backend dependencies
+  - Add `genpdf`, `rust_xlsxwriter`, `csv`, `calamine`, `actix-multipart`, and `actix-files` to `backend/Cargo.toml`
+  - _Requirements: 2.1, 2.2, 11.1, 14.4, 19.1, 19.3_
+
+- [x] 3. Audit logging service
+  - [x] 3.1 Implement `backend/src/services/auditoria.rs`
+    - Implement `registrar(txn: &DatabaseTransaction, entry: CreateAuditoriaEntry) -> Result<(), AppError>` to insert audit entries within the caller's transaction
+    - Implement `listar(db: &DatabaseConnection, query: AuditoriaQuery) -> Result<PaginatedResponse<AuditoriaResponse>, AppError>` with filters for entity_type, entity_id, usuario_id, and date range
+    - Add `AuditoriaQuery` and `AuditoriaResponse` structs to `backend/src/models/auditoria.rs`
+    - Register module in `backend/src/services/mod.rs` and `backend/src/models/mod.rs`
+    - _Requirements: 12.1, 12.2, 12.5_
+  - [x] 3.2 Implement `backend/src/handlers/auditoria.rs`
+    - Implement `GET /api/auditoria` handler restricted to `AdminOnly` extractor
+    - Register handler in `backend/src/handlers/mod.rs` and add route in `backend/src/routes.rs`
+    - _Requirements: 12.2, 12.3_
+  - [x] 3.3 Integrate audit logging into existing services
+    - Modify `services/propiedades.rs` create/update/delete to accept a transaction and call `auditoria::registrar` within the same transaction
+    - Modify `services/inquilinos.rs` create/update/delete similarly
+    - Modify `services/contratos.rs` create/update/delete similarly
+    - Modify `services/pagos.rs` create/update/delete similarly
+    - Update corresponding handlers to begin transactions and pass them to services
+    - _Requirements: 12.1, 12.5_
+  - [x] 3.4 Write unit tests for audit logging service
+    - Test `registrar` creates correct audit entry
+    - Test `listar` filters by entity_type, entity_id, usuario_id, and date range
+    - Test admin-only access restriction on handler
+    - _Requirements: 12.1, 12.2, 12.3_
+
+- [x] 4. Checkpoint — Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+
+- [x] 5. User management service and endpoints
+  - [x] 5.1 Implement `backend/src/services/usuarios.rs`
+    - Implement `listar(db, page, per_page) -> Result<PaginatedResponse<UsuarioResponse>, AppError>` returning paginated user list
+    - Implement `cambiar_rol(db, id, nuevo_rol) -> Result<UsuarioResponse, AppError>` with validation for "admin", "gerente", "visualizador"
+    - Implement `desactivar(db, id) -> Result<UsuarioResponse, AppError>` setting `activo = false`
+    - Implement `activar(db, id) -> Result<UsuarioResponse, AppError>` setting `activo = true`
+    - Add request/response DTOs to `backend/src/models/usuario.rs`
+    - Register module in `backend/src/services/mod.rs`
+    - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
+  - [x] 5.2 Implement `backend/src/handlers/usuarios.rs`
+    - Implement `GET /api/usuarios`, `PUT /api/usuarios/{id}/rol`, `PUT /api/usuarios/{id}/activar`, `PUT /api/usuarios/{id}/desactivar` handlers
+    - All restricted to `AdminOnly` extractor
+    - Register handler in `backend/src/handlers/mod.rs` and add routes in `backend/src/routes.rs`
+    - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
+  - [x] 5.3 Extend login flow to check `activo` status
+    - Modify `services/auth.rs` login to reject inactive users with "Cuenta inactiva" error before issuing JWT
+    - _Requirements: 10.6_
+  - [x] 5.4 Write unit tests for user management
+    - Test role change validation (valid/invalid roles)
+    - Test activate/deactivate toggling
+    - Test inactive user login rejection
+    - Test admin-only access restriction
+    - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6_
+
+- [x] 6. User profile service and endpoints
+  - [x] 6.1 Implement `backend/src/services/perfil.rs`
+    - Implement `obtener_perfil(db, user_id) -> Result<UsuarioResponse, AppError>`
+    - Implement `actualizar_perfil(db, user_id, nombre, email) -> Result<UsuarioResponse, AppError>` with email uniqueness validation
+    - Implement `cambiar_password(db, user_id, password_actual, password_nuevo) -> Result<(), AppError>` with argon2 verification and hashing
+    - Register module in `backend/src/services/mod.rs`
+    - _Requirements: 18.1, 18.2, 18.3, 18.4_
+  - [x] 6.2 Implement `backend/src/handlers/perfil.rs`
+    - Implement `GET /api/perfil`, `PUT /api/perfil`, `PUT /api/perfil/password` handlers
+    - Extract user_id from JWT claims
+    - Register handler in `backend/src/handlers/mod.rs` and add routes in `backend/src/routes.rs`
+    - _Requirements: 18.1, 18.3, 18.5_
+  - [x] 6.3 Write unit tests for profile service
+    - Test password change with correct/incorrect current password
+    - Test email uniqueness rejection
+    - Test profile update
+    - _Requirements: 18.1, 18.2, 18.3, 18.4_
+
+- [x] 7. Reporting service and export
+  - [x] 7.1 Implement `backend/src/services/reportes.rs`
+    - Implement `generar_reporte_ingresos(db, query) -> Result<IngresoReportSummary, AppError>` joining pagos → contratos → propiedades/inquilinos, filtering by month/year, grouping by propiedad, summing by estado
+    - Implement `historial_pagos(db, fecha_desde, fecha_hasta) -> Result<Vec<HistorialPagoEntry>, AppError>` returning chronologically ordered payment history
+    - Implement occupancy rate calculation: `(propiedades with estado "ocupada") / total * 100` rounded to one decimal
+    - Add `IngresoReportQuery`, `IngresoReportRow`, `IngresoReportSummary`, `HistorialPagoEntry` structs to `backend/src/models/reporte.rs`
+    - Register modules in `backend/src/services/mod.rs` and `backend/src/models/mod.rs`
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
+  - [x] 7.2 Implement PDF and Excel export functions
+    - Implement `exportar_pdf(summary) -> Result<Vec<u8>, AppError>` using `genpdf` with report title, date range, tabular data, summary totals, generation timestamp, requesting user name
+    - Implement `exportar_xlsx(summary) -> Result<Vec<u8>, AppError>` using `rust_xlsxwriter` with same content
+    - Handle empty reports with "Sin registros para el período" message
+    - _Requirements: 2.1, 2.2, 2.3, 2.4_
+  - [x] 7.3 Implement `backend/src/handlers/reportes.rs`
+    - Implement `GET /api/reportes/ingresos`, `GET /api/reportes/ingresos/pdf`, `GET /api/reportes/ingresos/xlsx`, `GET /api/reportes/historial-pagos`, `GET /api/reportes/ocupacion/tendencia`
+    - PDF/XLSX handlers stream bytes with appropriate Content-Type and Content-Disposition headers
+    - Register handler in `backend/src/handlers/mod.rs` and add routes in `backend/src/routes.rs`
+    - _Requirements: 1.1, 1.5, 2.1, 2.2_
+  - [x] 7.4 Write unit tests for reporting service
+    - Test income aggregation with mixed payment statuses
+    - Test filtering by propiedad and inquilino
+    - Test occupancy rate calculation
+    - Test empty report handling
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.4_
+
+- [x] 8. Notifications service (overdue payments)
+  - [x] 8.1 Implement `backend/src/services/notificaciones.rs`
+    - Implement `listar_pagos_vencidos(db) -> Result<Vec<PagoVencido>, AppError>` querying pagos where `estado == "pendiente"` AND `fecha_vencimiento < today`
+    - Calculate `dias_vencido = (today - fecha_vencimiento).num_days()`
+    - Join pagos → contratos → propiedades and contratos → inquilinos
+    - Sort by `dias_vencido` descending
+    - Add `PagoVencido` struct to `backend/src/models/notificacion.rs`
+    - Register modules in `backend/src/services/mod.rs` and `backend/src/models/mod.rs`
+    - _Requirements: 3.1, 3.4, 3.5_
+  - [x] 8.2 Implement `backend/src/handlers/notificaciones.rs`
+    - Implement `GET /api/notificaciones/pagos-vencidos` handler
+    - Register handler in `backend/src/handlers/mod.rs` and add routes in `backend/src/routes.rs`
+    - _Requirements: 3.1_
+  - [x] 8.3 Write unit tests for notifications service
+    - Test overdue detection logic (pendiente + past due date)
+    - Test that paid payments are excluded
+    - Test sorting by days overdue
+    - _Requirements: 3.1, 3.4, 3.5_
+
+- [x] 9. Contract lifecycle extensions
+  - [x] 9.1 Extend `backend/src/services/contratos.rs` with renewal
+    - Implement `renovar(db, contrato_id, input) -> Result<ContratoResponse, AppError>` within a transaction
+    - Create new contrato with same propiedad_id/inquilino_id, fecha_inicio = original.fecha_fin + 1 day, user-specified fecha_fin and monto_mensual
+    - Validate original contrato estado == "activo", validate no overlap with other active contracts for same propiedad
+    - Set original contrato estado = "finalizado"
+    - Add `RenovarContratoRequest` to `backend/src/models/contrato.rs`
+    - _Requirements: 4.1, 4.2, 4.3, 4.4_
+  - [x] 9.2 Extend `backend/src/services/contratos.rs` with early termination
+    - Implement `terminar(db, contrato_id, input) -> Result<ContratoResponse, AppError>` within a transaction
+    - Set estado = "terminado", fecha_fin = fecha_terminacion
+    - Validate estado == "activo" and fecha_terminacion >= fecha_inicio
+    - Set propiedad estado = "disponible" if no other active contrato exists
+    - Add `TerminarContratoRequest` to `backend/src/models/contrato.rs`
+    - _Requirements: 5.1, 5.2, 5.3, 5.4_
+  - [x] 9.3 Implement expiration alerts query
+    - Implement `listar_por_vencer(db, dias) -> Result<Vec<ContratoResponse>, AppError>` returning active contratos with fecha_fin within N days (default 90)
+    - _Requirements: 6.1_
+  - [x] 9.4 Implement contract lifecycle handlers
+    - Implement `POST /api/contratos/{id}/renovar`, `POST /api/contratos/{id}/terminar`, `GET /api/contratos/por-vencer` handlers
+    - Add routes in `backend/src/routes.rs`
+    - _Requirements: 4.1, 5.1, 6.1_
+  - [x] 9.5 Write unit tests for contract lifecycle
+    - Test renewal creates new contract with correct dates
+    - Test renewal rejects non-active contracts
+    - Test overlap detection on renewal
+    - Test early termination updates estado and fecha_fin
+    - Test termination rejects invalid dates
+    - Test propiedad status update on termination
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 5.1, 5.2, 5.3, 5.4_
+
+- [x] 10. Checkpoint — Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+
+- [x] 11. Advanced filtering — payments and tenants
+  - [x] 11.1 Extend `PagoListQuery` in `backend/src/models/pago.rs` with `fecha_desde` and `fecha_hasta` fields
+    - Update `services/pagos.rs` list query to filter by date range on `fecha_vencimiento` when provided
+    - _Requirements: 8.1, 8.2, 8.3_
+  - [x] 11.2 Extend `InquilinoListQuery` in `backend/src/models/inquilino.rs` with `busqueda` field
+    - Update `services/inquilinos.rs` list query to apply `ILIKE '%term%'` on nombre, apellido, cedula with OR logic
+    - Skip search when term is fewer than 2 characters
+    - _Requirements: 9.1, 9.3_
+  - [x] 11.3 Write unit tests for advanced filtering
+    - Test payment date range filtering
+    - Test tenant search by name and cédula
+    - Test search term minimum length behavior
+    - _Requirements: 8.2, 9.1, 9.3_
+
+- [x] 12. Payment receipts service
+  - [x] 12.1 Implement `backend/src/services/recibos.rs`
+    - Implement `generar_recibo(db, pago_id) -> Result<Vec<u8>, AppError>` using `genpdf`
+    - Include: company header, Propiedad dirección, Inquilino nombre + cédula, Contrato reference, monto, moneda, fecha_pago, método_pago, unique receipt number (UUID-based)
+    - Format date as DD/MM/YYYY, currency per DR conventions
+    - Reject if Pago estado != "pagado"
+    - Register module in `backend/src/services/mod.rs`
+    - _Requirements: 11.1, 11.2, 11.3_
+  - [x] 12.2 Implement `backend/src/handlers/recibos.rs`
+    - Implement `GET /api/pagos/{id}/recibo` handler streaming PDF bytes
+    - Register handler in `backend/src/handlers/mod.rs` and add route in `backend/src/routes.rs`
+    - _Requirements: 11.1_
+  - [x] 12.3 Write unit tests for receipt generation
+    - Test receipt generation for paid payment
+    - Test rejection for non-paid payment
+    - _Requirements: 11.1, 11.3_
+
+- [x] 13. Document upload service
+  - [x] 13.1 Implement `backend/src/services/documentos.rs`
+    - Implement `upload(db, entity_type, entity_id, file_data, filename, mime_type, uploaded_by) -> Result<DocumentoResponse, AppError>`
+    - Store files on disk under `{UPLOAD_DIR}/{entity_type}/{entity_id}/{uuid}-{filename}`
+    - Validate max 10 MB file size, allowed MIME types: image/jpeg, image/png, application/pdf
+    - Insert metadata into `documentos` table
+    - Implement `listar_documentos(db, entity_type, entity_id) -> Result<Vec<DocumentoResponse>, AppError>`
+    - Add `DocumentoResponse` to `backend/src/models/documento.rs`
+    - Register modules in `backend/src/services/mod.rs` and `backend/src/models/mod.rs`
+    - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6_
+  - [x] 13.2 Implement `backend/src/handlers/documentos.rs`
+    - Implement `POST /api/documentos/{entity_type}/{entity_id}` using `actix-multipart` for upload
+    - Implement `GET /api/documentos/{entity_type}/{entity_id}` for listing
+    - Configure static file serving for `UPLOAD_DIR` using `actix-files`
+    - Register handler in `backend/src/handlers/mod.rs` and add routes in `backend/src/routes.rs`
+    - _Requirements: 14.1, 14.4, 14.7_
+  - [x] 13.3 Write unit tests for document upload service
+    - Test file size validation (reject > 10 MB)
+    - Test MIME type validation (reject disallowed types)
+    - Test successful upload stores file and metadata
+    - _Requirements: 14.4, 14.5, 14.6_
+
+- [x] 14. Enhanced dashboard backend endpoints
+  - [x] 14.1 Extend `backend/src/services/dashboard.rs`
+    - Implement `ocupacion_tendencia(db, meses) -> Result<Vec<OcupacionMensual>, AppError>` calculating monthly occupancy for last 12 months
+    - Implement `ingreso_comparacion(db) -> Result<IngresoComparacion, AppError>` comparing expected vs collected income for current month
+    - Implement `pagos_proximos(db, dias) -> Result<Vec<PagoProximo>, AppError>` listing upcoming payments within N days
+    - Implement `contratos_calendario(db) -> Result<Vec<ContratoCalendario>, AppError>` returning contracts expiring within 90 days with color coding
+    - Add response DTOs to `backend/src/models/dashboard.rs`
+    - _Requirements: 13.1, 13.2, 13.3, 13.4_
+  - [x] 14.2 Implement dashboard handlers
+    - Implement `GET /api/dashboard/ocupacion-tendencia`, `GET /api/dashboard/ingresos-comparacion`, `GET /api/dashboard/pagos-proximos`, `GET /api/dashboard/contratos-calendario`
+    - Add routes in `backend/src/routes.rs`
+    - _Requirements: 13.1, 13.2, 13.3, 13.4_
+  - [x] 14.3 Write unit tests for enhanced dashboard
+    - Test occupancy trend calculation
+    - Test income comparison logic
+    - Test upcoming payments query
+    - _Requirements: 13.1, 13.2, 13.3_
+
+- [x] 15. Multi-currency configuration endpoints
+  - [x] 15.1 Implement configuration handlers
+    - Implement `GET /api/configuracion/moneda` returning exchange rate from `configuracion` table
+    - Implement `PUT /api/configuracion/moneda` (admin only) to update exchange rate
+    - Add route in `backend/src/routes.rs`
+    - _Requirements: 16.3, 16.4_
+
+- [x] 16. Bulk import service
+  - [x] 16.1 Implement `backend/src/services/importacion.rs`
+    - Implement `importar_propiedades(db, data, formato) -> Result<ImportResult, AppError>` parsing CSV with `csv` crate or XLSX with `calamine` crate
+    - Validate required fields: titulo, direccion, ciudad, provincia, tipo_propiedad, precio
+    - Each row validated independently; failures collected in error summary
+    - Implement `importar_inquilinos(db, data, formato) -> Result<ImportResult, AppError>`
+    - Validate required fields: nombre, apellido, cedula
+    - Detect duplicate cédula and skip + report
+    - Add `ImportResult`, `ImportError`, `ImportFormat` structs to `backend/src/models/importacion.rs`
+    - Register modules in `backend/src/services/mod.rs` and `backend/src/models/mod.rs`
+    - _Requirements: 19.1, 19.2, 19.3, 19.4, 19.5, 19.6_
+  - [x] 16.2 Implement `backend/src/handlers/importacion.rs`
+    - Implement `POST /api/importar/propiedades` and `POST /api/importar/inquilinos` using `actix-multipart`
+    - Restrict to `WriteAccess` extractor (admin/gerente)
+    - Register handler in `backend/src/handlers/mod.rs` and add routes in `backend/src/routes.rs`
+    - _Requirements: 19.1, 19.2, 19.7_
+  - [x] 16.3 Write unit tests for bulk import
+    - Test CSV parsing with valid and invalid rows
+    - Test XLSX parsing reads first sheet
+    - Test required field validation
+    - Test duplicate cédula detection
+    - Test import summary counts
+    - _Requirements: 19.1, 19.2, 19.3, 19.4, 19.5, 19.6_
+
+- [x] 17. Checkpoint — Ensure all backend tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+
+- [x] 18. Frontend shared components — Pagination, SortableHeader, CurrencyDisplay
+  - [x] 18.1 Implement `frontend/src/components/common/pagination.rs`
+    - Create reusable `<Pagination>` component with props: `total`, `page`, `per_page`, `on_page_change`, `on_per_page_change`
+    - Render previous/next buttons, page numbers, page size selector (10/20/50), "Mostrando X–Y de Z" label
+    - All text in Spanish
+    - Export from `frontend/src/components/common/mod.rs`
+    - _Requirements: 15.1, 15.2, 15.4_
+  - [x] 18.2 Implement `frontend/src/components/common/sortable_header.rs`
+    - Create `<SortableHeader>` component with clickable column headers
+    - First click sorts ascending, second click toggles descending
+    - Visual indicator for current sort direction
+    - Export from `frontend/src/components/common/mod.rs`
+    - _Requirements: 15.3_
+  - [x] 18.3 Implement `frontend/src/components/common/currency_display.rs`
+    - Create `<CurrencyDisplay>` component formatting amounts with currency prefix (DOP/USD)
+    - Use DR conventions: periods for thousands, comma for decimals
+    - Optional conversion display showing approximate equivalent in alternate currency
+    - Fetch exchange rate from `/api/configuracion/moneda`
+    - Export from `frontend/src/components/common/mod.rs`
+    - _Requirements: 16.1, 16.2, 16.3_
+  - [x] 18.4 Implement `frontend/src/components/common/document_gallery.rs`
+    - Create `<DocumentGallery>` component for upload/preview/download
+    - Show gallery for images, download links for PDFs
+    - Upload button triggers multipart POST to `/api/documentos/{entity_type}/{entity_id}`
+    - Display file size validation errors in Spanish
+    - Export from `frontend/src/components/common/mod.rs`
+    - _Requirements: 14.7_
+
+- [x] 19. Integrate pagination and sorting into existing list pages
+  - [x] 19.1 Update `frontend/src/pages/propiedades.rs`
+    - Add `<Pagination>` and `<SortableHeader>` components
+    - Add filter UI controls for ciudad, provincia, tipo_propiedad, estado, precio_min, precio_max
+    - Preserve filter/search params across page and sort changes
+    - Pass sort_by and sort_order as query params to backend
+    - _Requirements: 7.7, 15.1, 15.2, 15.3, 15.4, 15.5_
+  - [x] 19.2 Update `frontend/src/pages/inquilinos.rs`
+    - Add `<Pagination>` and `<SortableHeader>` components
+    - Add search input field for name/cédula search
+    - Send `busqueda` query param to backend
+    - _Requirements: 9.2, 15.1, 15.2, 15.3, 15.4, 15.5_
+  - [x] 19.3 Update `frontend/src/pages/contratos.rs`
+    - Add `<Pagination>` and `<SortableHeader>` components
+    - _Requirements: 15.1, 15.2, 15.3, 15.4, 15.5_
+  - [x] 19.4 Update `frontend/src/pages/pagos.rs`
+    - Add `<Pagination>` and `<SortableHeader>` components
+    - Add filter controls for estado, date range (fecha_desde, fecha_hasta), and contrato
+    - Add "Generar Recibo" button on each paid Pago row, triggering `GET /api/pagos/{id}/recibo`
+    - _Requirements: 8.4, 11.4, 15.1, 15.2, 15.3, 15.4, 15.5_
+
+- [x] 20. Enhanced dashboard frontend
+  - [x] 20.1 Update `frontend/src/pages/dashboard.rs` with overdue payment alerts
+    - Add prominently styled alert section listing overdue pagos from `/api/notificaciones/pagos-vencidos`
+    - Show propiedad titulo, inquilino nombre/apellido, monto, moneda, days overdue
+    - Add badge on "Pagos Atrasados" stat card with total overdue count
+    - Sort by days overdue descending
+    - _Requirements: 3.2, 3.3, 3.5_
+  - [x] 20.2 Add contract expiration alerts to dashboard
+    - Add "Contratos por Vencer" section fetching from `/api/contratos/por-vencer`
+    - Group into 30/60/90-day buckets
+    - Color-code: red ≤15 days, yellow ≤30 days, green >30 days
+    - _Requirements: 6.2, 6.3, 6.4_
+  - [x] 20.3 Add occupancy trend chart
+    - Fetch data from `/api/dashboard/ocupacion-tendencia`
+    - Display monthly occupancy percentages for last 12 months as a chart
+    - _Requirements: 13.1_
+  - [x] 20.4 Add income comparison widget
+    - Fetch from `/api/dashboard/ingresos-comparacion`
+    - Show actual collected vs expected income for current month
+    - _Requirements: 13.2_
+  - [x] 20.5 Add upcoming payments and contract calendar
+    - Fetch upcoming payments from `/api/dashboard/pagos-proximos` for next 30 days, sorted by fecha_vencimiento ascending
+    - Fetch contract calendar from `/api/dashboard/contratos-calendario` for next 90 days, color-coded by urgency
+    - Clicking a calendar entry navigates to contrato detail view
+    - _Requirements: 13.3, 13.4, 13.5_
+
+- [x] 21. Checkpoint — Ensure frontend compiles and dashboard renders
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 22. New frontend pages — Reportes, Usuarios, Perfil, Auditoría, Importar
+  - [x] 22.1 Implement `frontend/src/pages/reportes.rs`
+    - Income report view with month/year selector, optional propiedad/inquilino filters
+    - Display tabular report data with totals
+    - "Exportar PDF" and "Exportar Excel" buttons triggering download from `/api/reportes/ingresos/pdf` and `/api/reportes/ingresos/xlsx`
+    - All text in Spanish
+    - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2_
+  - [x] 22.2 Implement `frontend/src/pages/usuarios.rs`
+    - Admin-only user management table with columns: nombre, email, rol, activo status
+    - Action buttons for role change (dropdown with admin/gerente/visualizador) and activate/deactivate toggle
+    - Paginated list using `<Pagination>` component
+    - All text in Spanish
+    - _Requirements: 10.7, 10.8_
+  - [x] 22.3 Implement `frontend/src/pages/perfil.rs`
+    - Display current nombre, email, rol (read-only)
+    - Editable fields for nombre and email with save button
+    - Password change form: current password, new password, confirm new password
+    - Client-side validation with Spanish error messages
+    - _Requirements: 18.3, 18.4, 18.5_
+  - [x] 22.4 Implement `frontend/src/pages/auditoria.rs`
+    - Admin-only audit log viewer
+    - Paginated list with filters for entity_type, entity_id, usuario_id, date range
+    - Display timestamp, user, action, entity type, entity id, changes summary
+    - All text in Spanish
+    - _Requirements: 12.2, 12.3_
+  - [x] 22.5 Implement `frontend/src/pages/importar.rs`
+    - File upload UI for CSV/XLSX files
+    - Entity type selector (Propiedades / Inquilinos)
+    - Display import results: successful count, failed rows with error details
+    - All text in Spanish
+    - _Requirements: 19.1, 19.2, 19.3, 19.4, 19.5_
+
+- [x] 23. Register new pages in router and navigation
+  - [x] 23.1 Update `frontend/src/app.rs` with new routes
+    - Add routes: `/reportes`, `/usuarios`, `/perfil`, `/auditoria`, `/importar`
+    - Wrap all in `<ProtectedRoute>`
+    - Import new page components
+    - Update `frontend/src/pages/mod.rs` to export new modules
+    - _Requirements: 1.1, 10.7, 12.2, 18.5, 19.1_
+  - [x] 23.2 Update sidebar navigation
+    - Add navigation links for Reportes, Usuarios (admin only), Perfil, Auditoría (admin only), Importar (admin/gerente only)
+    - Conditionally show admin-only links based on user role from AuthContext
+    - All labels in Spanish
+    - _Requirements: 10.8, 12.3_
+
+- [x] 24. Integrate DocumentGallery into entity detail views
+  - Add `<DocumentGallery>` component to Propiedad, Inquilino, and Contrato detail/edit views
+  - Pass appropriate `entity_type` and `entity_id` props
+  - _Requirements: 14.1, 14.2, 14.3, 14.7_
+
+- [x] 25. Add CurrencyDisplay to monetary fields across the app
+  - Replace raw monetary displays with `<CurrencyDisplay>` component in Propiedades, Pagos, Contratos, Dashboard, and Reportes pages
+  - _Requirements: 16.1, 16.2_
+
+- [x] 26. Checkpoint — Ensure all frontend pages render and navigate correctly
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 27. PWA / Offline mode
+  - [x] 27.1 Create service worker and manifest
+    - Create `frontend/dist/sw.js` with cache-first strategy for app shell (HTML, CSS, WASM, JS)
+    - Create `frontend/dist/manifest.json` with app name "Gestión Inmobiliaria", appropriate icon, theme color
+    - Register service worker from `frontend/index.html`
+    - _Requirements: 17.1, 17.5_
+  - [x] 27.2 Implement offline data caching
+    - Cache recently viewed Propiedades, Inquilinos, and Contratos data in IndexedDB via service worker
+    - _Requirements: 17.2_
+  - [x] 27.3 Implement offline UI indicators
+    - Create `<OfflineBanner>` component checking `navigator.onLine`
+    - Display Spanish message when offline: "Sin conexión a internet"
+    - Disable CUD operations when offline with message "Se requiere conexión a internet para realizar cambios"
+    - Add to app layout so it appears on all protected pages
+    - _Requirements: 17.3, 17.4_
+
+- [x] 28. Contract lifecycle frontend integration
+  - [x] 28.1 Add renewal UI to contratos page
+    - Add "Renovar" button on active contrato rows
+    - Modal/form for new fecha_fin and monto_mensual
+    - Call `POST /api/contratos/{id}/renovar`
+    - Display success/error messages in Spanish
+    - _Requirements: 4.1, 4.2, 4.3, 4.4_
+  - [x] 28.2 Add early termination UI to contratos page
+    - Add "Terminar" button on active contrato rows
+    - Modal/form for fecha_terminacion
+    - Call `POST /api/contratos/{id}/terminar`
+    - Display success/error messages in Spanish
+    - _Requirements: 5.1, 5.2, 5.3, 5.4_
+
+- [x] 29. Add frontend API service functions for all new endpoints
+  - Extend `frontend/src/services/api.rs` with functions for all new backend endpoints
+  - Add corresponding types to `frontend/src/types/` (new files: `reporte.rs`, `notificacion.rs`, `auditoria.rs`, `documento.rs`, `importacion.rs`, `configuracion.rs`)
+  - Update `frontend/src/types/mod.rs` and `frontend/src/services/mod.rs`
+  - _Requirements: 1.1, 3.1, 4.1, 5.1, 6.1, 10.1, 11.1, 12.2, 13.1, 14.1, 16.3, 18.1, 19.1_
+
+- [x] 30. Final checkpoint — Ensure all tests pass and application compiles
+  - Run `cargo test --workspace` and verify all tests pass
+  - Verify `trunk build` compiles frontend without errors
+  - Ensure all tests pass, ask the user if questions arise.
+
+## Notes
+
+- Tasks marked with `*` are optional and can be skipped for faster MVP
+- Each task references specific requirements for traceability
+- Checkpoints ensure incremental validation
+- Task 29 (API service functions) can be done incrementally alongside page tasks but is listed separately for clarity
+- All UI text must be in Spanish per product requirements
+- Backend follows layered architecture: handlers → services → entities
+- All monetary values use DECIMAL, never FLOAT
+- All new database operations use transactions where multiple steps are involved

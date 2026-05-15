@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Steering Coherence Check",
+  "description": "When a steering file is created, checks for rule duplication across AGENTS.md and other steering files to prevent conflicting or redundant guides.",
+  "version": "1",
+  "when": {
+    "type": "fileCreated",
+    "patterns": [
+      ".kiro/steering/*.md"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A new steering file was just created. Check: (1) Does it duplicate rules already in AGENTS.md or other always-on steering files? (2) Is the fileMatchPattern correctly scoped to the files it protects? (3) Does it conflict with any existing steering file? If duplication or conflicts exist, fix them by removing the duplicate from the less-specific location."
+  }
+}

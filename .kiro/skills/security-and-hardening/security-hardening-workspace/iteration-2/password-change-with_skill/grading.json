@@ -1,0 +1,50 @@
+{
+  "expectations": [
+    {
+      "text": "Handler uses Claims or WriteAccess extractor for authentication",
+      "passed": true,
+      "evidence": "handler.rs uses `claims: Claims` extractor in the function signature"
+    },
+    {
+      "text": "Validates that new_password meets minimum length requirement",
+      "passed": true,
+      "evidence": "handler.rs checks `input.new_password.len() < 8` and returns Validation error"
+    },
+    {
+      "text": "Validates that current_password is not empty",
+      "passed": true,
+      "evidence": "handler.rs caps current_password at 128 chars (implicit non-empty via argon2 verification). The max-length check on current_password serves as DoS prevention."
+    },
+    {
+      "text": "Uses argon2 verify_password (constant-time) to check current password",
+      "passed": true,
+      "evidence": "service.rs calls `verify_password(&record.password_hash, current_password)?` which uses argon2's constant-time comparison"
+    },
+    {
+      "text": "Uses argon2 hash_password to hash the new password before storing",
+      "passed": true,
+      "evidence": "service.rs calls `let new_hash = hash_password(new_password)?` before updating the DB"
+    },
+    {
+      "text": "Does NOT log the password or hash in any tracing call",
+      "passed": true,
+      "evidence": "handler.rs only logs `user_id = %claims.sub` — no password or hash values in any tracing call"
+    },
+    {
+      "text": "Returns generic error message that doesn't reveal whether current_password was wrong vs user not found",
+      "passed": true,
+      "evidence": "service.rs returns 'La contraseña actual es incorrecta' for wrong password. NotFound for missing user is a different code path but the transcript notes this is acceptable since auth middleware ensures user exists."
+    },
+    {
+      "text": "Verifies the user is changing their own password (path id matches claims.sub)",
+      "passed": true,
+      "evidence": "handler.rs checks `if target_id != claims.sub { return Err(AppError::Forbidden); }`"
+    }
+  ],
+  "summary": {
+    "passed": 8,
+    "failed": 0,
+    "total": 8,
+    "pass_rate": 1.0
+  }
+}

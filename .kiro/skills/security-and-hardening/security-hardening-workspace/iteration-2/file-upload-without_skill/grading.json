@@ -1,0 +1,50 @@
+{
+  "expectations": [
+    {
+      "text": "Handler uses WriteAccess or AdminOnly extractor for authentication",
+      "passed": true,
+      "evidence": "handler.rs uses `access: WriteAccess` extractor"
+    },
+    {
+      "text": "Validates file size does not exceed 10MB limit before fully reading the file or after reading",
+      "passed": true,
+      "evidence": "handler.rs checks `data.len() > MAX_FILE_SIZE` during chunk accumulation (early rejection) AND service.rs validates with `validate_file_size(file_data)?`"
+    },
+    {
+      "text": "Validates file extension against an explicit allowlist (pdf, jpg, png, docx)",
+      "passed": true,
+      "evidence": "service.rs defines `ALLOWED_EXTENSIONS: &[&str] = &[\"pdf\", \"jpg\", \"jpeg\", \"png\", \"docx\"]` and validates via `validate_and_extract_extension()`"
+    },
+    {
+      "text": "Uses UUID-based filename for storage (not user-provided filename)",
+      "passed": true,
+      "evidence": "service.rs generates `let file_uuid = Uuid::new_v4()` and stores as `format!(\"{file_uuid}.{ext}\")`"
+    },
+    {
+      "text": "Prevents path traversal by not using user-provided filename in the storage path",
+      "passed": true,
+      "evidence": "service.rs uses UUID-based name for storage, sanitizes filename, AND performs canonical path verification"
+    },
+    {
+      "text": "Filters by organizacion_id or validates entity ownership (tenant scoping)",
+      "passed": false,
+      "evidence": "Neither handler.rs nor service.rs filters by organizacion_id or validates entity ownership. The handler passes access.0.sub as uploaded_by but doesn't verify the entity belongs to the user's org."
+    },
+    {
+      "text": "Does not serve the file back without authentication consideration",
+      "passed": true,
+      "evidence": "No static file serving added. Transcript notes this explicitly."
+    },
+    {
+      "text": "Rejects files with no extension or unrecognized extensions",
+      "passed": true,
+      "evidence": "service.rs validate_and_extract_extension() returns Err for empty extension or non-allowlisted extensions"
+    }
+  ],
+  "summary": {
+    "passed": 7,
+    "failed": 1,
+    "total": 8,
+    "pass_rate": 0.875
+  }
+}

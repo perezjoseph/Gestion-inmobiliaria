@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "name": "Harden Application",
+  "version": "1",
+  "description": "Runs security hardening on the backend with plan-code-review-test sub-agents.",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "This is not a new feature. Do not create a spec. Execute immediately in autopilot mode. Review the backend source code for security issues and fix them directly. Use sub-agents: one to identify gaps, one to implement fixes, one to review the changes, one to run cargo test. Focus on missing security headers, weak JWT validation, missing input validation, and unprotected file serving. Run cargo check after changes. Do not change token expiration. Do not break existing clients. Cap at 3 passes. Activate the security hardening skill."
+  },
+  "workspaceFolderName": "realestate",
+  "shortName": "harden-app"
+}

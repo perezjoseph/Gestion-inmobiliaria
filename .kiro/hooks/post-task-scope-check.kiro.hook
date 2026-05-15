@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Post-Task Scope Drift Check",
+  "description": "After completing a spec task, reviews the changes made against the original task description to detect scope drift, unplanned additions, or missing requirements.",
+  "version": "1",
+  "when": {
+    "type": "postTaskExecution"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review the changes just made for this task. Check: (1) Did the implementation match the task description, or did scope creep in? (2) Were any files modified that weren't part of the plan? If so, was it justified? (3) Is the codebase in a clean, compilable state? If you detect drift, note it but do not undo work — flag it for the user."
+  }
+}

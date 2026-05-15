@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Pre-Task Plan Validation",
+  "description": "Before starting a spec task, validates that the task has clear scope, lists affected files, and has verification criteria. Prevents diving into implementation without a clear plan.",
+  "version": "1",
+  "when": {
+    "type": "preTaskExecution"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Before starting this task, verify: (1) The task scope is clear and atomic — it should do ONE thing. (2) You know which files will be created or modified. (3) You have a concrete verification step (compile, test, or manual check). (4) You have read the relevant existing code. If any of these are missing, gather the information first before writing code."
+  }
+}
