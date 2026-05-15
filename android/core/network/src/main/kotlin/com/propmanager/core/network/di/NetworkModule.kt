@@ -20,6 +20,7 @@ import com.propmanager.core.network.api.PagosApiService
 import com.propmanager.core.network.api.PerfilApiService
 import com.propmanager.core.network.api.PropiedadesApiService
 import com.propmanager.core.network.api.ReportesApiService
+import com.propmanager.core.network.api.UsuariosApiService
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -157,4 +158,9 @@ object NetworkModule {
     @Singleton
     fun providePerfilApiService(retrofit: Retrofit): PerfilApiService =
         retrofit.create(PerfilApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideUsuariosApiService(retrofit: Retrofit): UsuariosApiService =
+        retrofit.create(UsuariosApiService::class.java)
 }

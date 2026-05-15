@@ -75,7 +75,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Add dependency in `:app` module's `build.gradle.kts`
     - _Requirements: 2.1_
 
-  - [~] 4.2 Create UsuariosApiService in `core/network/api/`
+  - [x] 4.2 Create UsuariosApiService in `core/network/api/`
     - Implement `getUsuarios(page, perPage)`, `changeRole(id, rol)`, `toggleActivo(id)` using Retrofit
     - Add to NetworkModule DI
     - _Requirements: 2.7_
