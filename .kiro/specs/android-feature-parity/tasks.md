@@ -134,7 +134,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - QR code display when connecting (if provided by API)
     - _Requirements: 3.3_
 
-  - [~] 5.6 Create PersonaStep composable
+  - [x] 5.6 Create PersonaStep composable
     - Form fields: display_name, language selector, tone selector, greeting (multiline), system_prompt (multiline)
     - Save button that calls updateConfig with persona fields
     - _Requirements: 3.4_
