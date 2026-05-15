@@ -127,7 +127,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Actions: loadConfig, updateConfig, connect, disconnect, testChat, loadPendingReceipts, confirmReceipt, rejectReceipt
     - _Requirements: 3.2 through 3.9_
 
-  - [~] 5.5 Create ConnectionStep composable
+  - [x] 5.5 Create ConnectionStep composable
     - Display connection status (color-coded: green/yellow/red)
     - Show connected phone number when connected
     - Connect/Disconnect buttons
