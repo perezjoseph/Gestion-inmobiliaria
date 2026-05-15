@@ -104,7 +104,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Add conditional menu item to `MasMenuScreen` (visible only for admin role)
     - _Requirements: 2.5, 2.6_
 
-- [ ] 5. Chatbot configuration feature module
+- [x] 5. Chatbot configuration feature module
   - [x] 5.1 Create `feature/chatbot` module scaffolding
     - Create `android/feature/chatbot/build.gradle.kts`
     - Register module in `settings.gradle.kts`
@@ -178,7 +178,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Reject action: optional reason text field → POST reject
     - _Requirements: 9.1, 9.2, 9.3, 9.4_
 
-  - [~] 5.14 Add Chatbot to navigation
+  - [x] 5.14 Add Chatbot to navigation
     - Add `CHATBOT_CONFIG` and `CHATBOT_RECEIPTS` routes to `Routes.kt`
     - Add composables to NavHost with admin role guard
     - Add navigation from ConfiguracionScreen to chatbot config (sub-item)
