@@ -11,6 +11,9 @@ interface GastoDao {
     @Query("SELECT * FROM gastos WHERE is_deleted = 0 ORDER BY fecha_gasto DESC")
     fun observeAll(): Flow<List<GastoEntity>>
 
+    @Query("SELECT * FROM gastos WHERE id = :id")
+    fun observeById(id: String): Flow<GastoEntity?>
+
     @Query(
         """
         SELECT * FROM gastos

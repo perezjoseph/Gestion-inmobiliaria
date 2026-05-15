@@ -36,6 +36,9 @@ import com.propmanager.feature.contratos.ContratosViewModel
 import com.propmanager.feature.pagos.PagoFormScreen
 import com.propmanager.feature.pagos.PagosListScreen
 import com.propmanager.feature.pagos.PagosViewModel
+import com.propmanager.feature.gastos.GastoFormScreen
+import com.propmanager.feature.gastos.GastosListScreen
+import com.propmanager.feature.gastos.GastosViewModel
 import com.propmanager.feature.propiedades.PropiedadDetailScreen
 import com.propmanager.feature.propiedades.PropiedadFormScreen
 import com.propmanager.feature.propiedades.PropiedadesListScreen
@@ -188,7 +191,55 @@ fun PropManagerNavHost(
                     onNavigateBack = { navController.popBackStack() },
                 )
             }
-            composable(Routes.GASTOS) { /* GastosListScreen */ }
+            composable(Routes.GASTOS) {
+                val vm: GastosViewModel = hiltViewModel()
+                GastosListScreen(
+                    viewModel = vm,
+                    onNavigateToCreate = {
+                        vm.initCreateForm()
+                        navController.navigate(Routes.gastoForm())
+                    },
+                    onNavigateToEdit = { id -> navController.navigate(Routes.gastoForm(id)) },
+                )
+            }
+            composable(Routes.GASTO_FORM) { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("id")?.takeIf { it.isNotEmpty() }
+                val vm: GastosViewModel = hiltViewModel()
+                val savedStateHandle = backStackEntry.savedStateHandle
+
+                LaunchedEffect(id) { id?.let { vm.loadEdit(it) } }
+
+                // Receive OCR results from receipt scanner
+                LaunchedEffect(Unit) {
+                    savedStateHandle.getStateFlow("receipt_monto", "").collect { monto ->
+                        if (monto.isNotEmpty()) {
+                            val fecha = savedStateHandle.get<String>("receipt_fecha") ?: ""
+                            val proveedor = savedStateHandle.get<String>("receipt_proveedor") ?: ""
+                            val factura = savedStateHandle.get<String>("receipt_factura") ?: ""
+                            val parsedFecha = fecha.takeIf { it.isNotEmpty() }?.let {
+                                runCatching { java.time.LocalDate.parse(it) }.getOrNull()
+                            }
+                            vm.prefillFromOcr(
+                                monto = monto.takeIf { it.isNotEmpty() },
+                                fecha = parsedFecha,
+                                proveedor = proveedor.takeIf { it.isNotEmpty() },
+                                numeroFactura = factura.takeIf { it.isNotEmpty() },
+                            )
+                            savedStateHandle["receipt_monto"] = ""
+                            savedStateHandle["receipt_fecha"] = ""
+                            savedStateHandle["receipt_proveedor"] = ""
+                            savedStateHandle["receipt_factura"] = ""
+                        }
+                    }
+                }
+
+                GastoFormScreen(
+                    viewModel = vm,
+                    isEditing = id != null,
+                    onNavigateBack = { navController.popBackStack() },
+                    onScanRecibo = { navController.navigate(Routes.SCANNER_RECEIPT) },
+                )
+            }
             composable(Routes.MANTENIMIENTO) { /* MantenimientoListScreen */ }
 
             // Online-only features

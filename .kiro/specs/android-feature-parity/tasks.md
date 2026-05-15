@@ -33,7 +33,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Handle route for `pagos/form?id={id}` with `PagoFormScreen`
     - _Requirements: 1.4, 1.7, 1.8_
 
-  - [~] 1.5 Wire Gastos screens (list, form)
+  - [x] 1.5 Wire Gastos screens (list, form)
     - Replace placeholder comment with `GastosScreen` composable
     - Wire navigation callbacks: onNavigateToForm, onNavigateToScanner (receipt), onNavigateBack
     - Handle savedStateHandle for receiving OCR results from scanner

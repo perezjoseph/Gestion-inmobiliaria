@@ -116,6 +116,16 @@ constructor(
         _filters.value = GastosFilterState()
     }
 
+    fun loadEdit(id: String) {
+        viewModelScope.launch {
+            gastosRepository.observeById(id).collect { gasto ->
+                if (gasto != null) {
+                    initEditForm(gasto)
+                }
+            }
+        }
+    }
+
     fun initCreateForm() {
         editingId = null
         _formState.value = GastoFormState()
