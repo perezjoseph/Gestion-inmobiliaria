@@ -46,7 +46,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Handle route arguments for `mantenimiento/{id}` and `mantenimiento/form?id={id}`
     - _Requirements: 1.6, 1.7, 1.8_
 
-- [~] 2. Checkpoint — Verify all CRUD navigation works
+- [x] 2. Checkpoint — Verify all CRUD navigation works
   - Build the app and verify all 6 CRUD features navigate correctly between list, detail, and form screens. Ask user to confirm on device if needed.
 
 - [ ] 3. Add Unidad model and API support
