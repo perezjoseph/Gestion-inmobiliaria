@@ -1,5 +1,5 @@
 [package]
-name = "dashboard-bench"
+name = "dashboard-aggregation-bench"
 version = "0.1.0"
 edition = "2021"
 
@@ -11,6 +11,10 @@ uuid = { version = "1", features = ["v4"] }
 criterion = { version = "0.5", features = ["html_reports"] }
 
 [[bench]]
-name = "dashboard"
+name = "bench"
 harness = false
 path = "bench.rs"
+
+[lib]
+name = "dashboard_aggregation"
+path = "optimized.rs"

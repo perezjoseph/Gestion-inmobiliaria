@@ -3,6 +3,8 @@ name = "payment-search-bench"
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+
 [[bench]]
 name = "payment_search"
 harness = false

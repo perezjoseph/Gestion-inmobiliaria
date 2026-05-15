@@ -464,10 +464,9 @@ jobs:
         build-and-test,
         baileys-container,
         ocr-container,
-        containers,
       ]
     if: >-
-      always() &&
+      !cancelled() &&
       github.ref != 'refs/heads/main' &&
       (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
       contains(needs.*.result, 'failure')
@@ -516,7 +515,7 @@ jobs:
 
           {
             echo "=== CI FAILURE DIAGNOSTICS ==="
-            echo "=== Failed jobs: security=${{ needs.security.result }} codeql=${{ needs.codeql.result }} lint=${{ needs.lint.result }} build-and-test=${{ needs.build-and-test.result }} baileys-container=${{ needs.baileys-container.result }} ocr-container=${{ needs.ocr-container.result }} containers=${{ needs.containers.result }} ==="
+            echo "=== Failed jobs: security=${{ needs.security.result }} codeql=${{ needs.codeql.result }} lint=${{ needs.lint.result }} build-and-test=${{ needs.build-and-test.result }} baileys-container=${{ needs.baileys-container.result }} ocr-container=${{ needs.ocr-container.result }} ==="
             echo ""
           } > "$OUT"
 
