@@ -49,7 +49,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
 - [x] 2. Checkpoint — Verify all CRUD navigation works
   - Build the app and verify all 6 CRUD features navigate correctly between list, detail, and form screens. Ask user to confirm on device if needed.
 
-- [ ] 3. Add Unidad model and API support
+- [x] 3. Add Unidad model and API support
   - [x] 3.1 Create Unidad domain model in `core/model`
     - Add `Unidad.kt` data class with: id, propiedadId, numeroUnidad, piso, habitaciones, banos, areaM2, precio (BigDecimal), moneda, estado, descripcion
     - _Requirements: 6.6_
@@ -62,7 +62,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Add `getUnidades(propiedadId)`, `createUnidad(propiedadId, request)`, `updateUnidad(propiedadId, unidadId, request)`, `deleteUnidad(propiedadId, unidadId)`
     - _Requirements: 6.8_
 
-  - [~] 3.4 Add Unidades section to PropiedadDetailScreen
+  - [x] 3.4 Add Unidades section to PropiedadDetailScreen
     - Display list of unidades in the propiedad detail screen
     - Add create/edit bottom sheet or inline form for unidad management
     - Add delete with confirmation dialog

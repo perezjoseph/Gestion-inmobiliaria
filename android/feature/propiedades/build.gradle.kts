@@ -36,9 +36,12 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.kotlinx.collections.immutable)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+
+    implementation(libs.retrofit2)
 
     testImplementation(libs.bundles.unit.test)
     testImplementation(libs.bundles.kotest)

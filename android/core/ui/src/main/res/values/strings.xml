@@ -75,6 +75,22 @@
     <string name="propiedad_estado">Estado</string>
     <string name="propiedad_empty">No hay propiedades registradas</string>
 
+    <!-- Unidades -->
+    <string name="unidades_title">Unidades</string>
+    <string name="unidad_create">Nueva Unidad</string>
+    <string name="unidad_edit">Editar Unidad</string>
+    <string name="unidad_numero">Número de unidad</string>
+    <string name="unidad_piso">Piso</string>
+    <string name="unidad_habitaciones">Habitaciones</string>
+    <string name="unidad_banos">Baños</string>
+    <string name="unidad_area">Área (m²)</string>
+    <string name="unidad_precio">Precio</string>
+    <string name="unidad_moneda">Moneda</string>
+    <string name="unidad_estado">Estado</string>
+    <string name="unidad_descripcion">Descripción</string>
+    <string name="unidad_empty">No hay unidades registradas</string>
+    <string name="unidad_loading_error">Error al cargar unidades</string>
+
     <!-- Inquilinos -->
     <string name="inquilinos_title">Inquilinos</string>
     <string name="inquilino_create">Nuevo Inquilino</string>
