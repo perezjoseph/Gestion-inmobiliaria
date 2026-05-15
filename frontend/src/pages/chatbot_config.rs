@@ -125,11 +125,21 @@ pub fn ChatbotConfig() -> Html {
         let connected_at = connected_at.clone();
         use_effect_with((), move |()| {
             spawn_local(async move {
-                match chatbot::get_config().await {
-                    Ok(cfg) => config.set(Some(cfg)),
+                // Fetch config and live Baileys status concurrently, then merge the
+                // live status into the config so the UI reflects the real session state
+                // on first render rather than the stale connection_status column from the DB.
+                let (cfg_res, status_res) =
+                    futures::future::join(chatbot::get_config(), chatbot::status()).await;
+                match cfg_res {
+                    Ok(mut cfg) => {
+                        if let Ok(status_resp) = &status_res {
+                            cfg.connection_status = status_resp.status.clone();
+                        }
+                        config.set(Some(cfg));
+                    }
                     Err(e) => error.set(Some(e)),
                 }
-                if let Ok(status_resp) = chatbot::status().await {
+                if let Ok(status_resp) = status_res {
                     connected_phone.set(status_resp.connected_phone);
                     connected_at.set(status_resp.connected_at);
                 }
