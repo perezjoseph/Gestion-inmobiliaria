@@ -1,5 +1,8 @@
 import makeWASocket, {
   DisconnectReason,
+  areJidsSameUser,
+  isPnUser,
+  jidDecode,
   makeCacheableSignalKeyStore,
   WASocket,
 } from '@whiskeysockets/baileys';
@@ -27,6 +30,8 @@ export interface SessionInfo {
   qrCode: string | null;
   socket: WASocket | null;
   connectedPhone: string | null;
+  /** All JIDs that identify the connected device (PN and/or LID forms). Used to detect self-chat messages. */
+  ownJids: string[];
   connectedAt: string | null;
   reconnectAttempts: number;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
@@ -50,6 +55,30 @@ const sessions: Map<string, SessionInfo> = new Map();
 // Track message IDs sent by the bot to avoid re-processing echoed self-messages
 const sentMessageIds: Set<string> = new Set();
 const SENT_IDS_MAX_SIZE = 500;
+
+/**
+ * Convert a Baileys PN-format JID into a `+E.164` phone string.
+ * Returns `null` for non-PN JIDs (e.g. `@lid`).
+ */
+function jidToPhone(jid: string | undefined | null): string | null {
+  if (!jid) return null;
+  const decoded = jidDecode(jid);
+  if (!decoded || decoded.server !== 's.whatsapp.net') return null;
+  return '+' + decoded.user;
+}
+
+/**
+ * Collect every JID that identifies the connected device. In Baileys v7 this can include
+ * both the phone-number JID (`@s.whatsapp.net`) and the LID (`@lid`); either may appear in
+ * an incoming message's `key.remoteJid` for a self-chat.
+ */
+function collectOwnJids(me: { id?: string; lid?: string; phoneNumber?: string } | undefined): string[] {
+  if (!me) return [];
+  const jids = [me.id, me.lid, me.phoneNumber].filter(
+    (v): v is string => typeof v === 'string' && v.length > 0,
+  );
+  return Array.from(new Set(jids));
+}
 
 /**
  * Handle a recoverable disconnect with capped exponential backoff.
@@ -110,6 +139,7 @@ function handleConnectionClose(sessionInfo: SessionInfo, statusCode: number | un
     sessionInfo.socket = null;
     sessionInfo.qrCode = null;
     sessionInfo.connectedPhone = null;
+    sessionInfo.ownJids = [];
     sessionInfo.connectedAt = null;
     sessionInfo.reconnectAttempts = 0;
     logger.info({ realmId }, 'Session logged out remotely');
@@ -142,7 +172,7 @@ function handleConnectionClose(sessionInfo: SessionInfo, statusCode: number | un
 function handleConnectionUpdate(
   update: { connection?: string; lastDisconnect?: any; qr?: string },
   sessionInfo: SessionInfo,
-  state: { creds: { me?: { id: string } } },
+  state: { creds: { me?: { id: string; lid?: string; phoneNumber?: string } } },
 ): void {
   const { connection, lastDisconnect, qr } = update;
   const { realmId } = sessionInfo;
@@ -163,15 +193,23 @@ function handleConnectionUpdate(
     }
 
     const me = state.creds.me;
-    if (me?.id) {
-      const phone = '+' + me.id.replace(/:.*$/, '').replace('@s.whatsapp.net', '');
-      sessionInfo.connectedPhone = phone;
+    if (me) {
+      sessionInfo.ownJids = collectOwnJids(me);
+      // Prefer the phone-number JID for display; fall back to whichever PN-form JID we have.
+      const phoneJid = me.phoneNumber || (isPnUser(me.id) ? me.id : undefined);
+      const phone = jidToPhone(phoneJid);
+      if (phone) {
+        sessionInfo.connectedPhone = phone;
+      }
     }
     if (!sessionInfo.connectedAt) {
       sessionInfo.connectedAt = new Date().toISOString();
     }
 
-    logger.info({ realmId, phone: sessionInfo.connectedPhone }, 'Connection established');
+    logger.info(
+      { realmId, phone: sessionInfo.connectedPhone, ownJids: sessionInfo.ownJids },
+      'Connection established',
+    );
   }
 
   if (connection === 'close') {
@@ -193,14 +231,17 @@ function shouldForwardMessage(msg: any, sessionInfo: SessionInfo): boolean {
 
   // For self-messages (messaging your own number), Baileys delivers
   // with fromMe=true. Allow these through so the bot can respond.
+  //
+  // In Baileys v7 the remote JID can be either the phone-number form
+  // (`@s.whatsapp.net`) or the LID form (`@lid`). Compare against every JID
+  // that identifies the connected device, plus the alternate JID Baileys
+  // attaches to the message key (`remoteJidAlt`).
   if (msg.key.fromMe) {
-    const remoteJid = msg.key?.remoteJid;
-    const isSelfChat =
-      remoteJid &&
-      sessionInfo.connectedPhone &&
-      '+' + remoteJid.replace(/:.*$/, '').replace('@s.whatsapp.net', '') ===
-        sessionInfo.connectedPhone;
-    return !!isSelfChat;
+    const remoteCandidates: (string | undefined)[] = [msg.key?.remoteJid, msg.key?.remoteJidAlt];
+    const isSelfChat = remoteCandidates.some((candidate) =>
+      sessionInfo.ownJids.some((own) => areJidsSameUser(candidate, own)),
+    );
+    return isSelfChat;
   }
 
   return true;
@@ -215,15 +256,24 @@ async function forwardToBackend(realmId: string, message: any): Promise<void> {
     return;
   }
 
-  const remoteJid = message.key?.remoteJid;
+  const remoteJid: string | undefined = message.key?.remoteJid;
+  const remoteJidAlt: string | undefined = message.key?.remoteJidAlt;
   if (!remoteJid || remoteJid.endsWith('@g.us') || remoteJid === 'status@broadcast') {
     // Skip group messages and status broadcasts
     return;
   }
 
-  // Extract sender phone from JID (format: 18091234567@s.whatsapp.net)
-  // Self-chat JIDs may include a device suffix (e.g. 18091234567:0@s.whatsapp.net)
-  const senderPhone = '+' + remoteJid.replace(/:.*$/, '').replace('@s.whatsapp.net', '');
+  // Resolve the sender's phone number. The backend identifies tenants by phone, so we
+  // need a PN-form JID. Try `remoteJid` first; if it's a `@lid`, fall back to
+  // `remoteJidAlt` (Baileys v7 attaches the PN as the alternate JID for LID chats).
+  const senderPhone = jidToPhone(remoteJid) ?? jidToPhone(remoteJidAlt);
+  if (!senderPhone) {
+    logger.warn(
+      { realmId, remoteJid, remoteJidAlt },
+      'Skipping message: could not resolve sender phone (no PN-form JID available)',
+    );
+    return;
+  }
 
   // Determine message type and content
   let messageType: 'text' | 'image' = 'text';
@@ -333,6 +383,7 @@ export async function startSession(realmId: string): Promise<SessionInfo> {
     qrCode: null,
     socket: null,
     connectedPhone: null,
+    ownJids: [],
     connectedAt: null,
     reconnectAttempts: 0,
     reconnectTimer: null,
@@ -345,11 +396,16 @@ export async function startSession(realmId: string): Promise<SessionInfo> {
   // Load auth state from PostgreSQL
   const { state, saveCreds } = await usePostgresAuthState(realmId);
 
-  // If creds already have a paired identity, pre-populate the phone number
-  // (happens on session restore after pod restart)
-  if (state.creds.me?.id) {
-    const phone = '+' + state.creds.me.id.replace(/:.*$/, '').replace('@s.whatsapp.net', '');
-    sessionInfo.connectedPhone = phone;
+  // If creds already have a paired identity, pre-populate identifiers so a self-message
+  // arriving during the brief reconnect window is still recognised.
+  if (state.creds.me) {
+    sessionInfo.ownJids = collectOwnJids(state.creds.me);
+    const phoneJid =
+      state.creds.me.phoneNumber || (isPnUser(state.creds.me.id) ? state.creds.me.id : undefined);
+    const phone = jidToPhone(phoneJid);
+    if (phone) {
+      sessionInfo.connectedPhone = phone;
+    }
   }
 
   // Wrap keys with in-memory cache to minimize DB round-trips
@@ -422,6 +478,7 @@ export async function stopSession(realmId: string): Promise<void> {
   session.socket = null;
   session.qrCode = null;
   session.connectedPhone = null;
+  session.ownJids = [];
   session.connectedAt = null;
   logger.info({ realmId }, 'Session stopped');
 }
