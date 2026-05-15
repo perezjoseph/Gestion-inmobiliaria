@@ -20,6 +20,9 @@ import com.propmanager.feature.documentos.DocumentosScreen
 import com.propmanager.feature.documentos.DocumentosViewModel
 import com.propmanager.feature.importacion.ImportacionScreen
 import com.propmanager.feature.importacion.ImportacionViewModel
+import com.propmanager.feature.inquilinos.InquilinoFormScreen
+import com.propmanager.feature.inquilinos.InquilinosListScreen
+import com.propmanager.feature.inquilinos.InquilinosViewModel
 import com.propmanager.feature.notificaciones.NotificacionesScreen
 import com.propmanager.feature.notificaciones.NotificacionesViewModel
 import com.propmanager.feature.perfil.PerfilScreen
@@ -87,7 +90,45 @@ fun PropManagerNavHost(
                     onNavigateBack = { navController.popBackStack() },
                 )
             }
-            composable(Routes.INQUILINOS) { /* InquilinosListScreen */ }
+            composable(Routes.INQUILINOS) {
+                val vm: InquilinosViewModel = hiltViewModel()
+                InquilinosListScreen(
+                    viewModel = vm,
+                    onNavigateToCreate = {
+                        vm.initCreateForm()
+                        navController.navigate(Routes.inquilinoForm())
+                    },
+                    onNavigateToEdit = { id -> navController.navigate(Routes.inquilinoForm(id)) },
+                )
+            }
+            composable(Routes.INQUILINO_FORM) { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("id")?.takeIf { it.isNotEmpty() }
+                val vm: InquilinosViewModel = hiltViewModel()
+                val savedStateHandle = backStackEntry.savedStateHandle
+
+                LaunchedEffect(id) { id?.let { vm.loadEdit(it) } }
+
+                // Receive OCR results from scanner
+                LaunchedEffect(Unit) {
+                    savedStateHandle.getStateFlow("cedula_nombre", "").collect { nombre ->
+                        if (nombre.isNotEmpty()) {
+                            val apellido = savedStateHandle.get<String>("cedula_apellido") ?: ""
+                            val numero = savedStateHandle.get<String>("cedula_numero") ?: ""
+                            vm.prefillFromOcr(nombre, apellido, numero)
+                            savedStateHandle["cedula_nombre"] = ""
+                            savedStateHandle["cedula_apellido"] = ""
+                            savedStateHandle["cedula_numero"] = ""
+                        }
+                    }
+                }
+
+                InquilinoFormScreen(
+                    viewModel = vm,
+                    isEditing = id != null,
+                    onNavigateBack = { navController.popBackStack() },
+                    onScanCedula = { navController.navigate(Routes.SCANNER_CEDULA) },
+                )
+            }
             composable(Routes.CONTRATOS) { /* ContratosListScreen */ }
             composable(Routes.PAGOS) { /* PagosListScreen */ }
             composable(Routes.GASTOS) { /* GastosListScreen */ }

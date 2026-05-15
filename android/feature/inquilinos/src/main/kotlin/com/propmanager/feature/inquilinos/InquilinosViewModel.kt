@@ -84,6 +84,16 @@ constructor(
         _formState.value = InquilinoFormState()
     }
 
+    fun loadEdit(id: String) {
+        viewModelScope.launch {
+            repository.observeById(id).collect { inquilino ->
+                if (inquilino != null) {
+                    initEditForm(inquilino)
+                }
+            }
+        }
+    }
+
     fun initEditForm(inquilino: Inquilino) {
         editingId = inquilino.id
         _formState.value =

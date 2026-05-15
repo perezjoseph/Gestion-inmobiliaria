@@ -14,7 +14,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Handle route arguments for `propiedades/{id}` and `propiedades/form?id={id}`
     - _Requirements: 1.1, 1.7, 1.8_
 
-  - [~] 1.2 Wire Inquilinos screens (list, form)
+  - [x] 1.2 Wire Inquilinos screens (list, form)
     - Replace placeholder comment with `InquilinosScreen` composable
     - Wire navigation callbacks: onNavigateToForm, onNavigateToScanner (cedula), onNavigateBack
     - Handle savedStateHandle for receiving OCR results from scanner
