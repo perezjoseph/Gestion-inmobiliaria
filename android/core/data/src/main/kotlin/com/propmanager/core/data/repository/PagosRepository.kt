@@ -31,6 +31,8 @@ constructor(
     open fun observeAll(): Flow<List<Pago>> =
         dao.observeAll().map { entities -> entities.map { it.toDomain() } }
 
+    open fun observeById(id: String): Flow<Pago?> = dao.observeById(id).map { it?.toDomain() }
+
     open fun observeFiltered(
         contratoId: String? = null,
         estado: String? = null,

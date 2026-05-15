@@ -117,6 +117,16 @@ constructor(
         _filters.value = PagosFilterState()
     }
 
+    fun loadEdit(id: String) {
+        viewModelScope.launch {
+            pagosRepository.observeById(id).collect { pago ->
+                if (pago != null) {
+                    initEditForm(pago)
+                }
+            }
+        }
+    }
+
     fun initCreateForm() {
         editingId = null
         _formState.value = PagoFormState()

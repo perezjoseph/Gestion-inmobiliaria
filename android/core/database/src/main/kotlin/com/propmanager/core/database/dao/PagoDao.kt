@@ -11,6 +11,9 @@ interface PagoDao {
     @Query("SELECT * FROM pagos WHERE is_deleted = 0 ORDER BY fecha_vencimiento DESC")
     fun observeAll(): Flow<List<PagoEntity>>
 
+    @Query("SELECT * FROM pagos WHERE id = :id")
+    fun observeById(id: String): Flow<PagoEntity?>
+
     @Query(
         """
         SELECT * FROM pagos

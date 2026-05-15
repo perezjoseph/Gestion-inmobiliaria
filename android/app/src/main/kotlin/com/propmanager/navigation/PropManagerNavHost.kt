@@ -33,6 +33,9 @@ import com.propmanager.feature.contratos.ContratoDetailScreen
 import com.propmanager.feature.contratos.ContratoFormScreen
 import com.propmanager.feature.contratos.ContratosListScreen
 import com.propmanager.feature.contratos.ContratosViewModel
+import com.propmanager.feature.pagos.PagoFormScreen
+import com.propmanager.feature.pagos.PagosListScreen
+import com.propmanager.feature.pagos.PagosViewModel
 import com.propmanager.feature.propiedades.PropiedadDetailScreen
 import com.propmanager.feature.propiedades.PropiedadFormScreen
 import com.propmanager.feature.propiedades.PropiedadesListScreen
@@ -164,7 +167,27 @@ fun PropManagerNavHost(
                     onNavigateBack = { navController.popBackStack() },
                 )
             }
-            composable(Routes.PAGOS) { /* PagosListScreen */ }
+            composable(Routes.PAGOS) {
+                val vm: PagosViewModel = hiltViewModel()
+                PagosListScreen(
+                    viewModel = vm,
+                    onNavigateToCreate = {
+                        vm.initCreateForm()
+                        navController.navigate(Routes.pagoForm())
+                    },
+                    onNavigateToEdit = { id -> navController.navigate(Routes.pagoForm(id)) },
+                )
+            }
+            composable(Routes.PAGO_FORM) { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("id")?.takeIf { it.isNotEmpty() }
+                val vm: PagosViewModel = hiltViewModel()
+                LaunchedEffect(id) { id?.let { vm.loadEdit(it) } }
+                PagoFormScreen(
+                    viewModel = vm,
+                    isEditing = id != null,
+                    onNavigateBack = { navController.popBackStack() },
+                )
+            }
             composable(Routes.GASTOS) { /* GastosListScreen */ }
             composable(Routes.MANTENIMIENTO) { /* MantenimientoListScreen */ }
 

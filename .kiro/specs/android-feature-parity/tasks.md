@@ -27,7 +27,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Handle route arguments for `contratos/{id}` and `contratos/form?id={id}`
     - _Requirements: 1.3, 1.7, 1.8_
 
-  - [~] 1.4 Wire Pagos screens (list, form)
+  - [x] 1.4 Wire Pagos screens (list, form)
     - Replace placeholder comment with `PagosScreen` composable
     - Wire navigation callbacks: onNavigateToForm, onNavigateBack
     - Handle route for `pagos/form?id={id}` with `PagoFormScreen`
