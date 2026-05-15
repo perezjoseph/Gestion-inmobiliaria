@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use actix_cors::Cors;
 use actix_web::HttpResponse;
 use actix_web::error::ResponseError;
@@ -8,9 +10,10 @@ use actix_web_prom::PrometheusMetricsBuilder;
 use sea_orm::DatabaseConnection;
 use tracing_actix_web::TracingLogger;
 
-use crate::config::AppConfig;
+use crate::config::{AppConfig, SmtpConfig};
 use crate::errors::AppError;
 use crate::routes;
+use crate::services::mail::{MailClient, OutgoingMail, SmtpMailClient};
 use crate::services::ocr_preview::PreviewStore;
 
 async fn health() -> HttpResponse {
@@ -107,6 +110,24 @@ pub fn create_app(
             .into()
         });
 
+    // Construct the mail client from SMTP env vars (graceful fallback if not configured)
+    let mail_client: Arc<dyn MailClient> = match SmtpConfig::from_env() {
+        Ok(smtp_cfg) => match SmtpMailClient::from_config(&smtp_cfg) {
+            Ok(client) => {
+                tracing::info!("Cliente SMTP configurado correctamente");
+                Arc::new(client)
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Error creando cliente SMTP — correos deshabilitados");
+                Arc::new(NoopMailClient)
+            }
+        },
+        Err(e) => {
+            tracing::warn!(error = %e, "SMTP no configurado — correos deshabilitados");
+            Arc::new(NoopMailClient)
+        }
+    };
+
     actix_web::App::new()
         .wrap(prometheus)
         .wrap(crate::middleware::security_headers::SecurityHeaders)
@@ -115,9 +136,31 @@ pub fn create_app(
         .app_data(web::Data::new(db))
         .app_data(web::Data::new(config))
         .app_data(preview_store)
+        .app_data(web::Data::from(mail_client))
         .app_data(json_cfg)
         .route("/health", web::get().to(health))
         .route("/metrics", web::get().to(metrics_handler))
         .configure(routes::configure)
         .route("/uploads/{path:.*}", web::get().to(serve_upload))
+}
+
+/// No-op mail client used when SMTP is not configured.
+/// Logs the email instead of sending it.
+struct NoopMailClient;
+
+impl MailClient for NoopMailClient {
+    fn send(
+        &self,
+        msg: OutgoingMail,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), AppError>> + Send + '_>>
+    {
+        Box::pin(async move {
+            tracing::warn!(
+                to = %msg.to,
+                subject = %msg.subject,
+                "Correo no enviado (SMTP no configurado)"
+            );
+            Ok(())
+        })
+    }
 }

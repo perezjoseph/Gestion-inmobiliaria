@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use actix_web::{HttpRequest, HttpResponse, web};
 use sea_orm::DatabaseConnection;
 use uuid::Uuid;
@@ -9,6 +11,7 @@ use crate::models::firma::{
 };
 use crate::services::auth::Claims;
 use crate::services::firmas;
+use crate::services::mail::MailClient;
 
 /// Extract client IP from X-Forwarded-For header, falling back to peer address.
 fn extract_ip(req: &HttpRequest) -> String {
@@ -69,12 +72,18 @@ pub async fn solicitar_firma(
     access: WriteAccess,
     path: web::Path<Uuid>,
     body: web::Json<SolicitarFirmaRequest>,
+    mail: web::Data<Arc<dyn MailClient>>,
 ) -> Result<HttpResponse, AppError> {
     let documento_id = path.into_inner();
 
-    let result =
-        firmas::solicitar_firma(db.get_ref(), documento_id, &body, access.0.organizacion_id)
-            .await?;
+    let result = firmas::solicitar_firma(
+        db.get_ref(),
+        documento_id,
+        &body,
+        access.0.organizacion_id,
+        mail.get_ref().as_ref(),
+    )
+    .await?;
 
     Ok(HttpResponse::Created().json(result))
 }

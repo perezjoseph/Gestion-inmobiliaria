@@ -4,15 +4,18 @@ use sea_orm::DatabaseConnection;
 use crate::config::AppConfig;
 use crate::errors::AppError;
 use crate::models::usuario::{LoginRequest, RegisterRequest};
-use crate::services::auth;
+use crate::services::auth::{self, RegisterResult};
 
 pub async fn register(
     db: web::Data<DatabaseConnection>,
     config: web::Data<AppConfig>,
     body: web::Json<RegisterRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let response = auth::register(db.get_ref(), body.into_inner(), &config.jwt_secret).await?;
-    Ok(HttpResponse::Created().json(response))
+    let result = auth::register(db.get_ref(), body.into_inner(), &config.jwt_secret).await?;
+    match result {
+        RegisterResult::User(user) => Ok(HttpResponse::Created().json(user)),
+        RegisterResult::Login(login) => Ok(HttpResponse::Ok().json(login)),
+    }
 }
 
 pub async fn login(

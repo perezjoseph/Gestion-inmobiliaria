@@ -19,14 +19,11 @@ use crate::services::validation::{MONEDAS, validate_enum};
 
 pub const CATEGORIAS_GASTO: &[&str] = &[
     "mantenimiento",
+    "servicios",
     "impuestos",
-    "seguros",
-    "servicios_publicos",
-    "servicio_publico",
+    "seguro",
     "administracion",
-    "legal",
-    "mejoras",
-    "otro",
+    "otros",
 ];
 pub const ESTADOS_GASTO: &[&str] = &["pendiente", "pagado", "cancelado"];
 
@@ -66,7 +63,11 @@ pub async fn create<C: ConnectionTrait>(
     usuario_id: Uuid,
     organizacion_id: Uuid,
 ) -> Result<GastoResponse, AppError> {
-    validate_enum("categoria", &input.categoria, CATEGORIAS_GASTO)?;
+    if !CATEGORIAS_GASTO.contains(&input.categoria.as_str()) {
+        return Err(AppError::Validation(
+            "Categoría de gasto no válida".to_string(),
+        ));
+    }
     validate_enum("moneda", &input.moneda, MONEDAS)?;
 
     if input.monto <= Decimal::ZERO {
@@ -92,8 +93,8 @@ pub async fn create<C: ConnectionTrait>(
         }
     }
 
-    // Utility field validation when categoria == "servicio_publico"
-    if input.categoria == "servicio_publico" || input.categoria == "servicios_publicos" {
+    // Utility field validation when categoria == "servicios"
+    if input.categoria == "servicios" {
         if input.proveedor_servicio.is_none() {
             return Err(AppError::Validation(
                 "proveedor_servicio es requerido para gastos de servicio público".to_string(),
@@ -165,7 +166,7 @@ pub async fn create<C: ConnectionTrait>(
     .await;
 
     // Best-effort anomaly detection for utility gastos
-    if record.categoria == "servicio_publico" || record.categoria == "servicios_publicos" {
+    if record.categoria == "servicios" {
         if let Err(e) =
             super::servicios_publicos::verificar_consumo_anormal(db, &record, organizacion_id).await
         {
@@ -196,6 +197,14 @@ pub async fn list(
 ) -> Result<PaginatedResponse<GastoResponse>, AppError> {
     let page = query.page.unwrap_or(1).max(1);
     let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
+
+    if let (Some(desde), Some(hasta)) = (query.fecha_desde, query.fecha_hasta) {
+        if desde > hasta {
+            return Err(AppError::BadRequest(
+                "fecha_desde no puede ser posterior a fecha_hasta".to_string(),
+            ));
+        }
+    }
 
     let mut select = gasto::Entity::find().filter(gasto::Column::OrganizacionId.eq(org_id));
 
@@ -244,7 +253,11 @@ pub async fn list(
 
 fn validate_gasto_update(input: &UpdateGastoRequest) -> Result<(), AppError> {
     if let Some(ref categoria) = input.categoria {
-        validate_enum("categoria", categoria, CATEGORIAS_GASTO)?;
+        if !CATEGORIAS_GASTO.contains(&categoria.as_str()) {
+            return Err(AppError::Validation(
+                "Categoría de gasto no válida".to_string(),
+            ));
+        }
     }
     if let Some(ref moneda) = input.moneda {
         validate_enum("moneda", moneda, MONEDAS)?;
@@ -488,7 +501,7 @@ mod tests {
 
     #[test]
     fn from_model_with_unidad_id() {
-        let mut model = make_model("seguros", "pendiente");
+        let mut model = make_model("seguro", "pendiente");
         let uid = Uuid::new_v4();
         model.unidad_id = Some(uid);
         let resp = GastoResponse::from(model);
@@ -497,7 +510,7 @@ mod tests {
 
     #[test]
     fn from_model_with_none_optional_fields() {
-        let mut model = make_model("legal", "cancelado");
+        let mut model = make_model("servicios", "cancelado");
         model.proveedor = None;
         model.numero_factura = None;
         model.notas = None;
@@ -510,15 +523,12 @@ mod tests {
     #[test]
     fn categorias_gasto_contains_expected_values() {
         assert!(CATEGORIAS_GASTO.contains(&"mantenimiento"));
+        assert!(CATEGORIAS_GASTO.contains(&"servicios"));
         assert!(CATEGORIAS_GASTO.contains(&"impuestos"));
-        assert!(CATEGORIAS_GASTO.contains(&"seguros"));
-        assert!(CATEGORIAS_GASTO.contains(&"servicios_publicos"));
-        assert!(CATEGORIAS_GASTO.contains(&"servicio_publico"));
+        assert!(CATEGORIAS_GASTO.contains(&"seguro"));
         assert!(CATEGORIAS_GASTO.contains(&"administracion"));
-        assert!(CATEGORIAS_GASTO.contains(&"legal"));
-        assert!(CATEGORIAS_GASTO.contains(&"mejoras"));
-        assert!(CATEGORIAS_GASTO.contains(&"otro"));
-        assert_eq!(CATEGORIAS_GASTO.len(), 9);
+        assert!(CATEGORIAS_GASTO.contains(&"otros"));
+        assert_eq!(CATEGORIAS_GASTO.len(), 6);
     }
 
     #[test]

@@ -23,6 +23,8 @@ pub enum AppError {
     Conflict(String),
     #[error("Recurso expirado: {0}")]
     Gone(String),
+    #[error("Bad Gateway: {0}")]
+    BadGateway(String),
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
@@ -39,6 +41,7 @@ impl actix_web::error::ResponseError for AppError {
             }
             Self::Conflict(_) => StatusCode::CONFLICT,
             Self::Gone(_) => StatusCode::GONE,
+            Self::BadGateway(_) => StatusCode::BAD_GATEWAY,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -64,6 +67,7 @@ impl actix_web::error::ResponseError for AppError {
                 Self::Validation(msg) => ("validation", msg.clone()),
                 Self::Conflict(msg) => ("conflict", msg.clone()),
                 Self::Gone(msg) => ("gone", msg.clone()),
+                Self::BadGateway(msg) => ("bad_gateway", msg.clone()),
                 Self::Internal(_) => ("internal", "Error interno del servidor".to_string()),
                 Self::ValidationWithFields { .. } => unreachable!(),
             };

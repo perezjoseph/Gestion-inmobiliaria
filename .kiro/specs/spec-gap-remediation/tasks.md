@@ -29,7 +29,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - Emit `tracing::warn!(target: "security.cross_tenant", usuario_id, organizacion_id, pago_id, ...)` on cross-tenant miss
     - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-  - [ ] 1.2 Wire `organizacion_id` from JWT Claims through the receipt handler
+  - [x] 1.2 Wire `organizacion_id` from JWT Claims through the receipt handler
     - Edit `backend/src/handlers/recibos.rs` to extract `claims.organizacion_id` via `AuthenticatedUser`
     - Forward `organizacion_id` and `usuario_id` to `services::recibos::generar_recibo`
     - Leave `routes.rs` binding unchanged
@@ -47,13 +47,13 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - _Requirements: 1.2, 1.3, 1.5_
 
 - [ ] 2. Self-registration role and `User` response contract (Requirement 2)
-  - [-] 2.1 Persist self-registered users with `rol = "gerente"` and a fresh `Organizacion`
+  - [x] 2.1 Persist self-registered users with `rol = "gerente"` and a fresh `Organizacion`
     - Edit `backend/src/services/auth.rs::register_new_org` to run inside a single transaction
     - Create `Organizacion` first, then `Usuario` with `rol: Set("gerente".into())` and `organizacion_id: Set(org.id)`
     - Return `User` DTO from `services::auth`; reject duplicate email with `AppError::Conflict("El correo ya está registrado")`
     - _Requirements: 2.1, 2.3, 2.4_
 
-  - [ ] 2.2 Return `201 Created` with `User` shape only from the register handler
+  - [x] 2.2 Return `201 Created` with `User` shape only from the register handler
     - Edit `backend/src/handlers/auth.rs` register handler to respond `HttpResponse::Created().json(user)`
     - Strip any token, password, or session payload from the response body
     - _Requirements: 2.2_
@@ -71,11 +71,11 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - _Requirements: 2.1, 2.3, 2.5_
 
 - [ ] 3. Maintenance list `unidad_id` filter (Requirement 10)
-  - [-] 3.1 Add `unidad_id: Option<Uuid>` to `SolicitudListQuery`
+  - [x] 3.1 Add `unidad_id: Option<Uuid>` to `SolicitudListQuery`
     - Edit `backend/src/models/mantenimiento.rs` to extend the existing `SolicitudListQuery` DTO
     - _Requirements: 10.1_
 
-  - [ ] 3.2 Apply the `unidad_id` filter in the maintenance service while preserving tenant scope
+  - [x] 3.2 Apply the `unidad_id` filter in the maintenance service while preserving tenant scope
     - Edit `backend/src/services/mantenimiento.rs::list` to chain `.filter(Column::OrganizacionId.eq(organizacion_id))` first, then `.apply_if(q.unidad_id, |sel, uid| sel.filter(Column::UnidadId.eq(uid)))`
     - A `unidad_id` from another organizacion yields an empty list (no existence leak)
     - _Requirements: 10.2, 10.3, 10.4_
@@ -92,12 +92,12 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - _Requirements: 10.2, 10.3, 10.4_
 
 - [ ] 4. Restore Yew bootstrap `[INIT]` logs and write the Bug_Condition_PBT (Requirement 7)
-  - [-] 4.1 Emit pre-renderer marker in `frontend/src/main.rs`
+  - [x] 4.1 Emit pre-renderer marker in `frontend/src/main.rs`
     - `web_sys::console::log_1(&"[INIT] pre-renderer".into());` before `yew::Renderer::<App>::new().render()`
     - Keep the log in production builds; do not gate behind `cfg(debug_assertions)`
     - _Requirements: 7.1, 7.4_
 
-  - [ ] 4.2 Emit app-mount, route-resolution, and switch markers in `frontend/src/app.rs`
+  - [x] 4.2 Emit app-mount, route-resolution, and switch markers in `frontend/src/app.rs`
     - Inside `App` function component: `[INIT] app mounted`
     - Inside the `Switch<Route>` render closure: `[INIT] route resolution`
     - Inside the `switch(route)` matcher: `[INIT] switch`
@@ -123,7 +123,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
 
   > **Deviation note**: Requirement 3.3 specifies HTTP `409 Conflict` for sealed-document delete attempts. The design overrides this with HTTP `403 Forbidden` (`AppError::Forbidden("No se puede eliminar un documento sellado")`). Per user guidance the design wins. Implementation in 6.3 and tests in 6.9 MUST assert `403`, not `409`. See the Note section at the bottom of this file.
 
-  - [-] 6.1 Add the `documento_origen_id` column migration
+  - [x] 6.1 Add the `documento_origen_id` column migration
     - Create `backend/src/migrations/m20260415_001_add_documento_origen_id.rs`
     - Add nullable `documento_origen_id UUID` to `documentos` with FK `fk_documento_origen_contrato → contratos.id ON DELETE SET NULL`
     - Re-export from `backend/src/migrations/mod.rs` and append to the migrator vector
@@ -141,20 +141,20 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - **Implementation MUST return 403 per design, not 409 from the requirements text** (see deviation note above)
     - _Requirements: 3.3_
 
-  - [-] 6.4 Define the `MailClient` trait, `OutgoingMail`, and `SmtpConfig`
+  - [x] 6.4 Define the `MailClient` trait, `OutgoingMail`, and `SmtpConfig`
     - Create `backend/src/services/mail/mod.rs`, `client.rs`, `message.rs`
     - `client.rs`: `#[async_trait] pub trait MailClient: Send + Sync { async fn send(&self, msg: OutgoingMail) -> Result<(), AppError>; }` plus `pub struct OutgoingMail { to, subject, body_html, body_text }`
     - `message.rs`: Spanish builder `signature_link_mail(contrato, link) -> OutgoingMail`
     - Add `SmtpConfig::from_env()` to `backend/src/config.rs` reading `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
     - _Requirements: 3.4_
 
-  - [ ] 6.5 Implement `SmtpMailClient` via `lettre`
+  - [-] 6.5 Implement `SmtpMailClient` via `lettre`
     - Create `backend/src/services/mail/smtp.rs` with `pub struct SmtpMailClient { transport: AsyncSmtpTransport<Tokio1Executor>, from: Mailbox }`
     - `from_config(cfg)` builds `starttls_relay(host).port(port).credentials(creds).build()`
     - `MailClient::send` builds a multipart-alternative message and maps SMTP errors to `AppError::BadGateway("No se pudo enviar el correo")` while logging without echoing credentials
     - _Requirements: 3.4, 3.6_
 
-  - [ ] 6.6 Wire `MailClient` into `AppState` and the signing flow
+  - [-] 6.6 Wire `MailClient` into `AppState` and the signing flow
     - Edit `backend/src/app.rs` to construct `Arc<dyn MailClient + Send + Sync>` from `SmtpConfig::from_env()` and store it on `AppState`
     - Edit `backend/src/services/firmas.rs::enviar_email_firma(mail: &dyn MailClient, inquilino, contrato, link)` to call `mail.send(signature_link_mail(...))` with Spanish subject/body
     - Wire the call site in the signing handler to use the trait object from `AppState`
@@ -228,7 +228,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - In `confirmar_preview`, fail with `AppError::UnprocessableEntity("Datos de OCR inválidos")` when extraction values fail validation; do not insert any row
     - _Requirements: 5.7_
 
-  - [-] 9.4 Pin OVMS to CPU-only in the K8s manifest
+  - [x] 9.4 Pin OVMS to CPU-only in the K8s manifest
     - Edit `infra/k8s/app/ovms.yaml`: remove the `gpu.intel.com/i915` resource request and any reference to the `i915` device-plugin DaemonSet
     - Set `env: [{ name: OPENVINO_DEVICE, value: "CPU" }, { name: TARGET_DEVICE, value: "CPU" }]`
     - _Requirements: 5.6_
@@ -276,24 +276,24 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - _Requirements: 8.3, 8.5_
 
 - [ ] 11. Gastos completion (Requirement 9)
-  - [-] 11.1 Add `Utility_Service_Fields` to the `Gasto` entity, DTOs, and migration
+  - [x] 11.1 Add `Utility_Service_Fields` to the `Gasto` entity, DTOs, and migration
     - Add a migration `m20260415_002_add_gasto_utility_fields.rs` with nullable `proveedor TEXT`, `numero_cuenta TEXT`, `periodo_inicio DATE`, `periodo_fin DATE` columns
     - Regenerate `backend/src/entities/gasto.rs` (or hand-add columns to match)
     - Extend `backend/src/models/gasto.rs::CreateGasto` and `UpdateGasto` with the four optional fields
     - _Requirements: 9.5_
 
-  - [ ] 11.2 Validate the `categoria` enum and reject out-of-set values with HTTP `422`
+  - [-] 11.2 Validate the `categoria` enum and reject out-of-set values with HTTP `422`
     - Edit `backend/src/services/gastos.rs::crear` and `actualizar` to validate against `{ mantenimiento, servicios, impuestos, seguro, administracion, otros }`
     - Return `AppError::UnprocessableEntity("Categoría de gasto no válida")` on miss
     - _Requirements: 9.4_
 
-  - [ ] 11.3 Apply the `Date_Range_Filter` on the gastos list endpoint
+  - [-] 11.3 Apply the `Date_Range_Filter` on the gastos list endpoint
     - Edit `backend/src/services/gastos.rs::list` to accept `fecha_desde`, `fecha_hasta` from the filter DTO
     - Return `AppError::BadRequest("fecha_desde no puede ser posterior a fecha_hasta")` when `fecha_desde > fecha_hasta`
     - Apply `apply_if(filter.fecha_desde, |q, d| q.filter(Column::FechaGasto.gte(d)))` and analogous `lte` for `fecha_hasta`, after the org-scope filter
     - _Requirements: 9.6, 9.7_
 
-  - [-] 11.4 Fix the `gastos.rs:48` enum-tuple typo on the frontend
+  - [x] 11.4 Fix the `gastos.rs:48` enum-tuple typo on the frontend
     - Edit `frontend/src/pages/gastos.rs` line 48: change to `("servicio_publico", "Servicio Público")`
     - _Requirements: 9.4_
 

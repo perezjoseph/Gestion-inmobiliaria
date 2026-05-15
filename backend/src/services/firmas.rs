@@ -120,6 +120,7 @@ pub async fn solicitar_firma(
     documento_id: Uuid,
     input: &SolicitarFirmaRequest,
     organizacion_id: Uuid,
+    mail: &dyn crate::services::mail::MailClient,
 ) -> Result<SolicitarFirmaResponse, AppError> {
     // Validate document exists and belongs to caller's org
     let doc = documento::Entity::find_by_id(documento_id)
@@ -164,8 +165,19 @@ pub async fn solicitar_firma(
 
     let inserted = firma.insert(db).await?;
 
-    // Send email with link + password (log if email service unavailable)
-    let email_enviado = enviar_email_firma(&input.email, &token, &password);
+    // Send email with link + password (log on failure, don't block the response)
+    let email_enviado = match enviar_email_firma(mail, &input.email, &token, &password).await {
+        Ok(()) => true,
+        Err(e) => {
+            tracing::warn!(
+                documento_id = %documento_id,
+                email = %input.email,
+                error = %e,
+                "No se pudo enviar correo de firma"
+            );
+            false
+        }
+    };
 
     Ok(SolicitarFirmaResponse {
         firma_id: inserted.id,
@@ -375,18 +387,39 @@ pub(crate) fn generar_password() -> String {
         .collect()
 }
 
-/// Send email with signing link and password. Returns true if sent successfully.
-fn enviar_email_firma(email: &str, token: &str, password: &str) -> bool {
-    // Log the signing link since no email service is configured
-    tracing::info!(
-        email = %email,
-        token = %token,
-        password = %password,
-        "Enlace de firma generado: /firmas/{token} — Contraseña: {password}",
-        token = token,
-        password = password,
+/// Send email with signing link and password via the MailClient trait.
+/// Returns `Ok(())` on success, or an `AppError` on failure.
+pub async fn enviar_email_firma(
+    mail: &dyn crate::services::mail::MailClient,
+    email: &str,
+    token: &str,
+    password: &str,
+) -> Result<(), AppError> {
+    let link = format!("/firmas/{token}");
+    let contrato_id = Uuid::nil(); // Placeholder — the full signing flow passes the real ID
+    let mut outgoing = crate::services::mail::signature_link_mail(contrato_id, &link);
+    outgoing.to = email.to_string();
+    // Append password info to the body
+    let password_note_text = format!(
+        "\n\nSu contraseña de acceso es: {password}\n\
+         Por favor, no comparta esta información."
     );
-    false
+    let password_note_html = format!(
+        "<p>Su contraseña de acceso es: <strong>{password}</strong></p>\
+         <p>Por favor, no comparta esta información.</p>"
+    );
+    outgoing.body_text.push_str(&password_note_text);
+    outgoing.body_html.push_str(&password_note_html);
+
+    mail.send(outgoing).await.map_err(|e| {
+        tracing::error!(
+            email = %email,
+            token = %token,
+            error = %e,
+            "Error enviando correo de firma"
+        );
+        e
+    })
 }
 
 /// Resolve the `organizacion_id` from a document's parent entity.

@@ -147,6 +147,7 @@ pub enum Route {
 }
 
 fn switch(routes: Route) -> Html {
+    web_sys::console::log_1(&"[INIT] switch".into());
     match routes {
         Route::Login => html! { <Login /> },
         Route::Registro => html! { <Registro /> },
@@ -283,6 +284,7 @@ pub fn ProtectedRoute(props: &ProtectedRouteProps) -> Html {
 
 #[component]
 pub fn App() -> Html {
+    web_sys::console::log_1(&"[INIT] app mounted".into());
     let auth = use_reducer(AuthState::default);
     let toasts = use_reducer(ToastState::default);
     let fetched = use_state(|| false);
@@ -328,7 +330,10 @@ pub fn App() -> Html {
             <ContextProvider<ThemeContext> context={is_dark}>
                 <ContextProvider<ToastContext> context={toasts}>
                     <BrowserRouter>
-                        <Switch<Route> render={switch} />
+                        <Switch<Route> render={|route| {
+                            web_sys::console::log_1(&"[INIT] route resolution".into());
+                            switch(route)
+                        }} />
                     </BrowserRouter>
                     <ToastContainer />
                 </ContextProvider<ToastContext>>

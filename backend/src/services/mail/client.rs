@@ -13,9 +13,12 @@ pub struct OutgoingMail {
 ///
 /// Implementations may use SMTP (production), file transport (tests),
 /// or an in-memory sink (unit tests).
+///
+/// Uses `Box<dyn Future>` for dyn-compatibility so the trait can be
+/// stored as `Arc<dyn MailClient>` in `AppState`.
 pub trait MailClient: Send + Sync {
     fn send(
         &self,
         msg: OutgoingMail,
-    ) -> impl std::future::Future<Output = Result<(), AppError>> + Send;
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), AppError>> + Send + '_>>;
 }

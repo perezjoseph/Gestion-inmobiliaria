@@ -208,6 +208,9 @@ pub async fn list(
     if let Some(propiedad_id) = query.propiedad_id {
         select = select.filter(solicitud_mantenimiento::Column::PropiedadId.eq(propiedad_id));
     }
+    if let Some(unidad_id) = query.unidad_id {
+        select = select.filter(solicitud_mantenimiento::Column::UnidadId.eq(unidad_id));
+    }
 
     let paginator = select
         .order_by_desc(solicitud_mantenimiento::Column::CreatedAt)
