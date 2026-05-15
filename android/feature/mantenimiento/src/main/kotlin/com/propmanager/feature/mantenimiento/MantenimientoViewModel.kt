@@ -147,6 +147,16 @@ constructor(
         }
     }
 
+    fun loadEdit(id: String) {
+        viewModelScope.launch {
+            mantenimientoRepository.observeById(id).collect { solicitud ->
+                if (solicitud != null) {
+                    initEditForm(solicitud)
+                }
+            }
+        }
+    }
+
     fun initCreateForm() {
         editingId = null
         _formState.value = SolicitudFormState()

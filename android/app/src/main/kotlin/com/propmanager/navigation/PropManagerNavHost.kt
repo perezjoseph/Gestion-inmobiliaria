@@ -39,6 +39,10 @@ import com.propmanager.feature.pagos.PagosViewModel
 import com.propmanager.feature.gastos.GastoFormScreen
 import com.propmanager.feature.gastos.GastosListScreen
 import com.propmanager.feature.gastos.GastosViewModel
+import com.propmanager.feature.mantenimiento.MantenimientoListScreen
+import com.propmanager.feature.mantenimiento.MantenimientoViewModel
+import com.propmanager.feature.mantenimiento.SolicitudDetailScreen
+import com.propmanager.feature.mantenimiento.SolicitudFormScreen
 import com.propmanager.feature.propiedades.PropiedadDetailScreen
 import com.propmanager.feature.propiedades.PropiedadFormScreen
 import com.propmanager.feature.propiedades.PropiedadesListScreen
@@ -240,7 +244,37 @@ fun PropManagerNavHost(
                     onScanRecibo = { navController.navigate(Routes.SCANNER_RECEIPT) },
                 )
             }
-            composable(Routes.MANTENIMIENTO) { /* MantenimientoListScreen */ }
+            composable(Routes.MANTENIMIENTO) {
+                val vm: MantenimientoViewModel = hiltViewModel()
+                MantenimientoListScreen(
+                    viewModel = vm,
+                    onNavigateToCreate = {
+                        vm.initCreateForm()
+                        navController.navigate(Routes.solicitudForm())
+                    },
+                    onNavigateToDetail = { id -> navController.navigate(Routes.solicitudDetail(id)) },
+                )
+            }
+            composable(Routes.SOLICITUD_DETAIL) { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("id") ?: return@composable
+                val vm: MantenimientoViewModel = hiltViewModel()
+                SolicitudDetailScreen(
+                    viewModel = vm,
+                    solicitudId = id,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToEdit = { navController.navigate(Routes.solicitudForm(id)) },
+                )
+            }
+            composable(Routes.SOLICITUD_FORM) { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("id")?.takeIf { it.isNotEmpty() }
+                val vm: MantenimientoViewModel = hiltViewModel()
+                LaunchedEffect(id) { id?.let { vm.loadEdit(it) } }
+                SolicitudFormScreen(
+                    viewModel = vm,
+                    isEditing = id != null,
+                    onNavigateBack = { navController.popBackStack() },
+                )
+            }
 
             // Online-only features
             composable(Routes.REPORTES) {

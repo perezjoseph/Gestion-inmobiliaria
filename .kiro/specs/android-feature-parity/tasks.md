@@ -6,7 +6,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
 
 ## Tasks
 
-- [ ] 1. Wire existing CRUD screens into NavHost
+- [x] 1. Wire existing CRUD screens into NavHost
   - [x] 1.1 Wire Propiedades screens (list, detail, form)
     - Replace placeholder comment in `PropManagerNavHost.kt` with `PropiedadesScreen`, `PropiedadDetailScreen`, `PropiedadFormScreen` composables
     - Add proper imports from `com.propmanager.feature.propiedades`
@@ -40,7 +40,7 @@ Bring the Android app to full parity with the frontend. Work is ordered: (1) wir
     - Handle route for `gastos/form?id={id}` with `GastoFormScreen`
     - _Requirements: 1.5, 1.7, 1.8_
 
-  - [~] 1.6 Wire Mantenimiento screens (list, detail, form)
+  - [x] 1.6 Wire Mantenimiento screens (list, detail, form)
     - Replace placeholder comment with `MantenimientoScreen`, `SolicitudDetailScreen`, `SolicitudFormScreen` composables
     - Wire navigation callbacks: onNavigateToDetail, onNavigateToForm, onNavigateBack
     - Handle route arguments for `mantenimiento/{id}` and `mantenimiento/form?id={id}`
