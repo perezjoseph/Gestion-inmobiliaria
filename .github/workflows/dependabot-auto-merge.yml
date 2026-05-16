@@ -17,9 +17,7 @@ jobs:
   dependabot:
     name: Auto-merge Dependabot
     runs-on: ubuntu-latest
-    if: >-
-      github.event.pull_request.user.login == 'dependabot[bot]' &&
-      github.repository == 'perezjoseph/Gestion-inmobiliaria'
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
     permissions:
       contents: write
       pull-requests: write

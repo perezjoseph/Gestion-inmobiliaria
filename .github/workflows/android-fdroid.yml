@@ -26,19 +26,24 @@ jobs:
           persist-credentials: false
 
       - name: Set up Android SDK
-        run: |
-          export ANDROID_HOME="${HOME}/android-sdk"
-          mkdir -p "${ANDROID_HOME}/cmdline-tools"
-          curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" \
-            -o /tmp/cmdline-tools.zip
-          unzip -q /tmp/cmdline-tools.zip -d "${ANDROID_HOME}/cmdline-tools"
-          mv "${ANDROID_HOME}/cmdline-tools/cmdline-tools" "${ANDROID_HOME}/cmdline-tools/latest"
-          (yes || true) | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
-          "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" \
-            "platforms;android-36" "build-tools;36.0.0" > /dev/null 2>&1
-          echo "ANDROID_HOME=${ANDROID_HOME}" >> "${GITHUB_ENV}"
-          echo "${ANDROID_HOME}/cmdline-tools/latest/bin" >> "${GITHUB_PATH}"
-          echo "${ANDROID_HOME}/build-tools/36.0.0" >> "${GITHUB_PATH}"
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            export ANDROID_HOME="${HOME}/android-sdk"
+            mkdir -p "${ANDROID_HOME}/cmdline-tools"
+            curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" \
+              -o /tmp/cmdline-tools.zip
+            unzip -qo /tmp/cmdline-tools.zip -d "${ANDROID_HOME}/cmdline-tools"
+            mv -f "${ANDROID_HOME}/cmdline-tools/cmdline-tools" "${ANDROID_HOME}/cmdline-tools/latest" 2>/dev/null || true
+            (yes || true) | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+            "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" \
+              "platforms;android-36" "build-tools;36.0.0" > /dev/null 2>&1
+            echo "ANDROID_HOME=${ANDROID_HOME}" >> "${GITHUB_ENV}"
+            echo "${ANDROID_HOME}/cmdline-tools/latest/bin" >> "${GITHUB_PATH}"
+            echo "${ANDROID_HOME}/build-tools/36.0.0" >> "${GITHUB_PATH}"
 
       - name: Build release APK
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0

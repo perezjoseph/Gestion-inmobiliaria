@@ -120,7 +120,7 @@ jobs:
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 10
-          max_attempts: 5
+          max_attempts: 3
           retry_wait_seconds: 10
           command: |
             LLVM_COV_VERSION="0.8.4"
@@ -145,7 +145,7 @@ jobs:
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 30
-          max_attempts: 5
+          max_attempts: 2
           command: |
             mkdir -p coverage
             cargo llvm-cov test --locked -p realestate-backend \
@@ -166,7 +166,7 @@ jobs:
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 30
-          max_attempts: 5
+          max_attempts: 2
           command: |
             cargo build --locked -p realestate-backend --profile ci-release --target x86_64-unknown-linux-musl 2>&1 | tee "${RUNNER_TEMP}/build-backend-output.txt"
             exit ${PIPESTATUS[0]}
@@ -327,7 +327,7 @@ jobs:
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 30
-          max_attempts: 5
+          max_attempts: 2
           command: |
             cargo test --locked -p realestate-frontend --all-targets 2>&1 | tee "${RUNNER_TEMP}/test-frontend-output.txt"
             exit ${PIPESTATUS[0]}
@@ -338,7 +338,7 @@ jobs:
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 10
-          max_attempts: 5
+          max_attempts: 3
           retry_wait_seconds: 10
           command: |
             TRUNK_VERSION="0.21.14"
@@ -372,7 +372,7 @@ jobs:
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 30
-          max_attempts: 5
+          max_attempts: 2
           command: |
             export PATH="${HOME}/.local/bin:$HOME/.cargo/bin:$PATH"
             cd frontend/

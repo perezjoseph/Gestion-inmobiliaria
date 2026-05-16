@@ -60,7 +60,7 @@ jobs:
           BACKEND_DIGEST: ${{ inputs.backend-digest }}
         with:
           timeout_minutes: 3
-          max_attempts: 5
+          max_attempts: 3
           retry_wait_seconds: 10
           command: |
             gh attestation verify \
@@ -75,7 +75,7 @@ jobs:
           FRONTEND_DIGEST: ${{ inputs.frontend-digest }}
         with:
           timeout_minutes: 3
-          max_attempts: 5
+          max_attempts: 3
           retry_wait_seconds: 10
           command: |
             gh attestation verify \
@@ -90,7 +90,7 @@ jobs:
           OCR_DIGEST: ${{ inputs.ocr-service-digest }}
         with:
           timeout_minutes: 3
-          max_attempts: 5
+          max_attempts: 3
           retry_wait_seconds: 10
           command: |
             gh attestation verify \
@@ -105,7 +105,7 @@ jobs:
           BAILEYS_DIGEST: ${{ inputs.baileys-digest }}
         with:
           timeout_minutes: 3
-          max_attempts: 5
+          max_attempts: 3
           retry_wait_seconds: 10
           command: |
             gh attestation verify \
@@ -176,19 +176,19 @@ jobs:
         id: rollout
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
-          timeout_minutes: 10
+          timeout_minutes: 15
           max_attempts: 2
           command: |
-            kubectl rollout status deployment/backend --namespace realestate --timeout=300s
-            kubectl rollout status deployment/frontend --namespace realestate --timeout=300s
-            kubectl rollout status deployment/ocr-service --namespace realestate --timeout=300s
-            kubectl rollout status deployment/baileys --namespace realestate --timeout=300s
+            kubectl rollout status deployment/backend --namespace realestate --timeout=600s
+            kubectl rollout status deployment/frontend --namespace realestate --timeout=600s
+            kubectl rollout status deployment/ocr-service --namespace realestate --timeout=600s
+            kubectl rollout status deployment/baileys --namespace realestate --timeout=600s
 
       - name: Health check
         id: health-check
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 5
           command: |
             for DEPLOY in backend frontend ocr-service baileys; do
