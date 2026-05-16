@@ -2,8 +2,8 @@
   "model_config_list": [],
   "mediapipe_config_list": [
     {
-      "name": "Qwen3.5-35B-A3B",
-      "base_path": "/models/Qwen3.5-35B-A3B"
+      "name": "Qwen3-Coder-30B-A3B-Instruct-int4-ov",
+      "base_path": "/models/Qwen3-Coder-30B-A3B-Instruct-int4-ov"
     }
   ]
 }

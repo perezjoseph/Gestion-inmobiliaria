@@ -15,7 +15,7 @@ node: {
   }
   node_options: {
     [type.googleapis.com/mediapipe.LLMCalculatorOptions]: {
-      models_path: "/models/Qwen3.5-35B-A3B"
+      models_path: "/models/Qwen3-Coder-30B-A3B-Instruct-int4-ov"
       device: "GPU"
       enable_prefix_caching: true
       max_num_batched_tokens: 8192

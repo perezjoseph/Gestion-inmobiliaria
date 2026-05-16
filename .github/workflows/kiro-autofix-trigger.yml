@@ -1,9 +1,10 @@
 name: Kiro Autofix Trigger
 
 # Triggered AFTER the CI/Semgrep workflows complete. Discovers failing-job
-# diagnostics artifacts and queues an autofix run per failing job, processed
-# strictly sequentially via a matrix with max-parallel: 1. This keeps Kiro's
-# context focused — one job's diagnostics per autofix invocation.
+# diagnostics artifacts and runs an inline sequential queue: one Kiro
+# invocation per failing artifact, one local commit per resolved issue,
+# one final push at the end. This keeps each commit focused (one fix per
+# artifact) while only triggering CI once at the end of the queue.
 
 on:
   workflow_run:
@@ -12,54 +13,140 @@ on:
 
 permissions: {}
 
-# IMPORTANT: cancel-in-progress MUST be false. The matrix queue processes one
-# failing-job artifact at a time. If a new workflow_run event fires (e.g. CI
-# re-runs after Kiro pushes iteration 1's fix), cancel-in-progress: true would
-# kill the still-running queue mid-iteration, breaking the sequential design.
+# IMPORTANT: cancel-in-progress MUST be false. The queue processes one
+# artifact at a time within a single job. If a new workflow_run event
+# fires (e.g. CI re-runs after the final push), cancel-in-progress: true
+# would kill the still-running queue mid-loop.
 concurrency:
   group: kiro-autofix-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: false
 
 jobs:
-  # ── Step 1: Discover all failing-job artifacts on non-main branches ──
-  discover-build-failures:
-    name: "Discover Build Failures"
+  autofix-build-queue:
+    name: "Sequential Autofix Queue"
     if: >-
       github.event.workflow_run.conclusion == 'failure' &&
       github.event.workflow_run.head_branch != 'main' &&
       (github.event.workflow_run.event != 'pull_request' ||
        github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: arc-runner-dind
-    timeout-minutes: 10
+    timeout-minutes: 90
     permissions:
-      contents: read
+      contents: write
+      pull-requests: write
       actions: read
-    outputs:
-      artifacts: ${{ steps.list.outputs.artifacts }}
-      count: ${{ steps.list.outputs.count }}
+    env:
+      MAX_ATTEMPTS: "5"
+      RUN_URL: ${{ github.event.workflow_run.html_url }}
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
+      CI_RUN_ID: ${{ github.event.workflow_run.id }}
     steps:
-      - name: List failing-job diagnostics artifacts
-        id: list
-        env:
-          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
-          REPO: ${{ github.repository }}
+      # persist-credentials: true is required because we git push at the end.
+      # All other workflows in this repo use persist-credentials: false.
+      - name: Checkout branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ env.BRANCH }}
+          fetch-depth: 0
+          token: ${{ secrets.KIRO_GITHUB_TOKEN }}
+          persist-credentials: true
+
+      - name: Count prior autofix attempts on this branch
+        id: attempts
         run: |
           umask 077
-          # Query GitHub API for all artifacts in the failing run, filter to diag-*.
-          # Order matters: build/lint first (most actionable), then containers, then security/codeql.
+          count=0
+          while [ "$count" -lt 50 ]; do
+            email=$(git log --format='%ae' -n 1 "HEAD~$count" 2>/dev/null || true)
+            if [ -z "$email" ]; then
+              break
+            fi
+            case "$email" in
+              kiro-bot@*) count=$((count + 1)) ;;
+              *) break ;;
+            esac
+          done
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          if [ "$count" -ge "${MAX_ATTEMPTS}" ]; then
+            echo "exceeded=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Kiro Autofix attempt limit reached: $count consecutive auto-fix commits at HEAD (max: ${MAX_ATTEMPTS})."
+          else
+            echo "exceeded=false" >> "$GITHUB_OUTPUT"
+            echo "Autofix attempt $((count + 1)) of ${MAX_ATTEMPTS}"
+          fi
+
+      - name: Find related PR
+        id: pr
+        if: steps.attempts.outputs.exceeded == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+        run: |
+          umask 077
+          pr_number=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --head "${{ env.BRANCH }}" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+          echo "number=${pr_number}" >> "$GITHUB_OUTPUT"
+
+      - name: Notify human on PR (max attempts reached)
+        if: steps.attempts.outputs.exceeded == 'true' && steps.pr.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+        run: |
+          gh pr comment "${{ steps.pr.outputs.number }}" \
+            --repo "${{ github.repository }}" \
+            --body "🤖 **Kiro Autofix gave up at the build stage.**
+
+          Attempted ${{ env.MAX_ATTEMPTS }} consecutive automated fixes without restoring CI to green. Manual intervention is required.
+
+          - Failed run: ${{ env.RUN_URL }}
+          - Branch: \`${{ env.BRANCH }}\`
+
+          To resume autofix, push a non-bot commit to this branch (the counter resets on any human commit at HEAD)."
+
+      - name: Stop if max attempts exceeded
+        if: steps.attempts.outputs.exceeded == 'true'
+        run: |
+          echo "::error::Kiro Autofix has attempted ${{ env.MAX_ATTEMPTS }} fixes without success. Manual intervention required."
+          exit 1
+
+      - name: Rust setup
+        if: steps.attempts.outputs.exceeded == 'false'
+        uses: ./.github/actions/rust-setup
+        with:
+          components: rustfmt,clippy
+          targets: x86_64-unknown-linux-musl,wasm32-unknown-unknown
+
+      - name: Install Kiro CLI
+        if: steps.attempts.outputs.exceeded == 'false'
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: curl -fsSL https://cli.kiro.dev/install | bash
+
+      - name: List failing-job artifacts from CI run (priority-sorted)
+        id: list
+        if: steps.attempts.outputs.exceeded == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+        run: |
+          umask 077
           ARTIFACTS_JSON=$(gh api \
-            "repos/${REPO}/actions/runs/${RUN_ID}/artifacts?per_page=100" \
+            "repos/${{ github.repository }}/actions/runs/${CI_RUN_ID}/artifacts?per_page=100" \
             --jq '[.artifacts[] | select(.name | startswith("diag-")) | .name]')
 
           if [ -z "$ARTIFACTS_JSON" ] || [ "$ARTIFACTS_JSON" = "[]" ]; then
-            echo "::warning::No diag-* artifacts found in run ${RUN_ID}"
+            echo "::warning::No diag-* artifacts found in run ${CI_RUN_ID}"
             echo "artifacts=[]" >> "$GITHUB_OUTPUT"
             echo "count=0" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Sort by priority: build > lint > container > security > semgrep > codeql
+          # Priority: build > lint > container > security > semgrep > codeql
           SORTED=$(echo "$ARTIFACTS_JSON" | jq -c '
             sort_by(
               if startswith("diag-build-") then 0
@@ -77,29 +164,255 @@ jobs:
           echo "count=$COUNT" >> "$GITHUB_OUTPUT"
           echo "Found $COUNT failing-job artifacts (priority-sorted): $SORTED"
 
-  # ── Step 2: Sequential autofix queue — one job per failing artifact ──
-  kiro-autofix-build:
-    name: "Autofix: ${{ matrix.artifact }}"
-    needs: [discover-build-failures]
-    if: needs.discover-build-failures.outputs.count != '0' && needs.discover-build-failures.outputs.count != ''
-    strategy:
-      fail-fast: false
-      max-parallel: 1
-      matrix:
-        artifact: ${{ fromJson(needs.discover-build-failures.outputs.artifacts) }}
-    permissions:
-      contents: write
-      pull-requests: write
-    uses: ./.github/workflows/kiro-autofix.yml
-    with:
-      stage: build
-      branch: ${{ github.event.workflow_run.head_branch }}
-      context-artifact: ${{ matrix.artifact }}
-      artifact-run-id: ${{ github.event.workflow_run.id }}
-      run-url: ${{ github.event.workflow_run.html_url }}
-    secrets:
-      kiro-api: ${{ secrets.KIRO_API }}
-      github-token: ${{ secrets.KIRO_GITHUB_TOKEN }}
+      - name: Download all failing-job artifacts
+        if: steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: diag-*
+          path: ${{ runner.temp }}/all-diag
+          merge-multiple: false
+          run-id: ${{ env.CI_RUN_ID }}
+          github-token: ${{ secrets.KIRO_GITHUB_TOKEN }}
+
+      - name: Build git history of prior attempts
+        id: history
+        if: steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
+        env:
+          ATTEMPT_COUNT: ${{ steps.attempts.outputs.count }}
+        run: |
+          umask 077
+          HISTORY_LOG="${RUNNER_TEMP}/git-history.txt"
+          {
+            echo "=== RECENT COMMITS (last 10) ==="
+            git log --format='%h %ae %s%n%b%n---' -n 10
+            echo ""
+            echo "=== CONSECUTIVE PRIOR KIRO-BOT ATTEMPTS AT HEAD: ${ATTEMPT_COUNT} ==="
+            if [ "${ATTEMPT_COUNT}" -gt 0 ]; then
+              echo ""
+              echo "=== DIFFS FROM EACH PRIOR KIRO-BOT ATTEMPT ==="
+              i=0
+              while [ "$i" -lt "${ATTEMPT_COUNT}" ]; do
+                echo "--- Attempt commit HEAD~${i} ---"
+                git show --stat --format='%h %ae %s%n%b' "HEAD~${i}"
+                echo ""
+                i=$((i + 1))
+              done
+            fi
+          } > "$HISTORY_LOG"
+          echo "history_log=$HISTORY_LOG" >> "$GITHUB_OUTPUT"
+
+      - name: Configure git identity
+        if: steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
+        run: |
+          git config user.name "kiro-bot"
+          git config user.email "kiro-bot@users.noreply.github.com"
+
+      - name: Process queue (one Kiro run + one commit per artifact)
+        id: queue
+        if: steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
+        env:
+          KIRO_API_KEY: ${{ secrets.KIRO_API }}
+          ARTIFACTS_JSON: ${{ steps.list.outputs.artifacts }}
+          GIT_HISTORY_FILE: ${{ steps.history.outputs.history_log }}
+          ATTEMPT_NUM: ${{ steps.attempts.outputs.count }}
+        run: |
+          umask 077
+          ATTEMPT_DISPLAY=$((ATTEMPT_NUM + 1))
+          COMMITS_MADE=0
+
+          # Iterate through artifacts in priority order
+          while IFS= read -r artifact; do
+            [ -z "$artifact" ] && continue
+            CONTEXT_PATH="${RUNNER_TEMP}/all-diag/${artifact}/context.txt"
+            if [ ! -s "$CONTEXT_PATH" ]; then
+              echo "::warning::Skipping ${artifact}: context.txt empty or missing"
+              continue
+            fi
+
+            echo "::group::Processing ${artifact}"
+            COMMIT_MSG_FILE="${RUNNER_TEMP}/kiro-commit-message-${artifact}.txt"
+            export KIRO_COMMIT_MSG_FILE="$COMMIT_MSG_FILE"
+
+            # Build the prompt in a file (avoids shell interpolation of artifact contents,
+            # which could contain backticks, quotes, or $(...) sequences).
+            PROMPT_FILE="${RUNNER_TEMP}/kiro-prompt-${artifact}.txt"
+            {
+              printf 'You are running in CI as automated remediation for a failed pipeline job.\n\n'
+              printf 'This is autofix queue iteration for artifact: %s\n' "$artifact"
+              printf '(attempt cycle %d of %s on this branch).\n\n' "$ATTEMPT_DISPLAY" "$MAX_ATTEMPTS"
+              printf 'STEP 1 — Review prior history before changing anything.\n'
+              printf 'If there are prior kiro-bot attempts at HEAD, read what they tried and\n'
+              printf 'DO NOT repeat the same change. If a previous attempt approach failed,\n'
+              printf 'try a fundamentally different approach.\n\n'
+              printf '=== GIT HISTORY (recent commits + prior autofix attempts) ===\n'
+              cat "$GIT_HISTORY_FILE"
+              printf '\nSTEP 2 — Diagnose the SINGLE failing job below.\n'
+              printf 'Other failing jobs are being handled in separate iterations of this queue.\n'
+              printf 'Focus only on what is in the diagnostics below. Do NOT speculate about\n'
+              printf 'other failures you do not see here.\n\n'
+              printf '=== DIAGNOSTICS (single failing job) ===\n'
+              cat "$CONTEXT_PATH"
+              printf '\nSTEP 3 — Fix only what is broken in this artifact.\n'
+              printf '- Match the project existing style and conventions.\n'
+              printf '- Do NOT add new features or refactor unrelated code.\n'
+              printf '- Touch only files necessary to resolve THIS specific failure.\n\n'
+              printf 'STEP 4 — Write a descriptive commit message to KIRO_COMMIT_MSG_FILE.\n\n'
+              printf '    fix(autofix): <subject under 70 chars; reference %s>\n\n' "$artifact"
+              printf '    Resolves: %s\n\n' "$artifact"
+              printf '    Root cause:\n'
+              printf '    - <what was actually wrong; cite test names, lint IDs, file:line>\n\n'
+              printf '    Changes:\n'
+              printf '    - <bullet per file or logical change>\n\n'
+              printf '    Workflow run: %s\n\n' "$RUN_URL"
+              printf 'Do NOT run git commit or git push yourself; the workflow handles that.\n'
+            } > "$PROMPT_FILE"
+
+            # Run Kiro on this single artifact's diagnostics. Pass prompt via stdin
+            # to avoid shell interpolation of untrusted artifact content.
+            kiro-cli chat --no-interactive --trust-all-tools < "$PROMPT_FILE"
+
+            # Check if Kiro made any changes for this artifact
+            if git diff --quiet && git diff --cached --quiet; then
+              echo "No changes produced by Kiro for ${artifact}, skipping commit"
+              echo "::endgroup::"
+              continue
+            fi
+
+            # Commit locally — no push yet (push happens once at end of queue)
+            git add -A
+            if [ -s "$COMMIT_MSG_FILE" ]; then
+              git commit -F "$COMMIT_MSG_FILE"
+            else
+              echo "::warning::Kiro did not produce a commit message for ${artifact}; using fallback."
+              git commit -m "fix(autofix): resolve ${artifact}
+
+          Kiro did not write a descriptive commit message. Inspect the diff for details.
+          Workflow run: ${RUN_URL}"
+            fi
+            COMMITS_MADE=$((COMMITS_MADE + 1))
+            echo "Commit ${COMMITS_MADE} created for ${artifact}"
+            echo "::endgroup::"
+          done < <(echo "$ARTIFACTS_JSON" | jq -r '.[]')
+
+          echo "commits_made=$COMMITS_MADE" >> "$GITHUB_OUTPUT"
+          echo ""
+          echo "Queue complete. Created $COMMITS_MADE commits."
+
+      - name: Verify cumulative state
+        id: verify
+        if: steps.queue.outputs.commits_made != '0' && steps.queue.outputs.commits_made != ''
+        run: |
+          umask 077
+          echo "=== Verifying cumulative fix state before pushing ==="
+          PASS_FILE="${RUNNER_TEMP}/verify-pass"
+          VERIFY_LOG="${RUNNER_TEMP}/verify-output.txt"
+          echo "true" > "$PASS_FILE"
+
+          {
+            echo "=== RUSTFMT CHECK ==="
+            if ! cargo fmt --all -- --check 2>&1; then
+              echo "false" > "$PASS_FILE"
+              echo "FAILED: rustfmt"
+            fi
+            echo ""
+            echo "=== CLIPPY BACKEND ==="
+            if ! cargo clippy --locked -p realestate-backend -- -D warnings 2>&1; then
+              echo "false" > "$PASS_FILE"
+              echo "FAILED: clippy backend"
+            fi
+            echo ""
+            echo "=== CLIPPY FRONTEND ==="
+            if ! cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings 2>&1; then
+              echo "false" > "$PASS_FILE"
+              echo "FAILED: clippy frontend"
+            fi
+          } | tee "$VERIFY_LOG"
+
+          PASS=$(cat "$PASS_FILE")
+          if [ "$PASS" = "true" ]; then
+            echo "verified=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Cumulative verification passed."
+          else
+            echo "verified=false" >> "$GITHUB_OUTPUT"
+            echo "verify_log=$VERIFY_LOG" >> "$GITHUB_OUTPUT"
+            echo "::warning::Cumulative verification failed. Asking Kiro for a fixup commit."
+          fi
+
+      - name: Fixup commit if cumulative verification failed
+        if: steps.verify.outputs.verified == 'false'
+        env:
+          KIRO_API_KEY: ${{ secrets.KIRO_API }}
+        run: |
+          umask 077
+          VERIFY_ERRORS=$(cat "${{ steps.verify.outputs.verify_log }}")
+          COMMIT_MSG_FILE="${RUNNER_TEMP}/kiro-fixup-message.txt"
+          export KIRO_COMMIT_MSG_FILE="$COMMIT_MSG_FILE"
+
+          kiro-cli chat --no-interactive --trust-all-tools \
+            "Your prior queue commits introduced cross-cutting issues.
+          Run cargo fmt, clippy, etc. on the cumulative state and fix any
+          remaining errors. This produces ONE fixup commit on top of the queue.
+
+          === VERIFICATION ERRORS ===
+          ${VERIFY_ERRORS}
+
+          Write commit message to KIRO_COMMIT_MSG_FILE."
+
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "::warning::Fixup pass produced no changes despite verification failures."
+            exit 0
+          fi
+
+          git add -A
+          if [ -s "$COMMIT_MSG_FILE" ]; then
+            git commit -F "$COMMIT_MSG_FILE"
+          else
+            git commit -m "fix(autofix): cumulative verification fixup
+
+          Resolves cross-cutting issues introduced by the autofix queue.
+          Workflow run: ${RUN_URL}"
+          fi
+
+      - name: Push all queued commits
+        id: push
+        if: steps.queue.outputs.commits_made != '0' && steps.queue.outputs.commits_made != ''
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            echo "Pushing $(git log origin/${BRANCH}..HEAD --oneline | wc -l) new commits to origin/${BRANCH}"
+            git log origin/${BRANCH}..HEAD --oneline
+            git fetch origin "${BRANCH}"
+            # If origin advanced (human pushed concurrently), rebase our queued commits on top
+            if ! git merge-base --is-ancestor "origin/${BRANCH}" HEAD; then
+              git rebase "origin/${BRANCH}" || { git rebase --abort; exit 1; }
+            fi
+            git push origin "${BRANCH}"
+
+      - name: Notify on push failure
+        if: failure() && steps.push.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+        run: |
+          umask 077
+          pr_number=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --head "${BRANCH}" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+          if [ -n "$pr_number" ]; then
+            gh pr comment "$pr_number" \
+              --repo "${{ github.repository }}" \
+              --body "🤖 **Kiro Autofix queue produced commits but push failed.**
+
+            $(git log origin/${BRANCH}..HEAD --oneline 2>/dev/null | head -10)
+
+            Branch was likely modified concurrently. Manual intervention required.
+            Failed run: ${RUN_URL}"
+          fi
 
   # ── Deploy Autofix: triggered when CI fails on main (deploy stage) ──
   # Deploy is a single artifact (kiro-deploy-diagnostics), no queue needed.
