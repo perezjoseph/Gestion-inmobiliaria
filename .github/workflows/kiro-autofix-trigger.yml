@@ -5,6 +5,22 @@ name: Kiro Autofix Trigger
 # invocation per failing artifact, one local commit per resolved issue,
 # one final push at the end. This keeps each commit focused (one fix per
 # artifact) while only triggering CI once at the end of the queue.
+#
+# REQUIRED SECRETS:
+#   KIRO_API       — kiro-cli API key
+#   KIRO_GITHUB_TOKEN — fine-grained PAT scoped to THIS repo with:
+#                       contents: read+write (push commits)
+#                       pull-requests: read+write (comment on PRs)
+#                       actions: read (cross-run artifact download)
+#                       metadata: read (default)
+#                     Do NOT use a classic PAT with org-wide access — the
+#                     kiro-cli step runs with --trust-all-tools and could
+#                     misuse a broadly-scoped token.
+#
+# OPT-OUT:
+#   - Add the [skip-autofix] PR label, OR
+#   - Include [skip-autofix] in the latest commit message
+#   The autofix will not run.
 
 on:
   workflow_run:
@@ -21,6 +37,14 @@ concurrency:
   group: kiro-autofix-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: false
 
+env:
+  # MAX_QUEUE_RUNS counts distinct queue executions (each may produce many
+  # commits). When exceeded, autofix halts and asks for human help.
+  MAX_QUEUE_RUNS: "5"
+  # Hard cap on prompt size sent to Kiro (per artifact). Avoids context
+  # window overflow when diagnostics are unusually verbose.
+  MAX_CONTEXT_BYTES: "60000"
+
 jobs:
   autofix-build-queue:
     name: "Sequential Autofix Queue"
@@ -36,7 +60,6 @@ jobs:
       pull-requests: write
       actions: read
     env:
-      MAX_ATTEMPTS: "5"
       RUN_URL: ${{ github.event.workflow_run.html_url }}
       BRANCH: ${{ github.event.workflow_run.head_branch }}
       CI_RUN_ID: ${{ github.event.workflow_run.id }}
@@ -51,76 +74,138 @@ jobs:
           token: ${{ secrets.KIRO_GITHUB_TOKEN }}
           persist-credentials: true
 
-      - name: Count prior autofix attempts on this branch
-        id: attempts
+      - name: Check opt-out (label or commit marker)
+        id: optout
+        env:
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
         run: |
           umask 077
-          count=0
-          while [ "$count" -lt 50 ]; do
-            email=$(git log --format='%ae' -n 1 "HEAD~$count" 2>/dev/null || true)
-            if [ -z "$email" ]; then
-              break
-            fi
+          # Check latest commit message
+          last_msg=$(git log -1 --format=%B)
+          if echo "$last_msg" | grep -qF '[skip-autofix]'; then
+            echo "::notice::Autofix skipped: [skip-autofix] marker in latest commit message"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Check PR labels (if a PR exists for this branch)
+          pr_labels=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --head "${BRANCH}" \
+            --state open \
+            --json labels \
+            --jq '[.[].labels[].name] | join(",")' 2>/dev/null || echo "")
+          if echo "$pr_labels" | grep -qF 'skip-autofix'; then
+            echo "::notice::Autofix skipped: skip-autofix label on PR"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Count prior queue runs (distinct workflow-run trailers in kiro-bot commits at HEAD)
+        id: attempts
+        if: steps.optout.outputs.skip == 'false'
+        run: |
+          umask 077
+          # Walk back from HEAD collecting consecutive kiro-bot commits.
+          # Group them by their "Workflow run:" trailer — each queue execution
+          # produces commits sharing the same trailer URL.
+          declare -A seen_runs
+          queue_runs=0
+          i=0
+          while [ "$i" -lt 50 ]; do
+            email=$(git log --format='%ae' -n 1 "HEAD~$i" 2>/dev/null || true)
+            if [ -z "$email" ]; then break; fi
             case "$email" in
-              kiro-bot@*) count=$((count + 1)) ;;
+              kiro-bot@*) ;;
               *) break ;;
             esac
+            # Extract Workflow run URL from commit message body
+            run_url=$(git log --format='%B' -n 1 "HEAD~$i" 2>/dev/null \
+              | grep -oP '^Workflow run:\s*\K\S+' | head -1 || true)
+            if [ -n "$run_url" ] && [ -z "${seen_runs[$run_url]+x}" ]; then
+              seen_runs[$run_url]=1
+              queue_runs=$((queue_runs + 1))
+            fi
+            i=$((i + 1))
           done
-          echo "count=$count" >> "$GITHUB_OUTPUT"
-          if [ "$count" -ge "${MAX_ATTEMPTS}" ]; then
+          echo "queue_runs=$queue_runs" >> "$GITHUB_OUTPUT"
+          echo "Detected $queue_runs distinct prior queue runs at HEAD (max: ${MAX_QUEUE_RUNS})"
+
+          if [ "$queue_runs" -ge "${MAX_QUEUE_RUNS}" ]; then
             echo "exceeded=true" >> "$GITHUB_OUTPUT"
-            echo "::warning::Kiro Autofix attempt limit reached: $count consecutive auto-fix commits at HEAD (max: ${MAX_ATTEMPTS})."
+            echo "::warning::Kiro Autofix limit reached: $queue_runs queue runs at HEAD."
           else
             echo "exceeded=false" >> "$GITHUB_OUTPUT"
-            echo "Autofix attempt $((count + 1)) of ${MAX_ATTEMPTS}"
           fi
 
       - name: Find related PR
         id: pr
-        if: steps.attempts.outputs.exceeded == 'true'
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'true'
         env:
           GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
         run: |
           umask 077
           pr_number=$(gh pr list \
             --repo "${{ github.repository }}" \
-            --head "${{ env.BRANCH }}" \
+            --head "${BRANCH}" \
             --state open \
             --json number \
             --jq '.[0].number // empty')
           echo "number=${pr_number}" >> "$GITHUB_OUTPUT"
 
+      # Edit existing comment if present, otherwise create — avoids spam
+      # when autofix repeatedly hits the limit on the same PR.
       - name: Notify human on PR (max attempts reached)
-        if: steps.attempts.outputs.exceeded == 'true' && steps.pr.outputs.number != ''
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'true' && steps.pr.outputs.number != ''
         env:
           GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          MARKER: "<!-- kiro-autofix-gave-up -->"
         run: |
-          gh pr comment "${{ steps.pr.outputs.number }}" \
-            --repo "${{ github.repository }}" \
-            --body "🤖 **Kiro Autofix gave up at the build stage.**
+          umask 077
+          BODY="${MARKER}
+          🤖 **Kiro Autofix gave up at the build stage.**
 
-          Attempted ${{ env.MAX_ATTEMPTS }} consecutive automated fixes without restoring CI to green. Manual intervention is required.
+          Attempted ${MAX_QUEUE_RUNS} consecutive queue runs without restoring CI to green. Manual intervention is required.
 
-          - Failed run: ${{ env.RUN_URL }}
-          - Branch: \`${{ env.BRANCH }}\`
+          - Latest failed run: ${RUN_URL}
+          - Branch: \`${BRANCH}\`
 
-          To resume autofix, push a non-bot commit to this branch (the counter resets on any human commit at HEAD)."
+          To resume autofix, push a non-bot commit to this branch (the counter resets on any human commit at HEAD), or remove the \`skip-autofix\` label."
+
+          existing=$(gh api \
+            "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments?per_page=100" \
+            --jq ".[] | select(.body | contains(\"${MARKER}\")) | .id" \
+            | head -1)
+
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/${existing}" \
+              -f body="$BODY"
+            echo "Updated existing autofix-gave-up comment ${existing}"
+          else
+            gh pr comment "$PR_NUMBER" \
+              --repo "${{ github.repository }}" \
+              --body "$BODY"
+            echo "Created new autofix-gave-up comment"
+          fi
 
       - name: Stop if max attempts exceeded
-        if: steps.attempts.outputs.exceeded == 'true'
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'true'
         run: |
-          echo "::error::Kiro Autofix has attempted ${{ env.MAX_ATTEMPTS }} fixes without success. Manual intervention required."
+          echo "::error::Kiro Autofix has hit the queue-run limit. Manual intervention required."
           exit 1
 
       - name: Rust setup
-        if: steps.attempts.outputs.exceeded == 'false'
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false'
         uses: ./.github/actions/rust-setup
         with:
           components: rustfmt,clippy
           targets: x86_64-unknown-linux-musl,wasm32-unknown-unknown
 
       - name: Install Kiro CLI
-        if: steps.attempts.outputs.exceeded == 'false'
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false'
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 10
@@ -130,7 +215,7 @@ jobs:
 
       - name: List failing-job artifacts from CI run (priority-sorted)
         id: list
-        if: steps.attempts.outputs.exceeded == 'false'
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false'
         env:
           GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
         run: |
@@ -165,7 +250,7 @@ jobs:
           echo "Found $COUNT failing-job artifacts (priority-sorted): $SORTED"
 
       - name: Download all failing-job artifacts
-        if: steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           pattern: diag-*
@@ -176,9 +261,7 @@ jobs:
 
       - name: Build git history of prior attempts
         id: history
-        if: steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
-        env:
-          ATTEMPT_COUNT: ${{ steps.attempts.outputs.count }}
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
         run: |
           umask 077
           HISTORY_LOG="${RUNNER_TEMP}/git-history.txt"
@@ -186,38 +269,27 @@ jobs:
             echo "=== RECENT COMMITS (last 10) ==="
             git log --format='%h %ae %s%n%b%n---' -n 10
             echo ""
-            echo "=== CONSECUTIVE PRIOR KIRO-BOT ATTEMPTS AT HEAD: ${ATTEMPT_COUNT} ==="
-            if [ "${ATTEMPT_COUNT}" -gt 0 ]; then
-              echo ""
-              echo "=== DIFFS FROM EACH PRIOR KIRO-BOT ATTEMPT ==="
-              i=0
-              while [ "$i" -lt "${ATTEMPT_COUNT}" ]; do
-                echo "--- Attempt commit HEAD~${i} ---"
-                git show --stat --format='%h %ae %s%n%b' "HEAD~${i}"
-                echo ""
-                i=$((i + 1))
-              done
-            fi
+            echo "=== PRIOR KIRO-BOT QUEUE RUNS AT HEAD: ${{ steps.attempts.outputs.queue_runs }} ==="
           } > "$HISTORY_LOG"
           echo "history_log=$HISTORY_LOG" >> "$GITHUB_OUTPUT"
 
       - name: Configure git identity
-        if: steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
         run: |
           git config user.name "kiro-bot"
           git config user.email "kiro-bot@users.noreply.github.com"
 
       - name: Process queue (one Kiro run + one commit per artifact)
         id: queue
-        if: steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
         env:
           KIRO_API_KEY: ${{ secrets.KIRO_API }}
           ARTIFACTS_JSON: ${{ steps.list.outputs.artifacts }}
           GIT_HISTORY_FILE: ${{ steps.history.outputs.history_log }}
-          ATTEMPT_NUM: ${{ steps.attempts.outputs.count }}
+          QUEUE_RUNS: ${{ steps.attempts.outputs.queue_runs }}
         run: |
           umask 077
-          ATTEMPT_DISPLAY=$((ATTEMPT_NUM + 1))
+          ATTEMPT_DISPLAY=$((QUEUE_RUNS + 1))
           COMMITS_MADE=0
 
           # Iterate through artifacts in priority order
@@ -233,13 +305,25 @@ jobs:
             COMMIT_MSG_FILE="${RUNNER_TEMP}/kiro-commit-message-${artifact}.txt"
             export KIRO_COMMIT_MSG_FILE="$COMMIT_MSG_FILE"
 
+            # Truncate diagnostics if oversized to protect Kiro's context window.
+            CTX_BYTES=$(wc -c < "$CONTEXT_PATH")
+            TRUNCATED_CTX="${RUNNER_TEMP}/all-diag/${artifact}/context-truncated.txt"
+            if [ "$CTX_BYTES" -gt "${MAX_CONTEXT_BYTES}" ]; then
+              echo "::warning::context.txt for ${artifact} is ${CTX_BYTES} bytes; truncating to last ${MAX_CONTEXT_BYTES}"
+              tail -c "${MAX_CONTEXT_BYTES}" "$CONTEXT_PATH" > "$TRUNCATED_CTX"
+              echo "[NOTE: Earlier diagnostic output was truncated; only the last ${MAX_CONTEXT_BYTES} bytes are shown above.]" >> "$TRUNCATED_CTX"
+              EFFECTIVE_CTX="$TRUNCATED_CTX"
+            else
+              EFFECTIVE_CTX="$CONTEXT_PATH"
+            fi
+
             # Build the prompt in a file (avoids shell interpolation of artifact contents,
             # which could contain backticks, quotes, or $(...) sequences).
             PROMPT_FILE="${RUNNER_TEMP}/kiro-prompt-${artifact}.txt"
             {
               printf 'You are running in CI as automated remediation for a failed pipeline job.\n\n'
               printf 'This is autofix queue iteration for artifact: %s\n' "$artifact"
-              printf '(attempt cycle %d of %s on this branch).\n\n' "$ATTEMPT_DISPLAY" "$MAX_ATTEMPTS"
+              printf '(queue run %d of %s on this branch).\n\n' "$ATTEMPT_DISPLAY" "$MAX_QUEUE_RUNS"
               printf 'STEP 1 — Review prior history before changing anything.\n'
               printf 'If there are prior kiro-bot attempts at HEAD, read what they tried and\n'
               printf 'DO NOT repeat the same change. If a previous attempt approach failed,\n'
@@ -251,7 +335,7 @@ jobs:
               printf 'Focus only on what is in the diagnostics below. Do NOT speculate about\n'
               printf 'other failures you do not see here.\n\n'
               printf '=== DIAGNOSTICS (single failing job) ===\n'
-              cat "$CONTEXT_PATH"
+              cat "$EFFECTIVE_CTX"
               printf '\nSTEP 3 — Fix only what is broken in this artifact.\n'
               printf '- Match the project existing style and conventions.\n'
               printf '- Do NOT add new features or refactor unrelated code.\n'
@@ -271,16 +355,22 @@ jobs:
             # to avoid shell interpolation of untrusted artifact content.
             kiro-cli chat --no-interactive --trust-all-tools < "$PROMPT_FILE"
 
-            # Check if Kiro made any changes for this artifact
-            if git diff --quiet && git diff --cached --quiet; then
+            # Detect ANY change in working tree (tracked, staged, OR untracked).
+            # `git diff` only sees tracked-file changes, missing new files Kiro creates.
+            git add -A
+            if [ -z "$(git status --porcelain)" ]; then
               echo "No changes produced by Kiro for ${artifact}, skipping commit"
               echo "::endgroup::"
               continue
             fi
 
-            # Commit locally — no push yet (push happens once at end of queue)
-            git add -A
+            # Commit locally — no push yet (push happens once at end of queue).
+            # Ensure every queued commit ends with the Workflow run trailer for
+            # the queue-run counter to detect.
             if [ -s "$COMMIT_MSG_FILE" ]; then
+              if ! grep -qF "Workflow run: ${RUN_URL}" "$COMMIT_MSG_FILE"; then
+                printf '\nWorkflow run: %s\n' "$RUN_URL" >> "$COMMIT_MSG_FILE"
+              fi
               git commit -F "$COMMIT_MSG_FILE"
             else
               echo "::warning::Kiro did not produce a commit message for ${artifact}; using fallback."
@@ -326,6 +416,15 @@ jobs:
               echo "false" > "$PASS_FILE"
               echo "FAILED: clippy frontend"
             fi
+            # Best-effort baileys typecheck if Node is available
+            if command -v npm >/dev/null 2>&1 && [ -f baileys-service/package.json ]; then
+              echo ""
+              echo "=== BAILEYS TYPECHECK ==="
+              ( cd baileys-service && npm ci --silent && npm run build 2>&1 ) || {
+                echo "false" > "$PASS_FILE"
+                echo "FAILED: baileys typecheck"
+              }
+            fi
           } | tee "$VERIFY_LOG"
 
           PASS=$(cat "$PASS_FILE")
@@ -344,27 +443,33 @@ jobs:
           KIRO_API_KEY: ${{ secrets.KIRO_API }}
         run: |
           umask 077
-          VERIFY_ERRORS=$(cat "${{ steps.verify.outputs.verify_log }}")
           COMMIT_MSG_FILE="${RUNNER_TEMP}/kiro-fixup-message.txt"
           export KIRO_COMMIT_MSG_FILE="$COMMIT_MSG_FILE"
 
-          kiro-cli chat --no-interactive --trust-all-tools \
-            "Your prior queue commits introduced cross-cutting issues.
-          Run cargo fmt, clippy, etc. on the cumulative state and fix any
-          remaining errors. This produces ONE fixup commit on top of the queue.
+          # Build prompt via file to avoid shell interpolation of verify output.
+          FIXUP_PROMPT="${RUNNER_TEMP}/kiro-fixup-prompt.txt"
+          {
+            printf 'Your prior queue commits introduced cross-cutting issues.\n'
+            printf 'Run cargo fmt, clippy, etc. on the cumulative state and fix any\n'
+            printf 'remaining errors. This produces ONE fixup commit on top of the queue.\n\n'
+            printf '=== VERIFICATION ERRORS ===\n'
+            cat "${{ steps.verify.outputs.verify_log }}"
+            printf '\nWrite commit message to KIRO_COMMIT_MSG_FILE.\n'
+            printf 'End the commit message with: Workflow run: %s\n' "$RUN_URL"
+          } > "$FIXUP_PROMPT"
 
-          === VERIFICATION ERRORS ===
-          ${VERIFY_ERRORS}
+          kiro-cli chat --no-interactive --trust-all-tools < "$FIXUP_PROMPT"
 
-          Write commit message to KIRO_COMMIT_MSG_FILE."
-
-          if git diff --quiet && git diff --cached --quiet; then
+          git add -A
+          if [ -z "$(git status --porcelain)" ]; then
             echo "::warning::Fixup pass produced no changes despite verification failures."
             exit 0
           fi
 
-          git add -A
           if [ -s "$COMMIT_MSG_FILE" ]; then
+            if ! grep -qF "Workflow run: ${RUN_URL}" "$COMMIT_MSG_FILE"; then
+              printf '\nWorkflow run: %s\n' "$RUN_URL" >> "$COMMIT_MSG_FILE"
+            fi
             git commit -F "$COMMIT_MSG_FILE"
           else
             git commit -m "fix(autofix): cumulative verification fixup
