@@ -154,8 +154,17 @@ pub async fn fetch_ipc_from_bcrd(db: &DatabaseConnection) -> Result<i64, AppErro
     Ok(1)
 }
 
+/// Maximum annual rent increase percentage allowed by Ley 85-25.
+const TOPE_LEGAL_PORCENTAJE: Decimal = Decimal::TEN;
+
 /// Calculate maximum allowed rent for a renewal.
-/// Pure function: returns `monto_actual * (1 + ipc_porcentaje / 100)`.
+/// Applies the IPC percentage capped at 10% (Ley 85-25).
+/// Returns `monto_actual * (1 + min(ipc_porcentaje, 10) / 100)`.
 pub fn calcular_monto_maximo(monto_actual: Decimal, ipc_porcentaje: Decimal) -> Decimal {
-    monto_actual * (Decimal::ONE + ipc_porcentaje / Decimal::from(100))
+    let porcentaje_aplicable = if ipc_porcentaje > TOPE_LEGAL_PORCENTAJE {
+        TOPE_LEGAL_PORCENTAJE
+    } else {
+        ipc_porcentaje
+    };
+    monto_actual * (Decimal::ONE + porcentaje_aplicable / Decimal::from(100))
 }

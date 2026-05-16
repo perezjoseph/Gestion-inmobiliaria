@@ -47,6 +47,7 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      android: ${{ steps.filter.outputs.android }}
       ocr-service: ${{ steps.filter.outputs.ocr-service }}
       baileys-service: ${{ steps.filter.outputs.baileys-service }}
       ci: ${{ steps.filter.outputs.ci }}
@@ -71,6 +72,8 @@ jobs:
               - 'Cargo.lock'
             ocr-service:
               - 'ocr-service/**'
+            android:
+              - 'android/**'
             baileys-service:
               - 'baileys-service/**'
             ci:
@@ -94,12 +97,24 @@ jobs:
   codeql:
     name: CodeQL
     needs: [changes]
+    if: >-
+      github.event_name != 'pull_request' ||
+      needs.changes.outputs.backend == 'true' ||
+      needs.changes.outputs.frontend == 'true' ||
+      needs.changes.outputs.android == 'true' ||
+      needs.changes.outputs.ocr-service == 'true' ||
+      needs.changes.outputs.baileys-service == 'true' ||
+      needs.changes.outputs.ci == 'true'
     permissions:
       contents: read
       security-events: write
     uses: ./.github/workflows/codeql.yml
     with:
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+      rust-changed: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.ci == 'true' }}
+      js-changed: ${{ needs.changes.outputs.baileys-service == 'true' || needs.changes.outputs.ci == 'true' }}
+      python-changed: ${{ needs.changes.outputs.ocr-service == 'true' || needs.changes.outputs.ci == 'true' }}
+      kotlin-changed: ${{ needs.changes.outputs.android == 'true' || needs.changes.outputs.ci == 'true' }}
 
   lint:
     name: Lint

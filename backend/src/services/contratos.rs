@@ -663,7 +663,7 @@ pub async fn renovar(
         ));
     }
 
-    // IPC cap validation (Ley 4314)
+    // IPC cap validation (Ley 85-25: máximo 10% anual)
     match super::ipc::obtener_ipc_actual(db).await? {
         Some(ipc_data) => {
             let max_allowed =
