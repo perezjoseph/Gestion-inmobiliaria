@@ -129,6 +129,11 @@ jobs:
         id: tests
         env:
           PROPTEST_CASES: "20"
+          # Bypass sccache for coverage builds. sccache + LLVM coverage
+          # instrumentation + cc-built crates (aws-lc-sys) produce truncated
+          # rlib archives ("end of file unexpectedly encountered"). The
+          # release build below still uses sccache for fast incremental CI.
+          RUSTC_WRAPPER: ""
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 30

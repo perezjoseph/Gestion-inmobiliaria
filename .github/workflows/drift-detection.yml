@@ -143,6 +143,11 @@ jobs:
           fi
 
       - name: Run coverage analysis
+        env:
+          # Bypass sccache for coverage builds. sccache + LLVM coverage
+          # instrumentation + cc-built crates (aws-lc-sys) produce truncated
+          # rlib archives ("end of file unexpectedly encountered").
+          RUSTC_WRAPPER: ""
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 30
