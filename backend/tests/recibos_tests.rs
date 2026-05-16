@@ -423,8 +423,10 @@ mod db_async {
 
             impl io::Write for TestWriter {
                 fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-                    let mut lock = self.0.lock().unwrap_or_else(|e| e.into_inner());
-                    lock.extend_from_slice(buf);
+                    self.0
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .extend_from_slice(buf);
                     Ok(buf.len())
                 }
                 fn flush(&mut self) -> io::Result<()> {
@@ -433,7 +435,7 @@ mod db_async {
             }
 
             impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for TestWriter {
-                type Writer = TestWriter;
+                type Writer = Self;
                 fn make_writer(&'a self) -> Self::Writer {
                     self.clone()
                 }

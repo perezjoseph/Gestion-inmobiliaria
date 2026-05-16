@@ -12,8 +12,10 @@ pub fn is_online() -> bool {
 /// Subscribes to browser `online`/`offline` events and invokes the callback
 /// with the new status. Returns the two `EventListener` guards — drop them
 /// to unsubscribe.
-pub fn subscribe_online_status(on_change: Callback<bool>) -> (EventListener, EventListener) {
-    let win = window().expect("window must exist");
+pub fn subscribe_online_status(
+    on_change: Callback<bool>,
+) -> Option<(EventListener, EventListener)> {
+    let win = window()?;
 
     let cb_online = on_change.clone();
     let online_listener = EventListener::new(&win, "online", move |_| {
@@ -24,5 +26,5 @@ pub fn subscribe_online_status(on_change: Callback<bool>) -> (EventListener, Eve
         on_change.emit(false);
     });
 
-    (online_listener, offline_listener)
+    Some((online_listener, offline_listener))
 }

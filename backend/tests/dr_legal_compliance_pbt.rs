@@ -136,7 +136,7 @@ fn arbitrary_string() -> impl Strategy<Value = String> {
 /// Helper: validates that completado requires fecha_resolucion.
 fn validate_desahucio_transition(
     estado: &str,
-    fecha_resolucion: &Option<NaiveDate>,
+    fecha_resolucion: Option<&NaiveDate>,
 ) -> Result<(), ()> {
     if estado == "completado" && fecha_resolucion.is_none() {
         return Err(());
@@ -159,7 +159,7 @@ fn test_desahucio_state_machine() {
         .run(&arbitrary_date(), |_fecha| {
             let fecha_resolucion: Option<NaiveDate> = None;
             prop_assert!(
-                validate_desahucio_transition("completado", &fecha_resolucion).is_err(),
+                validate_desahucio_transition("completado", fecha_resolucion.as_ref()).is_err(),
                 "completado without fecha_resolucion must be rejected"
             );
             Ok(())
@@ -171,7 +171,7 @@ fn test_desahucio_state_machine() {
         .run(&arbitrary_date(), |fecha| {
             let fecha_resolucion = Some(fecha);
             prop_assert!(
-                validate_desahucio_transition("completado", &fecha_resolucion).is_ok(),
+                validate_desahucio_transition("completado", fecha_resolucion.as_ref()).is_ok(),
                 "completado with fecha_resolucion must be accepted"
             );
             Ok(())
@@ -180,7 +180,7 @@ fn test_desahucio_state_machine() {
 
     // Sub-property C: only valid transitions allowed
     // Valid: iniciado → en_progreso, en_progreso → completado, iniciado → completado
-    let valid_transitions = vec![
+    let valid_transitions = [
         ("iniciado", "en_progreso"),
         ("en_progreso", "completado"),
         ("iniciado", "completado"),
@@ -560,7 +560,7 @@ fn test_utility_field_validation() {
         .run(&arbitrary_date(), |fecha| {
             // Same date: desde == hasta is invalid
             prop_assert!(
-                !(fecha < fecha),
+                fecha >= fecha,
                 "periodo_desde ({}) >= periodo_hasta ({}) should be rejected",
                 fecha,
                 fecha

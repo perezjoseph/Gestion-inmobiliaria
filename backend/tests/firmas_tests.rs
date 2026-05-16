@@ -1410,7 +1410,7 @@ struct FileMailClient {
 }
 
 impl FileMailClient {
-    fn new(dir: std::path::PathBuf) -> Self {
+    const fn new(dir: std::path::PathBuf) -> Self {
         Self { dir }
     }
 }

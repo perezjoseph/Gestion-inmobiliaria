@@ -12,21 +12,21 @@ pub fn use_online() -> bool {
     let state = use_state(is_online);
 
     {
+        #[allow(clippy::redundant_clone)]
         let state = state.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             let cb = {
-                let state = state.clone();
+                let state = state;
                 Callback::from(move |online: bool| {
                     state.set(online);
                 })
             };
 
-            let (online_listener, offline_listener) = subscribe_online_status(cb);
+            let guards = subscribe_online_status(cb);
 
             // Return cleanup closure that drops the listeners on unmount
             move || {
-                drop(online_listener);
-                drop(offline_listener);
+                drop(guards);
             }
         });
     }

@@ -401,7 +401,7 @@ pub(crate) fn generar_password() -> String {
         .collect()
 }
 
-/// Send email with signing link and password via the MailClient trait.
+/// Send email with signing link and password via the `MailClient` trait.
 /// Returns `Ok(())` on success, or an `AppError` on failure.
 pub async fn enviar_email_firma(
     mail: &dyn crate::services::mail::MailClient,
@@ -479,6 +479,7 @@ pub async fn generar_pdf_sellado(
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error escribiendo PDF sellado: {e}")))?;
 
     let now = Utc::now();
+    #[allow(clippy::cast_possible_wrap)]
     let file_size = pdf_bytes.len() as i64;
 
     // Insert a new Documento record for the sealed PDF

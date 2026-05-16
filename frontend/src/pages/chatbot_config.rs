@@ -133,7 +133,7 @@ pub fn ChatbotConfig() -> Html {
                 match cfg_res {
                     Ok(mut cfg) => {
                         if let Ok(status_resp) = &status_res {
-                            cfg.connection_status = status_resp.status.clone();
+                            cfg.connection_status.clone_from(&status_resp.status);
                         }
                         config.set(Some(cfg));
                     }

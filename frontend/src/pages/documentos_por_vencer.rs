@@ -15,7 +15,7 @@ pub fn documentos_por_vencer() -> Html {
         let docs = docs.clone();
         let loading = loading.clone();
         let error = error.clone();
-        use_effect_with((), move |_| {
+        use_effect_with((), move |()| {
             spawn_local(async move {
                 match api_get::<Vec<DocumentoResponse>>("/documentos/por-vencer").await {
                     Ok(mut rows) => {
@@ -79,7 +79,7 @@ fn documentos_por_vencer_table(props: &TableProps) -> Html {
                         </tr>
                     </thead>
                     <tbody>
-                        { for props.docs.iter().map(|doc| render_row(doc)) }
+                        { for props.docs.iter().map(render_row) }
                     </tbody>
                 </table>
             </div>
@@ -91,8 +91,7 @@ fn render_row(doc: &DocumentoResponse) -> Html {
     let fecha = doc
         .fecha_vencimiento
         .as_deref()
-        .map(format_date_display)
-        .unwrap_or_else(|| "—".to_string());
+        .map_or_else(|| "—".to_string(), format_date_display);
 
     let tipo_label = doc
         .tipo_documento

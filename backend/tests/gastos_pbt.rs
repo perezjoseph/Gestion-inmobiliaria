@@ -524,23 +524,25 @@ mod pbt_date_range_async {
             // Ensure desde > hasta
             let desde_day = (desde_offset % 364) + 1;
             let hasta_day = (hasta_offset % 364) + 1;
-            let (fecha_desde, fecha_hasta) = if desde_day > hasta_day {
-                (
+            let (fecha_desde, fecha_hasta) = match desde_day.cmp(&hasta_day) {
+                std::cmp::Ordering::Greater => (
                     NaiveDate::from_yo_opt(2025, desde_day).unwrap(),
                     NaiveDate::from_yo_opt(2025, hasta_day).unwrap(),
-                )
-            } else if desde_day < hasta_day {
-                // Swap so desde > hasta
-                (
-                    NaiveDate::from_yo_opt(2025, hasta_day).unwrap(),
-                    NaiveDate::from_yo_opt(2025, desde_day).unwrap(),
-                )
-            } else {
-                // Equal days — make desde one day later
-                (
-                    NaiveDate::from_yo_opt(2025, desde_day.min(364) + 1).unwrap(),
-                    NaiveDate::from_yo_opt(2025, desde_day).unwrap(),
-                )
+                ),
+                std::cmp::Ordering::Less => {
+                    // Swap so desde > hasta
+                    (
+                        NaiveDate::from_yo_opt(2025, hasta_day).unwrap(),
+                        NaiveDate::from_yo_opt(2025, desde_day).unwrap(),
+                    )
+                }
+                std::cmp::Ordering::Equal => {
+                    // Equal days — make desde one day later
+                    (
+                        NaiveDate::from_yo_opt(2025, desde_day.min(364) + 1).unwrap(),
+                        NaiveDate::from_yo_opt(2025, desde_day).unwrap(),
+                    )
+                }
             };
 
             assert!(

@@ -56,8 +56,8 @@ pub fn LineChart(props: &LineChartProps) -> Html {
         .iter()
         .enumerate()
         .map(|(i, p)| {
-            let x = PADDING_LEFT + i as f64 * x_step;
-            let y = PADDING_TOP + usable_h - ((p.value - min_val) / range) * usable_h;
+            let x = (i as f64).mul_add(x_step, PADDING_LEFT);
+            let y = ((p.value - min_val) / range).mul_add(-usable_h, PADDING_TOP + usable_h);
             if i == 0 {
                 format!("M {x:.1} {y:.1}")
             } else {
@@ -70,20 +70,20 @@ pub fn LineChart(props: &LineChartProps) -> Html {
     let area_data = {
         let baseline_y = PADDING_TOP + usable_h;
         let first_x = PADDING_LEFT;
-        let last_x = PADDING_LEFT + (points.len() - 1) as f64 * x_step;
+        let last_x = ((points.len() - 1) as f64).mul_add(x_step, PADDING_LEFT);
         format!("{path_data} L {last_x:.1} {baseline_y:.1} L {first_x:.1} {baseline_y:.1} Z")
     };
 
     // Y-axis grid lines (4 steps)
     let grid_lines: Vec<Html> = (0..=4)
         .map(|i| {
-            let frac = i as f64 / 4.0;
-            let y = PADDING_TOP + usable_h - frac * usable_h;
-            let val = min_val + frac * range;
+            let frac = f64::from(i) / 4.0;
+            let y = frac.mul_add(-usable_h, PADDING_TOP + usable_h);
+            let val = frac.mul_add(range, min_val);
             html! {
                 <g key={i}>
                     <line
-                        x1={format!("{:.1}", PADDING_LEFT)}
+                        x1={format!("{PADDING_LEFT:.1}")}
                         y1={format!("{y:.1}")}
                         x2={format!("{:.1}", CHART_WIDTH - PADDING_RIGHT)}
                         y2={format!("{y:.1}")}
@@ -98,7 +98,7 @@ pub fn LineChart(props: &LineChartProps) -> Html {
                         font-size="9"
                         fill="var(--text-tertiary)"
                     >
-                        {format!("{:.0}", val)}
+                        {format!("{val:.0}")}
                     </text>
                 </g>
             }
@@ -110,7 +110,7 @@ pub fn LineChart(props: &LineChartProps) -> Html {
         .iter()
         .enumerate()
         .map(|(i, p)| {
-            let x = PADDING_LEFT + i as f64 * x_step;
+            let x = (i as f64).mul_add(x_step, PADDING_LEFT);
             let y = CHART_HEIGHT - 6.0;
             html! {
                 <text
@@ -132,8 +132,8 @@ pub fn LineChart(props: &LineChartProps) -> Html {
         .iter()
         .enumerate()
         .map(|(i, p)| {
-            let x = PADDING_LEFT + i as f64 * x_step;
-            let y = PADDING_TOP + usable_h - ((p.value - min_val) / range) * usable_h;
+            let x = (i as f64).mul_add(x_step, PADDING_LEFT);
+            let y = ((p.value - min_val) / range).mul_add(-usable_h, PADDING_TOP + usable_h);
             html! {
                 <circle
                     key={i}

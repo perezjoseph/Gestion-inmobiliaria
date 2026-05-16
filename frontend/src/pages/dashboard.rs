@@ -286,9 +286,10 @@ fn ComplianceCounters(props: &ComplianceCountersProps) -> Html {
 
 /// Computes the date 30 days from now as YYYY-MM-DD for the API query.
 fn thirty_days_from_now() -> String {
+    const THIRTY_DAYS_MS: f64 = 30.0 * 24.0 * 60.0 * 60.0 * 1000.0;
     let now = js_sys::Date::new_0();
     let future = js_sys::Date::new_0();
-    future.set_time(now.get_time() + 30.0 * 24.0 * 60.0 * 60.0 * 1000.0);
+    future.set_time(now.get_time() + THIRTY_DAYS_MS);
     let y = future.get_full_year();
     let m = future.get_month() + 1; // 0-indexed
     let d = future.get_date();

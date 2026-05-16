@@ -884,16 +884,18 @@ pub async fn record_extraction<C: ConnectionTrait>(
 
 // --- Post-Loop Extraction Persistence ---
 
-/// Persists a receipt extraction from the AI agent's multi-turn loop into the
-/// `chatbot_receipt_extraction` table, delegating to `confirmar_preview` for
-/// domain entity creation once the extraction is confirmed.
+/// Persists a receipt extraction from the AI agent's multi-turn loop.
+///
+/// Stores the result in the `chatbot_receipt_extraction` table, delegating to
+/// `confirmar_preview` for domain entity creation once the extraction is confirmed.
 ///
 /// Called when `invoke_agent` returns `Final` and the history contains a
 /// successful `ExtractReceiptTool` result. This stores the extraction with
 /// `pending_confirmation` status so the landlord can review and confirm it.
 ///
 /// Requirement 8.3: When `ExtractReceiptTool` returns a successful extraction,
-/// the WhatsApp AI service SHALL invoke `Record_Extraction` to persist the result.
+/// the `WhatsApp` AI service SHALL invoke `Record_Extraction` to persist the result.
+#[allow(clippy::doc_markdown)]
 pub async fn record_extraction_from_agent<C: ConnectionTrait>(
     db: &C,
     receipt: &crate::services::ai_module::PaymentReceipt,

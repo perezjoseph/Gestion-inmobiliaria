@@ -422,6 +422,7 @@ mod pbt_async {
                 filename: Set(format!("sellado-{doc_id}.pdf")),
                 file_path: Set(file_path.clone()),
                 mime_type: Set("application/pdf".to_string()),
+                #[allow(clippy::cast_possible_wrap)]
                 file_size: Set(file_content.len() as i64),
                 uploaded_by: Set(user_id),
                 created_at: Set(now),

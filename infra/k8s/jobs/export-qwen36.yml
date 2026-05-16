@@ -1,0 +1,61 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: export-qwen36-35b-a3b
+  namespace: realestate
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: model-export
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/hostname: inference
+      containers:
+        - name: export
+          image: python:3.12-slim
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              echo "=== Installing dependencies ==="
+              pip install --no-cache-dir optimum[openvino] huggingface_hub
+
+              echo "=== Removing old model ==="
+              rm -rf /models/Qwen3-30B-A3B
+              echo "Old model removed."
+
+              echo "=== Exporting Qwen3.6-35B-A3B to OpenVINO IR (INT4) ==="
+              optimum-cli export openvino \
+                --model Qwen/Qwen3.6-35B-A3B \
+                --weight-format int4 \
+                --group-size 128 \
+                --ratio 1.0 \
+                --task text-generation-with-past \
+                /models/Qwen3.6-35B-A3B
+
+              echo "=== Export complete ==="
+              ls -la /models/Qwen3.6-35B-A3B/
+              du -sh /models/Qwen3.6-35B-A3B/
+              echo "=== Done ==="
+          resources:
+            requests:
+              cpu: "4"
+              memory: 48Gi
+              ephemeral-storage: 10Gi
+            limits:
+              cpu: "8"
+              memory: 64Gi
+              ephemeral-storage: 20Gi
+          volumeMounts:
+            - name: models
+              mountPath: /models
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: ovms-models-pvc

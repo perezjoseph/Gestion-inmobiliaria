@@ -221,11 +221,11 @@ fn test_final_text_responses_pass_through_unchanged() {
 ///
 /// Property: For all `Capabilities` configurations, tool registration matches
 /// exactly the enabled capabilities. The mapping is:
-/// - receipt_ocr → ["extract_receipt"]
-/// - balance_queries → ["query_balance", "get_payment_history"]
-/// - maintenance_requests → ["create_maintenance_request"]
-/// - human_handoff → ["handoff_to_human"]
-/// - payment_reminders → (no tool mapping)
+/// - `receipt_ocr` → `extract_receipt`
+/// - `balance_queries` → `query_balance`, `get_payment_history`
+/// - `maintenance_requests` → `create_maintenance_request`
+/// - `human_handoff` → `handoff_to_human`
+/// - `payment_reminders` → (no tool mapping)
 #[test]
 fn test_capability_gating_matches_enabled_capabilities() {
     let mut runner = TestRunner::new(ProptestConfig {

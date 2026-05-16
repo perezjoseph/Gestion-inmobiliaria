@@ -1517,7 +1517,7 @@ mod gastos_utility_db_tests {
             assert_eq!(resp.status(), 200);
             let body: Value = test::read_body_json(resp).await;
             // Should contain at least the April gasto
-            assert!(body["data"].as_array().unwrap().len() >= 1);
+            assert!(!body["data"].as_array().unwrap().is_empty());
         });
     }
 }
