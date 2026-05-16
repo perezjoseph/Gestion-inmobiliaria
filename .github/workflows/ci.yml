@@ -94,21 +94,6 @@ jobs:
       is-pr: ${{ github.event_name == 'pull_request' }}
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
-  lint:
-    name: Lint
-    needs: [changes]
-    if: >-
-      github.event_name != 'pull_request' ||
-      needs.changes.outputs.backend == 'true' ||
-      needs.changes.outputs.frontend == 'true' ||
-      needs.changes.outputs.baileys-service == 'true' ||
-      needs.changes.outputs.ci == 'true'
-    permissions:
-      contents: read
-    uses: ./.github/workflows/lint.yml
-    with:
-      is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
-
   # Build & Test runs clippy + tests + release build in unified jobs
   # (one Rust compilation per target instead of three separate ones)
   build-and-test:
@@ -365,12 +350,11 @@ jobs:
 
   containers:
     name: Containers
-    needs: [build-and-test, security, lint]
+    needs: [build-and-test, security]
     if: |
       !cancelled() &&
       needs.build-and-test.result == 'success' &&
-      (needs.security.result == 'success' || needs.security.result == 'skipped') &&
-      (needs.lint.result == 'success' || needs.lint.result == 'skipped')
+      (needs.security.result == 'success' || needs.security.result == 'skipped')
     permissions:
       contents: read
       packages: write
