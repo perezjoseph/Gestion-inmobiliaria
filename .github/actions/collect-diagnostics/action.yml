@@ -1,9 +1,9 @@
 name: Collect Job Diagnostics
 description: >
   Captures diagnostics from a failed job and uploads them as an artifact
-  for the Kiro Autofix workflow. Add as the last step(s) in any job with
-  `if: failure()`. Reads output files you specify and packages them into
-  a single diag-* artifact.
+  for the Kiro Autofix workflow. Add as the last step in any job with
+  if-failure conditional. Reads output files you specify and packages them
+  into a single diag-* artifact.
 
 inputs:
   job-name:
@@ -13,21 +13,11 @@ inputs:
     description: "Unique suffix for the artifact name (e.g. 'build-backend'). Final name: diag-{suffix}"
     required: true
   output-files:
-    description: |
-      Newline-separated list of file paths to include in diagnostics.
-      Non-existent or empty files are silently skipped.
-      Example: |
-        ${{ runner.temp }}/clippy-output.txt
-        ${{ runner.temp }}/test-output.txt
+    description: "Newline-separated list of file paths to include in diagnostics. Non-existent or empty files are silently skipped."
     required: false
     default: ""
   step-outcomes:
-    description: |
-      Newline-separated list of "step_name=outcome" pairs for the summary header.
-      Example: |
-        clippy=${{ steps.clippy.outcome }}
-        tests=${{ steps.tests.outcome }}
-        build=${{ steps.build.outcome }}
+    description: "Newline-separated list of step_name=outcome pairs for the summary header."
     required: false
     default: ""
   extra-context:

@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: seed-ovms-config
+  namespace: realestate
+  labels:
+    app.kubernetes.io/name: model-export
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  nodeSelector:
+    kubernetes.io/hostname: inference
+  containers:
+    - name: seed
+      image: busybox:1.36
+      command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Removing stale config and old model dir"
+          rm -f /models/config.json
+          rm -rf /models/Qwen3-Coder-30B-A3B-Instruct-int4-ov
+
+          echo "Writing /models/config.json"
+          cp /seed/config.json /models/config.json
+
+          echo "Writing /models/Qwen3-30B-A3B-Instruct-2507-int4-ov/graph.pbtxt"
+          cp /seed/graph.pbtxt /models/Qwen3-30B-A3B-Instruct-2507-int4-ov/graph.pbtxt
+
+          echo "--- /models ---"
+          ls -la /models
+          echo "--- model dir ---"
+          ls -la /models/Qwen3-30B-A3B-Instruct-2507-int4-ov | head -5
+          echo "--- config.json ---"
+          cat /models/config.json
+          echo "--- graph.pbtxt (head) ---"
+          head -10 /models/Qwen3-30B-A3B-Instruct-2507-int4-ov/graph.pbtxt
+      resources:
+        requests:
+          cpu: "100m"
+          memory: 64Mi
+          ephemeral-storage: 64Mi
+        limits:
+          cpu: "500m"
+          memory: 128Mi
+          ephemeral-storage: 128Mi
+      volumeMounts:
+        - name: models
+          mountPath: /models
+        - name: seed
+          mountPath: /seed
+  volumes:
+    - name: models
+      persistentVolumeClaim:
+        claimName: ovms-models-pvc
+    - name: seed
+      configMap:
+        name: ovms-config

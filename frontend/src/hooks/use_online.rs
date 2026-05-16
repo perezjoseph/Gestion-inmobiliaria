@@ -22,11 +22,18 @@ pub fn use_online() -> bool {
                 })
             };
 
-            let guards = subscribe_online_status(cb);
+            // Bind both listener guards by name so they are kept alive for the
+            // lifetime of the effect and dropped together on unmount.
+            let listeners = subscribe_online_status(cb);
 
-            // Return cleanup closure that drops the listeners on unmount
+            // Cleanup closure: dropping the tuple drops both
+            // `online_listener` and `offline_listener`, removing the window
+            // event handlers.
             move || {
-                drop(guards);
+                if let Some((online_listener, offline_listener)) = listeners {
+                    drop(online_listener);
+                    drop(offline_listener);
+                }
             }
         });
     }
