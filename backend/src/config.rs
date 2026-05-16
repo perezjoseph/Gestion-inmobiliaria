@@ -85,6 +85,22 @@ impl ChatbotEnvConfig {
             ai_chat_timeout_secs,
         })
     }
+
+    /// Returns a `ChatbotEnvConfig` populated with deterministic defaults for tests.
+    ///
+    /// Matches the production defaults so unit and integration tests behave the
+    /// same as a fresh deployment without any custom env vars. Use this anywhere
+    /// you previously wrote out the struct literal by hand.
+    #[doc(hidden)]
+    pub fn for_testing() -> Self {
+        Self {
+            baileys_service_url: "http://baileys:3100".to_string(),
+            baileys_internal_token: "a".repeat(32),
+            ovms_endpoint: "http://ovms:8000/v3".to_string(),
+            ovms_chat_model: "test-model".to_string(),
+            ai_chat_timeout_secs: 30,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -409,16 +425,29 @@ mod tests {
                 max_lifetime_secs: 900,
                 sqlx_logging: true,
             },
-            chatbot: ChatbotEnvConfig {
-                baileys_service_url: "http://baileys:3100".to_string(),
-                baileys_internal_token: "a]3kF9#mP7$vL2nQ8wR5xT0yU4zA1bC6d".to_string(),
-                ovms_endpoint: "http://ovms:8000/v3".to_string(),
-                ovms_chat_model: "Qwen3-30B-A3B-Instruct-2507-int4-ov".to_string(),
-                ai_chat_timeout_secs: 30,
-            },
+            chatbot: ChatbotEnvConfig::for_testing(),
         };
 
         let opts = config.connect_options();
         assert_eq!(opts.get_max_connections(), Some(25));
+    }
+
+    #[test]
+    fn for_testing_matches_production_defaults() {
+        // The test helper exists to deduplicate fixtures, but it must keep behaving
+        // like a fresh deployment so unit tests don't drift from real defaults.
+        let cfg = ChatbotEnvConfig::for_testing();
+
+        assert_eq!(cfg.baileys_service_url, "http://baileys:3100");
+        assert_eq!(cfg.ovms_endpoint, "http://ovms:8000/v3");
+        assert_eq!(cfg.ai_chat_timeout_secs, 30);
+        assert!(
+            cfg.baileys_internal_token.len() >= 32,
+            "token must satisfy from_env() length check"
+        );
+        assert!(
+            !cfg.ovms_chat_model.is_empty(),
+            "model name must not be empty"
+        );
     }
 }

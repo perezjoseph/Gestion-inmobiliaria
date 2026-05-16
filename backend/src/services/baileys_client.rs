@@ -178,10 +178,7 @@ mod tests {
     fn new_creates_client_with_trimmed_url() {
         let config = ChatbotEnvConfig {
             baileys_service_url: "http://baileys:3100/".to_string(),
-            baileys_internal_token: "a".repeat(32),
-            ovms_endpoint: "http://ovms:8000/v3".to_string(),
-            ovms_chat_model: "Qwen3-30B-A3B-Instruct-2507-int4-ov".to_string(),
-            ai_chat_timeout_secs: 30,
+            ..ChatbotEnvConfig::for_testing()
         };
 
         let client = BaileysClient::new(&config).unwrap();
@@ -192,10 +189,7 @@ mod tests {
     fn new_preserves_url_without_trailing_slash() {
         let config = ChatbotEnvConfig {
             baileys_service_url: "http://baileys:3100".to_string(),
-            baileys_internal_token: "a".repeat(32),
-            ovms_endpoint: "http://ovms:8000/v3".to_string(),
-            ovms_chat_model: "Qwen3-30B-A3B-Instruct-2507-int4-ov".to_string(),
-            ai_chat_timeout_secs: 30,
+            ..ChatbotEnvConfig::for_testing()
         };
 
         let client = BaileysClient::new(&config).unwrap();

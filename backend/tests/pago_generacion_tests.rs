@@ -81,13 +81,7 @@ fn make_config() -> AppConfig {
         server_port: 0,
         cors_origin: None,
         pool: realestate_backend::config::PoolConfig::default(),
-        chatbot: realestate_backend::config::ChatbotEnvConfig {
-            baileys_service_url: "http://baileys:3100".to_string(),
-            baileys_internal_token: "a]3kF9#mP7vL2nQ8wR5xT0yU4zA1bC6dE".to_string(),
-            ovms_endpoint: "http://ovms:8000/v3".to_string(),
-            ovms_chat_model: "Qwen3-30B-A3B-Instruct-2507-int4-ov".to_string(),
-            ai_chat_timeout_secs: 30,
-        },
+        chatbot: realestate_backend::config::ChatbotEnvConfig::for_testing(),
     }
 }
 
@@ -235,13 +229,7 @@ mod pago_generacion_rbac_tests {
             server_port: 8080,
             cors_origin: None,
             pool: realestate_backend::config::PoolConfig::default(),
-            chatbot: realestate_backend::config::ChatbotEnvConfig {
-                baileys_service_url: "http://baileys:3100".to_string(),
-                baileys_internal_token: "a]3kF9#mP7vL2nQ8wR5xT0yU4zA1bC6dE".to_string(),
-                ovms_endpoint: "http://ovms:8000/v3".to_string(),
-                ovms_chat_model: "Qwen3-30B-A3B-Instruct-2507-int4-ov".to_string(),
-                ai_chat_timeout_secs: 30,
-            },
+            chatbot: realestate_backend::config::ChatbotEnvConfig::for_testing(),
         }
     }
 
