@@ -1,64 +1,77 @@
-/target
+# Rust build artifacts (any nested target/ directory, not just root)
+target/
 target-test/
 target-verify/
-/.env
 *.rs.bk
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Editor / OS clutter
 .DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+.~lock.*
+~$*
+*.lnk
+*.stackdump
+
+# Backup / scratch files
+*.bak
+*.old
+*.orig
+*.tmp
+*.temp
+*.cache
+*_output.txt
+check_output.txt
+
+# Logs (any nested *.log)
+*.log
+kiro-debug.log
+
+# Node / frontend builds
 node_modules/
 baileys-service/dist/
-.impeccable.md
-.claude/
-.vscode/
-.playwright/
-.worktrees/
-.playwright-cli/
 frontend/dist/
 
-kiro-debug.log
-kiro-debug.log
-.kiro/skills/*
-# Android build artifacts
-android/.gradle/
-android/.jdk/
-android/build/
-android/*/build/
-android/*/*/build/
-android/local.properties
-tools/
 # Python
 __pycache__/
 *.pyc
 *.pyo
 .hypothesis/
 .pytest_cache/
+
+# Android build artifacts
+android/.gradle/
+android/.jdk/
+android/.kotlin/
+android/build/
+android/*/build/
+android/*/*/build/
+android/local.properties
+
+# Editor / IDE / tooling caches
+.vscode/
+.claude/
+.impeccable.md
+.playwright/
+.playwright-cli/
+.worktrees/
+tools/
+
+# Kiro / skills / state
+.kiro/skills/*
+.kiro/settings/
+.kiro/specs/*/.tasks/
+
 # K3s deployment manifests (local cluster config)
 k3s/
 
-# Git worktrees
-.worktrees/
-
-# Temp files
-*.tmp
-*.temp
-*.swp
-*.swo
-*~
-.~lock.*
-~$*
-*.bak
-*.old
-*.orig
-*.log
-*.cache
-Thumbs.db
-desktop.ini
-*.lnk
-*.stackdump
-*_output.txt
-check_output.txt
-
 # State store (redb)
 data/state_store.db
-
-# Kiro MCP Manager - Sensitive configuration files
-.kiro/settings/
