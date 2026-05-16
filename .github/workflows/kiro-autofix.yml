@@ -276,29 +276,31 @@ jobs:
           umask 077
           echo "=== Verifying Kiro's fix locally before pushing ==="
           VERIFY_LOG="${RUNNER_TEMP}/verify-output.txt"
-          PASS=true
+          PASS_FILE="${RUNNER_TEMP}/verify-pass"
+          echo "true" > "$PASS_FILE"
 
           # Run the same checks that CI would run
           {
             echo "=== RUSTFMT CHECK ==="
             if ! cargo fmt --all -- --check 2>&1; then
-              PASS=false
+              echo "false" > "$PASS_FILE"
               echo "FAILED: rustfmt"
             fi
             echo ""
             echo "=== CLIPPY BACKEND ==="
             if ! cargo clippy --locked -p realestate-backend -- -D warnings 2>&1; then
-              PASS=false
+              echo "false" > "$PASS_FILE"
               echo "FAILED: clippy backend"
             fi
             echo ""
             echo "=== CLIPPY FRONTEND ==="
             if ! cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings 2>&1; then
-              PASS=false
+              echo "false" > "$PASS_FILE"
               echo "FAILED: clippy frontend"
             fi
           } | tee "$VERIFY_LOG"
 
+          PASS=$(cat "$PASS_FILE")
           if [ "$PASS" = "true" ]; then
             echo "verified=true" >> "$GITHUB_OUTPUT"
             echo "✅ Local verification passed — safe to push."
