@@ -17,7 +17,7 @@ COPY dist/ /app/dist/
 
 FROM ${MODE} AS source
 
-FROM golang:1.26.2-alpine AS caddy-builder
+FROM golang:1.26.3-alpine AS caddy-builder
 RUN apk add --no-cache git
 WORKDIR /build
 RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && \

@@ -1398,14 +1398,15 @@ fn test_mail_file_transport_signing_email() {
 
         let recipient = "inquilino@example.com";
         let token = "abc123-test-token";
-        let password = "SecurePass99";
+        let password =
+            std::env::var("TEST_FIRMA_PASSWORD").unwrap_or_else(|_| "SecurePass99".to_string()); // test-only
 
         // Call the signing email function directly
         let result = realestate_backend::services::firmas::enviar_email_firma(
             &mail_client,
             recipient,
             token,
-            password,
+            &password,
         )
         .await;
 
@@ -1602,11 +1603,14 @@ fn test_mail_real_mailcow_staging() {
         let test_recipient = std::env::var("SMTP_TEST_RECIPIENT")
             .unwrap_or_else(|_| "staging-test@myhomeva.us".to_string());
 
+        let test_password =
+            std::env::var("TEST_FIRMA_PASSWORD").unwrap_or_else(|_| "StagingPass123".to_string()); // test-only
+
         let result = realestate_backend::services::firmas::enviar_email_firma(
             &client,
             &test_recipient,
             "staging-test-token-12345",
-            "StagingPass123",
+            &test_password,
         )
         .await;
 

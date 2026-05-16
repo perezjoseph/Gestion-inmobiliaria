@@ -2,8 +2,10 @@
 # node:24-alpine ships npm 11 which patches the bundled-npm CVEs
 # (tar, minimatch, glob, cross-spawn, brace-expansion, ip-address)
 # that ship inside node:20-alpine's older npm 10.x.
+# We also upgrade npm to latest to pick up patched bundled deps.
 FROM node:24-alpine AS deps
 WORKDIR /app
+RUN npm install -g npm@latest
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
 

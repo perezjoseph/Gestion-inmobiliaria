@@ -1,36 +1,22 @@
-name: CodeQL Analysis
+name: Scheduled Security Scans
 
 on:
-  workflow_call:
-    inputs:
-      is-fork-pr:
-        type: boolean
-        required: true
-      rust-changed:
-        type: boolean
-        required: false
-        default: true
-      js-changed:
-        type: boolean
-        required: false
-        default: true
-      python-changed:
-        type: boolean
-        required: false
-        default: true
-      kotlin-changed:
-        type: boolean
-        required: false
-        default: true
+  schedule:
+    # Nightly at 04:23 UTC
+    - cron: "23 4 * * *"
+  workflow_dispatch: {}
 
 permissions: {}
 
 jobs:
+  # ══════════════════════════════════════════════════════════════════════════════
+  # CodeQL Analysis
+  # ══════════════════════════════════════════════════════════════════════════════
+
   # ── Rust: build-mode none (no build needed, uses rust-analyzer internally) ──
-  analyze-rust:
+  codeql-rust:
     name: CodeQL (Rust)
     runs-on: arc-runner-dind
-    if: ${{ !inputs.is-fork-pr && inputs.rust-changed }}
     permissions:
       contents: read
       security-events: write
@@ -64,18 +50,16 @@ jobs:
         if: failure()
         uses: ./.github/actions/collect-diagnostics
         with:
-          job-name: "codeql / analyze-rust"
+          job-name: "scheduled-security-scans / codeql-rust"
           artifact-suffix: codeql-rust
           step-outcomes: |
             analyze=${{ steps.analyze.outcome }}
-          extra-context: "CodeQL analysis for Rust failed. Check the SARIF results in GitHub Security tab. This may indicate code patterns that CodeQL flags as security vulnerabilities."
+          extra-context: "CodeQL analysis for Rust failed. Check the SARIF results in GitHub Security tab."
 
-  # ── JavaScript/TypeScript: interpreted (no build needed, but Node.js required for extraction) ──
-  # Covers baileys-service (Node.js + TypeScript)
-  analyze-javascript:
+  # ── JavaScript/TypeScript: covers baileys-service ──
+  codeql-javascript:
     name: CodeQL (JavaScript/TypeScript)
     runs-on: arc-runner-dind
-    if: ${{ !inputs.is-fork-pr && inputs.js-changed }}
     permissions:
       contents: read
       security-events: write
@@ -109,18 +93,16 @@ jobs:
         if: failure()
         uses: ./.github/actions/collect-diagnostics
         with:
-          job-name: "codeql / analyze-javascript"
+          job-name: "scheduled-security-scans / codeql-javascript"
           artifact-suffix: codeql-javascript
           step-outcomes: |
             analyze=${{ steps.analyze.outcome }}
-          extra-context: "CodeQL analysis for JavaScript/TypeScript failed. Check the SARIF results in GitHub Security tab. This may indicate code patterns that CodeQL flags as security vulnerabilities in baileys-service."
+          extra-context: "CodeQL analysis for JavaScript/TypeScript failed. Check the SARIF results in GitHub Security tab."
 
-  # ── Python: interpreted (no build needed, Python required for extraction) ──
-  # Covers ocr-service (FastAPI + PaddleOCR)
-  analyze-python:
+  # ── Python: covers ocr-service ──
+  codeql-python:
     name: CodeQL (Python)
     runs-on: arc-runner-dind
-    if: ${{ !inputs.is-fork-pr && inputs.python-changed }}
     permissions:
       contents: read
       security-events: write
@@ -154,21 +136,19 @@ jobs:
         if: failure()
         uses: ./.github/actions/collect-diagnostics
         with:
-          job-name: "codeql / analyze-python"
+          job-name: "scheduled-security-scans / codeql-python"
           artifact-suffix: codeql-python
           step-outcomes: |
             analyze=${{ steps.analyze.outcome }}
-          extra-context: "CodeQL analysis for Python failed. Check the SARIF results in GitHub Security tab. This may indicate code patterns that CodeQL flags as security vulnerabilities in ocr-service."
+          extra-context: "CodeQL analysis for Python failed. Check the SARIF results in GitHub Security tab."
 
-  # ── Java/Kotlin: manual build (AGP 9.0 requires Android SDK + specific Gradle invocation) ──
-  # Covers android/ multi-module project.
+  # ── Java/Kotlin: covers android/ multi-module project ──
   # Note: autobuild fails because AGP 9.0 has built-in Kotlin support and the
   # CodeQL autobuild runs `clean` which triggers plugin resolution before our
   # Gradle wrapper can configure properly. Manual build mode gives us control.
-  analyze-kotlin:
+  codeql-kotlin:
     name: CodeQL (Java/Kotlin)
     runs-on: arc-runner-dind
-    if: ${{ !inputs.is-fork-pr && inputs.kotlin-changed }}
     permissions:
       contents: read
       security-events: write
@@ -243,8 +223,94 @@ jobs:
         if: failure()
         uses: ./.github/actions/collect-diagnostics
         with:
-          job-name: "codeql / analyze-kotlin"
+          job-name: "scheduled-security-scans / codeql-kotlin"
           artifact-suffix: codeql-kotlin
           step-outcomes: |
             analyze=${{ steps.analyze.outcome }}
-          extra-context: "CodeQL analysis for Java/Kotlin failed. Check the SARIF results in GitHub Security tab. This may indicate code patterns that CodeQL flags as security vulnerabilities in the Android app."
+          extra-context: "CodeQL analysis for Java/Kotlin failed. Check the SARIF results in GitHub Security tab."
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # Semgrep
+  # ══════════════════════════════════════════════════════════════════════════════
+
+  semgrep:
+    name: Semgrep CI
+    runs-on: arc-runner-dind
+    permissions:
+      contents: read
+    env:
+      SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Run Semgrep CI
+        id: scan
+        run: semgrep ci 2>&1 | tee "${RUNNER_TEMP}/semgrep-ci-output.txt"
+
+      - name: Collect diagnostics
+        if: failure()
+        uses: ./.github/actions/collect-diagnostics
+        with:
+          job-name: "scheduled-security-scans / semgrep"
+          artifact-suffix: semgrep-ci
+          step-outcomes: |
+            scan=${{ steps.scan.outcome }}
+          output-files: |
+            ${{ runner.temp }}/semgrep-ci-output.txt
+
+  semgrep-community:
+    name: Semgrep Community Rules
+    runs-on: arc-runner-dind
+    permissions:
+      contents: read
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Run enterprise security rules (SOC 1/2/3)
+        id: scan
+        run: |
+          semgrep scan \
+            --config "p/rust" \
+            --config "p/kotlin" \
+            --config "p/java" \
+            --config "p/python" \
+            --config "p/fastapi" \
+            --config "p/owasp-top-ten" \
+            --config "p/cwe-top-25" \
+            --config "p/command-injection" \
+            --config "p/sql-injection" \
+            --config "p/xss" \
+            --config "p/jwt" \
+            --config "p/insecure-transport" \
+            --config "p/secrets" \
+            --config "p/security-audit" \
+            --config "p/trailofbits" \
+            --config "p/supply-chain" \
+            --config "p/docker" \
+            --config "p/dockerfile" \
+            --config "p/kubernetes" \
+            --config "p/github-actions" \
+            --config "p/r2c-security-audit" \
+            --config "p/r2c-best-practices" \
+            --config "p/gitleaks" \
+            --config "p/default" \
+            --error 2>&1 | tee "${RUNNER_TEMP}/semgrep-community-output.txt"
+
+      - name: Collect diagnostics
+        if: failure()
+        uses: ./.github/actions/collect-diagnostics
+        with:
+          job-name: "scheduled-security-scans / semgrep-community"
+          artifact-suffix: semgrep-community
+          step-outcomes: |
+            scan=${{ steps.scan.outcome }}
+          output-files: |
+            ${{ runner.temp }}/semgrep-community-output.txt
