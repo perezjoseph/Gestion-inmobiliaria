@@ -75,7 +75,7 @@ spec:
             - name: OVMS_ENDPOINT
               value: http://ovms:8000/v3
             - name: OVMS_CHAT_MODEL
-              value: Qwen3-30B-A3B
+              value: Qwen3-30B-A3B-Instruct-2507-int4-ov
             - name: AI_CHAT_TIMEOUT_SECS
               value: "30"
           volumeMounts:

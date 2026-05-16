@@ -96,8 +96,8 @@ data:
       "model_config_list": [],
       "mediapipe_config_list": [
         {
-          "name": "Qwen3-Coder-30B-A3B-Instruct-int4-ov",
-          "base_path": "/models/Qwen3-Coder-30B-A3B-Instruct-int4-ov"
+          "name": "Qwen3-30B-A3B-Instruct-2507-int4-ov",
+          "base_path": "/models/Qwen3-30B-A3B-Instruct-2507-int4-ov"
         }
       ]
     }
@@ -119,14 +119,14 @@ data:
       }
       node_options: {
         [type.googleapis.com/mediapipe.LLMCalculatorOptions]: {
-          models_path: "/models/Qwen3-Coder-30B-A3B-Instruct-int4-ov"
+          models_path: "/models/Qwen3-30B-A3B-Instruct-2507-int4-ov"
           device: "GPU"
           enable_prefix_caching: true
           max_num_batched_tokens: 8192
           cache_size: 0
           dynamic_split_fuse: false
           plugin_config: '{"KV_CACHE_PRECISION": "u8", "DYNAMIC_QUANTIZATION_GROUP_SIZE": "32"}'
-          tool_parser: "qwen3coder"
+          tool_parser: "hermes3"
           reasoning_parser: "qwen3"
         }
       }

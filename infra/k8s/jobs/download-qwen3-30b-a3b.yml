@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: download-qwen3-coder-ov
+  name: download-qwen3-30b-a3b-ov
   namespace: realestate
 spec:
   backoffLimit: 1
@@ -32,15 +32,17 @@ spec:
               rm -rf /models/Qwen3-30B-A3B || true
               rm -rf /models/Qwen3.5-35B-A3B || true
               rm -rf /models/Qwen3.6-35B-A3B || true
+              rm -rf /models/Qwen3-Coder-30B-A3B-Instruct-int4-ov || true
+              rm -rf /models/Qwen3-8B-int4-ov || true
               df -h /models
 
               echo "=== Downloading pre-built OpenVINO IR (INT4) ==="
-              hf download OpenVINO/Qwen3-Coder-30B-A3B-Instruct-int4-ov \
-                --local-dir /models/Qwen3-Coder-30B-A3B-Instruct-int4-ov
+              hf download OpenVINO/Qwen3-30B-A3B-Instruct-2507-int4-ov \
+                --local-dir /models/Qwen3-30B-A3B-Instruct-2507-int4-ov
 
               echo "=== Download complete ==="
-              ls -la /models/Qwen3-Coder-30B-A3B-Instruct-int4-ov/
-              du -sh /models/Qwen3-Coder-30B-A3B-Instruct-int4-ov/
+              ls -la /models/Qwen3-30B-A3B-Instruct-2507-int4-ov/
+              du -sh /models/Qwen3-30B-A3B-Instruct-2507-int4-ov/
               echo "=== Done ==="
           resources:
             requests:
