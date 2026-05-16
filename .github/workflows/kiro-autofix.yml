@@ -60,6 +60,27 @@ jobs:
     env:
       MAX_ATTEMPTS: ${{ inputs.max-attempts }}
     steps:
+      # Preflight: fail fast with a clear message if required secrets are
+      # missing or empty. Without this, actions/checkout below would die
+      # with the opaque "Input required and not supplied: token" error
+      # because we explicitly pass token:, and an empty secret resolves
+      # to an empty input value rather than falling back to a default.
+      - name: Validate required secrets
+        env:
+          GITHUB_TOKEN_INPUT: ${{ secrets.github-token }}
+          KIRO_API_INPUT: ${{ secrets.kiro-api }}
+        run: |
+          umask 077
+          missing=()
+          [ -z "${GITHUB_TOKEN_INPUT}" ] && missing+=("github-token")
+          [ -z "${KIRO_API_INPUT}" ] && missing+=("kiro-api")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Kiro Autofix cannot run: caller did not supply secret(s): ${missing[*]}"
+            echo "::error::Ensure the calling workflow passes these via 'secrets:' and that they are configured at the repository level."
+            exit 1
+          fi
+          echo "All required secrets are supplied by caller."
+
       - name: Checkout branch
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:

@@ -10,16 +10,12 @@ mod auditoria_handler_tests {
     use realestate_backend::middleware::rbac::AdminOnly;
     use realestate_backend::services::auth::{Claims, encode_jwt};
 
-    const JWT_SECRET: &str = "test_secret_key_that_is_long_enough_32chars!";
+    use crate::common::{JWT_SECRET, test_app_config};
 
     fn test_config() -> AppConfig {
         AppConfig {
-            database_url: String::new(),
-            jwt_secret: JWT_SECRET.to_string(),
             server_port: 8080,
-            cors_origin: None,
-            pool: realestate_backend::config::PoolConfig::default(),
-            chatbot: realestate_backend::config::ChatbotEnvConfig::for_testing(),
+            ..test_app_config("")
         }
     }
 

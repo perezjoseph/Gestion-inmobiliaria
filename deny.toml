@@ -56,6 +56,13 @@ allow = ["CDLA-Permissive-2.0"]
 name = "webpki-root-certs"
 allow = ["CDLA-Permissive-2.0"]
 
+# Rust port of the upstream bzip2 reference implementation. Carries the
+# original "bzip2-1.0.6" permissive license. Pulled in transitively via
+# zip 7.x (calamine, rust_xlsxwriter).
+[[licenses.exceptions]]
+name = "libbz2-rs-sys"
+allow = ["bzip2-1.0.6"]
+
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"

@@ -64,6 +64,28 @@ jobs:
       BRANCH: ${{ github.event.workflow_run.head_branch }}
       CI_RUN_ID: ${{ github.event.workflow_run.id }}
     steps:
+      # Preflight: fail fast with a clear message if required secrets are
+      # missing or empty. Without this, actions/checkout below would die
+      # with the opaque "Input required and not supplied: token" error
+      # because we explicitly pass token:, and an empty secret resolves
+      # to an empty input value rather than falling back to a default.
+      - name: Validate required secrets
+        env:
+          KIRO_GITHUB_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+          KIRO_API: ${{ secrets.KIRO_API }}
+        run: |
+          umask 077
+          missing=()
+          [ -z "${KIRO_GITHUB_TOKEN}" ] && missing+=("KIRO_GITHUB_TOKEN")
+          [ -z "${KIRO_API}" ] && missing+=("KIRO_API")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Kiro Autofix cannot run: missing repository secret(s): ${missing[*]}"
+            echo "::error::Configure them at Settings -> Secrets and variables -> Actions."
+            echo "::error::See the header of .github/workflows/kiro-autofix-trigger.yml for required scopes."
+            exit 1
+          fi
+          echo "All required secrets are configured."
+
       # persist-credentials: true is required because we git push at the end.
       # All other workflows in this repo use persist-credentials: false.
       - name: Checkout branch

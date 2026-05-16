@@ -27,3 +27,9 @@ fileMatchPattern: ["backend/**/*.rs", "backend/Cargo.toml", "backend/migrations/
 - Never validate or compute inside a `DatabaseTransaction`. Holds row locks and connection pool slots. Validate outside, write inside, keep txns short.
 - Never loop `find_by_id` for related entities (N+1). 100 parents with 2 relations = 201 queries. Use `find_with_related()` for JOINs, `load_many()` for batch loading, or `is_in()` + `HashMap<Uuid, &Model>` lookups.
 - Never skip indexes on FK columns. SeaORM generates entities but not index strategy. Add in migrations for all FKs and frequently filtered columns.
+
+## Tests
+- Test fixtures are configuration. If a struct literal (`AppConfig`, `ChatbotEnvConfig`, etc.) appears in 3+ test files, hoist a `Type::for_testing()` constructor next to the type definition. Then use struct-update syntax (`..Type::for_testing()`) when a single field needs to vary.
+- Shared test helpers (`db_url`, `setup_db`, `with_db`, `shared_rt_and_db`, `GLOBAL_DB_SERIAL`, `JWT_SECRET`) live in `backend/tests/common/mod.rs` and are imported with `mod common;`. Never copy-paste them between integration test files.
+- One canonical value per test concern. Two `JWT_SECRET` constants with different strings in two test files is a bug — JWTs signed by one cannot be verified by the other. Same applies to test URLs, mock tokens, and model names.
+- A config field rename should touch one file (the `for_testing()` constructor or the shared helper). If you find yourself sed-sweeping more than 2 test files for a single rename, the abstraction is missing — extract before continuing.

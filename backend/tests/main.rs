@@ -26,6 +26,8 @@
 #[path = "../migrations/mod.rs"]
 mod migrations;
 
+mod common;
+
 /// Global mutex shared by all integration test modules.
 /// Each module's `with_db` acquires this lock so tests that share the
 /// database never run concurrently — even across modules.
