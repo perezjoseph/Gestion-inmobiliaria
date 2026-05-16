@@ -541,14 +541,68 @@ jobs:
             Failed run: ${RUN_URL}"
           fi
 
-  # ── Deploy Autofix: triggered when CI fails on main (deploy stage) ──
-  # Deploy is a single artifact (kiro-deploy-diagnostics), no queue needed.
-  kiro-autofix-deploy:
-    name: Kiro Autofix (deploy)
+  # ── Deploy Autofix Precheck: only proceed if the deploy artifact exists ──
+  # CI on main can fail at build, lint, security, container, or deploy stages.
+  # The deploy autofix is only meaningful for deploy-stage failures, signalled
+  # by the presence of the kiro-deploy-diagnostics artifact uploaded by
+  # deploy.yml. If CI failed earlier (no deploy run), there is no artifact to
+  # download and the reusable workflow's actions/download-artifact step would
+  # hard-fail. Probe artifacts here and only dispatch the reusable workflow
+  # when the artifact is present.
+  kiro-autofix-deploy-precheck:
+    name: Kiro Autofix (deploy) — Precheck
     if: >-
       github.event.workflow_run.conclusion == 'failure' &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.event == 'push'
+    runs-on: arc-runner-dind
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    outputs:
+      artifact-present: ${{ steps.probe.outputs.present }}
+    steps:
+      - name: Validate required secrets
+        env:
+          KIRO_GITHUB_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+          KIRO_API: ${{ secrets.KIRO_API }}
+        run: |
+          umask 077
+          missing=()
+          [ -z "${KIRO_GITHUB_TOKEN}" ] && missing+=("KIRO_GITHUB_TOKEN")
+          [ -z "${KIRO_API}" ] && missing+=("KIRO_API")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Kiro Autofix cannot run: missing repository secret(s): ${missing[*]}"
+            echo "::error::Configure them at Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+      - name: Probe for kiro-deploy-diagnostics artifact
+        id: probe
+        env:
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+          CI_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          umask 077
+          present=$(gh api \
+            "repos/${{ github.repository }}/actions/runs/${CI_RUN_ID}/artifacts?per_page=100" \
+            --jq '[.artifacts[] | select(.name == "kiro-deploy-diagnostics")] | length')
+          if [ "${present:-0}" -gt 0 ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "kiro-deploy-diagnostics found; deploy autofix will run."
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::kiro-deploy-diagnostics not found in run ${CI_RUN_ID}."
+            echo "::notice::CI on main failed before the deploy stage produced diagnostics."
+            echo "::notice::Build-stage failures on main are not auto-fixed (autofix-build-queue is restricted to non-main branches)."
+          fi
+
+  # ── Deploy Autofix: triggered when CI fails on main (deploy stage) ──
+  # Deploy is a single artifact (kiro-deploy-diagnostics), no queue needed.
+  kiro-autofix-deploy:
+    name: Kiro Autofix (deploy)
+    needs: [kiro-autofix-deploy-precheck]
+    if: needs.kiro-autofix-deploy-precheck.outputs.artifact-present == 'true'
     permissions:
       contents: write
       pull-requests: write
