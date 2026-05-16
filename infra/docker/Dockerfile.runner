@@ -122,4 +122,33 @@ RUN ARCHIVE="/tmp/gh.tar.gz" \
     && install -m 755 "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" /usr/local/bin/gh \
     && rm -rf "$ARCHIVE" "/tmp/gh_${GH_VERSION}_linux_amd64"
 
+# cargo-machete — unused dependency detection
+ARG CARGO_MACHETE_VERSION=0.7.0
+ARG CARGO_MACHETE_SHA256=a25d42e0809e4e12f1e3e72e87b3a0e8a1df00eb21a0a7e4e0a3e1c5f6b8d9e2
+RUN ARCHIVE="/tmp/cargo-machete.tar.gz" \
+    && curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors \
+       --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+       "https://github.com/bnjbvr/cargo-machete/releases/download/v${CARGO_MACHETE_VERSION}/cargo-machete-v${CARGO_MACHETE_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+    && tar xzf "$ARCHIVE" --no-same-owner -C /usr/local/bin cargo-machete \
+    && chmod +x /usr/local/bin/cargo-machete \
+    && rm -f "$ARCHIVE"
+
+# ── Android SDK (cmdline-tools + platform 36 + build-tools 36) ──
+# Prebaked to avoid ~500MB download on every Android CI job.
+ARG ANDROID_SDK_TOOLS_VERSION=11076708
+ENV ANDROID_HOME=/opt/android-sdk
+RUN mkdir -p "${ANDROID_HOME}/cmdline-tools" \
+    && curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
+       --connect-timeout 15 --max-time 300 -o /tmp/cmdline-tools.zip \
+       "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_TOOLS_VERSION}_latest.zip" \
+    && unzip -qo /tmp/cmdline-tools.zip -d "${ANDROID_HOME}/cmdline-tools" \
+    && mv "${ANDROID_HOME}/cmdline-tools/cmdline-tools" "${ANDROID_HOME}/cmdline-tools/latest" \
+    && rm -f /tmp/cmdline-tools.zip \
+    && yes 2>/dev/null | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true \
+    && "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" \
+       "platforms;android-36" "build-tools;36.0.0" > /dev/null 2>&1 \
+    && rm -rf "${ANDROID_HOME}/.android" /tmp/.android
+
+ENV PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/build-tools/36.0.0:${PATH}"
+
 USER runner

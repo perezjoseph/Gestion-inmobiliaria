@@ -115,28 +115,15 @@ jobs:
           echo "::error::Postgres port not reachable"
           exit 1
 
-      - name: Install cargo-llvm-cov
+      - name: Verify cargo-llvm-cov available
         id: install-llvm-cov
-        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
-        with:
-          timeout_minutes: 10
-          max_attempts: 3
-          retry_wait_seconds: 10
-          command: |
-            LLVM_COV_VERSION="0.8.4"
-            ARCHIVE="${RUNNER_TEMP}/cargo-llvm-cov.tar.gz"
-            curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
-              "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v${LLVM_COV_VERSION}/cargo-llvm-cov-x86_64-unknown-linux-musl.tar.gz"
-            for dir in "${HOME}/.cargo" "${HOME}/.cargo/bin"; do
-              mkdir -p "$dir" 2>/dev/null || sudo mkdir -p "$dir"
-              if [ ! -w "$dir" ]; then
-                sudo chown -R "$(id -u):$(id -g)" "${HOME}/.cargo"
-              fi
-            done
-            tar xzf "$ARCHIVE" --no-same-owner -C "${HOME}/.cargo/bin" cargo-llvm-cov
-            rm -f "$ARCHIVE"
-            chmod +x "${HOME}/.cargo/bin/cargo-llvm-cov"
-            cargo llvm-cov --version
+        run: |
+          if command -v cargo-llvm-cov &>/dev/null; then
+            echo "cargo-llvm-cov already available: $(cargo-llvm-cov --version)"
+          else
+            echo "::error::cargo-llvm-cov not found — expected prebaked in runner image"
+            exit 1
+          fi
 
       - name: Run tests with coverage (llvm-cov)
         id: tests
@@ -333,27 +320,15 @@ jobs:
             exit ${PIPESTATUS[0]}
 
       # ── Phase 3: Trunk release build (sccache makes this fast) ──
-      - name: Install Trunk
+      - name: Verify Trunk available
         id: install-trunk
-        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
-        with:
-          timeout_minutes: 10
-          max_attempts: 3
-          retry_wait_seconds: 10
-          command: |
-            TRUNK_VERSION="0.21.14"
-            TRUNK_SHA256="a67f4054b249fe9acc5fabc25de1aebf19783aca3ad6ff64bf34d7da44d0ea20"
-            ARCHIVE="${RUNNER_TEMP}/trunk.tar.gz"
-            curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
-              "https://github.com/trunk-rs/trunk/releases/download/v${TRUNK_VERSION}/trunk-x86_64-unknown-linux-musl.tar.gz"
-            echo "${TRUNK_SHA256}  ${ARCHIVE}" | sha256sum -c -
-            mkdir -p "${HOME}/.local/bin"
-            tar xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "${HOME}/.local/bin" trunk
-            rm -f "$ARCHIVE"
-            chmod +x "${HOME}/.local/bin/trunk"
-            export PATH="${HOME}/.local/bin:$PATH"
-            echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
-            trunk --version
+        run: |
+          if command -v trunk &>/dev/null; then
+            echo "trunk already available: $(trunk --version)"
+          else
+            echo "::error::trunk not found — expected prebaked in runner image"
+            exit 1
+          fi
 
       - name: Pre-install wasm-bindgen-cli
         run: |

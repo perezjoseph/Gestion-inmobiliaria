@@ -23,20 +23,17 @@ jobs:
       - name: Rust setup
         uses: ./.github/actions/rust-setup
 
-      - name: Install cargo-machete
-        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
-        with:
-          timeout_minutes: 10
-          max_attempts: 3
-          retry_wait_seconds: 10
-          command: |
-            export PATH="$HOME/.cargo/bin:$PATH"
-            cargo install cargo-machete --locked 2>&1 || true
-            cargo-machete --version || cargo install cargo-machete --locked
+      - name: Verify cargo-machete available
+        run: |
+          if command -v cargo-machete &>/dev/null; then
+            echo "cargo-machete already available: $(cargo-machete --version)"
+          else
+            echo "::error::cargo-machete not found — expected prebaked in runner image"
+            exit 1
+          fi
 
       - name: Check for unused dependencies
         run: |
-          export PATH="$HOME/.cargo/bin:$PATH"
           cargo machete 2>&1 | tee "${RUNNER_TEMP}/machete-output.txt" || true
           # Report but don't fail — this is advisory
           if grep -q "unused" "${RUNNER_TEMP}/machete-output.txt"; then
@@ -136,21 +133,14 @@ jobs:
           echo "::add-mask::realestate_dev_password"
           echo "::add-mask::drift_detection_jwt_secret_32chars_long!"
 
-      - name: Install cargo-llvm-cov
-        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
-        with:
-          timeout_minutes: 10
-          max_attempts: 3
-          retry_wait_seconds: 10
-          command: |
-            LLVM_COV_VERSION="0.8.4"
-            ARCHIVE="${RUNNER_TEMP}/cargo-llvm-cov.tar.gz"
-            curl -sSfL --proto =https --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
-              "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v${LLVM_COV_VERSION}/cargo-llvm-cov-x86_64-unknown-linux-musl.tar.gz"
-            mkdir -p "${HOME}/.cargo/bin"
-            tar xzf "$ARCHIVE" --no-same-owner -C "${HOME}/.cargo/bin" cargo-llvm-cov
-            rm -f "$ARCHIVE"
-            chmod +x "${HOME}/.cargo/bin/cargo-llvm-cov"
+      - name: Verify cargo-llvm-cov available
+        run: |
+          if command -v cargo-llvm-cov &>/dev/null; then
+            echo "cargo-llvm-cov already available: $(cargo-llvm-cov --version)"
+          else
+            echo "::error::cargo-llvm-cov not found — expected prebaked in runner image"
+            exit 1
+          fi
 
       - name: Run coverage analysis
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0

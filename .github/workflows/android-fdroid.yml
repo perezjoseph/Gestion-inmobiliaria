@@ -32,6 +32,14 @@ jobs:
           max_attempts: 3
           retry_wait_seconds: 10
           command: |
+            if [ -d "${ANDROID_HOME:-/opt/android-sdk}/cmdline-tools/latest" ]; then
+              export ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
+              echo "Android SDK already available at ${ANDROID_HOME}"
+              echo "ANDROID_HOME=${ANDROID_HOME}" >> "${GITHUB_ENV}"
+              echo "${ANDROID_HOME}/cmdline-tools/latest/bin" >> "${GITHUB_PATH}"
+              echo "${ANDROID_HOME}/build-tools/36.0.0" >> "${GITHUB_PATH}"
+              exit 0
+            fi
             export ANDROID_HOME="${HOME}/android-sdk"
             mkdir -p "${ANDROID_HOME}/cmdline-tools"
             curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" \
