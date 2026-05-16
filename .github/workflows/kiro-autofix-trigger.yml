@@ -362,16 +362,16 @@ jobs:
               printf '=== DIAGNOSTICS (single failing job) ===\n'
               cat "$EFFECTIVE_CTX"
               printf '\nSTEP 3 — Fix only what is broken in this artifact.\n'
-              printf '- Match the project existing style and conventions.\n'
-              printf '- Do NOT add new features or refactor unrelated code.\n'
-              printf '- Touch only files necessary to resolve THIS specific failure.\n\n'
+              printf -- '- Match the project existing style and conventions.\n'
+              printf -- '- Do NOT add new features or refactor unrelated code.\n'
+              printf -- '- Touch only files necessary to resolve THIS specific failure.\n\n'
               printf 'STEP 4 — Write a descriptive commit message to KIRO_COMMIT_MSG_FILE.\n\n'
               printf '    fix(autofix): <subject under 70 chars; reference %s>\n\n' "$artifact"
               printf '    Resolves: %s\n\n' "$artifact"
               printf '    Root cause:\n'
-              printf '    - <what was actually wrong; cite test names, lint IDs, file:line>\n\n'
+              printf -- '    - <what was actually wrong; cite test names, lint IDs, file:line>\n\n'
               printf '    Changes:\n'
-              printf '    - <bullet per file or logical change>\n\n'
+              printf -- '    - <bullet per file or logical change>\n\n'
               printf '    Workflow run: %s\n\n' "$RUN_URL"
               printf 'Do NOT run git commit or git push yourself; the workflow handles that.\n'
             } > "$PROMPT_FILE"
