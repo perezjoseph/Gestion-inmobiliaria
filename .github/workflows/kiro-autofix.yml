@@ -166,15 +166,6 @@ jobs:
           components: rustfmt,clippy
           targets: x86_64-unknown-linux-musl,wasm32-unknown-unknown
 
-      - name: Install Kiro CLI
-        if: steps.attempts.outputs.exceeded == 'false'
-        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
-        with:
-          timeout_minutes: 10
-          max_attempts: 3
-          retry_wait_seconds: 10
-          command: curl -fsSL https://cli.kiro.dev/install | bash
-
       - name: Build git history of prior attempts
         id: history
         if: steps.attempts.outputs.exceeded == 'false'

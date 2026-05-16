@@ -133,6 +133,13 @@ RUN ARCHIVE="/tmp/cargo-machete.tar.gz" \
     && chmod +x /usr/local/bin/cargo-machete \
     && rm -f "$ARCHIVE"
 
+# kiro-cli — AI-assisted CI remediation
+RUN curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors \
+       --connect-timeout 15 --max-time 120 -o /tmp/kiro-cli.deb \
+       "https://desktop-release.q.us-east-1.amazonaws.com/latest/kiro-cli.deb" \
+    && dpkg -i /tmp/kiro-cli.deb \
+    && rm -f /tmp/kiro-cli.deb
+
 # ── Android SDK (cmdline-tools + platform 36 + build-tools 36) ──
 # Prebaked to avoid ~500MB download on every Android CI job.
 ARG ANDROID_SDK_TOOLS_VERSION=11076708
