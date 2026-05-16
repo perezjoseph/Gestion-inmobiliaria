@@ -11,11 +11,14 @@ use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::document_gallery::DocumentGallery;
 use crate::components::common::error_banner::ErrorBanner;
+use crate::components::common::offline_guard::OfflineGuard;
 use crate::components::common::pagination::Pagination;
 use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::components::propiedades::unidades_tab::UnidadesTab;
+use crate::hooks::use_online;
 use crate::services::api::{api_delete, api_get, api_post, api_put};
+use crate::services::idb_cache;
 use crate::types::PaginatedResponse;
 use crate::types::propiedad::{CreatePropiedad, Propiedad, UpdatePropiedad};
 use crate::utils::{EscapeHandler, can_delete, can_write, field_error, input_class};
@@ -306,9 +309,11 @@ fn PropiedadForm(props: &PropiedadFormProps) -> Html {
                 </div>
                 <div style="grid-column: 1 / -1; display: flex; gap: var(--space-2); justify-content: flex-end;">
                     <button type="button" onclick={props.on_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                    <button type="submit" disabled={props.submitting} class="gi-btn gi-btn-primary">
-                        {if props.submitting { "Guardando..." } else { "Guardar" }}
-                    </button>
+                    <OfflineGuard>
+                        <button type="submit" disabled={props.submitting} class="gi-btn gi-btn-primary">
+                            {if props.submitting { "Guardando..." } else { "Guardar" }}
+                        </button>
+                    </OfflineGuard>
                 </div>
             </form>
             if let Some(ref id) = props.editing_id {
@@ -700,15 +705,35 @@ fn load_propiedades_data(
     error: UseStateHandle<Option<String>>,
     loading: UseStateHandle<bool>,
     url: String,
+    is_online: bool,
 ) {
     spawn_local(async move {
         loading.set(true);
-        match api_get::<PaginatedResponse<Propiedad>>(&url).await {
-            Ok(resp) => {
-                items.set(resp.data);
-                total.set(resp.total);
+        if is_online {
+            match api_get::<PaginatedResponse<Propiedad>>(&url).await {
+                Ok(resp) => {
+                    idb_cache::write_list("propiedades", "list", &resp.data).await;
+                    items.set(resp.data);
+                    total.set(resp.total);
+                }
+                Err(err) => {
+                    // Network failed despite being online — try cache fallback
+                    if let Some(cached) =
+                        idb_cache::read_list::<Propiedad>("propiedades", "list").await
+                    {
+                        let len = cached.len() as u64;
+                        items.set(cached);
+                        total.set(len);
+                    } else {
+                        error.set(Some(err));
+                    }
+                }
             }
-            Err(err) => error.set(Some(err)),
+        } else if let Some(cached) = idb_cache::read_list::<Propiedad>("propiedades", "list").await
+        {
+            let len = cached.len() as u64;
+            items.set(cached);
+            total.set(len);
         }
         loading.set(false);
     });
@@ -1048,6 +1073,7 @@ fn render_propiedades_view(
 pub fn Propiedades() -> Html {
     let auth = use_context::<AuthContext>();
     let toasts = use_context::<ToastContext>();
+    let online = use_online();
     let user_rol = auth
         .as_ref()
         .and_then(|a| a.user.as_ref())
@@ -1157,9 +1183,10 @@ pub fn Propiedades() -> Html {
         let fe = (*filter_estado).clone();
         let sf = (*sort_field).clone();
         let so = (*sort_order).clone();
+        let is_online = online;
         use_effect_with((reload_val, pg), move |_| {
             let url = build_propiedades_url(pg, pp, &fc, &ft, &fe, sf.as_ref(), so.as_ref());
-            load_propiedades_data(items, total, error, loading, url);
+            load_propiedades_data(items, total, error, loading, url, is_online);
         });
     }
 

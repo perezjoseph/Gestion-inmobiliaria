@@ -1,16 +1,21 @@
 use std::fmt::Write as _;
 use std::time::Duration;
 
+use base64::Engine;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use rust_decimal::Decimal;
-use sea_orm::DatabaseConnection;
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::config::ChatbotEnvConfig;
+use crate::entities::{contrato, pago};
 use crate::errors::AppError;
-use crate::models::chatbot::{BalanceResponse, Capabilities, Confidence, FaqEntry};
+use crate::models::chatbot::{
+    BalanceResponse, Capabilities, Confidence, FaqEntry, format_currency,
+};
+use crate::services::ocr_client::OcrClient;
 use crate::services::ovms_provider::OvmsCompletionModel;
 
 // =============================================================================
@@ -42,6 +47,9 @@ pub struct AgentResponse {
     pub reply: String,
     /// Names of tools that were invoked during processing.
     pub tools_invoked: Vec<String>,
+    /// If `extract_receipt` was successfully invoked, carries the extracted receipt data.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extracted_receipt: Option<PaymentReceipt>,
 }
 
 // =============================================================================
@@ -135,8 +143,17 @@ impl AiModule {
         let timeout_duration = Duration::from_secs(self.timeout_secs);
 
         let result = tokio::time::timeout(timeout_duration, async {
-            self.invoke_agent(&system_prompt, ctx.capabilities, ctx.history, &user_prompt)
-                .await
+            self.invoke_agent(
+                &system_prompt,
+                ctx.capabilities,
+                ctx.history,
+                &user_prompt,
+                ctx.db,
+                ctx.organizacion_id,
+                ctx.sender_phone,
+                ctx.user_message.image_base64.as_deref(),
+            )
+            .await
         })
         .await;
 
@@ -161,23 +178,35 @@ impl AiModule {
                         Por favor, intente de nuevo en unos momentos."
                         .to_string(),
                     tools_invoked: vec![],
+                    extracted_receipt: None,
                 })
             }
         }
     }
 
-    /// Internal method that builds the Rig agent and invokes it via the
-    /// [`OvmsCompletionModel`] which handles OVMS's missing `id` field and
-    /// supports tool calling through Rig's native agent loop.
+    /// Maximum number of tool-calling turns before returning a fallback.
+    const MAX_AGENT_TURNS: usize = 5;
+
+    /// Internal method that implements the multi-turn agent loop.
+    ///
+    /// Sends the completion request to OVMS. If the response contains tool
+    /// calls, executes each tool, appends results to chat history, and loops.
+    /// If the response contains final text (no tool calls), returns it directly.
+    /// If the turn limit is reached, returns a fallback message.
+    #[allow(clippy::too_many_arguments)]
     async fn invoke_agent(
         &self,
         system_prompt: &str,
         capabilities: &Capabilities,
         history: &[ConversationEntry],
         user_prompt: &str,
+        db: &DatabaseConnection,
+        organizacion_id: Uuid,
+        sender_phone: &str,
+        image_base64: Option<&str>,
     ) -> Result<AgentResponse, AppError> {
         use rig::completion::{CompletionModel, CompletionRequest};
-        use rig::message::{self, AssistantContent, ToolChoice, UserContent};
+        use rig::message::{self, AssistantContent, ToolChoice, ToolResultContent, UserContent};
         use rig::one_or_many::OneOrMany;
 
         let enabled_tools = get_enabled_tools(capabilities);
@@ -210,61 +239,206 @@ impl AiModule {
             content: OneOrMany::one(UserContent::text(user_prompt)),
         });
 
-        // Build the CompletionRequest manually
-        let request = CompletionRequest {
-            model: None,
-            preamble: Some(system_prompt.to_string()),
-            chat_history: OneOrMany::many(chat_history)
-                .map_err(|_| AppError::Internal(anyhow::anyhow!("Chat history cannot be empty")))?,
-            documents: vec![],
-            tools: tool_defs,
-            temperature: None,
-            max_tokens: None,
-            tool_choice: if enabled_tools.is_empty() {
-                None
-            } else {
-                Some(ToolChoice::Auto)
-            },
-            additional_params: None,
-            output_schema: None,
-        };
+        let mut all_tools_invoked: Vec<String> = Vec::new();
+        let mut extracted_receipt: Option<PaymentReceipt> = None;
 
-        // Send to OVMS via our custom CompletionModel
-        let response = self
-            .model
-            .completion(request)
-            .await
-            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error en agente AI: {e}")))?;
+        // Multi-turn agent loop
+        for turn in 0..Self::MAX_AGENT_TURNS {
+            let request = CompletionRequest {
+                model: None,
+                preamble: Some(system_prompt.to_string()),
+                chat_history: OneOrMany::many(chat_history.clone()).map_err(|_| {
+                    AppError::Internal(anyhow::anyhow!("Chat history cannot be empty"))
+                })?,
+                documents: vec![],
+                tools: tool_defs.clone(),
+                temperature: None,
+                max_tokens: None,
+                tool_choice: if enabled_tools.is_empty() {
+                    None
+                } else {
+                    Some(ToolChoice::Auto)
+                },
+                additional_params: None,
+                output_schema: None,
+            };
 
-        // Extract text and tool calls from the response
-        let mut reply_parts = Vec::new();
-        let mut tools_invoked = Vec::new();
+            // Send to OVMS via our custom CompletionModel
+            let response = self
+                .model
+                .completion(request)
+                .await
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error en agente AI: {e}")))?;
 
-        for item in response.choice.iter() {
-            match item {
-                AssistantContent::Text(text) => {
-                    reply_parts.push(text.text.clone());
+            // Separate text and tool calls from the response
+            let mut reply_parts = Vec::new();
+            let mut tool_calls: Vec<(String, String, serde_json::Value)> = Vec::new();
+
+            for item in response.choice.iter() {
+                match item {
+                    AssistantContent::Text(text) => {
+                        reply_parts.push(text.text.clone());
+                    }
+                    AssistantContent::ToolCall(tc) => {
+                        tool_calls.push((
+                            tc.id.clone(),
+                            tc.function.name.clone(),
+                            tc.function.arguments.clone(),
+                        ));
+                    }
+                    _ => {}
                 }
-                AssistantContent::ToolCall(tc) => {
-                    tools_invoked.push(tc.function.name.clone());
-                }
-                _ => {}
             }
+
+            // If no tool calls, return the final text response directly
+            if tool_calls.is_empty() {
+                let reply = reply_parts.join("\n");
+                return Ok(AgentResponse {
+                    reply,
+                    tools_invoked: all_tools_invoked,
+                    extracted_receipt,
+                });
+            }
+
+            // Append the assistant message (with tool calls) to history
+            chat_history.push(message::Message::Assistant {
+                id: None,
+                content: response.choice.clone(),
+            });
+
+            // Execute each tool call and append results
+            for (call_id, tool_name, args) in &tool_calls {
+                all_tools_invoked.push(tool_name.clone());
+
+                let result = dispatch_tool_call(
+                    tool_name,
+                    args,
+                    db,
+                    organizacion_id,
+                    sender_phone,
+                    image_base64,
+                )
+                .await;
+
+                // If extract_receipt succeeded, capture the receipt
+                if tool_name == ExtractReceiptTool::NAME {
+                    if let Ok(ref result_str) = result {
+                        if let Ok(receipt) = serde_json::from_str::<PaymentReceipt>(result_str) {
+                            extracted_receipt = Some(receipt);
+                        }
+                    }
+                }
+
+                let tool_result_text = match result {
+                    Ok(text) => text,
+                    Err(e) => format!("Error: {e}"),
+                };
+
+                // Append tool result as a user message with ToolResult content
+                chat_history.push(message::Message::User {
+                    content: OneOrMany::one(UserContent::ToolResult(message::ToolResult {
+                        id: call_id.clone(),
+                        call_id: None,
+                        content: OneOrMany::one(ToolResultContent::text(tool_result_text)),
+                    })),
+                });
+            }
+
+            tracing::debug!(
+                turn = turn + 1,
+                tools = ?all_tools_invoked,
+                "Agent loop turn completed"
+            );
         }
 
-        let reply = if reply_parts.is_empty() && !tools_invoked.is_empty() {
-            // Model only returned tool calls — this is the first turn of a
-            // multi-turn loop. For now, return a placeholder indicating tools
-            // were invoked. Full multi-turn execution will be wired next.
-            format!("Herramientas invocadas: {}", tools_invoked.join(", "))
-        } else {
-            reply_parts.join("\n")
-        };
+        // Turn limit reached — return fallback
+        tracing::warn!(
+            max_turns = Self::MAX_AGENT_TURNS,
+            tools_invoked = ?all_tools_invoked,
+            "Agent loop reached turn limit"
+        );
 
         Ok(AgentResponse {
-            reply,
-            tools_invoked,
+            reply: "Lo siento, no pude completar la solicitud. Por favor, intente reformular su pregunta.".to_string(),
+            tools_invoked: all_tools_invoked,
+            extracted_receipt,
         })
+    }
+}
+
+// =============================================================================
+// Tool Dispatch
+// =============================================================================
+
+/// Dispatches a tool call by name, deserializing args and calling the
+/// appropriate tool implementation. Returns the serialized result as a string.
+async fn dispatch_tool_call(
+    tool_name: &str,
+    args: &serde_json::Value,
+    db: &DatabaseConnection,
+    organizacion_id: Uuid,
+    sender_phone: &str,
+    image_base64: Option<&str>,
+) -> Result<String, String> {
+    match tool_name {
+        ExtractReceiptTool::NAME => {
+            let mut input: ExtractReceiptInput = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Error deserializando args de extract_receipt: {e}"))?;
+
+            // If the LLM didn't provide image_base64 in args but we have it from the message
+            if input.image_base64.is_empty() {
+                if let Some(img) = image_base64 {
+                    input.image_base64 = img.to_string();
+                }
+            }
+
+            let tool = ExtractReceiptTool {
+                db: db.clone(),
+                organizacion_id,
+                sender_phone: sender_phone.to_string(),
+            };
+            let result = tool.call(input).await.map_err(|e| e.to_string())?;
+            serde_json::to_string(&result).map_err(|e| format!("Error serializando resultado: {e}"))
+        }
+        QueryBalanceTool::NAME => {
+            let input: QueryBalanceInput = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Error deserializando args de query_balance: {e}"))?;
+            let tool = QueryBalanceTool { db: db.clone() };
+            let result = tool.call(input).await.map_err(|e| e.to_string())?;
+            serde_json::to_string(&result).map_err(|e| format!("Error serializando resultado: {e}"))
+        }
+        GetPaymentHistoryTool::NAME => {
+            let input: GetPaymentHistoryInput = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Error deserializando args de get_payment_history: {e}"))?;
+            let tool = GetPaymentHistoryTool {
+                db: db.clone(),
+                organizacion_id,
+                sender_phone: sender_phone.to_string(),
+            };
+            let result = tool.call(input).await.map_err(|e| e.to_string())?;
+            serde_json::to_string(&result).map_err(|e| format!("Error serializando resultado: {e}"))
+        }
+        CreateMaintenanceRequestTool::NAME => {
+            let input: CreateMaintenanceRequestInput = serde_json::from_value(args.clone())
+                .map_err(|e| {
+                    format!("Error deserializando args de create_maintenance_request: {e}")
+                })?;
+            let tool = CreateMaintenanceRequestTool { db: db.clone() };
+            let result = tool.call(input).await.map_err(|e| e.to_string())?;
+            serde_json::to_string(&result).map_err(|e| format!("Error serializando resultado: {e}"))
+        }
+        HandoffToHumanTool::NAME => {
+            let input: HandoffToHumanInput = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Error deserializando args de handoff_to_human: {e}"))?;
+            let tool = HandoffToHumanTool {
+                db: db.clone(),
+                organizacion_id,
+                sender_phone: sender_phone.to_string(),
+            };
+            let result = tool.call(input).await.map_err(|e| e.to_string())?;
+            serde_json::to_string(&result).map_err(|e| format!("Error serializando resultado: {e}"))
+        }
+        other => Err(format!("Herramienta desconocida: {other}")),
     }
 }
 
@@ -376,6 +550,8 @@ pub struct PaymentReceipt {
 #[derive(Clone)]
 pub struct ExtractReceiptTool {
     pub db: DatabaseConnection,
+    pub organizacion_id: Uuid,
+    pub sender_phone: String,
 }
 
 impl Tool for ExtractReceiptTool {
@@ -406,11 +582,74 @@ impl Tool for ExtractReceiptTool {
         }
     }
 
-    async fn call(&self, _args: Self::Args) -> Result<Self::Output, Self::Error> {
-        // Stub: actual OCR service call will be wired in the full pipeline.
-        Err(ChatbotToolError::Service(
-            "OCR service not yet wired".to_string(),
-        ))
+    async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+        // Decode base64 image data
+        let image_data = base64::engine::general_purpose::STANDARD
+            .decode(&args.image_base64)
+            .map_err(|e| {
+                ChatbotToolError::Validation(format!("Error decodificando imagen base64: {e}"))
+            })?;
+
+        // Construct OcrClient and call extract
+        let ocr_client = OcrClient::new()
+            .map_err(|e| ChatbotToolError::Service(format!("Error creando cliente OCR: {e}")))?;
+
+        let ocr_result = ocr_client
+            .extract(&image_data, "receipt.jpg", "image/jpeg", Some("receipt"))
+            .await
+            .map_err(|e| ChatbotToolError::Service(format!("Error en servicio OCR: {e}")))?;
+
+        // Map OcrResult structured_fields to PaymentReceipt
+        let fields = &ocr_result.structured_fields;
+
+        let amount_str = fields
+            .get("amount")
+            .or_else(|| fields.get("monto"))
+            .cloned()
+            .unwrap_or_default();
+        let amount = amount_str
+            .replace(',', "")
+            .replace("RD$", "")
+            .replace("US$", "")
+            .trim()
+            .parse::<Decimal>()
+            .unwrap_or(Decimal::ZERO);
+
+        let currency = fields
+            .get("currency")
+            .or_else(|| fields.get("moneda"))
+            .cloned()
+            .unwrap_or_else(|| "DOP".to_string());
+
+        // Calculate average confidence from OCR lines
+        let avg_confidence = if ocr_result.lines.is_empty() {
+            0.0
+        } else {
+            ocr_result.lines.iter().map(|l| l.confidence).sum::<f64>()
+                / ocr_result.lines.len() as f64
+        };
+
+        use crate::models::chatbot::map_confidence;
+
+        Ok(PaymentReceipt {
+            bank: fields.get("bank").or_else(|| fields.get("banco")).cloned(),
+            amount,
+            currency,
+            date: fields.get("date").or_else(|| fields.get("fecha")).cloned(),
+            reference: fields
+                .get("reference")
+                .or_else(|| fields.get("referencia"))
+                .cloned(),
+            sender_name: fields
+                .get("sender_name")
+                .or_else(|| fields.get("remitente"))
+                .cloned(),
+            recipient: fields
+                .get("recipient")
+                .or_else(|| fields.get("destinatario"))
+                .cloned(),
+            confidence: map_confidence(avg_confidence),
+        })
     }
 }
 
@@ -598,6 +837,8 @@ pub struct PaymentHistoryResult {
 #[derive(Clone)]
 pub struct GetPaymentHistoryTool {
     pub db: DatabaseConnection,
+    pub organizacion_id: Uuid,
+    pub sender_phone: String,
 }
 
 impl Tool for GetPaymentHistoryTool {
@@ -632,12 +873,60 @@ impl Tool for GetPaymentHistoryTool {
         }
     }
 
-    async fn call(&self, _args: Self::Args) -> Result<Self::Output, Self::Error> {
-        // Stub: full query will be wired when the pipeline is assembled.
-        // The actual implementation will query pagos for the tenant's contracts.
+    async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+        use sea_orm::QuerySelect;
+
+        let inquilino_id = Uuid::parse_str(&args.inquilino_id)
+            .map_err(|e| ChatbotToolError::Validation(format!("inquilino_id inválido: {e}")))?;
+        let org_id = Uuid::parse_str(&args.organizacion_id)
+            .map_err(|e| ChatbotToolError::Validation(format!("organizacion_id inválido: {e}")))?;
+
+        let limit = u64::from(args.limit.unwrap_or(10).min(50));
+
+        // Find all contrato IDs for this tenant in this org
+        let contrato_ids: Vec<Uuid> = contrato::Entity::find()
+            .filter(contrato::Column::InquilinoId.eq(inquilino_id))
+            .filter(contrato::Column::OrganizacionId.eq(org_id))
+            .select_only()
+            .column(contrato::Column::Id)
+            .into_tuple()
+            .all(&self.db)
+            .await
+            .map_err(|e| ChatbotToolError::Service(format!("Error consultando contratos: {e}")))?;
+
+        if contrato_ids.is_empty() {
+            return Ok(PaymentHistoryResult {
+                payments: vec![],
+                total_count: 0,
+            });
+        }
+
+        // Query pagos for those contracts, ordered by due date descending
+        let pagos = pago::Entity::find()
+            .filter(pago::Column::ContratoId.is_in(contrato_ids))
+            .filter(pago::Column::OrganizacionId.eq(org_id))
+            .order_by_desc(pago::Column::FechaVencimiento)
+            .limit(limit)
+            .all(&self.db)
+            .await
+            .map_err(|e| ChatbotToolError::Service(format!("Error consultando pagos: {e}")))?;
+
+        let total_count = pagos.len();
+        let payments: Vec<PaymentHistoryEntry> = pagos
+            .iter()
+            .map(|p| PaymentHistoryEntry {
+                amount: p.monto,
+                currency: p.moneda.clone(),
+                formatted_amount: format_currency(p.monto, &p.moneda),
+                status: p.estado.clone(),
+                due_date: p.fecha_vencimiento.format("%Y-%m-%d").to_string(),
+                payment_date: p.fecha_pago.map(|d| d.format("%Y-%m-%d").to_string()),
+            })
+            .collect();
+
         Ok(PaymentHistoryResult {
-            payments: vec![],
-            total_count: 0,
+            payments,
+            total_count,
         })
     }
 }

@@ -374,6 +374,7 @@ mod pbt_async {
             updated_at: Set(None),
             sellado: Set(false),
             sellado_at: Set(None),
+            documento_origen_id: Set(None),
         }
         .insert(db)
         .await

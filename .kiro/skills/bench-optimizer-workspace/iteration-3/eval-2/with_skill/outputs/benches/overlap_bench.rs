@@ -1,116 +1,127 @@
 use chrono::NaiveDate;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use overlap_bench::*;
 use rand::Rng;
 use uuid::Uuid;
 
-/// Generate realistic contract data for benchmarking.
-/// Simulates a bulk import scenario where multiple contracts exist for the same propiedad.
-/// - `n`: total number of contracts
-/// - ~70% are "activo", ~20% "vencido", ~10% "cancelado"
-/// - All contracts belong to a small number of propiedades (simulates bulk import for one property)
-/// - Date ranges span 24 months with some overlaps
-fn generate_contratos(n: usize, num_propiedades: usize) -> Vec<Contrato> {
+use overlap_detection_bench::{
+    detectar_solapamientos_grouped, detectar_solapamientos_pairwise,
+    detectar_solapamientos_sort_sweep, Contrato,
+};
+
+/// Generate realistic contract data for a single propiedad.
+/// Simulates the production scenario: contracts for one propiedad being validated.
+/// - ~30% of contracts overlap with at least one other (realistic for bulk import validation)
+/// - All contracts are "activo" (worst case for the algorithm — no early filtering)
+/// - Date ranges span ~2 years
+fn generate_contratos_single_propiedad(n: usize) -> Vec<Contrato> {
     let mut rng = rand::thread_rng();
-    let propiedades: Vec<Uuid> = (0..num_propiedades).map(|_| Uuid::new_v4()).collect();
+    let propiedad_id = Uuid::new_v4();
+    let base_date = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
 
     (0..n)
         .map(|_| {
-            let propiedad_id = propiedades[rng.gen_range(0..num_propiedades)];
-            let start_month = rng.gen_range(1..=22u32);
-            let duration_months = rng.gen_range(1..=12u32);
-            let end_month = (start_month + duration_months).min(24);
-
-            let fecha_inicio =
-                NaiveDate::from_ymd_opt(2024, ((start_month - 1) % 12) + 1, 1).unwrap();
-            let fecha_fin = NaiveDate::from_ymd_opt(
-                2024 + (end_month / 13) as i32,
-                ((end_month - 1) % 12) + 1,
-                28,
-            )
-            .unwrap();
-
-            let estado = match rng.gen_range(0..10) {
-                0 => "cancelado".to_string(),
-                1..=2 => "vencido".to_string(),
-                _ => "activo".to_string(),
-            };
+            // Random start within 24 months
+            let start_offset = rng.gen_range(0..730);
+            // Duration between 30 and 365 days
+            let duration = rng.gen_range(30..365);
+            let fecha_inicio = base_date + chrono::Duration::days(start_offset);
+            let fecha_fin = fecha_inicio + chrono::Duration::days(duration);
 
             Contrato {
                 id: Uuid::new_v4(),
                 propiedad_id,
                 fecha_inicio,
                 fecha_fin,
-                estado,
+                estado: "activo".to_string(),
+            }
+        })
+        .collect()
+}
+
+/// Generate contracts spread across multiple propiedades.
+/// Simulates bulk import where contracts belong to different properties.
+/// ~10 propiedades, contracts distributed among them.
+fn generate_contratos_multi_propiedad(n: usize) -> Vec<Contrato> {
+    let mut rng = rand::thread_rng();
+    let num_propiedades = 10;
+    let propiedades: Vec<Uuid> = (0..num_propiedades).map(|_| Uuid::new_v4()).collect();
+    let base_date = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
+
+    (0..n)
+        .map(|_| {
+            let propiedad_id = propiedades[rng.gen_range(0..num_propiedades)];
+            let start_offset = rng.gen_range(0..730);
+            let duration = rng.gen_range(30..365);
+            let fecha_inicio = base_date + chrono::Duration::days(start_offset);
+            let fecha_fin = fecha_inicio + chrono::Duration::days(duration);
+
+            Contrato {
+                id: Uuid::new_v4(),
+                propiedad_id,
+                fecha_inicio,
+                fecha_fin,
+                // Mix of active and inactive to test filtering
+                estado: if rng.gen_range(0..10) < 8 {
+                    "activo".to_string()
+                } else {
+                    "cancelado".to_string()
+                },
             }
         })
         .collect()
 }
 
 /// Benchmark at production-representative sizes:
-/// - n=10: normal use (5-15 contracts per propiedad)
-/// - n=50: moderate load
-/// - n=200: bulk import scenario (the case we're investigating)
-fn bench_overlap_detection(c: &mut Criterion) {
-    let mut group = c.benchmark_group("overlap_detection");
+/// - n=10: typical single-property validation
+/// - n=15: upper end of normal use
+/// - n=50: moderate bulk import
+/// - n=200: maximum bulk import size
+fn bench_single_propiedad_scaling(c: &mut Criterion) {
+    let mut group = c.benchmark_group("single_propiedad");
 
-    // Single propiedad scenario (worst case for overlap detection — all contracts same property)
-    for size in [10, 50, 200] {
-        let contratos = generate_contratos(size, 1);
+    for size in [10, 15, 50, 200] {
+        let data = generate_contratos_single_propiedad(size);
 
-        group.bench_with_input(
-            BenchmarkId::new("bruteforce", size),
-            &contratos,
-            |b, data| b.iter(|| detectar_solapamientos_bruteforce(data)),
-        );
-
-        group.bench_with_input(
-            BenchmarkId::new("sort_scan", size),
-            &contratos,
-            |b, data| b.iter(|| detectar_solapamientos_sort_scan(data)),
-        );
-
-        group.bench_with_input(
-            BenchmarkId::new("sort_early_exit", size),
-            &contratos,
-            |b, data| b.iter(|| detectar_solapamientos_sort_early_exit(data)),
-        );
-
-        group.bench_with_input(
-            BenchmarkId::new("prefilter_only", size),
-            &contratos,
-            |b, data| b.iter(|| detectar_solapamientos_prefilter(data)),
-        );
+        group.bench_with_input(BenchmarkId::new("pairwise", size), &data, |b, d| {
+            b.iter(|| detectar_solapamientos_pairwise(d))
+        });
+        group.bench_with_input(BenchmarkId::new("sort_sweep", size), &data, |b, d| {
+            b.iter(|| detectar_solapamientos_sort_sweep(d))
+        });
+        group.bench_with_input(BenchmarkId::new("grouped", size), &data, |b, d| {
+            b.iter(|| detectar_solapamientos_grouped(d))
+        });
     }
 
     group.finish();
 }
 
-/// Benchmark the realistic multi-propiedad scenario during bulk import
-/// (200 contracts spread across 5 propiedades)
-fn bench_multi_propiedad(c: &mut Criterion) {
-    let mut group = c.benchmark_group("overlap_multi_propiedad");
+/// Benchmark the multi-propiedad scenario (bulk import with mixed properties).
+/// This tests whether grouping by propiedad provides benefit when contracts
+/// are spread across multiple properties.
+fn bench_multi_propiedad_scaling(c: &mut Criterion) {
+    let mut group = c.benchmark_group("multi_propiedad");
 
-    let contratos = generate_contratos(200, 5);
+    for size in [10, 15, 50, 200] {
+        let data = generate_contratos_multi_propiedad(size);
 
-    group.bench_function("bruteforce", |b| {
-        b.iter(|| detectar_solapamientos_bruteforce(&contratos))
-    });
-
-    group.bench_function("sort_scan", |b| {
-        b.iter(|| detectar_solapamientos_sort_scan(&contratos))
-    });
-
-    group.bench_function("sort_early_exit", |b| {
-        b.iter(|| detectar_solapamientos_sort_early_exit(&contratos))
-    });
-
-    group.bench_function("prefilter_only", |b| {
-        b.iter(|| detectar_solapamientos_prefilter(&contratos))
-    });
+        group.bench_with_input(BenchmarkId::new("pairwise", size), &data, |b, d| {
+            b.iter(|| detectar_solapamientos_pairwise(d))
+        });
+        group.bench_with_input(BenchmarkId::new("sort_sweep", size), &data, |b, d| {
+            b.iter(|| detectar_solapamientos_sort_sweep(d))
+        });
+        group.bench_with_input(BenchmarkId::new("grouped", size), &data, |b, d| {
+            b.iter(|| detectar_solapamientos_grouped(d))
+        });
+    }
 
     group.finish();
 }
 
-criterion_group!(benches, bench_overlap_detection, bench_multi_propiedad);
+criterion_group!(
+    benches,
+    bench_single_propiedad_scaling,
+    bench_multi_propiedad_scaling
+);
 criterion_main!(benches);

@@ -1,4 +1,5 @@
 pub mod auditoria;
+pub mod calendario;
 pub mod categorias_gastos;
 pub mod chatbot_config;
 pub mod configuracion;

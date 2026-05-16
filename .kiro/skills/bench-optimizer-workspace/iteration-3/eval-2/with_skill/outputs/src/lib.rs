@@ -9,8 +9,9 @@ pub struct Contrato {
     pub estado: String,
 }
 
-/// Current O(n²) pairwise comparison.
-/// Checks every pair for overlap among active contracts of the same propiedad.
+/// Current implementation: O(n²) pairwise comparison.
+/// Checks all pairs for overlapping date ranges among active contracts
+/// for the same propiedad.
 pub fn detectar_solapamientos_pairwise(contratos: &[Contrato]) -> Vec<(Uuid, Uuid)> {
     let mut solapamientos = Vec::new();
 
@@ -33,13 +34,23 @@ pub fn detectar_solapamientos_pairwise(contratos: &[Contrato]) -> Vec<(Uuid, Uui
     solapamientos
 }
 
-/// Approach 2: Filter active first, group by propiedad, then pairwise within groups.
-/// Reduces comparisons by only comparing contracts of the same propiedad.
-/// Still O(n²) worst case (all same propiedad) but better average case.
-pub fn detectar_solapamientos_grouped(contratos: &[Contrato]) -> Vec<(Uuid, Uuid)> {
+/// Approach 2: Filter active first, group by propiedad, then sort by fecha_inicio
+/// within each group and scan adjacent pairs.
+///
+/// Complexity: O(n log n) due to sorting, but with lower constant factor for
+/// the overlap detection phase (only adjacent comparisons needed for non-overlapping
+/// detection). However, for detecting ALL overlaps (not just adjacent), we still
+/// need a sweep-line approach.
+///
+/// Note: sorting + adjacent scan only finds adjacent overlaps. For ALL overlapping
+/// pairs, we use a sweep-line: sort by start, then for each contract check against
+/// all previous contracts whose end >= current start.
+pub fn detectar_solapamientos_sort_sweep(contratos: &[Contrato]) -> Vec<(Uuid, Uuid)> {
     use std::collections::HashMap;
 
-    // Filter active contracts and group by propiedad_id
+    let mut solapamientos = Vec::new();
+
+    // Group active contracts by propiedad_id
     let mut por_propiedad: HashMap<Uuid, Vec<&Contrato>> = HashMap::new();
     for c in contratos {
         if c.estado == "activo" {
@@ -47,104 +58,52 @@ pub fn detectar_solapamientos_grouped(contratos: &[Contrato]) -> Vec<(Uuid, Uuid
         }
     }
 
+    // For each propiedad, sort by fecha_inicio and sweep
+    for (_propiedad_id, mut grupo) in por_propiedad {
+        grupo.sort_unstable_by_key(|c| c.fecha_inicio);
+
+        // Sweep: for each contract, check against all previous contracts
+        // that haven't ended yet (fecha_fin >= current.fecha_inicio)
+        for i in 1..grupo.len() {
+            for j in 0..i {
+                // Since sorted by fecha_inicio, we know grupo[j].fecha_inicio <= grupo[i].fecha_inicio
+                // Overlap condition: grupo[j].fecha_fin >= grupo[i].fecha_inicio
+                if grupo[j].fecha_fin >= grupo[i].fecha_inicio {
+                    solapamientos.push((grupo[j].id, grupo[i].id));
+                }
+            }
+        }
+    }
+
+    solapamientos
+}
+
+/// Approach 3: Pre-filter active contracts, then do pairwise only within
+/// same propiedad groups. No sorting overhead, but avoids cross-propiedad comparisons.
+///
+/// This is the "minimal optimization" — same algorithm but skips the estado and
+/// propiedad_id checks inside the inner loop by pre-grouping.
+pub fn detectar_solapamientos_grouped(contratos: &[Contrato]) -> Vec<(Uuid, Uuid)> {
+    use std::collections::HashMap;
+
     let mut solapamientos = Vec::new();
 
-    for (_propiedad_id, grupo) in &por_propiedad {
+    // Group active contracts by propiedad_id
+    let mut por_propiedad: HashMap<Uuid, Vec<&Contrato>> = HashMap::new();
+    for c in contratos {
+        if c.estado == "activo" {
+            por_propiedad.entry(c.propiedad_id).or_default().push(c);
+        }
+    }
+
+    // Pairwise within each group (no need to check propiedad_id or estado)
+    for grupo in por_propiedad.values() {
         for i in 0..grupo.len() {
             for j in (i + 1)..grupo.len() {
                 let a = grupo[i];
                 let b = grupo[j];
                 if a.fecha_inicio <= b.fecha_fin && b.fecha_inicio <= a.fecha_fin {
                     solapamientos.push((a.id, b.id));
-                }
-            }
-        }
-    }
-
-    solapamientos
-}
-
-/// Approach 3: Filter active, group by propiedad, sort by fecha_inicio, scan adjacent.
-/// O(n log n) per group. Only detects overlaps between adjacent intervals after sorting.
-/// NOTE: This only finds overlaps between consecutive intervals when sorted by start date.
-/// For full overlap detection, we need a sweep-line approach.
-pub fn detectar_solapamientos_sort_scan(contratos: &[Contrato]) -> Vec<(Uuid, Uuid)> {
-    use std::collections::HashMap;
-
-    let mut por_propiedad: HashMap<Uuid, Vec<&Contrato>> = HashMap::new();
-    for c in contratos {
-        if c.estado == "activo" {
-            por_propiedad.entry(c.propiedad_id).or_default().push(c);
-        }
-    }
-
-    let mut solapamientos = Vec::new();
-
-    for (_propiedad_id, mut grupo) in por_propiedad {
-        grupo.sort_by_key(|c| c.fecha_inicio);
-
-        // Sweep-line: track the maximum fecha_fin seen so far.
-        // Any contract whose fecha_inicio <= max_fecha_fin overlaps with at least one prior.
-        // To find ALL overlapping pairs, we compare each contract against all prior
-        // contracts whose fecha_fin >= current.fecha_inicio.
-        for i in 1..grupo.len() {
-            let current = grupo[i];
-            // Walk backwards through prior contracts that could overlap
-            for j in (0..i).rev() {
-                let prior = grupo[j];
-                if prior.fecha_fin >= current.fecha_inicio {
-                    solapamientos.push((prior.id, current.id));
-                } else {
-                    // Since sorted by fecha_inicio, if prior.fecha_fin < current.fecha_inicio,
-                    // we can't break early because an even earlier contract might have a later fecha_fin.
-                    // So we must check all prior contracts.
-                }
-            }
-        }
-    }
-
-    solapamientos
-}
-
-/// Approach 4: Filter active, group by propiedad, sort by fecha_inicio,
-/// use a sweep-line with early termination.
-/// After sorting by fecha_inicio, for each contract we only need to look back
-/// at contracts whose fecha_fin >= current.fecha_inicio. We maintain a sorted
-/// structure of end dates to enable early termination.
-/// For n=200 with many propiedades, this should be efficient.
-pub fn detectar_solapamientos_sort_sweep(contratos: &[Contrato]) -> Vec<(Uuid, Uuid)> {
-    use std::collections::HashMap;
-
-    let mut por_propiedad: HashMap<Uuid, Vec<&Contrato>> = HashMap::new();
-    for c in contratos {
-        if c.estado == "activo" {
-            por_propiedad.entry(c.propiedad_id).or_default().push(c);
-        }
-    }
-
-    let mut solapamientos = Vec::new();
-
-    for (_propiedad_id, mut grupo) in por_propiedad {
-        if grupo.len() < 2 {
-            continue;
-        }
-
-        // Sort by fecha_inicio, then by fecha_fin descending for ties
-        grupo.sort_by(|a, b| {
-            a.fecha_inicio
-                .cmp(&b.fecha_inicio)
-                .then(b.fecha_fin.cmp(&a.fecha_fin))
-        });
-
-        // For each contract, compare against all prior contracts.
-        // Since sorted by fecha_inicio, we know b.fecha_inicio >= a.fecha_inicio for all prior a.
-        // Overlap condition simplifies to: a.fecha_fin >= current.fecha_inicio
-        for i in 1..grupo.len() {
-            let current = grupo[i];
-            for j in 0..i {
-                let prior = grupo[j];
-                if prior.fecha_fin >= current.fecha_inicio {
-                    solapamientos.push((prior.id, current.id));
                 }
             }
         }
@@ -174,75 +133,67 @@ mod tests {
     }
 
     #[test]
-    fn test_no_overlap() {
+    fn test_all_approaches_agree() {
+        let prop_a = Uuid::new_v4();
+        let prop_b = Uuid::new_v4();
+
+        let contratos = vec![
+            make_contrato(prop_a, (2024, 1, 1), (2024, 6, 30), "activo"),
+            make_contrato(prop_a, (2024, 5, 1), (2024, 12, 31), "activo"), // overlaps with [0]
+            make_contrato(prop_a, (2025, 1, 1), (2025, 6, 30), "activo"),  // no overlap
+            make_contrato(prop_a, (2024, 3, 1), (2024, 4, 30), "cancelado"), // inactive
+            make_contrato(prop_b, (2024, 1, 1), (2024, 12, 31), "activo"), // different propiedad
+        ];
+
+        let mut r1 = detectar_solapamientos_pairwise(&contratos);
+        let mut r2 = detectar_solapamientos_sort_sweep(&contratos);
+        let mut r3 = detectar_solapamientos_grouped(&contratos);
+
+        // Normalize: sort each pair and then sort the vec
+        let normalize = |v: &mut Vec<(Uuid, Uuid)>| {
+            for pair in v.iter_mut() {
+                if pair.0 > pair.1 {
+                    std::mem::swap(&mut pair.0, &mut pair.1);
+                }
+            }
+            v.sort();
+        };
+
+        normalize(&mut r1);
+        normalize(&mut r2);
+        normalize(&mut r3);
+
+        assert_eq!(r1.len(), 1, "Should find exactly 1 overlap");
+        assert_eq!(r1, r2, "sort_sweep should match pairwise");
+        assert_eq!(r1, r3, "grouped should match pairwise");
+    }
+
+    #[test]
+    fn test_no_overlaps() {
         let prop = Uuid::new_v4();
         let contratos = vec![
-            make_contrato(prop, (2024, 1, 1), (2024, 6, 30), "activo"),
-            make_contrato(prop, (2024, 7, 1), (2024, 12, 31), "activo"),
+            make_contrato(prop, (2024, 1, 1), (2024, 3, 31), "activo"),
+            make_contrato(prop, (2024, 4, 1), (2024, 6, 30), "activo"),
+            make_contrato(prop, (2024, 7, 1), (2024, 9, 30), "activo"),
         ];
 
         assert_eq!(detectar_solapamientos_pairwise(&contratos).len(), 0);
-        assert_eq!(detectar_solapamientos_grouped(&contratos).len(), 0);
-        assert_eq!(detectar_solapamientos_sort_scan(&contratos).len(), 0);
         assert_eq!(detectar_solapamientos_sort_sweep(&contratos).len(), 0);
+        assert_eq!(detectar_solapamientos_grouped(&contratos).len(), 0);
     }
 
     #[test]
-    fn test_overlap_detected() {
-        let prop = Uuid::new_v4();
-        let contratos = vec![
-            make_contrato(prop, (2024, 1, 1), (2024, 7, 15), "activo"),
-            make_contrato(prop, (2024, 7, 1), (2024, 12, 31), "activo"),
-        ];
-
-        assert_eq!(detectar_solapamientos_pairwise(&contratos).len(), 1);
-        assert_eq!(detectar_solapamientos_grouped(&contratos).len(), 1);
-        assert_eq!(detectar_solapamientos_sort_scan(&contratos).len(), 1);
-        assert_eq!(detectar_solapamientos_sort_sweep(&contratos).len(), 1);
-    }
-
-    #[test]
-    fn test_inactive_ignored() {
+    fn test_all_overlap() {
         let prop = Uuid::new_v4();
         let contratos = vec![
             make_contrato(prop, (2024, 1, 1), (2024, 12, 31), "activo"),
-            make_contrato(prop, (2024, 6, 1), (2024, 12, 31), "cancelado"),
-        ];
-
-        assert_eq!(detectar_solapamientos_pairwise(&contratos).len(), 0);
-        assert_eq!(detectar_solapamientos_grouped(&contratos).len(), 0);
-        assert_eq!(detectar_solapamientos_sort_scan(&contratos).len(), 0);
-        assert_eq!(detectar_solapamientos_sort_sweep(&contratos).len(), 0);
-    }
-
-    #[test]
-    fn test_different_propiedades_no_overlap() {
-        let prop1 = Uuid::new_v4();
-        let prop2 = Uuid::new_v4();
-        let contratos = vec![
-            make_contrato(prop1, (2024, 1, 1), (2024, 12, 31), "activo"),
-            make_contrato(prop2, (2024, 1, 1), (2024, 12, 31), "activo"),
-        ];
-
-        assert_eq!(detectar_solapamientos_pairwise(&contratos).len(), 0);
-        assert_eq!(detectar_solapamientos_grouped(&contratos).len(), 0);
-        assert_eq!(detectar_solapamientos_sort_scan(&contratos).len(), 0);
-        assert_eq!(detectar_solapamientos_sort_sweep(&contratos).len(), 0);
-    }
-
-    #[test]
-    fn test_multiple_overlaps() {
-        let prop = Uuid::new_v4();
-        let contratos = vec![
             make_contrato(prop, (2024, 1, 1), (2024, 12, 31), "activo"),
-            make_contrato(prop, (2024, 3, 1), (2024, 9, 30), "activo"),
-            make_contrato(prop, (2024, 6, 1), (2024, 8, 31), "activo"),
+            make_contrato(prop, (2024, 1, 1), (2024, 12, 31), "activo"),
         ];
 
-        // All 3 overlap with each other: (0,1), (0,2), (1,2) = 3 pairs
+        // 3 contracts all overlapping = 3 pairs
         assert_eq!(detectar_solapamientos_pairwise(&contratos).len(), 3);
-        assert_eq!(detectar_solapamientos_grouped(&contratos).len(), 3);
-        assert_eq!(detectar_solapamientos_sort_scan(&contratos).len(), 3);
         assert_eq!(detectar_solapamientos_sort_sweep(&contratos).len(), 3);
+        assert_eq!(detectar_solapamientos_grouped(&contratos).len(), 3);
     }
 }

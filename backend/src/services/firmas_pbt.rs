@@ -554,6 +554,7 @@ fn sealed_document_immutability() {
                     updated_at: Set(Some(now)),
                     sellado: Set(true),
                     sellado_at: Set(Some(now)),
+                    documento_origen_id: Set(None),
                 };
                 doc.insert(&db)
                     .await

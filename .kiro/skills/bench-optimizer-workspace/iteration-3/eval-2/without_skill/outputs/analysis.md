@@ -1,55 +1,50 @@
 # Overlap Detection Performance Analysis
 
-## Summary
+## Question
 
-**Recommendation: Keep the O(n²) approach.** The optimization is not worth the added complexity for this use case.
+The current `detectar_solapamientos` is O(n²) pairwise comparison. With n=5-15 normally and n=200 during bulk import, should we optimize?
 
-## Reasoning
+## Answer: No, keep the O(n²) approach.
 
-### Dataset Size Analysis
+### Reasoning
 
-| Scenario | n | Comparisons (n²/2) | Estimated Time |
-|----------|---|---------------------|----------------|
-| Normal use | 5-15 | 10-105 | < 1 µs |
-| Bulk import (worst case) | 200 | 19,900 | ~10-50 µs |
+**The numbers don't justify optimization:**
 
-Even at n=200, ~20,000 comparisons of simple date/string checks complete in microseconds on modern hardware. This is well below any threshold where a user or system would notice.
+| n | Comparisons (n²/2) | Estimated time |
+|---|---|---|
+| 15 | 105 | ~1 µs |
+| 200 | 19,900 | ~20-50 µs |
 
-### Why Sorting Doesn't Help Here
+At n=200, you're doing ~20,000 comparisons. Each comparison is a few field checks (two UUID equality checks, two string comparisons, two date comparisons). On modern hardware this completes in tens of microseconds — well below any threshold where a user or system would notice.
 
-The suggested optimization (sort by `fecha_inicio`, scan adjacent pairs) has a critical flaw: **it only detects overlaps between adjacent intervals**. Non-adjacent intervals can still overlap. For example:
+**The "optimized" alternative isn't actually better here:**
 
-```
-Contract A: Jan 1 - Dec 31
-Contract B: Feb 1 - Mar 31
-Contract C: Jun 1 - Jul 31
-```
+A sort-then-scan approach (O(n log n)) would:
+1. Require filtering to only `activo` contracts first
+2. Require grouping by `propiedad_id` first
+3. Sort each group by `fecha_inicio`
+4. Scan adjacent pairs
 
-After sorting by `fecha_inicio`: A, B, C. Adjacent-pair scanning finds A↔B and B↔C, but **misses A↔C**.
+But adjacent-pair scanning **only works for non-overlapping detection in sorted intervals when each interval can overlap at most one neighbor**. For general interval overlap detection (where one contract could overlap multiple others), you still need a sweep-line algorithm, which adds complexity.
 
-To correctly detect all overlaps with a sort-based approach, you'd need a sweep-line algorithm:
-1. Sort by `fecha_inicio` — O(n log n)
-2. Maintain an active set, removing contracts whose `fecha_fin` has passed — O(n log n) with a heap
+**The current code is correct and handles the general case** — it finds ALL overlapping pairs, not just adjacent ones. A sort-based approach that only checks adjacent pairs would **miss overlaps** when contract A overlaps contracts C and D but not B (where B sits between A and C in sorted order).
 
-This is O(n log n) but adds significant implementation complexity (active set management, heap operations) for a gain that's invisible at n=200.
+**Complexity cost of "optimizing":**
+- More code to maintain
+- Subtle correctness bugs (missing non-adjacent overlaps)
+- Negligible performance gain (microseconds saved)
+- Violates YAGNI — the current code works fine at n=200
 
-### Additional Considerations
+### When would optimization matter?
 
-1. **The filter on `propiedad_id`**: In practice, contracts are already scoped to a single propiedad (the function comment says "for a given propiedad"). If the caller pre-filters, n is even smaller.
+If n regularly exceeded ~10,000, an interval-tree or sweep-line approach would be warranted. At n=200, the O(n²) approach is the right choice: simple, correct, and fast enough.
 
-2. **The filter on `estado == "activo"`**: Most contracts in a bulk import won't all be active simultaneously. The effective comparison count is lower than the theoretical n².
+### Recommendation
 
-3. **Correctness risk**: The current implementation is trivially correct. A sweep-line algorithm is harder to verify and maintain.
+Keep the current implementation as-is. The O(n²) pairwise comparison is:
+- **Correct**: finds all overlapping pairs, not just adjacent
+- **Fast enough**: ~20K comparisons at n=200 is trivial
+- **Simple**: easy to read, easy to verify, no subtle bugs
+- **Maintainable**: any developer can understand it immediately
 
-4. **Where time actually goes during bulk import**: Database I/O, transaction management, and validation queries dominate. The in-memory overlap check is noise.
-
-## When to Reconsider
-
-Optimize if:
-- n regularly exceeds 10,000+ (not the case here)
-- Profiling shows this function as a hotspot (unlikely given the I/O-bound context)
-- The function is called in a tight loop without pre-filtering by propiedad_id
-
-## Conclusion
-
-At n=200, the O(n²) approach completes in microseconds. The code is simple, correct, and easy to maintain. The sort-based alternative adds complexity for no measurable user-facing benefit. Keep it as-is.
+If bulk import performance becomes a concern, the bottleneck will be database I/O, not this in-memory comparison.

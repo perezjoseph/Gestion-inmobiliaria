@@ -882,6 +882,42 @@ pub async fn record_extraction<C: ConnectionTrait>(
     Ok(record)
 }
 
+// --- Post-Loop Extraction Persistence ---
+
+/// Persists a receipt extraction from the AI agent's multi-turn loop into the
+/// `chatbot_receipt_extraction` table, delegating to `confirmar_preview` for
+/// domain entity creation once the extraction is confirmed.
+///
+/// Called when `invoke_agent` returns `Final` and the history contains a
+/// successful `ExtractReceiptTool` result. This stores the extraction with
+/// `pending_confirmation` status so the landlord can review and confirm it.
+///
+/// Requirement 8.3: When `ExtractReceiptTool` returns a successful extraction,
+/// the WhatsApp AI service SHALL invoke `Record_Extraction` to persist the result.
+pub async fn record_extraction_from_agent<C: ConnectionTrait>(
+    db: &C,
+    receipt: &crate::services::ai_module::PaymentReceipt,
+    organizacion_id: Uuid,
+    usuario_id: Option<Uuid>,
+) -> Result<chatbot_receipt_extraction::Model, AppError> {
+    let extracted_data = serde_json::to_value(receipt)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error serializando recibo: {e}")))?;
+
+    // Create a conversation-level record to track the extraction
+    let conversation_id = Uuid::new_v4();
+
+    record_extraction(
+        db,
+        organizacion_id,
+        conversation_id,
+        usuario_id,
+        None, // contrato_id resolved during confirmation
+        extracted_data,
+        &receipt.confidence,
+    )
+    .await
+}
+
 // --- Receipt Confirmation Workflow ---
 
 /// Lists all receipt extractions with status `pending_confirmation` for an organization,

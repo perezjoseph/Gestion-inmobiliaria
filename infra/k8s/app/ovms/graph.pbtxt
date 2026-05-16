@@ -15,12 +15,15 @@ node: {
   }
   node_options: {
     [type.googleapis.com/mediapipe.LLMCalculatorOptions]: {
-      models_path: "/models/Qwen3-30B-A3B"
+      models_path: "/models/Qwen3.6-35B-A3B"
       device: "GPU"
       enable_prefix_caching: true
-      max_num_batched_tokens: 4096
-      cache_size: 8
-      plugin_config: "{}"
+      max_num_batched_tokens: 8192
+      cache_size: 0
+      dynamic_split_fuse: false
+      plugin_config: '{"KV_CACHE_PRECISION": "u8", "DYNAMIC_QUANTIZATION_GROUP_SIZE": "32"}'
+      tool_parser: "qwen3coder"
+      reasoning_parser: "qwen3"
     }
   }
   input_stream_handler {

@@ -1,14 +1,68 @@
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::skeleton::ReportSkeleton;
 use crate::services::api::{api_download, api_get};
 use crate::types::reporte::IngresoReportSummary;
 
+#[derive(Clone, Copy, PartialEq)]
+enum ReportTab {
+    Ingresos,
+    Rentabilidad,
+}
+
 #[component]
 pub fn Reportes() -> Html {
+    let active_tab = use_state(|| ReportTab::Ingresos);
+
+    let on_tab_ingresos = {
+        let active_tab = active_tab.clone();
+        Callback::from(move |_: MouseEvent| active_tab.set(ReportTab::Ingresos))
+    };
+
+    let on_tab_rentabilidad = {
+        let active_tab = active_tab.clone();
+        Callback::from(move |_: MouseEvent| active_tab.set(ReportTab::Rentabilidad))
+    };
+
+    html! {
+        <div>
+            <div class="gi-page-header">
+                <h1 class="gi-page-title">{"Reportes"}</h1>
+            </div>
+
+            <div class="gi-tab-bar" style="display: flex; gap: var(--space-1); margin-bottom: var(--space-4); border-bottom: 1px solid var(--border-primary);">
+                <button
+                    class={classes!("gi-tab-btn", (*active_tab == ReportTab::Ingresos).then_some("gi-tab-btn-active"))}
+                    onclick={on_tab_ingresos}
+                    style="padding: var(--space-2) var(--space-4); border: none; background: none; cursor: pointer; font-weight: 500; border-bottom: 2px solid transparent;"
+                >
+                    {"Ingresos"}
+                </button>
+                <button
+                    class={classes!("gi-tab-btn", (*active_tab == ReportTab::Rentabilidad).then_some("gi-tab-btn-active"))}
+                    onclick={on_tab_rentabilidad}
+                    style="padding: var(--space-2) var(--space-4); border: none; background: none; cursor: pointer; font-weight: 500; border-bottom: 2px solid transparent;"
+                >
+                    {"Rentabilidad"}
+                </button>
+            </div>
+
+            {match *active_tab {
+                ReportTab::Ingresos => html! { <IngresosTab /> },
+                ReportTab::Rentabilidad => html! { <RentabilidadTab /> },
+            }}
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Ingresos Tab (existing functionality)
+// ---------------------------------------------------------------------------
+
+#[component]
+fn IngresosTab() -> Html {
     let mes = use_state(|| {
         let d = js_sys::Date::new_0();
         d.get_month() + 1
@@ -105,144 +159,66 @@ pub fn Reportes() -> Html {
 
     html! {
         <div>
-            <div class="gi-page-header">
-                <h1 class="gi-page-title">{"Reportes de Ingresos"}</h1>
-            </div>
-
             if let Some(err) = (*error).as_ref() {
                 <ErrorBanner message={err.clone()} onclose={Callback::from({
                     let error = error.clone(); move |_: MouseEvent| error.set(None)
                 })} />
             }
 
-            <div class="gi-filter-bar">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); align-items: end;">
-                    <div>
-                        <label class="gi-label">{"Mes"}</label>
-                        <select onchange={on_mes_change} class="gi-input">
-                            { for (1..=12u32).map(|m| {
-                                let label = mes_label(m);
-                                html! { <option value={m.to_string()} selected={m == *mes}>{label}</option> }
-                            })}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="gi-label">{"Año"}</label>
-                        <input type="number" value={anio.to_string()} oninput={on_anio_change}
-                            class="gi-input" min="2020" max="2099" />
-                    </div>
-                    <div style="display: flex; gap: var(--space-2);">
-                        <button onclick={on_generate} class="gi-btn gi-btn-primary" disabled={*loading}>
-                            { if *loading { "Generando..." } else { "Generar Reporte" } }
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <IngresosFilterBar
+                mes={*mes}
+                anio={*anio}
+                loading={*loading}
+                on_mes_change={on_mes_change}
+                on_anio_change={on_anio_change}
+                on_generate={on_generate}
+            />
 
             if *loading {
                 <ReportSkeleton />
             }
 
             if let Some(ref r) = *report {
-                <div class="gi-card" style="padding: var(--space-5); margin-top: var(--space-4);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
-                        <h2 style="font-size: var(--text-base); font-weight: 600; color: var(--text-primary);">
-                            {"Resultado del Reporte"}
-                        </h2>
-                        <div style="display: flex; gap: var(--space-2);">
-                            <button onclick={on_export_pdf} class="gi-btn gi-btn-sm gi-btn-secondary">{"📄 Exportar PDF"}</button>
-                            <button onclick={on_export_xlsx} class="gi-btn gi-btn-sm gi-btn-secondary">{"📊 Exportar Excel"}</button>
-                        </div>
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4);">
-                        <div class="gi-inline-stat">
-                            <div style="font-size: var(--text-xs); color: var(--text-secondary);">{"Total Pagado"}</div>
-                            <div style="font-size: var(--text-lg); font-weight: 700; color: var(--color-success);">
-                                <CurrencyDisplay monto={r.total_pagado} moneda={"DOP".to_string()} />
-                            </div>
-                        </div>
-                        <div class="gi-inline-stat">
-                            <div style="font-size: var(--text-xs); color: var(--text-secondary);">{"Total Pendiente"}</div>
-                            <div style="font-size: var(--text-lg); font-weight: 700; color: var(--color-warning);">
-                                <CurrencyDisplay monto={r.total_pendiente} moneda={"DOP".to_string()} />
-                            </div>
-                        </div>
-                        <div class="gi-inline-stat">
-                            <div style="font-size: var(--text-xs); color: var(--text-secondary);">{"Total Atrasado"}</div>
-                            <div style="font-size: var(--text-lg); font-weight: 700; color: var(--color-error);">
-                                <CurrencyDisplay monto={r.total_atrasado} moneda={"DOP".to_string()} />
-                            </div>
-                        </div>
-                        <div class="gi-inline-stat">
-                            <div style="font-size: var(--text-xs); color: var(--text-secondary);">{"Tasa Ocupación"}</div>
-                            <div style="font-size: var(--text-lg); font-weight: 700; color: var(--text-primary);">
-                                {format!("{:.1}%", r.tasa_ocupacion)}
-                            </div>
-                        </div>
-                    </div>
-
-                    if r.rows.is_empty() {
-                        <p style="text-align: center; color: var(--text-tertiary); padding: var(--space-4);">
-                            {"Sin registros para el período seleccionado."}
-                        </p>
-                    } else {
-                        <div style="overflow-x: auto;">
-                            <table class="gi-table" style="width: 100%;">
-                                <thead>
-                                    <tr>
-                                        <th style="padding: var(--space-3) var(--space-4);">{"Propiedad"}</th>
-                                        <th style="padding: var(--space-3) var(--space-4);">{"Inquilino"}</th>
-                                        <th style="padding: var(--space-3) var(--space-4);">{"Monto"}</th>
-                                        <th style="padding: var(--space-3) var(--space-4);">{"Estado"}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    { for r.rows.iter().map(|row| html! {
-                                        <tr>
-                                            <td style="padding: var(--space-3) var(--space-4); font-size: var(--text-sm);">{&row.propiedad_titulo}</td>
-                                            <td style="padding: var(--space-3) var(--space-4); font-size: var(--text-sm);">{&row.inquilino_nombre}</td>
-                                            <td class="tabular-nums" style="padding: var(--space-3) var(--space-4); font-size: var(--text-sm);"><CurrencyDisplay monto={row.monto} moneda={row.moneda.clone()} /></td>
-                                            <td style="padding: var(--space-3) var(--space-4); font-size: var(--text-sm);">{estado_label(&row.estado)}</td>
-                                        </tr>
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    }
-
-                    <div style="margin-top: var(--space-3); font-size: var(--text-xs); color: var(--text-tertiary);">
-                        {format!("Generado: {} — Por: {}", r.generated_at, r.generated_by)}
-                    </div>
-                </div>
+                <IngresosResult report={r.clone()} on_export_pdf={on_export_pdf} on_export_xlsx={on_export_xlsx} />
             }
         </div>
     }
 }
 
-const fn mes_label(m: u32) -> &'static str {
-    match m {
-        1 => "Enero",
-        2 => "Febrero",
-        3 => "Marzo",
-        4 => "Abril",
-        5 => "Mayo",
-        6 => "Junio",
-        7 => "Julio",
-        8 => "Agosto",
-        9 => "Septiembre",
-        10 => "Octubre",
-        11 => "Noviembre",
-        12 => "Diciembre",
-        _ => "—",
-    }
+// ---------------------------------------------------------------------------
+// Stub components — to be implemented by task 11.5
+// ---------------------------------------------------------------------------
+
+#[derive(Properties, PartialEq)]
+struct IngresosFilterBarProps {
+    mes: u32,
+    anio: i32,
+    loading: bool,
+    on_mes_change: Callback<Event>,
+    on_anio_change: Callback<InputEvent>,
+    on_generate: Callback<MouseEvent>,
 }
 
-fn estado_label(estado: &str) -> &str {
-    match estado {
-        "pagado" => "Pagado",
-        "pendiente" => "Pendiente",
-        "atrasado" => "Atrasado",
-        _ => estado,
-    }
+#[component]
+fn IngresosFilterBar(props: &IngresosFilterBarProps) -> Html {
+    let _ = props;
+    html! { <div class="gi-filter-bar">{"TODO: Ingresos filter"}</div> }
+}
+
+#[derive(Properties, PartialEq, Clone)]
+struct IngresosResultProps {
+    report: IngresoReportSummary,
+    on_export_pdf: Callback<MouseEvent>,
+    on_export_xlsx: Callback<MouseEvent>,
+}
+
+#[component]
+fn IngresosResult(props: &IngresosResultProps) -> Html {
+    let _ = props;
+    html! { <div>{"TODO: Ingresos result"}</div> }
+}
+
+#[component]
+fn RentabilidadTab() -> Html {
+    html! { <div>{"TODO: Rentabilidad"}</div> }
 }

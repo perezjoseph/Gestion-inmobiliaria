@@ -2,6 +2,8 @@ use gloo_events::EventListener;
 use wasm_bindgen::JsCast;
 use yew::prelude::*;
 
+use crate::components::common::offline_guard::OfflineGuard;
+
 #[derive(Properties, PartialEq)]
 pub struct DeleteConfirmModalProps {
     pub message: String,
@@ -70,7 +72,9 @@ pub fn DeleteConfirmModal(props: &DeleteConfirmModalProps) -> Html {
                     {&props.message}</p>
                 <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
                     <button ref={cancel_ref} onclick={props.on_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                    <button onclick={props.on_confirm.clone()} class="gi-btn gi-btn-danger">{props.confirm_label.as_deref().unwrap_or("Eliminar")}</button>
+                    <OfflineGuard>
+                        <button onclick={props.on_confirm.clone()} class="gi-btn gi-btn-danger">{props.confirm_label.as_deref().unwrap_or("Eliminar")}</button>
+                    </OfflineGuard>
                 </div>
             </div>
         </div>

@@ -73,30 +73,38 @@ pub async fn incoming_webhook(
         return Ok(HttpResponse::Ok().json(serde_json::json!({"status": "discarded"})));
     }
 
+    // Self-message bypass: skip sender policy for messages from the bot's own number
+    let is_self_message = payload.session_phone.as_deref() == Some(&payload.sender_phone);
+    if is_self_message {
+        tracing::debug!("Self-message detected, bypassing sender policy");
+    }
+
     // Step 3: Apply sender policy (Requirement 2.4)
-    let allowlist: Option<Vec<String>> = cfg
-        .allowlist
-        .as_ref()
-        .and_then(|v| serde_json::from_value(v.clone()).ok());
-    let allowlist_slice = allowlist.as_deref();
+    if !is_self_message {
+        let allowlist: Option<Vec<String>> = cfg
+            .allowlist
+            .as_ref()
+            .and_then(|v| serde_json::from_value(v.clone()).ok());
+        let allowlist_slice = allowlist.as_deref();
 
-    let is_allowed = chatbot::is_sender_allowed(
-        &cfg.sender_policy,
-        &payload.sender_phone,
-        allowlist_slice,
-        org_id,
-        db.get_ref(),
-    )
-    .await;
+        let is_allowed = chatbot::is_sender_allowed(
+            &cfg.sender_policy,
+            &payload.sender_phone,
+            allowlist_slice,
+            org_id,
+            db.get_ref(),
+        )
+        .await;
 
-    if !is_allowed {
-        tracing::info!(
-            organizacion_id = %org_id,
-            sender_phone_hash = %hash_phone(&payload.sender_phone),
-            "Sender no autorizado por política '{}', descartando mensaje",
-            cfg.sender_policy
-        );
-        return Ok(HttpResponse::Ok().json(serde_json::json!({"status": "discarded"})));
+        if !is_allowed {
+            tracing::info!(
+                organizacion_id = %org_id,
+                sender_phone_hash = %hash_phone(&payload.sender_phone),
+                "Sender no autorizado por política '{}', descartando mensaje",
+                cfg.sender_policy
+            );
+            return Ok(HttpResponse::Ok().json(serde_json::json!({"status": "discarded"})));
+        }
     }
 
     // Step 4: Resolve tenant by phone + org_id
@@ -236,6 +244,30 @@ pub async fn incoming_webhook(
                 None,
             )
             .await?;
+
+            // Post-loop: if extract_receipt was invoked successfully, persist the extraction
+            // (Requirement 8.3)
+            if response
+                .tools_invoked
+                .contains(&"extract_receipt".to_string())
+            {
+                if let Some(ref receipt) = response.extracted_receipt {
+                    if let Err(e) = chatbot::record_extraction_from_agent(
+                        db.get_ref(),
+                        receipt,
+                        org_id,
+                        inquilino_id,
+                    )
+                    .await
+                    {
+                        tracing::error!(
+                            organizacion_id = %org_id,
+                            error = %e,
+                            "Error persistiendo extracción de recibo del agente"
+                        );
+                    }
+                }
+            }
 
             response.reply
         }

@@ -76,17 +76,43 @@ def convert_to_onnx() -> None:
         print(f"  -> {output_onnx} ({output_onnx.stat().st_size} bytes)")
 
 
+def convert_to_ir() -> None:
+    """Convert ONNX models to OpenVINO IR (.xml + .bin) for optimized inference."""
+    import openvino as ov
+
+    models = discover_models()
+    if not models:
+        raise RuntimeError(f"No models found in {MODEL_DIR}")
+
+    for model_path in models:
+        onnx_file = model_path / "inference.onnx"
+        ir_xml = model_path / "inference.xml"
+
+        if not onnx_file.exists():
+            continue
+
+        if ir_xml.exists():
+            print(f"IR already exists for {model_path.name}, skipping.")
+            continue
+
+        print(f"Converting {model_path.name} ONNX -> OpenVINO IR...")
+        model = ov.Core().read_model(str(onnx_file))
+        ov.save_model(model, str(ir_xml))
+        print(f"  -> {ir_xml} ({ir_xml.stat().st_size} bytes)")
+
+
 def main() -> None:
     download_models()
     convert_to_onnx()
+    convert_to_ir()
 
     converted = [
         d.name for d in MODEL_DIR.iterdir()
-        if d.is_dir() and (d / "inference.onnx").exists()
+        if d.is_dir() and (d / "inference.xml").exists()
     ]
-    print(f"Converted models: {converted}")
+    print(f"Converted models (IR): {converted}")
     if not converted:
-        raise RuntimeError("No models were converted to ONNX")
+        raise RuntimeError("No models were converted to OpenVINO IR")
 
     print("All models converted successfully.")
 

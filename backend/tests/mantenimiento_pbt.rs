@@ -149,7 +149,7 @@ mod pbt_async {
                 baileys_service_url: "http://baileys:3100".to_string(),
                 baileys_internal_token: "a]3kF9#mP7vL2nQ8wR5xT0yU4zA1bC6dE".to_string(),
                 ovms_endpoint: "http://ovms:8000/v1".to_string(),
-                ovms_chat_model: "qwen3.6".to_string(),
+                ovms_chat_model: "Qwen3.6-35B-A3B".to_string(),
                 ai_chat_timeout_secs: 30,
             },
             database_url: String::new(),
@@ -880,6 +880,151 @@ mod pbt_async {
             assert_eq!(resp.status(), 404);
         });
     }
+
+    /// Feature: spec-gap-remediation, Property 6: Maintenance filter respects unidad_id and tenant scope
+    /// For any (org, unidad_id) query: every returned row satisfies
+    /// row.organizacion_id == caller_org AND (unidad_id.is_none() OR row.unidad_id == unidad_id).
+    /// A unidad_id from another org returns empty results (no existence leak).
+    pub fn p_sgr6(use_cross_org_unidad: bool) {
+        with_db(|db| async move {
+            let config = make_config();
+
+            // Create two organizations
+            let org_a = create_test_organizacion(&db).await;
+            let org_b = create_test_organizacion(&db).await;
+
+            let admin_a = create_test_usuario(&db, "admin", org_a).await;
+            let admin_b = create_test_usuario(&db, "admin", org_b).await;
+
+            // Create propiedades and unidades for both orgs
+            let prop_a = create_test_propiedad(&db, org_a).await;
+            let unidad_a = create_test_unidad(&db, prop_a).await;
+
+            let prop_b = create_test_propiedad(&db, org_b).await;
+            let unidad_b = create_test_unidad(&db, prop_b).await;
+
+            // Token for org_a user
+            let claims_a = Claims {
+                sub: admin_a,
+                email: format!("admin+{admin_a}@test.com"),
+                rol: "admin".to_string(),
+                organizacion_id: org_a,
+                exp: (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
+            };
+            let token_a = encode_jwt(&claims_a, JWT_SECRET).unwrap();
+
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
+
+            // Create solicitudes: one for unidad_a (org_a), one for unidad_b (org_b)
+            let req = test::TestRequest::post()
+                .uri("/api/v1/mantenimiento")
+                .insert_header(("Authorization", format!("Bearer {token_a}")))
+                .set_json(json!({
+                    "propiedadId": prop_a,
+                    "unidadId": unidad_a,
+                    "titulo": "Solicitud en unidad A"
+                }))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 201);
+            let body_a: Value = test::read_body_json(resp).await;
+            let sol_a_id: Uuid = body_a["id"].as_str().unwrap().parse().unwrap();
+
+            // Create solicitud for org_b
+            let claims_b = Claims {
+                sub: admin_b,
+                email: format!("admin+{admin_b}@test.com"),
+                rol: "admin".to_string(),
+                organizacion_id: org_b,
+                exp: (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
+            };
+            let token_b = encode_jwt(&claims_b, JWT_SECRET).unwrap();
+
+            let req = test::TestRequest::post()
+                .uri("/api/v1/mantenimiento")
+                .insert_header(("Authorization", format!("Bearer {token_b}")))
+                .set_json(json!({
+                    "propiedadId": prop_b,
+                    "unidadId": unidad_b,
+                    "titulo": "Solicitud en unidad B"
+                }))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 201);
+            let body_b: Value = test::read_body_json(resp).await;
+            let sol_b_id: Uuid = body_b["id"].as_str().unwrap().parse().unwrap();
+
+            if use_cross_org_unidad {
+                // Query org_a's list with unidad_b (belongs to org_b) → must return empty
+                let req = test::TestRequest::get()
+                    .uri(&format!("/api/v1/mantenimiento?unidadId={unidad_b}"))
+                    .insert_header(("Authorization", format!("Bearer {token_a}")))
+                    .to_request();
+                let resp = test::call_service(&app, req).await;
+                assert_eq!(resp.status(), 200);
+                let body: Value = test::read_body_json(resp).await;
+                let data = body["data"].as_array().unwrap();
+                assert!(
+                    data.is_empty(),
+                    "unidad_id from another org must return empty list, got {} items",
+                    data.len()
+                );
+            } else {
+                // Query org_a's list with unidad_a → must return only matching rows
+                let req = test::TestRequest::get()
+                    .uri(&format!("/api/v1/mantenimiento?unidadId={unidad_a}"))
+                    .insert_header(("Authorization", format!("Bearer {token_a}")))
+                    .to_request();
+                let resp = test::call_service(&app, req).await;
+                assert_eq!(resp.status(), 200);
+                let body: Value = test::read_body_json(resp).await;
+                let data = body["data"].as_array().unwrap();
+
+                // Every returned row must belong to org_a and match unidad_a
+                for item in data {
+                    assert_eq!(
+                        item["unidadId"],
+                        unidad_a.to_string(),
+                        "Every row must match the requested unidad_id"
+                    );
+                }
+                // Must contain our solicitud
+                assert!(
+                    data.iter().any(|item| item["id"] == sol_a_id.to_string()),
+                    "Result must include the solicitud created for unidad_a"
+                );
+            }
+
+            // Also verify: no filter returns only org_a's solicitudes (not org_b's)
+            let req = test::TestRequest::get()
+                .uri("/api/v1/mantenimiento")
+                .insert_header(("Authorization", format!("Bearer {token_a}")))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 200);
+            let body: Value = test::read_body_json(resp).await;
+            let data = body["data"].as_array().unwrap();
+            for item in data {
+                // None of the returned items should be sol_b_id (org_b's solicitud)
+                assert_ne!(
+                    item["id"].as_str().unwrap(),
+                    sol_b_id.to_string(),
+                    "Org A's list must never contain org B's solicitudes"
+                );
+            }
+
+            // Cleanup
+            cleanup_solicitud(&db, sol_a_id).await;
+            cleanup_solicitud(&db, sol_b_id).await;
+        });
+    }
 } // end mod pbt_async
 
 // ── Property test functions ──
@@ -1143,6 +1288,25 @@ fn test_nonexistent_fk_rejected() {
     runner
         .run(&strategy, |(a, b)| {
             pbt_async::p13(a, b);
+            Ok(())
+        })
+        .unwrap();
+}
+
+// Feature: spec-gap-remediation, Property 6: Maintenance filter respects unidad_id and tenant scope
+// **Validates: Requirements 10.2, 10.3, 10.4**
+#[test]
+fn test_unidad_id_filter_respects_tenant_scope() {
+    let mut runner = TestRunner::new(ProptestConfig {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
+
+    // Boolean strategy: true = test cross-org unidad_id (should return empty),
+    // false = test same-org unidad_id (should return matching rows)
+    runner
+        .run(&proptest::bool::ANY, |use_cross_org| {
+            pbt_async::p_sgr6(use_cross_org);
             Ok(())
         })
         .unwrap();

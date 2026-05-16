@@ -26,7 +26,7 @@ mod gastos_rbac_tests {
                 baileys_service_url: "http://baileys:3100".to_string(),
                 baileys_internal_token: "a]3kF9#mP7vL2nQ8wR5xT0yU4zA1bC6dE".to_string(),
                 ovms_endpoint: "http://ovms:8000/v1".to_string(),
-                ovms_chat_model: "qwen3.6".to_string(),
+                ovms_chat_model: "Qwen3.6-35B-A3B".to_string(),
                 ai_chat_timeout_secs: 30,
             },
         }
@@ -347,7 +347,7 @@ mod db_async {
                 baileys_service_url: "http://baileys:3100".to_string(),
                 baileys_internal_token: "a]3kF9#mP7vL2nQ8wR5xT0yU4zA1bC6dE".to_string(),
                 ovms_endpoint: "http://ovms:8000/v1".to_string(),
-                ovms_chat_model: "qwen3.6".to_string(),
+                ovms_chat_model: "Qwen3.6-35B-A3B".to_string(),
                 ai_chat_timeout_secs: 30,
             },
             database_url: String::new(),
@@ -1162,7 +1162,7 @@ mod gastos_utility_db_tests {
                 baileys_service_url: "http://baileys:3100".to_string(),
                 baileys_internal_token: "a]3kF9#mP7vL2nQ8wR5xT0yU4zA1bC6dE".to_string(),
                 ovms_endpoint: "http://ovms:8000/v1".to_string(),
-                ovms_chat_model: "qwen3.6".to_string(),
+                ovms_chat_model: "Qwen3.6-35B-A3B".to_string(),
                 ai_chat_timeout_secs: 30,
             },
             database_url: String::new(),
@@ -1546,4 +1546,383 @@ fn utility_gasto_filter_by_proveedor_servicio() {
 #[test]
 fn utility_gasto_filter_by_periodo_date_range() {
     gastos_utility_db_tests::filter_by_periodo_date_range();
+}
+
+// Feature: spec-gap-remediation, Task 11.11
+// Tests for `categoria` enum validation and utility-fields round-trip
+// **Validates: Requirements 9.4, 9.5**
+
+mod gastos_categoria_and_utility_tests {
+    use actix_web::test;
+    use chrono::Utc;
+    use proptest::prelude::*;
+    use proptest::strategy::ValueTree;
+    use proptest::test_runner::{Config as ProptestConfig, TestRunner};
+    use realestate_backend::app::create_app;
+    use realestate_backend::config::AppConfig;
+    use realestate_backend::services::auth::{Claims, encode_jwt};
+    use realestate_backend::services::gastos::CATEGORIAS_GASTO;
+    use rust_decimal::Decimal;
+    use sea_orm::{ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, Set};
+    use sea_orm_migration::MigratorTrait;
+    use serde_json::{Value, json};
+    use uuid::Uuid;
+
+    const JWT_SECRET: &str = "test_secret_key_that_is_long_enough_for_jwt";
+
+    fn db_url() -> String {
+        dotenvy::dotenv().ok();
+        std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for integration tests")
+    }
+
+    async fn setup_db() -> Result<DatabaseConnection, String> {
+        let mut opts = ConnectOptions::new(db_url());
+        opts.max_connections(5)
+            .min_connections(1)
+            .connect_timeout(std::time::Duration::from_secs(30))
+            .idle_timeout(std::time::Duration::from_secs(60))
+            .acquire_timeout(std::time::Duration::from_secs(30));
+        let db = Database::connect(opts)
+            .await
+            .map_err(|e| format!("Failed to connect to database: {e}"))?;
+        super::migrations::Migrator::up(&db, None)
+            .await
+            .map_err(|e| format!("Failed to run migrations: {e}"))?;
+        Ok(db)
+    }
+
+    fn shared_rt_and_db() -> Option<&'static (tokio::runtime::Runtime, DatabaseConnection)> {
+        static SHARED: std::sync::OnceLock<
+            Result<(tokio::runtime::Runtime, DatabaseConnection), String>,
+        > = std::sync::OnceLock::new();
+        SHARED
+            .get_or_init(|| {
+                let rt =
+                    tokio::runtime::Runtime::new().map_err(|e| format!("Runtime error: {e}"))?;
+                let db = rt.block_on(setup_db())?;
+                Ok((rt, db))
+            })
+            .as_ref()
+            .ok()
+    }
+
+    fn with_db<F, Fut>(f: F)
+    where
+        F: FnOnce(DatabaseConnection) -> Fut,
+        Fut: std::future::Future<Output = ()>,
+    {
+        dotenvy::dotenv().ok();
+        if std::env::var("DATABASE_URL").is_err() {
+            eprintln!("DATABASE_URL not set -- skipping DB integration test");
+            return;
+        }
+        let _guard = crate::GLOBAL_DB_SERIAL
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let Some((rt, db)) = shared_rt_and_db() else {
+            eprintln!("Database not reachable -- skipping DB integration test");
+            return;
+        };
+        rt.block_on(f(db.clone()));
+    }
+
+    fn make_config() -> AppConfig {
+        AppConfig {
+            pool: realestate_backend::config::PoolConfig::default(),
+            chatbot: realestate_backend::config::ChatbotEnvConfig {
+                baileys_service_url: "http://baileys:3100".to_string(),
+                baileys_internal_token: "a]3kF9#mP7vL2nQ8wR5xT0yU4zA1bC6dE".to_string(),
+                ovms_endpoint: "http://ovms:8000/v1".to_string(),
+                ovms_chat_model: "Qwen3.6-35B-A3B".to_string(),
+                ai_chat_timeout_secs: 30,
+            },
+            database_url: String::new(),
+            jwt_secret: JWT_SECRET.to_string(),
+            server_port: 0,
+            cors_origin: None,
+        }
+    }
+
+    fn make_token(user_id: Uuid, rol: &str, org_id: Uuid) -> String {
+        let claims = Claims {
+            sub: user_id,
+            email: format!("{rol}@test.com"),
+            rol: rol.to_string(),
+            organizacion_id: org_id,
+            exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
+        };
+        encode_jwt(&claims, JWT_SECRET).unwrap()
+    }
+
+    async fn create_test_organizacion(db: &DatabaseConnection) -> Uuid {
+        use realestate_backend::entities::organizacion;
+        let id = Uuid::new_v4();
+        let now = Utc::now().into();
+        organizacion::ActiveModel {
+            id: Set(id),
+            tipo: Set("persona_fisica".to_string()),
+            nombre: Set(format!("Org Test {id}")),
+            estado: Set("activo".to_string()),
+            cedula: Set(None),
+            telefono: Set(None),
+            email_organizacion: Set(None),
+            rnc: Set(None),
+            razon_social: Set(None),
+            nombre_comercial: Set(None),
+            direccion_fiscal: Set(None),
+            representante_legal: Set(None),
+            dgii_data: Set(None),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .expect("Failed to create test organizacion");
+        id
+    }
+
+    async fn create_test_usuario(db: &DatabaseConnection, rol: &str, org_id: Uuid) -> Uuid {
+        use realestate_backend::entities::usuario;
+        let id = Uuid::new_v4();
+        let now = Utc::now().into();
+        usuario::ActiveModel {
+            id: Set(id),
+            nombre: Set(format!("Test {rol}")),
+            email: Set(format!("{rol}+{id}@test.com")),
+            password_hash: Set("not_used".to_string()),
+            rol: Set(rol.to_string()),
+            activo: Set(true),
+            organizacion_id: Set(org_id),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .expect("Failed to create test usuario");
+        id
+    }
+
+    async fn create_test_propiedad(db: &DatabaseConnection, org_id: Uuid) -> Uuid {
+        use realestate_backend::entities::propiedad;
+        let id = Uuid::new_v4();
+        let now = Utc::now().into();
+        propiedad::ActiveModel {
+            id: Set(id),
+            titulo: Set("Propiedad Test Categoria".to_string()),
+            descripcion: Set(None),
+            direccion: Set("Calle Test 456".to_string()),
+            ciudad: Set("Santo Domingo".to_string()),
+            provincia: Set("Distrito Nacional".to_string()),
+            tipo_propiedad: Set("apartamento".to_string()),
+            habitaciones: Set(Some(2)),
+            banos: Set(Some(1)),
+            area_m2: Set(Some(Decimal::new(8000, 2))),
+            precio: Set(Decimal::new(2500000, 2)),
+            moneda: Set("DOP".to_string()),
+            estado: Set("disponible".to_string()),
+            imagenes: Set(None),
+            organizacion_id: Set(org_id),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .expect("Failed to create test propiedad");
+        id
+    }
+
+    async fn cleanup_gasto(db: &DatabaseConnection, id: Uuid) {
+        use realestate_backend::entities::gasto;
+        use sea_orm::EntityTrait;
+        let _ = gasto::Entity::delete_by_id(id).exec(db).await;
+    }
+
+    /// Property-style negative test: random non-enum strings for `categoria`
+    /// must be rejected with HTTP 422 and a Spanish error message.
+    /// **Validates: Requirements 9.4**
+    pub fn invalid_categoria_rejected_with_422() {
+        with_db(|db| async move {
+            let config = make_config();
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
+            let token = make_token(admin_id, "admin", org_id);
+            let propiedad_id = create_test_propiedad(&db, org_id).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
+
+            let valid_set: Vec<&str> = CATEGORIAS_GASTO.to_vec();
+            let cases = crate::pbt_cases();
+
+            // Generate random invalid categoria strings using proptest's TestRunner
+            let invalid_categoria_strategy = "[a-zA-Z0-9_]{1,30}"
+                .prop_filter("must not be a valid categoria", move |s| {
+                    !valid_set.contains(&s.as_str())
+                });
+
+            let mut runner = TestRunner::new(ProptestConfig {
+                cases,
+                ..Default::default()
+            });
+
+            // Collect generated values using new_tree
+            let mut invalid_categorias = Vec::with_capacity(cases as usize);
+            for _ in 0..cases {
+                let tree = invalid_categoria_strategy
+                    .new_tree(&mut runner)
+                    .expect("Failed to generate test value");
+                invalid_categorias.push(tree.current());
+            }
+
+            for invalid_cat in &invalid_categorias {
+                let req = test::TestRequest::post()
+                    .uri("/api/v1/gastos")
+                    .insert_header(("Authorization", format!("Bearer {token}")))
+                    .set_json(json!({
+                        "propiedadId": propiedad_id,
+                        "categoria": invalid_cat,
+                        "descripcion": "Test invalid categoria",
+                        "monto": "1000",
+                        "moneda": "DOP",
+                        "fechaGasto": "2025-04-01"
+                    }))
+                    .to_request();
+                let resp = test::call_service(&app, req).await;
+                assert_eq!(
+                    resp.status().as_u16(),
+                    422,
+                    "Expected 422 for invalid categoria '{invalid_cat}', got {}",
+                    resp.status()
+                );
+                let body: Value = test::read_body_json(resp).await;
+                let message = body["message"].as_str().unwrap_or("");
+                assert!(
+                    message.contains("Categoría de gasto no válida"),
+                    "Expected Spanish error message for '{invalid_cat}', got: {message}"
+                );
+            }
+        });
+    }
+
+    /// Round-trip test: create a gasto with utility fields (`proveedor`,
+    /// `numero_cuenta`, `periodo_inicio`, `periodo_fin`) and verify they
+    /// are persisted and returned correctly on read.
+    /// **Validates: Requirements 9.5**
+    pub fn utility_fields_round_trip() {
+        with_db(|db| async move {
+            let config = make_config();
+            let org_id = create_test_organizacion(&db).await;
+            let admin_id = create_test_usuario(&db, "admin", org_id).await;
+            let token = make_token(admin_id, "admin", org_id);
+            let propiedad_id = create_test_propiedad(&db, org_id).await;
+            let app = test::init_service(create_app(
+                db.clone(),
+                config,
+                actix_web::web::Data::new(
+                    realestate_backend::services::ocr_preview::PreviewStore::new(),
+                ),
+            ))
+            .await;
+
+            // Create a gasto with all utility fields populated
+            let req = test::TestRequest::post()
+                .uri("/api/v1/gastos")
+                .insert_header(("Authorization", format!("Bearer {token}")))
+                .set_json(json!({
+                    "propiedadId": propiedad_id,
+                    "categoria": "administracion",
+                    "descripcion": "Gasto con campos de utilidad",
+                    "monto": "5000.00",
+                    "moneda": "DOP",
+                    "fechaGasto": "2025-06-15",
+                    "proveedor": "Edenorte Dominicana",
+                    "numeroCuenta": "ACCT-2025-001",
+                    "periodoInicio": "2025-05-01",
+                    "periodoFin": "2025-05-31"
+                }))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(
+                resp.status().as_u16(),
+                201,
+                "Expected 201 Created for gasto with utility fields"
+            );
+            let created: Value = test::read_body_json(resp).await;
+            let gasto_id = created["id"].as_str().unwrap().to_string();
+
+            // Verify utility fields in create response
+            assert_eq!(created["proveedor"], "Edenorte Dominicana");
+            assert_eq!(created["numeroCuenta"], "ACCT-2025-001");
+            assert_eq!(created["periodoInicio"], "2025-05-01");
+            assert_eq!(created["periodoFin"], "2025-05-31");
+
+            // Read back and verify round-trip
+            let req = test::TestRequest::get()
+                .uri(&format!("/api/v1/gastos/{gasto_id}"))
+                .insert_header(("Authorization", format!("Bearer {token}")))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status().as_u16(), 200);
+            let detail: Value = test::read_body_json(resp).await;
+
+            assert_eq!(detail["id"], gasto_id);
+            assert_eq!(detail["proveedor"], "Edenorte Dominicana");
+            assert_eq!(detail["numeroCuenta"], "ACCT-2025-001");
+            assert_eq!(detail["periodoInicio"], "2025-05-01");
+            assert_eq!(detail["periodoFin"], "2025-05-31");
+            assert_eq!(detail["categoria"], "administracion");
+
+            // Also test with null utility fields (they should be optional)
+            let req = test::TestRequest::post()
+                .uri("/api/v1/gastos")
+                .insert_header(("Authorization", format!("Bearer {token}")))
+                .set_json(json!({
+                    "propiedadId": propiedad_id,
+                    "categoria": "impuestos",
+                    "descripcion": "Gasto sin campos de utilidad",
+                    "monto": "3000.00",
+                    "moneda": "DOP",
+                    "fechaGasto": "2025-06-20"
+                }))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status().as_u16(), 201);
+            let created_no_utility: Value = test::read_body_json(resp).await;
+            let gasto_id_2 = created_no_utility["id"].as_str().unwrap().to_string();
+
+            // Verify null utility fields
+            assert!(
+                created_no_utility["numeroCuenta"].is_null(),
+                "numeroCuenta should be null when not provided"
+            );
+            assert!(
+                created_no_utility["periodoInicio"].is_null(),
+                "periodoInicio should be null when not provided"
+            );
+            assert!(
+                created_no_utility["periodoFin"].is_null(),
+                "periodoFin should be null when not provided"
+            );
+
+            // Cleanup
+            cleanup_gasto(&db, gasto_id.parse().unwrap()).await;
+            cleanup_gasto(&db, gasto_id_2.parse().unwrap()).await;
+        });
+    }
+}
+
+// Task 11.11: categoria enum and utility-fields tests
+#[test]
+fn invalid_categoria_rejected_with_422_pbt() {
+    gastos_categoria_and_utility_tests::invalid_categoria_rejected_with_422();
+}
+
+#[test]
+fn utility_fields_round_trip_create_read() {
+    gastos_categoria_and_utility_tests::utility_fields_round_trip();
 }

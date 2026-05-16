@@ -17,5 +17,5 @@ Format: `- **Topic**: correction`
 - **Deployment**: Everything runs on Kubernetes, not Docker Compose. Don't reference docker-compose for deployment or configuration.
 - **Sidebar navigation**: Chatbot WhatsApp belongs under Configuración (Sistema section), not as its own item in Herramientas. It's a configuration sub-page.
 - **Container images**: Use official pre-built container images (e.g. intel/xpumanager from DockerHub) instead of building custom images or extracting RPMs manually. Don't overcomplicate.
-- **OVMS endpoint**: The OVMS endpoint is `/v3`, not `/v1`. The readiness probe path (`/v1/config`) is unrelated to the chat completions API path. Don't change it.
+- **OVMS endpoint**: The OVMS endpoint is `/v1` (confirmed working). `/v3` does NOT work. The readiness probe path (`/v1/config`) uses the same base path. Don't change the endpoint.
 - **WhatsApp self-messaging**: The user wants to message themselves (same number as the bot) for testing. Don't filter out self-messages in the baileys-service.

@@ -701,6 +701,8 @@ pub async fn gastos_comparacion(
         mes_actual,
         mes_anterior,
         porcentaje_cambio,
+        total_pendiente: Decimal::ZERO,
+        gastos_vencidos: 0,
     })
 }
 

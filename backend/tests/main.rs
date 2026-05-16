@@ -41,12 +41,16 @@ pub fn pbt_cases() -> u32 {
         .unwrap_or(100)
 }
 
+mod agent_loop_bug_pbt;
+mod ai_module_pbt;
 mod architecture_tests;
 mod auditoria_tests;
+mod auth_pbt;
 mod auth_tests;
 mod background_jobs_pbt;
 mod background_jobs_tests;
 mod chatbot_pbt;
+mod chatbot_self_message_pbt;
 mod contratos_tests;
 mod deposit_tracking_pbt;
 mod deposit_tracking_tests;
@@ -59,6 +63,7 @@ mod firmas_pbt;
 mod firmas_tests;
 mod gastos_pbt;
 mod gastos_tests;
+mod importacion_pbt;
 mod inquilinos_tests;
 mod ipc_tests;
 mod late_fees_pbt;
@@ -74,7 +79,9 @@ mod pago_generacion_pbt;
 mod pago_generacion_tests;
 mod pagos_tests;
 mod perfil_tests;
+mod preservation_pbt;
 mod propiedades_tests;
+mod recibos_pbt;
 mod recibos_tests;
 mod reportes_tests;
 mod servicios_publicos_tests;

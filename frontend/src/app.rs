@@ -8,10 +8,13 @@ use crate::components::layout::footer::Footer;
 use crate::components::layout::navbar::Navbar;
 use crate::components::layout::sidebar::Sidebar;
 use crate::pages::auditoria::Auditoria;
+use crate::pages::calendario::Calendario;
+use crate::pages::categorias_gastos::CategoriasGastos;
 use crate::pages::configuracion::Configuracion;
 use crate::pages::contratos::Contratos;
 use crate::pages::dashboard::Dashboard;
 use crate::pages::documento_editor::DocumentoEditorPage;
+use crate::pages::documentos_por_vencer::DocumentosPorVencer;
 use crate::pages::firma_publica::FirmaPublica;
 use crate::pages::gastos::Gastos;
 use crate::pages::importar::Importar;
@@ -106,6 +109,8 @@ pub enum Route {
     Pagos,
     #[at("/gastos")]
     Gastos,
+    #[at("/categorias-gastos")]
+    CategoriasGastos,
     #[at("/registro")]
     Registro,
     #[at("/reportes")]
@@ -128,6 +133,10 @@ pub enum Route {
     ConfiguracionChatbot,
     #[at("/plantillas")]
     Plantillas,
+    #[at("/calendario")]
+    Calendario,
+    #[at("/documentos/por-vencer")]
+    DocumentosPorVencer,
     #[at("/documentos/editor/:entity_type/:entity_id")]
     DocumentoEditor {
         entity_type: String,
@@ -158,6 +167,7 @@ fn switch(routes: Route) -> Html {
         Route::Contratos => html! { <ProtectedRoute><Contratos /></ProtectedRoute> },
         Route::Pagos => html! { <ProtectedRoute><Pagos /></ProtectedRoute> },
         Route::Gastos => html! { <ProtectedRoute><Gastos /></ProtectedRoute> },
+        Route::CategoriasGastos => html! { <ProtectedRoute><CategoriasGastos /></ProtectedRoute> },
         Route::Reportes => html! { <ProtectedRoute><Reportes /></ProtectedRoute> },
         Route::UsuariosPage => html! { <ProtectedRoute><Usuarios /></ProtectedRoute> },
         Route::Perfil => html! { <ProtectedRoute><Perfil /></ProtectedRoute> },
@@ -168,6 +178,10 @@ fn switch(routes: Route) -> Html {
         Route::Configuracion => html! { <ProtectedRoute><Configuracion /></ProtectedRoute> },
         Route::ConfiguracionChatbot => html! { <ProtectedRoute><Configuracion /></ProtectedRoute> },
         Route::Plantillas => html! { <ProtectedRoute><Plantillas /></ProtectedRoute> },
+        Route::Calendario => html! { <ProtectedRoute><Calendario /></ProtectedRoute> },
+        Route::DocumentosPorVencer => {
+            html! { <ProtectedRoute><DocumentosPorVencer /></ProtectedRoute> }
+        }
         Route::DocumentoEditor {
             entity_type,
             entity_id,

@@ -305,6 +305,8 @@ pub async fn firmar_con_token(
 
 /// Check if all parties signed and seal if complete.
 async fn verificar_y_sellar(db: &DatabaseConnection, documento_id: Uuid) -> Result<(), AppError> {
+    use crate::entities::contrato;
+
     let firmas = firma_documento::Entity::find()
         .filter(firma_documento::Column::DocumentoId.eq(documento_id))
         .all(db)
@@ -327,18 +329,30 @@ async fn verificar_y_sellar(db: &DatabaseConnection, documento_id: Uuid) -> Resu
         // Only seal if not already sealed
         if !doc.sellado {
             let now = Utc::now();
-            let mut active: documento::ActiveModel = doc.into_active_model();
+            let mut active: documento::ActiveModel = doc.clone().into_active_model();
             active.sellado = Set(true);
             active.sellado_at = Set(Some(now.into()));
             active.update(db).await?;
 
             // Generate sealed PDF (best-effort, log on failure)
-            if let Err(e) = generar_pdf_sellado(db, documento_id).await {
-                tracing::warn!(
-                    documento_id = %documento_id,
-                    error = %e,
-                    "Error generando PDF sellado"
-                );
+            // Resolve the contrato from the document's entity_id
+            if doc.entity_type == "contrato" {
+                let contrato_model = contrato::Entity::find_by_id(doc.entity_id)
+                    .one(db)
+                    .await?
+                    .ok_or_else(|| {
+                        AppError::NotFound(format!("Contrato {} no encontrado", doc.entity_id))
+                    })?;
+                let organizacion_id = contrato_model.organizacion_id;
+
+                if let Err(e) = generar_pdf_sellado(db, &contrato_model, organizacion_id).await {
+                    tracing::warn!(
+                        documento_id = %documento_id,
+                        contrato_id = %doc.entity_id,
+                        error = %e,
+                        "Error generando PDF sellado"
+                    );
+                }
             }
         }
     }
@@ -420,67 +434,6 @@ pub async fn enviar_email_firma(
         );
         e
     })
-}
-
-/// Resolve the `organizacion_id` from a document's parent entity.
-async fn resolver_org_de_entidad(
-    db: &DatabaseConnection,
-    entity_type: &str,
-    entity_id: Uuid,
-) -> Result<Uuid, AppError> {
-    match entity_type {
-        "propiedad" => {
-            use crate::entities::propiedad;
-            let e = propiedad::Entity::find_by_id(entity_id)
-                .one(db)
-                .await?
-                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
-            Ok(e.organizacion_id)
-        }
-        "inquilino" => {
-            use crate::entities::inquilino;
-            let e = inquilino::Entity::find_by_id(entity_id)
-                .one(db)
-                .await?
-                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
-            Ok(e.organizacion_id)
-        }
-        "contrato" => {
-            use crate::entities::contrato;
-            let e = contrato::Entity::find_by_id(entity_id)
-                .one(db)
-                .await?
-                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
-            Ok(e.organizacion_id)
-        }
-        "pago" => {
-            use crate::entities::pago;
-            let e = pago::Entity::find_by_id(entity_id)
-                .one(db)
-                .await?
-                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
-            Ok(e.organizacion_id)
-        }
-        "gasto" => {
-            use crate::entities::gasto;
-            let e = gasto::Entity::find_by_id(entity_id)
-                .one(db)
-                .await?
-                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
-            Ok(e.organizacion_id)
-        }
-        "mantenimiento" => {
-            use crate::entities::solicitud_mantenimiento;
-            let e = solicitud_mantenimiento::Entity::find_by_id(entity_id)
-                .one(db)
-                .await?
-                .ok_or_else(|| AppError::NotFound("Entidad no encontrada".to_string()))?;
-            Ok(e.organizacion_id)
-        }
-        _ => Err(AppError::Validation(
-            "Tipo de entidad no válido".to_string(),
-        )),
-    }
 }
 
 /// Generate a sealed PDF and persist it as a new `Documento` record.

@@ -53,7 +53,7 @@ impl PagoIndex {
     }
 
     pub fn buscar<'a>(
-        &self,
+        &'a self,
         pagos: &'a [Pago],
         contrato_id: Option<Uuid>,
         estado: Option<&str>,

@@ -1,13 +1,14 @@
-[workspace]
-
 [package]
 name = "dashboard-aggregation-bench"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+publish = false
+
+[workspace]
 
 [dependencies]
+chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
-chrono = "0.4"
 rand = "0.8"
 
 [dev-dependencies]
@@ -16,3 +17,7 @@ criterion = { version = "0.5", features = ["html_reports"] }
 [[bench]]
 name = "dashboard_bench"
 harness = false
+
+[lints.clippy]
+unwrap_used = "allow"
+expect_used = "allow"

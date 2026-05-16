@@ -13,10 +13,13 @@ use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::document_gallery::DocumentGallery;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::ocr_scan_button::OcrScanButton;
+use crate::components::common::offline_guard::OfflineGuard;
 use crate::components::common::pagination::Pagination;
 use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
+use crate::hooks::use_online;
 use crate::services::api::{api_delete, api_get, api_post, api_put};
+use crate::services::idb_cache;
 use crate::types::PaginatedResponse;
 use crate::types::gasto::{CreateGasto, Gasto, UpdateGasto};
 use crate::types::ocr::OcrExtractField;
@@ -350,9 +353,11 @@ fn GastoForm(props: &GastoFormProps) -> Html {
                 </div>
                 <div style="grid-column: 1 / -1; display: flex; gap: var(--space-2); justify-content: flex-end;">
                     <button type="button" onclick={props.on_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
-                    <button type="submit" disabled={props.submitting} class="gi-btn gi-btn-primary">
-                        {if props.submitting { "Guardando..." } else { "Guardar" }}
-                    </button>
+                    <OfflineGuard>
+                        <button type="submit" disabled={props.submitting} class="gi-btn gi-btn-primary">
+                            {if props.submitting { "Guardando..." } else { "Guardar" }}
+                        </button>
+                    </OfflineGuard>
                 </div>
             </form>
             if let Some(ref id) = props.editing_id {
@@ -532,15 +537,31 @@ fn load_gastos_data(
     error: UseStateHandle<Option<String>>,
     loading: UseStateHandle<bool>,
     url: String,
+    is_online: bool,
 ) {
     spawn_local(async move {
         loading.set(true);
-        match api_get::<PaginatedResponse<Gasto>>(&url).await {
-            Ok(resp) => {
-                total.set(resp.total);
-                items.set(resp.data);
+        if is_online {
+            match api_get::<PaginatedResponse<Gasto>>(&url).await {
+                Ok(resp) => {
+                    idb_cache::write_list("gastos", "list", &resp.data).await;
+                    total.set(resp.total);
+                    items.set(resp.data);
+                }
+                Err(err) => {
+                    if let Some(cached) = idb_cache::read_list::<Gasto>("gastos", "list").await {
+                        let len = cached.len() as u64;
+                        items.set(cached);
+                        total.set(len);
+                    } else {
+                        error.set(Some(err));
+                    }
+                }
             }
-            Err(err) => error.set(Some(err)),
+        } else if let Some(cached) = idb_cache::read_list::<Gasto>("gastos", "list").await {
+            let len = cached.len() as u64;
+            items.set(cached);
+            total.set(len);
         }
         loading.set(false);
     });
@@ -692,6 +713,7 @@ fn handle_escape_gastos(
 pub fn Gastos() -> Html {
     let auth = use_context::<AuthContext>();
     let toasts = use_context::<ToastContext>();
+    let online = use_online();
     let user_rol = auth
         .as_ref()
         .and_then(|a| a.user.as_ref())
@@ -728,6 +750,8 @@ pub fn Gastos() -> Html {
     let filter_propiedad = use_state(String::new);
     let filter_categoria = use_state(String::new);
     let filter_estado = use_state(String::new);
+    let filter_fecha_desde = use_state(String::new);
+    let filter_fecha_hasta = use_state(String::new);
 
     let confidences = use_state(HashMap::<String, f64>::new);
 
@@ -742,11 +766,12 @@ pub fn Gastos() -> Html {
         let f_propiedad = (*filter_propiedad).clone();
         let f_categoria = (*filter_categoria).clone();
         let f_estado = (*filter_estado).clone();
+        let is_online = online;
         use_effect_with(
             (reload_val, pg, f_propiedad, f_categoria, f_estado),
             move |(_, _, f_propiedad, f_categoria, f_estado)| {
                 let url = build_gastos_url(pg, pp, f_propiedad, f_categoria, f_estado);
-                load_gastos_data(items, total, error, loading, url);
+                load_gastos_data(items, total, error, loading, url, is_online);
             },
         );
     }
@@ -981,6 +1006,9 @@ pub fn Gastos() -> Html {
                 moneda: (*moneda).clone(),
                 fecha_gasto: (*fecha_gasto).clone(),
                 proveedor: non_empty(&proveedor),
+                numero_cuenta: None,
+                periodo_inicio: None,
+                periodo_fin: None,
                 numero_factura: non_empty(&numero_factura),
                 notas: non_empty(&notas),
             };
@@ -1034,6 +1062,8 @@ pub fn Gastos() -> Html {
         filter_propiedad,
         filter_categoria,
         filter_estado,
+        filter_fecha_desde,
+        filter_fecha_hasta,
         &propiedades,
         on_filter_apply,
         on_filter_clear,
@@ -1085,6 +1115,8 @@ fn render_gastos_view(
     filter_propiedad: UseStateHandle<String>,
     filter_categoria: UseStateHandle<String>,
     filter_estado: UseStateHandle<String>,
+    filter_fecha_desde: UseStateHandle<String>,
+    filter_fecha_hasta: UseStateHandle<String>,
     propiedades: &UseStateHandle<Vec<Propiedad>>,
     on_filter_apply: Callback<MouseEvent>,
     on_filter_clear: Callback<MouseEvent>,
@@ -1200,6 +1232,7 @@ fn render_gastos_view(
             <GastoFilterBar
                 filter_propiedad={filter_propiedad} filter_categoria={filter_categoria}
                 filter_estado={filter_estado}
+                filter_fecha_desde={filter_fecha_desde} filter_fecha_hasta={filter_fecha_hasta}
                 propiedades={(**propiedades).clone()}
                 on_apply={on_filter_apply} on_clear={on_filter_clear}
             />

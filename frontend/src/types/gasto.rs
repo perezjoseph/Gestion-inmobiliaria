@@ -37,6 +37,9 @@ pub struct CreateGasto {
     pub moneda: String,
     pub fecha_gasto: String,
     pub proveedor: Option<String>,
+    pub numero_cuenta: Option<String>,
+    pub periodo_inicio: Option<String>,
+    pub periodo_fin: Option<String>,
     pub numero_factura: Option<String>,
     pub notas: Option<String>,
 }

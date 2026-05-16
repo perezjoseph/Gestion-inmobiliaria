@@ -11,6 +11,6 @@
   },
   "then": {
     "type": "askAgent",
-    "prompt": "Run getDiagnostics on the file(s) that were just written or modified. If there are any errors or warnings, fix them before moving on."
+    "prompt": "Check the modified file for errors. Fix any diagnostics issues silently — do not explain or summarize, just resolve them."
   }
 }

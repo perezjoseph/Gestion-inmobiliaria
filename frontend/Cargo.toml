@@ -18,9 +18,46 @@ wasm-bindgen-futures = "0.4"
 futures = "0.3"
 gloo-timers = "0.3"
 gloo-events = "0.3"
-web-sys = { version = "0.3", features = ["Window", "Storage", "Location", "HtmlSelectElement", "HtmlInputElement", "HtmlElement", "HtmlDocument", "File", "FileList", "FormData", "Blob", "BlobPropertyBag", "Url", "Navigator", "Document", "KeyboardEvent", "EventTarget", "console", "HtmlCanvasElement", "CanvasRenderingContext2d", "TouchEvent", "TouchList", "Touch", "Element", "DomRect", "Headers", "Request", "RequestInit", "RequestMode", "Response", "ReadableStream", "ReadableStreamDefaultReader", "TextDecoder"] }
+web-sys = { version = "0.3", features = [
+    "Window",
+    "Storage",
+    "Location",
+    "HtmlSelectElement",
+    "HtmlInputElement",
+    "HtmlElement",
+    "HtmlDocument",
+    "File",
+    "FileList",
+    "FormData",
+    "Blob",
+    "BlobPropertyBag",
+    "Url",
+    "Navigator",
+    "Document",
+    "KeyboardEvent",
+    "EventTarget",
+    "console",
+    "HtmlCanvasElement",
+    "CanvasRenderingContext2d",
+    "TouchEvent",
+    "TouchList",
+    "Touch",
+    "Element",
+    "DomRect",
+    "Headers",
+    "Request",
+    "RequestInit",
+    "RequestMode",
+    "Response",
+    "ReadableStream",
+    "ReadableStreamDefaultReader",
+    "TextDecoder",
+] }
 js-sys = "0.3"
 console_error_panic_hook = "0.1"
+idb = "0.6"
+serde-wasm-bindgen = "0.6"
 
 [dev-dependencies]
 proptest.workspace = true
+wasm-bindgen-test = "0.3"

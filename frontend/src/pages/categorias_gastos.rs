@@ -132,7 +132,7 @@ pub fn CategoriasGastos() -> Html {
             }
 
             if *loading {
-                <TableSkeleton />
+                <TableSkeleton title_width="260px" columns={3} rows={6} />
             } else if sorted_data.is_empty() {
                 <p style="text-align: center; color: var(--text-tertiary); padding: var(--space-6);">
                     {"No hay gastos registrados."}

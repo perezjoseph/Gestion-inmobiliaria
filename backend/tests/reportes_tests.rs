@@ -22,7 +22,7 @@ mod reportes_handler_tests {
                 baileys_service_url: "http://baileys:3100".to_string(),
                 baileys_internal_token: "a]3kF9#mP7vL2nQ8wR5xT0yU4zA1bC6dE".to_string(),
                 ovms_endpoint: "http://ovms:8000/v1".to_string(),
-                ovms_chat_model: "qwen3.6".to_string(),
+                ovms_chat_model: "Qwen3.6-35B-A3B".to_string(),
                 ai_chat_timeout_secs: 30,
             },
         }

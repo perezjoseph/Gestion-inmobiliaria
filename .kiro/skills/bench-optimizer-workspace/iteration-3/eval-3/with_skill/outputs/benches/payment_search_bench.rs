@@ -1,82 +1,128 @@
+use chrono::NaiveDate;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use payment_search_bench::{buscar_pagos_linear, generate_realistic_pagos, PagoIndexSimple};
+use rand::Rng;
 use uuid::Uuid;
 
-/// Production dataset: ~5000 pagos, ~200 contratos.
-/// Typical query: filter by contrato_id (80% of queries), result set 20-100.
-const PRODUCTION_SIZE: usize = 5000;
-const NUM_CONTRATOS: usize = 200;
+use payment_search_bench::{buscar_pagos_linear, Pago, PagoIndex, PagoIndexDirect};
 
-/// Benchmark the most common query pattern: filter by a single contrato_id.
-/// This represents 80% of real queries.
-fn bench_filter_by_contrato_id(c: &mut Criterion) {
-    let pagos = generate_realistic_pagos(PRODUCTION_SIZE, NUM_CONTRATOS);
+/// Generate realistic payment data matching production characteristics:
+/// - ~200 unique contratos (5000 pagos / ~25 payments per contract)
+/// - 70% pagado, 20% pendiente, 10% atrasado
+/// - Dates spanning 24 months
+/// - ~30% have a referencia string
+fn generate_realistic_pagos(n: usize) -> Vec<Pago> {
+    let mut rng = rand::thread_rng();
+    let num_contratos = (n / 25).max(1);
+    let contrato_ids: Vec<Uuid> = (0..num_contratos).map(|_| Uuid::new_v4()).collect();
 
-    // Pick a contrato_id that exists in the dataset
-    let target_contrato_id = pagos[0].contrato_id;
+    (0..n)
+        .map(|i| {
+            let contrato_id = contrato_ids[i % num_contratos];
+            let month = (i % 24) as u32 + 1;
+            let year = 2023 + (month - 1) / 12;
+            let month_in_year = ((month - 1) % 12) + 1;
 
-    // Pre-build the index (this cost is amortized across many queries)
-    let index = PagoIndexSimple::new(&pagos);
+            let estado = match rng.gen_range(0..10) {
+                0 => "atrasado".to_string(),
+                1..=2 => "pendiente".to_string(),
+                _ => "pagado".to_string(),
+            };
 
-    let mut group = c.benchmark_group("filter_by_contrato_id");
+            let fecha_vencimiento = NaiveDate::from_ymd_opt(year as i32, month_in_year, 1).unwrap();
 
-    group.bench_function("linear_scan", |b| {
-        b.iter(|| {
-            buscar_pagos_linear(
-                black_box(&pagos),
-                black_box(Some(target_contrato_id)),
-                black_box(None),
-                black_box(None),
-                black_box(None),
-                black_box(None),
-            )
+            let fecha_pago = if estado == "pagado" {
+                Some(
+                    NaiveDate::from_ymd_opt(year as i32, month_in_year, rng.gen_range(1..=28))
+                        .unwrap(),
+                )
+            } else {
+                None
+            };
+
+            let referencia = if rng.gen_range(0..10) < 3 {
+                Some(format!("REF-{:04}", rng.gen_range(1..9999)))
+            } else {
+                None
+            };
+
+            Pago {
+                id: Uuid::new_v4(),
+                contrato_id,
+                monto: rng.gen_range(5000.0..50000.0),
+                fecha_vencimiento,
+                fecha_pago,
+                estado,
+                referencia,
+            }
         })
-    });
+        .collect()
+}
 
-    group.bench_function("hashmap_index", |b| {
-        b.iter(|| {
-            index.buscar(
-                black_box(Some(target_contrato_id)),
-                black_box(None),
-                black_box(None),
-                black_box(None),
-                black_box(None),
-            )
-        })
-    });
+/// Benchmark the most common query pattern: filter by contrato_id (80% of queries).
+fn bench_contrato_id_filter(c: &mut Criterion) {
+    let mut group = c.benchmark_group("contrato_id_filter");
+
+    for size in [1000, 5000] {
+        let pagos = generate_realistic_pagos(size);
+        // Pick a contrato_id that exists in the data
+        let target_contrato = pagos[size / 2].contrato_id;
+
+        group.bench_with_input(
+            BenchmarkId::new("linear_scan", size),
+            &(&pagos, target_contrato),
+            |b, (pagos, cid)| {
+                b.iter(|| buscar_pagos_linear(black_box(pagos), Some(*cid), None, None, None, None))
+            },
+        );
+
+        // For indexed approaches, build the index outside the loop (amortized cost)
+        let index = PagoIndex::new(&pagos);
+        group.bench_with_input(
+            BenchmarkId::new("indexed_dyn", size),
+            &(&index, target_contrato),
+            |b, (idx, cid)| b.iter(|| idx.buscar(Some(black_box(*cid)), None, None, None, None)),
+        );
+
+        let index_direct = PagoIndexDirect::new(&pagos);
+        group.bench_with_input(
+            BenchmarkId::new("indexed_direct", size),
+            &(&index_direct, target_contrato),
+            |b, (idx, cid)| b.iter(|| idx.buscar(Some(black_box(*cid)), None, None, None, None)),
+        );
+    }
 
     group.finish();
 }
 
-/// Benchmark with combined filters: contrato_id + estado (common in UI).
+/// Benchmark combined filter: contrato_id + estado (common in "show pending payments for contract")
 fn bench_contrato_and_estado(c: &mut Criterion) {
-    let pagos = generate_realistic_pagos(PRODUCTION_SIZE, NUM_CONTRATOS);
-    let target_contrato_id = pagos[0].contrato_id;
-    let index = PagoIndexSimple::new(&pagos);
-
     let mut group = c.benchmark_group("contrato_id_and_estado");
 
+    let pagos = generate_realistic_pagos(5000);
+    let target_contrato = pagos[2500].contrato_id;
+
     group.bench_function("linear_scan", |b| {
         b.iter(|| {
             buscar_pagos_linear(
                 black_box(&pagos),
-                black_box(Some(target_contrato_id)),
-                black_box(Some("pendiente")),
-                black_box(None),
-                black_box(None),
-                black_box(None),
+                Some(target_contrato),
+                Some("pendiente"),
+                None,
+                None,
+                None,
             )
         })
     });
 
-    group.bench_function("hashmap_index", |b| {
+    let index_direct = PagoIndexDirect::new(&pagos);
+    group.bench_function("indexed_direct", |b| {
         b.iter(|| {
-            index.buscar(
-                black_box(Some(target_contrato_id)),
-                black_box(Some("pendiente")),
-                black_box(None),
-                black_box(None),
-                black_box(None),
+            index_direct.buscar(
+                Some(black_box(target_contrato)),
+                Some("pendiente"),
+                None,
+                None,
+                None,
             )
         })
     });
@@ -84,87 +130,44 @@ fn bench_contrato_and_estado(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark the fallback case: no contrato_id filter (date range only).
-/// Both approaches should perform similarly here since the index can't help.
+/// Benchmark the fallback case: no contrato_id filter (should be similar to linear).
 fn bench_no_contrato_filter(c: &mut Criterion) {
-    let pagos = generate_realistic_pagos(PRODUCTION_SIZE, NUM_CONTRATOS);
-    let index = PagoIndexSimple::new(&pagos);
-
-    let fecha_desde = chrono::NaiveDate::from_ymd_opt(2023, 6, 1).unwrap();
-    let fecha_hasta = chrono::NaiveDate::from_ymd_opt(2023, 12, 31).unwrap();
-
     let mut group = c.benchmark_group("no_contrato_filter");
 
+    let pagos = generate_realistic_pagos(5000);
+    let fecha_desde = NaiveDate::from_ymd_opt(2024, 1, 1);
+    let fecha_hasta = NaiveDate::from_ymd_opt(2024, 6, 30);
+
     group.bench_function("linear_scan", |b| {
         b.iter(|| {
             buscar_pagos_linear(
                 black_box(&pagos),
-                black_box(None),
-                black_box(None),
-                black_box(Some(fecha_desde)),
-                black_box(Some(fecha_hasta)),
-                black_box(None),
+                None,
+                None,
+                fecha_desde,
+                fecha_hasta,
+                None,
             )
         })
     });
 
-    group.bench_function("hashmap_index", |b| {
-        b.iter(|| {
-            index.buscar(
-                black_box(None),
-                black_box(None),
-                black_box(Some(fecha_desde)),
-                black_box(Some(fecha_hasta)),
-                black_box(None),
-            )
-        })
+    let index_direct = PagoIndexDirect::new(&pagos);
+    group.bench_function("indexed_direct", |b| {
+        b.iter(|| index_direct.buscar(black_box(None), None, fecha_desde, fecha_hasta, None))
     });
 
     group.finish();
 }
 
-/// Benchmark index construction cost to understand amortization.
-fn bench_index_construction(c: &mut Criterion) {
-    let pagos = generate_realistic_pagos(PRODUCTION_SIZE, NUM_CONTRATOS);
+/// Benchmark index build cost to understand amortization.
+fn bench_index_build(c: &mut Criterion) {
+    let mut group = c.benchmark_group("index_build_cost");
 
-    c.bench_function("index_construction_5000", |b| {
-        b.iter(|| PagoIndexSimple::new(black_box(&pagos)))
-    });
-}
+    for size in [1000, 5000] {
+        let pagos = generate_realistic_pagos(size);
 
-/// Scaling benchmark: how does the advantage change with dataset size?
-fn bench_scaling(c: &mut Criterion) {
-    let mut group = c.benchmark_group("scaling_contrato_filter");
-
-    for size in [100, 500, 1000, 2500, 5000] {
-        let num_contratos = (size / 25).max(10); // ~25 pagos per contrato
-        let pagos = generate_realistic_pagos(size, num_contratos);
-        let target_id = pagos[0].contrato_id;
-        let index = PagoIndexSimple::new(&pagos);
-
-        group.bench_with_input(BenchmarkId::new("linear_scan", size), &size, |b, _| {
-            b.iter(|| {
-                buscar_pagos_linear(
-                    black_box(&pagos),
-                    black_box(Some(target_id)),
-                    black_box(None),
-                    black_box(None),
-                    black_box(None),
-                    black_box(None),
-                )
-            })
-        });
-
-        group.bench_with_input(BenchmarkId::new("hashmap_index", size), &size, |b, _| {
-            b.iter(|| {
-                index.buscar(
-                    black_box(Some(target_id)),
-                    black_box(None),
-                    black_box(None),
-                    black_box(None),
-                    black_box(None),
-                )
-            })
+        group.bench_with_input(BenchmarkId::new("build_index", size), &pagos, |b, pagos| {
+            b.iter(|| PagoIndexDirect::new(black_box(pagos)))
         });
     }
 
@@ -173,10 +176,9 @@ fn bench_scaling(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    bench_filter_by_contrato_id,
+    bench_contrato_id_filter,
     bench_contrato_and_estado,
     bench_no_contrato_filter,
-    bench_index_construction,
-    bench_scaling,
+    bench_index_build,
 );
 criterion_main!(benches);

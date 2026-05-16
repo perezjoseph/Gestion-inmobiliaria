@@ -15,6 +15,16 @@ fn non_pendiente_estado() -> impl Strategy<Value = String> {
     ]
 }
 
+/// Strategy for sealed-document variants: (sellado, has_documento_origen_id)
+/// At least one must be true for the document to be considered sealed.
+fn sealed_document_variant() -> impl Strategy<Value = (bool, bool)> {
+    prop_oneof![
+        Just((true, false)), // sellado=true, no origen
+        Just((false, true)), // not sellado, but has documento_origen_id
+        Just((true, true)),  // both sealed and has origen
+    ]
+}
+
 /// Arbitrary firmante name (1-30 alphanumeric chars).
 fn arbitrary_firmante_nombre() -> impl Strategy<Value = String> {
     "[a-zA-Z][a-zA-Z ]{0,29}".prop_map(|s| s.trim().to_string())
@@ -243,6 +253,7 @@ mod pbt_async {
             updated_at: Set(Some(now)),
             sellado: Set(false),
             sellado_at: Set(None),
+            documento_origen_id: Set(None),
         }
         .insert(db)
         .await
@@ -255,6 +266,216 @@ mod pbt_async {
             .exec(db)
             .await;
         let _ = documento::Entity::delete_by_id(documento_id).exec(db).await;
+    }
+
+    /// Property 3 (spec-gap-remediation): Sealed-document deletion is rejected.
+    /// Creates a sealed document (sellado=true and/or documento_origen_id set),
+    /// attempts deletion, asserts HTTP 403 Forbidden, row persists, file unchanged.
+    pub fn p3_sealed_document_deletion_rejected(sellado: bool, has_origen_id: bool) {
+        with_db(|db| async move {
+            use realestate_backend::entities::{contrato, inquilino, propiedad};
+            use realestate_backend::services::documentos;
+            use rust_decimal::Decimal;
+            use std::io::Write;
+
+            let now = Utc::now().into();
+            let org_id = Uuid::new_v4();
+
+            // Create org
+            organizacion::ActiveModel {
+                id: Set(org_id),
+                tipo: Set("persona_fisica".to_string()),
+                nombre: Set(format!("PBT Org {org_id}")),
+                estado: Set("activo".to_string()),
+                cedula: Set(None),
+                telefono: Set(None),
+                email_organizacion: Set(None),
+                rnc: Set(None),
+                razon_social: Set(None),
+                nombre_comercial: Set(None),
+                direccion_fiscal: Set(None),
+                representante_legal: Set(None),
+                dgii_data: Set(None),
+                created_at: Set(now),
+                updated_at: Set(now),
+            }
+            .insert(&db)
+            .await
+            .expect("create org for P3");
+
+            // Create user
+            let user_id = Uuid::new_v4();
+            usuario::ActiveModel {
+                id: Set(user_id),
+                nombre: Set("PBT User P3".to_string()),
+                email: Set(format!("pbt-p3+{user_id}@test.com")),
+                password_hash: Set("not_used".to_string()),
+                rol: Set("admin".to_string()),
+                activo: Set(true),
+                organizacion_id: Set(org_id),
+                created_at: Set(now),
+                updated_at: Set(now),
+            }
+            .insert(&db)
+            .await
+            .expect("create user for P3");
+
+            // Create propiedad
+            let propiedad_id = Uuid::new_v4();
+            propiedad::ActiveModel {
+                id: Set(propiedad_id),
+                titulo: Set("Propiedad P3".to_string()),
+                descripcion: Set(None),
+                direccion: Set("Calle P3".to_string()),
+                ciudad: Set("Santo Domingo".to_string()),
+                provincia: Set("Distrito Nacional".to_string()),
+                tipo_propiedad: Set("apartamento".to_string()),
+                habitaciones: Set(Some(2)),
+                banos: Set(Some(1)),
+                area_m2: Set(Some(Decimal::new(8000, 2))),
+                precio: Set(Decimal::new(2500000, 2)),
+                moneda: Set("DOP".to_string()),
+                estado: Set("disponible".to_string()),
+                imagenes: Set(None),
+                organizacion_id: Set(org_id),
+                created_at: Set(now),
+                updated_at: Set(now),
+            }
+            .insert(&db)
+            .await
+            .expect("create propiedad for P3");
+
+            // Create inquilino
+            let inquilino_id = Uuid::new_v4();
+            inquilino::ActiveModel {
+                id: Set(inquilino_id),
+                nombre: Set("Inquilino".to_string()),
+                apellido: Set("P3".to_string()),
+                email: Set(Some(format!("inq-p3+{inquilino_id}@test.com"))),
+                telefono: Set(None),
+                cedula: Set(format!("P3{}", &inquilino_id.simple().to_string()[..17])),
+                contacto_emergencia: Set(None),
+                notas: Set(None),
+                documentos: Set(None),
+                organizacion_id: Set(org_id),
+                created_at: Set(now),
+                updated_at: Set(now),
+            }
+            .insert(&db)
+            .await
+            .expect("create inquilino for P3");
+
+            // Create contrato (needed as entity_id for the documento)
+            let contrato_id = Uuid::new_v4();
+            contrato::ActiveModel {
+                id: Set(contrato_id),
+                propiedad_id: Set(propiedad_id),
+                inquilino_id: Set(inquilino_id),
+                fecha_inicio: Set(chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap()),
+                fecha_fin: Set(chrono::NaiveDate::from_ymd_opt(2025, 1, 1).unwrap()),
+                monto_mensual: Set(Decimal::new(25000, 0)),
+                deposito: Set(None),
+                moneda: Set("DOP".to_string()),
+                estado: Set("activo".to_string()),
+                documentos: Set(None),
+                organizacion_id: Set(org_id),
+                estado_deposito: Set(None),
+                fecha_cobro_deposito: Set(None),
+                fecha_devolucion_deposito: Set(None),
+                monto_retenido: Set(None),
+                motivo_retencion: Set(None),
+                recargo_porcentaje: Set(None),
+                dias_gracia: Set(None),
+                created_at: Set(now),
+                updated_at: Set(now),
+            }
+            .insert(&db)
+            .await
+            .expect("create contrato for P3");
+
+            // Create a temp file on disk to verify it remains after failed delete
+            let doc_id = Uuid::new_v4();
+            let upload_dir =
+                std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
+            let file_path = format!("pbt-sealed-{doc_id}.pdf");
+            let full_path = format!("{upload_dir}/{file_path}");
+
+            // Ensure upload dir exists
+            std::fs::create_dir_all(&upload_dir).expect("create upload dir");
+            let file_content = b"sealed-pdf-content-for-pbt";
+            {
+                let mut f = std::fs::File::create(&full_path).expect("create test file on disk");
+                f.write_all(file_content).expect("write test file");
+            }
+
+            // Create sealed documento
+            let documento_origen_id = if has_origen_id {
+                Some(contrato_id)
+            } else {
+                None
+            };
+
+            documento::ActiveModel {
+                id: Set(doc_id),
+                entity_type: Set("contrato".to_string()),
+                entity_id: Set(contrato_id),
+                filename: Set(format!("sellado-{doc_id}.pdf")),
+                file_path: Set(file_path.clone()),
+                mime_type: Set("application/pdf".to_string()),
+                file_size: Set(file_content.len() as i64),
+                uploaded_by: Set(user_id),
+                created_at: Set(now),
+                tipo_documento: Set("contrato_arrendamiento".to_string()),
+                estado_verificacion: Set("pendiente".to_string()),
+                fecha_vencimiento: Set(None),
+                verificado_por: Set(None),
+                fecha_verificacion: Set(None),
+                notas_verificacion: Set(None),
+                numero_documento: Set(None),
+                contenido_editable: Set(None),
+                updated_at: Set(Some(now)),
+                sellado: Set(sellado),
+                sellado_at: Set(if sellado { Some(now) } else { None }),
+                documento_origen_id: Set(documento_origen_id),
+            }
+            .insert(&db)
+            .await
+            .expect("create sealed documento for P3");
+
+            // Attempt deletion — should fail with Forbidden (403)
+            let result = documentos::eliminar(&db, doc_id, user_id, org_id).await;
+
+            assert!(
+                result.is_err(),
+                "Delete of sealed document should fail (sellado={sellado}, has_origen={has_origen_id})"
+            );
+            let err = result.unwrap_err();
+            assert!(
+                matches!(err, AppError::Forbidden(_)),
+                "Expected AppError::Forbidden (HTTP 403), got: {err:?}"
+            );
+
+            // Verify row still exists in DB
+            let doc_after = documento::Entity::find_by_id(doc_id)
+                .one(&db)
+                .await
+                .expect("DB query should succeed")
+                .expect("Sealed document row should still exist after rejected delete");
+            assert_eq!(doc_after.id, doc_id);
+            assert_eq!(doc_after.sellado, sellado);
+            assert_eq!(doc_after.documento_origen_id, documento_origen_id);
+
+            // Verify file on disk is unchanged
+            let disk_content = std::fs::read(&full_path).expect("File should still exist on disk");
+            assert_eq!(
+                disk_content, file_content,
+                "File content should be unchanged after rejected delete"
+            );
+
+            // Cleanup: remove test file and DB rows
+            let _ = std::fs::remove_file(&full_path);
+            let _ = documento::Entity::delete_by_id(doc_id).exec(&db).await;
+        });
     }
 
     /// Property 12: Document sealing triggers on complete signatures.
@@ -647,5 +868,22 @@ fn test_signing_order_independence() {
                 Ok(())
             },
         )
+        .unwrap();
+}
+
+// Feature: spec-gap-remediation, Property 3: Sealed-document deletion is rejected
+// **Validates: Requirements 3.2, 3.3**
+#[test]
+fn test_sealed_document_deletion_is_rejected() {
+    let mut runner = TestRunner::new(ProptestConfig {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
+
+    runner
+        .run(&sealed_document_variant(), |(sellado, has_origen_id)| {
+            pbt_async::p3_sealed_document_deletion_rejected(sellado, has_origen_id);
+            Ok(())
+        })
         .unwrap();
 }

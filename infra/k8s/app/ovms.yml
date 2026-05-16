@@ -35,7 +35,7 @@ spec:
         kubernetes.io/hostname: inference
       containers:
         - name: ovms
-          image: openvino/model_server:latest
+          image: openvino/model_server:latest-gpu
           args:
             - "--config_path"
             - "/models/config.json"
@@ -46,20 +46,17 @@ spec:
             - "--metrics_enable"
           ports:
             - containerPort: 8000
-          env:
-            - name: OPENVINO_DEVICE
-              value: "CPU"
-            - name: TARGET_DEVICE
-              value: "CPU"
           resources:
             requests:
               cpu: 500m
               memory: 16Gi
               ephemeral-storage: 128Mi
+              gpu.intel.com/xe: "1"
             limits:
               cpu: 4000m
               memory: 20Gi
               ephemeral-storage: 512Mi
+              gpu.intel.com/xe: "1"
           volumeMounts:
             - name: models
               mountPath: /models
@@ -99,8 +96,8 @@ data:
       "model_config_list": [],
       "mediapipe_config_list": [
         {
-          "name": "Qwen3-30B-A3B",
-          "base_path": "/models/Qwen3-30B-A3B"
+          "name": "Qwen3.6-35B-A3B",
+          "base_path": "/models/Qwen3.6-35B-A3B"
         }
       ]
     }
@@ -122,12 +119,15 @@ data:
       }
       node_options: {
         [type.googleapis.com/mediapipe.LLMCalculatorOptions]: {
-          models_path: "/models/Qwen3-30B-A3B"
-          device: "CPU"
+          models_path: "/models/Qwen3.6-35B-A3B"
+          device: "GPU"
           enable_prefix_caching: true
-          max_num_batched_tokens: 4096
-          cache_size: 8
-          plugin_config: "{}"
+          max_num_batched_tokens: 8192
+          cache_size: 0
+          dynamic_split_fuse: false
+          plugin_config: '{"KV_CACHE_PRECISION": "u8", "DYNAMIC_QUANTIZATION_GROUP_SIZE": "32"}'
+          tool_parser: "qwen3coder"
+          reasoning_parser: "qwen3"
         }
       }
       input_stream_handler {

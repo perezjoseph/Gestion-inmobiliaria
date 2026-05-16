@@ -1,4 +1,6 @@
 /target
+target-test/
+target-verify/
 /.env
 *.rs.bk
 .DS_Store
@@ -14,7 +16,7 @@ frontend/dist/
 
 kiro-debug.log
 kiro-debug.log
-.kiro\skills\bench-optimizer-works*
+.kiro/skills/*
 # Android build artifacts
 android/.gradle/
 android/.jdk/
@@ -48,6 +50,12 @@ k3s/
 *.orig
 *.log
 *.cache
+Thumbs.db
+desktop.ini
+*.lnk
+*.stackdump
+*_output.txt
+check_output.txt
 
 # State store (redb)
 data/state_store.db

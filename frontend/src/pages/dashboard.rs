@@ -5,17 +5,22 @@ use yew_router::prelude::*;
 use crate::app::Route;
 use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::error_banner::ErrorBanner;
+use crate::components::common::line_chart::{ChartPoint, LineChart};
 use crate::components::common::skeleton::DashboardSkeleton;
 use crate::services::api::api_get;
-use crate::types::DashboardStats;
-use crate::types::dashboard_extra::IngresoComparacion;
+use crate::types::contrato::Contrato;
+use crate::types::dashboard_extra::{IngresoComparacion, OcupacionMensual};
 use crate::types::notificacion::PagoVencido;
+use crate::types::pago::Pago;
+use crate::types::{DashboardStats, PaginatedResponse};
+use crate::utils::format_date_display;
 
 #[component]
 pub fn Dashboard() -> Html {
     let stats = use_state(|| Option::<DashboardStats>::None);
     let overdue_pagos = use_state(Vec::<PagoVencido>::new);
     let ingreso_comp = use_state(|| Option::<IngresoComparacion>::None);
+    let ocupacion_tendencia = use_state(Vec::<OcupacionMensual>::new);
     let error = use_state(|| Option::<String>::None);
     let loading = use_state(|| true);
 
@@ -23,6 +28,7 @@ pub fn Dashboard() -> Html {
         let stats = stats.clone();
         let overdue_pagos = overdue_pagos.clone();
         let ingreso_comp = ingreso_comp.clone();
+        let ocupacion_tendencia = ocupacion_tendencia.clone();
         let error = error.clone();
         let loading = loading.clone();
         use_effect_with((), move |()| {
@@ -52,6 +58,15 @@ pub fn Dashboard() -> Html {
                     }
                 });
             }
+            {
+                spawn_local(async move {
+                    if let Ok(data) =
+                        api_get::<Vec<OcupacionMensual>>("/dashboard/ocupacion-tendencia").await
+                    {
+                        ocupacion_tendencia.set(data);
+                    }
+                });
+            }
         });
     }
 
@@ -78,7 +93,10 @@ pub fn Dashboard() -> Html {
                 if let Some(s) = (*stats).as_ref() {
                     <StatsHeader stats={s.clone()} ingreso_comp={(*ingreso_comp).clone()} />
                 }
+                <OccupancyChart data={(*ocupacion_tendencia).clone()} />
                 <OverdueSection pagos={(*overdue_pagos).clone()} />
+                <ContratosPorVencerWidget />
+                <UpcomingPaymentsWidget />
             } else {
                 <WelcomeCard />
             }
@@ -262,6 +280,232 @@ fn ComplianceCounters(props: &ComplianceCountersProps) -> Html {
                     <p class="gi-stat-value">{s.entidades_incompletas}</p>
                 </div>
             </div>
+        </div>
+    }
+}
+
+/// Computes the date 30 days from now as YYYY-MM-DD for the API query.
+fn thirty_days_from_now() -> String {
+    let now = js_sys::Date::new_0();
+    let future = js_sys::Date::new_0();
+    future.set_time(now.get_time() + 30.0 * 24.0 * 60.0 * 60.0 * 1000.0);
+    let y = future.get_full_year();
+    let m = future.get_month() + 1; // 0-indexed
+    let d = future.get_date();
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
+#[component]
+fn UpcomingPaymentsWidget() -> Html {
+    let pagos = use_state(Vec::<Pago>::new);
+    let loading = use_state(|| true);
+
+    {
+        let pagos = pagos.clone();
+        let loading = loading.clone();
+        use_effect_with((), move |()| {
+            spawn_local(async move {
+                let hasta = thirty_days_from_now();
+                let url = format!("/pagos?estado=pendiente&fechaHasta={hasta}&perPage=10");
+                if let Ok(resp) = api_get::<PaginatedResponse<Pago>>(&url).await {
+                    let mut data = resp.data;
+                    data.sort_by(|a, b| a.fecha_vencimiento.cmp(&b.fecha_vencimiento));
+                    pagos.set(data);
+                }
+                loading.set(false);
+            });
+        });
+    }
+
+    if *loading {
+        return html! {
+            <div class="gi-card-section">
+                <p class="gi-text-sm gi-text-tertiary gi-py-3">{"Cargando..."}</p>
+            </div>
+        };
+    }
+
+    html! {
+        <div class="gi-card-section">
+            <div class="gi-section-header">
+                <h2 class="gi-section-header-title">{"Próximos Pagos"}</h2>
+                <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-xs">{"Ver todos →"}</Link<Route>>
+            </div>
+            if pagos.is_empty() {
+                <p class="gi-text-sm gi-text-tertiary gi-py-3">{"Sin pagos pendientes en los próximos 30 días."}</p>
+            } else {
+                <div class="gi-flex-col gi-gap-2">
+                    { for pagos.iter().map(|p| html! {
+                        <UpcomingPaymentRow pago={p.clone()} />
+                    })}
+                </div>
+            }
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct UpcomingPaymentRowProps {
+    pago: Pago,
+}
+
+#[component]
+fn UpcomingPaymentRow(props: &UpcomingPaymentRowProps) -> Html {
+    let p = &props.pago;
+    html! {
+        <div class="gi-overdue-row">
+            <div class="gi-min-w-0 gi-flex-1">
+                <div class="gi-overdue-row-title">
+                    {"Vence: "}{format_date_display(&p.fecha_vencimiento)}
+                </div>
+                <div class="gi-overdue-row-detail">
+                    <CurrencyDisplay monto={p.monto} moneda={p.moneda.clone()} />
+                </div>
+            </div>
+            <span class="gi-badge gi-badge-warning">{"Pendiente"}</span>
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct OccupancyChartProps {
+    data: Vec<OcupacionMensual>,
+}
+
+#[component]
+fn OccupancyChart(props: &OccupancyChartProps) -> Html {
+    let points: Vec<ChartPoint> = props
+        .data
+        .iter()
+        .map(|d| {
+            let label = format!("{:02}/{}", d.mes, d.anio % 100);
+            ChartPoint {
+                label: AttrValue::from(label),
+                value: d.tasa,
+            }
+        })
+        .collect();
+
+    html! {
+        <div class="gi-card-section">
+            <LineChart
+                points={points}
+                title={AttrValue::from("Ocupación últimos 12 meses")}
+                suffix={AttrValue::from("%")}
+            />
+        </div>
+    }
+}
+
+#[component]
+fn ContratosPorVencerWidget() -> Html {
+    let contratos_30 = use_state(Vec::<Contrato>::new);
+    let contratos_60 = use_state(Vec::<Contrato>::new);
+    let contratos_90 = use_state(Vec::<Contrato>::new);
+    let loading = use_state(|| true);
+
+    {
+        let contratos_30 = contratos_30.clone();
+        let contratos_60 = contratos_60.clone();
+        let contratos_90 = contratos_90.clone();
+        let loading = loading.clone();
+        use_effect_with((), move |()| {
+            spawn_local(async move {
+                if let Ok(data) = api_get::<Vec<Contrato>>("/contratos/por-vencer?dias=30").await {
+                    contratos_30.set(data);
+                }
+            });
+            {
+                let contratos_60 = contratos_60.clone();
+                spawn_local(async move {
+                    if let Ok(data) =
+                        api_get::<Vec<Contrato>>("/contratos/por-vencer?dias=60").await
+                    {
+                        contratos_60.set(data);
+                    }
+                });
+            }
+            {
+                let contratos_90 = contratos_90.clone();
+                spawn_local(async move {
+                    if let Ok(data) =
+                        api_get::<Vec<Contrato>>("/contratos/por-vencer?dias=90").await
+                    {
+                        contratos_90.set(data);
+                    }
+                    loading.set(false);
+                });
+            }
+        });
+    }
+
+    if *loading {
+        return html! {
+            <div class="gi-card-section">
+                <p class="gi-text-sm gi-text-tertiary gi-py-3">{"Cargando contratos..."}</p>
+            </div>
+        };
+    }
+
+    html! {
+        <div class="gi-card-section">
+            <div class="gi-section-header">
+                <h2 class="gi-section-header-title">{"Contratos por vencer"}</h2>
+                <Link<Route> to={Route::Contratos} classes="gi-btn-text gi-text-xs">{"Ver todos →"}</Link<Route>>
+            </div>
+            <ContratosBucket label="Próximos 30 días" contratos={(*contratos_30).clone()} />
+            <ContratosBucket label="Próximos 60 días" contratos={(*contratos_60).clone()} />
+            <ContratosBucket label="Próximos 90 días" contratos={(*contratos_90).clone()} />
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct ContratosBucketProps {
+    label: AttrValue,
+    contratos: Vec<Contrato>,
+}
+
+#[component]
+fn ContratosBucket(props: &ContratosBucketProps) -> Html {
+    html! {
+        <div class="gi-mb-3">
+            <p class="gi-text-xs gi-font-bold gi-text-secondary gi-mb-1">
+                {&props.label}{format!(" ({})", props.contratos.len())}
+            </p>
+            if props.contratos.is_empty() {
+                <p class="gi-text-sm gi-text-tertiary">{"Sin contratos en este período."}</p>
+            } else {
+                <div class="gi-flex-col gi-gap-1">
+                    { for props.contratos.iter().map(|c| html! {
+                        <ContratoPorVencerRow contrato={c.clone()} />
+                    })}
+                </div>
+            }
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct ContratoPorVencerRowProps {
+    contrato: Contrato,
+}
+
+#[component]
+fn ContratoPorVencerRow(props: &ContratoPorVencerRowProps) -> Html {
+    let c = &props.contrato;
+    html! {
+        <div class="gi-overdue-row">
+            <div class="gi-min-w-0 gi-flex-1">
+                <div class="gi-overdue-row-title">
+                    {"Vence: "}{format_date_display(&c.fecha_fin)}
+                </div>
+                <div class="gi-overdue-row-detail">
+                    <CurrencyDisplay monto={c.monto_mensual} moneda={c.moneda.clone()} />
+                    {" / mes"}
+                </div>
+            </div>
+            <span class="gi-badge gi-badge-warning">{"Por vencer"}</span>
         </div>
     }
 }

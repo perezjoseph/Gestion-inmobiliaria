@@ -79,7 +79,7 @@ mod pbt_async {
                 baileys_service_url: "http://baileys:3100".to_string(),
                 baileys_internal_token: "a]3kF9#mP7vL2nQ8wR5xT0yU4zA1bC6dE".to_string(),
                 ovms_endpoint: "http://ovms:8000/v1".to_string(),
-                ovms_chat_model: "qwen3.6".to_string(),
+                ovms_chat_model: "Qwen3.6-35B-A3B".to_string(),
                 ai_chat_timeout_secs: 30,
             },
             database_url: String::new(),
@@ -217,11 +217,7 @@ mod pbt_async {
         id
     }
 
-    async fn create_pago(
-        db: &DatabaseConnection,
-        org_id: Uuid,
-        contrato_id: Uuid,
-    ) -> Uuid {
+    async fn create_pago(db: &DatabaseConnection, org_id: Uuid, contrato_id: Uuid) -> Uuid {
         use realestate_backend::entities::pago;
         let id = Uuid::new_v4();
         let now = Utc::now().into();
@@ -292,8 +288,7 @@ mod pbt_async {
             // Seed a pago under org_b
             let propiedad_id = create_propiedad(&db, org_b).await;
             let inquilino_id = create_inquilino(&db, org_b).await;
-            let contrato_id =
-                create_contrato(&db, org_b, propiedad_id, inquilino_id).await;
+            let contrato_id = create_contrato(&db, org_b, propiedad_id, inquilino_id).await;
             let pago_id = create_pago(&db, org_b, contrato_id).await;
 
             // Create a token for a user in org_a (the attacker)
@@ -332,8 +327,7 @@ mod pbt_async {
             );
             // Additionally verify body is empty or is a JSON error (not PDF content)
             assert!(
-                body.is_empty()
-                    || serde_json::from_slice::<serde_json::Value>(&body).is_ok(),
+                body.is_empty() || serde_json::from_slice::<serde_json::Value>(&body).is_ok(),
                 "Response body should be empty or a JSON error, not PDF content"
             );
 

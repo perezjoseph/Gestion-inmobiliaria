@@ -21,7 +21,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
 
 ## Tasks
 
-- [ ] 1. Scope receipt PDF generation by `organizacion_id` (Requirement 1)
+- [x] 1. Scope receipt PDF generation by `organizacion_id` (Requirement 1)
   - [x] 1.1 Update `Receipt_Service::generar_recibo` to require `organizacion_id`
     - Edit `backend/src/services/recibos.rs` to add `organizacion_id: Uuid` parameter
     - Join `pago` through `contrato` and filter `contrato::Column::OrganizacionId.eq(organizacion_id)`
@@ -35,18 +35,18 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - Leave `routes.rs` binding unchanged
     - _Requirements: 1.1, 1.2_
 
-  - [ ] 1.3 Write cross-tenant integration test for the receipt endpoint
+  - [x] 1.3 Write cross-tenant integration test for the receipt endpoint
     - Add to `backend/tests/recibos_tests.rs`: seed orgA + orgB pagos, request orgB pago as orgA user, assert `404` and empty body
     - Assert structured warning was logged via `tracing-test`
     - _Requirements: 1.3, 1.4, 1.5_
 
-  - [ ] 1.4 Write Property 1 PBT in `backend/tests/recibos_pbt.rs`
+  - [x] 1.4 Write Property 1 PBT in `backend/tests/recibos_pbt.rs`
     - `// Feature: spec-gap-remediation, Property 1: Cross-tenant receipt access never leaks`
     - Generate random `(orgA, orgB, pago)` tuples via `proptest`; iterate `crate::pbt_cases()` cases
     - Assert: every cross-tenant call yields HTTP `404` and the response body contains zero PDF bytes
     - _Requirements: 1.2, 1.3, 1.5_
 
-- [ ] 2. Self-registration role and `User` response contract (Requirement 2)
+- [x] 2. Self-registration role and `User` response contract (Requirement 2)
   - [x] 2.1 Persist self-registered users with `rol = "gerente"` and a fresh `Organizacion`
     - Edit `backend/src/services/auth.rs::register_new_org` to run inside a single transaction
     - Create `Organizacion` first, then `Usuario` with `rol: Set("gerente".into())` and `organizacion_id: Set(org.id)`
@@ -58,19 +58,19 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - Strip any token, password, or session payload from the response body
     - _Requirements: 2.2_
 
-  - [ ] 2.3 Write integration tests for register response shape and persistence
+  - [x] 2.3 Write integration tests for register response shape and persistence
     - Add to `backend/tests/auth_tests.rs`: assert response body matches `User` schema (no `token`, no `password`)
     - Assert persisted `usuario.rol == "gerente"` and `usuario.organizacion_id` is non-null
     - Assert duplicate-email request yields `409` with `"El correo ya está registrado"`
     - _Requirements: 2.2, 2.4, 2.5_
 
-  - [ ] 2.4 Write Property 2 PBT in `backend/tests/auth_pbt.rs`
+  - [x] 2.4 Write Property 2 PBT in `backend/tests/auth_pbt.rs`
     - `// Feature: spec-gap-remediation, Property 2: Self-registered users are always gerente`
     - Iterate `crate::pbt_cases()` random register payloads (varying any role hint)
     - Assert: persisted `rol == "gerente"`, `organizacion_id` non-null, response JSON contains exactly the `User` keys
     - _Requirements: 2.1, 2.3, 2.5_
 
-- [ ] 3. Maintenance list `unidad_id` filter (Requirement 10)
+- [x] 3. Maintenance list `unidad_id` filter (Requirement 10)
   - [x] 3.1 Add `unidad_id: Option<Uuid>` to `SolicitudListQuery`
     - Edit `backend/src/models/mantenimiento.rs` to extend the existing `SolicitudListQuery` DTO
     - _Requirements: 10.1_
@@ -80,12 +80,12 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - A `unidad_id` from another organizacion yields an empty list (no existence leak)
     - _Requirements: 10.2, 10.3, 10.4_
 
-  - [ ] 3.3 Write integration tests in `backend/tests/mantenimiento_tests.rs`
+  - [x] 3.3 Write integration tests in `backend/tests/mantenimiento_tests.rs`
     - Seed solicitudes across two organizations and two unidades; assert filter returns only matching rows scoped to caller's `organizacion_id`
     - Assert `unidad_id` from another organizacion returns `[]`
     - _Requirements: 10.2, 10.4, 10.5_
 
-  - [ ] 3.4 Write Property 6 PBT in `backend/tests/mantenimiento_pbt.rs`
+  - [x] 3.4 Write Property 6 PBT in `backend/tests/mantenimiento_pbt.rs`
     - `// Feature: spec-gap-remediation, Property 6: Maintenance filter respects unidad_id and tenant scope`
     - Iterate `crate::pbt_cases()` random datasets and `(org, unidad_id)` query inputs
     - Assert: every returned row satisfies `row.organizacion_id == caller_org` AND (`unidad_id.is_none()` OR `row.unidad_id == unidad_id`)
@@ -108,18 +108,18 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - Inside the auth-success branch: `[INIT] first route rendered`
     - _Requirements: 7.1, 7.4_
 
-  - [ ] 4.4 Restore `frontend/tests/init_logging_tests.rs` Bug_Condition_PBT
+  - [x] 4.4 Restore `frontend/tests/init_logging_tests.rs` Bug_Condition_PBT
     - `// Feature: spec-gap-remediation, Bug_Condition_PBT: All [INIT] markers present at boot`
     - Use `wasm-bindgen-test` headless to boot the app under random `(route, auth_state)` permutations
     - Iterate `crate::pbt_cases()` cases; assert every marker (`pre-renderer`, `app mounted`, `route resolution`, `switch`, `auth check`, `first route rendered`) appears in console output
     - On failure, the counterexample SHALL identify the missing stage
     - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 5. Checkpoint — verify P1, P2, Req 7, Req 10 land cleanly
+- [x] 5. Checkpoint — verify P1, P2, Req 7, Req 10 land cleanly
   - Run `cargo test --workspace` and `trunk build --release` (or equivalent frontend test runner) to confirm the four highest-priority remediations pass before touching shared subsystems.
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 6. Sealed signed-contract document and Mailcow SMTP wiring (Requirement 3)
+- [x] 6. Sealed signed-contract document and Mailcow SMTP wiring (Requirement 3)
 
   > **Deviation note**: Requirement 3.3 specifies HTTP `409 Conflict` for sealed-document delete attempts. The design overrides this with HTTP `403 Forbidden` (`AppError::Forbidden("No se puede eliminar un documento sellado")`). Per user guidance the design wins. Implementation in 6.3 and tests in 6.9 MUST assert `403`, not `409`. See the Note section at the bottom of this file.
 
@@ -165,17 +165,17 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - Document the expected secret keys (`SMTP_HOST=mail.myhomeva.us`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM=no-reply@myhomeva.us`) in a manifest comment
     - _Requirements: 3.4_
 
-  - [ ] 6.8 Write Property 3 PBT and integration tests in `backend/tests/firmas_pbt.rs`
+  - [x] 6.8 Write Property 3 PBT and integration tests in `backend/tests/firmas_pbt.rs`
     - `// Feature: spec-gap-remediation, Property 3: Sealed-document deletion is rejected`
     - Iterate `crate::pbt_cases()` random sealed-document datasets; assert delete returns HTTP `403` (see deviation note), the row remains in DB, and the file on disk is unchanged
     - _Requirements: 3.2, 3.3_
 
-  - [ ] 6.9 Write mail integration test using `lettre::AsyncFileTransport`
+  - [x] 6.9 Write mail integration test using `lettre::AsyncFileTransport`
     - Add to `backend/tests/firmas_tests.rs`: swap `MailClient` for a file-transport implementation, trigger the signing flow, parse the persisted `.eml`, assert Spanish subject (`"Firma electrónica de su contrato #..."`), Spanish body, recipient address, and presence of the signing link
     - Add a separate gated test (`#[ignore]`) under `backend/tests/firmas_tests.rs` for real Mailcow staging
     - _Requirements: 3.5, 3.6_
 
-- [ ] 7. Document management frontend (Requirement 4)
+- [x] 7. Document management frontend (Requirement 4)
   - [-] 7.1 Activate the `Verification_Action` button in `frontend/src/components/feature/verification_badge.rs`
     - Wire the button click to `api::put::<DocumentoStatus, ()>("/documentos/{id}/verificar", &DocumentoStatus { status })` via `spawn_local`
     - Update the displayed status from local state without a full page reload
@@ -200,16 +200,16 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - All labels in Spanish (`"Documentos vencidos"`, `"Por vencer"`, `"Entidades incompletas"`)
     - _Requirements: 4.5, 4.7_
 
-  - [ ] 7.5 Write component tests for visualizador hiding and Spanish copy
+  - [x] 7.5 Write component tests for visualizador hiding and Spanish copy
     - Use `wasm-bindgen-test` to assert the verification button is absent when `rol == "visualizador"` and present for `admin`/`gerente`
     - Assert all rendered labels and statuses are in Spanish
     - _Requirements: 4.1, 4.6, 4.7_
 
-- [ ] 8. Checkpoint — confirm sealed-doc + mail + document-management land cleanly
+- [x] 8. Checkpoint — confirm sealed-doc + mail + document-management land cleanly
   - Run `cargo test --workspace` and the frontend test runner.
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 9. OCR confirm persistence, tenant match, and CPU-only OVMS (Requirement 5)
+- [x] 9. OCR confirm persistence, tenant match, and CPU-only OVMS (Requirement 5)
   - [-] 9.1 Implement synchronous `Confirmar_Preview` insert in `backend/src/services/chatbot.rs`
     - Add `confirmar_preview(db, preview, organizacion_id, usuario_id)` running inside `db.begin()` transaction
     - Idempotency: lookup by `preview.id` within org first; return existing `ConfirmedEntity` if present
@@ -233,19 +233,19 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - Set `env: [{ name: OPENVINO_DEVICE, value: "CPU" }, { name: TARGET_DEVICE, value: "CPU" }]`
     - _Requirements: 5.6_
 
-  - [ ] 9.5 Write Property 4 PBT in `backend/tests/importacion_pbt.rs`
+  - [x] 9.5 Write Property 4 PBT in `backend/tests/importacion_pbt.rs`
     - `// Feature: spec-gap-remediation, Property 4: OCR confirm inserts exactly one row, idempotently`
     - Iterate `crate::pbt_cases()` random valid `OcrPreview` payloads; assert single-row insertion for `recibo`/`gasto`, and that two confirms with the same `preview_id` produce one row
     - For invalid extraction payloads assert HTTP `422` and unchanged row counts
     - _Requirements: 5.1, 5.2, 5.3, 5.7_
 
-  - [ ] 9.6 Write Property 5 PBT in `backend/tests/importacion_pbt.rs`
+  - [x] 9.6 Write Property 5 PBT in `backend/tests/importacion_pbt.rs`
     - `// Feature: spec-gap-remediation, Property 5: Tenant match is best-effort and never wrong`
     - Iterate `crate::pbt_cases()` random `(name, inquilino_dataset, organizacion_id)` triples
     - Assert: returned `Some(id)` only when candidate set within `organizacion_id` has size 1; never returns an inquilino from another org; otherwise `None`
     - _Requirements: 5.4, 5.5_
 
-- [ ] 10. WhatsApp AI multi-turn agent loop and `Extract_Receipt_Tool` wiring (Requirement 8)
+- [x] 10. WhatsApp AI multi-turn agent loop and `Extract_Receipt_Tool` wiring (Requirement 8)
   - [-] 10.1 Implement `Multi_Turn_Agent_Loop` in `backend/src/services/ai_module.rs::invoke_agent`
     - Loop up to `TURN_LIMIT = 5` turns, calling `agent.completion(&chat_history)`
     - On `AgentResponse::Final(text)` return `AgentOutcome::Final { text, history }`
@@ -261,17 +261,17 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - Register the tool when constructing the agent in `services::ai_module`
     - _Requirements: 8.2, 8.6_
 
-  - [ ] 10.3 Wire `record_extraction` into the post-loop path
+  - [x] 10.3 Wire `record_extraction` into the post-loop path
     - Edit `backend/src/services/chatbot.rs`: when `invoke_agent` returns `Final` and the history contains a successful `ExtractReceiptTool` result, call `record_extraction(db, receipt, organizacion_id, usuario_id)` which delegates to `confirmar_preview`
     - _Requirements: 8.3_
 
-  - [ ] 10.4 Write Property 7 PBT in `backend/tests/ai_module_pbt.rs`
+  - [x] 10.4 Write Property 7 PBT in `backend/tests/ai_module_pbt.rs`
     - `// Feature: spec-gap-remediation, Property 7: Multi-turn agent loop terminates`
     - Iterate `crate::pbt_cases()` random tool-call sequences from a stub LLM (final, tool, error, looping, etc.)
     - Assert: `invoke_agent` always returns within 5 turns with either `Final` text or the Spanish `TurnLimitReached` fallback; never loops indefinitely
     - _Requirements: 8.1, 8.4_
 
-  - [ ] 10.5 Write integration test for `record_extraction` post-loop wiring
+  - [x] 10.5 Write integration test for `record_extraction` post-loop wiring
     - Add to `backend/tests/chatbot_pbt.rs`: stub a successful `ExtractReceiptTool` result, run `invoke_agent`, assert a `Pago` row is persisted via `confirmar_preview`
     - _Requirements: 8.3, 8.5_
 
@@ -323,79 +323,79 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - Edit `frontend/src/components/feature/gasto_filter_bar.rs` to add the two date inputs and propagate state via callback
     - _Requirements: 9.6, 9.8_
 
-  - [ ] 11.10 Write Property 8 PBT in `backend/tests/gastos_pbt.rs`
+  - [x] 11.10 Write Property 8 PBT in `backend/tests/gastos_pbt.rs`
     - `// Feature: spec-gap-remediation, Property 8: Date-range filter on gastos is sound and complete`
     - Iterate `crate::pbt_cases()` random gastos datasets and `(fecha_desde, fecha_hasta)` tuples
     - Assert: every returned row satisfies `fecha_desde <= row.fecha_gasto <= fecha_hasta` and belongs to caller's `organizacion_id`; `fecha_desde > fecha_hasta` yields HTTP `400`
     - _Requirements: 9.6, 9.7_
 
-  - [ ] 11.11 Write `categoria` enum and utility-fields tests in `backend/tests/gastos_tests.rs`
+  - [x] 11.11 Write `categoria` enum and utility-fields tests in `backend/tests/gastos_tests.rs`
     - Property-style negative test (`crate::pbt_cases()` random non-enum strings) asserting `422` with Spanish message
     - Round-trip test for `proveedor`, `numero_cuenta`, `periodo_inicio`, `periodo_fin` create→read
     - _Requirements: 9.4, 9.5_
 
-- [ ] 12. Checkpoint — confirm OCR, WhatsApp AI, and gastos land cleanly
+- [x] 12. Checkpoint — confirm OCR, WhatsApp AI, and gastos land cleanly
   - Run `cargo test --workspace` and the frontend test runner.
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 13. Platform enhancements — dashboard widgets and full PWA (Requirement 6)
+- [x] 13. Platform enhancements — dashboard widgets and full PWA (Requirement 6)
 
   > Deferred to last because tasks 13.5 and 13.6 edit `frontend/index.html`, which would otherwise collide with the `[INIT]` log restoration in task 4. Run task 4 to completion (and the bug-condition PBT in 4.4) before starting this group.
 
-  - [ ] 13.1 Render `Contratos_Por_Vencer_Widget` on the dashboard
+  - [x] 13.1 Render `Contratos_Por_Vencer_Widget` on the dashboard
     - Edit `frontend/src/pages/dashboard.rs` to render three buckets (30/60/90 days) sorted ascending by `fecha_fin`
     - Backed by the existing list endpoint with a `dias` query param
     - Spanish labels (`"Contratos por vencer"`)
     - _Requirements: 6.1, 6.9_
 
-  - [ ] 13.2 Render `Occupancy_Chart` on the dashboard
+  - [x] 13.2 Render `Occupancy_Chart` on the dashboard
     - Wrap `/dashboard/ocupacion-tendencia`; render a 12-month line chart via the existing chart component
     - Spanish title (`"Ocupación últimos 12 meses"`)
     - _Requirements: 6.2, 6.9_
 
-  - [ ] 13.3 Render `Upcoming_Payments_Widget` on the dashboard
+  - [x] 13.3 Render `Upcoming_Payments_Widget` on the dashboard
     - Call `/pagos?estado=pendiente&hasta=YYYY-MM-DD` (next 30 days), sorted ascending by `fecha_vencimiento`
     - Spanish labels; DD/MM/YYYY date format
     - _Requirements: 6.3, 6.9_
 
-  - [ ] 13.4 Create the `Calendar_View` page
+  - [x] 13.4 Create the `Calendar_View` page
     - New `frontend/src/pages/calendario.rs` overlaying contratos (start/end), pagos (due dates), and mantenimientos (appointments) for the user's `organizacion_id`
     - Add `#[at("/calendario")] Calendario` to the `Route` enum
     - Spanish entries; split into sub-components if `html!` exceeds 150 lines
     - _Requirements: 6.4, 6.9_
 
-  - [ ] 13.5 Ship the `PWA_Manifest`
+  - [x] 13.5 Ship the `PWA_Manifest`
     - Create `frontend/manifest.webmanifest` declaring `name`, `short_name`, icons (192, 512), `theme_color`, `background_color`, `display: "standalone"`
     - _Requirements: 6.5_
 
-  - [ ] 13.6 Register the `Service_Worker`
+  - [x] 13.6 Register the `Service_Worker`
     - Create `frontend/service-worker.js` precaching `/index.html`, `/main.wasm`, `/main.js`, theme CSS; add runtime cache and offline fallback
     - Edit `frontend/index.html` to add `<link rel="manifest">` and the SW registration script (do not disturb the `[INIT]` log markers added in task 4)
     - _Requirements: 6.6_
 
-  - [ ] 13.7 Implement `IndexedDB_Cache` wrapper
+  - [x] 13.7 Implement `IndexedDB_Cache` wrapper
     - Create `frontend/src/services/idb_cache.rs` wrapping the `idb` crate with `read_list<T>(store, key) -> Option<Vec<T>>` and `write_list<T>(store, key, value)` via `serde_wasm_bindgen`
     - _Requirements: 6.7_
 
-  - [ ] 13.8 Implement the `Online_Hook` and online listener
+  - [x] 13.8 Implement the `Online_Hook` and online listener
     - Create `frontend/src/services/online.rs` subscribing to browser `online`/`offline` events via `gloo-events`
     - Create `frontend/src/hooks/use_online.rs` exposing `pub fn use_online() -> bool`
     - _Requirements: 6.8_
 
-  - [ ] 13.9 Add the `offline_guard` component
+  - [x] 13.9 Add the `offline_guard` component
     - Create `frontend/src/components/common/offline_guard.rs` wrapping any submit button and rendering it disabled when `use_online()` is false
     - Wire it into create/update/delete buttons across propiedades, inquilinos, contratos, pagos, gastos forms
     - _Requirements: 6.8_
 
-  - [ ] 13.10 Apply cache-first reads in list pages
+  - [x] 13.10 Apply cache-first reads in list pages
     - Edit `frontend/src/pages/{propiedades,inquilinos,contratos,pagos,gastos}.rs` to: try `idb_cache::read_list` first when offline; on successful network read, write-through via `idb_cache::write_list`
     - _Requirements: 6.7, 6.8_
 
-  - [ ] 13.11 Write tests for manifest, service-worker registration, and `use_online`
+  - [x] 13.11 Write tests for manifest, service-worker registration, and `use_online`
     - `wasm-bindgen-test` cases asserting `manifest.webmanifest` ships with the required fields, the SW registers, `use_online` reflects toggled events, and `offline_guard` disables buttons when offline
     - _Requirements: 6.5, 6.6, 6.8, 6.9_
 
-- [~] 14. Final checkpoint — full workspace verification
+- [x] 14. Final checkpoint — full workspace verification
   - Run `cargo test --workspace` and the frontend test runner one last time
   - Verify K8s manifests parse (`kubectl --dry-run=client apply -f infra/k8s/app/`) and that the OVMS endpoint is `/v3` with `OPENVINO_DEVICE=CPU`
   - Ensure all tests pass, ask the user if questions arise.

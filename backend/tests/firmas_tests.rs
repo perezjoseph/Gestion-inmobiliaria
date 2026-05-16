@@ -86,7 +86,7 @@ fn make_config() -> AppConfig {
             baileys_service_url: "http://baileys:3100".to_string(),
             baileys_internal_token: "a]3kF9#mP7vL2nQ8wR5xT0yU4zA1bC6dE".to_string(),
             ovms_endpoint: "http://ovms:8000/v1".to_string(),
-            ovms_chat_model: "qwen3.6".to_string(),
+            ovms_chat_model: "Qwen3.6-35B-A3B".to_string(),
             ai_chat_timeout_secs: 30,
         },
     }
@@ -262,6 +262,7 @@ async fn create_test_documento(db: &DatabaseConnection, user_id: Uuid, org_id: U
         updated_at: Set(Some(now)),
         sellado: Set(false),
         sellado_at: Set(None),
+        documento_origen_id: Set(None),
     }
     .insert(db)
     .await
@@ -997,6 +998,7 @@ fn test_docx_export_no_content_returns_400() {
             updated_at: Set(Some(now)),
             sellado: Set(false),
             sellado_at: Set(None),
+            documento_origen_id: Set(None),
         }
         .insert(&db)
         .await
@@ -1393,5 +1395,296 @@ fn test_rbac_docx_export_rejects_unauthenticated() {
             StatusCode::UNAUTHORIZED,
             "Unauthenticated should get 401 on DOCX export"
         );
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Test: Mail integration using file-transport (AsyncFileTransport)
+// Requirements: 3.5, 3.6
+// ═══════════════════════════════════════════════════════════════════════
+
+/// A `MailClient` implementation backed by `lettre::AsyncFileTransport`.
+/// Writes `.eml` files to a temp directory for test inspection.
+struct FileMailClient {
+    dir: std::path::PathBuf,
+}
+
+impl FileMailClient {
+    fn new(dir: std::path::PathBuf) -> Self {
+        Self { dir }
+    }
+}
+
+impl realestate_backend::services::mail::MailClient for FileMailClient {
+    fn send(
+        &self,
+        msg: realestate_backend::services::mail::OutgoingMail,
+    ) -> std::pin::Pin<
+        Box<
+            dyn std::future::Future<Output = Result<(), realestate_backend::errors::AppError>>
+                + Send
+                + '_,
+        >,
+    > {
+        Box::pin(async move {
+            use lettre::message::MultiPart;
+            use lettre::{AsyncFileTransport, AsyncTransport, Message, Tokio1Executor};
+
+            let email = Message::builder()
+                .from("no-reply@myhomeva.us".parse().unwrap())
+                .to(msg.to.parse().map_err(|e| {
+                    realestate_backend::errors::AppError::Validation(format!(
+                        "Dirección de correo inválida: {e}"
+                    ))
+                })?)
+                .subject(&msg.subject)
+                .multipart(MultiPart::alternative_plain_html(
+                    msg.body_text,
+                    msg.body_html,
+                ))
+                .map_err(|e| {
+                    realestate_backend::errors::AppError::Internal(anyhow::anyhow!(
+                        "Error construyendo correo: {e}"
+                    ))
+                })?;
+
+            let transport = AsyncFileTransport::<Tokio1Executor>::new(&self.dir);
+            transport.send(email).await.map_err(|e| {
+                realestate_backend::errors::AppError::Internal(anyhow::anyhow!(
+                    "Error escribiendo correo a archivo: {e}"
+                ))
+            })?;
+
+            Ok(())
+        })
+    }
+}
+
+#[test]
+fn test_mail_file_transport_signing_email() {
+    dotenvy::dotenv().ok();
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        // Create a temp directory for .eml files
+        let mail_dir = std::env::temp_dir().join(format!("mail_test_{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&mail_dir).unwrap();
+
+        let mail_client = FileMailClient::new(mail_dir.clone());
+
+        let recipient = "inquilino@example.com";
+        let token = "abc123-test-token";
+        let password = "SecurePass99";
+
+        // Call the signing email function directly
+        let result = realestate_backend::services::firmas::enviar_email_firma(
+            &mail_client,
+            recipient,
+            token,
+            password,
+        )
+        .await;
+
+        assert!(
+            result.is_ok(),
+            "enviar_email_firma should succeed: {result:?}"
+        );
+
+        // Find the .eml file written by the file transport
+        let entries: Vec<_> = std::fs::read_dir(&mail_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "eml"))
+            .collect();
+
+        assert_eq!(
+            entries.len(),
+            1,
+            "Expected exactly one .eml file, found {}",
+            entries.len()
+        );
+
+        let eml_content = std::fs::read_to_string(entries[0].path()).unwrap();
+
+        // Helper: decode MIME Q-encoded and base64 body parts for assertion.
+        // lettre Q-encodes the Subject (spaces → '_', non-ASCII → =XX) and
+        // may base64-encode multipart body parts.
+        let decoded_subject = {
+            use base64::Engine;
+            // Extract Subject header line(s) and decode MIME encoded-words
+            let mut subj = String::new();
+            for line in eml_content.lines() {
+                if line.starts_with("Subject:") {
+                    subj = line.to_string();
+                    // Continuation lines (start with whitespace)
+                    continue;
+                }
+                if !subj.is_empty() && (line.starts_with(' ') || line.starts_with('\t')) {
+                    subj.push_str(line.trim());
+                } else if !subj.is_empty() {
+                    break;
+                }
+            }
+            // Decode =?utf-8?b?...?= (base64) and =?utf-8?q?...?= (quoted-printable) tokens
+            let mut decoded = subj.clone();
+            // Base64 encoded words
+            while let Some(start) = decoded
+                .find("=?utf-8?b?")
+                .or_else(|| decoded.find("=?UTF-8?b?"))
+            {
+                let prefix_len = "=?utf-8?b?".len();
+                if let Some(end) = decoded[start + prefix_len..].find("?=") {
+                    let b64_data = &decoded[start + prefix_len..start + prefix_len + end];
+                    if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(b64_data) {
+                        if let Ok(text) = String::from_utf8(bytes) {
+                            decoded = format!(
+                                "{}{}{}",
+                                &decoded[..start],
+                                text,
+                                &decoded[start + prefix_len + end + 2..]
+                            );
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+            // Q-encoded words
+            if decoded.contains("=?utf-8?q?") || decoded.contains("=?UTF-8?q?") {
+                decoded = decoded
+                    .replace('_', " ")
+                    .replace("=C3=B3", "ó")
+                    .replace("=C3=A9", "é")
+                    .replace("=C3=AD", "í")
+                    .replace("=?utf-8?q?", "")
+                    .replace("=?UTF-8?q?", "")
+                    .replace("?=", "");
+            }
+            decoded
+        };
+
+        // Decode base64 body parts to check content
+        let decoded_body = {
+            use base64::Engine;
+            let mut body = String::new();
+            let mut in_base64_part = false;
+            let mut b64_buf = String::new();
+            for line in eml_content.lines() {
+                if line.starts_with("Content-Transfer-Encoding: base64") {
+                    in_base64_part = true;
+                    b64_buf.clear();
+                    continue;
+                }
+                if in_base64_part {
+                    if line.is_empty() && !b64_buf.is_empty() {
+                        // Skip the blank line after the header
+                        continue;
+                    }
+                    if line.starts_with("--") {
+                        // MIME boundary — decode accumulated base64
+                        if let Ok(bytes) =
+                            base64::engine::general_purpose::STANDARD.decode(b64_buf.trim())
+                        {
+                            if let Ok(text) = String::from_utf8(bytes) {
+                                body.push_str(&text);
+                                body.push('\n');
+                            }
+                        }
+                        b64_buf.clear();
+                        in_base64_part = false;
+                    } else {
+                        b64_buf.push_str(line);
+                    }
+                }
+            }
+            // Decode any remaining base64 buffer
+            if !b64_buf.is_empty() {
+                if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(b64_buf.trim())
+                {
+                    if let Ok(text) = String::from_utf8(bytes) {
+                        body.push_str(&text);
+                    }
+                }
+            }
+            // Also include raw eml_content as fallback (for 7bit/quoted-printable parts)
+            format!("{body}\n{eml_content}")
+        };
+
+        // Assert Spanish subject
+        assert!(
+            decoded_subject.contains("Firma electr"),
+            "Email should contain Spanish subject about firma electrónica. Got: {decoded_subject}"
+        );
+        assert!(
+            decoded_subject.contains("contrato"),
+            "Email subject should reference contrato. Got: {decoded_subject}"
+        );
+
+        // Assert recipient address
+        assert!(
+            eml_content.contains(recipient),
+            "Email should be addressed to the recipient: {recipient}"
+        );
+
+        // Assert Spanish body content
+        assert!(
+            decoded_body.contains("inquilino") || decoded_body.contains("Estimado"),
+            "Email body should contain Spanish text"
+        );
+        assert!(
+            decoded_body.contains("firma electr") || decoded_body.contains("firma"),
+            "Email body should mention firma"
+        );
+
+        // Assert signing link is present
+        assert!(
+            decoded_body.contains(&format!("/firmas/{token}")),
+            "Email should contain the signing link with token"
+        );
+
+        // Assert from address
+        assert!(
+            eml_content.contains("no-reply@myhomeva.us"),
+            "Email should be from no-reply@myhomeva.us"
+        );
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&mail_dir);
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Test: Real Mailcow staging (gated, requires SMTP credentials)
+// Requirements: 3.5, 3.6
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+#[ignore = "Requires real Mailcow SMTP credentials (SMTP_HOST, SMTP_USER, SMTP_PASS)"]
+fn test_mail_real_mailcow_staging() {
+    dotenvy::dotenv().ok();
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        use realestate_backend::config::SmtpConfig;
+        use realestate_backend::services::mail::SmtpMailClient;
+
+        let smtp_cfg = SmtpConfig::from_env().expect("SMTP env vars must be set for staging test");
+        let client = SmtpMailClient::from_config(&smtp_cfg)
+            .expect("SmtpMailClient should build from valid config");
+
+        let test_recipient = std::env::var("SMTP_TEST_RECIPIENT")
+            .unwrap_or_else(|_| "staging-test@myhomeva.us".to_string());
+
+        let result = realestate_backend::services::firmas::enviar_email_firma(
+            &client,
+            &test_recipient,
+            "staging-test-token-12345",
+            "StagingPass123",
+        )
+        .await;
+
+        assert!(result.is_ok(), "Real SMTP send should succeed: {result:?}");
     });
 }

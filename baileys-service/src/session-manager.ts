@@ -296,6 +296,7 @@ async function forwardToBackend(realmId: string, message: any): Promise<void> {
     return;
   }
 
+  const sessionInfo = sessions.get(realmId);
   const payload = {
     realmId,
     senderPhone,
@@ -306,6 +307,7 @@ async function forwardToBackend(realmId: string, message: any): Promise<void> {
     timestamp: message.messageTimestamp
       ? Number(message.messageTimestamp)
       : Math.floor(Date.now() / 1000),
+    sessionPhone: sessionInfo?.connectedPhone ?? null,
   };
 
   const webhookUrl = `${BACKEND_WEBHOOK_URL}/internal/whatsapp/incoming`;

@@ -115,6 +115,8 @@ pub struct IncomingWebhookPayload {
     pub caption: Option<String>,
     pub message_id: String,
     pub timestamp: i64,
+    #[serde(default)]
+    pub session_phone: Option<String>,
 }
 
 /// Request to send a message via Baileys service.

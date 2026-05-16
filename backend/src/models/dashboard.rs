@@ -59,4 +59,6 @@ pub struct GastosComparacion {
     pub mes_actual: Decimal,
     pub mes_anterior: Decimal,
     pub porcentaje_cambio: f64,
+    pub total_pendiente: Decimal,
+    pub gastos_vencidos: u64,
 }

@@ -27,11 +27,21 @@ fn route_variant_name(index: usize) -> &'static str {
         11 => "Importar",
         12 => "Mantenimiento",
         13 => "NotFound",
+        14 => "Gastos",
+        15 => "CategoriasGastos",
+        16 => "Notificaciones",
+        17 => "Configuracion",
+        18 => "ConfiguracionChatbot",
+        19 => "Plantillas",
+        20 => "DocumentosPorVencer",
+        21 => "DocumentoEditor",
+        22 => "DocumentoEditorExisting",
+        23 => "FirmaPublica",
         _ => unreachable!(),
     }
 }
 
-const ROUTE_COUNT: usize = 14;
+const ROUTE_COUNT: usize = 24;
 
 const SWITCH_FN_SOURCE: &str = include_str!("../src/app.rs");
 
@@ -346,5 +356,301 @@ mod preservation_spinner_removal {
             has_remove,
             "index.html must call .remove() on the loading element",
         );
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Feature: spec-gap-remediation, Bug_Condition_PBT: All [INIT] markers present at boot
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// This PBT verifies that the six [INIT] bootstrap markers are emitted for every
+// (route, auth_state) permutation. Since WASM browser tests require a headless
+// browser environment (CI), we verify the property via source-level analysis:
+// the markers must be unconditionally present in the code paths that execute
+// for each route/auth combination.
+//
+// The six required markers:
+//   1. "[INIT] pre-renderer"       — in main.rs before renderer starts
+//   2. "[INIT] app mounted"        — in App component body
+//   3. "[INIT] route resolution"   — in Switch<Route> render closure
+//   4. "[INIT] switch"             — in switch() function body
+//   5. "[INIT] auth check"         — in ProtectedRoute component body
+//   6. "[INIT] first route rendered" — in ProtectedRoute auth-success path
+
+const MAIN_RS_SOURCE: &str = include_str!("../src/main.rs");
+
+const INIT_MARKERS: [&str; 6] = [
+    "[INIT] pre-renderer",
+    "[INIT] app mounted",
+    "[INIT] route resolution",
+    "[INIT] switch",
+    "[INIT] auth check",
+    "[INIT] first route rendered",
+];
+
+/// Markers that fire unconditionally on every boot (before auth branching).
+const UNCONDITIONAL_MARKERS: [&str; 4] = [
+    "[INIT] pre-renderer",
+    "[INIT] app mounted",
+    "[INIT] route resolution",
+    "[INIT] switch",
+];
+
+/// Markers that fire only for protected (authenticated) routes.
+#[allow(dead_code)]
+const PROTECTED_ONLY_MARKERS: [&str; 2] = ["[INIT] auth check", "[INIT] first route rendered"];
+
+/// Routes that go through ProtectedRoute (authenticated).
+const AUTH_PROTECTED_ROUTES: [&str; 20] = [
+    "Dashboard",
+    "Propiedades",
+    "Inquilinos",
+    "Contratos",
+    "Pagos",
+    "Gastos",
+    "CategoriasGastos",
+    "Reportes",
+    "UsuariosPage",
+    "Perfil",
+    "AuditoriaPage",
+    "Importar",
+    "Mantenimiento",
+    "Notificaciones",
+    "Configuracion",
+    "ConfiguracionChatbot",
+    "Plantillas",
+    "DocumentosPorVencer",
+    "DocumentoEditor",
+    "DocumentoEditorExisting",
+];
+
+/// Routes that render directly without ProtectedRoute (public).
+#[allow(dead_code)]
+const PUBLIC_BOOT_ROUTES: [&str; 4] = ["Login", "Registro", "FirmaPublica", "NotFound"];
+
+/// Auth states for permutation testing.
+#[derive(Debug, Clone, Copy)]
+enum AuthState {
+    Authenticated,
+    Unauthenticated,
+}
+
+fn auth_state_from_index(idx: usize) -> AuthState {
+    match idx % 2 {
+        0 => AuthState::Authenticated,
+        _ => AuthState::Unauthenticated,
+    }
+}
+
+/// Returns the set of [INIT] markers expected for a given (route, auth_state) pair.
+fn expected_markers_for(route: &str, auth: AuthState) -> Vec<&'static str> {
+    let mut markers: Vec<&str> = UNCONDITIONAL_MARKERS.to_vec();
+
+    let is_protected = AUTH_PROTECTED_ROUTES.contains(&route);
+
+    if is_protected {
+        // Protected routes always hit ProtectedRoute, which emits "auth check".
+        markers.push("[INIT] auth check");
+        // "first route rendered" only fires when authenticated.
+        if matches!(auth, AuthState::Authenticated) {
+            markers.push("[INIT] first route rendered");
+        }
+    }
+
+    markers
+}
+
+/// Checks that a marker is present in the correct source file.
+fn marker_present_in_source(marker: &str) -> bool {
+    match marker {
+        "[INIT] pre-renderer" => MAIN_RS_SOURCE.contains(marker),
+        "[INIT] app mounted" => SWITCH_FN_SOURCE.contains(marker),
+        "[INIT] route resolution" => SWITCH_FN_SOURCE.contains(marker),
+        "[INIT] switch" => SWITCH_FN_SOURCE.contains(marker),
+        "[INIT] auth check" => SWITCH_FN_SOURCE.contains(marker),
+        "[INIT] first route rendered" => SWITCH_FN_SOURCE.contains(marker),
+        _ => false,
+    }
+}
+
+/// Verifies that a marker is NOT gated behind cfg(debug_assertions).
+fn marker_not_debug_gated(marker: &str) -> bool {
+    let source = if marker == "[INIT] pre-renderer" {
+        MAIN_RS_SOURCE
+    } else {
+        SWITCH_FN_SOURCE
+    };
+
+    let Some(pos) = source.find(marker) else {
+        return false;
+    };
+
+    // Check the 200 chars before the marker for a debug gate
+    let start = pos.saturating_sub(200);
+    let preceding = &source[start..pos];
+    !preceding.contains("cfg(debug_assertions)") && !preceding.contains("#[cfg(debug_assertions)]")
+}
+
+// **Validates: Requirements 7.1, 7.2, 7.3, 7.4**
+#[cfg(test)]
+mod bug_condition_pbt {
+    use super::*;
+
+    /// Structural pre-check: all six markers exist in source and are not debug-gated.
+    #[test]
+    fn all_init_markers_present_in_source() {
+        for marker in &INIT_MARKERS {
+            assert!(
+                marker_present_in_source(marker),
+                "Missing [INIT] marker in source: {marker}",
+            );
+            assert!(
+                marker_not_debug_gated(marker),
+                "[INIT] marker must not be gated behind cfg(debug_assertions): {marker}",
+            );
+        }
+    }
+
+    /// Verify pre-renderer fires before the renderer call.
+    #[test]
+    fn pre_renderer_fires_before_render() {
+        let marker_pos = MAIN_RS_SOURCE
+            .find("[INIT] pre-renderer")
+            .expect("[INIT] pre-renderer must exist in main.rs");
+        let render_pos = MAIN_RS_SOURCE
+            .find("Renderer::<")
+            .or_else(|| MAIN_RS_SOURCE.find("yew::Renderer"))
+            .expect("yew::Renderer call must exist in main.rs");
+        assert!(
+            marker_pos < render_pos,
+            "[INIT] pre-renderer must fire BEFORE yew::Renderer is called",
+        );
+    }
+
+    /// Verify switch marker fires unconditionally at the top of switch().
+    #[test]
+    fn switch_marker_at_top_of_switch_fn() {
+        let switch_fn = extract_switch_fn(SWITCH_FN_SOURCE);
+        assert!(
+            !switch_fn.is_empty(),
+            "switch() function must exist in app.rs",
+        );
+        let marker_pos = switch_fn
+            .find("[INIT] switch")
+            .expect("[INIT] switch must exist inside switch()");
+        let match_pos = switch_fn
+            .find("match")
+            .expect("switch() must contain a match expression");
+        assert!(
+            marker_pos < match_pos,
+            "[INIT] switch must fire BEFORE the match expression in switch()",
+        );
+    }
+
+    /// Verify auth check and first route rendered are inside ProtectedRoute.
+    #[test]
+    fn auth_markers_inside_protected_route() {
+        let pr_fn = extract_protected_route_fn(SWITCH_FN_SOURCE);
+        assert!(
+            !pr_fn.is_empty(),
+            "ProtectedRoute function must exist in app.rs",
+        );
+        assert!(
+            pr_fn.contains("[INIT] auth check"),
+            "[INIT] auth check must be inside ProtectedRoute",
+        );
+        assert!(
+            pr_fn.contains("[INIT] first route rendered"),
+            "[INIT] first route rendered must be inside ProtectedRoute",
+        );
+    }
+
+    /// Verify "first route rendered" fires only after auth succeeds (after is_authed check).
+    #[test]
+    fn first_route_rendered_after_auth_check() {
+        let pr_fn = extract_protected_route_fn(SWITCH_FN_SOURCE);
+        let auth_check_pos = pr_fn
+            .find("[INIT] auth check")
+            .expect("[INIT] auth check must exist in ProtectedRoute");
+        let first_rendered_pos = pr_fn
+            .find("[INIT] first route rendered")
+            .expect("[INIT] first route rendered must exist in ProtectedRoute");
+        let is_authed_pos = pr_fn
+            .find("is_authed")
+            .expect("ProtectedRoute must check is_authed");
+        assert!(
+            auth_check_pos < is_authed_pos,
+            "[INIT] auth check must fire before is_authed branching",
+        );
+        assert!(
+            first_rendered_pos > is_authed_pos,
+            "[INIT] first route rendered must fire after is_authed check (auth-success path only)",
+        );
+    }
+}
+
+// **Validates: Requirements 7.1, 7.2, 7.3, 7.4**
+//
+// Bug_Condition_PBT: For every (route, auth_state) permutation, all expected
+// [INIT] markers are present in the code paths that will execute at boot.
+// On failure, the counterexample identifies the missing stage.
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(48))]
+    #[test]
+    fn bug_condition_all_init_markers_present_at_boot(
+        route_idx in 0..ROUTE_COUNT,
+        auth_idx in 0..2usize,
+    ) {
+        let route = route_variant_name(route_idx);
+        let auth = auth_state_from_index(auth_idx);
+        let expected = expected_markers_for(route, auth);
+        let switch_fn = extract_switch_fn(SWITCH_FN_SOURCE);
+
+        // Verify the route is handled in switch()
+        prop_assert!(
+            switch_fn.contains(&format!("Route::{route}"))
+                || switch_fn.contains(route),
+            "Route::{} not found in switch() — boot path broken",
+            route,
+        );
+
+        // Verify each expected marker is present in source
+        for marker in &expected {
+            prop_assert!(
+                marker_present_in_source(marker),
+                "Missing [INIT] stage '{}' for route={}, auth={:?} — \
+                 counterexample: (route={}, auth_state={:?}, missing_stage='{}')",
+                marker, route, auth, route, auth, marker,
+            );
+
+            // Verify not debug-gated (Requirement 7.4)
+            prop_assert!(
+                marker_not_debug_gated(marker),
+                "[INIT] stage '{}' is gated behind cfg(debug_assertions) — \
+                 must be present in production builds. \
+                 counterexample: (route={}, auth_state={:?}, debug_gated_stage='{}')",
+                marker, route, auth, marker,
+            );
+        }
+
+        // For protected routes, verify ProtectedRoute wraps the route
+        let is_protected = AUTH_PROTECTED_ROUTES.contains(&route);
+        if is_protected {
+            let arm = format!("Route::{route}");
+            if let Some(arm_start) = switch_fn.find(&arm) {
+                let arm_rest = &switch_fn[arm_start..];
+                let next_route = arm_rest[1..].find("Route::");
+                let arm_text = match next_route {
+                    Some(end) => &arm_rest[..end + 1],
+                    None => arm_rest,
+                };
+                prop_assert!(
+                    arm_text.contains("ProtectedRoute"),
+                    "Route::{} must be wrapped in <ProtectedRoute> to emit auth markers — \
+                     counterexample: (route={}, missing ProtectedRoute wrapper)",
+                    route, route,
+                );
+            }
+        }
     }
 }
