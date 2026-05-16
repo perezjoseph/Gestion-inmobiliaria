@@ -50,8 +50,50 @@ jobs:
             echo "found=true" >> "$GITHUB_OUTPUT"
           else
             echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::No diagnostics artifacts found from CI run ${{ github.event.workflow_run.id }}"
+            echo "::warning::No diagnostics artifacts found from CI run ${{ github.event.workflow_run.id }}. Will run fallback checks."
           fi
+
+      - name: Checkout for fallback diagnostics
+        if: steps.check-diag.outputs.found == 'false'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          persist-credentials: false
+
+      - name: Rust setup (fallback)
+        if: steps.check-diag.outputs.found == 'false'
+        uses: ./.github/actions/rust-setup
+        with:
+          components: rustfmt,clippy
+          targets: x86_64-unknown-linux-musl,wasm32-unknown-unknown
+
+      - name: Generate fallback diagnostics
+        if: steps.check-diag.outputs.found == 'false'
+        run: |
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/diag"
+          OUT="${RUNNER_TEMP}/diag/context.txt"
+          {
+            echo "=== CI FAILURE DIAGNOSTICS (FALLBACK — no per-job artifacts found) ==="
+            echo "=== Source workflow run: ${{ github.event.workflow_run.html_url }} ==="
+            echo "=== Branch: ${{ github.event.workflow_run.head_branch }} ==="
+            echo ""
+            echo "=== RUSTFMT CHECK ==="
+            cargo fmt --all -- --check 2>&1 || true
+            echo ""
+            echo "=== CLIPPY BACKEND ==="
+            cargo clippy --locked -p realestate-backend -- -D warnings 2>&1 || true
+            echo ""
+            echo "=== CLIPPY FRONTEND ==="
+            cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings 2>&1 || true
+            echo ""
+            echo "=== CARGO TEST BACKEND (last 150 lines) ==="
+            cargo test --locked -p realestate-backend --no-fail-fast 2>&1 | tail -150 || true
+            echo ""
+            echo "=== CARGO TEST FRONTEND (last 150 lines) ==="
+            cargo test --locked -p realestate-frontend --no-fail-fast 2>&1 | tail -150 || true
+          } > "$OUT"
+          echo "Wrote $(wc -l < "$OUT") lines to $OUT"
 
       - name: Merge diagnostics into single context file
         if: steps.check-diag.outputs.found == 'true'
@@ -81,15 +123,15 @@ jobs:
           echo "Wrote $(wc -l < "$OUT") lines to $OUT"
 
       - name: Upload merged diagnostics
-        if: steps.check-diag.outputs.found == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
         with:
           name: kiro-build-diagnostics
           path: ${{ runner.temp }}/diag/context.txt
           retention-days: 1
+          if-no-files-found: warn
 
     outputs:
-      has-diagnostics: ${{ steps.check-diag.outputs.found }}
+      has-diagnostics: "true"
 
   kiro-autofix-build:
     name: Kiro Autofix (build)
