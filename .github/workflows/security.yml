@@ -31,7 +31,20 @@ jobs:
           gitleaks: "true"
 
       - name: Run Gitleaks secret detection
-        run: gitleaks detect --source . --verbose --redact --exit-code 1
+        id: gitleaks
+        run: gitleaks detect --source . --verbose --redact --exit-code 1 2>&1 | tee "${RUNNER_TEMP}/gitleaks-output.txt"
+
+      - name: Collect diagnostics
+        if: failure()
+        uses: ./.github/actions/collect-diagnostics
+        with:
+          job-name: "security / secret-scan (gitleaks)"
+          artifact-suffix: security-gitleaks
+          step-outcomes: |
+            gitleaks=${{ steps.gitleaks.outcome }}
+          output-files: |
+            ${{ runner.temp }}/gitleaks-output.txt
+          extra-context: "Do NOT commit secrets. Fix by removing the secret from source and rotating it."
 
   dependency-review:
     name: Dependency Review (PR)
@@ -94,28 +107,16 @@ jobs:
             cargo deny check 2>&1 | tee "${RUNNER_TEMP}/deny-output.txt"
             exit ${PIPESTATUS[0]}
 
-      - name: Collect cargo-deny diagnostics on failure
+      - name: Collect diagnostics
         if: failure() && steps.install_deny.outputs.installed == 'true'
-        run: |
-          umask 077
-          mkdir -p "${RUNNER_TEMP}/diag"
-          OUT="${RUNNER_TEMP}/diag/context.txt"
-          {
-            echo "=== JOB: security / cargo-deny ==="
-            echo "=== FAILED STEP: cargo_deny=${{ steps.cargo_deny.outcome }} ==="
-            echo ""
-            echo "=== CARGO DENY OUTPUT ==="
-            cat "${RUNNER_TEMP}/deny-output.txt" 2>/dev/null || echo "(no output captured)"
-          } > "$OUT"
-          echo "Wrote $(wc -l < "$OUT") lines to $OUT"
-
-      - name: Upload cargo-deny diagnostics
-        if: failure() && steps.install_deny.outputs.installed == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        uses: ./.github/actions/collect-diagnostics
         with:
-          name: diag-security-cargo-deny
-          path: ${{ runner.temp }}/diag/context.txt
-          retention-days: 1
+          job-name: "security / cargo-deny"
+          artifact-suffix: security-cargo-deny
+          step-outcomes: |
+            cargo_deny=${{ steps.cargo_deny.outcome }}
+          output-files: |
+            ${{ runner.temp }}/deny-output.txt
 
       - name: Generate cargo-deny SARIF report
         if: "!cancelled() && steps.install_deny.outputs.installed == 'true'"
@@ -175,28 +176,16 @@ jobs:
               infra/docker/ 2>&1 | tee "${RUNNER_TEMP}/trivy-iac-output.txt"
             exit ${PIPESTATUS[0]}
 
-      - name: Collect trivy-iac diagnostics on failure
+      - name: Collect diagnostics
         if: failure() && steps.install_trivy.outputs.trivy-installed == 'true'
-        run: |
-          umask 077
-          mkdir -p "${RUNNER_TEMP}/diag"
-          OUT="${RUNNER_TEMP}/diag/context.txt"
-          {
-            echo "=== JOB: security / trivy-iac ==="
-            echo "=== FAILED STEP: trivy_iac=${{ steps.trivy_iac.outcome }} ==="
-            echo ""
-            echo "=== TRIVY IAC SCAN OUTPUT ==="
-            cat "${RUNNER_TEMP}/trivy-iac-output.txt" 2>/dev/null || echo "(no output captured)"
-          } > "$OUT"
-          echo "Wrote $(wc -l < "$OUT") lines to $OUT"
-
-      - name: Upload trivy-iac diagnostics
-        if: failure() && steps.install_trivy.outputs.trivy-installed == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        uses: ./.github/actions/collect-diagnostics
         with:
-          name: diag-security-trivy-iac
-          path: ${{ runner.temp }}/diag/context.txt
-          retention-days: 1
+          job-name: "security / trivy-iac"
+          artifact-suffix: security-trivy-iac
+          step-outcomes: |
+            trivy_iac=${{ steps.trivy_iac.outcome }}
+          output-files: |
+            ${{ runner.temp }}/trivy-iac-output.txt
 
       - name: Generate Trivy IaC SARIF report
         if: "!cancelled() && steps.install_trivy.outputs.trivy-installed == 'true'"

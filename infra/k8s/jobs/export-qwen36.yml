@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: export-qwen36-35b-a3b
+  name: export-qwen35-35b-a3b
   namespace: realestate
 spec:
   backoffLimit: 1
@@ -35,24 +35,25 @@ spec:
               pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
               pip install --no-cache-dir git+https://github.com/huggingface/optimum-intel.git
               pip install --no-cache-dir git+https://github.com/huggingface/optimum.git
-              pip install --no-cache-dir git+https://github.com/huggingface/transformers.git
+              pip install --no-cache-dir "transformers>=5.5,<5.8"
 
               echo "=== Removing old model (if exists) ==="
               rm -rf /models/Qwen3-30B-A3B || true
-              echo "Old model removed."
+              rm -rf /models/Qwen3.6-35B-A3B || true
+              echo "Old models removed."
 
-              echo "=== Exporting Qwen3.6-35B-A3B to OpenVINO IR (INT4) ==="
+              echo "=== Exporting Qwen3.5-35B-A3B to OpenVINO IR (INT4) ==="
               optimum-cli export openvino \
-                --model Qwen/Qwen3.6-35B-A3B \
+                --model Qwen/Qwen3.5-35B-A3B \
                 --weight-format int4 \
                 --group-size 128 \
                 --ratio 1.0 \
                 --task image-text-to-text \
-                /models/Qwen3.6-35B-A3B
+                /models/Qwen3.5-35B-A3B
 
               echo "=== Export complete ==="
-              ls -la /models/Qwen3.6-35B-A3B/
-              du -sh /models/Qwen3.6-35B-A3B/
+              ls -la /models/Qwen3.5-35B-A3B/
+              du -sh /models/Qwen3.5-35B-A3B/
               echo "=== Cleaning up cache ==="
               rm -rf /models/.hf_cache /models/.pip_cache
               echo "=== Done ==="

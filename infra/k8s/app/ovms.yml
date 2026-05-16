@@ -96,8 +96,8 @@ data:
       "model_config_list": [],
       "mediapipe_config_list": [
         {
-          "name": "Qwen3.6-35B-A3B",
-          "base_path": "/models/Qwen3.6-35B-A3B"
+          "name": "Qwen3.5-35B-A3B",
+          "base_path": "/models/Qwen3.5-35B-A3B"
         }
       ]
     }
@@ -119,7 +119,7 @@ data:
       }
       node_options: {
         [type.googleapis.com/mediapipe.LLMCalculatorOptions]: {
-          models_path: "/models/Qwen3.6-35B-A3B"
+          models_path: "/models/Qwen3.5-35B-A3B"
           device: "GPU"
           enable_prefix_caching: true
           max_num_batched_tokens: 8192

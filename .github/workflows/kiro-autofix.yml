@@ -25,6 +25,11 @@ on:
         type: string
         required: false
         default: "context.txt"
+      artifact-run-id:
+        description: "Workflow run ID where the artifact lives. Empty = current run."
+        type: string
+        required: false
+        default: ""
       run-url:
         description: "URL of the failing workflow run for traceability"
         type: string
@@ -68,6 +73,8 @@ jobs:
         with:
           name: ${{ inputs.context-artifact }}
           path: ${{ runner.temp }}/kiro-context
+          run-id: ${{ inputs.artifact-run-id || github.run_id }}
+          github-token: ${{ secrets.github-token }}
 
       - name: Count prior autofix attempts on this branch
         id: attempts

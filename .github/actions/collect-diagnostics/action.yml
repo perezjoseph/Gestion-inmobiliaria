@@ -1,0 +1,97 @@
+name: Collect Job Diagnostics
+description: >
+  Captures diagnostics from a failed job and uploads them as an artifact
+  for the Kiro Autofix workflow. Add as the last step(s) in any job with
+  `if: failure()`. Reads output files you specify and packages them into
+  a single diag-* artifact.
+
+inputs:
+  job-name:
+    description: "Human-readable job identifier (e.g. 'build-and-test / backend')"
+    required: true
+  artifact-suffix:
+    description: "Unique suffix for the artifact name (e.g. 'build-backend'). Final name: diag-{suffix}"
+    required: true
+  output-files:
+    description: |
+      Newline-separated list of file paths to include in diagnostics.
+      Non-existent or empty files are silently skipped.
+      Example: |
+        ${{ runner.temp }}/clippy-output.txt
+        ${{ runner.temp }}/test-output.txt
+    required: false
+    default: ""
+  step-outcomes:
+    description: |
+      Newline-separated list of "step_name=outcome" pairs for the summary header.
+      Example: |
+        clippy=${{ steps.clippy.outcome }}
+        tests=${{ steps.tests.outcome }}
+        build=${{ steps.build.outcome }}
+    required: false
+    default: ""
+  extra-context:
+    description: "Additional text to append (e.g. notes, hints for the fixer)"
+    required: false
+    default: ""
+  tail-lines:
+    description: "Max lines to keep from each output file (0 = no limit)"
+    required: false
+    default: "200"
+
+runs:
+  using: composite
+  steps:
+    - name: Build diagnostics file
+      shell: bash
+      env:
+        JOB_NAME: ${{ inputs.job-name }}
+        ARTIFACT_SUFFIX: ${{ inputs.artifact-suffix }}
+        OUTPUT_FILES: ${{ inputs.output-files }}
+        STEP_OUTCOMES: ${{ inputs.step-outcomes }}
+        EXTRA_CONTEXT: ${{ inputs.extra-context }}
+        TAIL_LINES: ${{ inputs.tail-lines }}
+      run: |
+        umask 077
+        mkdir -p "${RUNNER_TEMP}/diag"
+        OUT="${RUNNER_TEMP}/diag/context.txt"
+
+        {
+          echo "=== JOB: ${JOB_NAME} ==="
+
+          if [ -n "${STEP_OUTCOMES}" ]; then
+            echo "=== FAILED STEPS: ${STEP_OUTCOMES} ==="
+          fi
+          echo ""
+
+          # Include each output file
+          while IFS= read -r filepath; do
+            filepath=$(echo "$filepath" | xargs)  # trim whitespace
+            [ -z "$filepath" ] && continue
+            if [ -s "$filepath" ]; then
+              basename_label=$(basename "$filepath")
+              echo "=== OUTPUT: ${basename_label} ==="
+              if [ "${TAIL_LINES}" -gt 0 ] 2>/dev/null; then
+                tail -"${TAIL_LINES}" "$filepath"
+              else
+                cat "$filepath"
+              fi
+              echo ""
+            fi
+          done <<< "${OUTPUT_FILES}"
+
+          if [ -n "${EXTRA_CONTEXT}" ]; then
+            echo "=== ADDITIONAL CONTEXT ==="
+            echo "${EXTRA_CONTEXT}"
+            echo ""
+          fi
+        } > "$OUT"
+
+        echo "Wrote $(wc -l < "$OUT") lines to $OUT"
+
+    - name: Upload diagnostics artifact
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+      with:
+        name: diag-${{ inputs.artifact-suffix }}
+        path: ${{ runner.temp }}/diag/context.txt
+        retention-days: 1

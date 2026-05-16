@@ -218,34 +218,16 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
-      - name: Collect baileys container diagnostics on failure
+      - name: Collect diagnostics
         if: failure()
-        run: |
-          umask 077
-          mkdir -p "${RUNNER_TEMP}/diag"
-          OUT="${RUNNER_TEMP}/diag/context.txt"
-          {
-            echo "=== JOB: baileys-container ==="
-            echo "=== FAILED STEP: push=${{ steps.push.outcome }} ==="
-            echo ""
-            echo "=== DOCKER BUILD LOGS ==="
-            docker buildx du 2>&1 || true
-            echo ""
-            if [ -s "${RUNNER_TEMP}/trivy-baileys-image.txt" ]; then
-              echo "=== TRIVY SCAN OUTPUT ==="
-              cat "${RUNNER_TEMP}/trivy-baileys-image.txt"
-              echo ""
-            fi
-          } > "$OUT"
-          echo "Wrote $(wc -l < "$OUT") lines to $OUT"
-
-      - name: Upload baileys container diagnostics
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        uses: ./.github/actions/collect-diagnostics
         with:
-          name: diag-container-baileys
-          path: ${{ runner.temp }}/diag/context.txt
-          retention-days: 1
+          job-name: "baileys-container"
+          artifact-suffix: container-baileys
+          step-outcomes: |
+            push=${{ steps.push.outcome }}
+          output-files: |
+            ${{ runner.temp }}/trivy-baileys-image.txt
 
       - name: Credential cleanup (baileys)
         if: always()
@@ -368,34 +350,16 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
-      - name: Collect OCR container diagnostics on failure
+      - name: Collect diagnostics
         if: failure()
-        run: |
-          umask 077
-          mkdir -p "${RUNNER_TEMP}/diag"
-          OUT="${RUNNER_TEMP}/diag/context.txt"
-          {
-            echo "=== JOB: ocr-container ==="
-            echo "=== FAILED STEP: push=${{ steps.push.outcome }} ==="
-            echo ""
-            echo "=== DOCKER BUILD LOGS ==="
-            docker buildx du 2>&1 || true
-            echo ""
-            if [ -s "${RUNNER_TEMP}/trivy-ocr-service-image.txt" ]; then
-              echo "=== TRIVY SCAN OUTPUT ==="
-              cat "${RUNNER_TEMP}/trivy-ocr-service-image.txt"
-              echo ""
-            fi
-          } > "$OUT"
-          echo "Wrote $(wc -l < "$OUT") lines to $OUT"
-
-      - name: Upload OCR container diagnostics
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        uses: ./.github/actions/collect-diagnostics
         with:
-          name: diag-container-ocr
-          path: ${{ runner.temp }}/diag/context.txt
-          retention-days: 1
+          job-name: "ocr-container"
+          artifact-suffix: container-ocr
+          step-outcomes: |
+            push=${{ steps.push.outcome }}
+          output-files: |
+            ${{ runner.temp }}/trivy-ocr-service-image.txt
 
       - name: Credential cleanup (ocr)
         if: always()

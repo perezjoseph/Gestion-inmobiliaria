@@ -34,9 +34,20 @@ jobs:
           build-mode: none
 
       - name: Perform CodeQL Analysis
+        id: analyze
         uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
         with:
           category: codeql-rust
+
+      - name: Collect diagnostics
+        if: failure()
+        uses: ./.github/actions/collect-diagnostics
+        with:
+          job-name: "codeql / analyze-rust"
+          artifact-suffix: codeql-rust
+          step-outcomes: |
+            analyze=${{ steps.analyze.outcome }}
+          extra-context: "CodeQL analysis for Rust failed. Check the SARIF results in GitHub Security tab. This may indicate code patterns that CodeQL flags as security vulnerabilities."
 
   # ── JavaScript/TypeScript: interpreted (no build needed, but Node.js required for extraction) ──
   # Covers baileys-service (Node.js + TypeScript)
@@ -64,9 +75,20 @@ jobs:
           languages: javascript-typescript
 
       - name: Perform CodeQL Analysis
+        id: analyze
         uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
         with:
           category: codeql-javascript
+
+      - name: Collect diagnostics
+        if: failure()
+        uses: ./.github/actions/collect-diagnostics
+        with:
+          job-name: "codeql / analyze-javascript"
+          artifact-suffix: codeql-javascript
+          step-outcomes: |
+            analyze=${{ steps.analyze.outcome }}
+          extra-context: "CodeQL analysis for JavaScript/TypeScript failed. Check the SARIF results in GitHub Security tab. This may indicate code patterns that CodeQL flags as security vulnerabilities in baileys-service."
 
   # ── Python: interpreted (no build needed, Python required for extraction) ──
   # Covers ocr-service (FastAPI + PaddleOCR)
@@ -94,9 +116,20 @@ jobs:
           languages: python
 
       - name: Perform CodeQL Analysis
+        id: analyze
         uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
         with:
           category: codeql-python
+
+      - name: Collect diagnostics
+        if: failure()
+        uses: ./.github/actions/collect-diagnostics
+        with:
+          job-name: "codeql / analyze-python"
+          artifact-suffix: codeql-python
+          step-outcomes: |
+            analyze=${{ steps.analyze.outcome }}
+          extra-context: "CodeQL analysis for Python failed. Check the SARIF results in GitHub Security tab. This may indicate code patterns that CodeQL flags as security vulnerabilities in ocr-service."
 
   # ── Java/Kotlin: manual build (AGP 9.0 requires Android SDK + specific Gradle invocation) ──
   # Covers android/ multi-module project.
@@ -162,6 +195,17 @@ jobs:
           ./gradlew --no-daemon compileDebugKotlin compileDebugJavaWithJavac
 
       - name: Perform CodeQL Analysis
+        id: analyze
         uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
         with:
           category: codeql-kotlin
+
+      - name: Collect diagnostics
+        if: failure()
+        uses: ./.github/actions/collect-diagnostics
+        with:
+          job-name: "codeql / analyze-kotlin"
+          artifact-suffix: codeql-kotlin
+          step-outcomes: |
+            analyze=${{ steps.analyze.outcome }}
+          extra-context: "CodeQL analysis for Java/Kotlin failed. Check the SARIF results in GitHub Security tab. This may indicate code patterns that CodeQL flags as security vulnerabilities in the Android app."
