@@ -23,11 +23,15 @@ spec:
             - -c
             - |
               set -e
+              apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
               echo "=== Installing dependencies ==="
-              pip install --no-cache-dir optimum[openvino] huggingface_hub
+              pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+              pip install --no-cache-dir git+https://github.com/huggingface/optimum-intel.git
+              pip install --no-cache-dir git+https://github.com/huggingface/optimum.git
+              pip install --no-cache-dir git+https://github.com/huggingface/transformers.git
 
-              echo "=== Removing old model ==="
-              rm -rf /models/Qwen3-30B-A3B
+              echo "=== Removing old model (if exists) ==="
+              rm -rf /models/Qwen3-30B-A3B || true
               echo "Old model removed."
 
               echo "=== Exporting Qwen3.6-35B-A3B to OpenVINO IR (INT4) ==="
@@ -36,7 +40,7 @@ spec:
                 --weight-format int4 \
                 --group-size 128 \
                 --ratio 1.0 \
-                --task text-generation-with-past \
+                --task image-text-to-text \
                 /models/Qwen3.6-35B-A3B
 
               echo "=== Export complete ==="

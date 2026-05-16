@@ -400,7 +400,7 @@ const UNCONDITIONAL_MARKERS: [&str; 4] = [
 #[allow(dead_code)]
 const PROTECTED_ONLY_MARKERS: [&str; 2] = ["[INIT] auth check", "[INIT] first route rendered"];
 
-/// Routes that go through ProtectedRoute (authenticated).
+/// Routes that go through `ProtectedRoute` (authenticated).
 const AUTH_PROTECTED_ROUTES: [&str; 20] = [
     "Dashboard",
     "Propiedades",
@@ -424,7 +424,7 @@ const AUTH_PROTECTED_ROUTES: [&str; 20] = [
     "DocumentoEditorExisting",
 ];
 
-/// Routes that render directly without ProtectedRoute (public).
+/// Routes that render directly without `ProtectedRoute` (public).
 #[allow(dead_code)]
 const PUBLIC_BOOT_ROUTES: [&str; 4] = ["Login", "Registro", "FirmaPublica", "NotFound"];
 
@@ -435,14 +435,14 @@ enum AuthState {
     Unauthenticated,
 }
 
-fn auth_state_from_index(idx: usize) -> AuthState {
+const fn auth_state_from_index(idx: usize) -> AuthState {
     match idx % 2 {
         0 => AuthState::Authenticated,
         _ => AuthState::Unauthenticated,
     }
 }
 
-/// Returns the set of [INIT] markers expected for a given (route, auth_state) pair.
+/// Returns the set of [INIT] markers expected for a given (route, `auth_state`) pair.
 fn expected_markers_for(route: &str, auth: AuthState) -> Vec<&'static str> {
     let mut markers: Vec<&str> = UNCONDITIONAL_MARKERS.to_vec();
 
@@ -464,16 +464,16 @@ fn expected_markers_for(route: &str, auth: AuthState) -> Vec<&'static str> {
 fn marker_present_in_source(marker: &str) -> bool {
     match marker {
         "[INIT] pre-renderer" => MAIN_RS_SOURCE.contains(marker),
-        "[INIT] app mounted" => SWITCH_FN_SOURCE.contains(marker),
-        "[INIT] route resolution" => SWITCH_FN_SOURCE.contains(marker),
-        "[INIT] switch" => SWITCH_FN_SOURCE.contains(marker),
-        "[INIT] auth check" => SWITCH_FN_SOURCE.contains(marker),
-        "[INIT] first route rendered" => SWITCH_FN_SOURCE.contains(marker),
+        "[INIT] app mounted"
+        | "[INIT] route resolution"
+        | "[INIT] switch"
+        | "[INIT] auth check"
+        | "[INIT] first route rendered" => SWITCH_FN_SOURCE.contains(marker),
         _ => false,
     }
 }
 
-/// Verifies that a marker is NOT gated behind cfg(debug_assertions).
+/// Verifies that a marker is NOT gated behind `cfg(debug_assertions)`.
 fn marker_not_debug_gated(marker: &str) -> bool {
     let source = if marker == "[INIT] pre-renderer" {
         MAIN_RS_SOURCE
@@ -527,7 +527,7 @@ mod bug_condition_pbt {
         );
     }
 
-    /// Verify switch marker fires unconditionally at the top of switch().
+    /// Verify switch marker fires unconditionally at the top of `switch()`.
     #[test]
     fn switch_marker_at_top_of_switch_fn() {
         let switch_fn = extract_switch_fn(SWITCH_FN_SOURCE);
@@ -547,7 +547,7 @@ mod bug_condition_pbt {
         );
     }
 
-    /// Verify auth check and first route rendered are inside ProtectedRoute.
+    /// Verify auth check and first route rendered are inside `ProtectedRoute`.
     #[test]
     fn auth_markers_inside_protected_route() {
         let pr_fn = extract_protected_route_fn(SWITCH_FN_SOURCE);
@@ -565,7 +565,7 @@ mod bug_condition_pbt {
         );
     }
 
-    /// Verify "first route rendered" fires only after auth succeeds (after is_authed check).
+    /// Verify "first route rendered" fires only after auth succeeds (after `is_authed` check).
     #[test]
     fn first_route_rendered_after_auth_check() {
         let pr_fn = extract_protected_route_fn(SWITCH_FN_SOURCE);
