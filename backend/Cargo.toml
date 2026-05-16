@@ -68,5 +68,5 @@ path = "tests/main.rs"
 
 [dev-dependencies]
 proptest.workspace = true
-zip = "2"
+zip = "7"
 actix-http = "3"
