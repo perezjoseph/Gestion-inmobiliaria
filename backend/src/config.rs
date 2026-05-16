@@ -67,7 +67,7 @@ impl ChatbotEnvConfig {
             .unwrap_or_else(|_| "http://baileys:3100".to_string());
 
         let ovms_endpoint =
-            std::env::var("OVMS_ENDPOINT").unwrap_or_else(|_| "http://ovms:8000/v1".to_string());
+            std::env::var("OVMS_ENDPOINT").unwrap_or_else(|_| "http://ovms:8000/v3".to_string());
 
         let ovms_chat_model = std::env::var("OVMS_CHAT_MODEL")
             .unwrap_or_else(|_| "Qwen3-30B-A3B-Instruct-2507-int4-ov".to_string());
@@ -412,7 +412,7 @@ mod tests {
             chatbot: ChatbotEnvConfig {
                 baileys_service_url: "http://baileys:3100".to_string(),
                 baileys_internal_token: "a]3kF9#mP7$vL2nQ8wR5xT0yU4zA1bC6d".to_string(),
-                ovms_endpoint: "http://ovms:8000/v1".to_string(),
+                ovms_endpoint: "http://ovms:8000/v3".to_string(),
                 ovms_chat_model: "Qwen3-30B-A3B-Instruct-2507-int4-ov".to_string(),
                 ai_chat_timeout_secs: 30,
             },
