@@ -924,6 +924,7 @@ pub fn Pagos() -> Html {
     });
 
     let confidences = use_state(HashMap::<String, f64>::new);
+    let selected_ids = use_state(Vec::<String>::new);
 
     {
         let items = items.clone();
@@ -1331,7 +1332,18 @@ fn render_pagos_view(
                 contrato_label={contrato_label.clone()} on_edit={on_edit}
                 on_delete={on_delete_click} on_new={on_new}
                 on_page_change={on_page_change} on_per_page_change={on_per_page_change}
+                selected_ids={(*selected_ids).clone()}
+                on_toggle_select={on_toggle_select}
+                on_select_all={on_select_all}
             />
+            <BulkActionBar
+                selected_count={selected_ids.len()}
+                on_clear={on_clear_selection.clone()}
+            >
+                <button onclick={on_bulk_mark_paid.clone()} class="gi-btn gi-btn-primary gi-btn-sm">
+                    {"✓ Marcar como pagado"}
+                </button>
+            </BulkActionBar>
         </div>
     }
 }
