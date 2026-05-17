@@ -863,17 +863,19 @@ pub async fn record_extraction<C: ConnectionTrait>(
     extracted_data: serde_json::Value,
     _confidence: &Confidence,
 ) -> Result<chatbot_receipt_extraction::Model, AppError> {
+    use sea_orm::ActiveValue::NotSet;
+
     let now = Utc::now().into();
 
     let active = chatbot_receipt_extraction::ActiveModel {
         id: Set(Uuid::new_v4()),
         organizacion_id: Set(org_id),
         conversation_id: Set(conversation_id),
-        inquilino_id: Set(inquilino_id),
-        contrato_id: Set(contrato_id),
+        inquilino_id: inquilino_id.map_or(NotSet, |id| Set(Some(id))),
+        contrato_id: contrato_id.map_or(NotSet, |id| Set(Some(id))),
         extracted_data: Set(extracted_data),
         status: Set("pending_confirmation".to_string()),
-        confirmed_by: Set(None),
+        confirmed_by: NotSet,
         created_at: Set(now),
         updated_at: Set(now),
     };
