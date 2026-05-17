@@ -72,7 +72,9 @@ pub fn dispatch_formatter(file_path: &str) -> Option<String> {
         && file_path.contains("baileys-service/")
     {
         Some(format!("npx eslint --fix {file_path}"))
-    } else if matches!(ext, Some(e) if e.eq_ignore_ascii_case("kt")) && file_path.contains("android/") {
+    } else if matches!(ext, Some(e) if e.eq_ignore_ascii_case("kt"))
+        && file_path.contains("android/")
+    {
         Some("./gradlew spotlessApply".to_string())
     } else {
         None
@@ -119,12 +121,13 @@ pub fn select_sensors(modified_files: &[&str]) -> HashSet<SensorSuite> {
 pub fn parse_max_iterations(env_value: Option<&str>) -> u32 {
     const DEFAULT: u32 = 3;
 
-    env_value.map_or(DEFAULT, |s| s
-        .parse::<i64>()
-        .ok()
-        .filter(|&n| n > 0)
-        .and_then(|n| u32::try_from(n).ok())
-        .unwrap_or(DEFAULT))
+    env_value.map_or(DEFAULT, |s| {
+        s.parse::<i64>()
+            .ok()
+            .filter(|&n| n > 0)
+            .and_then(|n| u32::try_from(n).ok())
+            .unwrap_or(DEFAULT)
+    })
 }
 
 /// Determines whether the verify-fix loop should continue or stop.
@@ -256,6 +259,7 @@ pub fn prioritize_failures(failures: &mut [Failure]) {
 mod harness_pbt;
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

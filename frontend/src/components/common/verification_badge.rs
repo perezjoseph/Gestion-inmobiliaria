@@ -57,7 +57,7 @@ pub fn VerificationBadge(props: &VerificationBadgeProps) -> Html {
     {
         let local_estado = local_estado.clone();
         let prop_estado = props.estado.clone();
-        use_effect_with(prop_estado.clone(), move |estado| {
+        use_effect_with(prop_estado, move |estado| {
             local_estado.set(estado.to_string());
             || ()
         });
@@ -75,60 +75,58 @@ pub fn VerificationBadge(props: &VerificationBadgeProps) -> Html {
     let label = badge_label(&estado_str);
 
     let action_buttons = if can_verify {
-        if let Some(doc_id) = &props.documento_id {
-            let buttons = VERIFICATION_OPTIONS
-                .iter()
-                .filter(|(value, _)| *value != estado_str.as_str())
-                .map(|(value, btn_label)| {
-                    let doc_id = doc_id.to_string();
-                    let new_status = value.to_string();
-                    let local_estado = local_estado.clone();
-                    let submitting = submitting.clone();
-
-                    let onclick = {
-                        let new_status = new_status.clone();
+        props.documento_id.as_ref().map_or_else(
+            || html! {},
+            |doc_id| {
+                VERIFICATION_OPTIONS
+                    .iter()
+                    .filter(|(value, _)| *value != estado_str.as_str())
+                    .map(|(value, btn_label)| {
+                        let doc_id = doc_id.to_string();
+                        let new_status = value.to_string();
                         let local_estado = local_estado.clone();
                         let submitting = submitting.clone();
-                        Callback::from(move |_: MouseEvent| {
-                            let doc_id = doc_id.clone();
-                            let new_status = new_status.clone();
-                            let local_estado = local_estado.clone();
-                            let submitting = submitting.clone();
-                            submitting.set(true);
-                            spawn_local(async move {
-                                let body = VerificarDocumentoRequest {
-                                    estado_verificacion: new_status.clone(),
-                                    notas_verificacion: None,
-                                };
-                                let result = api_put::<serde_json::Value, _>(
-                                    &format!("/documentos/{doc_id}/verificar"),
-                                    &body,
-                                )
-                                .await;
-                                if result.is_ok() {
-                                    local_estado.set(new_status);
-                                }
-                                submitting.set(false);
-                            });
-                        })
-                    };
 
-                    html! {
-                        <button
-                            type="button"
-                            class="gi-btn gi-btn-sm gi-btn-outline"
-                            onclick={onclick}
-                            disabled={*submitting}
-                        >
-                            {*btn_label}
-                        </button>
-                    }
-                })
-                .collect::<Html>();
-            buttons
-        } else {
-            html! {}
-        }
+                        let onclick = {
+                            let submitting = submitting.clone();
+                            Callback::from(move |_: MouseEvent| {
+                                let doc_id = doc_id.clone();
+                                let new_status = new_status.clone();
+                                let local_estado = local_estado.clone();
+                                let submitting = submitting.clone();
+                                submitting.set(true);
+                                spawn_local(async move {
+                                    let body = VerificarDocumentoRequest {
+                                        estado_verificacion: new_status.clone(),
+                                        notas_verificacion: None,
+                                    };
+                                    let result = api_put::<serde_json::Value, _>(
+                                        &format!("/documentos/{doc_id}/verificar"),
+                                        &body,
+                                    )
+                                    .await;
+                                    if result.is_ok() {
+                                        local_estado.set(new_status);
+                                    }
+                                    submitting.set(false);
+                                });
+                            })
+                        };
+
+                        html! {
+                            <button
+                                type="button"
+                                class="gi-btn gi-btn-sm gi-btn-outline"
+                                onclick={onclick}
+                                disabled={*submitting}
+                            >
+                                {*btn_label}
+                            </button>
+                        }
+                    })
+                    .collect::<Html>()
+            },
+        )
     } else {
         html! {}
     };
