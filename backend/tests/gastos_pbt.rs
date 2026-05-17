@@ -163,7 +163,7 @@ fn test_category_summary_sorted_descending() {
 
     runner
         .run(&vec_strategy, |mut rows| {
-            rows.sort_by(|a, b| b.total.cmp(&a.total));
+            rows.sort_by_key(|b| std::cmp::Reverse(b.total));
 
             for window in rows.windows(2) {
                 assert!(

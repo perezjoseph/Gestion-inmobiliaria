@@ -208,8 +208,7 @@ pub async fn confirmar_preview(
             .fields
             .iter()
             .find(|f| f.name == "depositante")
-            .map(|f| f.value.as_str())
-            .unwrap_or("");
+            .map_or("", |f| f.value.as_str());
         if depositante.is_empty() {
             None
         } else {
