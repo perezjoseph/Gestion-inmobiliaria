@@ -72,6 +72,11 @@ spec:
                 secretKeyRef:
                   name: realestate-chatbot-secret
                   key: baileys-internal-token
+            - name: BCRD_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: realestate-bcrd-secret
+                  key: BCRD_API_TOKEN
             - name: OVMS_ENDPOINT
               value: http://ovms:8000/v3
             - name: OVMS_CHAT_MODEL
