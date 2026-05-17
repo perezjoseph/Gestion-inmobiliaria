@@ -132,12 +132,10 @@ RUN ARCHIVE="/tmp/gh.tar.gz" \
        "cargo-machete-v${CARGO_MACHETE_VERSION}-x86_64-unknown-linux-musl/cargo-machete" \
     && chmod +x /usr/local/bin/cargo-machete \
     && rm -f "$ARCHIVE" \
-    && curl --proto '=https' --tlsv1.2 -sSf --retry 5 --retry-delay 5 --retry-all-errors \
-       --connect-timeout 15 --max-time 120 -o /tmp/kirocli.zip \
-       "https://desktop-release.q.us-east-1.amazonaws.com/latest/kirocli-x86_64-linux.zip" \
-    && unzip -qo /tmp/kirocli.zip -d /tmp/kirocli \
-    && install -m 755 /tmp/kirocli/kirocli/kiro-cli /usr/local/bin/kiro-cli \
-    && rm -rf /tmp/kirocli.zip /tmp/kirocli
+    && curl -fsSL https://cli.kiro.dev/install | bash \
+    && cp /root/.local/bin/kiro-cli /usr/local/bin/kiro-cli 2>/dev/null \
+    || cp /root/.local/bin/kiro /usr/local/bin/kiro-cli 2>/dev/null \
+    || true
 
 # ── Android SDK (cmdline-tools + platform 36 + build-tools 36) ──
 # Prebaked to avoid ~500MB download on every Android CI job.
