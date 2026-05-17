@@ -136,7 +136,7 @@ pub fn create_app(
         .app_data(web::Data::new(db))
         .app_data(web::Data::new(config))
         .app_data(preview_store)
-        .app_data(web::Data::from(mail_client))
+        .app_data(web::Data::new(mail_client))
         .app_data(json_cfg)
         .route("/health", web::get().to(health))
         .route("/metrics", web::get().to(metrics_handler))

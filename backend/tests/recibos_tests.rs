@@ -160,7 +160,7 @@ mod db_async {
             apellido: Set("Recibos".to_string()),
             email: Set(Some(format!("inquilino-{id}@test.com"))),
             telefono: Set(None),
-            cedula: Set(format!("REC-{id}")),
+            cedula: Set(format!("R{}", &id.simple().to_string()[..19])),
             contacto_emergencia: Set(None),
             notas: Set(None),
             documentos: Set(None),

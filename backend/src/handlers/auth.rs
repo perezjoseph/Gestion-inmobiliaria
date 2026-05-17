@@ -14,7 +14,7 @@ pub async fn register(
     let result = auth::register(db.get_ref(), body.into_inner(), &config.jwt_secret).await?;
     match result {
         RegisterResult::User(user) => Ok(HttpResponse::Created().json(user)),
-        RegisterResult::Login(login) => Ok(HttpResponse::Ok().json(login)),
+        RegisterResult::Login(login) => Ok(HttpResponse::Created().json(login)),
     }
 }
 

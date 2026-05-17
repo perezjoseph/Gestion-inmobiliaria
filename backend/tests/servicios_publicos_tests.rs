@@ -623,7 +623,7 @@ mod servicios_publicos_db_tests {
                     .set_json(json!({
                         "propiedadId": propiedad_id,
                         "unidadId": unidad_id,
-                        "categoria": "servicio_publico",
+                        "categoria": "servicios",
                         "descripcion": format!("Electricidad mes {i}"),
                         "monto": "2500",
                         "moneda": "DOP",
@@ -646,7 +646,7 @@ mod servicios_publicos_db_tests {
                 .set_json(json!({
                     "propiedadId": propiedad_id,
                     "unidadId": unidad_id,
-                    "categoria": "servicio_publico",
+                    "categoria": "servicios",
                     "descripcion": "Electricidad mes 4 - anormal",
                     "monto": "5000",
                     "moneda": "DOP",
@@ -689,7 +689,7 @@ mod servicios_publicos_db_tests {
                 .set_json(json!({
                     "propiedadId": propiedad_id,
                     "unidadId": unidad_id,
-                    "categoria": "servicio_publico",
+                    "categoria": "servicios",
                     "descripcion": "Electricidad mes 1",
                     "monto": "2500",
                     "moneda": "DOP",
@@ -711,7 +711,7 @@ mod servicios_publicos_db_tests {
                 .set_json(json!({
                     "propiedadId": propiedad_id,
                     "unidadId": unidad_id,
-                    "categoria": "servicio_publico",
+                    "categoria": "servicios",
                     "descripcion": "Electricidad mes 2 - alto",
                     "monto": "8000",
                     "moneda": "DOP",

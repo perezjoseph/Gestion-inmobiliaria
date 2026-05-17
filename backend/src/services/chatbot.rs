@@ -905,8 +905,21 @@ pub async fn record_extraction_from_agent<C: ConnectionTrait>(
     let extracted_data = serde_json::to_value(receipt)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error serializando recibo: {e}")))?;
 
-    // Create a conversation-level record to track the extraction
+    // Create a placeholder conversation record to satisfy the FK constraint
     let conversation_id = Uuid::new_v4();
+    let now = Utc::now().into();
+    let conv = crate::entities::chatbot_conversation::ActiveModel {
+        id: Set(conversation_id),
+        organizacion_id: Set(organizacion_id),
+        sender_phone: Set("agent".to_string()),
+        inquilino_id: Set(None),
+        role: Set("system".to_string()),
+        content: Set("Receipt extraction from agent".to_string()),
+        message_type: Set("extraction".to_string()),
+        metadata: Set(None),
+        created_at: Set(now),
+    };
+    conv.insert(db).await?;
 
     record_extraction(
         db,

@@ -367,9 +367,9 @@ jobs:
               printf 'Do NOT run git commit or git push yourself; the workflow handles that.\n'
             } > "$PROMPT_FILE"
 
-            # Run Kiro on this single artifact's diagnostics. Pass prompt via stdin
-            # to avoid shell interpolation of untrusted artifact content.
-            kiro-cli chat --no-interactive --trust-all-tools < "$PROMPT_FILE"
+            # Run Kiro on this single artifact's diagnostics.
+            # Pass prompt as a positional argument (kiro-cli does not read from stdin).
+            kiro-cli chat --no-interactive --trust-all-tools "$(cat "$PROMPT_FILE")"
 
             # Detect ANY change in working tree (tracked, staged, OR untracked).
             # `git diff` only sees tracked-file changes, missing new files Kiro creates.
@@ -474,7 +474,7 @@ jobs:
             printf 'End the commit message with: Workflow run: %s\n' "$RUN_URL"
           } > "$FIXUP_PROMPT"
 
-          kiro-cli chat --no-interactive --trust-all-tools < "$FIXUP_PROMPT"
+          kiro-cli chat --no-interactive --trust-all-tools "$(cat "$FIXUP_PROMPT")"
 
           git add -A
           if [ -z "$(git status --porcelain)" ]; then

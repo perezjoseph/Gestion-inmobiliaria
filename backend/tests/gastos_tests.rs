@@ -603,7 +603,7 @@ mod db_async {
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
                     "propiedadId": prop_b,
-                    "categoria": "seguros",
+                    "categoria": "seguro",
                     "descripcion": "Gasto prop B",
                     "monto": "3000",
                     "moneda": "DOP",
@@ -650,7 +650,7 @@ mod db_async {
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
                     "propiedadId": propiedad_id,
-                    "categoria": "legal",
+                    "categoria": "administracion",
                     "descripcion": "Gasto legal",
                     "monto": "8000",
                     "moneda": "DOP",
@@ -663,14 +663,14 @@ mod db_async {
 
             let req = test::TestRequest::get()
                 .uri(&format!(
-                    "/api/v1/gastos?propiedadId={propiedad_id}&categoria=legal"
+                    "/api/v1/gastos?propiedadId={propiedad_id}&categoria=administracion"
                 ))
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .to_request();
             let resp = test::call_service(&app, req).await;
             let body: Value = test::read_body_json(resp).await;
             for item in body["data"].as_array().unwrap() {
-                assert_eq!(item["categoria"], "legal");
+                assert_eq!(item["categoria"], "administracion");
             }
 
             cleanup_gasto(&db, gasto_id).await;
@@ -1261,7 +1261,7 @@ mod gastos_utility_db_tests {
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
                     "propiedadId": propiedad_id,
-                    "categoria": "servicio_publico",
+                    "categoria": "servicios",
                     "descripcion": "Electricidad sin proveedor",
                     "monto": "2500",
                     "moneda": "DOP",
@@ -1296,7 +1296,7 @@ mod gastos_utility_db_tests {
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
                     "propiedadId": propiedad_id,
-                    "categoria": "servicio_publico",
+                    "categoria": "servicios",
                     "descripcion": "Electricidad consumo cero",
                     "monto": "2500",
                     "moneda": "DOP",
@@ -1334,7 +1334,7 @@ mod gastos_utility_db_tests {
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
                     "propiedadId": propiedad_id,
-                    "categoria": "servicio_publico",
+                    "categoria": "servicios",
                     "descripcion": "Electricidad periodo invertido",
                     "monto": "2500",
                     "moneda": "DOP",
@@ -1374,7 +1374,7 @@ mod gastos_utility_db_tests {
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
                     "propiedadId": propiedad_id,
-                    "categoria": "servicio_publico",
+                    "categoria": "servicios",
                     "descripcion": "Electricidad EDENORTE",
                     "monto": "2500",
                     "moneda": "DOP",
@@ -1395,7 +1395,7 @@ mod gastos_utility_db_tests {
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
                     "propiedadId": propiedad_id,
-                    "categoria": "servicio_publico",
+                    "categoria": "servicios",
                     "descripcion": "Agua CAASD",
                     "monto": "800",
                     "moneda": "DOP",
@@ -1449,7 +1449,7 @@ mod gastos_utility_db_tests {
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
                     "propiedadId": propiedad_id,
-                    "categoria": "servicio_publico",
+                    "categoria": "servicios",
                     "descripcion": "Electricidad enero",
                     "monto": "2500",
                     "moneda": "DOP",
@@ -1469,7 +1469,7 @@ mod gastos_utility_db_tests {
                 .insert_header(("Authorization", format!("Bearer {token}")))
                 .set_json(json!({
                     "propiedadId": propiedad_id,
-                    "categoria": "servicio_publico",
+                    "categoria": "servicios",
                     "descripcion": "Electricidad abril",
                     "monto": "2800",
                     "moneda": "DOP",

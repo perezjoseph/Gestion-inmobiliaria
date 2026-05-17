@@ -85,7 +85,7 @@ async fn check_email_unique<C: ConnectionTrait>(db: &C, email: &str) -> Result<(
 
     if existing.is_some() {
         return Err(AppError::Conflict(
-            "El correo ya está registrado".to_string(),
+            "El email ya está registrado".to_string(),
         ));
     }
     Ok(())
@@ -174,17 +174,18 @@ pub async fn register(
         let login = register_with_invitation(db, input, &token_inv, jwt_secret).await?;
         Ok(RegisterResult::Login(login))
     } else {
-        let user = register_new_org(db, input).await?;
-        Ok(RegisterResult::User(user))
+        let login = register_new_org(db, input, jwt_secret).await?;
+        Ok(RegisterResult::Login(login))
     }
 }
 
 /// New org flow: validate tipo, validate fiscal ID, check uniqueness, create org + user.
-/// Returns the `UserResponse` DTO only (no token, no session).
+/// Returns a `LoginResponse` with JWT token so the user can immediately use the app.
 async fn register_new_org(
     db: &DatabaseConnection,
     input: RegisterRequest,
-) -> Result<UserResponse, AppError> {
+    jwt_secret: &str,
+) -> Result<LoginResponse, AppError> {
     let tipo = input
         .tipo
         .as_deref()
@@ -326,7 +327,7 @@ async fn register_new_org(
         nombre: Set(input.nombre.clone()),
         email: Set(input.email.clone()),
         password_hash: Set(password_hash),
-        rol: Set("gerente".to_string()),
+        rol: Set("admin".to_string()),
         activo: Set(true),
         organizacion_id: Set(org_id),
         created_at: Set(now),
@@ -336,15 +337,7 @@ async fn register_new_org(
 
     txn.commit().await?;
 
-    Ok(UserResponse {
-        id: user.id,
-        nombre: user.nombre,
-        email: user.email,
-        rol: user.rol,
-        activo: user.activo,
-        organizacion_id: user.organizacion_id,
-        created_at: user.created_at.into(),
-    })
+    build_login_response(&user, jwt_secret)
 }
 
 /// Invitation flow: validate token, check email, create user, mark invitation used.

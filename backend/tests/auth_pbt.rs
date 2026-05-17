@@ -148,8 +148,11 @@ mod pbt_async {
         }
     }
 
-    /// Expected keys in the UserResponse DTO (camelCase serialization).
-    const USER_RESPONSE_KEYS: &[&str] = &[
+    /// Expected keys in the LoginResponse DTO (camelCase serialization).
+    const LOGIN_RESPONSE_KEYS: &[&str] = &["token", "user"];
+
+    /// Expected keys in the nested user object.
+    const USER_KEYS: &[&str] = &[
         "id",
         "nombre",
         "email",
@@ -160,7 +163,7 @@ mod pbt_async {
     ];
 
     /// Keys that must NOT appear in the response (security contract).
-    const FORBIDDEN_KEYS: &[&str] = &["token", "password", "passwordHash", "session"];
+    const FORBIDDEN_KEYS: &[&str] = &["password", "passwordHash", "session"];
 
     async fn cleanup_user_and_org(db: &DatabaseConnection, user_id: Uuid, org_id: Uuid) {
         use realestate_backend::entities::{organizacion, usuario};
@@ -215,6 +218,7 @@ mod pbt_async {
 
             let req = test::TestRequest::post()
                 .uri("/api/v1/auth/register")
+                .peer_addr("127.0.0.1:8080".parse().unwrap())
                 .set_json(&payload)
                 .to_request();
             let resp = test::call_service(&app, req).await;
@@ -229,12 +233,23 @@ mod pbt_async {
 
             let body: Value = test::read_body_json(resp).await;
 
-            // Assert response contains exactly the User DTO keys
+            // Assert response contains the LoginResponse keys
             let obj = body.as_object().expect("Response should be a JSON object");
-            for key in USER_RESPONSE_KEYS {
+            for key in LOGIN_RESPONSE_KEYS {
                 assert!(
                     obj.contains_key(*key),
                     "Response missing expected key: {key}"
+                );
+            }
+
+            // Assert nested user object contains expected keys
+            let user_obj = body["user"]
+                .as_object()
+                .expect("Response should contain a 'user' object");
+            for key in USER_KEYS {
+                assert!(
+                    user_obj.contains_key(*key),
+                    "User object missing expected key: {key}"
                 );
             }
 
@@ -246,33 +261,36 @@ mod pbt_async {
                 );
             }
 
-            // Assert rol is always "gerente" regardless of role hint
+            // Assert rol is always "admin" for org creator regardless of role hint
             assert_eq!(
-                body["rol"], "gerente",
-                "Persisted rol must be 'gerente', got: {}",
-                body["rol"]
+                body["user"]["rol"], "admin",
+                "Persisted rol must be 'admin', got: {}",
+                body["user"]["rol"]
             );
 
             // Assert organizacionId is non-null
             assert!(
-                !body["organizacionId"].is_null(),
+                !body["user"]["organizacionId"].is_null(),
                 "organizacionId must not be null"
             );
 
             // Parse IDs for cleanup
-            let user_id: Uuid = body["id"]
+            let user_id: Uuid = body["user"]["id"]
                 .as_str()
                 .expect("id should be a string")
                 .parse()
                 .expect("id should be a valid UUID");
-            let org_id: Uuid = body["organizacionId"]
+            let org_id: Uuid = body["user"]["organizacionId"]
                 .as_str()
                 .expect("organizacionId should be a string")
                 .parse()
                 .expect("organizacionId should be a valid UUID");
 
             // Assert activo is true
-            assert_eq!(body["activo"], true, "New user should be activo=true");
+            assert_eq!(
+                body["user"]["activo"], true,
+                "New user should be activo=true"
+            );
 
             // Cleanup
             cleanup_user_and_org(&db, user_id, org_id).await;

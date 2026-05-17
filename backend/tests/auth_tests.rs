@@ -149,26 +149,27 @@ mod db_async {
 
             let body: Value = test::read_body_json(resp).await;
 
-            // Response MUST contain all User DTO fields
-            assert!(body["id"].is_string(), "response must have 'id'");
-            assert_eq!(body["nombre"], "Test Gerente");
-            assert_eq!(body["email"], email);
-            assert_eq!(body["rol"], "gerente");
-            assert_eq!(body["activo"], true);
+            // Response MUST contain token and user object (LoginResponse)
+            assert!(body["token"].is_string(), "response must have 'token'");
+            assert!(!body["token"].as_str().unwrap().is_empty());
+            assert!(body["user"].is_object(), "response must have 'user' object");
+
+            // User object MUST contain all expected fields
+            assert!(body["user"]["id"].is_string(), "user must have 'id'");
+            assert_eq!(body["user"]["nombre"], "Test Gerente");
+            assert_eq!(body["user"]["email"], email);
+            assert_eq!(body["user"]["rol"], "admin");
+            assert_eq!(body["user"]["activo"], true);
             assert!(
-                body["organizacionId"].is_string(),
-                "response must have 'organizacionId'"
+                body["user"]["organizacionId"].is_string(),
+                "user must have 'organizacionId'"
             );
             assert!(
-                body["createdAt"].is_string(),
-                "response must have 'createdAt'"
+                body["user"]["createdAt"].is_string(),
+                "user must have 'createdAt'"
             );
 
-            // Response MUST NOT contain token, password, or session fields
-            assert!(
-                body.get("token").is_none(),
-                "response must NOT contain 'token'"
-            );
+            // Response MUST NOT contain password or session fields
             assert!(
                 body.get("password").is_none(),
                 "response must NOT contain 'password'"
@@ -178,32 +179,19 @@ mod db_async {
                 "response must NOT contain 'passwordHash'"
             );
             assert!(
-                body.get("password_hash").is_none(),
-                "response must NOT contain 'password_hash'"
-            );
-            assert!(
                 body.get("session").is_none(),
                 "response must NOT contain 'session'"
             );
 
-            // Verify the response has exactly the expected keys (no extras)
+            // Verify the top-level response has exactly the expected keys
             let obj = body.as_object().unwrap();
-            let expected_keys: std::collections::HashSet<&str> = [
-                "id",
-                "nombre",
-                "email",
-                "rol",
-                "activo",
-                "organizacionId",
-                "createdAt",
-            ]
-            .into_iter()
-            .collect();
+            let expected_keys: std::collections::HashSet<&str> =
+                ["token", "user"].into_iter().collect();
             let actual_keys: std::collections::HashSet<&str> =
                 obj.keys().map(|k| k.as_str()).collect();
             assert_eq!(
                 actual_keys, expected_keys,
-                "response keys must match User DTO exactly"
+                "response keys must match LoginResponse exactly"
             );
         });
     }
@@ -243,10 +231,7 @@ mod db_async {
                 .unwrap()
                 .expect("user should be persisted in the database");
 
-            assert_eq!(
-                user.rol, "gerente",
-                "persisted user must have rol == 'gerente'"
-            );
+            assert_eq!(user.rol, "admin", "persisted user must have rol == 'admin'");
             assert_ne!(
                 user.organizacion_id,
                 Uuid::nil(),
@@ -305,7 +290,7 @@ mod db_async {
             let body: Value = test::read_body_json(resp).await;
             assert_eq!(body["error"], "conflict");
             assert_eq!(
-                body["message"], "El correo ya está registrado",
+                body["message"], "El email ya está registrado",
                 "error message must be the exact Spanish string"
             );
         });
