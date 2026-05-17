@@ -125,6 +125,19 @@ jobs:
             exit 1
           fi
 
+      - name: Clean stale llvm-cov target artifacts
+        run: |
+          # The persistent CARGO_TARGET_DIR can retain sccache-produced rlibs
+          # from prior runs. cargo-llvm-cov uses a "llvm-cov-target" subdir
+          # and those stale artifacts cause "LLVM error: end of file
+          # unexpectedly encountered" when building aws-lc-sys with coverage
+          # instrumentation. Nuke the subdir to guarantee a clean build.
+          COV_TARGET="${CARGO_TARGET_DIR:-target}/llvm-cov-target"
+          if [ -d "$COV_TARGET" ]; then
+            echo "Removing stale llvm-cov-target: $COV_TARGET"
+            rm -rf "$COV_TARGET"
+          fi
+
       - name: Run tests with coverage (llvm-cov)
         id: tests
         env:
