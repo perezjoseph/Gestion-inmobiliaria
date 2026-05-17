@@ -900,7 +900,7 @@ pub async fn record_extraction_from_agent<C: ConnectionTrait>(
     db: &C,
     receipt: &crate::services::ai_module::PaymentReceipt,
     organizacion_id: Uuid,
-    usuario_id: Option<Uuid>,
+    _usuario_id: Option<Uuid>,
 ) -> Result<chatbot_receipt_extraction::Model, AppError> {
     let extracted_data = serde_json::to_value(receipt)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error serializando recibo: {e}")))?;
@@ -925,7 +925,7 @@ pub async fn record_extraction_from_agent<C: ConnectionTrait>(
         db,
         organizacion_id,
         conversation_id,
-        usuario_id,
+        None, // inquilino_id resolved during confirmation
         None, // contrato_id resolved during confirmation
         extracted_data,
         &receipt.confidence,

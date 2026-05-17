@@ -448,7 +448,7 @@ fn test_record_extraction_post_loop_persists_pago() {
         // Assert the extraction row is persisted with correct data
         assert_eq!(extraction.organizacion_id, org_id);
         assert_eq!(extraction.status, "pending_confirmation");
-        assert_eq!(extraction.inquilino_id, Some(user_id));
+        assert_eq!(extraction.inquilino_id, None);
 
         // Verify extracted_data contains the receipt fields
         let data = &extraction.extracted_data;
