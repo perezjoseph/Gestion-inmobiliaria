@@ -31,7 +31,7 @@ Transform the CI autofix harness into a structured, multi-language agent harness
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 8.5, 14.7, 15.3, 15.4_
 
 - [ ] 2. Create on-demand skills
-  - [-] 2.1 Create the TypeScript CI fix skill at `.kiro/skills/ci-fix-typescript/SKILL.md`
+  - [x] 2.1 Create the TypeScript CI fix skill at `.kiro/skills/ci-fix-typescript/SKILL.md`
     - Add YAML frontmatter with `name: ci-fix-typescript` and description for activation triggers (TS compilation errors, ESLint violations, test failures in baileys-service)
     - Document verification commands: `cd baileys-service && npm run build`, `cd baileys-service && npx eslint . --max-warnings 0`, `cd baileys-service && npm test`
     - Instruct to run `npx eslint --fix .` for auto-fixable lint issues before manual fixes
