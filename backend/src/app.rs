@@ -57,6 +57,12 @@ async fn serve_upload(
 
     actix_files::NamedFile::open_async(&canonical_file)
         .await
+        .map(|f| {
+            f.set_content_disposition(actix_web::http::header::ContentDisposition {
+                disposition: actix_web::http::header::DispositionType::Attachment,
+                parameters: vec![],
+            })
+        })
         .map_err(|_| AppError::NotFound("Archivo no encontrado".to_string()))
 }
 

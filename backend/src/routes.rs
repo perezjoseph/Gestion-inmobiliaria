@@ -63,17 +63,20 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             )
             .service(
                 web::scope("/organizacion")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route("", web::get().to(handlers::organizaciones::get))
                     .route("", web::put().to(handlers::organizaciones::update)),
             )
             .service(
                 web::scope("/invitaciones")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route("", web::post().to(handlers::invitaciones::crear))
                     .route("", web::get().to(handlers::invitaciones::listar))
                     .route("/{id}", web::delete().to(handlers::invitaciones::revocar)),
             )
             .service(
                 web::scope("/propiedades")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route("", web::get().to(handlers::propiedades::list))
                     .route("", web::post().to(handlers::propiedades::create))
                     .route("/{id}", web::get().to(handlers::propiedades::get_by_id))
@@ -101,6 +104,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             )
             .service(
                 web::scope("/inquilinos")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route("", web::get().to(handlers::inquilinos::list))
                     .route("", web::post().to(handlers::inquilinos::create))
                     .route("/{id}", web::get().to(handlers::inquilinos::get_by_id))
@@ -109,6 +113,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             )
             .service(
                 web::scope("/contratos")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route(
                         "/por-vencer",
                         web::get().to(handlers::contratos::por_vencer),
@@ -146,6 +151,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             )
             .service(
                 web::scope("/pagos")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route("", web::get().to(handlers::pagos::list))
                     .route("", web::post().to(handlers::pagos::create))
                     .route("/{id}", web::get().to(handlers::pagos::get_by_id))
@@ -158,6 +164,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             )
             .service(
                 web::scope("/gastos")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route(
                         "/resumen-categorias",
                         web::get().to(handlers::gastos::resumen_categorias),
@@ -170,6 +177,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             )
             .service(
                 web::scope("/mantenimiento")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route("", web::get().to(handlers::mantenimiento::list))
                     .route("", web::post().to(handlers::mantenimiento::create))
                     .route("/{id}", web::get().to(handlers::mantenimiento::get_by_id))
@@ -232,6 +240,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             )
             .service(
                 web::scope("/notificaciones")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route(
                         "/pagos-vencidos",
                         web::get().to(handlers::notificaciones::pagos_vencidos),
@@ -256,6 +265,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             )
             .service(
                 web::scope("/reportes")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route("/ingresos", web::get().to(handlers::reportes::ingresos))
                     .route(
                         "/ingresos/pdf",
@@ -409,6 +419,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             )
             .service(
                 web::scope("/configuracion")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route(
                         "/moneda",
                         web::get().to(handlers::configuracion::obtener_moneda),
@@ -466,6 +477,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             )
             .service(
                 web::scope("/tareas")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route(
                         "/historial",
                         web::get().to(handlers::background_jobs::historial),
@@ -477,12 +489,14 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             )
             .service(
                 web::scope("/desahucios")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route("", web::get().to(handlers::desahucios::list))
                     .route("", web::post().to(handlers::desahucios::create))
                     .route("/{id}", web::put().to(handlers::desahucios::update)),
             )
             .service(
                 web::scope("/dgii")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route("/consulta", web::get().to(handlers::dgii::consultar_rnc))
                     .route(
                         "/consulta/nombre",
