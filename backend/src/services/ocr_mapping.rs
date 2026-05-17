@@ -1,10 +1,51 @@
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, sea_query::SimpleExpr,
+};
 use std::str::FromStr;
 use uuid::Uuid;
 
+use crate::entities::inquilino;
 use crate::errors::AppError;
 use crate::models::ocr::{ExtractField, ImportPreview, OcrResult, PreviewField};
+
+// Feature: spec-gap-remediation, Property 5
+#[allow(clippy::too_long_first_doc_paragraph)]
+/// Best-effort tenant matcher by full name.
+///
+/// Looks up an `inquilino` by `LIKE %trimmed%` over `nombre || ' ' || apellido`
+/// within the caller's `organizacion_id`. Returns `Some(id)` only when exactly
+/// one candidate matches; otherwise `None` (never returns the wrong tenant).
+pub async fn match_inquilino_by_name<C: ConnectionTrait>(
+    db: &C,
+    nombre_extraido: &str,
+    organizacion_id: Uuid,
+) -> Result<Option<Uuid>, AppError> {
+    let trimmed = nombre_extraido.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    let pattern = format!("%{trimmed}%");
+
+    // Build: (nombre || ' ' || apellido) LIKE '%trimmed%'
+    let concat_expr = SimpleExpr::Custom(format!(
+        "\"nombre\" || ' ' || \"apellido\" LIKE '{}'",
+        pattern.replace('\'', "''")
+    ));
+
+    let candidatos = inquilino::Entity::find()
+        .filter(inquilino::Column::OrganizacionId.eq(organizacion_id))
+        .filter(concat_expr)
+        .limit(2)
+        .all(db)
+        .await?;
+
+    Ok(match candidatos.as_slice() {
+        [unico] => Some(unico.id),
+        _ => None,
+    })
+}
 
 fn field_confidence(result: &OcrResult, value: &str) -> f64 {
     if value.is_empty() {

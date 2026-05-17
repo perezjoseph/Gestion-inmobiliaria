@@ -7,6 +7,7 @@ use yew::prelude::*;
 use yew_router::prelude::*;
 
 use crate::app::{AuthContext, Route};
+use crate::components::common::compliance_badge::ComplianceProfile;
 use crate::components::common::confidence_input::ConfidenceInput;
 use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
@@ -224,6 +225,12 @@ fn InquilinoForm(props: &InquilinoFormProps) -> Html {
                 </div>
             </form>
             if let Some(ref id) = props.editing_id {
+                <div style="margin-top: var(--space-5); border-top: 1px solid var(--border-subtle); padding-top: var(--space-5);">
+                    <ComplianceProfile
+                        entity_type={AttrValue::from("inquilino")}
+                        entity_id={AttrValue::from(id.clone())}
+                    />
+                </div>
                 <div style="margin-top: var(--space-5); border-top: 1px solid var(--border-subtle); padding-top: var(--space-5);">
                     <DocumentGallery
                         entity_type={"inquilino".to_string()}

@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc e244e8706da01fdecaa2aded0b2fe164abc0a42312a8d8e22ff5d9d8d143817a # shrinks to failures = [Failure { failure_type: Compilation, message: " " }, Failure { failure_type: Compilation, message: " " }]

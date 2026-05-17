@@ -103,7 +103,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - Inside the `switch(route)` matcher: `[INIT] switch`
     - _Requirements: 7.1, 7.4_
 
-  - [-] 4.3 Emit auth-check and first-route-rendered markers in `frontend/src/components/common/protected_route.rs`
+  - [x] 4.3 Emit auth-check and first-route-rendered markers in `frontend/src/components/common/protected_route.rs`
     - Inside `ProtectedRoute`: `[INIT] auth check`
     - Inside the auth-success branch: `[INIT] first route rendered`
     - _Requirements: 7.1, 7.4_
@@ -129,13 +129,13 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - Re-export from `backend/src/migrations/mod.rs` and append to the migrator vector
     - _Requirements: 3.1_
 
-  - [-] 6.2 Persist the sealed PDF as a `Documento` after signing completes
+  - [x] 6.2 Persist the sealed PDF as a `Documento` after signing completes
     - Edit `backend/src/services/firmas.rs` to add `generar_pdf_sellado(db, contrato, organizacion_id)`
     - Render PDF via existing `render_contrato_pdf`, write to `uploads/contratos/{contrato_id}/sellado.pdf`
     - Insert `documento::ActiveModel` with `entity_type = "contrato"`, `entity_id = contrato.id`, `documento_origen_id = Some(contrato.id)`, `sellado = true`, `organizacion_id`
     - _Requirements: 3.2_
 
-  - [-] 6.3 Reject sealed-document deletion with HTTP `403 Forbidden`
+  - [x] 6.3 Reject sealed-document deletion with HTTP `403 Forbidden`
     - Edit `backend/src/services/documentos.rs::eliminar` to load with org scope, then return `AppError::Forbidden("No se puede eliminar un documento sellado")` when `doc.sellado || doc.documento_origen_id.is_some()`
     - Verify `AppError::Forbidden` maps to HTTP `403` in the central error layer; add the variant if missing
     - **Implementation MUST return 403 per design, not 409 from the requirements text** (see deviation note above)
@@ -160,7 +160,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - Wire the call site in the signing handler to use the trait object from `AppState`
     - _Requirements: 3.5, 3.6_
 
-  - [-] 6.7 Add `mailcow-smtp` envFrom to backend deployment
+  - [x] 6.7 Add `mailcow-smtp` envFrom to backend deployment
     - Edit `infra/k8s/app/backend.yaml` to add `envFrom: [{ secretRef: { name: mailcow-smtp } }]`
     - Document the expected secret keys (`SMTP_HOST=mail.myhomeva.us`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM=no-reply@myhomeva.us`) in a manifest comment
     - _Requirements: 3.4_
@@ -176,25 +176,25 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - _Requirements: 3.5, 3.6_
 
 - [x] 7. Document management frontend (Requirement 4)
-  - [-] 7.1 Activate the `Verification_Action` button in `frontend/src/components/feature/verification_badge.rs`
+  - [x] 7.1 Activate the `Verification_Action` button in `frontend/src/components/feature/verification_badge.rs`
     - Wire the button click to `api::put::<DocumentoStatus, ()>("/documentos/{id}/verificar", &DocumentoStatus { status })` via `spawn_local`
     - Update the displayed status from local state without a full page reload
     - Hide the button when `current_user().rol == "visualizador"`
     - _Requirements: 4.1, 4.2, 4.6_
 
-  - [-] 7.2 Render the `Compliance_Profile` per-property view via `frontend/src/components/feature/compliance_badge.rs`
+  - [x] 7.2 Render the `Compliance_Profile` per-property view via `frontend/src/components/feature/compliance_badge.rs`
     - Render the response of `GET /documentos/cumplimiento/{entity_type}/{entity_id}`
     - Show required, present, missing, and expiring-within-30-days lists in Spanish
     - Mount on `frontend/src/pages/inquilinos.rs`, `frontend/src/pages/propiedades.rs`, and `frontend/src/pages/contratos.rs` detail views
     - _Requirements: 4.3, 4.7_
 
-  - [-] 7.3 Create `Expiring_Docs_List` page and route
+  - [x] 7.3 Create `Expiring_Docs_List` page and route
     - New page `frontend/src/pages/documentos_por_vencer.rs` calling `GET /documentos/por-vencer`
     - Sort ascending by `fecha_expiracion`; render dates as DD/MM/YYYY
     - Add `#[at("/documentos/por-vencer")] DocumentosPorVencer` to the `Route` enum and switch
     - _Requirements: 4.4, 4.7_
 
-  - [-] 7.4 Render `Compliance_Counters` on the dashboard
+  - [x] 7.4 Render `Compliance_Counters` on the dashboard
     - Extend `frontend/src/types/dashboard.rs::DashboardStats` with `documentos_vencidos`, `documentos_por_vencer`, `entidades_incompletas`
     - Add three counter cards in `frontend/src/pages/dashboard.rs` scoped to caller's `organizacion_id`
     - All labels in Spanish (`"Documentos vencidos"`, `"Por vencer"`, `"Entidades incompletas"`)
@@ -210,14 +210,14 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 9. OCR confirm persistence, tenant match, and CPU-only OVMS (Requirement 5)
-  - [-] 9.1 Implement synchronous `Confirmar_Preview` insert in `backend/src/services/chatbot.rs`
+  - [x] 9.1 Implement synchronous `Confirmar_Preview` insert in `backend/src/services/chatbot.rs`
     - Add `confirmar_preview(db, preview, organizacion_id, usuario_id)` running inside `db.begin()` transaction
     - Idempotency: lookup by `preview.id` within org first; return existing `ConfirmedEntity` if present
     - `Document_Type::Recibo` → `services::pagos::crear`; `Document_Type::Gasto` → `services::gastos::crear`
     - Record the preview→entity mapping in `preview_index` before commit
     - _Requirements: 5.1, 5.2, 5.3_
 
-  - [-] 9.2 Add best-effort tenant matcher `services::ocr_mapping::map_deposito`
+  - [x] 9.2 Add best-effort tenant matcher `services::ocr_mapping::map_deposito`
     - Create `backend/src/services/ocr_mapping.rs`
     - Filter `inquilino` by `organizacion_id` and a `LIKE %trimmed%` predicate over `concat(nombre, ' ', apellido)`
     - Return `Some(id)` only when candidate set has exactly one match; otherwise `None` (never wrong)

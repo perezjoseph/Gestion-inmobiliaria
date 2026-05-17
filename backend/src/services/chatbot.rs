@@ -1,15 +1,16 @@
 use chrono::{Duration, Utc};
 use rust_decimal::Decimal;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set, TransactionTrait,
 };
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::entities::{
     chatbot_config, chatbot_conversation, chatbot_receipt_extraction, contrato, pago,
-    solicitud_mantenimiento,
+    preview_index, solicitud_mantenimiento,
 };
 use crate::errors::AppError;
 use crate::models::PaginatedResponse;
@@ -1311,6 +1312,160 @@ pub fn resolve_maintenance_defaults(
         status: "pendiente".to_string(),
         priority: prioridad.to_string(),
     })
+}
+
+// --- OCR Preview Confirmation (Requirement 5) ---
+
+/// Discriminator for confirmed OCR previews.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DocumentType {
+    Recibo,
+    Gasto,
+}
+
+/// Result of confirming an OCR preview — identifies the created entity.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ConfirmedEntity {
+    Pago(Uuid),
+    Gasto(Uuid),
+}
+
+/// Input for the `confirmar_preview` function.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrPreviewConfirm {
+    pub id: Uuid,
+    pub document_type: DocumentType,
+    pub monto: Decimal,
+    pub moneda: Option<String>,
+    pub fecha: Option<chrono::NaiveDate>,
+    pub nombre_depositante: Option<String>,
+    pub contrato_id: Option<Uuid>,
+    pub propiedad_id: Option<Uuid>,
+    pub categoria: Option<String>,
+    pub descripcion: Option<String>,
+    pub metodo_pago: Option<String>,
+    pub notas: Option<String>,
+}
+
+/// Synchronous OCR preview confirmation that persists the extraction as a domain entity.
+///
+/// - Idempotent: looks up by `preview.id` within org first; returns existing if present.
+/// - Routes to `pagos::create` for `Recibo`, `gastos::create` for `Gasto`.
+/// - Records the preview→entity mapping in `preview_index` before commit.
+///
+/// Requirement 5.1: synchronous insert before returning confirmation response.
+/// Requirement 5.2: `Recibo` → Pago row.
+/// Requirement 5.3: `Gasto` → Gasto row.
+// Feature: spec-gap-remediation, Property 4
+pub async fn confirmar_preview(
+    db: &DatabaseConnection,
+    preview: OcrPreviewConfirm,
+    organizacion_id: Uuid,
+    usuario_id: Uuid,
+) -> Result<ConfirmedEntity, AppError> {
+    // Idempotency: lookup by preview.id within org first
+    if let Some(existing) = preview_index::Entity::find()
+        .filter(preview_index::Column::PreviewId.eq(preview.id))
+        .filter(preview_index::Column::OrganizacionId.eq(organizacion_id))
+        .one(db)
+        .await?
+    {
+        return match existing.entity_type.as_str() {
+            "pago" => Ok(ConfirmedEntity::Pago(existing.entity_id)),
+            "gasto" => Ok(ConfirmedEntity::Gasto(existing.entity_id)),
+            _ => Ok(ConfirmedEntity::Pago(existing.entity_id)),
+        };
+    }
+
+    // Validate basic fields
+    if preview.monto <= Decimal::ZERO {
+        return Err(AppError::Validation("Datos de OCR inválidos".to_string()));
+    }
+
+    let txn = db.begin().await?;
+
+    let result = match preview.document_type {
+        DocumentType::Recibo => {
+            let contrato_id = preview
+                .contrato_id
+                .ok_or_else(|| AppError::Validation("Datos de OCR inválidos".to_string()))?;
+
+            let req = crate::models::pago::CreatePagoRequest {
+                contrato_id,
+                monto: preview.monto,
+                moneda: preview.moneda.clone(),
+                fecha_pago: preview.fecha,
+                fecha_vencimiento: preview.fecha.unwrap_or_else(|| Utc::now().date_naive()),
+                metodo_pago: preview.metodo_pago.clone(),
+                notas: preview.notas.clone(),
+            };
+
+            let pago =
+                crate::services::pagos::create(&txn, req, usuario_id, organizacion_id).await?;
+            ConfirmedEntity::Pago(pago.id)
+        }
+        DocumentType::Gasto => {
+            let propiedad_id = preview
+                .propiedad_id
+                .ok_or_else(|| AppError::Validation("Datos de OCR inválidos".to_string()))?;
+
+            let req = crate::models::gasto::CreateGastoRequest {
+                propiedad_id,
+                unidad_id: None,
+                categoria: preview
+                    .categoria
+                    .clone()
+                    .unwrap_or_else(|| "otros".to_string()),
+                descripcion: preview
+                    .descripcion
+                    .clone()
+                    .unwrap_or_else(|| "Gasto registrado desde OCR".to_string()),
+                monto: preview.monto,
+                moneda: preview.moneda.clone().unwrap_or_else(|| "DOP".to_string()),
+                fecha_gasto: preview.fecha.unwrap_or_else(|| Utc::now().date_naive()),
+                proveedor: None,
+                numero_factura: None,
+                notas: preview.notas.clone(),
+                nic_contrato: None,
+                proveedor_servicio: None,
+                consumo: None,
+                unidad_consumo: None,
+                periodo_desde: None,
+                periodo_hasta: None,
+                numero_cuenta: None,
+                periodo_inicio: None,
+                periodo_fin: None,
+            };
+
+            let gasto =
+                crate::services::gastos::create(&txn, req, usuario_id, organizacion_id).await?;
+            ConfirmedEntity::Gasto(gasto.id)
+        }
+    };
+
+    // Record the preview→entity mapping
+    let (entity_type_str, entity_id) = match &result {
+        ConfirmedEntity::Pago(id) => ("pago", *id),
+        ConfirmedEntity::Gasto(id) => ("gasto", *id),
+    };
+
+    let now = Utc::now().into();
+    let index_record = preview_index::ActiveModel {
+        id: Set(Uuid::new_v4()),
+        preview_id: Set(preview.id),
+        organizacion_id: Set(organizacion_id),
+        entity_type: Set(entity_type_str.to_string()),
+        entity_id: Set(entity_id),
+        created_at: Set(now),
+    };
+    index_record.insert(&txn).await?;
+
+    txn.commit().await?;
+
+    Ok(result)
 }
 
 #[cfg(test)]

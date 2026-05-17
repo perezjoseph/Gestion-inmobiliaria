@@ -59,49 +59,49 @@ Transform the CI autofix harness into a structured, multi-language agent harness
     - Implement `prioritize_failures(failures) -> Vec<Failure>`: stable-sorts by type priority (compile > lint > test)
     - _Requirements: 3.2, 3.3, 3.4, 6.1, 6.2, 6.3, 6.4, 9.1, 9.2, 9.3, 9.4, 9.5, 10.1, 10.3, 10.4, 10.5, 13.3, 13.5_
 
-  - [~] 3.2 Write property test for dispatch_formatter
+  - [-] 3.2 Write property test for dispatch_formatter
     - **Property 1: Hook dispatch produces correct formatter command**
     - Use proptest to generate random file paths with various extensions (.rs, .ts, .tsx, .kt, .py, .md, .yml) and directory prefixes (baileys-service/, android/, src/, etc.)
     - Assert correct command returned for each file type/path combination
     - **Validates: Requirements 3.2, 3.3, 3.4**
 
-  - [~] 3.3 Write property test for select_sensors
+  - [-] 3.3 Write property test for select_sensors
     - **Property 2: Selective sensor activation by modified file set**
     - Use proptest to generate random sets of 1-20 file paths from all stacks plus non-code files
     - Assert exactly the correct sensor suites are returned for each file set composition
     - **Validates: Requirements 5.1, 5.2, 5.3, 9.1, 9.2, 9.3, 9.4, 9.5**
 
-  - [~] 3.4 Write property test for parse_max_iterations
+  - [-] 3.4 Write property test for parse_max_iterations
     - **Property 3: Iteration configuration parsing**
     - Use proptest to generate random strings: valid positive integers, empty strings, non-numeric strings, negative numbers, zero
     - Assert returns parsed integer for valid positive values, 3 for all invalid/missing/zero/negative
     - **Validates: Requirements 6.1**
 
-  - [~] 3.5 Write property test for should_continue_loop
+  - [-] 3.5 Write property test for should_continue_loop
     - **Property 4: Loop termination correctness**
     - Use proptest to generate random (iteration, max, Vec<SensorResult>) tuples
     - Assert: continues when iteration < max and sensors fail; exit 0 when all pass; exit 1 when max reached with progress; exit 2 when max reached without progress
     - **Validates: Requirements 4.6, 6.2, 6.3, 6.4**
 
-  - [~] 3.6 Write property test for determine_exit_code
+  - [-] 3.6 Write property test for determine_exit_code
     - **Property 5: Exit code determination**
     - Exhaustively test all 8 combinations of (all_pass, max_reached, progress_made) booleans
     - Assert: 0 when all_pass=true; 1 when !all_pass && max_reached && progress_made; 2 when !all_pass && max_reached && !progress_made
     - **Validates: Requirements 7.5, 13.5**
 
-  - [~] 3.7 Write property test for format_commit_message (format validity)
+  - [-] 3.7 Write property test for format_commit_message (format validity)
     - **Property 6: Commit message format validity**
     - Use proptest to generate random scope (alphanumeric 1-20 chars) and subject (1-70 chars)
     - Assert first line matches `fix(<scope>): <subject>` and does not exceed 70 characters
     - **Validates: Requirements 10.1**
 
-  - [~] 3.8 Write property test for format_commit_message (completeness)
+  - [-] 3.8 Write property test for format_commit_message (completeness)
     - **Property 7: Commit message completeness**
     - Use proptest to generate random file sets (1-30 paths) and sensor result sets (1-10 sensors with pass/fail)
     - Assert: each file appears in Changes section, each sensor appears in Verification section, PARTIAL status includes failing sensors, iteration count present
     - **Validates: Requirements 6.5, 10.3, 10.4, 10.5**
 
-  - [~] 3.9 Write property test for prioritize_failures
+  - [-] 3.9 Write property test for prioritize_failures
     - **Property 8: Failure priority ordering**
     - Use proptest to generate random lists of 1-50 failures with types {compilation, lint, test}
     - Assert: all compilation errors precede lint warnings, all lint warnings precede test failures, stable sort within same type

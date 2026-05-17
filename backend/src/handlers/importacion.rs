@@ -182,9 +182,9 @@ pub async fn importar_gastos(
 }
 
 pub async fn confirmar_preview(
-    _db: web::Data<DatabaseConnection>,
+    db: web::Data<DatabaseConnection>,
     preview_store: web::Data<PreviewStore>,
-    _access: WriteAccess,
+    access: WriteAccess,
     body: web::Json<ConfirmPreviewRequest>,
 ) -> Result<HttpResponse, AppError> {
     let mut preview = preview_store
@@ -202,10 +202,33 @@ pub async fn confirmar_preview(
 
     validate_preview_fields(&preview)?;
 
+    // Best-effort tenant match for deposito_bancario (Recibo branch)
+    let inquilino_id = if preview.document_type == "deposito_bancario" {
+        let depositante = preview
+            .fields
+            .iter()
+            .find(|f| f.name == "depositante")
+            .map(|f| f.value.as_str())
+            .unwrap_or("");
+        if depositante.is_empty() {
+            None
+        } else {
+            ocr_mapping::match_inquilino_by_name(
+                db.get_ref(),
+                depositante,
+                access.0.organizacion_id,
+            )
+            .await?
+        }
+    } else {
+        None
+    };
+
     Ok(HttpResponse::Ok().json(json!({
         "totalFilas": 1,
         "exitosos": 1,
-        "fallidos": 0
+        "fallidos": 0,
+        "inquilinoId": inquilino_id
     })))
 }
 

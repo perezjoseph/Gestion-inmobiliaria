@@ -250,6 +250,9 @@ pub fn prioritize_failures(failures: &mut [Failure]) {
 // ── Unit Tests ─────────────────────────────────────────────────────────
 
 #[cfg(test)]
+mod harness_pbt;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

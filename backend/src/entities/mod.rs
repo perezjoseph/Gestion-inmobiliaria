@@ -22,6 +22,7 @@ pub mod pago;
 #[allow(dead_code)]
 pub mod plantilla_documento;
 pub mod prelude;
+pub mod preview_index;
 pub mod propiedad;
 pub mod registro_auditoria;
 pub mod responsabilidad_servicio;

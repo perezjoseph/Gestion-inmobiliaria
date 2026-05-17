@@ -1,5 +1,4 @@
 pub mod command_palette;
-#[allow(dead_code)]
 pub mod compliance_badge;
 pub mod confidence_input;
 
