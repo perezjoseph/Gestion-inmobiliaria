@@ -158,7 +158,7 @@ pub fn LineChart(props: &LineChartProps) -> Html {
             <svg
                 viewBox={format!("0 0 {CHART_WIDTH} {CHART_HEIGHT}")}
                 preserveAspectRatio="xMidYMid meet"
-                style="width: 100%; height: auto;"
+                style="width: 100%; max-height: 200px;"
                 role="img"
                 aria-label={props.title.clone()}
             >
