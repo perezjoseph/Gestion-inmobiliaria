@@ -2,10 +2,12 @@ use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::web;
 
 use crate::handlers;
+use crate::middleware::rate_limit::FallbackPeerIpKeyExtractor;
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
     #[allow(clippy::unwrap_used)]
     let auth_governor_conf = GovernorConfigBuilder::default()
+        .key_extractor(FallbackPeerIpKeyExtractor)
         .seconds_per_request(6)
         .burst_size(10)
         .finish()
@@ -13,6 +15,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
 
     #[allow(clippy::unwrap_used)]
     let write_governor_conf = GovernorConfigBuilder::default()
+        .key_extractor(FallbackPeerIpKeyExtractor)
         .seconds_per_request(2)
         .burst_size(20)
         .finish()
@@ -20,6 +23,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
 
     #[allow(clippy::unwrap_used)]
     let firmas_governor_conf = GovernorConfigBuilder::default()
+        .key_extractor(FallbackPeerIpKeyExtractor)
         .seconds_per_request(6)
         .burst_size(5)
         .finish()
@@ -27,6 +31,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
 
     #[allow(clippy::unwrap_used)]
     let webhook_governor_conf = GovernorConfigBuilder::default()
+        .key_extractor(FallbackPeerIpKeyExtractor)
         .seconds_per_request(1)
         .burst_size(30)
         .finish()
