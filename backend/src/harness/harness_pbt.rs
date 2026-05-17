@@ -1,4 +1,8 @@
-#![allow(clippy::expect_used, clippy::unwrap_used)]
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::case_sensitive_file_extension_comparisons
+)]
 
 use proptest::prelude::*;
 
@@ -20,7 +24,7 @@ fn directory_prefix() -> impl Strategy<Value = String> {
         Just("frontend/src/".to_string()),
         Just("infra/".to_string()),
         Just("scripts/".to_string()),
-        Just("".to_string()),
+        Just(String::new()),
     ]
 }
 

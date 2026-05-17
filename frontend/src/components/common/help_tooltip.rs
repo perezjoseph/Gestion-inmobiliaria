@@ -1,6 +1,6 @@
 use yew::prelude::*;
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct HelpTooltipProps {
     pub text: AttrValue,
     #[prop_or_default]
@@ -49,7 +49,7 @@ pub fn HelpTooltip(props: &HelpTooltipProps) -> Html {
                 <span
                     class="gi-help-tooltip-content"
                     role="tooltip"
-                    id={props.id.as_ref().map(|id| id.to_string())}
+                    id={props.id.as_ref().map(ToString::to_string)}
                 >
                     {&props.text}
                 </span>

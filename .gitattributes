@@ -3,6 +3,9 @@
 gradlew text eol=lf
 gradlew.bat text eol=crlf
 
+# Enforce LF for Rust source files (prevents module resolution issues)
+*.rs text eol=lf
+
 # Gradle config files
 *.properties text eol=lf
 *.toml text eol=lf

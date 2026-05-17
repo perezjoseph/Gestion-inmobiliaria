@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use web_sys::window;
 
 /// Reads query parameters from the current URL.
-/// Returns a HashMap of key-value pairs.
+/// Returns a `HashMap` of key-value pairs.
 pub fn read_query_params() -> HashMap<String, String> {
     let mut params = HashMap::new();
     let Some(win) = window() else {
@@ -18,9 +18,8 @@ pub fn read_query_params() -> HashMap<String, String> {
     }
     for pair in search.split('&') {
         if let Some((key, value)) = pair.split_once('=') {
-            let decoded_value = js_sys::decode_uri_component(value)
-                .map(|s| s.into())
-                .unwrap_or_else(|_| value.to_string());
+            let decoded_value =
+                js_sys::decode_uri_component(value).map_or_else(|_| value.to_string(), Into::into);
             params.insert(key.to_string(), decoded_value);
         }
     }

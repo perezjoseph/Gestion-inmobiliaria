@@ -1120,6 +1120,8 @@ pub fn Pagos() -> Html {
         }
     };
 
+    let toasts_for_bulk = toasts.clone();
+
     let on_submit = {
         let contrato_id = contrato_id.clone();
         let monto = monto.clone();
@@ -1275,6 +1277,89 @@ pub fn Pagos() -> Html {
         .and_then(|a| a.token.clone())
         .unwrap_or_default();
 
+    let on_toggle_select = {
+        let selected_ids = selected_ids.clone();
+        Callback::from(move |id: String| {
+            let mut ids = (*selected_ids).clone();
+            if let Some(pos) = ids.iter().position(|x| x == &id) {
+                ids.remove(pos);
+            } else {
+                ids.push(id);
+            }
+            selected_ids.set(ids);
+        })
+    };
+
+    let on_select_all = {
+        let selected_ids = selected_ids.clone();
+        let items = items.clone();
+        Callback::from(move |select: bool| {
+            if select {
+                let ids = items.iter().map(|p| p.id.clone()).collect();
+                selected_ids.set(ids);
+            } else {
+                selected_ids.set(Vec::new());
+            }
+        })
+    };
+
+    let on_clear_selection = {
+        let selected_ids = selected_ids.clone();
+        Callback::from(move |_: MouseEvent| {
+            selected_ids.set(Vec::new());
+        })
+    };
+
+    let on_bulk_mark_paid = {
+        let selected_ids = selected_ids.clone();
+        let reload = reload;
+        let error = error.clone();
+        let toasts = toasts_for_bulk;
+        Callback::from(move |_: MouseEvent| {
+            let selected_ids = selected_ids.clone();
+            let reload = reload.clone();
+            let error = error.clone();
+            let toasts = toasts.clone();
+            spawn_local(async move {
+                let today = {
+                    let d = js_sys::Date::new_0();
+                    let y = d.get_full_year();
+                    let m = d.get_month() + 1;
+                    let day = d.get_date();
+                    format!("{y:04}-{m:02}-{day:02}")
+                };
+                let ids: Vec<String> = (*selected_ids).clone();
+                let mut failed = false;
+                for id in &ids {
+                    let body = UpdatePago {
+                        monto: None,
+                        fecha_pago: Some(today.clone()),
+                        metodo_pago: None,
+                        estado: Some("pagado".into()),
+                        notas: None,
+                    };
+                    if api_put::<Pago, _>(&format!("/pagos/{id}"), &body)
+                        .await
+                        .is_err()
+                    {
+                        failed = true;
+                    }
+                }
+                if failed {
+                    error.set(Some("Error al marcar algunos pagos".into()));
+                } else {
+                    push_toast(
+                        toasts.as_ref(),
+                        "Pagos marcados como pagado",
+                        ToastKind::Success,
+                    );
+                }
+                selected_ids.set(Vec::new());
+                reload.set(*reload + 1);
+            });
+        })
+    };
+
     render_pagos_view(
         &loading,
         &user_rol,
@@ -1316,7 +1401,7 @@ pub fn Pagos() -> Html {
         on_new,
         on_page_change,
         on_per_page_change,
-        (*selected_ids).clone(),
+        &selected_ids,
         on_toggle_select,
         on_select_all,
         on_clear_selection,
@@ -1366,9 +1451,9 @@ fn render_pagos_view(
     on_new: Callback<MouseEvent>,
     on_page_change: Callback<u64>,
     on_per_page_change: Callback<u64>,
-    selected_ids: Vec<String>,
-    on_toggle_select: Option<Callback<String>>,
-    on_select_all: Option<Callback<bool>>,
+    selected_ids: &UseStateHandle<Vec<String>>,
+    on_toggle_select: Callback<String>,
+    on_select_all: Callback<bool>,
     on_clear_selection: Callback<MouseEvent>,
     on_bulk_mark_paid: Callback<MouseEvent>,
 ) -> Html {
@@ -1439,9 +1524,9 @@ fn render_pagos_view(
                 contrato_label={contrato_label.clone()} on_edit={on_edit}
                 on_delete={on_delete_click} on_new={on_new}
                 on_page_change={on_page_change} on_per_page_change={on_per_page_change}
-                selected_ids={selected_ids.clone()}
-                on_toggle_select={on_toggle_select}
-                on_select_all={on_select_all}
+                selected_ids={(**selected_ids).clone()}
+                on_toggle_select={Some(on_toggle_select)}
+                on_select_all={Some(on_select_all)}
             />
             <BulkActionBar
                 selected_count={selected_ids.len()}

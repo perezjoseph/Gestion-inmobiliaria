@@ -5,6 +5,8 @@
 //! property-tested independently of the LLM agent.
 
 use std::collections::HashSet;
+use std::fmt::Write;
+use std::path::Path;
 
 // ── Enums ──────────────────────────────────────────────────────────────
 
@@ -63,13 +65,16 @@ pub enum FixStatus {
 /// - `*/android/*.kt` → `./gradlew spotlessApply`
 /// - Everything else → None
 pub fn dispatch_formatter(file_path: &str) -> Option<String> {
-    if file_path.ends_with(".rs") {
+    let ext = Path::new(file_path).extension().and_then(|e| e.to_str());
+    if matches!(ext, Some(e) if e.eq_ignore_ascii_case("rs")) {
         Some(format!("cargo fmt -- {file_path}"))
-    } else if (file_path.ends_with(".ts") || file_path.ends_with(".tsx"))
+    } else if matches!(ext, Some(e) if e.eq_ignore_ascii_case("ts") || e.eq_ignore_ascii_case("tsx"))
         && file_path.contains("baileys-service/")
     {
         Some(format!("npx eslint --fix {file_path}"))
-    } else if file_path.ends_with(".kt") && file_path.contains("android/") {
+    } else if matches!(ext, Some(e) if e.eq_ignore_ascii_case("kt"))
+        && file_path.contains("android/")
+    {
         Some("./gradlew spotlessApply".to_string())
     } else {
         None
@@ -88,13 +93,16 @@ pub fn select_sensors(modified_files: &[&str]) -> HashSet<SensorSuite> {
     let mut suites = HashSet::new();
 
     for path in modified_files {
-        if path.ends_with(".rs") {
+        let ext = Path::new(path).extension().and_then(|e| e.to_str());
+        if matches!(ext, Some(e) if e.eq_ignore_ascii_case("rs")) {
             suites.insert(SensorSuite::Rust);
         } else if path.contains("baileys-service/")
-            && (path.ends_with(".ts") || path.ends_with(".tsx") || path.ends_with(".json"))
+            && matches!(ext, Some(e) if e.eq_ignore_ascii_case("ts") || e.eq_ignore_ascii_case("tsx") || e.eq_ignore_ascii_case("json"))
         {
             suites.insert(SensorSuite::TypeScript);
-        } else if path.contains("android/") && (path.ends_with(".kt") || path.ends_with(".kts")) {
+        } else if path.contains("android/")
+            && matches!(ext, Some(e) if e.eq_ignore_ascii_case("kt") || e.eq_ignore_ascii_case("kts"))
+        {
             suites.insert(SensorSuite::Kotlin);
         }
         // Non-code files (YAML, MD, Dockerfile, etc.) contribute nothing.
@@ -113,15 +121,13 @@ pub fn select_sensors(modified_files: &[&str]) -> HashSet<SensorSuite> {
 pub fn parse_max_iterations(env_value: Option<&str>) -> u32 {
     const DEFAULT: u32 = 3;
 
-    match env_value {
-        None => DEFAULT,
-        Some(s) => s
-            .parse::<i64>()
+    env_value.map_or(DEFAULT, |s| {
+        s.parse::<i64>()
             .ok()
             .filter(|&n| n > 0)
             .and_then(|n| u32::try_from(n).ok())
-            .unwrap_or(DEFAULT),
-    }
+            .unwrap_or(DEFAULT)
+    })
 }
 
 /// Determines whether the verify-fix loop should continue or stop.
@@ -160,7 +166,7 @@ pub fn should_continue_loop(
 /// - `all_pass = true` → 0
 /// - `!all_pass && max_reached && progress_made` → 1
 /// - `!all_pass && max_reached && !progress_made` → 2
-pub fn determine_exit_code(all_pass: bool, max_reached: bool, progress_made: bool) -> u8 {
+pub const fn determine_exit_code(all_pass: bool, max_reached: bool, progress_made: bool) -> u8 {
     if all_pass {
         0
     } else if max_reached && progress_made {
@@ -217,25 +223,25 @@ pub fn format_commit_message(
 
     let mut msg = first_line;
     msg.push_str("\n\nRoot cause:\n");
-    msg.push_str(&format!("- {root_cause}\n"));
+    let _ = writeln!(msg, "- {root_cause}");
 
     msg.push_str("\nChanges:\n");
     for change in changes {
-        msg.push_str(&format!("- {change}\n"));
+        let _ = writeln!(msg, "- {change}");
     }
 
     msg.push_str("\nVerification:\n");
     for sensor in sensors {
         let status_str = if sensor.passed { "PASS" } else { "FAIL" };
-        msg.push_str(&format!("- {}: {status_str}\n", sensor.name));
+        let _ = writeln!(msg, "- {}: {status_str}", sensor.name);
     }
 
     let status_str = match status {
         FixStatus::Clean => "CLEAN",
         FixStatus::Partial => "PARTIAL",
     };
-    msg.push_str(&format!("\nStatus: {status_str}\n"));
-    msg.push_str(&format!("Iteration: {iteration}/{max_iterations}\n"));
+    let _ = writeln!(msg, "\nStatus: {status_str}");
+    let _ = writeln!(msg, "Iteration: {iteration}/{max_iterations}");
 
     msg
 }
@@ -253,6 +259,7 @@ pub fn prioritize_failures(failures: &mut [Failure]) {
 mod harness_pbt;
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

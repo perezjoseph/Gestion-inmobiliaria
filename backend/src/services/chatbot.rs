@@ -1374,7 +1374,6 @@ pub async fn confirmar_preview(
         .await?
     {
         return match existing.entity_type.as_str() {
-            "pago" => Ok(ConfirmedEntity::Pago(existing.entity_id)),
             "gasto" => Ok(ConfirmedEntity::Gasto(existing.entity_id)),
             _ => Ok(ConfirmedEntity::Pago(existing.entity_id)),
         };

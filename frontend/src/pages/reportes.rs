@@ -555,6 +555,7 @@ fn RentabilidadResult(props: &RentabilidadResultProps) -> Html {
 }
 
 #[derive(Properties, PartialEq)]
+#[allow(clippy::struct_field_names)]
 struct RentabilidadSummaryCardsProps {
     total_ingresos: f64,
     total_gastos: f64,
@@ -638,7 +639,7 @@ fn RentabilidadTable(props: &RentabilidadTableProps) -> Html {
 
 fn format_currency(value: f64) -> String {
     if value >= 0.0 {
-        format!("RD$ {:.2}", value)
+        format!("RD$ {value:.2}")
     } else {
         format!("-RD$ {:.2}", value.abs())
     }
