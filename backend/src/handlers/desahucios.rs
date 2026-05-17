@@ -9,7 +9,7 @@ use crate::models::desahucio::{
 };
 use crate::services::desahucios;
 
-const VALID_ESTADOS: &[&str] = &["pendiente", "en_proceso", "resuelto", "cancelado"];
+const VALID_ESTADOS: &[&str] = &["iniciado", "en_progreso", "completado"];
 
 fn validate_create(dto: &CreateDesahucioRequest) -> Result<(), AppError> {
     if dto.motivo.trim().is_empty() {
