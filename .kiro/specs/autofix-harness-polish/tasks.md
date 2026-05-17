@@ -30,7 +30,7 @@ Transform the CI autofix harness into a structured, multi-language agent harness
     - Instruct to run the verify loop internally rather than relying on workflow re-invocation
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 8.5, 14.7, 15.3, 15.4_
 
-- [ ] 2. Create on-demand skills
+- [x] 2. Create on-demand skills
   - [x] 2.1 Create the TypeScript CI fix skill at `.kiro/skills/ci-fix-typescript/SKILL.md`
     - Add YAML frontmatter with `name: ci-fix-typescript` and description for activation triggers (TS compilation errors, ESLint violations, test failures in baileys-service)
     - Document verification commands: `cd baileys-service && npm run build`, `cd baileys-service && npx eslint . --max-warnings 0`, `cd baileys-service && npm test`
@@ -39,7 +39,7 @@ Transform the CI autofix harness into a structured, multi-language agent harness
     - Instruct to never add `// @ts-ignore` or `// eslint-disable` unless confirmed false positive with justification
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
 
-  - [-] 2.2 Create the verify-fix loop skill at `.kiro/skills/verify-fix-loop/SKILL.md`
+  - [x] 2.2 Create the verify-fix loop skill at `.kiro/skills/verify-fix-loop/SKILL.md`
     - Add YAML frontmatter with `name: verify-fix-loop` and description for activation triggers (after applying fixes, running sensors, iterating on failed checks)
     - Define the loop workflow: detect modified types → select sensors → run sensors → parse failures → apply fixes → re-run → repeat
     - Define priority ordering: compilation errors > lint warnings > test failures
