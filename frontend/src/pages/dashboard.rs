@@ -242,8 +242,10 @@ fn AttentionSection(props: &AttentionSectionProps) -> Html {
     let docs_por_vencer = props.stats.as_ref().map_or(0, |s| s.documentos_por_vencer);
     let entidades_incompletas = props.stats.as_ref().map_or(0, |s| s.entidades_incompletas);
 
-    let total_alerts: i64 =
-        i64::try_from(overdue_count).unwrap_or(i64::MAX) + docs_vencidos + docs_por_vencer + entidades_incompletas;
+    let total_alerts: i64 = i64::try_from(overdue_count).unwrap_or(i64::MAX)
+        + docs_vencidos
+        + docs_por_vencer
+        + entidades_incompletas;
 
     if total_alerts == 0 {
         return html! {

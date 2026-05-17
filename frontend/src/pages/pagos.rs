@@ -1251,7 +1251,11 @@ pub fn Pagos() -> Html {
                 if failed {
                     error.set(Some("Error al marcar algunos pagos".into()));
                 } else {
-                    push_toast(toasts.as_ref(), "Pagos marcados como pagado", ToastKind::Success);
+                    push_toast(
+                        toasts.as_ref(),
+                        "Pagos marcados como pagado",
+                        ToastKind::Success,
+                    );
                 }
                 selected_ids.set(Vec::new());
                 reload.set(*reload + 1);

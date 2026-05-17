@@ -81,15 +81,14 @@ impl Tool for ExtractReceiptTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        use base64::Engine;
         use crate::models::chatbot::map_confidence;
+        use base64::Engine;
 
         let image_data = base64::engine::general_purpose::STANDARD
             .decode(&args.image_base64)
             .map_err(|e| ExtractReceiptError::Decode(e.to_string()))?;
 
-        let content_type = infer::get(&image_data)
-            .map_or("image/jpeg", |t| t.mime_type());
+        let content_type = infer::get(&image_data).map_or("image/jpeg", |t| t.mime_type());
 
         let ocr_result = self
             .ocr

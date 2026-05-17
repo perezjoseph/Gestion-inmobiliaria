@@ -18,8 +18,8 @@ pub fn read_query_params() -> HashMap<String, String> {
     }
     for pair in search.split('&') {
         if let Some((key, value)) = pair.split_once('=') {
-            let decoded_value = js_sys::decode_uri_component(value)
-                .map_or_else(|_| value.to_string(), Into::into);
+            let decoded_value =
+                js_sys::decode_uri_component(value).map_or_else(|_| value.to_string(), Into::into);
             params.insert(key.to_string(), decoded_value);
         }
     }
