@@ -1,5 +1,7 @@
 use sea_orm_migration::prelude::*;
 
+use super::m20250413_000001_create_organizaciones::Organizaciones;
+
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
@@ -39,7 +41,7 @@ impl MigrationTrait for Migration {
                         ForeignKey::create()
                             .name("fk_preview_index_organizacion")
                             .from(PreviewIndex::Table, PreviewIndex::OrganizacionId)
-                            .to(Organizacion::Table, Organizacion::Id)
+                            .to(Organizaciones::Table, Organizaciones::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
@@ -78,10 +80,4 @@ enum PreviewIndex {
     EntityType,
     EntityId,
     CreatedAt,
-}
-
-#[derive(DeriveIden)]
-enum Organizacion {
-    Table,
-    Id,
 }
