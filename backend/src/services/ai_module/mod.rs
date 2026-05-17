@@ -514,7 +514,7 @@ pub fn compose_system_prompt(
 // Rig Tool Definitions (other tools remain inline)
 // =============================================================================
 
-/// Error type for all chatbot AI tools (except ExtractReceiptTool which has its own).
+/// Error type for all chatbot AI tools (except `ExtractReceiptTool` which has its own).
 #[derive(Debug, thiserror::Error)]
 pub enum ChatbotToolError {
     #[error("Error de servicio: {0}")]
