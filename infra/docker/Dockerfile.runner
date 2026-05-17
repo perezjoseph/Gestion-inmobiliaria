@@ -161,4 +161,39 @@ RUN mkdir -p "${ANDROID_HOME}/cmdline-tools" \
 
 ENV PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/build-tools/36.0.0:${PATH}"
 
+# ── LSP tooling for Kiro autofix agent ──────────────────────────
+# rust-analyzer, typescript-language-server, pyrefly provide rich
+# type-aware diagnostics as feedback sensors during the verify-fix loop.
+
+# Node.js 20 LTS — required for typescript-language-server and skills CLI (npx)
+ARG NODE_MAJOR=20
+RUN curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
+       --connect-timeout 15 --max-time 60 \
+       "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash - \
+    && apt-get install -y -qq --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# typescript-language-server + typescript — TS/JS diagnostics for baileys-service
+ARG TSSERVER_VERSION=4.3.3
+ARG TYPESCRIPT_VERSION=5.8.3
+RUN npm install -g --prefer-offline \
+       "typescript-language-server@${TSSERVER_VERSION}" \
+       "typescript@${TYPESCRIPT_VERSION}"
+
+# rust-analyzer — Rust LSP with clippy integration
+ARG RUST_ANALYZER_VERSION=2025-06-02
+RUN BIN="/tmp/rust-analyzer.gz" \
+    && curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors \
+       --connect-timeout 15 --max-time 120 -o "$BIN" \
+       "https://github.com/rust-lang/rust-analyzer/releases/download/${RUST_ANALYZER_VERSION}/rust-analyzer-x86_64-unknown-linux-gnu.gz" \
+    && gunzip "$BIN" \
+    && install -m 755 /tmp/rust-analyzer /usr/local/bin/rust-analyzer \
+    && rm -f /tmp/rust-analyzer
+
+# pyrefly — Python type-checker (LSP diagnostics for .py scripts)
+RUN apt-get update -qq \
+    && apt-get install -y -qq --no-install-recommends python3-pip \
+    && pip3 install --no-cache-dir --break-system-packages pyrefly \
+    && rm -rf /var/lib/apt/lists/*
+
 USER runner

@@ -295,11 +295,24 @@ jobs:
           git config user.name "kiro-bot"
           git config user.email "kiro-bot@users.noreply.github.com"
 
+      - name: Install community skills
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            npx skills add warpdotdev/common-skills@diagnose-ci-failures -g -y
+            npx skills add warpdotdev/common-skills@fix-errors -g -y
+            npx skills add warpdotdev/oz-skills@ci-fix -g -y
+
       - name: Process queue (one Kiro run + one commit per artifact)
         id: queue
         if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
         env:
           KIRO_API_KEY: ${{ secrets.KIRO_API }}
+          KIRO_MAX_FIX_ITERATIONS: "3"
           ARTIFACTS_JSON: ${{ steps.list.outputs.artifacts }}
           GIT_HISTORY_FILE: ${{ steps.history.outputs.history_log }}
           QUEUE_RUNS: ${{ steps.attempts.outputs.queue_runs }}
@@ -307,10 +320,13 @@ jobs:
           umask 077
           ATTEMPT_DISPLAY=$((QUEUE_RUNS + 1))
           COMMITS_MADE=0
+          TOTAL=$(echo "$ARTIFACTS_JSON" | jq 'length')
+          POS=0
 
           # Iterate through artifacts in priority order
           while IFS= read -r artifact; do
             [ -z "$artifact" ] && continue
+            POS=$((POS + 1))
             CONTEXT_PATH="${RUNNER_TEMP}/all-diag/${artifact}/context.txt"
             if [ ! -s "$CONTEXT_PATH" ]; then
               echo "::warning::Skipping ${artifact}: context.txt empty or missing"
@@ -318,10 +334,8 @@ jobs:
             fi
 
             echo "::group::Processing ${artifact}"
-            COMMIT_MSG_FILE="${RUNNER_TEMP}/kiro-commit-message-${artifact}.txt"
-            export KIRO_COMMIT_MSG_FILE="$COMMIT_MSG_FILE"
 
-            # Truncate diagnostics if oversized to protect Kiro's context window.
+            # Truncate diagnostics if oversized to protect context window.
             CTX_BYTES=$(wc -c < "$CONTEXT_PATH")
             TRUNCATED_CTX="${RUNNER_TEMP}/all-diag/${artifact}/context-truncated.txt"
             if [ "$CTX_BYTES" -gt "${MAX_CONTEXT_BYTES}" ]; then
@@ -333,49 +347,27 @@ jobs:
               EFFECTIVE_CTX="$CONTEXT_PATH"
             fi
 
-            # Build the prompt in a file (avoids shell interpolation of artifact contents,
-            # which could contain backticks, quotes, or $(...) sequences).
-            PROMPT_FILE="${RUNNER_TEMP}/kiro-prompt-${artifact}.txt"
-            {
-              printf 'You are running in CI as automated remediation for a failed pipeline job.\n\n'
-              printf 'This is autofix queue iteration for artifact: %s\n' "$artifact"
-              printf '(queue run %d of %s on this branch).\n\n' "$ATTEMPT_DISPLAY" "$MAX_QUEUE_RUNS"
-              printf 'STEP 1 — Review prior history before changing anything.\n'
-              printf 'If there are prior kiro-bot attempts at HEAD, read what they tried and\n'
-              printf 'DO NOT repeat the same change. If a previous attempt approach failed,\n'
-              printf 'try a fundamentally different approach.\n\n'
-              printf '=== GIT HISTORY (recent commits + prior autofix attempts) ===\n'
-              cat "$GIT_HISTORY_FILE"
-              printf '\nSTEP 2 — Diagnose the SINGLE failing job below.\n'
-              printf 'Other failing jobs are being handled in separate iterations of this queue.\n'
-              printf 'Focus only on what is in the diagnostics below. Do NOT speculate about\n'
-              printf 'other failures you do not see here.\n\n'
-              printf '=== DIAGNOSTICS (single failing job) ===\n'
-              cat "$EFFECTIVE_CTX"
-              printf '\nSTEP 3 — Fix only what is broken in this artifact.\n'
-              printf -- '- Match the project existing style and conventions.\n'
-              printf -- '- Do NOT add new features or refactor unrelated code.\n'
-              printf -- '- Touch only files necessary to resolve THIS specific failure.\n\n'
-              printf 'STEP 4 — Write a descriptive commit message to KIRO_COMMIT_MSG_FILE.\n\n'
-              printf '    fix(autofix): <subject under 70 chars; reference %s>\n\n' "$artifact"
-              printf '    Resolves: %s\n\n' "$artifact"
-              printf '    Root cause:\n'
-              printf -- '    - <what was actually wrong; cite test names, lint IDs, file:line>\n\n'
-              printf '    Changes:\n'
-              printf -- '    - <bullet per file or logical change>\n\n'
-              printf '    Workflow run: %s\n\n' "$RUN_URL"
-              printf 'Do NOT run git commit or git push yourself; the workflow handles that.\n'
-            } > "$PROMPT_FILE"
+            # Set environment variables for the agent
+            export KIRO_DIAGNOSTICS_FILE="$EFFECTIVE_CTX"
+            export KIRO_COMMIT_MSG_FILE="${RUNNER_TEMP}/kiro-commit-message-${artifact}.txt"
 
-            # Run Kiro on this single artifact's diagnostics.
-            # Pass prompt as a positional argument (kiro-cli does not read from stdin).
-            kiro-cli chat --no-interactive --trust-all-tools "$(cat "$PROMPT_FILE")"
+            # Invoke the autofix agent with minimal positional prompt.
+            # The system prompt (loaded from .kiro/prompts/autofix-system.md) contains
+            # all behavioral instructions; the positional prompt only provides context.
+            AGENT_EXIT=0
+            kiro-cli --agent autofix chat --no-interactive --trust-all-tools \
+              "Fix artifact: ${artifact} (queue position ${POS}/${TOTAL}). Diagnostics at KIRO_DIAGNOSTICS_FILE." \
+              || AGENT_EXIT=$?
 
             # Detect ANY change in working tree (tracked, staged, OR untracked).
-            # `git diff` only sees tracked-file changes, missing new files Kiro creates.
             git add -A
             if [ -z "$(git status --porcelain)" ]; then
               echo "No changes produced by Kiro for ${artifact}, skipping commit"
+              if [ "$AGENT_EXIT" -ne 0 ]; then
+                echo "::warning::Agent exited ${AGENT_EXIT} with no changes for ${artifact}; stopping queue."
+                echo "::endgroup::"
+                break
+              fi
               echo "::endgroup::"
               continue
             fi
@@ -383,11 +375,11 @@ jobs:
             # Commit locally — no push yet (push happens once at end of queue).
             # Ensure every queued commit ends with the Workflow run trailer for
             # the queue-run counter to detect.
-            if [ -s "$COMMIT_MSG_FILE" ]; then
-              if ! grep -qF "Workflow run: ${RUN_URL}" "$COMMIT_MSG_FILE"; then
-                printf '\nWorkflow run: %s\n' "$RUN_URL" >> "$COMMIT_MSG_FILE"
+            if [ -s "$KIRO_COMMIT_MSG_FILE" ]; then
+              if ! grep -qF "Workflow run: ${RUN_URL}" "$KIRO_COMMIT_MSG_FILE"; then
+                printf '\nWorkflow run: %s\n' "$RUN_URL" >> "$KIRO_COMMIT_MSG_FILE"
               fi
-              git commit -F "$COMMIT_MSG_FILE"
+              git commit -F "$KIRO_COMMIT_MSG_FILE"
             else
               echo "::warning::Kiro did not produce a commit message for ${artifact}; using fallback."
               git commit -m "fix(autofix): resolve ${artifact}
@@ -397,102 +389,20 @@ jobs:
             fi
             COMMITS_MADE=$((COMMITS_MADE + 1))
             echo "Commit ${COMMITS_MADE} created for ${artifact}"
+
+            # Exit code handling: 0 → continue queue; non-zero → stop queue
+            if [ "$AGENT_EXIT" -ne 0 ]; then
+              echo "::warning::Agent exited ${AGENT_EXIT} for ${artifact}; committed partial fix, stopping queue."
+              echo "::endgroup::"
+              break
+            fi
+
             echo "::endgroup::"
           done < <(echo "$ARTIFACTS_JSON" | jq -r '.[]')
 
           echo "commits_made=$COMMITS_MADE" >> "$GITHUB_OUTPUT"
           echo ""
           echo "Queue complete. Created $COMMITS_MADE commits."
-
-      - name: Verify cumulative state
-        id: verify
-        if: steps.queue.outputs.commits_made != '0' && steps.queue.outputs.commits_made != ''
-        run: |
-          umask 077
-          echo "=== Verifying cumulative fix state before pushing ==="
-          PASS_FILE="${RUNNER_TEMP}/verify-pass"
-          VERIFY_LOG="${RUNNER_TEMP}/verify-output.txt"
-          echo "true" > "$PASS_FILE"
-
-          {
-            echo "=== RUSTFMT CHECK ==="
-            if ! cargo fmt --all -- --check 2>&1; then
-              echo "false" > "$PASS_FILE"
-              echo "FAILED: rustfmt"
-            fi
-            echo ""
-            echo "=== CLIPPY BACKEND ==="
-            if ! cargo clippy --locked -p realestate-backend -- -D warnings 2>&1; then
-              echo "false" > "$PASS_FILE"
-              echo "FAILED: clippy backend"
-            fi
-            echo ""
-            echo "=== CLIPPY FRONTEND ==="
-            if ! cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings 2>&1; then
-              echo "false" > "$PASS_FILE"
-              echo "FAILED: clippy frontend"
-            fi
-            # Best-effort baileys typecheck if Node is available
-            if command -v npm >/dev/null 2>&1 && [ -f baileys-service/package.json ]; then
-              echo ""
-              echo "=== BAILEYS TYPECHECK ==="
-              ( cd baileys-service && npm ci --silent && npm run build 2>&1 ) || {
-                echo "false" > "$PASS_FILE"
-                echo "FAILED: baileys typecheck"
-              }
-            fi
-          } | tee "$VERIFY_LOG"
-
-          PASS=$(cat "$PASS_FILE")
-          if [ "$PASS" = "true" ]; then
-            echo "verified=true" >> "$GITHUB_OUTPUT"
-            echo "✅ Cumulative verification passed."
-          else
-            echo "verified=false" >> "$GITHUB_OUTPUT"
-            echo "verify_log=$VERIFY_LOG" >> "$GITHUB_OUTPUT"
-            echo "::warning::Cumulative verification failed. Asking Kiro for a fixup commit."
-          fi
-
-      - name: Fixup commit if cumulative verification failed
-        if: steps.verify.outputs.verified == 'false'
-        env:
-          KIRO_API_KEY: ${{ secrets.KIRO_API }}
-        run: |
-          umask 077
-          COMMIT_MSG_FILE="${RUNNER_TEMP}/kiro-fixup-message.txt"
-          export KIRO_COMMIT_MSG_FILE="$COMMIT_MSG_FILE"
-
-          # Build prompt via file to avoid shell interpolation of verify output.
-          FIXUP_PROMPT="${RUNNER_TEMP}/kiro-fixup-prompt.txt"
-          {
-            printf 'Your prior queue commits introduced cross-cutting issues.\n'
-            printf 'Run cargo fmt, clippy, etc. on the cumulative state and fix any\n'
-            printf 'remaining errors. This produces ONE fixup commit on top of the queue.\n\n'
-            printf '=== VERIFICATION ERRORS ===\n'
-            cat "${{ steps.verify.outputs.verify_log }}"
-            printf '\nWrite commit message to KIRO_COMMIT_MSG_FILE.\n'
-            printf 'End the commit message with: Workflow run: %s\n' "$RUN_URL"
-          } > "$FIXUP_PROMPT"
-
-          kiro-cli chat --no-interactive --trust-all-tools "$(cat "$FIXUP_PROMPT")"
-
-          git add -A
-          if [ -z "$(git status --porcelain)" ]; then
-            echo "::warning::Fixup pass produced no changes despite verification failures."
-            exit 0
-          fi
-
-          if [ -s "$COMMIT_MSG_FILE" ]; then
-            if ! grep -qF "Workflow run: ${RUN_URL}" "$COMMIT_MSG_FILE"; then
-              printf '\nWorkflow run: %s\n' "$RUN_URL" >> "$COMMIT_MSG_FILE"
-            fi
-            git commit -F "$COMMIT_MSG_FILE"
-          else
-            git commit -m "fix(autofix): cumulative verification fixup
-
-          Resolves cross-cutting issues introduced by the autofix queue.
-          Workflow run: ${RUN_URL}"
-          fi
 
       - name: Push all queued commits
         id: push

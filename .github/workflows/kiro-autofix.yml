@@ -193,178 +193,56 @@ jobs:
           } > "$HISTORY_LOG"
           echo "history_log=$HISTORY_LOG" >> "$GITHUB_OUTPUT"
 
-      - name: Run Kiro CLI to fix errors
+      - name: Install community skills
+        if: steps.attempts.outputs.exceeded == 'false'
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            npx skills add warpdotdev/common-skills@diagnose-ci-failures -g -y
+            npx skills add warpdotdev/common-skills@fix-errors -g -y
+            npx skills add warpdotdev/oz-skills@ci-fix -g -y
+
+      - name: Run Kiro CLI agent to fix errors
+        id: kiro
         if: steps.attempts.outputs.exceeded == 'false'
         env:
           KIRO_API_KEY: ${{ secrets.kiro-api }}
-          ATTEMPT_NUM: ${{ steps.attempts.outputs.count }}
+          KIRO_DIAGNOSTICS_FILE: ${{ runner.temp }}/kiro-context/${{ inputs.context-filename }}
+          KIRO_COMMIT_MSG_FILE: ${{ runner.temp }}/kiro-commit-message.txt
+          KIRO_MAX_FIX_ITERATIONS: "3"
           STAGE: ${{ inputs.stage }}
-          RUN_URL: ${{ inputs.run-url }}
+          BRANCH: ${{ inputs.branch }}
         run: |
           umask 077
-          CONTEXT_PATH="${RUNNER_TEMP}/kiro-context/${{ inputs.context-filename }}"
-          if [ ! -s "$CONTEXT_PATH" ]; then
-            echo "::error::Diagnostics artifact at $CONTEXT_PATH is empty or missing"
+          if [ ! -s "${KIRO_DIAGNOSTICS_FILE}" ]; then
+            echo "::error::Diagnostics artifact at ${KIRO_DIAGNOSTICS_FILE} is empty or missing"
             exit 1
           fi
-          ERROR_CONTEXT=$(cat "$CONTEXT_PATH")
-          GIT_HISTORY=$(cat "${{ steps.history.outputs.history_log }}")
-          COMMIT_MSG_FILE="${RUNNER_TEMP}/kiro-commit-message.txt"
-          ATTEMPT_DISPLAY=$((ATTEMPT_NUM + 1))
 
-          export KIRO_COMMIT_MSG_FILE="$COMMIT_MSG_FILE"
+          set +e
+          kiro-cli --agent autofix chat --no-interactive --trust-all-tools \
+            "Fix ${STAGE} failure on branch ${BRANCH}. Diagnostics at KIRO_DIAGNOSTICS_FILE."
+          AGENT_EXIT=$?
+          set -e
 
-          STAGE_GUIDANCE=""
-          case "${STAGE}" in
-            build)
-              STAGE_GUIDANCE="The failure is in the CI build/test stage. The diagnostics below come from whichever job(s) failed — this could be Rust (clippy, tests, cargo build), TypeScript (baileys-service tsc/tests), rustfmt, security scans (cargo-deny, trivy IaC), or container builds. Read the diagnostics carefully to identify which job failed and fix accordingly. For Rust issues, verify with 'cargo fmt --all', 'cargo clippy -p realestate-backend -- -D warnings', and 'cargo clippy --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings'. For baileys-service TypeScript issues, verify with 'cd baileys-service && npm run build && npm test'. For security/container issues, fix the relevant config files."
-              ;;
-            deploy)
-              STAGE_GUIDANCE="The failure is in the Kubernetes deploy stage. The diagnostics include kubectl events, pod descriptions, and container logs from the realestate namespace. The fix could go in: (1) backend/frontend Rust code if logs show a panic, missing env var, or startup error; (2) Kubernetes manifests under infra/k8s/app/ if it's a manifest, probe, resource, or selector issue; (3) Caddyfile under infra/caddy/ for ingress/proxy issues. Read the logs carefully and identify the actual failure mode (CrashLoopBackOff, ImagePullBackOff, readiness/liveness failure, OOMKilled) before editing. Do NOT change image tags or digests — those are managed by deploy.yml."
-              ;;
-            *)
-              STAGE_GUIDANCE="Diagnose the failure from the diagnostics below and fix only what is broken."
-              ;;
-          esac
-
-          kiro-cli chat --no-interactive --trust-all-tools \
-            "You are running in CI as automated remediation for a failed pipeline.
-          Stage: ${STAGE}.
-          This is autofix attempt ${ATTEMPT_DISPLAY} of ${MAX_ATTEMPTS} on this branch.
-
-          STEP 1 — Review prior history before changing anything.
-          Inspect the git history below. If there are prior kiro-bot attempts at HEAD,
-          read what they tried and DO NOT repeat the same change. If a previous
-          attempt's approach clearly failed, try a fundamentally different approach
-          rather than tweaking incrementally.
-
-          === GIT HISTORY (recent commits + prior autofix attempts) ===
-          ${GIT_HISTORY}
-
-          STEP 2 — Diagnose.
-          ${STAGE_GUIDANCE}
-
-          === DIAGNOSTICS ===
-          ${ERROR_CONTEXT}
-
-          STEP 3 — Fix only what is broken.
-          - Match the project's existing style and conventions.
-          - Do NOT add new features or refactor unrelated code.
-          - Touch only files necessary to resolve the failure.
-
-          STEP 4 — Write a descriptive commit message.
-          After all fixes are in place, write a commit message to the file at the
-          path stored in the environment variable KIRO_COMMIT_MSG_FILE. The message
-          must follow this exact format:
-
-              fix(${STAGE}): <one-line subject under 70 chars summarizing the fix>
-
-              Attempt ${ATTEMPT_DISPLAY} of ${MAX_ATTEMPTS}.
-
-              Root cause:
-              - <what was actually wrong; cite test names, lint IDs, file:line, pod names, or k8s events>
-
-              Changes:
-              - <bullet per file or logical change, naming the symbol or file>
-
-              Verification:
-              - <which commands you ran and what they showed>
-
-              Workflow run: ${RUN_URL}
-
-          Be specific. Reference exact test names, clippy lint IDs, file paths,
-          symbols, pod names, or kubectl event messages. Avoid filler like 'various
-          fixes' or 'minor improvements'. Do NOT run 'git commit' or 'git push'
-          yourself; the workflow handles that."
+          echo "agent_exit=${AGENT_EXIT}" >> "$GITHUB_OUTPUT"
+          if [ "$AGENT_EXIT" -ne 0 ]; then
+            echo "::warning::Kiro agent exited with code ${AGENT_EXIT} (partial fix or failure)"
+          fi
 
       - name: Check for changes
         id: changes
         if: steps.attempts.outputs.exceeded == 'false'
         run: |
-          if git diff --quiet && git diff --cached --quiet; then
+          git add -A
+          if [ -z "$(git status --porcelain)" ]; then
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
             echo "No changes to commit"
           else
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Verify fix before committing
-        id: verify
-        if: steps.attempts.outputs.exceeded == 'false' && steps.changes.outputs.has_changes == 'true' && inputs.stage == 'build'
-        run: |
-          umask 077
-          echo "=== Verifying Kiro's fix locally before pushing ==="
-          VERIFY_LOG="${RUNNER_TEMP}/verify-output.txt"
-          PASS_FILE="${RUNNER_TEMP}/verify-pass"
-          echo "true" > "$PASS_FILE"
-
-          # Run the same checks that CI would run
-          {
-            echo "=== RUSTFMT CHECK ==="
-            if ! cargo fmt --all -- --check 2>&1; then
-              echo "false" > "$PASS_FILE"
-              echo "FAILED: rustfmt"
-            fi
-            echo ""
-            echo "=== CLIPPY BACKEND ==="
-            if ! cargo clippy --locked -p realestate-backend -- -D warnings 2>&1; then
-              echo "false" > "$PASS_FILE"
-              echo "FAILED: clippy backend"
-            fi
-            echo ""
-            echo "=== CLIPPY FRONTEND ==="
-            if ! cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings 2>&1; then
-              echo "false" > "$PASS_FILE"
-              echo "FAILED: clippy frontend"
-            fi
-          } | tee "$VERIFY_LOG"
-
-          PASS=$(cat "$PASS_FILE")
-          if [ "$PASS" = "true" ]; then
-            echo "verified=true" >> "$GITHUB_OUTPUT"
-            echo "✅ Local verification passed — safe to push."
-          else
-            echo "verified=false" >> "$GITHUB_OUTPUT"
-            echo "verify_log=$VERIFY_LOG" >> "$GITHUB_OUTPUT"
-            echo "::warning::Local verification failed. Giving Kiro a second pass."
-          fi
-
-      - name: Re-run Kiro CLI to fix verification failures
-        if: steps.verify.outputs.verified == 'false'
-        env:
-          KIRO_API_KEY: ${{ secrets.kiro-api }}
-        run: |
-          umask 077
-          VERIFY_ERRORS=$(cat "${{ steps.verify.outputs.verify_log }}")
-          COMMIT_MSG_FILE="${RUNNER_TEMP}/kiro-commit-message.txt"
-          export KIRO_COMMIT_MSG_FILE="$COMMIT_MSG_FILE"
-
-          kiro-cli chat --no-interactive --trust-all-tools \
-            "Your previous fix did not pass local verification. The errors below are from
-          running cargo fmt, clippy, and tests on your changes. Fix these remaining issues.
-          Do NOT revert your prior changes — build on them.
-
-          === VERIFICATION ERRORS ===
-          ${VERIFY_ERRORS}
-
-          After fixing, update the commit message file at KIRO_COMMIT_MSG_FILE."
-
-      - name: Re-verify after second pass
-        id: reverify
-        if: steps.verify.outputs.verified == 'false'
-        run: |
-          umask 077
-          PASS=true
-          cargo fmt --all -- --check 2>&1 || PASS=false
-          cargo clippy --locked -p realestate-backend -- -D warnings 2>&1 || PASS=false
-          cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings 2>&1 || PASS=false
-
-          if [ "$PASS" = "true" ]; then
-            echo "verified=true" >> "$GITHUB_OUTPUT"
-            echo "✅ Second-pass verification passed."
-          else
-            echo "verified=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Second-pass verification also failed. Pushing anyway to consume an attempt."
           fi
 
       - name: Commit and push fixes
@@ -373,19 +251,18 @@ jobs:
           ATTEMPT: ${{ steps.attempts.outputs.count }}
           STAGE: ${{ inputs.stage }}
           RUN_URL: ${{ inputs.run-url }}
+          KIRO_COMMIT_MSG_FILE: ${{ runner.temp }}/kiro-commit-message.txt
         run: |
           umask 077
-          COMMIT_MSG_FILE="${RUNNER_TEMP}/kiro-commit-message.txt"
           attempt_num=$((ATTEMPT + 1))
 
           git config user.name "kiro-bot"
           git config user.email "kiro-bot@users.noreply.github.com"
-          git add -A
 
-          if [ -s "$COMMIT_MSG_FILE" ]; then
+          if [ -s "${KIRO_COMMIT_MSG_FILE}" ]; then
             echo "Using Kiro-generated commit message:"
-            cat "$COMMIT_MSG_FILE"
-            git commit -F "$COMMIT_MSG_FILE"
+            cat "${KIRO_COMMIT_MSG_FILE}"
+            git commit -F "${KIRO_COMMIT_MSG_FILE}"
           else
             echo "::warning::Kiro did not produce a commit message; using fallback."
             git commit -m "fix(${STAGE}): auto-fix CI errors via Kiro CLI (attempt ${attempt_num}/${{ env.MAX_ATTEMPTS }})
@@ -395,3 +272,9 @@ jobs:
           fi
 
           git push origin "${{ inputs.branch }}"
+
+      - name: Fail step if agent exited non-zero
+        if: steps.attempts.outputs.exceeded == 'false' && steps.kiro.outputs.agent_exit != '0' && steps.kiro.outputs.agent_exit != ''
+        run: |
+          echo "::error::Kiro agent exited with code ${{ steps.kiro.outputs.agent_exit }}. Partial fix committed (if changes existed)."
+          exit 1
