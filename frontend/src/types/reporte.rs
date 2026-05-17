@@ -31,7 +31,6 @@ pub struct IngresoReportSummary {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
 pub struct RentabilidadReportRow {
     pub propiedad_id: String,
     pub propiedad_titulo: String,
@@ -46,7 +45,6 @@ pub struct RentabilidadReportRow {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
 pub struct RentabilidadReportSummary {
     pub rows: Vec<RentabilidadReportRow>,
     #[serde(deserialize_with = "deserialize_f64_from_any")]

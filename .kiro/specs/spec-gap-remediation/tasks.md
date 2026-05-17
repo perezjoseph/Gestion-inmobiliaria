@@ -224,7 +224,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - Wire into `confirmar_preview` for the `Recibo` branch; persist with `inquilino_id = NULL` when `None`
     - _Requirements: 5.4, 5.5_
 
-  - [-] 9.3 Map OCR validation failures to HTTP `422`
+  - [x] 9.3 Map OCR validation failures to HTTP `422`
     - In `confirmar_preview`, fail with `AppError::UnprocessableEntity("Datos de OCR inválidos")` when extraction values fail validation; do not insert any row
     - _Requirements: 5.7_
 
@@ -246,7 +246,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - _Requirements: 5.4, 5.5_
 
 - [x] 10. WhatsApp AI multi-turn agent loop and `Extract_Receipt_Tool` wiring (Requirement 8)
-  - [-] 10.1 Implement `Multi_Turn_Agent_Loop` in `backend/src/services/ai_module.rs::invoke_agent`
+  - [x] 10.1 Implement `Multi_Turn_Agent_Loop` in `backend/src/services/ai_module.rs::invoke_agent`
     - Loop up to `TURN_LIMIT = 5` turns, calling `agent.completion(&chat_history)`
     - On `AgentResponse::Final(text)` return `AgentOutcome::Final { text, history }`
     - On `AgentResponse::ToolCalls(calls)` execute each tool, push tool results back into `chat_history`, and continue
@@ -255,7 +255,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - All inference targets `https://ovms.<ns>.svc.cluster.local/v3` — never an external provider
     - _Requirements: 8.1, 8.4, 8.5, 8.6_
 
-  - [-] 10.2 Register `Extract_Receipt_Tool` with the Rig agent
+  - [x] 10.2 Register `Extract_Receipt_Tool` with the Rig agent
     - Create `backend/src/services/ai_module/tools/extract_receipt.rs` implementing `rig::Tool` with `NAME = "extract_receipt"`
     - `call(args)`: fetch media via `media_store.fetch(args.media_id)`, then `ocr.extract(&bytes)` (which targets OVMS `/v3`), returning `PaymentReceipt`
     - Register the tool when constructing the agent in `services::ai_module`
@@ -297,29 +297,29 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - Edit `frontend/src/pages/gastos.rs` line 48: change to `("servicio_publico", "Servicio Público")`
     - _Requirements: 9.4_
 
-  - [-] 11.5 Add the `Rentabilidad_View` tab to the reportes page
+  - [x] 11.5 Add the `Rentabilidad_View` tab to the reportes page
     - Edit `frontend/src/pages/reportes.rs` to add a `Rentabilidad` tab calling `/reportes/rentabilidad?fecha_desde=…&fecha_hasta=…`
     - Render a per-`Propiedad` table of income (`sum(Pago WHERE estado = 'pagado')`) minus expenses (`sum(Gasto WHERE estado = 'pagado')`)
     - Wire `Descargar PDF` and `Descargar Excel` buttons to existing export endpoints; all labels in Spanish
     - _Requirements: 9.1, 9.8_
 
-  - [-] 11.6 Create the `Category_Summary` page
+  - [x] 11.6 Create the `Category_Summary` page
     - New `frontend/src/pages/categorias_gastos.rs` calling `GET /gastos/resumen-categorias`
     - Render a sortable table of `categoría / total / count`; Spanish labels; DD/MM/YYYY where dates are shown
     - Add `#[at("/categorias-gastos")] CategoriasGastos` to the `Route` enum
     - _Requirements: 9.2, 9.8_
 
-  - [-] 11.7 Add the `Expense_Card` to the dashboard
+  - [x] 11.7 Add the `Expense_Card` to the dashboard
     - Edit `frontend/src/pages/dashboard.rs` to render a card showing total pending expenses, total paid expenses for the current month, and overdue count
     - Backed by `GET /dashboard/gastos-comparacion`
     - _Requirements: 9.3, 9.8_
 
-  - [-] 11.8 Render utility fields conditionally and format currency/dates
+  - [x] 11.8 Render utility fields conditionally and format currency/dates
     - Edit `frontend/src/components/feature/gasto_form.rs` to render `proveedor`, `numero_cuenta`, `periodo_inicio`, `periodo_fin` only when `categoria == "servicios"`
     - Display all amounts with `moneda` symbol and two decimals; render dates as DD/MM/YYYY
     - _Requirements: 9.5, 9.8_
 
-  - [-] 11.9 Add `fecha_desde`/`fecha_hasta` date pickers to the gastos filter bar
+  - [x] 11.9 Add `fecha_desde`/`fecha_hasta` date pickers to the gastos filter bar
     - Edit `frontend/src/components/feature/gasto_filter_bar.rs` to add the two date inputs and propagate state via callback
     - _Requirements: 9.6, 9.8_
 

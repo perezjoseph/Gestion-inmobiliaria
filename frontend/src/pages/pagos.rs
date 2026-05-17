@@ -7,9 +7,9 @@ use yew::prelude::*;
 use yew_router::prelude::*;
 
 use crate::app::{AuthContext, Route};
+use crate::components::common::bulk_action_bar::BulkActionBar;
 use crate::components::common::confidence_input::ConfidenceInput;
 use crate::components::common::currency_display::CurrencyDisplay;
-use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::document_gallery::DocumentGallery;
 use crate::components::common::error_banner::ErrorBanner;
@@ -19,6 +19,7 @@ use crate::components::common::pagination::Pagination;
 use crate::components::common::skeleton::TableSkeleton;
 use crate::components::common::toast::{ToastAction, ToastContext, ToastKind};
 use crate::hooks::use_online;
+use crate::hooks::use_query_filters::{read_query_params, write_query_params};
 use crate::services::api::{BASE_URL, api_delete, api_get, api_post, api_put};
 use crate::services::idb_cache;
 use crate::types::PaginatedResponse;
@@ -316,6 +317,12 @@ struct PagoListProps {
     on_new: Callback<MouseEvent>,
     on_page_change: Callback<u64>,
     on_per_page_change: Callback<u64>,
+    #[prop_or_default]
+    selected_ids: Vec<String>,
+    #[prop_or_default]
+    on_toggle_select: Option<Callback<String>>,
+    #[prop_or_default]
+    on_select_all: Option<Callback<bool>>,
 }
 
 fn render_pago_row(
@@ -346,6 +353,37 @@ fn render_pago_row(
             <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
             {actions}
         </tr>
+    }
+}
+
+fn render_pago_cells(
+    p: &Pago,
+    user_rol: &str,
+    contrato_label: &Callback<String, String>,
+    on_edit: &Callback<Pago>,
+    on_delete: &Callback<Pago>,
+) -> Html {
+    let c_label = contrato_label.emit(p.contrato_id.clone());
+    let (badge_cls, badge_label) = estado_badge(&p.estado);
+    let recargo_cell = render_recargo_cell(p.recargo, &p.moneda);
+    let pc = p.clone();
+    let pd = p.clone();
+    let on_edit = on_edit.clone();
+    let on_delete_click = on_delete.clone();
+    let actions = render_pago_actions(user_rol, &p.estado, &p.id, pc, pd, on_edit, on_delete_click);
+    html! {
+        <>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{c_label}</td>
+            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={p.monto} moneda={p.moneda.clone()} /></td>
+            {recargo_cell}
+            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
+                {p.fecha_pago.as_deref().map_or_else(|| "—".into(), format_date_display)}</td>
+            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&p.fecha_vencimiento)}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
+                {p.metodo_pago.as_deref().map_or("—", metodo_label)}</td>
+            <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
+            {actions}
+        </>
     }
 }
 
@@ -429,11 +467,81 @@ fn PagoList(props: &PagoListProps) -> Html {
         return render_pago_empty_state(&props.user_rol, &props.on_new);
     }
 
+    let can_select = props.on_toggle_select.is_some() && can_write(&props.user_rol);
+    let all_selected = can_select
+        && !props.items.is_empty()
+        && props
+            .items
+            .iter()
+            .all(|p| props.selected_ids.contains(&p.id));
+
+    let select_all_cb = {
+        let on_select_all = props.on_select_all.clone();
+        let all_sel = all_selected;
+        Callback::from(move |_: Event| {
+            if let Some(ref cb) = on_select_all {
+                cb.emit(!all_sel);
+            }
+        })
+    };
+
     html! {
         <>
-            <DataTable headers={props.headers.clone()}>
-                { for props.items.iter().map(|p| render_pago_row(p, &props.user_rol, &props.contrato_label, &props.on_edit, &props.on_delete)) }
-            </DataTable>
+            <div class="gi-table-wrap" aria-live="polite" style="border-radius: 12px; border: 1px solid var(--border-subtle); overflow: hidden;">
+                <table class="gi-table">
+                    <thead>
+                        <tr>
+                            if can_select {
+                                <th class="gi-table-checkbox-cell">
+                                    <input
+                                        type="checkbox"
+                                        class="gi-table-checkbox"
+                                        checked={all_selected}
+                                        onchange={select_all_cb}
+                                        aria-label="Seleccionar todos"
+                                    />
+                                </th>
+                            }
+                            { for props.headers.iter().filter(|h| !h.is_empty()).map(|header| {
+                                html! { <th>{header}</th> }
+                            })}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        { for props.items.iter().map(|p| {
+                            let is_selected = props.selected_ids.contains(&p.id);
+                            let toggle_cb = {
+                                let on_toggle = props.on_toggle_select.clone();
+                                let id = p.id.clone();
+                                Callback::from(move |_: Event| {
+                                    if let Some(ref cb) = on_toggle {
+                                        cb.emit(id.clone());
+                                    }
+                                })
+                            };
+                            let row = render_pago_row(p, &props.user_rol, &props.contrato_label, &props.on_edit, &props.on_delete);
+                            if can_select {
+                                html! {
+                                    <tr class={if is_selected { "gi-row-selected" } else { "" }}>
+                                        <td class="gi-table-checkbox-cell">
+                                            <input
+                                                type="checkbox"
+                                                class="gi-table-checkbox"
+                                                checked={is_selected}
+                                                onchange={toggle_cb}
+                                                aria-label="Seleccionar pago"
+                                            />
+                                        </td>
+                                        {render_pago_cells(p, &props.user_rol, &props.contrato_label, &props.on_edit, &props.on_delete)}
+                                    </tr>
+                                }
+                            } else {
+                                row
+                            }
+                        })}
+                    </tbody>
+                </table>
+            </div>
             <Pagination
                 total={props.total}
                 page={props.page}
@@ -802,8 +910,18 @@ pub fn Pagos() -> Html {
     let estado_form = use_state(|| "pendiente".to_string());
     let notas = use_state(String::new);
 
-    let filter_contrato = use_state(String::new);
-    let filter_estado = use_state(String::new);
+    let filter_contrato = use_state(|| {
+        read_query_params()
+            .get("contrato")
+            .cloned()
+            .unwrap_or_default()
+    });
+    let filter_estado = use_state(|| {
+        read_query_params()
+            .get("estado")
+            .cloned()
+            .unwrap_or_default()
+    });
 
     let confidences = use_state(HashMap::<String, f64>::new);
 
@@ -821,6 +939,10 @@ pub fn Pagos() -> Html {
         use_effect_with(
             (reload_val, pg, f_contrato, f_estado),
             move |(_, _, f_contrato, f_estado)| {
+                write_query_params(&[
+                    ("contrato", f_contrato.as_str()),
+                    ("estado", f_estado.as_str()),
+                ]);
                 let url = build_pagos_url(pg, pp, f_contrato, f_estado);
                 load_pagos_data(items, total, error, loading, url, is_online);
             },

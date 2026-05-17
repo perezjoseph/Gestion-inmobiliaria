@@ -15,6 +15,7 @@ use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::document_gallery::DocumentGallery;
 use crate::components::common::error_banner::ErrorBanner;
+use crate::components::common::help_tooltip::HelpTooltip;
 use crate::components::common::ocr_scan_button::OcrScanButton;
 use crate::components::common::offline_guard::OfflineGuard;
 use crate::components::common::pagination::Pagination;
@@ -177,7 +178,9 @@ fn ContratoForm(props: &ContratoFormProps) -> Html {
                     {field_error(&fe.inquilino_id)}
                 </div>
                 <div>
-                    <label class="gi-label" title="No puede solaparse con otro contrato activo de la misma propiedad">{"Fecha Inicio *"}</label>
+                    <label class="gi-label" title="No puede solaparse con otro contrato activo de la misma propiedad">{"Fecha Inicio *"}
+                        <HelpTooltip text="No puede solaparse con otro contrato activo de la misma propiedad." id="help-fecha-inicio" />
+                    </label>
                     <ConfidenceInput
                         value={AttrValue::from((*props.fecha_inicio).clone())}
                         confidence={confidence_for("fecha_inicio")}
@@ -188,7 +191,9 @@ fn ContratoForm(props: &ContratoFormProps) -> Html {
                     {field_error(&fe.fecha_inicio)}
                 </div>
                 <div>
-                    <label class="gi-label" title="Debe ser posterior a la fecha de inicio. No puede solaparse con otro contrato activo">{"Fecha Fin *"}</label>
+                    <label class="gi-label" title="Debe ser posterior a la fecha de inicio. No puede solaparse con otro contrato activo">{"Fecha Fin *"}
+                        <HelpTooltip text="Debe ser posterior a la fecha de inicio. No puede solaparse con otro contrato activo." id="help-fecha-fin" />
+                    </label>
                     <ConfidenceInput
                         value={AttrValue::from((*props.fecha_fin).clone())}
                         confidence={confidence_for("fecha_fin")}

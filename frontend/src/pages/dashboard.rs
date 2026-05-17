@@ -9,7 +9,7 @@ use crate::components::common::line_chart::{ChartPoint, LineChart};
 use crate::components::common::skeleton::DashboardSkeleton;
 use crate::services::api::api_get;
 use crate::types::contrato::Contrato;
-use crate::types::dashboard_extra::{IngresoComparacion, OcupacionMensual};
+use crate::types::dashboard_extra::{GastosComparacion, IngresoComparacion, OcupacionMensual};
 use crate::types::notificacion::PagoVencido;
 use crate::types::pago::Pago;
 use crate::types::{DashboardStats, PaginatedResponse};
@@ -21,6 +21,7 @@ pub fn Dashboard() -> Html {
     let overdue_pagos = use_state(Vec::<PagoVencido>::new);
     let ingreso_comp = use_state(|| Option::<IngresoComparacion>::None);
     let ocupacion_tendencia = use_state(Vec::<OcupacionMensual>::new);
+    let gastos_comp = use_state(|| Option::<GastosComparacion>::None);
     let error = use_state(|| Option::<String>::None);
     let loading = use_state(|| true);
 
@@ -29,6 +30,7 @@ pub fn Dashboard() -> Html {
         let overdue_pagos = overdue_pagos.clone();
         let ingreso_comp = ingreso_comp.clone();
         let ocupacion_tendencia = ocupacion_tendencia.clone();
+        let gastos_comp = gastos_comp.clone();
         let error = error.clone();
         let loading = loading.clone();
         use_effect_with((), move |()| {
@@ -67,6 +69,15 @@ pub fn Dashboard() -> Html {
                     }
                 });
             }
+            {
+                spawn_local(async move {
+                    if let Ok(data) =
+                        api_get::<GastosComparacion>("/dashboard/gastos-comparacion").await
+                    {
+                        gastos_comp.set(Some(data));
+                    }
+                });
+            }
         });
     }
 
@@ -93,10 +104,14 @@ pub fn Dashboard() -> Html {
                 if let Some(s) = (*stats).as_ref() {
                     <StatsHeader stats={s.clone()} ingreso_comp={(*ingreso_comp).clone()} />
                 }
+                <AttentionSection
+                    overdue_pagos={(*overdue_pagos).clone()}
+                    stats={(*stats).clone()}
+                />
                 <OccupancyChart data={(*ocupacion_tendencia).clone()} />
-                <OverdueSection pagos={(*overdue_pagos).clone()} />
                 <ContratosPorVencerWidget />
                 <UpcomingPaymentsWidget />
+                <ExpenseCard data={(*gastos_comp).clone()} />
             } else {
                 <WelcomeCard />
             }
@@ -215,38 +230,96 @@ fn StatsHeader(props: &StatsHeaderProps) -> Html {
 }
 
 #[derive(Properties, PartialEq)]
-struct OverdueSectionProps {
-    pagos: Vec<PagoVencido>,
+struct AttentionSectionProps {
+    overdue_pagos: Vec<PagoVencido>,
+    stats: Option<DashboardStats>,
 }
 
 #[component]
-fn OverdueSection(props: &OverdueSectionProps) -> Html {
-    html! {
-        <div class="gi-card-section">
-            <div class="gi-section-header">
-                <h2 class="gi-section-header-title">{"Pagos Atrasados"}</h2>
-                <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-xs">{"Ver todos →"}</Link<Route>>
+fn AttentionSection(props: &AttentionSectionProps) -> Html {
+    let overdue_count = props.overdue_pagos.len();
+    let docs_vencidos = props.stats.as_ref().map_or(0, |s| s.documentos_vencidos);
+    let docs_por_vencer = props.stats.as_ref().map_or(0, |s| s.documentos_por_vencer);
+    let entidades_incompletas = props.stats.as_ref().map_or(0, |s| s.entidades_incompletas);
+
+    let total_alerts =
+        overdue_count as i64 + docs_vencidos + docs_por_vencer + entidades_incompletas;
+
+    if total_alerts == 0 {
+        return html! {
+            <div class="gi-card-section gi-attention-clear">
+                <p class="gi-text-sm" style="color: var(--color-success-dark); display: flex; align-items: center; gap: var(--space-2);">
+                    <span>{"✓"}</span>
+                    {"Todo al día. Sin asuntos pendientes."}
+                </p>
             </div>
-            if props.pagos.is_empty() {
-                <p class="gi-text-sm gi-text-tertiary gi-py-3">{"Sin pagos atrasados. ¡Todo al día!"}</p>
-            } else {
-                <div class="gi-flex-col gi-gap-2">
-                    { for props.pagos.iter().take(5).map(|p| html! {
-                        <div class="gi-overdue-row">
-                            <div class="gi-min-w-0 gi-flex-1">
-                                <div class="gi-overdue-row-title">{&p.propiedad_titulo}</div>
-                                <div class="gi-overdue-row-detail">
-                                    {format!("{} {} — ", p.inquilino_nombre, p.inquilino_apellido)}<CurrencyDisplay monto={p.monto} moneda={p.moneda.clone()} />
+        };
+    }
+
+    html! {
+        <div class="gi-card-section gi-attention-section">
+            <div class="gi-section-header">
+                <h2 class="gi-section-header-title">
+                    {"Requiere Atención"}
+                    <span class="gi-badge gi-badge-error" style="margin-left: var(--space-2); font-size: var(--text-xs);">
+                        {total_alerts}
+                    </span>
+                </h2>
+            </div>
+            if overdue_count > 0 {
+                <div class="gi-attention-group">
+                    <div class="gi-attention-group-header">
+                        <span class="gi-text-sm gi-font-semibold">{"Pagos Atrasados"}</span>
+                        <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-xs">{"Ver todos →"}</Link<Route>>
+                    </div>
+                    <div class="gi-flex-col gi-gap-2">
+                        { for props.overdue_pagos.iter().take(3).map(|p| html! {
+                            <div class="gi-overdue-row">
+                                <div class="gi-min-w-0 gi-flex-1">
+                                    <div class="gi-overdue-row-title">{&p.propiedad_titulo}</div>
+                                    <div class="gi-overdue-row-detail">
+                                        {format!("{} {} — ", p.inquilino_nombre, p.inquilino_apellido)}<CurrencyDisplay monto={p.monto} moneda={p.moneda.clone()} />
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="flex items-center gi-gap-2 gi-flex-shrink-0">
-                                <Link<Route> to={Route::Pagos} classes="gi-btn gi-btn-primary gi-btn-sm">
-                                    {"Registrar Pago"}
-                                </Link<Route>>
                                 <span class="gi-badge gi-badge-error">{format!("{} días", p.dias_vencido)}</span>
                             </div>
-                        </div>
-                    })}
+                        })}
+                        if overdue_count > 3 {
+                            <span style="align-self: flex-start;">
+                                <Link<Route> to={Route::Pagos} classes="gi-btn gi-btn-primary gi-btn-sm">
+                                    {format!("Ver {} más", overdue_count - 3)}
+                                </Link<Route>>
+                            </span>
+                        }
+                    </div>
+                </div>
+            }
+            if docs_vencidos > 0 || docs_por_vencer > 0 || entidades_incompletas > 0 {
+                <div class="gi-attention-group">
+                    <div class="gi-attention-group-header">
+                        <span class="gi-text-sm gi-font-semibold">{"Cumplimiento Documental"}</span>
+                        <Link<Route> to={Route::DocumentosPorVencer} classes="gi-btn-text gi-text-xs">{"Ver detalles →"}</Link<Route>>
+                    </div>
+                    <div style="display: flex; gap: var(--space-4); flex-wrap: wrap;">
+                        if docs_vencidos > 0 {
+                            <span class="gi-attention-counter gi-attention-counter-error">
+                                <span class="gi-attention-counter-num">{docs_vencidos}</span>
+                                {" vencidos"}
+                            </span>
+                        }
+                        if docs_por_vencer > 0 {
+                            <span class="gi-attention-counter gi-attention-counter-warning">
+                                <span class="gi-attention-counter-num">{docs_por_vencer}</span>
+                                {" por vencer"}
+                            </span>
+                        }
+                        if entidades_incompletas > 0 {
+                            <span class="gi-attention-counter gi-attention-counter-warning">
+                                <span class="gi-attention-counter-num">{entidades_incompletas}</span>
+                                {" incompletas"}
+                            </span>
+                        }
+                    </div>
                 </div>
             }
         </div>
@@ -507,6 +580,45 @@ fn ContratoPorVencerRow(props: &ContratoPorVencerRowProps) -> Html {
                 </div>
             </div>
             <span class="gi-badge gi-badge-warning">{"Por vencer"}</span>
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct ExpenseCardProps {
+    data: Option<GastosComparacion>,
+}
+
+#[component]
+fn ExpenseCard(props: &ExpenseCardProps) -> Html {
+    let Some(ref data) = props.data else {
+        return html! {};
+    };
+
+    html! {
+        <div class="gi-card-section">
+            <div class="gi-section-header">
+                <h2 class="gi-section-header-title">{"Resumen de Gastos"}</h2>
+                <Link<Route> to={Route::Gastos} classes="gi-btn-text gi-text-xs">{"Ver todos →"}</Link<Route>>
+            </div>
+            <div class="gi-dashboard-header">
+                <div class="gi-dashboard-secondary">
+                    <p class="gi-stat-label">{"Pendientes"}</p>
+                    <p class="gi-stat-value">
+                        <CurrencyDisplay monto={data.total_pendiente} moneda={"DOP".to_string()} />
+                    </p>
+                </div>
+                <div class="gi-dashboard-secondary">
+                    <p class="gi-stat-label">{"Pagados este mes"}</p>
+                    <p class="gi-stat-value">
+                        <CurrencyDisplay monto={data.mes_actual} moneda={"DOP".to_string()} />
+                    </p>
+                </div>
+                <div class={if data.gastos_vencidos > 0 { "gi-dashboard-secondary gi-dashboard-alert" } else { "gi-dashboard-secondary" }}>
+                    <p class="gi-stat-label">{"Gastos vencidos"}</p>
+                    <p class="gi-stat-value">{data.gastos_vencidos}</p>
+                </div>
+            </div>
         </div>
     }
 }

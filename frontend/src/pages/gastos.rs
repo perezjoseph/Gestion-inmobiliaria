@@ -114,6 +114,16 @@ fn GastoFilterBar(props: &GastoFilterBarProps) -> Html {
         let el: web_sys::HtmlSelectElement = e.target_unchecked_into();
         fe.set(el.value());
     });
+    let fd = props.filter_fecha_desde.clone();
+    let on_fecha_desde_change = Callback::from(move |e: InputEvent| {
+        let el: web_sys::HtmlInputElement = e.target_unchecked_into();
+        fd.set(el.value());
+    });
+    let fh = props.filter_fecha_hasta.clone();
+    let on_fecha_hasta_change = Callback::from(move |e: InputEvent| {
+        let el: web_sys::HtmlInputElement = e.target_unchecked_into();
+        fh.set(el.value());
+    });
     html! {
         <div class="gi-filter-bar">
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); align-items: end;">
@@ -146,6 +156,16 @@ fn GastoFilterBar(props: &GastoFilterBarProps) -> Html {
                         <option value="cancelado" selected={*props.filter_estado == "cancelado"}>{"Cancelado"}</option>
                     </select>
                 </div>
+                <div>
+                    <label class="gi-label">{"Fecha desde"}</label>
+                    <input type="date" value={(*props.filter_fecha_desde).clone()}
+                        oninput={on_fecha_desde_change} class="gi-input" />
+                </div>
+                <div>
+                    <label class="gi-label">{"Fecha hasta"}</label>
+                    <input type="date" value={(*props.filter_fecha_hasta).clone()}
+                        oninput={on_fecha_hasta_change} class="gi-input" />
+                </div>
                 <div style="display: flex; gap: var(--space-2);">
                     <button onclick={props.on_apply.clone()} class="gi-btn gi-btn-primary">{"Filtrar"}</button>
                     <button onclick={props.on_clear.clone()} class="gi-btn gi-btn-ghost">{"Limpiar"}</button>
@@ -167,6 +187,9 @@ struct GastoFormProps {
     fecha_gasto: UseStateHandle<String>,
     estado_form: UseStateHandle<String>,
     proveedor: UseStateHandle<String>,
+    numero_cuenta: UseStateHandle<String>,
+    periodo_inicio: UseStateHandle<String>,
+    periodo_fin: UseStateHandle<String>,
     numero_factura: UseStateHandle<String>,
     notas: UseStateHandle<String>,
     propiedades: Vec<Propiedad>,
@@ -318,15 +341,33 @@ fn GastoForm(props: &GastoFormProps) -> Html {
                     />
                     {field_error(&fe.fecha_gasto)}
                 </div>
-                <div>
-                    <label class="gi-label">{"Proveedor"}</label>
-                    <ConfidenceInput
-                        value={AttrValue::from((*props.proveedor).clone())}
-                        confidence={confidence_for("proveedor")}
-                        oninput={input_cb_conf(&props.proveedor, "proveedor")}
-                        placeholder={AttrValue::from("Nombre del proveedor")}
-                    />
-                </div>
+                if *props.categoria == "servicios" {
+                    <div>
+                        <label class="gi-label">{"Proveedor"}</label>
+                        <ConfidenceInput
+                            value={AttrValue::from((*props.proveedor).clone())}
+                            confidence={confidence_for("proveedor")}
+                            oninput={input_cb_conf(&props.proveedor, "proveedor")}
+                            placeholder={AttrValue::from("Nombre del proveedor")}
+                        />
+                    </div>
+                    <div>
+                        <label class="gi-label">{"Número de Cuenta"}</label>
+                        <input type="text" value={(*props.numero_cuenta).clone()}
+                            oninput={input_cb!(props.numero_cuenta)}
+                            placeholder="Número de cuenta del servicio" class="gi-input" />
+                    </div>
+                    <div>
+                        <label class="gi-label">{"Periodo Inicio"}</label>
+                        <input type="date" value={(*props.periodo_inicio).clone()}
+                            oninput={input_cb!(props.periodo_inicio)} class="gi-input" />
+                    </div>
+                    <div>
+                        <label class="gi-label">{"Periodo Fin"}</label>
+                        <input type="date" value={(*props.periodo_fin).clone()}
+                            oninput={input_cb!(props.periodo_fin)} class="gi-input" />
+                    </div>
+                }
                 <div>
                     <label class="gi-label">{"Número de Factura"}</label>
                     <ConfidenceInput
@@ -517,6 +558,8 @@ fn build_gastos_url(
     f_propiedad: &str,
     f_categoria: &str,
     f_estado: &str,
+    f_fecha_desde: &str,
+    f_fecha_hasta: &str,
 ) -> String {
     let mut params = vec![format!("page={pg}"), format!("perPage={pp}")];
     if !f_propiedad.is_empty() {
@@ -527,6 +570,12 @@ fn build_gastos_url(
     }
     if !f_estado.is_empty() {
         params.push(format!("estado={f_estado}"));
+    }
+    if !f_fecha_desde.is_empty() {
+        params.push(format!("fechaDesde={f_fecha_desde}"));
+    }
+    if !f_fecha_hasta.is_empty() {
+        params.push(format!("fechaHasta={f_fecha_hasta}"));
     }
     format!("/gastos?{}", params.join("&"))
 }
@@ -601,6 +650,9 @@ fn make_gasto_edit_cb(
     fecha_gasto: &UseStateHandle<String>,
     estado_form: &UseStateHandle<String>,
     proveedor: &UseStateHandle<String>,
+    numero_cuenta: &UseStateHandle<String>,
+    periodo_inicio: &UseStateHandle<String>,
+    periodo_fin: &UseStateHandle<String>,
     numero_factura: &UseStateHandle<String>,
     notas: &UseStateHandle<String>,
     editing: &UseStateHandle<Option<Gasto>>,
@@ -612,6 +664,11 @@ fn make_gasto_edit_cb(
     let (descripcion, monto, moneda) = (descripcion.clone(), monto.clone(), moneda.clone());
     let (fecha_gasto, estado_form, proveedor) =
         (fecha_gasto.clone(), estado_form.clone(), proveedor.clone());
+    let (numero_cuenta, periodo_inicio, periodo_fin) = (
+        numero_cuenta.clone(),
+        periodo_inicio.clone(),
+        periodo_fin.clone(),
+    );
     let (numero_factura, notas) = (numero_factura.clone(), notas.clone());
     let (editing, show_form, form_errors) =
         (editing.clone(), show_form.clone(), form_errors.clone());
@@ -625,6 +682,9 @@ fn make_gasto_edit_cb(
         fecha_gasto.set(g.fecha_gasto.clone());
         estado_form.set(g.estado.clone());
         proveedor.set(g.proveedor.clone().unwrap_or_default());
+        numero_cuenta.set(g.numero_cuenta.clone().unwrap_or_default());
+        periodo_inicio.set(g.periodo_inicio.clone().unwrap_or_default());
+        periodo_fin.set(g.periodo_fin.clone().unwrap_or_default());
         numero_factura.set(g.numero_factura.clone().unwrap_or_default());
         notas.set(g.notas.clone().unwrap_or_default());
         editing.set(Some(g));
@@ -744,6 +804,9 @@ pub fn Gastos() -> Html {
     let fecha_gasto = use_state(String::new);
     let estado_form = use_state(|| "pendiente".to_string());
     let proveedor = use_state(String::new);
+    let numero_cuenta = use_state(String::new);
+    let periodo_inicio = use_state(String::new);
+    let periodo_fin = use_state(String::new);
     let numero_factura = use_state(String::new);
     let notas = use_state(String::new);
 
@@ -766,11 +829,29 @@ pub fn Gastos() -> Html {
         let f_propiedad = (*filter_propiedad).clone();
         let f_categoria = (*filter_categoria).clone();
         let f_estado = (*filter_estado).clone();
+        let f_fecha_desde = (*filter_fecha_desde).clone();
+        let f_fecha_hasta = (*filter_fecha_hasta).clone();
         let is_online = online;
         use_effect_with(
-            (reload_val, pg, f_propiedad, f_categoria, f_estado),
-            move |(_, _, f_propiedad, f_categoria, f_estado)| {
-                let url = build_gastos_url(pg, pp, f_propiedad, f_categoria, f_estado);
+            (
+                reload_val,
+                pg,
+                f_propiedad,
+                f_categoria,
+                f_estado,
+                f_fecha_desde,
+                f_fecha_hasta,
+            ),
+            move |(_, _, f_propiedad, f_categoria, f_estado, f_fecha_desde, f_fecha_hasta)| {
+                let url = build_gastos_url(
+                    pg,
+                    pp,
+                    f_propiedad,
+                    f_categoria,
+                    f_estado,
+                    f_fecha_desde,
+                    f_fecha_hasta,
+                );
                 load_gastos_data(items, total, error, loading, url, is_online);
             },
         );
@@ -803,6 +884,9 @@ pub fn Gastos() -> Html {
         let fecha_gasto = fecha_gasto.clone();
         let estado_form = estado_form.clone();
         let proveedor = proveedor.clone();
+        let numero_cuenta = numero_cuenta.clone();
+        let periodo_inicio = periodo_inicio.clone();
+        let periodo_fin = periodo_fin.clone();
         let numero_factura = numero_factura.clone();
         let notas = notas.clone();
         let editing = editing.clone();
@@ -819,6 +903,9 @@ pub fn Gastos() -> Html {
             fecha_gasto.set(String::new());
             estado_form.set("pendiente".into());
             proveedor.set(String::new());
+            numero_cuenta.set(String::new());
+            periodo_inicio.set(String::new());
+            periodo_fin.set(String::new());
             numero_factura.set(String::new());
             notas.set(String::new());
             editing.set(None);
@@ -905,6 +992,9 @@ pub fn Gastos() -> Html {
         &fecha_gasto,
         &estado_form,
         &proveedor,
+        &numero_cuenta,
+        &periodo_inicio,
+        &periodo_fin,
         &numero_factura,
         &notas,
         &editing,
@@ -968,6 +1058,9 @@ pub fn Gastos() -> Html {
         let fecha_gasto = fecha_gasto.clone();
         let estado_form = estado_form.clone();
         let proveedor = proveedor.clone();
+        let numero_cuenta = numero_cuenta.clone();
+        let periodo_inicio = periodo_inicio.clone();
+        let periodo_fin = periodo_fin.clone();
         let numero_factura = numero_factura.clone();
         let notas = notas.clone();
         let editing = editing.clone();
@@ -993,6 +1086,9 @@ pub fn Gastos() -> Html {
                 fecha_gasto: Some((*fecha_gasto).clone()),
                 unidad_id: non_empty(&unidad_id),
                 proveedor: non_empty(&proveedor),
+                numero_cuenta: non_empty(&numero_cuenta),
+                periodo_inicio: non_empty(&periodo_inicio),
+                periodo_fin: non_empty(&periodo_fin),
                 numero_factura: non_empty(&numero_factura),
                 estado: Some((*estado_form).clone()),
                 notas: non_empty(&notas),
@@ -1006,9 +1102,9 @@ pub fn Gastos() -> Html {
                 moneda: (*moneda).clone(),
                 fecha_gasto: (*fecha_gasto).clone(),
                 proveedor: non_empty(&proveedor),
-                numero_cuenta: None,
-                periodo_inicio: None,
-                periodo_fin: None,
+                numero_cuenta: non_empty(&numero_cuenta),
+                periodo_inicio: non_empty(&periodo_inicio),
+                periodo_fin: non_empty(&periodo_fin),
                 numero_factura: non_empty(&numero_factura),
                 notas: non_empty(&notas),
             };
@@ -1032,11 +1128,15 @@ pub fn Gastos() -> Html {
         let fp = filter_propiedad.clone();
         let fc = filter_categoria.clone();
         let fe = filter_estado.clone();
+        let fd = filter_fecha_desde.clone();
+        let fh = filter_fecha_hasta.clone();
         super::page_helpers::filter_clear_cb(
             move || {
                 fp.set(String::new());
                 fc.set(String::new());
                 fe.set(String::new());
+                fd.set(String::new());
+                fh.set(String::new());
             },
             &page,
             &reload,
@@ -1078,6 +1178,9 @@ pub fn Gastos() -> Html {
         fecha_gasto,
         estado_form,
         proveedor,
+        numero_cuenta,
+        periodo_inicio,
+        periodo_fin,
         numero_factura,
         notas,
         &form_errors,
@@ -1131,6 +1234,9 @@ fn render_gastos_view(
     fecha_gasto: UseStateHandle<String>,
     estado_form: UseStateHandle<String>,
     proveedor: UseStateHandle<String>,
+    numero_cuenta: UseStateHandle<String>,
+    periodo_inicio: UseStateHandle<String>,
+    periodo_fin: UseStateHandle<String>,
     numero_factura: UseStateHandle<String>,
     notas: UseStateHandle<String>,
     form_errors: &UseStateHandle<FormErrors>,
@@ -1206,6 +1312,8 @@ fn render_gastos_view(
                 categoria={categoria} descripcion={descripcion}
                 monto={monto} moneda={moneda} fecha_gasto={fecha_gasto}
                 estado_form={estado_form} proveedor={proveedor}
+                numero_cuenta={numero_cuenta} periodo_inicio={periodo_inicio}
+                periodo_fin={periodo_fin}
                 numero_factura={numero_factura} notas={notas}
                 propiedades={(**propiedades).clone()} unidades={(**unidades).clone()}
                 form_errors={(**form_errors).clone()} submitting={**submitting}

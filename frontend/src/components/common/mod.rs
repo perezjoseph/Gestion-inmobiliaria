@@ -1,3 +1,4 @@
+pub mod bulk_action_bar;
 pub mod command_palette;
 pub mod compliance_badge;
 pub mod confidence_input;
@@ -9,6 +10,7 @@ pub mod document_editor;
 pub mod document_gallery;
 pub mod error_banner;
 pub mod form_error_summary;
+pub mod help_tooltip;
 pub mod line_chart;
 pub mod loading;
 pub mod ocr_scan_button;

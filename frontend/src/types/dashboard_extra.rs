@@ -11,6 +11,9 @@ pub struct GastosComparacion {
     #[serde(deserialize_with = "deserialize_f64_from_any")]
     pub mes_anterior: f64,
     pub porcentaje_cambio: f64,
+    #[serde(deserialize_with = "deserialize_f64_from_any")]
+    pub total_pendiente: f64,
+    pub gastos_vencidos: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
