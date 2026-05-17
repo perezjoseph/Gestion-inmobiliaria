@@ -246,6 +246,7 @@ h6,
 
 .gi-navbar-search {
   animation: gi-search-in 0.2s var(--ease-out);
+  width: 260px;
 }
 
 .gi-navbar-search-btn {
@@ -254,13 +255,15 @@ h6,
 
 @keyframes gi-search-in {
   from {
-    width: 0;
     opacity: 0;
+    transform: scaleX(0.8);
+    transform-origin: right;
   }
 
   to {
-    width: 260px;
     opacity: 1;
+    transform: scaleX(1);
+    transform-origin: right;
   }
 }
 
@@ -839,13 +842,15 @@ h6,
 
   @keyframes gi-search-in {
     from {
-      width: 0;
       opacity: 0;
+      transform: scaleX(0.8);
+      transform-origin: right;
     }
 
     to {
-      width: 160px;
       opacity: 1;
+      transform: scaleX(1);
+      transform-origin: right;
     }
   }
 
@@ -2632,6 +2637,14 @@ h6,
 .gi-table-checkbox-cell {
   width: 40px;
   padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
+}
+
+.gi-row-selected {
+  background-color: var(--color-primary-50);
+}
+
+[data-theme="dark"] .gi-row-selected {
+  background-color: oklch(20% 0.018 185);
 }
 
 

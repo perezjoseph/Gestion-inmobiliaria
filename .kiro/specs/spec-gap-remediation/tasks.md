@@ -91,7 +91,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - Assert: every returned row satisfies `row.organizacion_id == caller_org` AND (`unidad_id.is_none()` OR `row.unidad_id == unidad_id`)
     - _Requirements: 10.2, 10.3, 10.4_
 
-- [ ] 4. Restore Yew bootstrap `[INIT]` logs and write the Bug_Condition_PBT (Requirement 7)
+- [x] 4. Restore Yew bootstrap `[INIT]` logs and write the Bug_Condition_PBT (Requirement 7)
   - [x] 4.1 Emit pre-renderer marker in `frontend/src/main.rs`
     - `web_sys::console::log_1(&"[INIT] pre-renderer".into());` before `yew::Renderer::<App>::new().render()`
     - Keep the log in production builds; do not gate behind `cfg(debug_assertions)`
@@ -275,7 +275,7 @@ All Spanish UI copy, DD/MM/YYYY dates, K8s deployment, and OVMS at `/v3` per pro
     - Add to `backend/tests/chatbot_pbt.rs`: stub a successful `ExtractReceiptTool` result, run `invoke_agent`, assert a `Pago` row is persisted via `confirmar_preview`
     - _Requirements: 8.3, 8.5_
 
-- [ ] 11. Gastos completion (Requirement 9)
+- [x] 11. Gastos completion (Requirement 9)
   - [x] 11.1 Add `Utility_Service_Fields` to the `Gasto` entity, DTOs, and migration
     - Add a migration `m20260415_002_add_gasto_utility_fields.rs` with nullable `proveedor TEXT`, `numero_cuenta TEXT`, `periodo_inicio DATE`, `periodo_fin DATE` columns
     - Regenerate `backend/src/entities/gasto.rs` (or hand-add columns to match)

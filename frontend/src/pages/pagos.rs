@@ -13,6 +13,7 @@ use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::document_gallery::DocumentGallery;
 use crate::components::common::error_banner::ErrorBanner;
+use crate::components::common::help_tooltip::HelpTooltip;
 use crate::components::common::ocr_scan_button::OcrScanButton;
 use crate::components::common::offline_guard::OfflineGuard;
 use crate::components::common::pagination::Pagination;
@@ -239,7 +240,9 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                     </select>
                 </div>
                 <div>
-                    <label class="gi-label">{"Fecha de Vencimiento *"}</label>
+                    <label class="gi-label">{"Fecha de Vencimiento *"}
+                        <HelpTooltip text="Fecha límite para recibir el pago sin que se considere atrasado." id="help-fecha-venc" />
+                    </label>
                     <input type="date" value={(*props.fecha_vencimiento).clone()} oninput={input_cb!(props.fecha_vencimiento)} disabled={props.is_editing}
                         class={input_class(fe.fecha_vencimiento.is_some())} />
                     {field_error(&fe.fecha_vencimiento)}
@@ -1131,6 +1134,7 @@ pub fn Pagos() -> Html {
         let reload = reload.clone();
         let reset_form = reset_form.clone();
         let submitting = submitting.clone();
+        let toasts = toasts.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
             handle_pago_submit(
@@ -1171,6 +1175,99 @@ pub fn Pagos() -> Html {
 
     let (on_page_change, on_per_page_change) =
         super::page_helpers::pagination_cbs(&page, &per_page, &reload);
+
+    let on_toggle_select = {
+        let selected_ids = selected_ids.clone();
+        Some(Callback::from(move |id: String| {
+            let mut ids = (*selected_ids).clone();
+            if let Some(pos) = ids.iter().position(|x| x == &id) {
+                ids.remove(pos);
+            } else {
+                ids.push(id);
+            }
+            selected_ids.set(ids);
+        }))
+    };
+
+    let on_select_all = {
+        let selected_ids = selected_ids.clone();
+        let items = items.clone();
+        Some(Callback::from(move |select: bool| {
+            if select {
+                selected_ids.set(items.iter().map(|p| p.id.clone()).collect());
+            } else {
+                selected_ids.set(Vec::new());
+            }
+        }))
+    };
+
+    let on_clear_selection = {
+        let selected_ids = selected_ids.clone();
+        Callback::from(move |_: MouseEvent| {
+            selected_ids.set(Vec::new());
+        })
+    };
+
+    let on_bulk_mark_paid = {
+        let selected_ids = selected_ids.clone();
+        let reload = reload.clone();
+        let toasts = toasts.clone();
+        let error = error.clone();
+        Callback::from(move |_: MouseEvent| {
+            let ids = (*selected_ids).clone();
+            if ids.is_empty() {
+                return;
+            }
+            let selected_ids = selected_ids.clone();
+            let reload = reload.clone();
+            let toasts = toasts.clone();
+            let error = error.clone();
+            spawn_local(async move {
+                let mut success_count = 0u32;
+                for id in &ids {
+                    let update = UpdatePago {
+                        monto: None,
+                        fecha_pago: Some(
+                            js_sys::Date::new_0()
+                                .to_iso_string()
+                                .as_string()
+                                .unwrap_or_default()[..10]
+                                .to_string(),
+                        ),
+                        metodo_pago: None,
+                        estado: Some("pagado".to_string()),
+                        notas: None,
+                    };
+                    if api_put::<Pago, _>(&format!("/pagos/{id}"), &update)
+                        .await
+                        .is_ok()
+                    {
+                        success_count += 1;
+                    }
+                }
+                if success_count > 0 {
+                    push_toast(
+                        toasts.as_ref(),
+                        &format!(
+                            "{success_count} pago{} marcado{} como pagado{}",
+                            if success_count > 1 { "s" } else { "" },
+                            if success_count > 1 { "s" } else { "" },
+                            if success_count > 1 { "s" } else { "" },
+                        ),
+                        ToastKind::Success,
+                    );
+                    selected_ids.set(Vec::new());
+                    reload.set(*reload + 1);
+                }
+                if success_count < ids.len() as u32 {
+                    error.set(Some(format!(
+                        "No se pudieron actualizar {} pago(s). Intente de nuevo.",
+                        ids.len() as u32 - success_count
+                    )));
+                }
+            });
+        })
+    };
 
     let editing_id = editing.as_ref().map(|e| e.id.clone());
     let token = auth
@@ -1219,6 +1316,11 @@ pub fn Pagos() -> Html {
         on_new,
         on_page_change,
         on_per_page_change,
+        (*selected_ids).clone(),
+        on_toggle_select,
+        on_select_all,
+        on_clear_selection,
+        on_bulk_mark_paid,
     )
 }
 
@@ -1264,6 +1366,11 @@ fn render_pagos_view(
     on_new: Callback<MouseEvent>,
     on_page_change: Callback<u64>,
     on_per_page_change: Callback<u64>,
+    selected_ids: Vec<String>,
+    on_toggle_select: Option<Callback<String>>,
+    on_select_all: Option<Callback<bool>>,
+    on_clear_selection: Callback<MouseEvent>,
+    on_bulk_mark_paid: Callback<MouseEvent>,
 ) -> Html {
     if **loading {
         return html! { <TableSkeleton title_width="160px" columns={8} has_filter=true /> };
@@ -1332,7 +1439,7 @@ fn render_pagos_view(
                 contrato_label={contrato_label.clone()} on_edit={on_edit}
                 on_delete={on_delete_click} on_new={on_new}
                 on_page_change={on_page_change} on_per_page_change={on_per_page_change}
-                selected_ids={(*selected_ids).clone()}
+                selected_ids={selected_ids.clone()}
                 on_toggle_select={on_toggle_select}
                 on_select_all={on_select_all}
             />
