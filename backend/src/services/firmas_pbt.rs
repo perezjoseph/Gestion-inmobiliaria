@@ -142,7 +142,7 @@ fn arbitrary_blocks() -> impl Strategy<Value = Vec<serde_json::Value>> {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(20))]
+    #![proptest_config(ProptestConfig { cases: crate::test_support::pbt_cases(), ..Default::default() })]
 
     // Feature: contract-document-signing, Property 8: Token generation correctness
     /// **Validates: Requirements 5.1, 5.2, 8.4, 8.5, 8.6**
@@ -358,7 +358,7 @@ proptest! {
 // record has all required fields: non-null firma_imagen, non-empty ip_address,
 // non-empty user_agent, firmado_at within 5s of now, estado="firmado".
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(20))]
+    #![proptest_config(ProptestConfig { cases: crate::test_support::pbt_cases(), ..Default::default() })]
 
     // Feature: contract-document-signing, Property 7: Signature record completeness
     /// **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5, 8.1, 8.2, 8.3**
@@ -480,7 +480,7 @@ fn sealed_document_immutability() {
     use proptest::test_runner::{Config as ProptestConfig, TestRunner};
 
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 20,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 

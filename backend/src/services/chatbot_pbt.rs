@@ -48,7 +48,7 @@ fn arb_unrecognized_policy() -> impl Strategy<Value = String> {
 #[test]
 fn tenants_and_prospects_always_allows() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -71,7 +71,7 @@ fn tenants_and_prospects_always_allows() {
 #[test]
 fn allowlist_allows_phone_in_list() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -92,7 +92,7 @@ fn allowlist_allows_phone_in_list() {
 #[test]
 fn allowlist_denies_phone_not_in_list() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -113,7 +113,7 @@ fn allowlist_denies_phone_not_in_list() {
 #[test]
 fn allowlist_denies_when_none() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -134,7 +134,7 @@ fn allowlist_denies_when_none() {
 #[test]
 fn unrecognized_policy_always_denies() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -161,7 +161,7 @@ fn unrecognized_policy_always_denies() {
 #[test]
 fn tenants_only_requires_db_lookup() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -184,7 +184,7 @@ fn tenants_only_requires_db_lookup() {
 #[test]
 fn check_sender_policy_allowlist_correctness() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -312,7 +312,7 @@ use crate::services::chatbot::{enforce_config_role, normalize_phone, validate_e1
 #[test]
 fn valid_e164_numbers_are_accepted() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -335,7 +335,7 @@ fn valid_e164_numbers_are_accepted() {
 #[test]
 fn invalid_e164_numbers_are_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -357,7 +357,7 @@ fn invalid_e164_numbers_are_rejected() {
 #[test]
 fn normalize_phone_output_always_valid_e164() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -401,7 +401,7 @@ fn valid_e164_normalizable() -> impl Strategy<Value = String> {
 #[test]
 fn normalize_phone_is_idempotent() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -498,7 +498,7 @@ fn arb_retention_days() -> impl Strategy<Value = i64> {
 #[test]
 fn retention_cleanup_deletes_expired_messages() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -555,7 +555,7 @@ fn retention_cleanup_deletes_expired_messages() {
 #[test]
 fn retention_cleanup_preserves_recent_messages() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -599,7 +599,7 @@ fn retention_cleanup_preserves_recent_messages() {
 #[test]
 fn retention_cleanup_partition_is_exhaustive() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -654,7 +654,7 @@ fn retention_cleanup_partition_is_exhaustive() {
 #[test]
 fn retention_cleanup_boundary_message_is_preserved() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -725,7 +725,7 @@ fn arb_history_limit() -> impl Strategy<Value = usize> {
 #[test]
 fn history_windowing_returns_min_m_n() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -754,7 +754,7 @@ fn history_windowing_returns_min_m_n() {
 #[test]
 fn history_windowing_returns_most_recent() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -974,7 +974,7 @@ fn build_model_from_input(input: &ChatbotConfigUpdateRequest) -> chatbot_config:
 #[test]
 fn config_round_trip_preserves_all_fields() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 200,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1131,7 +1131,7 @@ fn arb_confidence_score() -> impl Strategy<Value = f64> {
 #[test]
 fn confidence_high_threshold() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1152,7 +1152,7 @@ fn confidence_high_threshold() {
 #[test]
 fn confidence_medium_threshold() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1173,7 +1173,7 @@ fn confidence_medium_threshold() {
 #[test]
 fn confidence_low_threshold() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1194,7 +1194,7 @@ fn confidence_low_threshold() {
 #[test]
 fn confidence_mapping_exhaustive() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1220,7 +1220,7 @@ fn confidence_mapping_exhaustive() {
 #[test]
 fn confidence_mapping_monotonic() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1302,7 +1302,7 @@ fn determine_extraction_status(
 #[test]
 fn receipt_routing_high_confidence_resolved_tenant() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1325,7 +1325,7 @@ fn receipt_routing_high_confidence_resolved_tenant() {
 #[test]
 fn receipt_routing_medium_low_always_pending_confirmation() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1356,7 +1356,7 @@ fn receipt_routing_medium_low_always_pending_confirmation() {
 #[test]
 fn receipt_routing_always_pending_confirmation() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1459,7 +1459,7 @@ fn calculate_balance(payments: &[TestPayment]) -> std::collections::HashMap<Stri
 #[test]
 fn balance_calculation_sums_outstanding_only() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1506,7 +1506,7 @@ fn balance_calculation_sums_outstanding_only() {
 #[test]
 fn balance_excludes_paid_payments() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1542,7 +1542,7 @@ fn balance_excludes_paid_payments() {
 #[test]
 fn balance_never_mixes_currencies() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1609,7 +1609,7 @@ fn arb_format_amount() -> impl Strategy<Value = Decimal> {
 #[test]
 fn currency_format_dop_contains_correct_symbol() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1638,7 +1638,7 @@ fn currency_format_dop_contains_correct_symbol() {
 #[test]
 fn currency_format_usd_contains_correct_symbol() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1667,7 +1667,7 @@ fn currency_format_usd_contains_correct_symbol() {
 #[test]
 fn currency_format_has_two_decimal_places() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1716,7 +1716,7 @@ fn currency_format_has_two_decimal_places() {
 #[test]
 fn currency_format_never_mixes_symbols() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1795,7 +1795,7 @@ fn arb_invalid_priority() -> impl Strategy<Value = String> {
 #[test]
 fn maintenance_defaults_no_priority() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1842,7 +1842,7 @@ fn maintenance_defaults_no_priority() {
 #[test]
 fn maintenance_defaults_explicit_priority() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1892,7 +1892,7 @@ fn maintenance_defaults_explicit_priority() {
 #[test]
 fn maintenance_always_linked_to_property() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1931,7 +1931,7 @@ fn maintenance_always_linked_to_property() {
 #[test]
 fn maintenance_rejects_short_description() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1959,7 +1959,7 @@ fn maintenance_rejects_short_description() {
 #[test]
 fn maintenance_rejects_long_description() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -1986,7 +1986,7 @@ fn maintenance_rejects_long_description() {
 #[test]
 fn maintenance_rejects_invalid_priority() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2129,7 +2129,7 @@ fn arb_extraction_list(max_len: usize) -> impl Strategy<Value = Vec<TestReceiptE
 #[test]
 fn pending_receipts_includes_all_pending_in_org() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2166,7 +2166,7 @@ fn pending_receipts_includes_all_pending_in_org() {
 #[test]
 fn pending_receipts_excludes_non_pending() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2199,7 +2199,7 @@ fn pending_receipts_excludes_non_pending() {
 #[test]
 fn pending_receipts_scoped_to_org() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2239,7 +2239,7 @@ fn pending_receipts_scoped_to_org() {
 #[test]
 fn confirm_pending_sets_confirmed_with_user() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2288,7 +2288,7 @@ fn confirm_pending_sets_confirmed_with_user() {
 #[test]
 fn reject_pending_sets_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2333,7 +2333,7 @@ fn reject_pending_sets_rejected() {
 #[test]
 fn confirm_non_pending_is_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2366,7 +2366,7 @@ fn confirm_non_pending_is_rejected() {
 #[test]
 fn reject_non_pending_is_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2396,7 +2396,7 @@ fn reject_non_pending_is_rejected() {
 #[test]
 fn pending_only_transitions_to_confirmed_or_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2480,7 +2480,7 @@ fn arb_handoff_keywords() -> impl Strategy<Value = Vec<String>> {
 #[test]
 fn system_prompt_contains_tone_when_present() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2509,7 +2509,7 @@ fn system_prompt_contains_tone_when_present() {
 #[test]
 fn system_prompt_contains_greeting_when_present() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2538,7 +2538,7 @@ fn system_prompt_contains_greeting_when_present() {
 #[test]
 fn system_prompt_contains_system_prompt_override_when_present() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2567,7 +2567,7 @@ fn system_prompt_contains_system_prompt_override_when_present() {
 #[test]
 fn system_prompt_contains_all_faq_entries() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2607,7 +2607,7 @@ fn system_prompt_contains_all_faq_entries() {
 #[test]
 fn system_prompt_contains_policies_when_present() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2636,7 +2636,7 @@ fn system_prompt_contains_policies_when_present() {
 #[test]
 fn system_prompt_contains_tenant_name_when_resolved() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2666,7 +2666,7 @@ fn system_prompt_contains_tenant_name_when_resolved() {
 #[test]
 fn system_prompt_contains_handoff_keywords_when_provided() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2700,7 +2700,7 @@ fn system_prompt_contains_handoff_keywords_when_provided() {
 #[test]
 fn system_prompt_composition_completeness_combined() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2832,7 +2832,7 @@ fn expected_tools_for_capabilities(caps: &Capabilities) -> HashSet<&'static str>
 #[test]
 fn tool_registration_matches_capabilities_exactly() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2858,7 +2858,7 @@ fn tool_registration_matches_capabilities_exactly() {
 #[test]
 fn disabled_capabilities_never_produce_tools() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2904,7 +2904,7 @@ fn disabled_capabilities_never_produce_tools() {
 #[test]
 fn enabled_capabilities_always_produce_tools() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -2990,7 +2990,7 @@ fn arb_token() -> impl Strategy<Value = String> {
 #[test]
 fn webhook_auth_valid_token_always_accepted() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -3013,7 +3013,7 @@ fn webhook_auth_valid_token_always_accepted() {
 #[test]
 fn webhook_auth_invalid_token_always_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -3038,7 +3038,7 @@ fn webhook_auth_invalid_token_always_rejected() {
 #[test]
 fn webhook_auth_missing_token_always_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -3061,7 +3061,7 @@ fn webhook_auth_missing_token_always_rejected() {
 #[test]
 fn webhook_auth_constant_time_eq_correctness() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -3119,7 +3119,7 @@ fn pipeline_decision(activo: bool, sender_authorized: bool) -> AiInvocationDecis
 #[test]
 fn inactive_org_never_invokes_ai() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -3141,7 +3141,7 @@ fn inactive_org_never_invokes_ai() {
 #[test]
 fn unauthorized_sender_never_invokes_ai() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -3163,7 +3163,7 @@ fn unauthorized_sender_never_invokes_ai() {
 #[test]
 fn ai_invoked_only_when_active_and_authorized() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -3198,7 +3198,7 @@ fn ai_invoked_only_when_active_and_authorized() {
 #[test]
 fn pipeline_decision_with_sender_policy() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -3298,7 +3298,7 @@ fn rbac_gerente_always_allowed() {
 #[test]
 fn rbac_non_admin_roles_always_forbidden() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -3388,7 +3388,7 @@ fn arb_handoff_state() -> impl Strategy<Value = HandoffState> {
 #[test]
 fn handoff_active_ai_never_invoked() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -3427,7 +3427,7 @@ fn handoff_active_ai_never_invoked() {
 #[test]
 fn handoff_cleared_ai_resumes() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -3469,7 +3469,7 @@ fn handoff_cleared_ai_resumes() {
 #[test]
 fn handoff_set_then_clear_returns_to_normal() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -3520,7 +3520,7 @@ fn handoff_set_then_clear_returns_to_normal() {
 #[test]
 fn handoff_ai_invocation_consistent_with_state() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -3563,7 +3563,7 @@ fn handoff_ai_invocation_consistent_with_state() {
 #[test]
 fn handoff_set_is_idempotent() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -3655,7 +3655,7 @@ fn arb_message_content() -> impl Strategy<Value = String> {
 #[test]
 fn conversation_persistence_completeness_all_fields_present() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -3717,7 +3717,7 @@ fn conversation_persistence_completeness_all_fields_present() {
 #[test]
 fn conversation_persistence_both_roles_complete() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 
@@ -3813,7 +3813,7 @@ fn conversation_persistence_both_roles_complete() {
 #[test]
 fn conversation_persistence_generates_valid_id() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: 100,
+        cases: crate::test_support::pbt_cases(),
         ..Default::default()
     });
 

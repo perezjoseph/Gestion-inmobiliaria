@@ -192,7 +192,10 @@ fn arb_import_preview() -> impl Strategy<Value = ImportPreview> {
 // **Validates: Requirements 9.3, 9.4, 9.5**
 #[test]
 fn ocr_result_serialization_roundtrip() {
-    let mut runner = TestRunner::new(Config::with_cases(100));
+    let mut runner = TestRunner::new(Config {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
     runner
         .run(&arb_ocr_result(), |result| {
             let json = serde_json::to_string(&result).unwrap();
@@ -207,7 +210,10 @@ fn ocr_result_serialization_roundtrip() {
 // **Validates: Requirements 10.1, 10.2, 10.6**
 #[test]
 fn dr_date_parsing_roundtrip_dd_slash_mm_slash_yyyy() {
-    let mut runner = TestRunner::new(Config::with_cases(100));
+    let mut runner = TestRunner::new(Config {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
     runner
         .run(&arb_date_in_range(), |date| {
             let formatted = date.format("%d/%m/%Y").to_string();
@@ -222,7 +228,10 @@ fn dr_date_parsing_roundtrip_dd_slash_mm_slash_yyyy() {
 // **Validates: Requirements 10.1, 10.2, 10.6**
 #[test]
 fn dr_date_parsing_roundtrip_dd_dash_mm_dash_yyyy() {
-    let mut runner = TestRunner::new(Config::with_cases(100));
+    let mut runner = TestRunner::new(Config {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
     runner
         .run(&arb_date_in_range(), |date| {
             let formatted = date.format("%d-%m-%Y").to_string();
@@ -237,7 +246,10 @@ fn dr_date_parsing_roundtrip_dd_dash_mm_dash_yyyy() {
 // **Validates: Requirements 10.1, 10.2, 10.6**
 #[test]
 fn dr_date_parsing_roundtrip_yyyy_mm_dd() {
-    let mut runner = TestRunner::new(Config::with_cases(100));
+    let mut runner = TestRunner::new(Config {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
     runner
         .run(&arb_date_in_range(), |date| {
             let formatted = date.format("%Y-%m-%d").to_string();
@@ -252,7 +264,10 @@ fn dr_date_parsing_roundtrip_yyyy_mm_dd() {
 // **Validates: Requirements 10.1, 10.2, 10.6**
 #[test]
 fn dr_date_parsing_roundtrip_dd_mm_yy() {
-    let mut runner = TestRunner::new(Config::with_cases(100));
+    let mut runner = TestRunner::new(Config {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
     let strategy = arb_date_in_range().prop_filter(
         "only dates in 1950-1999 or 2000-2049 round-trip with 2-digit year",
         |date| {
@@ -274,7 +289,10 @@ fn dr_date_parsing_roundtrip_dd_mm_yy() {
 // **Validates: Requirements 10.3, 10.4, 10.5, 10.7**
 #[test]
 fn dr_currency_parsing_roundtrip_rdp() {
-    let mut runner = TestRunner::new(Config::with_cases(100));
+    let mut runner = TestRunner::new(Config {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
     runner
         .run(&arb_decimal_2dp(), |amount| {
             let formatted = format!("RD${}", format_with_commas(&amount));
@@ -290,7 +308,10 @@ fn dr_currency_parsing_roundtrip_rdp() {
 // **Validates: Requirements 10.3, 10.4, 10.5, 10.7**
 #[test]
 fn dr_currency_parsing_roundtrip_usd() {
-    let mut runner = TestRunner::new(Config::with_cases(100));
+    let mut runner = TestRunner::new(Config {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
     runner
         .run(&arb_decimal_2dp(), |amount| {
             let formatted = format!("US${}", format_with_commas(&amount));
@@ -306,7 +327,10 @@ fn dr_currency_parsing_roundtrip_usd() {
 // **Validates: Requirements 10.3, 10.4, 10.5, 10.7**
 #[test]
 fn dr_currency_parsing_roundtrip_no_prefix() {
-    let mut runner = TestRunner::new(Config::with_cases(100));
+    let mut runner = TestRunner::new(Config {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
     runner
         .run(&arb_decimal_2dp(), |amount| {
             let formatted = format_with_commas(&amount);
@@ -322,7 +346,10 @@ fn dr_currency_parsing_roundtrip_no_prefix() {
 // **Validates: Requirements 3.2, 3.4**
 #[test]
 fn file_extension_detection() {
-    let mut runner = TestRunner::new(Config::with_cases(100));
+    let mut runner = TestRunner::new(Config {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
     runner
         .run(&arb_filename_with_ext(), |(filename, expected_format)| {
             let detected = detect_format_test(&filename);
@@ -336,7 +363,10 @@ fn file_extension_detection() {
 // **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5, 4.8, 4.9**
 #[test]
 fn deposit_receipt_field_mapping() {
-    let mut runner = TestRunner::new(Config::with_cases(100));
+    let mut runner = TestRunner::new(Config {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
     runner
         .run(&arb_deposito_fields(), |fields| {
             let monto_raw = fields.get("monto").unwrap().clone();
@@ -379,7 +409,10 @@ fn deposit_receipt_field_mapping() {
 // **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5**
 #[test]
 fn expense_receipt_field_mapping() {
-    let mut runner = TestRunner::new(Config::with_cases(100));
+    let mut runner = TestRunner::new(Config {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
     runner
         .run(&arb_gasto_fields(), |fields| {
             let monto_raw = fields.get("monto").unwrap().clone();
@@ -417,7 +450,10 @@ fn expense_receipt_field_mapping() {
 // **Validates: Requirements 6.5, 6.6**
 #[test]
 fn preview_store_insert_get_remove() {
-    let mut runner = TestRunner::new(Config::with_cases(100));
+    let mut runner = TestRunner::new(Config {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
     runner
         .run(&arb_import_preview(), |preview| {
             let store = PreviewStore::new();
@@ -439,7 +475,10 @@ fn preview_store_insert_get_remove() {
 
 #[test]
 fn preview_store_cleanup_does_not_remove_fresh() {
-    let mut runner = TestRunner::new(Config::with_cases(100));
+    let mut runner = TestRunner::new(Config {
+        cases: crate::pbt_cases(),
+        ..Default::default()
+    });
     runner
         .run(&arb_import_preview(), |preview| {
             let store = PreviewStore::new();

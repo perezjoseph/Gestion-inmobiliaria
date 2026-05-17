@@ -378,7 +378,7 @@ fn random_ocr_result() -> impl Strategy<Value = (String, OcrResult)> {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(200))]
+    #![proptest_config(ProptestConfig { cases: crate::test_support::pbt_cases(), ..Default::default() })]
 
     // Feature: ocr-form-prefill, Property 1: Cédula normalization is idempotent and format-preserving
     /// **Validates: Requirements 2.3, 4.4**

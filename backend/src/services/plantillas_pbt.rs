@@ -59,7 +59,7 @@ fn replacement_value() -> impl Strategy<Value = String> {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(20))]
+    #![proptest_config(ProptestConfig { cases: crate::test_support::pbt_cases(), ..Default::default() })]
 
     // ── Property 3: Template CRUD round-trip ───────────────────────
     // For any valid template input, creating a PlantillaResponse with those

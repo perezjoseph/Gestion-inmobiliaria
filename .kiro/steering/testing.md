@@ -15,7 +15,7 @@ fileMatchPattern: ["**/*_pbt.rs"]
 ## Property-Based (proptest)
 - Backend: `TestRunner` directly. Frontend: `proptest!` macro.
 - Custom strategies at top of file. Annotate: `// Feature: {feature}, Property N: description`.
-- Never hardcode case counts. Use `crate::pbt_cases()` from `tests/main.rs` which reads `PROPTEST_CASES` env var (default: 100). CI sets this to 20 for speed.
+- Never hardcode case counts. Use `crate::pbt_cases()` from `tests/main.rs` for integration tests, or `crate::test_support::pbt_cases()` for in-crate unit tests. Both read `PROPTEST_CASES` env var (default: 100). CI sets this to 10 for speed.
 
 ## Data
 - `Uuid::new_v4()` for IDs, `Decimal::new(value, scale)` for money. Never depend on pre-existing DB state.

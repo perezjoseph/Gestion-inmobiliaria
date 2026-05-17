@@ -145,7 +145,7 @@ fn extract_text_from_blocks(blocks: &[serde_json::Value]) -> Vec<String> {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(20))]
+    #![proptest_config(ProptestConfig { cases: crate::test_support::pbt_cases(), ..Default::default() })]
 
     // Feature: contract-document-signing, Property 1: DOCX export produces valid output for any Block_JSON
     /// **Validates: Requirements 1.1**
