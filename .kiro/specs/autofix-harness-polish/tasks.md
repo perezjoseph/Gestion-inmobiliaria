@@ -48,7 +48,7 @@ Transform the CI autofix harness into a structured, multi-language agent harness
     - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5_
 
 - [ ] 3. Implement pure logic functions and property-based tests
-  - [~] 3.1 Create the harness logic module with pure functions
+  - [x] 3.1 Create the harness logic module with pure functions
     - Create a new Rust source file (e.g., `backend/src/harness/mod.rs` or a dedicated crate) containing the pure logic functions
     - Implement `dispatch_formatter(file_path) -> Option<String>`: returns formatter command based on file extension and path
     - Implement `select_sensors(modified_files) -> HashSet<SensorSuite>`: returns applicable sensor suites based on file paths
