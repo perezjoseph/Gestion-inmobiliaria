@@ -6,7 +6,7 @@ Transform the CI autofix harness into a structured, multi-language agent harness
 
 ## Tasks
 
-- [ ] 1. Create agent configuration and system prompt
+- [x] 1. Create agent configuration and system prompt
   - [x] 1.1 Create the agent configuration file at `.kiro/agents/autofix.json`
     - Define the JSON structure with fields: `name`, `description`, `prompt`, `model`, `tools`, `allowedTools`, `resources`, `hooks`
     - Set `prompt` to `file://../prompts/autofix-system.md`
@@ -15,7 +15,7 @@ Transform the CI autofix harness into a structured, multi-language agent harness
     - Add the `postToolUse` hook with `matcher: "fs_write"` and the bash dispatch command handling `.rs`, `.ts`/`.tsx` (baileys-service), and `.kt` (android) files with `|| true` for failure swallowing
     - _Requirements: 1.1, 1.2, 1.3, 3.1, 3.2, 3.3, 3.4, 3.5, 8.1, 8.2, 8.3, 8.4, 8.5, 11.4, 12.6, 13.6, 14.8, 15.1_
 
-  - [-] 1.2 Create the system prompt file at `.kiro/prompts/autofix-system.md`
+  - [x] 1.2 Create the system prompt file at `.kiro/prompts/autofix-system.md`
     - Define the agent's role as automated CI remediation making surgical, minimal fixes
     - Document constraints: no new features, match existing style, no suppressed warnings
     - Document environment variables: `KIRO_DIAGNOSTICS_FILE`, `KIRO_COMMIT_MSG_FILE`, `KIRO_MAX_FIX_ITERATIONS`
