@@ -1,4 +1,6 @@
 pub mod guardrail_hook;
+#[cfg(test)]
+mod guardrail_hook_pbt;
 pub mod tools;
 
 use std::fmt::Write as _;

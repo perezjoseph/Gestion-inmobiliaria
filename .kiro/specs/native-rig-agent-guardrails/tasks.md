@@ -66,7 +66,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - **Property 1: Selective Tool Registration Completeness**
     - **Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5, 2.6**
 
-- [ ] 6. Implement RentalGuardrailHook
+- [x] 6. Implement RentalGuardrailHook
   - [x] 6.1 Create `RentalGuardrailHook` struct implementing `PromptHook`
     - Define struct with fields: captured_receipt (Arc<Mutex<Option<PaymentReceipt>>>), tools_invoked (Arc<Mutex<Vec<String>>>), organizacion_id (Uuid), guardrail_config (GuardrailConfig)
     - Implement `on_completion_call` as no-op returning `HookAction::Continue`
@@ -78,11 +78,11 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - Never return `ToolCallHookAction::Terminate`
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-  - [~] 6.3 Write property test for argument validation bounds
+  - [x] 6.3 Write property test for argument validation bounds
     - **Property 2: Argument Validation Bounds**
     - **Validates: Requirements 3.1, 3.2, 3.3**
 
-  - [~] 6.4 Write property test for argument validation never terminates
+  - [x] 6.4 Write property test for argument validation never terminates
     - **Property 3: Argument Validation Never Terminates**
     - **Validates: Requirements 3.4, 3.5**
 
@@ -93,11 +93,11 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - Always return `HookAction::Continue`
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-  - [~] 6.6 Write property test for receipt capture consistency
+  - [x] 6.6 Write property test for receipt capture consistency
     - **Property 4: Receipt Capture Consistency**
     - **Validates: Requirements 4.1, 4.2**
 
-  - [~] 6.7 Write property test for tools invoked tracking
+  - [x] 6.7 Write property test for tools invoked tracking
     - **Property 5: Tools Invoked Tracking**
     - **Validates: Requirements 4.3, 4.4**
 
@@ -108,7 +108,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - Skip matching entirely if patterns list is empty
     - _Requirements: 5.1, 5.2, 5.4, 5.5_
 
-  - [~] 6.9 Write property test for output safety filter correctness
+  - [x] 6.9 Write property test for output safety filter correctness
     - **Property 6: Output Safety Filter Correctness**
     - **Validates: Requirements 5.1, 5.2**
 
