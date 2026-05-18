@@ -303,6 +303,17 @@ impl AiModule {
         // 11. Handle result and extract side-effects from shared state
         match result {
             Ok(Ok(reply)) => {
+                // Check for empty reply (Req 1.6)
+                if reply.trim().is_empty() {
+                    tracing::error!(
+                        organizacion_id = %ctx.organizacion_id,
+                        "El modelo devolvió una respuesta vacía"
+                    );
+                    return Err(AppError::Internal(anyhow::anyhow!(
+                        "Respuesta vacía inesperada del modelo"
+                    )));
+                }
+
                 let tools_list = tools_invoked
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
@@ -319,6 +330,26 @@ impl AiModule {
                 })
             }
             Ok(Err(e)) => {
+                let error_msg = e.to_string();
+
+                // Handle HookAction::Terminate from safety filter (Req 5.3)
+                if error_msg.contains("Response blocked by safety filter") {
+                    tracing::warn!(
+                        organizacion_id = %ctx.organizacion_id,
+                        "Respuesta bloqueada por filtro de seguridad"
+                    );
+                    return Ok(AgentResponse {
+                        reply: "Lo siento, no puedo proporcionar esa información. \
+                            ¿Puedo ayudarte con algo más?"
+                            .to_string(),
+                        tools_invoked: tools_invoked
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .clone(),
+                        extracted_receipt: None,
+                    });
+                }
+
                 tracing::error!(
                     organizacion_id = %ctx.organizacion_id,
                     error = %e,
@@ -343,270 +374,6 @@ impl AiModule {
                 })
             }
         }
-    }
-
-    /// Maximum number of tool-calling turns before returning a fallback.
-    #[allow(dead_code)] // Kept for task 8.3 removal
-    const MAX_AGENT_TURNS: usize = 5;
-
-    /// Internal method that implements the multi-turn agent loop.
-    ///
-    /// Sends the completion request to OVMS. If the response contains tool
-    /// calls, executes each tool, appends results to chat history, and loops.
-    /// If the response contains final text (no tool calls), returns it directly.
-    /// If the turn limit is reached, returns a fallback message.
-    #[allow(dead_code)] // Kept for task 8.3 removal
-    #[allow(clippy::too_many_arguments)]
-    async fn invoke_agent(
-        &self,
-        system_prompt: &str,
-        capabilities: &Capabilities,
-        history: &[ConversationEntry],
-        user_prompt: &str,
-        db: &DatabaseConnection,
-        organizacion_id: Uuid,
-        sender_phone: &str,
-        image_base64: Option<&str>,
-    ) -> Result<AgentResponse, AppError> {
-        use rig::completion::{CompletionModel, CompletionRequest};
-        use rig::message::{self, AssistantContent, ToolChoice, ToolResultContent, UserContent};
-        use rig::one_or_many::OneOrMany;
-
-        let enabled_tools = get_enabled_tools(capabilities);
-
-        // Build tool definitions for the request
-        let tool_defs: Vec<rig::completion::ToolDefinition> = enabled_tools
-            .iter()
-            .map(|name| get_tool_definition(name))
-            .collect();
-
-        // Build Rig messages from conversation history
-        let mut chat_history: Vec<message::Message> = Vec::with_capacity(history.len() + 1);
-
-        for entry in history {
-            let msg = match entry.role.as_str() {
-                "user" => message::Message::User {
-                    content: OneOrMany::one(UserContent::text(&entry.content)),
-                },
-                "assistant" => message::Message::Assistant {
-                    id: None,
-                    content: OneOrMany::one(AssistantContent::text(&entry.content)),
-                },
-                _ => continue,
-            };
-            chat_history.push(msg);
-        }
-
-        // Add the current user message
-        chat_history.push(message::Message::User {
-            content: OneOrMany::one(UserContent::text(user_prompt)),
-        });
-
-        let mut all_tools_invoked: Vec<String> = Vec::new();
-        let mut extracted_receipt: Option<PaymentReceipt> = None;
-
-        // Multi-turn agent loop
-        for turn in 0..Self::MAX_AGENT_TURNS {
-            let request = CompletionRequest {
-                model: None,
-                preamble: Some(system_prompt.to_string()),
-                chat_history: OneOrMany::many(chat_history.clone()).map_err(|_| {
-                    AppError::Internal(anyhow::anyhow!("Chat history cannot be empty"))
-                })?,
-                documents: vec![],
-                tools: tool_defs.clone(),
-                temperature: None,
-                max_tokens: None,
-                tool_choice: if enabled_tools.is_empty() {
-                    None
-                } else {
-                    Some(ToolChoice::Auto)
-                },
-                additional_params: None,
-                output_schema: None,
-            };
-
-            // Send to OVMS via our custom CompletionModel
-            let response = self
-                .model
-                .completion(request)
-                .await
-                .map_err(|e| AppError::Internal(anyhow::anyhow!("Error en agente AI: {e}")))?;
-
-            // Separate text and tool calls from the response
-            let mut reply_parts = Vec::new();
-            let mut tool_calls: Vec<(String, String, serde_json::Value)> = Vec::new();
-
-            for item in response.choice.iter() {
-                match item {
-                    AssistantContent::Text(text) => {
-                        reply_parts.push(text.text.clone());
-                    }
-                    AssistantContent::ToolCall(tc) => {
-                        tool_calls.push((
-                            tc.id.clone(),
-                            tc.function.name.clone(),
-                            tc.function.arguments.clone(),
-                        ));
-                    }
-                    _ => {}
-                }
-            }
-
-            // If no tool calls, return the final text response directly
-            if tool_calls.is_empty() {
-                let reply = reply_parts.join("\n");
-                return Ok(AgentResponse {
-                    reply,
-                    tools_invoked: all_tools_invoked,
-                    extracted_receipt,
-                });
-            }
-
-            // Append the assistant message (with tool calls) to history
-            chat_history.push(message::Message::Assistant {
-                id: None,
-                content: response.choice.clone(),
-            });
-
-            // Execute each tool call and append results
-            for (call_id, tool_name, args) in &tool_calls {
-                all_tools_invoked.push(tool_name.clone());
-
-                let result = dispatch_tool_call(
-                    tool_name,
-                    args,
-                    db,
-                    organizacion_id,
-                    sender_phone,
-                    image_base64,
-                )
-                .await;
-
-                // If extract_receipt succeeded, capture the receipt
-                if tool_name == ExtractReceiptTool::NAME {
-                    if let Ok(ref result_str) = result {
-                        if let Ok(receipt) = serde_json::from_str::<PaymentReceipt>(result_str) {
-                            extracted_receipt = Some(receipt);
-                        }
-                    }
-                }
-
-                let tool_result_text = match result {
-                    Ok(text) => text,
-                    Err(e) => format!("Error: {e}"),
-                };
-
-                // Append tool result as a user message with ToolResult content
-                chat_history.push(message::Message::User {
-                    content: OneOrMany::one(UserContent::ToolResult(message::ToolResult {
-                        id: call_id.clone(),
-                        call_id: None,
-                        content: OneOrMany::one(ToolResultContent::text(tool_result_text)),
-                    })),
-                });
-            }
-
-            tracing::debug!(
-                turn = turn + 1,
-                tools = ?all_tools_invoked,
-                "Agent loop turn completed"
-            );
-        }
-
-        // Turn limit reached — return fallback and log conversation id
-        tracing::warn!(
-            max_turns = Self::MAX_AGENT_TURNS,
-            organizacion_id = %organizacion_id,
-            sender_phone = %sender_phone,
-            tools_invoked = ?all_tools_invoked,
-            "Agent loop reached turn limit without final response"
-        );
-
-        Ok(AgentResponse {
-            reply: "Disculpa, no pude completar tu solicitud. Inténtalo de nuevo, por favor."
-                .to_string(),
-            tools_invoked: all_tools_invoked,
-            extracted_receipt,
-        })
-    }
-}
-
-// =============================================================================
-// Tool Dispatch
-// =============================================================================
-
-/// Dispatches a tool call by name, deserializing args and calling the
-/// appropriate tool implementation. Returns the serialized result as a string.
-#[allow(dead_code)] // Kept for task 8.3 removal
-async fn dispatch_tool_call(
-    tool_name: &str,
-    args: &serde_json::Value,
-    db: &DatabaseConnection,
-    organizacion_id: Uuid,
-    sender_phone: &str,
-    image_base64: Option<&str>,
-) -> Result<String, String> {
-    match tool_name {
-        ExtractReceiptTool::NAME => {
-            let mut input: ExtractReceiptInput = serde_json::from_value(args.clone())
-                .map_err(|e| format!("Error deserializando args de extract_receipt: {e}"))?;
-
-            // If the LLM didn't provide image_base64 in args but we have it from the message
-            if input.image_base64.is_empty() {
-                if let Some(img) = image_base64 {
-                    input.image_base64 = img.to_string();
-                }
-            }
-
-            // Construct the tool with InlineBase64MediaStore and OcrClient
-            let ocr = OcrClient::new().map_err(|e| format!("Error creando cliente OCR: {e}"))?;
-            let tool = ExtractReceiptTool {
-                media_store: InlineBase64MediaStore,
-                ocr,
-            };
-            let result = tool.call(input).await.map_err(|e| e.to_string())?;
-            serde_json::to_string(&result).map_err(|e| format!("Error serializando resultado: {e}"))
-        }
-        QueryBalanceTool::NAME => {
-            let input: QueryBalanceInput = serde_json::from_value(args.clone())
-                .map_err(|e| format!("Error deserializando args de query_balance: {e}"))?;
-            let tool = QueryBalanceTool { db: db.clone() };
-            let result = tool.call(input).await.map_err(|e| e.to_string())?;
-            serde_json::to_string(&result).map_err(|e| format!("Error serializando resultado: {e}"))
-        }
-        GetPaymentHistoryTool::NAME => {
-            let input: GetPaymentHistoryInput = serde_json::from_value(args.clone())
-                .map_err(|e| format!("Error deserializando args de get_payment_history: {e}"))?;
-            let tool = GetPaymentHistoryTool {
-                db: db.clone(),
-                organizacion_id,
-                sender_phone: sender_phone.to_string(),
-            };
-            let result = tool.call(input).await.map_err(|e| e.to_string())?;
-            serde_json::to_string(&result).map_err(|e| format!("Error serializando resultado: {e}"))
-        }
-        CreateMaintenanceRequestTool::NAME => {
-            let input: CreateMaintenanceRequestInput = serde_json::from_value(args.clone())
-                .map_err(|e| {
-                    format!("Error deserializando args de create_maintenance_request: {e}")
-                })?;
-            let tool = CreateMaintenanceRequestTool { db: db.clone() };
-            let result = tool.call(input).await.map_err(|e| e.to_string())?;
-            serde_json::to_string(&result).map_err(|e| format!("Error serializando resultado: {e}"))
-        }
-        HandoffToHumanTool::NAME => {
-            let input: HandoffToHumanInput = serde_json::from_value(args.clone())
-                .map_err(|e| format!("Error deserializando args de handoff_to_human: {e}"))?;
-            let tool = HandoffToHumanTool {
-                db: db.clone(),
-                organizacion_id,
-                sender_phone: sender_phone.to_string(),
-            };
-            let result = tool.call(input).await.map_err(|e| e.to_string())?;
-            serde_json::to_string(&result).map_err(|e| format!("Error serializando resultado: {e}"))
-        }
-        other => Err(format!("Herramienta desconocida: {other}")),
     }
 }
 
@@ -968,118 +735,6 @@ impl Tool for HandoffToHumanTool {
 // =============================================================================
 // Capability-Gated Tool Registration
 // =============================================================================
-
-/// Returns a [`ToolDefinition`] for a given tool name. Used to build the
-/// tool definitions array for the Rig `CompletionRequest`.
-#[allow(dead_code)] // Kept for task 8.3 removal
-fn get_tool_definition(name: &str) -> ToolDefinition {
-    match name {
-        ExtractReceiptTool::NAME => ToolDefinition {
-            name: ExtractReceiptTool::NAME.to_string(),
-            description: "Extrae datos estructurados de un comprobante de pago a partir de una imagen. Usa esta herramienta cuando el usuario envía una foto de un recibo o comprobante de transferencia.".to_string(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "image_base64": {
-                        "type": "string",
-                        "description": "Imagen del recibo codificada en base64"
-                    },
-                    "caption": {
-                        "type": "string",
-                        "description": "Texto opcional que acompaña la imagen"
-                    }
-                },
-                "required": ["image_base64"]
-            }),
-        },
-        QueryBalanceTool::NAME => ToolDefinition {
-            name: QueryBalanceTool::NAME.to_string(),
-            description: "Consulta el balance pendiente de un inquilino. Devuelve los pagos pendientes y atrasados con totales por moneda. Usa esta herramienta cuando el usuario pregunta cuánto debe.".to_string(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "inquilino_id": {
-                        "type": "string",
-                        "description": "UUID del inquilino"
-                    },
-                    "organizacion_id": {
-                        "type": "string",
-                        "description": "UUID de la organización"
-                    }
-                },
-                "required": ["inquilino_id", "organizacion_id"]
-            }),
-        },
-        GetPaymentHistoryTool::NAME => ToolDefinition {
-            name: GetPaymentHistoryTool::NAME.to_string(),
-            description: "Consulta el historial de pagos recientes de un inquilino. Usa esta herramienta cuando el usuario pregunta por sus pagos anteriores o recibos.".to_string(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "inquilino_id": {
-                        "type": "string",
-                        "description": "UUID del inquilino"
-                    },
-                    "organizacion_id": {
-                        "type": "string",
-                        "description": "UUID de la organización"
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Cantidad máxima de pagos a devolver (por defecto 10)"
-                    }
-                },
-                "required": ["inquilino_id", "organizacion_id"]
-            }),
-        },
-        CreateMaintenanceRequestTool::NAME => ToolDefinition {
-            name: CreateMaintenanceRequestTool::NAME.to_string(),
-            description: "Crea una solicitud de mantenimiento para el inquilino. Usa esta herramienta cuando el usuario reporta un problema o avería en su propiedad.".to_string(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "inquilino_id": {
-                        "type": "string",
-                        "description": "UUID del inquilino"
-                    },
-                    "organizacion_id": {
-                        "type": "string",
-                        "description": "UUID de la organización"
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Descripción del problema de mantenimiento (2–1000 caracteres)"
-                    },
-                    "priority": {
-                        "type": "string",
-                        "enum": ["baja", "media", "alta", "urgente"],
-                        "description": "Prioridad de la solicitud (por defecto: media)"
-                    }
-                },
-                "required": ["inquilino_id", "organizacion_id", "description"]
-            }),
-        },
-        HandoffToHumanTool::NAME => ToolDefinition {
-            name: HandoffToHumanTool::NAME.to_string(),
-            description: "Transfiere la conversación a un operador humano. Usa esta herramienta cuando el usuario solicita hablar con una persona o cuando no puedes resolver su consulta.".to_string(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "reason": {
-                        "type": "string",
-                        "description": "Razón por la cual se transfiere a un humano"
-                    }
-                },
-                "required": []
-            }),
-        },
-        other => ToolDefinition {
-            name: other.to_string(),
-            description: String::new(),
-            parameters: serde_json::json!({"type": "object", "properties": {}}),
-        },
-    }
-}
 
 /// Returns the list of tool names that should be registered on the AI agent
 /// based on the organization's enabled capabilities.

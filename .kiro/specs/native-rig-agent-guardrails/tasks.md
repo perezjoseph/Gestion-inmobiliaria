@@ -115,7 +115,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
 - [~] 7. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 8. Refactor AiModule to use AgentBuilder
+- [x] 8. Refactor AiModule to use AgentBuilder
   - [x] 8.1 Refactor `process_message()` to build agent via AgentBuilder
     - Compose system prompt, resolve AgentConfig, build shared state for hook
     - Construct `RentalGuardrailHook` with shared Arc<Mutex> state
@@ -124,7 +124,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - Apply optional temperature and max_tokens from resolved config
     - _Requirements: 1.1, 2.8, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7_
 
-  - [~] 8.2 Implement multi_turn invocation with timeout
+  - [x] 8.2 Implement multi_turn invocation with timeout
     - Invoke `agent.chat(msg, history).multi_turn(max_turns).send()` wrapped in `tokio::time::timeout`
     - On success: extract reply, tools_invoked, and captured_receipt from shared state
     - On timeout: return fallback AgentResponse with Spanish unavailability message
@@ -133,7 +133,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - Handle `HookAction::Terminate` from safety filter by returning safe fallback message
     - _Requirements: 1.2, 1.3, 1.4, 1.5, 1.6, 5.3_
 
-  - [~] 8.3 Remove deprecated manual agent loop code
+  - [x] 8.3 Remove deprecated manual agent loop code
     - Delete `dispatch_tool_call()`, `get_tool_definition()`, `get_enabled_tools()`, `invoke_agent()` functions
     - Remove the manual `for turn in 0..5` loop
     - Clean up unused imports
