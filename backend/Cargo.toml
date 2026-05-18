@@ -74,5 +74,5 @@ evals = ["rig-core/experimental"]
 [dev-dependencies]
 clap = { version = "4", features = ["derive"] }
 proptest.workspace = true
-zip = "7"
+zip = "8"
 actix-http = "3"
