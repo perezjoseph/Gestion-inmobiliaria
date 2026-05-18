@@ -52,7 +52,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - **Property 9: Tool Args Schema Round-Trip**
     - **Validates: Requirements 7.4**
 
-- [~] 4. Checkpoint - Ensure all tests pass
+- [x] 4. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 5. Implement selective tool registration
