@@ -112,7 +112,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - **Property 6: Output Safety Filter Correctness**
     - **Validates: Requirements 5.1, 5.2**
 
-- [~] 7. Checkpoint - Ensure all tests pass
+- [x] 7. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 8. Refactor AiModule to use AgentBuilder
