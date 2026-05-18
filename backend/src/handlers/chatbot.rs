@@ -8,9 +8,9 @@ use crate::config::AppConfig;
 use crate::errors::AppError;
 use crate::middleware::rbac::WriteAccess;
 use crate::models::chatbot::{
-    Capabilities, ChatbotConfigUpdateRequest, ClearHandoffRequest, ConversationMessage, FaqEntry,
-    HandoffStatusResponse, ReceiptConfirmRequest, ReceiptExtractionResponse, TestChatRequest,
-    TestChatResponse,
+    AgentConfig, Capabilities, ChatbotConfigUpdateRequest, ClearHandoffRequest,
+    ConversationMessage, FaqEntry, HandoffStatusResponse, ReceiptConfirmRequest,
+    ReceiptExtractionResponse, TestChatRequest, TestChatResponse,
 };
 use crate::services::ai_module::{
     AiModule, ChatbotPersona, ConversationEntry, ProcessMessageContext, UserMessage,
@@ -513,6 +513,7 @@ pub async fn test_chat(
         db: db.get_ref(),
         organizacion_id: org_id,
         sender_phone: "test",
+        agent_config: AgentConfig::default(),
     };
 
     match ai_module.process_message(&ctx).await {

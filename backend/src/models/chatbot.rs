@@ -51,6 +51,20 @@ pub struct Capabilities {
     pub human_handoff: bool,
 }
 
+impl Capabilities {
+    /// Returns a `Capabilities` instance with all flags enabled.
+    /// Used for `AllWithHookGating` strategy where all tools are registered.
+    pub fn all() -> Self {
+        Self {
+            receipt_ocr: true,
+            balance_queries: true,
+            payment_reminders: true,
+            maintenance_requests: true,
+            human_handoff: true,
+        }
+    }
+}
+
 // --- Agent Configuration ---
 
 /// Per-organization agent configuration. Stored in chatbot_config.agent_config JSONB.

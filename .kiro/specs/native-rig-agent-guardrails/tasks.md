@@ -116,7 +116,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 8. Refactor AiModule to use AgentBuilder
-  - [~] 8.1 Refactor `process_message()` to build agent via AgentBuilder
+  - [x] 8.1 Refactor `process_message()` to build agent via AgentBuilder
     - Compose system prompt, resolve AgentConfig, build shared state for hook
     - Construct `RentalGuardrailHook` with shared Arc<Mutex> state
     - Call `build_tools()` based on `tool_registration` strategy (Selective vs AllWithHookGating)

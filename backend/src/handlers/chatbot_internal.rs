@@ -3,7 +3,9 @@ use sea_orm::DatabaseConnection;
 
 use crate::config::AppConfig;
 use crate::errors::AppError;
-use crate::models::chatbot::{Capabilities, FaqEntry, IncomingWebhookPayload, SendMessageRequest};
+use crate::models::chatbot::{
+    AgentConfig, Capabilities, FaqEntry, IncomingWebhookPayload, SendMessageRequest,
+};
 use crate::services::ai_module::{
     AiModule, ChatbotPersona, ConversationEntry, ProcessMessageContext, TenantContext, UserMessage,
 };
@@ -212,6 +214,7 @@ pub async fn incoming_webhook(
         db: db.get_ref(),
         organizacion_id: org_id,
         sender_phone: &payload.sender_phone,
+        agent_config: AgentConfig::default(),
     };
 
     let ai_result = ai_module.process_message(&ctx).await;

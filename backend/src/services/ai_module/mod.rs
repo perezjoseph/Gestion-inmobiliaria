@@ -4,9 +4,11 @@ mod guardrail_hook_pbt;
 pub mod tools;
 
 use std::fmt::Write as _;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use regex::Regex;
+use rig::agent::AgentBuilder;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use rust_decimal::Decimal;
@@ -19,7 +21,8 @@ use crate::config::ChatbotEnvConfig;
 use crate::entities::{contrato, pago};
 use crate::errors::AppError;
 use crate::models::chatbot::{
-    BalanceResponse, Capabilities, FaqEntry, GuardrailOverrides, format_currency,
+    AgentConfig, BalanceResponse, Capabilities, FaqEntry, GuardrailOverrides,
+    ToolRegistrationStrategy, format_currency,
 };
 use crate::services::ocr_client::OcrClient;
 use crate::services::ovms_provider::OvmsCompletionModel;
@@ -170,6 +173,8 @@ pub struct ProcessMessageContext<'a> {
     pub db: &'a DatabaseConnection,
     pub organizacion_id: Uuid,
     pub sender_phone: &'a str,
+    /// Per-organization agent configuration. Defaults to `AgentConfig::default()`.
+    pub agent_config: AgentConfig,
 }
 
 impl AiModule {
@@ -189,14 +194,18 @@ impl AiModule {
     /// Uses Rig's native agent loop with the OVMS provider. The LLM decides
     /// which tools to invoke based on content. This method:
     /// 1. Composes the system prompt from persona config + tenant context
-    /// 2. Builds a Rig agent with the OVMS model and enabled tools
-    /// 3. Converts conversation history to Rig `Message` format
-    /// 4. Sends the user message to the agent with a timeout
-    /// 5. Returns the agent's response (including any tool invocations)
+    /// 2. Resolves `AgentConfig` and builds the guardrail hook with shared state
+    /// 3. Builds a Rig agent via `AgentBuilder` with tools, hook, and config
+    /// 4. Invokes the agent with timeout
+    /// 5. Extracts side-effects from shared state and returns `AgentResponse`
     pub async fn process_message(
         &self,
         ctx: &ProcessMessageContext<'_>,
     ) -> Result<AgentResponse, AppError> {
+        use rig::agent::PromptRequest;
+        use rig::message::{self, UserContent};
+        use rig::one_or_many::OneOrMany;
+
         // 1. Compose system prompt
         let system_prompt = compose_system_prompt(
             ctx.config,
@@ -206,7 +215,53 @@ impl AiModule {
             ctx.handoff_keywords,
         );
 
-        // 2. Compose the user prompt (include image reference if present)
+        // 2. Resolve AgentConfig
+        let resolved = ctx.agent_config.resolve();
+
+        // 3. Build shared state for the hook
+        let captured_receipt: Arc<Mutex<Option<PaymentReceipt>>> = Arc::new(Mutex::new(None));
+        let tools_invoked: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+
+        // 4. Construct GuardrailConfig from resolved guardrails
+        let guardrail_config: GuardrailConfig = resolved.guardrails.clone().into();
+
+        // 5. Construct RentalGuardrailHook
+        let hook = guardrail_hook::RentalGuardrailHook {
+            captured_receipt: captured_receipt.clone(),
+            tools_invoked: tools_invoked.clone(),
+            organizacion_id: ctx.organizacion_id,
+            guardrail_config,
+        };
+
+        // 6. Build tools based on tool_registration strategy
+        let capabilities_for_tools = match resolved.tool_registration {
+            ToolRegistrationStrategy::Selective => ctx.capabilities,
+            ToolRegistrationStrategy::AllWithHookGating => &Capabilities::all(),
+        };
+        let tools = build_tools(
+            capabilities_for_tools,
+            ctx.db,
+            ctx.organizacion_id,
+            ctx.sender_phone,
+            ctx.user_message.image_base64.as_deref(),
+        );
+
+        // 7. Build agent via AgentBuilder
+        let mut builder = AgentBuilder::new(self.model.clone())
+            .preamble(&system_prompt)
+            .hook(hook)
+            .default_max_turns(resolved.max_turns);
+
+        if let Some(temp) = resolved.temperature {
+            builder = builder.temperature(temp);
+        }
+        if let Some(max_tok) = resolved.max_tokens {
+            builder = builder.max_tokens(max_tok);
+        }
+
+        let agent = builder.tools(tools).build();
+
+        // 8. Compose the user prompt (include image reference if present)
         let user_prompt = ctx.user_message.image_base64.as_ref().map_or_else(
             || ctx.user_message.content.clone(),
             |_| {
@@ -218,33 +273,60 @@ impl AiModule {
             },
         );
 
-        // 3. Build agent with enabled tools and invoke with timeout
+        // 9. Convert conversation history to Rig Message format
+        let chat_history: Vec<message::Message> = ctx
+            .history
+            .iter()
+            .filter_map(|entry| match entry.role.as_str() {
+                "user" => Some(message::Message::User {
+                    content: OneOrMany::one(UserContent::text(&entry.content)),
+                }),
+                "assistant" => Some(message::Message::Assistant {
+                    id: None,
+                    content: OneOrMany::one(message::AssistantContent::text(&entry.content)),
+                }),
+                _ => None,
+            })
+            .collect();
+
+        // 10. Invoke agent with timeout
         let timeout_duration = Duration::from_secs(self.timeout_secs);
 
         let result = tokio::time::timeout(timeout_duration, async {
-            self.invoke_agent(
-                &system_prompt,
-                ctx.capabilities,
-                ctx.history,
-                &user_prompt,
-                ctx.db,
-                ctx.organizacion_id,
-                ctx.sender_phone,
-                ctx.user_message.image_base64.as_deref(),
-            )
-            .await
+            PromptRequest::from_agent(&agent, user_prompt)
+                .with_history(chat_history)
+                .max_turns(resolved.max_turns)
+                .await
         })
         .await;
 
+        // 11. Handle result and extract side-effects from shared state
         match result {
-            Ok(Ok(response)) => Ok(response),
+            Ok(Ok(reply)) => {
+                let tools_list = tools_invoked
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .clone();
+                let receipt = captured_receipt
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .clone();
+
+                Ok(AgentResponse {
+                    reply,
+                    tools_invoked: tools_list,
+                    extracted_receipt: receipt,
+                })
+            }
             Ok(Err(e)) => {
                 tracing::error!(
                     organizacion_id = %ctx.organizacion_id,
                     error = %e,
                     "Error en el agente AI"
                 );
-                Err(e)
+                Err(AppError::Internal(anyhow::anyhow!(
+                    "Error en agente AI: {e}"
+                )))
             }
             Err(_elapsed) => {
                 tracing::warn!(
@@ -264,6 +346,7 @@ impl AiModule {
     }
 
     /// Maximum number of tool-calling turns before returning a fallback.
+    #[allow(dead_code)] // Kept for task 8.3 removal
     const MAX_AGENT_TURNS: usize = 5;
 
     /// Internal method that implements the multi-turn agent loop.
@@ -272,6 +355,7 @@ impl AiModule {
     /// calls, executes each tool, appends results to chat history, and loops.
     /// If the response contains final text (no tool calls), returns it directly.
     /// If the turn limit is reached, returns a fallback message.
+    #[allow(dead_code)] // Kept for task 8.3 removal
     #[allow(clippy::too_many_arguments)]
     async fn invoke_agent(
         &self,
@@ -454,6 +538,7 @@ impl AiModule {
 
 /// Dispatches a tool call by name, deserializing args and calling the
 /// appropriate tool implementation. Returns the serialized result as a string.
+#[allow(dead_code)] // Kept for task 8.3 removal
 async fn dispatch_tool_call(
     tool_name: &str,
     args: &serde_json::Value,
@@ -886,6 +971,7 @@ impl Tool for HandoffToHumanTool {
 
 /// Returns a [`ToolDefinition`] for a given tool name. Used to build the
 /// tool definitions array for the Rig `CompletionRequest`.
+#[allow(dead_code)] // Kept for task 8.3 removal
 fn get_tool_definition(name: &str) -> ToolDefinition {
     match name {
         ExtractReceiptTool::NAME => ToolDefinition {
