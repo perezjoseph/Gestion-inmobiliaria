@@ -90,3 +90,6 @@ mod servicios_publicos_tests;
 mod unidades_pbt;
 mod unidades_tests;
 mod usuarios_tests;
+
+#[cfg(feature = "evals")]
+mod chatbot_evals_tests;

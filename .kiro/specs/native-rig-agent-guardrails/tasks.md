@@ -158,7 +158,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
 - [~] 10. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 11. Implement evals subsystem (behind feature flag)
+- [x] 11. Implement evals subsystem (behind feature flag)
   - [x] 11.1 Create eval data models and runner in `backend/src/services/ai_module/evals.rs`
     - Define `EvalCase`, `EvalMetric`, `EvalSuite`, `EvalRun` structs
     - Implement `EvalRunner` that builds agent per case using same AgentBuilder pattern as production
@@ -183,7 +183,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - Print pass rate to stdout
     - _Requirements: 8.7_
 
-  - [~] 11.4 Write integration tests for eval endpoints
+  - [x] 11.4 Write integration tests for eval endpoints
     - Test suite creation and listing by org
     - Test run execution with mock agent
     - Test not-found error for invalid suite_id
