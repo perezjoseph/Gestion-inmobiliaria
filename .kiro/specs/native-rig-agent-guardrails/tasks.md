@@ -20,7 +20,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - Create indexes on `chatbot_eval_suite.organizacion_id`, `chatbot_eval_run.suite_id`, `chatbot_eval_run.organizacion_id`
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7_
 
-- [ ] 2. Define data models and configuration structs
+- [x] 2. Define data models and configuration structs
   - [x] 2.1 Create AgentConfig, GuardrailOverrides, and ToolRegistrationStrategy in `backend/src/models/chatbot.rs`
     - Define `AgentConfig` struct with optional fields: max_turns (u8), temperature (f64), max_tokens (u64), tool_registration (ToolRegistrationStrategy), guardrails (GuardrailOverrides)
     - Define `ToolRegistrationStrategy` enum with variants `Selective` and `AllWithHookGating`
@@ -28,7 +28,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - Implement `AgentConfig::resolve()` that clamps max_turns to 1–15 (default 5), filters temperature to 0.0–2.0, filters max_tokens to 1–4096
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7_
 
-  - [~] 2.2 Write property test for AgentConfig resolution
+  - [x] 2.2 Write property test for AgentConfig resolution
     - **Property 7: AgentConfig Resolution Validity**
     - **Validates: Requirements 6.2, 6.3, 6.4, 6.5, 6.6, 6.7**
 
@@ -44,7 +44,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - Add doc comments on struct fields so they become JSON schema descriptions
     - _Requirements: 7.1, 7.3_
 
-  - [~] 3.2 Update tool `definition()` methods to use `schemars::schema_for!`
+  - [x] 3.2 Update tool `definition()` methods to use `schemars::schema_for!`
     - Replace hand-written JSON schema in each tool's `definition()` with `serde_json::to_value(schemars::schema_for!(Self::Args)).unwrap()`
     - _Requirements: 7.2, 7.5_
 

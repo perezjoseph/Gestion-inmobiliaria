@@ -1,6 +1,8 @@
 pub mod auditoria;
 pub mod background_jobs;
 pub mod chatbot;
+#[cfg(test)]
+mod chatbot_pbt;
 pub mod contrato;
 pub mod dashboard;
 pub mod desahucio;

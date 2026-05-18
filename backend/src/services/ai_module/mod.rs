@@ -626,20 +626,7 @@ impl Tool for QueryBalanceTool {
         ToolDefinition {
             name: self.name(),
             description: "Consulta el balance pendiente de un inquilino. Devuelve los pagos pendientes y atrasados con totales por moneda. Usa esta herramienta cuando el usuario pregunta cuánto debe.".to_string(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "inquilino_id": {
-                        "type": "string",
-                        "description": "UUID del inquilino"
-                    },
-                    "organizacion_id": {
-                        "type": "string",
-                        "description": "UUID de la organización"
-                    }
-                },
-                "required": ["inquilino_id", "organizacion_id"]
-            }),
+            parameters: serde_json::to_value(schemars::schema_for!(Self::Args)).unwrap(),
         }
     }
 
@@ -696,29 +683,7 @@ impl Tool for CreateMaintenanceRequestTool {
         ToolDefinition {
             name: self.name(),
             description: "Crea una solicitud de mantenimiento para el inquilino. Usa esta herramienta cuando el usuario reporta un problema o avería en su propiedad.".to_string(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "inquilino_id": {
-                        "type": "string",
-                        "description": "UUID del inquilino"
-                    },
-                    "organizacion_id": {
-                        "type": "string",
-                        "description": "UUID de la organización"
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Descripción del problema de mantenimiento (2–1000 caracteres)"
-                    },
-                    "priority": {
-                        "type": "string",
-                        "enum": ["baja", "media", "alta", "urgente"],
-                        "description": "Prioridad de la solicitud (por defecto: media)"
-                    }
-                },
-                "required": ["inquilino_id", "organizacion_id", "description"]
-            }),
+            parameters: serde_json::to_value(schemars::schema_for!(Self::Args)).unwrap(),
         }
     }
 
@@ -797,24 +762,7 @@ impl Tool for GetPaymentHistoryTool {
         ToolDefinition {
             name: self.name(),
             description: "Consulta el historial de pagos recientes de un inquilino. Usa esta herramienta cuando el usuario pregunta por sus pagos anteriores o recibos.".to_string(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "inquilino_id": {
-                        "type": "string",
-                        "description": "UUID del inquilino"
-                    },
-                    "organizacion_id": {
-                        "type": "string",
-                        "description": "UUID de la organización"
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Cantidad máxima de pagos a devolver (por defecto 10)"
-                    }
-                },
-                "required": ["inquilino_id", "organizacion_id"]
-            }),
+            parameters: serde_json::to_value(schemars::schema_for!(Self::Args)).unwrap(),
         }
     }
 
@@ -911,16 +859,7 @@ impl Tool for HandoffToHumanTool {
         ToolDefinition {
             name: self.name(),
             description: "Transfiere la conversación a un operador humano. Usa esta herramienta cuando el usuario solicita hablar con una persona o cuando no puedes resolver su consulta.".to_string(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "reason": {
-                        "type": "string",
-                        "description": "Razón por la cual se transfiere a un humano"
-                    }
-                },
-                "required": []
-            }),
+            parameters: serde_json::to_value(schemars::schema_for!(Self::Args)).unwrap(),
         }
     }
 
