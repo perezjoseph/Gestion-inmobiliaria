@@ -155,7 +155,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - **Property 8: Blocked Pattern Regex Validation**
     - **Validates: Requirements 6.8**
 
-- [~] 10. Checkpoint - Ensure all tests pass
+- [x] 10. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 11. Implement evals subsystem (behind feature flag)
