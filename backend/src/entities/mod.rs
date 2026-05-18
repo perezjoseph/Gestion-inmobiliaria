@@ -3,6 +3,10 @@
 pub mod cache_dgii;
 pub mod chatbot_config;
 pub mod chatbot_conversation;
+#[cfg(feature = "evals")]
+pub mod chatbot_eval_run;
+#[cfg(feature = "evals")]
+pub mod chatbot_eval_suite;
 pub mod chatbot_receipt_extraction;
 #[allow(dead_code)]
 pub mod configuracion;

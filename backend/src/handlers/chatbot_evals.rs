@@ -1,0 +1,243 @@
+//! Eval API endpoints for the chatbot subsystem.
+//!
+//! All handlers are gated behind the `evals` feature flag.
+
+use actix_web::{HttpResponse, web};
+use chrono::Utc;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
+};
+use serde::Deserialize;
+use uuid::Uuid;
+
+use crate::config::AppConfig;
+use crate::entities::{chatbot_eval_run, chatbot_eval_suite};
+use crate::errors::AppError;
+use crate::middleware::rbac::WriteAccess;
+use crate::models::chatbot::AgentConfig;
+use crate::services::ai_module::AiModule;
+use crate::services::ai_module::evals::{EvalRunConfig, EvalRunner, EvalSuite};
+
+// =============================================================================
+// Request / Response DTOs
+// =============================================================================
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateEvalSuiteRequest {
+    pub name: String,
+    pub description: Option<String>,
+    pub cases: serde_json::Value,
+    pub metrics: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunEvalRequest {
+    pub suite_id: Uuid,
+    pub agent_config_override: Option<AgentConfig>,
+    pub concurrency: Option<usize>,
+}
+
+// =============================================================================
+// Handlers
+// =============================================================================
+
+/// GET `/api/v1/chatbot/evals/suites` — list eval suites for the requesting user's org.
+pub async fn list_suites(
+    db: web::Data<DatabaseConnection>,
+    claims: WriteAccess,
+) -> Result<HttpResponse, AppError> {
+    let org_id = claims.0.organizacion_id;
+
+    let suites = chatbot_eval_suite::Entity::find()
+        .filter(chatbot_eval_suite::Column::OrganizacionId.eq(org_id))
+        .order_by_desc(chatbot_eval_suite::Column::CreatedAt)
+        .all(db.get_ref())
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error listando eval suites: {e}")))?;
+
+    Ok(HttpResponse::Ok().json(suites))
+}
+
+/// POST `/api/v1/chatbot/evals/suites` — create a new eval suite.
+pub async fn create_suite(
+    db: web::Data<DatabaseConnection>,
+    claims: WriteAccess,
+    body: web::Json<CreateEvalSuiteRequest>,
+) -> Result<HttpResponse, AppError> {
+    let org_id = claims.0.organizacion_id;
+    let request = body.into_inner();
+
+    if request.name.is_empty() || request.name.len() > 100 {
+        return Err(AppError::Validation(
+            "El nombre debe tener entre 1 y 100 caracteres".to_string(),
+        ));
+    }
+
+    let now = Utc::now().into();
+    let id = Uuid::new_v4();
+
+    let model = chatbot_eval_suite::ActiveModel {
+        id: Set(id),
+        organizacion_id: Set(org_id),
+        name: Set(request.name),
+        description: Set(request.description),
+        cases: Set(request.cases),
+        metrics: Set(request.metrics),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+
+    let inserted = model
+        .insert(db.get_ref())
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error creando eval suite: {e}")))?;
+
+    Ok(HttpResponse::Created().json(inserted))
+}
+
+/// POST `/api/v1/chatbot/evals/run` — run an eval suite.
+///
+/// Validates that the suite_id belongs to the requesting org before executing.
+pub async fn run_eval(
+    db: web::Data<DatabaseConnection>,
+    app_config: web::Data<AppConfig>,
+    claims: WriteAccess,
+    body: web::Json<RunEvalRequest>,
+) -> Result<HttpResponse, AppError> {
+    let org_id = claims.0.organizacion_id;
+    let request = body.into_inner();
+
+    // Validate suite exists and belongs to org
+    let suite_model = chatbot_eval_suite::Entity::find_by_id(request.suite_id)
+        .filter(chatbot_eval_suite::Column::OrganizacionId.eq(org_id))
+        .one(db.get_ref())
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error buscando eval suite: {e}")))?
+        .ok_or_else(|| {
+            AppError::NotFound("Eval suite no encontrada o no pertenece a esta organización".into())
+        })?;
+
+    // Parse cases from JSONB
+    let cases: Vec<crate::services::ai_module::evals::EvalCase> =
+        serde_json::from_value(suite_model.cases.clone()).map_err(|e| {
+            AppError::Internal(anyhow::anyhow!("Error parseando casos del suite: {e}"))
+        })?;
+
+    let metrics: Vec<crate::services::ai_module::evals::EvalMetric> =
+        serde_json::from_value(suite_model.metrics.clone()).map_err(|e| {
+            AppError::Internal(anyhow::anyhow!("Error parseando métricas del suite: {e}"))
+        })?;
+
+    let suite = EvalSuite {
+        id: suite_model.id,
+        organizacion_id: suite_model.organizacion_id,
+        name: suite_model.name,
+        description: suite_model.description,
+        cases,
+        metrics,
+    };
+
+    let eval_config = EvalRunConfig {
+        concurrency: request.concurrency.unwrap_or(3).clamp(1, 10),
+        agent_config_override: request.agent_config_override,
+    };
+
+    // Build AI module
+    let chatbot_env = &app_config.chatbot;
+    let ai_module = AiModule::new(chatbot_env)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error inicializando AI module: {e}")))?;
+
+    // Create the run record with status "running"
+    let run_id = Uuid::new_v4();
+    let now = Utc::now().into();
+    let agent_config_snapshot = serde_json::to_value(
+        eval_config
+            .agent_config_override
+            .as_ref()
+            .unwrap_or(&AgentConfig::default()),
+    )
+    .unwrap_or_default();
+
+    let run_model = chatbot_eval_run::ActiveModel {
+        id: Set(run_id),
+        suite_id: Set(suite.id),
+        organizacion_id: Set(org_id),
+        status: Set("running".to_string()),
+        results: Set(None),
+        summary: Set(None),
+        agent_config_snapshot: Set(agent_config_snapshot),
+        started_at: Set(now),
+        completed_at: Set(None),
+    };
+
+    run_model
+        .clone()
+        .insert(db.get_ref())
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error creando eval run: {e}")))?;
+
+    // Execute the eval suite
+    let runner = EvalRunner::new(&ai_module, db.get_ref());
+    let result = runner.run_suite(&suite, &eval_config).await;
+
+    // Update the run record with results
+    let completed_at = Utc::now().into();
+    let results_json = serde_json::to_value(&result.results).ok();
+    let summary_json = serde_json::to_value(&result.summary).ok();
+
+    let update_model = chatbot_eval_run::ActiveModel {
+        id: Set(run_id),
+        status: Set("completed".to_string()),
+        results: Set(results_json),
+        summary: Set(summary_json),
+        completed_at: Set(Some(completed_at)),
+        ..Default::default()
+    };
+
+    update_model
+        .update(db.get_ref())
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error actualizando eval run: {e}")))?;
+
+    Ok(HttpResponse::Ok().json(result))
+}
+
+/// GET `/api/v1/chatbot/evals/runs` — list eval runs for the org.
+pub async fn list_runs(
+    db: web::Data<DatabaseConnection>,
+    claims: WriteAccess,
+) -> Result<HttpResponse, AppError> {
+    let org_id = claims.0.organizacion_id;
+
+    let runs = chatbot_eval_run::Entity::find()
+        .filter(chatbot_eval_run::Column::OrganizacionId.eq(org_id))
+        .order_by_desc(chatbot_eval_run::Column::StartedAt)
+        .all(db.get_ref())
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error listando eval runs: {e}")))?;
+
+    Ok(HttpResponse::Ok().json(runs))
+}
+
+/// GET `/api/v1/chatbot/evals/runs/{id}` — get specific run results.
+pub async fn get_run(
+    db: web::Data<DatabaseConnection>,
+    claims: WriteAccess,
+    path: web::Path<Uuid>,
+) -> Result<HttpResponse, AppError> {
+    let org_id = claims.0.organizacion_id;
+    let run_id = path.into_inner();
+
+    let run = chatbot_eval_run::Entity::find_by_id(run_id)
+        .filter(chatbot_eval_run::Column::OrganizacionId.eq(org_id))
+        .one(db.get_ref())
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error buscando eval run: {e}")))?
+        .ok_or_else(|| {
+            AppError::NotFound("Eval run no encontrado o no pertenece a esta organización".into())
+        })?;
+
+    Ok(HttpResponse::Ok().json(run))
+}

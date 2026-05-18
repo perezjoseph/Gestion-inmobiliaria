@@ -422,6 +422,29 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                         web::post().to(handlers::chatbot::reject_receipt),
                     ),
             )
+            .service({
+                #[allow(unused_mut)]
+                let mut evals_scope = web::scope("/chatbot/evals");
+                #[cfg(feature = "evals")]
+                {
+                    evals_scope = evals_scope
+                        .route(
+                            "/suites",
+                            web::get().to(handlers::chatbot_evals::list_suites),
+                        )
+                        .route(
+                            "/suites",
+                            web::post().to(handlers::chatbot_evals::create_suite),
+                        )
+                        .route("/run", web::post().to(handlers::chatbot_evals::run_eval))
+                        .route("/runs", web::get().to(handlers::chatbot_evals::list_runs))
+                        .route(
+                            "/runs/{id}",
+                            web::get().to(handlers::chatbot_evals::get_run),
+                        );
+                }
+                evals_scope
+            })
             .service(
                 web::scope("/configuracion")
                     .wrap(Governor::new(&write_governor_conf))

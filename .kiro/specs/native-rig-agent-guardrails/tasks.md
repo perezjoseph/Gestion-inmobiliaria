@@ -168,7 +168,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - Record case failures with score 0.0 and continue remaining cases
     - _Requirements: 8.1, 8.2, 8.4, 8.5, 8.6_
 
-  - [~] 11.2 Create eval API endpoints in `backend/src/handlers/chatbot.rs`
+  - [x] 11.2 Create eval API endpoints in `backend/src/handlers/chatbot.rs`
     - GET `/api/v1/chatbot/evals/suites` — list suites filtered by org
     - POST `/api/v1/chatbot/evals/suites` — create eval suite
     - POST `/api/v1/chatbot/evals/run` — run eval suite (validate suite_id belongs to org)
@@ -176,7 +176,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - GET `/api/v1/chatbot/evals/runs/{id}` — get run results with per-case outcomes and summary
     - _Requirements: 8.2, 8.3, 8.8, 8.9_
 
-  - [~] 11.3 Create eval-runner CLI binary in `backend/src/bin/eval_runner.rs`
+  - [x] 11.3 Create eval-runner CLI binary in `backend/src/bin/eval_runner.rs`
     - Accept suite_id argument via clap
     - Load suite from DB, build agent, execute all cases
     - Persist results to `chatbot_eval_run` table

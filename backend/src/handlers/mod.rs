@@ -2,6 +2,8 @@ pub mod auditoria;
 pub mod auth;
 pub mod background_jobs;
 pub mod chatbot;
+#[cfg(feature = "evals")]
+pub mod chatbot_evals;
 pub mod chatbot_internal;
 pub mod configuracion;
 pub mod contratos;
