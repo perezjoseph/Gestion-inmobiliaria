@@ -69,7 +69,7 @@ name = "integration"
 path = "tests/main.rs"
 
 [features]
-evals = ["rig-core/experimental"]
+evals = []
 
 [dev-dependencies]
 clap = { version = "4", features = ["derive"] }

@@ -1,3 +1,5 @@
+#[cfg(feature = "evals")]
+pub mod evals;
 pub mod guardrail_hook;
 #[cfg(test)]
 mod guardrail_hook_pbt;
@@ -148,7 +150,7 @@ pub struct ChatbotPersona {
 }
 
 /// Resolved tenant information used to personalize AI responses.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TenantContext {
     pub name: String,
 }

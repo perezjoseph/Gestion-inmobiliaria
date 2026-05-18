@@ -250,7 +250,9 @@ fn validate_faqs(faqs: &[FaqEntry]) -> Result<(), AppError> {
 ///
 /// Rules:
 /// - `blocked_patterns`: each must be a valid regex, max 20 entries
-fn validate_agent_config(config: &crate::models::chatbot::AgentConfig) -> Result<(), AppError> {
+pub(crate) fn validate_agent_config(
+    config: &crate::models::chatbot::AgentConfig,
+) -> Result<(), AppError> {
     if let Some(ref guardrails) = config.guardrails {
         if let Some(ref patterns) = guardrails.blocked_patterns {
             if patterns.len() > 20 {

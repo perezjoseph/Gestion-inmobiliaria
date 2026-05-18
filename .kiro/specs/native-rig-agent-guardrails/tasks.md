@@ -139,7 +139,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - Clean up unused imports
     - _Requirements: 1.1, 1.2_
 
-- [ ] 9. Wire AgentConfig into chatbot configuration
+- [x] 9. Wire AgentConfig into chatbot configuration
   - [x] 9.1 Update `ProcessMessageContext` to include `agent_config`
     - Add `agent_config: &AgentConfig` field to `ProcessMessageContext`
     - Update `chatbot_internal` handler to read `agent_config` from chatbot_config entity and pass it through
@@ -151,7 +151,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - Implement full replacement semantics for `agent_config` on PUT
     - _Requirements: 6.8, 6.10, 6.11_
 
-  - [~] 9.3 Write property test for blocked pattern regex validation
+  - [x] 9.3 Write property test for blocked pattern regex validation
     - **Property 8: Blocked Pattern Regex Validation**
     - **Validates: Requirements 6.8**
 
@@ -159,7 +159,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 11. Implement evals subsystem (behind feature flag)
-  - [~] 11.1 Create eval data models and runner in `backend/src/services/ai_module/evals.rs`
+  - [x] 11.1 Create eval data models and runner in `backend/src/services/ai_module/evals.rs`
     - Define `EvalCase`, `EvalMetric`, `EvalSuite`, `EvalRun` structs
     - Implement `EvalRunner` that builds agent per case using same AgentBuilder pattern as production
     - Implement `ToolSelectionEval` custom eval checking if expected tool was invoked

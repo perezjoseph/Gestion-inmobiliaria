@@ -3849,3 +3849,234 @@ fn conversation_persistence_generates_valid_id() {
         )
         .expect("conversation_persistence_generates_valid_id failed");
 }
+
+// ── Property 8: Blocked Pattern Regex Validation ──────────────────────────────
+
+// Feature: native-rig-agent-guardrails, Property 8: Blocked Pattern Regex Validation
+// **Validates: Requirements 6.8**
+
+use crate::models::chatbot::{AgentConfig, GuardrailOverrides};
+use crate::services::chatbot::validate_agent_config;
+
+/// Generate a valid regex pattern string.
+fn arb_valid_regex() -> impl Strategy<Value = String> {
+    prop_oneof![
+        Just(r"\d+".to_string()),
+        Just(r"[a-z]+".to_string()),
+        Just(r"foo|bar".to_string()),
+        Just(r"^\w+$".to_string()),
+        Just(r"test.*pattern".to_string()),
+        Just(r"(abc)+".to_string()),
+        Just(r"[0-9]{2,4}".to_string()),
+        Just(r"\bword\b".to_string()),
+        "[a-zA-Z0-9.]{1,30}".prop_map(|s| s), // literal strings are valid regexes
+    ]
+}
+
+/// Generate an invalid regex pattern string (unclosed brackets, unmatched parens, etc.).
+fn arb_invalid_regex() -> impl Strategy<Value = String> {
+    prop_oneof![
+        Just("[unclosed".to_string()),
+        Just("(unmatched".to_string()),
+        Just("[z-a]".to_string()),
+        Just("*invalid".to_string()),
+        Just("(?P<>bad)".to_string()),
+        Just("\\".to_string()),
+        Just("(?i".to_string()),
+        Just("[".to_string()),
+        Just("(".to_string()),
+        Just("(?P<name".to_string()),
+    ]
+}
+
+/// Generate a list of 0–20 valid regex patterns.
+fn arb_valid_patterns(max_len: usize) -> impl Strategy<Value = Vec<String>> {
+    prop::collection::vec(arb_valid_regex(), 0..=max_len)
+}
+
+/// Property 8: FOR ALL AgentConfig values, `validate_agent_config` returns Ok
+/// if and only if all patterns are valid regexes AND count ≤ 20.
+#[test]
+fn blocked_pattern_valid_regexes_within_limit_pass() {
+    let mut runner = TestRunner::new(ProptestConfig {
+        cases: crate::test_support::pbt_cases(),
+        ..Default::default()
+    });
+
+    runner
+        .run(&arb_valid_patterns(20), |patterns| {
+            let config = AgentConfig {
+                guardrails: Some(GuardrailOverrides {
+                    blocked_patterns: Some(patterns.clone()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+
+            let result = validate_agent_config(&config);
+            prop_assert!(
+                result.is_ok(),
+                "Valid patterns (count={}) should pass validation, got: {:?}",
+                patterns.len(),
+                result.err()
+            );
+            Ok(())
+        })
+        .expect("blocked_pattern_valid_regexes_within_limit_pass failed");
+}
+
+/// Property 8: Any invalid regex in blocked_patterns causes validation to fail.
+#[test]
+fn blocked_pattern_invalid_regex_fails() {
+    let mut runner = TestRunner::new(ProptestConfig {
+        cases: crate::test_support::pbt_cases(),
+        ..Default::default()
+    });
+
+    runner
+        .run(
+            &(arb_valid_patterns(10), arb_invalid_regex()),
+            |(mut patterns, invalid)| {
+                // Insert the invalid pattern at a random position
+                patterns.push(invalid.clone());
+
+                let config = AgentConfig {
+                    guardrails: Some(GuardrailOverrides {
+                        blocked_patterns: Some(patterns),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                };
+
+                let result = validate_agent_config(&config);
+                prop_assert!(
+                    result.is_err(),
+                    "Invalid regex '{}' should cause validation to fail",
+                    invalid
+                );
+                Ok(())
+            },
+        )
+        .expect("blocked_pattern_invalid_regex_fails failed");
+}
+
+/// Property 8: More than 20 patterns causes validation to fail regardless of validity.
+#[test]
+fn blocked_pattern_exceeding_max_count_fails() {
+    let mut runner = TestRunner::new(ProptestConfig {
+        cases: crate::test_support::pbt_cases(),
+        ..Default::default()
+    });
+
+    runner
+        .run(
+            &prop::collection::vec(arb_valid_regex(), 21..=40),
+            |patterns| {
+                let config = AgentConfig {
+                    guardrails: Some(GuardrailOverrides {
+                        blocked_patterns: Some(patterns.clone()),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                };
+
+                let result = validate_agent_config(&config);
+                prop_assert!(
+                    result.is_err(),
+                    "More than 20 patterns (count={}) should fail validation",
+                    patterns.len()
+                );
+                Ok(())
+            },
+        )
+        .expect("blocked_pattern_exceeding_max_count_fails failed");
+}
+
+/// Property 8: Empty patterns list always passes validation.
+#[test]
+fn blocked_pattern_empty_list_passes() {
+    let mut runner = TestRunner::new(ProptestConfig {
+        cases: crate::test_support::pbt_cases(),
+        ..Default::default()
+    });
+
+    runner
+        .run(&any::<bool>(), |_| {
+            let config = AgentConfig {
+                guardrails: Some(GuardrailOverrides {
+                    blocked_patterns: Some(vec![]),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+
+            let result = validate_agent_config(&config);
+            prop_assert!(
+                result.is_ok(),
+                "Empty patterns list should pass validation, got: {:?}",
+                result.err()
+            );
+            Ok(())
+        })
+        .expect("blocked_pattern_empty_list_passes failed");
+}
+
+/// Property 8: No guardrails at all passes validation.
+#[test]
+fn blocked_pattern_no_guardrails_passes() {
+    let mut runner = TestRunner::new(ProptestConfig {
+        cases: crate::test_support::pbt_cases(),
+        ..Default::default()
+    });
+
+    runner
+        .run(&any::<bool>(), |_| {
+            let config = AgentConfig {
+                guardrails: None,
+                ..Default::default()
+            };
+
+            let result = validate_agent_config(&config);
+            prop_assert!(
+                result.is_ok(),
+                "No guardrails should pass validation, got: {:?}",
+                result.err()
+            );
+            Ok(())
+        })
+        .expect("blocked_pattern_no_guardrails_passes failed");
+}
+
+/// Property 8: Exactly 20 valid patterns passes validation (boundary).
+#[test]
+fn blocked_pattern_exactly_20_valid_passes() {
+    let mut runner = TestRunner::new(ProptestConfig {
+        cases: crate::test_support::pbt_cases(),
+        ..Default::default()
+    });
+
+    runner
+        .run(
+            &prop::collection::vec(arb_valid_regex(), 20..=20),
+            |patterns| {
+                prop_assert_eq!(patterns.len(), 20);
+
+                let config = AgentConfig {
+                    guardrails: Some(GuardrailOverrides {
+                        blocked_patterns: Some(patterns),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                };
+
+                let result = validate_agent_config(&config);
+                prop_assert!(
+                    result.is_ok(),
+                    "Exactly 20 valid patterns should pass validation, got: {:?}",
+                    result.err()
+                );
+                Ok(())
+            },
+        )
+        .expect("blocked_pattern_exactly_20_valid_passes failed");
+}
