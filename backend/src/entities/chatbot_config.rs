@@ -31,6 +31,8 @@ pub struct Model {
     pub handoff_keywords: Option<Json>,
     pub history_limit: i32,
     pub retention_days: i32,
+    #[sea_orm(column_type = "JsonBinary")]
+    pub agent_config: Json,
     pub updated_by: Option<Uuid>,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,

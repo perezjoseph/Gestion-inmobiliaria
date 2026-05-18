@@ -916,6 +916,7 @@ fn valid_config_update() -> impl Strategy<Value = ChatbotConfigUpdateRequest> {
                     handoff_keywords: Some(vec!["hablar con humano".to_string()]),
                     history_limit: Some(history_limit),
                     retention_days: Some(retention_days),
+                    agent_config: None,
                 }
             },
         )
@@ -961,6 +962,11 @@ fn build_model_from_input(input: &ChatbotConfigUpdateRequest) -> chatbot_config:
             .map(|k| serde_json::to_value(k).unwrap()),
         history_limit: input.history_limit.unwrap_or(10),
         retention_days: input.retention_days.unwrap_or(90),
+        agent_config: input
+            .agent_config
+            .as_ref()
+            .map(|a| serde_json::to_value(a).unwrap())
+            .unwrap_or_else(|| serde_json::json!({})),
         updated_by: Some(Uuid::new_v4()),
         created_at: now,
         updated_at: now,

@@ -140,12 +140,12 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - _Requirements: 1.1, 1.2_
 
 - [ ] 9. Wire AgentConfig into chatbot configuration
-  - [~] 9.1 Update `ProcessMessageContext` to include `agent_config`
+  - [x] 9.1 Update `ProcessMessageContext` to include `agent_config`
     - Add `agent_config: &AgentConfig` field to `ProcessMessageContext`
     - Update `chatbot_internal` handler to read `agent_config` from chatbot_config entity and pass it through
     - _Requirements: 6.1, 6.9_
 
-  - [~] 9.2 Add AgentConfig validation in chatbot config service
+  - [x] 9.2 Add AgentConfig validation in chatbot config service
     - Validate `blocked_patterns` are valid regexes (reject with HTTP 400 on invalid)
     - Validate `blocked_patterns` count ≤ 20 (reject with HTTP 400 if exceeded)
     - Implement full replacement semantics for `agent_config` on PUT

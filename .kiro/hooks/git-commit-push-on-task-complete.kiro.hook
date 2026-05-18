@@ -8,6 +8,8 @@
   },
   "then": {
     "type": "runCommand",
-    "command": "git add -A && (git diff --cached --quiet || git commit -m \"chore: complete spec task\") && git push"
-  }
+    "command": "git add -A && (git diff --cached --quiet || git commit -m \"chore: complete spec task\")"
+  },
+  "workspaceFolderName": "realestate",
+  "shortName": "git-commit-push-on-task-complete"
 }

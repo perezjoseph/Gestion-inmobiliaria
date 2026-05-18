@@ -170,6 +170,7 @@ pub struct ChatbotConfigResponse {
     pub handoff_keywords: Option<Vec<String>>,
     pub history_limit: i32,
     pub retention_days: i32,
+    pub agent_config: AgentConfig,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -198,6 +199,8 @@ pub struct ChatbotConfigUpdateRequest {
     pub handoff_keywords: Option<Vec<String>>,
     pub history_limit: Option<i32>,
     pub retention_days: Option<i32>,
+    /// Agent behavior configuration (optional). Full replacement on PUT.
+    pub agent_config: Option<AgentConfig>,
 }
 
 // --- Webhook DTOs ---
@@ -525,6 +528,7 @@ mod tests {
             handoff_keywords: None,
             history_limit: 10,
             retention_days: 90,
+            agent_config: AgentConfig::default(),
             created_at: now,
             updated_at: now,
         };
