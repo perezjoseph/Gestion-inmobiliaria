@@ -318,11 +318,11 @@ impl AiModule {
 
                 let tools_list = tools_invoked
                     .lock()
-                    .unwrap_or_else(|e| e.into_inner())
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
                     .clone();
                 let receipt = captured_receipt
                     .lock()
-                    .unwrap_or_else(|e| e.into_inner())
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
                     .clone();
 
                 Ok(AgentResponse {
@@ -346,7 +346,7 @@ impl AiModule {
                             .to_string(),
                         tools_invoked: tools_invoked
                             .lock()
-                            .unwrap_or_else(|e| e.into_inner())
+                            .unwrap_or_else(std::sync::PoisonError::into_inner)
                             .clone(),
                         extracted_receipt: None,
                     });
@@ -459,7 +459,7 @@ pub enum ChatbotToolError {
 // --- QueryBalanceTool ---
 
 /// Input the LLM provides when it wants to query a tenant's balance.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, JsonSchema)]
 pub struct QueryBalanceInput {
     /// UUID del inquilino cuyo balance se desea consultar
     pub inquilino_id: String,
@@ -484,7 +484,7 @@ impl Tool for QueryBalanceTool {
         ToolDefinition {
             name: self.name(),
             description: "Consulta el balance pendiente de un inquilino. Devuelve los pagos pendientes y atrasados con totales por moneda. Usa esta herramienta cuando el usuario pregunta cuánto debe.".to_string(),
-            parameters: serde_json::to_value(schemars::schema_for!(Self::Args)).unwrap(),
+            parameters: serde_json::to_value(schemars::schema_for!(Self::Args)).unwrap_or_default(),
         }
     }
 
@@ -503,7 +503,7 @@ impl Tool for QueryBalanceTool {
 // --- CreateMaintenanceRequestTool ---
 
 /// Input the LLM provides when creating a maintenance request.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, JsonSchema)]
 pub struct CreateMaintenanceRequestInput {
     /// UUID del inquilino que reporta el problema
     pub inquilino_id: String,
@@ -541,7 +541,7 @@ impl Tool for CreateMaintenanceRequestTool {
         ToolDefinition {
             name: self.name(),
             description: "Crea una solicitud de mantenimiento para el inquilino. Usa esta herramienta cuando el usuario reporta un problema o avería en su propiedad.".to_string(),
-            parameters: serde_json::to_value(schemars::schema_for!(Self::Args)).unwrap(),
+            parameters: serde_json::to_value(schemars::schema_for!(Self::Args)).unwrap_or_default(),
         }
     }
 
@@ -573,7 +573,7 @@ impl Tool for CreateMaintenanceRequestTool {
 // --- GetPaymentHistoryTool ---
 
 /// Input the LLM provides when querying payment history.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, JsonSchema)]
 pub struct GetPaymentHistoryInput {
     /// UUID del inquilino
     pub inquilino_id: String,
@@ -620,7 +620,7 @@ impl Tool for GetPaymentHistoryTool {
         ToolDefinition {
             name: self.name(),
             description: "Consulta el historial de pagos recientes de un inquilino. Usa esta herramienta cuando el usuario pregunta por sus pagos anteriores o recibos.".to_string(),
-            parameters: serde_json::to_value(schemars::schema_for!(Self::Args)).unwrap(),
+            parameters: serde_json::to_value(schemars::schema_for!(Self::Args)).unwrap_or_default(),
         }
     }
 
@@ -685,7 +685,7 @@ impl Tool for GetPaymentHistoryTool {
 // --- HandoffToHumanTool ---
 
 /// Input the LLM provides when handing off to a human operator.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, JsonSchema)]
 pub struct HandoffToHumanInput {
     /// Razón por la cual se transfiere a un operador humano
     pub reason: Option<String>,
@@ -717,7 +717,7 @@ impl Tool for HandoffToHumanTool {
         ToolDefinition {
             name: self.name(),
             description: "Transfiere la conversación a un operador humano. Usa esta herramienta cuando el usuario solicita hablar con una persona o cuando no puedes resolver su consulta.".to_string(),
-            parameters: serde_json::to_value(schemars::schema_for!(Self::Args)).unwrap(),
+            parameters: serde_json::to_value(schemars::schema_for!(Self::Args)).unwrap_or_default(),
         }
     }
 

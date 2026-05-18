@@ -191,7 +191,7 @@ impl MigrationTrait for Migration {
     }
 }
 
-/// Extra column added to ChatbotConfig in this migration.
+/// Extra column added to `ChatbotConfig` in this migration.
 #[derive(DeriveIden)]
 enum ChatbotConfigExtra {
     AgentConfig,

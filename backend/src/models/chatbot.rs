@@ -54,7 +54,7 @@ pub struct Capabilities {
 impl Capabilities {
     /// Returns a `Capabilities` instance with all flags enabled.
     /// Used for `AllWithHookGating` strategy where all tools are registered.
-    pub fn all() -> Self {
+    pub const fn all() -> Self {
         Self {
             receipt_ocr: true,
             balance_queries: true,
@@ -67,7 +67,7 @@ impl Capabilities {
 
 // --- Agent Configuration ---
 
-/// Per-organization agent configuration. Stored in chatbot_config.agent_config JSONB.
+/// Per-organization agent configuration. Stored in `chatbot_config.agent_config` JSONB.
 /// All fields are optional — defaults are applied when absent.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]

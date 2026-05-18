@@ -124,13 +124,16 @@ where
         // Record tool invocation
         self.tools_invoked
             .lock()
-            .unwrap()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push(tool_name.to_string());
 
         // Capture receipt extraction side-effect
         if tool_name == "extract_receipt" {
             if let Ok(receipt) = serde_json::from_str::<PaymentReceipt>(result) {
-                *self.captured_receipt.lock().unwrap() = Some(receipt);
+                *self
+                    .captured_receipt
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(receipt);
             }
         }
 
