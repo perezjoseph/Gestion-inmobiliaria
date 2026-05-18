@@ -3,9 +3,11 @@ pub mod tools;
 use std::fmt::Write as _;
 use std::time::Duration;
 
+use regex::Regex;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use rust_decimal::Decimal;
+use schemars::JsonSchema;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -13,12 +15,83 @@ use uuid::Uuid;
 use crate::config::ChatbotEnvConfig;
 use crate::entities::{contrato, pago};
 use crate::errors::AppError;
-use crate::models::chatbot::{BalanceResponse, Capabilities, FaqEntry, format_currency};
+use crate::models::chatbot::{
+    BalanceResponse, Capabilities, FaqEntry, GuardrailOverrides, format_currency,
+};
 use crate::services::ocr_client::OcrClient;
 use crate::services::ovms_provider::OvmsCompletionModel;
 
 // Re-export tool types for backward compatibility
 pub use tools::{ExtractReceiptInput, ExtractReceiptTool, InlineBase64MediaStore, PaymentReceipt};
+
+// =============================================================================
+// GuardrailConfig — validation limits for the guardrail hook
+// =============================================================================
+
+/// Configuration for argument validation and output safety in the guardrail hook.
+pub struct GuardrailConfig {
+    /// Maximum allowed payment amount for receipt extraction (DOP).
+    pub max_receipt_amount_dop: Decimal,
+    /// Maximum allowed payment amount for receipt extraction (USD).
+    pub max_receipt_amount_usd: Decimal,
+    /// Maximum description length for maintenance requests.
+    pub max_description_length: usize,
+    /// Blocked output patterns (compiled regexes for safety filtering).
+    pub blocked_output_patterns: Vec<Regex>,
+}
+
+impl Default for GuardrailConfig {
+    fn default() -> Self {
+        Self {
+            max_receipt_amount_dop: Decimal::new(10_000_000, 2), // RD$100,000
+            max_receipt_amount_usd: Decimal::new(500_000, 2),    // US$5,000
+            max_description_length: 1000,
+            blocked_output_patterns: vec![],
+        }
+    }
+}
+
+impl From<GuardrailOverrides> for GuardrailConfig {
+    fn from(overrides: GuardrailOverrides) -> Self {
+        let default = Self::default();
+
+        let max_receipt_amount_dop = overrides
+            .max_receipt_amount_dop
+            .map_or(default.max_receipt_amount_dop, |v| {
+                Decimal::try_from(v).unwrap_or(default.max_receipt_amount_dop)
+            });
+
+        let max_receipt_amount_usd = overrides
+            .max_receipt_amount_usd
+            .map_or(default.max_receipt_amount_usd, |v| {
+                Decimal::try_from(v).unwrap_or(default.max_receipt_amount_usd)
+            });
+
+        let blocked_output_patterns = overrides
+            .blocked_patterns
+            .unwrap_or_default()
+            .iter()
+            .filter_map(|pattern| match Regex::new(pattern) {
+                Ok(re) => Some(re),
+                Err(e) => {
+                    tracing::warn!(
+                        pattern = %pattern,
+                        error = %e,
+                        "Invalid regex in blocked_patterns, skipping"
+                    );
+                    None
+                }
+            })
+            .collect();
+
+        Self {
+            max_receipt_amount_dop,
+            max_receipt_amount_usd,
+            max_description_length: default.max_description_length,
+            blocked_output_patterns,
+        }
+    }
+}
 
 // =============================================================================
 // Types for process_message entry point
@@ -528,11 +601,11 @@ pub enum ChatbotToolError {
 // --- QueryBalanceTool ---
 
 /// Input the LLM provides when it wants to query a tenant's balance.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
 pub struct QueryBalanceInput {
-    /// UUID of the tenant whose balance to query.
+    /// UUID del inquilino cuyo balance se desea consultar
     pub inquilino_id: String,
-    /// UUID of the organization.
+    /// UUID de la organización
     pub organizacion_id: String,
 }
 
@@ -585,15 +658,15 @@ impl Tool for QueryBalanceTool {
 // --- CreateMaintenanceRequestTool ---
 
 /// Input the LLM provides when creating a maintenance request.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
 pub struct CreateMaintenanceRequestInput {
-    /// UUID of the tenant filing the request.
+    /// UUID del inquilino que reporta el problema
     pub inquilino_id: String,
-    /// UUID of the organization.
+    /// UUID de la organización
     pub organizacion_id: String,
-    /// Description of the maintenance issue (2–1000 characters).
+    /// Descripción del problema de mantenimiento (2–1000 caracteres)
     pub description: String,
-    /// Optional priority: `baja`, `media`, `alta`, or `urgente`.
+    /// Prioridad de la solicitud: `baja`, `media`, `alta` o `urgente`
     pub priority: Option<String>,
 }
 
@@ -677,13 +750,13 @@ impl Tool for CreateMaintenanceRequestTool {
 // --- GetPaymentHistoryTool ---
 
 /// Input the LLM provides when querying payment history.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
 pub struct GetPaymentHistoryInput {
-    /// UUID of the tenant.
+    /// UUID del inquilino
     pub inquilino_id: String,
-    /// UUID of the organization.
+    /// UUID de la organización
     pub organizacion_id: String,
-    /// Maximum number of recent payments to return (default 10).
+    /// Cantidad máxima de pagos a devolver (por defecto 10)
     pub limit: Option<u32>,
 }
 
@@ -806,9 +879,9 @@ impl Tool for GetPaymentHistoryTool {
 // --- HandoffToHumanTool ---
 
 /// Input the LLM provides when handing off to a human operator.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
 pub struct HandoffToHumanInput {
-    /// Reason for the handoff (from conversation context).
+    /// Razón por la cual se transfiere a un operador humano
     pub reason: Option<String>,
 }
 

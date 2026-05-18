@@ -33,6 +33,7 @@ pub mod m20260512_000002_create_desahucios;
 pub mod m20260512_000003_create_responsabilidad_servicios;
 pub mod m20260512_000004_create_cache_dgii;
 pub mod m20260513_000001_create_preview_index;
+pub mod m20260514_000001_add_agent_config_and_eval_tables;
 
 use sea_orm_migration::prelude::*;
 
@@ -76,6 +77,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260512_000004_create_cache_dgii::Migration),
             Box::new(m20260415_002_add_gasto_utility_fields::Migration),
             Box::new(m20260513_000001_create_preview_index::Migration),
+            Box::new(m20260514_000001_add_agent_config_and_eval_tables::Migration),
         ]
     }
 }

@@ -14,7 +14,9 @@ impl KeyExtractor for FallbackPeerIpKeyExtractor {
     fn extract(&self, req: &ServiceRequest) -> Result<Self::Key, Self::KeyExtractionError> {
         let mut ip = req
             .peer_addr()
-            .map_or(IpAddr::V4(std::net::Ipv4Addr::LOCALHOST), |socket| socket.ip());
+            .map_or(IpAddr::V4(std::net::Ipv4Addr::LOCALHOST), |socket| {
+                socket.ip()
+            });
         if let IpAddr::V6(ipv6) = ip {
             let mut octets = ipv6.octets();
             octets[7..16].fill(0);

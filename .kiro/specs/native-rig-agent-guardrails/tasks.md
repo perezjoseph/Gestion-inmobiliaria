@@ -6,14 +6,14 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
 
 ## Tasks
 
-- [ ] 1. Add dependencies and database migration
+- [x] 1. Add dependencies and database migration
   - [x] 1.1 Update Cargo.toml with new dependencies
     - Add `schemars = "1"` and `regex = "1"` to `[dependencies]`
     - Add `clap = { version = "4", features = ["derive"] }` to `[dev-dependencies]` or under `[[bin]]` target
     - Add feature flag `evals = ["rig-core/experimental"]`
     - _Requirements: 7.1, 7.5, 8.1_
 
-  - [-] 1.2 Create database migration for agent_config column and eval tables
+  - [x] 1.2 Create database migration for agent_config column and eval tables
     - Add `agent_config JSONB NOT NULL DEFAULT '{}'` column to `chatbot_config` table
     - Create `chatbot_eval_suite` table with columns: id (UUID PK), organizacion_id (UUID NOT NULL FK → organizaciones ON DELETE CASCADE), name (VARCHAR(100) NOT NULL), description (TEXT), cases (JSONB NOT NULL DEFAULT '[]'), metrics (JSONB NOT NULL DEFAULT '[]'), created_at (TIMESTAMPTZ NOT NULL), updated_at (TIMESTAMPTZ NOT NULL)
     - Create `chatbot_eval_run` table with columns: id (UUID PK), suite_id (UUID NOT NULL FK → chatbot_eval_suite ON DELETE CASCADE), organizacion_id (UUID NOT NULL FK → organizaciones ON DELETE CASCADE), status (VARCHAR(20) NOT NULL), results (JSONB), summary (JSONB), agent_config_snapshot (JSONB NOT NULL DEFAULT '{}'), started_at (TIMESTAMPTZ NOT NULL), completed_at (TIMESTAMPTZ)
@@ -21,7 +21,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7_
 
 - [ ] 2. Define data models and configuration structs
-  - [~] 2.1 Create AgentConfig, GuardrailOverrides, and ToolRegistrationStrategy in `backend/src/models/chatbot.rs`
+  - [x] 2.1 Create AgentConfig, GuardrailOverrides, and ToolRegistrationStrategy in `backend/src/models/chatbot.rs`
     - Define `AgentConfig` struct with optional fields: max_turns (u8), temperature (f64), max_tokens (u64), tool_registration (ToolRegistrationStrategy), guardrails (GuardrailOverrides)
     - Define `ToolRegistrationStrategy` enum with variants `Selective` and `AllWithHookGating`
     - Define `GuardrailOverrides` struct with optional fields: max_receipt_amount_dop, max_receipt_amount_usd, blocked_patterns (Vec<String>), output_safety_enabled (bool)
@@ -32,14 +32,14 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - **Property 7: AgentConfig Resolution Validity**
     - **Validates: Requirements 6.2, 6.3, 6.4, 6.5, 6.6, 6.7**
 
-  - [~] 2.3 Create GuardrailConfig struct in `backend/src/services/ai_module/mod.rs`
+  - [x] 2.3 Create GuardrailConfig struct in `backend/src/services/ai_module/mod.rs`
     - Define `GuardrailConfig` with fields: max_receipt_amount_dop (Decimal), max_receipt_amount_usd (Decimal), max_description_length (usize), blocked_output_patterns (Vec<Regex>)
     - Implement `Default` with values: RD$100,000, US$5,000, 1000 chars, empty patterns
     - Implement `From<GuardrailOverrides>` to convert org-level overrides into compiled config
     - _Requirements: 3.6, 5.5, 6.8_
 
 - [ ] 3. Implement tool schema auto-generation
-  - [~] 3.1 Add `#[derive(JsonSchema)]` to all tool Args types
+  - [x] 3.1 Add `#[derive(JsonSchema)]` to all tool Args types
     - Update `ExtractReceiptInput`, `QueryBalanceInput`, `GetPaymentHistoryInput`, `CreateMaintenanceRequestInput`, `HandoffToHumanInput` to derive `schemars::JsonSchema`
     - Add doc comments on struct fields so they become JSON schema descriptions
     - _Requirements: 7.1, 7.3_
