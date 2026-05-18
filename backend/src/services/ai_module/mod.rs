@@ -1,3 +1,4 @@
+pub mod guardrail_hook;
 pub mod tools;
 
 use std::fmt::Write as _;
@@ -29,6 +30,7 @@ pub use tools::{ExtractReceiptInput, ExtractReceiptTool, InlineBase64MediaStore,
 // =============================================================================
 
 /// Configuration for argument validation and output safety in the guardrail hook.
+#[derive(Clone)]
 pub struct GuardrailConfig {
     /// Maximum allowed payment amount for receipt extraction (DOP).
     pub max_receipt_amount_dop: Decimal,

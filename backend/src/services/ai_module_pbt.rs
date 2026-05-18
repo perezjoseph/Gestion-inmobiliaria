@@ -4,13 +4,15 @@
     clippy::doc_markdown,
     clippy::empty_line_after_doc_comments
 )]
-//! Property-based tests for tool Args schema round-trip.
+//! Property-based tests for tool Args schema round-trip and selective tool registration.
 //!
-//! **Validates: Requirements 7.4**
+//! **Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 7.4**
 
 use proptest::prelude::*;
 use proptest::test_runner::{Config as ProptestConfig, TestRunner};
 
+use crate::models::chatbot::Capabilities;
+use crate::services::ai_module::get_enabled_tools;
 use crate::services::ai_module::tools::ExtractReceiptInput;
 use crate::services::ai_module::{
     CreateMaintenanceRequestInput, GetPaymentHistoryInput, HandoffToHumanInput, QueryBalanceInput,
@@ -184,6 +186,108 @@ fn test_tool_args_round_trip_handoff_to_human() {
             let deserialized: HandoffToHumanInput =
                 serde_json::from_value(json).expect("deserialize");
             prop_assert_eq!(input, deserialized);
+            Ok(())
+        })
+        .unwrap();
+}
+
+// ── Strategies for Capabilities ────────────────────────────────────────
+
+/// Generate an arbitrary Capabilities struct with all boolean fields.
+fn arb_capabilities() -> impl Strategy<Value = Capabilities> {
+    (
+        any::<bool>(),
+        any::<bool>(),
+        any::<bool>(),
+        any::<bool>(),
+        any::<bool>(),
+    )
+        .prop_map(
+            |(
+                receipt_ocr,
+                balance_queries,
+                payment_reminders,
+                maintenance_requests,
+                human_handoff,
+            )| {
+                Capabilities {
+                    receipt_ocr,
+                    balance_queries,
+                    payment_reminders,
+                    maintenance_requests,
+                    human_handoff,
+                }
+            },
+        )
+}
+
+// ── Property 1: Selective Tool Registration Completeness ───────────────
+
+// Feature: native-rig-agent-guardrails, Property 1: Selective Tool Registration Completeness
+// **Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5, 2.6**
+
+#[test]
+fn test_selective_tool_registration_completeness() {
+    let mut runner = TestRunner::new(ProptestConfig {
+        cases: crate::test_support::pbt_cases(),
+        ..Default::default()
+    });
+
+    runner
+        .run(&arb_capabilities(), |caps| {
+            let tools = get_enabled_tools(&caps);
+
+            // Compute expected count based on the mapping:
+            // receipt_ocr → 1 tool ("extract_receipt")
+            // balance_queries → 2 tools ("query_balance", "get_payment_history")
+            // maintenance_requests → 1 tool ("create_maintenance_request")
+            // human_handoff → 1 tool ("handoff_to_human")
+            // payment_reminders → 0 tools (no tool mapping)
+            let expected_count = caps.receipt_ocr as usize
+                + caps.balance_queries as usize * 2
+                + caps.maintenance_requests as usize
+                + caps.human_handoff as usize;
+
+            // Assert tool count equals expected
+            prop_assert_eq!(
+                tools.len(),
+                expected_count,
+                "Tool count mismatch for caps: receipt_ocr={}, balance_queries={}, \
+                 maintenance_requests={}, human_handoff={}, payment_reminders={}",
+                caps.receipt_ocr,
+                caps.balance_queries,
+                caps.maintenance_requests,
+                caps.human_handoff,
+                caps.payment_reminders,
+            );
+
+            // Assert specific tool names are present/absent based on flags
+            prop_assert_eq!(
+                tools.contains(&"extract_receipt"),
+                caps.receipt_ocr,
+                "extract_receipt presence should match receipt_ocr flag"
+            );
+            prop_assert_eq!(
+                tools.contains(&"query_balance"),
+                caps.balance_queries,
+                "query_balance presence should match balance_queries flag"
+            );
+            prop_assert_eq!(
+                tools.contains(&"get_payment_history"),
+                caps.balance_queries,
+                "get_payment_history presence should match balance_queries flag"
+            );
+            prop_assert_eq!(
+                tools.contains(&"create_maintenance_request"),
+                caps.maintenance_requests,
+                "create_maintenance_request presence should match maintenance_requests flag"
+            );
+            prop_assert_eq!(
+                tools.contains(&"handoff_to_human"),
+                caps.human_handoff,
+                "handoff_to_human presence should match human_handoff flag"
+            );
+
             Ok(())
         })
         .unwrap();

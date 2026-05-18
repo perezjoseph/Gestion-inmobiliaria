@@ -55,19 +55,19 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
 - [~] 4. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 5. Implement selective tool registration
+- [x] 5. Implement selective tool registration
   - [x] 5.1 Create `build_tools()` function in `backend/src/services/ai_module/mod.rs`
     - Implement `build_tools(capabilities, db, organizacion_id, sender_phone, image_base64) -> Vec<Box<dyn ToolDyn>>`
     - Conditionally register ExtractReceiptTool (receipt_ocr), QueryBalanceTool + GetPaymentHistoryTool (balance_queries), CreateMaintenanceRequestTool (maintenance_requests), HandoffToHumanTool (human_handoff)
     - Return empty vector when all capabilities are disabled
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7_
 
-  - [~] 5.2 Write property test for selective tool registration completeness
+  - [x] 5.2 Write property test for selective tool registration completeness
     - **Property 1: Selective Tool Registration Completeness**
     - **Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5, 2.6**
 
 - [ ] 6. Implement RentalGuardrailHook
-  - [~] 6.1 Create `RentalGuardrailHook` struct implementing `PromptHook`
+  - [x] 6.1 Create `RentalGuardrailHook` struct implementing `PromptHook`
     - Define struct with fields: captured_receipt (Arc<Mutex<Option<PaymentReceipt>>>), tools_invoked (Arc<Mutex<Vec<String>>>), organizacion_id (Uuid), guardrail_config (GuardrailConfig)
     - Implement `on_completion_call` as no-op returning `HookAction::Continue`
     - _Requirements: 1.1_
