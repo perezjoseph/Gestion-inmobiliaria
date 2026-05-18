@@ -1,4 +1,6 @@
 pub mod ai_module;
+#[cfg(test)]
+mod ai_module_pbt;
 pub mod auditoria;
 pub mod auth;
 pub mod background_jobs;

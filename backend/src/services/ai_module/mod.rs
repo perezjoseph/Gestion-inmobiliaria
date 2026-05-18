@@ -601,7 +601,7 @@ pub enum ChatbotToolError {
 // --- QueryBalanceTool ---
 
 /// Input the LLM provides when it wants to query a tenant's balance.
-#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, JsonSchema)]
 pub struct QueryBalanceInput {
     /// UUID del inquilino cuyo balance se desea consultar
     pub inquilino_id: String,
@@ -645,7 +645,7 @@ impl Tool for QueryBalanceTool {
 // --- CreateMaintenanceRequestTool ---
 
 /// Input the LLM provides when creating a maintenance request.
-#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, JsonSchema)]
 pub struct CreateMaintenanceRequestInput {
     /// UUID del inquilino que reporta el problema
     pub inquilino_id: String,
@@ -715,7 +715,7 @@ impl Tool for CreateMaintenanceRequestTool {
 // --- GetPaymentHistoryTool ---
 
 /// Input the LLM provides when querying payment history.
-#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, JsonSchema)]
 pub struct GetPaymentHistoryInput {
     /// UUID del inquilino
     pub inquilino_id: String,
@@ -827,7 +827,7 @@ impl Tool for GetPaymentHistoryTool {
 // --- HandoffToHumanTool ---
 
 /// Input the LLM provides when handing off to a human operator.
-#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, JsonSchema)]
 pub struct HandoffToHumanInput {
     /// Razón por la cual se transfiere a un operador humano
     pub reason: Option<String>,
@@ -1014,6 +1014,50 @@ pub fn get_enabled_tools(capabilities: &Capabilities) -> Vec<&'static str> {
     }
     if capabilities.human_handoff {
         tools.push(HandoffToHumanTool::NAME);
+    }
+
+    tools
+}
+
+/// Builds the tool vector based on enabled capabilities.
+/// Only enabled tools are registered — the LLM never sees disabled tool definitions.
+pub fn build_tools(
+    capabilities: &Capabilities,
+    db: &DatabaseConnection,
+    organizacion_id: Uuid,
+    sender_phone: &str,
+    _image_base64: Option<&str>,
+) -> Vec<Box<dyn rig::tool::ToolDyn>> {
+    let mut tools: Vec<Box<dyn rig::tool::ToolDyn>> = Vec::new();
+
+    if capabilities.receipt_ocr {
+        if let Ok(ocr) = OcrClient::new() {
+            tools.push(Box::new(ExtractReceiptTool {
+                media_store: InlineBase64MediaStore,
+                ocr,
+            }));
+        }
+    }
+
+    if capabilities.balance_queries {
+        tools.push(Box::new(QueryBalanceTool { db: db.clone() }));
+        tools.push(Box::new(GetPaymentHistoryTool {
+            db: db.clone(),
+            organizacion_id,
+            sender_phone: sender_phone.to_string(),
+        }));
+    }
+
+    if capabilities.maintenance_requests {
+        tools.push(Box::new(CreateMaintenanceRequestTool { db: db.clone() }));
+    }
+
+    if capabilities.human_handoff {
+        tools.push(Box::new(HandoffToHumanTool {
+            db: db.clone(),
+            organizacion_id,
+            sender_phone: sender_phone.to_string(),
+        }));
     }
 
     tools

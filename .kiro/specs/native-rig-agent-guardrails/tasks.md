@@ -38,7 +38,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - Implement `From<GuardrailOverrides>` to convert org-level overrides into compiled config
     - _Requirements: 3.6, 5.5, 6.8_
 
-- [ ] 3. Implement tool schema auto-generation
+- [x] 3. Implement tool schema auto-generation
   - [x] 3.1 Add `#[derive(JsonSchema)]` to all tool Args types
     - Update `ExtractReceiptInput`, `QueryBalanceInput`, `GetPaymentHistoryInput`, `CreateMaintenanceRequestInput`, `HandoffToHumanInput` to derive `schemars::JsonSchema`
     - Add doc comments on struct fields so they become JSON schema descriptions
@@ -48,7 +48,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - Replace hand-written JSON schema in each tool's `definition()` with `serde_json::to_value(schemars::schema_for!(Self::Args)).unwrap()`
     - _Requirements: 7.2, 7.5_
 
-  - [~] 3.3 Write property test for tool args round-trip
+  - [x] 3.3 Write property test for tool args round-trip
     - **Property 9: Tool Args Schema Round-Trip**
     - **Validates: Requirements 7.4**
 
@@ -56,7 +56,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 5. Implement selective tool registration
-  - [~] 5.1 Create `build_tools()` function in `backend/src/services/ai_module/mod.rs`
+  - [x] 5.1 Create `build_tools()` function in `backend/src/services/ai_module/mod.rs`
     - Implement `build_tools(capabilities, db, organizacion_id, sender_phone, image_base64) -> Vec<Box<dyn ToolDyn>>`
     - Conditionally register ExtractReceiptTool (receipt_ocr), QueryBalanceTool + GetPaymentHistoryTool (balance_queries), CreateMaintenanceRequestTool (maintenance_requests), HandoffToHumanTool (human_handoff)
     - Return empty vector when all capabilities are disabled
