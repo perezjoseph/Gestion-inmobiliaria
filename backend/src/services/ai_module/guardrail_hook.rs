@@ -10,7 +10,7 @@ use rig::agent::{HookAction, PromptHook, ToolCallHookAction};
 use rig::completion::CompletionModel;
 use uuid::Uuid;
 
-use super::GuardrailConfig;
+use super::{CreateMaintenanceRequestInput, GuardrailConfig};
 use crate::services::ai_module::tools::PaymentReceipt;
 
 /// Guardrail hook that intercepts the Rig agent loop at four points:
@@ -45,32 +45,95 @@ where
     async fn on_completion_response(
         &self,
         _prompt: &rig::message::Message,
-        _response: &rig::completion::CompletionResponse<M::Response>,
+        response: &rig::completion::CompletionResponse<M::Response>,
     ) -> HookAction {
-        // Output safety filtering — implemented in task 6.8
+        // Skip if no blocked patterns configured
+        if self.guardrail_config.blocked_output_patterns.is_empty() {
+            return HookAction::Continue;
+        }
+
+        // Extract text content from response (read-only)
+        let text = response
+            .choice
+            .iter()
+            .filter_map(|c| match c {
+                rig::message::AssistantContent::Text(t) => Some(t.text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        // Check against blocked patterns
+        for pattern in &self.guardrail_config.blocked_output_patterns {
+            if pattern.is_match(&text) {
+                tracing::warn!(
+                    organizacion_id = %self.organizacion_id,
+                    pattern = %pattern,
+                    "Output safety check triggered"
+                );
+                return HookAction::Terminate {
+                    reason: "Response blocked by safety filter".into(),
+                };
+            }
+        }
+
         HookAction::Continue
     }
 
     async fn on_tool_call(
         &self,
-        _tool_name: &str,
+        tool_name: &str,
         _tool_call_id: Option<String>,
         _internal_call_id: &str,
-        _args: &str,
+        args: &str,
     ) -> ToolCallHookAction {
-        // Argument validation — implemented in task 6.2
-        ToolCallHookAction::Continue
+        match tool_name {
+            "create_maintenance_request" => {
+                // Try to deserialize args to check description length
+                if let Ok(parsed) = serde_json::from_str::<CreateMaintenanceRequestInput>(args) {
+                    let desc_len = parsed.description.len(); // UTF-8 byte length
+                    if desc_len < 2 {
+                        return ToolCallHookAction::Skip {
+                            reason: "Description too short (min 2 chars)".into(),
+                        };
+                    }
+                    if desc_len > self.guardrail_config.max_description_length {
+                        return ToolCallHookAction::Skip {
+                            reason: format!(
+                                "Description too long (max {} chars)",
+                                self.guardrail_config.max_description_length
+                            ),
+                        };
+                    }
+                }
+                // If deserialization fails, let Rig handle the error
+                ToolCallHookAction::Continue
+            }
+            _ => ToolCallHookAction::Continue,
+        }
     }
 
     async fn on_tool_result(
         &self,
-        _tool_name: &str,
+        tool_name: &str,
         _tool_call_id: Option<String>,
         _internal_call_id: &str,
         _args: &str,
-        _result: &str,
+        result: &str,
     ) -> HookAction {
-        // Side-effect capture — implemented in task 6.5
+        // Record tool invocation
+        self.tools_invoked
+            .lock()
+            .unwrap()
+            .push(tool_name.to_string());
+
+        // Capture receipt extraction side-effect
+        if tool_name == "extract_receipt" {
+            if let Ok(receipt) = serde_json::from_str::<PaymentReceipt>(result) {
+                *self.captured_receipt.lock().unwrap() = Some(receipt);
+            }
+        }
+
         HookAction::Continue
     }
 }

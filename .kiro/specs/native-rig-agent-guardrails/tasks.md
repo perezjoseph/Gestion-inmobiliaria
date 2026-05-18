@@ -72,7 +72,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - Implement `on_completion_call` as no-op returning `HookAction::Continue`
     - _Requirements: 1.1_
 
-  - [~] 6.2 Implement `on_tool_call` for argument validation
+  - [x] 6.2 Implement `on_tool_call` for argument validation
     - Validate `create_maintenance_request` description length: skip if < 2 or > max_description_length
     - Return `ToolCallHookAction::Continue` for valid args or deserialization failures
     - Never return `ToolCallHookAction::Terminate`
@@ -86,7 +86,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - **Property 3: Argument Validation Never Terminates**
     - **Validates: Requirements 3.4, 3.5**
 
-  - [~] 6.5 Implement `on_tool_result` for side-effect capture
+  - [x] 6.5 Implement `on_tool_result` for side-effect capture
     - Capture `PaymentReceipt` from `extract_receipt` results into shared state
     - Overwrite on multiple successful extractions (last-write-wins)
     - Append tool name to tools_invoked list on every call
@@ -101,7 +101,7 @@ Refactor `AiModule` to use Rig's native `AgentBuilder` with `multi_turn` orchest
     - **Property 5: Tools Invoked Tracking**
     - **Validates: Requirements 4.3, 4.4**
 
-  - [~] 6.8 Implement `on_completion_response` for output safety filtering
+  - [x] 6.8 Implement `on_completion_response` for output safety filtering
     - Concatenate all `AssistantContent::Text` items joined with space
     - Check against `blocked_output_patterns` regexes
     - Return `HookAction::Terminate` with reason on match, `HookAction::Continue` otherwise
