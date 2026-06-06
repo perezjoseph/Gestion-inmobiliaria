@@ -3,20 +3,17 @@
 //! All handlers are gated behind the `evals` feature flag.
 
 use actix_web::{HttpResponse, web};
-use chrono::Utc;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
-};
+use sea_orm::DatabaseConnection;
 use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::config::AppConfig;
-use crate::entities::{chatbot_eval_run, chatbot_eval_suite};
 use crate::errors::AppError;
 use crate::middleware::rbac::WriteAccess;
 use crate::models::chatbot::AgentConfig;
 use crate::services::ai_module::AiModule;
 use crate::services::ai_module::evals::{EvalRunConfig, EvalRunner, EvalSuite};
+use crate::services::chatbot_evals;
 
 // =============================================================================
 // Request / Response DTOs
@@ -48,15 +45,7 @@ pub async fn list_suites(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,
 ) -> Result<HttpResponse, AppError> {
-    let org_id = claims.0.organizacion_id;
-
-    let suites = chatbot_eval_suite::Entity::find()
-        .filter(chatbot_eval_suite::Column::OrganizacionId.eq(org_id))
-        .order_by_desc(chatbot_eval_suite::Column::CreatedAt)
-        .all(db.get_ref())
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error listando eval suites: {e}")))?;
-
+    let suites = chatbot_evals::list_suites(db.get_ref(), claims.0.organizacion_id).await?;
     Ok(HttpResponse::Ok().json(suites))
 }
 
@@ -66,7 +55,6 @@ pub async fn create_suite(
     claims: WriteAccess,
     body: web::Json<CreateEvalSuiteRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let org_id = claims.0.organizacion_id;
     let request = body.into_inner();
 
     if request.name.is_empty() || request.name.len() > 100 {
@@ -75,24 +63,15 @@ pub async fn create_suite(
         ));
     }
 
-    let now = Utc::now().into();
-    let id = Uuid::new_v4();
-
-    let model = chatbot_eval_suite::ActiveModel {
-        id: Set(id),
-        organizacion_id: Set(org_id),
-        name: Set(request.name),
-        description: Set(request.description),
-        cases: Set(request.cases),
-        metrics: Set(request.metrics),
-        created_at: Set(now),
-        updated_at: Set(now),
-    };
-
-    let inserted = model
-        .insert(db.get_ref())
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error creando eval suite: {e}")))?;
+    let inserted = chatbot_evals::create_suite(
+        db.get_ref(),
+        claims.0.organizacion_id,
+        request.name,
+        request.description,
+        request.cases,
+        request.metrics,
+    )
+    .await?;
 
     Ok(HttpResponse::Created().json(inserted))
 }
@@ -110,14 +89,7 @@ pub async fn run_eval(
     let request = body.into_inner();
 
     // Validate suite exists and belongs to org
-    let suite_model = chatbot_eval_suite::Entity::find_by_id(request.suite_id)
-        .filter(chatbot_eval_suite::Column::OrganizacionId.eq(org_id))
-        .one(db.get_ref())
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error buscando eval suite: {e}")))?
-        .ok_or_else(|| {
-            AppError::NotFound("Eval suite no encontrada o no pertenece a esta organización".into())
-        })?;
+    let suite_model = chatbot_evals::find_suite(db.get_ref(), request.suite_id, org_id).await?;
 
     // Parse cases from JSONB
     let cases: Vec<crate::services::ai_module::evals::EvalCase> =
@@ -151,7 +123,6 @@ pub async fn run_eval(
 
     // Create the run record with status "running"
     let run_id = Uuid::new_v4();
-    let now = Utc::now().into();
     let agent_config_snapshot = serde_json::to_value(
         eval_config
             .agent_config_override
@@ -160,46 +131,18 @@ pub async fn run_eval(
     )
     .unwrap_or_default();
 
-    let run_model = chatbot_eval_run::ActiveModel {
-        id: Set(run_id),
-        suite_id: Set(suite.id),
-        organizacion_id: Set(org_id),
-        status: Set("running".to_string()),
-        results: Set(None),
-        summary: Set(None),
-        agent_config_snapshot: Set(agent_config_snapshot),
-        started_at: Set(now),
-        completed_at: Set(None),
-    };
-
-    run_model
-        .clone()
-        .insert(db.get_ref())
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error creando eval run: {e}")))?;
+    chatbot_evals::create_run(db.get_ref(), run_id, suite.id, org_id, agent_config_snapshot)
+        .await?;
 
     // Execute the eval suite
     let runner = EvalRunner::new(&ai_module, db.get_ref());
     let result = runner.run_suite(&suite, &eval_config).await;
 
     // Update the run record with results
-    let completed_at = Utc::now().into();
     let results_json = serde_json::to_value(&result.results).ok();
     let summary_json = serde_json::to_value(&result.summary).ok();
 
-    let update_model = chatbot_eval_run::ActiveModel {
-        id: Set(run_id),
-        status: Set("completed".to_string()),
-        results: Set(results_json),
-        summary: Set(summary_json),
-        completed_at: Set(Some(completed_at)),
-        ..Default::default()
-    };
-
-    update_model
-        .update(db.get_ref())
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error actualizando eval run: {e}")))?;
+    chatbot_evals::complete_run(db.get_ref(), run_id, results_json, summary_json).await?;
 
     Ok(HttpResponse::Ok().json(result))
 }
@@ -209,15 +152,7 @@ pub async fn list_runs(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,
 ) -> Result<HttpResponse, AppError> {
-    let org_id = claims.0.organizacion_id;
-
-    let runs = chatbot_eval_run::Entity::find()
-        .filter(chatbot_eval_run::Column::OrganizacionId.eq(org_id))
-        .order_by_desc(chatbot_eval_run::Column::StartedAt)
-        .all(db.get_ref())
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error listando eval runs: {e}")))?;
-
+    let runs = chatbot_evals::list_runs(db.get_ref(), claims.0.organizacion_id).await?;
     Ok(HttpResponse::Ok().json(runs))
 }
 
@@ -227,17 +162,7 @@ pub async fn get_run(
     claims: WriteAccess,
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
-    let org_id = claims.0.organizacion_id;
-    let run_id = path.into_inner();
-
-    let run = chatbot_eval_run::Entity::find_by_id(run_id)
-        .filter(chatbot_eval_run::Column::OrganizacionId.eq(org_id))
-        .one(db.get_ref())
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error buscando eval run: {e}")))?
-        .ok_or_else(|| {
-            AppError::NotFound("Eval run no encontrado o no pertenece a esta organización".into())
-        })?;
-
+    let run =
+        chatbot_evals::find_run(db.get_ref(), path.into_inner(), claims.0.organizacion_id).await?;
     Ok(HttpResponse::Ok().json(run))
 }

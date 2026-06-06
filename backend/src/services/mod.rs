@@ -6,6 +6,8 @@ pub mod auth;
 pub mod background_jobs;
 pub mod baileys_client;
 pub mod chatbot;
+#[cfg(feature = "evals")]
+pub mod chatbot_evals;
 #[cfg(test)]
 mod chatbot_pbt;
 pub mod configuracion;
