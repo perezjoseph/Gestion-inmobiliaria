@@ -79,7 +79,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Define `CrearCuotaRequest`, `UpdateCuotaRequest`, `CuotaResponse`, `BillingDesglose`
     - _Requirements: 2.1, 2.3, 2.4_
 
-- [~] 3. Checkpoint - Verify migrations compile and entities are generated
+- [x] 3. Checkpoint - Verify migrations compile and entities are generated
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 4. Fiscal classification service
