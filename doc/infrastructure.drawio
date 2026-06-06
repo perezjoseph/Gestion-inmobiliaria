@@ -1,136 +1,115 @@
 <mxfile>
   <diagram id="infra-1" name="Infrastructure">
-    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="900" math="0" shadow="0" background="#FFFFFF">
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
-        <mxCell id="cluster" value="k3s Cluster" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;html=1;fontSize=14;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="20" y="20" width="1540" height="1100" as="geometry"/>
+        <mxCell id="ns-prod" value="realestate (prod)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=4;fillColor=none;strokeColor=#326CE5;dashed=1;verticalAlign=top;align=left;spacingLeft=14;spacingTop=8;fontStyle=1;fontSize=13;fontColor=#326CE5;container=0;" vertex="1" parent="1">
+          <mxGeometry x="200" y="40" width="1060" height="400" as="geometry"/>
         </mxCell>
-        <mxCell id="ns-prod" value="namespace: realestate (PROD)" style="swimlane;startSize=24;fillColor=#dae8fc;strokeColor=#6c8ebf;html=1;fontSize=12;fontStyle=1;" vertex="1" parent="cluster">
-          <mxGeometry x="20" y="50" width="740" height="700" as="geometry"/>
+        <mxCell id="ns-dev" value="realestate-dev" style="rounded=1;whiteSpace=wrap;html=1;arcSize=4;fillColor=none;strokeColor=#82B366;dashed=1;verticalAlign=top;align=left;spacingLeft=14;spacingTop=8;fontStyle=1;fontSize=13;fontColor=#82B366;container=0;" vertex="1" parent="1">
+          <mxGeometry x="200" y="480" width="660" height="200" as="geometry"/>
         </mxCell>
-        <mxCell id="frontend" value="&lt;b&gt;Frontend&lt;/b&gt;&lt;br&gt;Caddy + WASM&lt;br&gt;:8443" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="ns-prod">
-          <mxGeometry x="40" y="50" width="140" height="70" as="geometry"/>
+        <mxCell id="ns-sys" value="kube-system" style="rounded=1;whiteSpace=wrap;html=1;arcSize=4;fillColor=none;strokeColor=#666666;dashed=1;verticalAlign=top;align=left;spacingLeft=14;spacingTop=8;fontStyle=1;fontSize=13;fontColor=#666666;container=0;" vertex="1" parent="1">
+          <mxGeometry x="200" y="720" width="250" height="160" as="geometry"/>
         </mxCell>
-        <mxCell id="backend" value="&lt;b&gt;Backend&lt;/b&gt;&lt;br&gt;Actix-web (Rust)&lt;br&gt;:8080&lt;br&gt;2-5 replicas (HPA)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="ns-prod">
-          <mxGeometry x="280" y="50" width="160" height="80" as="geometry"/>
+        <mxCell id="external" value="External" style="rounded=1;whiteSpace=wrap;html=1;arcSize=4;fillColor=none;strokeColor=#B85450;dashed=1;verticalAlign=top;align=left;spacingLeft=14;spacingTop=8;fontStyle=1;fontSize=13;fontColor=#B85450;container=0;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="40" width="160" height="400" as="geometry"/>
         </mxCell>
-        <mxCell id="baileys" value="&lt;b&gt;Baileys&lt;/b&gt;&lt;br&gt;WhatsApp Sidecar&lt;br&gt;Node.js :3100" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="ns-prod">
-          <mxGeometry x="540" y="50" width="160" height="70" as="geometry"/>
+        <mxCell id="internet" value="Internet" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#326CE5;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=user;" vertex="1" parent="1">
+          <mxGeometry x="60" y="100" width="75" height="72" as="geometry"/>
         </mxCell>
-        <mxCell id="postgres" value="&lt;b&gt;PostgreSQL 16&lt;/b&gt;&lt;br&gt;:5432&lt;br&gt;10Gi PVC" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;size=12;" vertex="1" parent="ns-prod">
-          <mxGeometry x="300" y="220" width="130" height="80" as="geometry"/>
+        <mxCell id="cloudflared" value="Cloudflared" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#326CE5;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=deploy;" vertex="1" parent="1">
+          <mxGeometry x="260" y="100" width="75" height="72" as="geometry"/>
         </mxCell>
-        <mxCell id="nfs" value="&lt;b&gt;NFS Uploads&lt;/b&gt;&lt;br&gt;5Gi RWX" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;size=12;" vertex="1" parent="ns-prod">
-          <mxGeometry x="500" y="220" width="130" height="80" as="geometry"/>
+        <mxCell id="frontend" value="Frontend" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#326CE5;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=deploy;" vertex="1" parent="1">
+          <mxGeometry x="460" y="100" width="75" height="72" as="geometry"/>
         </mxCell>
-        <mxCell id="ocr" value="&lt;b&gt;OCR Service&lt;/b&gt;&lt;br&gt;PaddleOCR + OpenVINO&lt;br&gt;:8000 (Intel GPU)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="ns-prod">
-          <mxGeometry x="40" y="400" width="180" height="70" as="geometry"/>
+        <mxCell id="backend" value="Backend" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#326CE5;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=deploy;" vertex="1" parent="1">
+          <mxGeometry x="660" y="100" width="75" height="72" as="geometry"/>
         </mxCell>
-        <mxCell id="ovms" value="&lt;b&gt;OVMS&lt;/b&gt;&lt;br&gt;Qwen3-30B LLM&lt;br&gt;:8000 (Intel Xe GPU)&lt;br&gt;25Gi models PVC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="ns-prod">
-          <mxGeometry x="280" y="400" width="180" height="80" as="geometry"/>
+        <mxCell id="baileys" value="Baileys" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#326CE5;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=deploy;" vertex="1" parent="1">
+          <mxGeometry x="860" y="100" width="75" height="72" as="geometry"/>
         </mxCell>
-        <mxCell id="fdroid" value="&lt;b&gt;F-Droid Repo&lt;/b&gt;&lt;br&gt;:80" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="ns-prod">
-          <mxGeometry x="540" y="400" width="140" height="60" as="geometry"/>
+        <mxCell id="hpa" value="HPA" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#326CE5;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=hpa;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="100" width="75" height="72" as="geometry"/>
         </mxCell>
-        <mxCell id="cloudflared" value="&lt;b&gt;Cloudflared&lt;/b&gt;&lt;br&gt;Tunnel to Internet" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="ns-prod">
-          <mxGeometry x="40" y="560" width="160" height="60" as="geometry"/>
+        <mxCell id="ocr" value="OCR Service" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#326CE5;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=deploy;" vertex="1" parent="1">
+          <mxGeometry x="660" y="290" width="75" height="72" as="geometry"/>
         </mxCell>
-        <mxCell id="ns-dev" value="namespace: realestate-dev (DEV)" style="swimlane;startSize=24;fillColor=#fff2cc;strokeColor=#d6b656;html=1;fontSize=12;fontStyle=1;" vertex="1" parent="cluster">
-          <mxGeometry x="800" y="50" width="700" height="400" as="geometry"/>
+        <mxCell id="ovms" value="OVMS" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#326CE5;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=deploy;" vertex="1" parent="1">
+          <mxGeometry x="860" y="290" width="75" height="72" as="geometry"/>
         </mxCell>
-        <mxCell id="dev-frontend" value="&lt;b&gt;Frontend&lt;/b&gt;&lt;br&gt;Caddy + WASM&lt;br&gt;:8443" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="ns-dev">
-          <mxGeometry x="40" y="50" width="140" height="70" as="geometry"/>
+        <mxCell id="postgres" value="PostgreSQL" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#326CE5;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=sts;" vertex="1" parent="1">
+          <mxGeometry x="1350" y="100" width="75" height="72" as="geometry"/>
         </mxCell>
-        <mxCell id="dev-backend" value="&lt;b&gt;Backend&lt;/b&gt;&lt;br&gt;Actix-web&lt;br&gt;:8080 (1 replica)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="ns-dev">
-          <mxGeometry x="260" y="50" width="160" height="70" as="geometry"/>
+        <mxCell id="smtp" value="Mailcow" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#326CE5;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=ep;" vertex="1" parent="1">
+          <mxGeometry x="1350" y="250" width="75" height="72" as="geometry"/>
         </mxCell>
-        <mxCell id="dev-baileys" value="&lt;b&gt;Baileys&lt;/b&gt;&lt;br&gt;WhatsApp :3100" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="ns-dev">
-          <mxGeometry x="500" y="50" width="150" height="70" as="geometry"/>
+        <mxCell id="nfs" value="NFS Storage" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#326CE5;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=pv;" vertex="1" parent="1">
+          <mxGeometry x="1350" y="370" width="75" height="72" as="geometry"/>
         </mxCell>
-        <mxCell id="dev-postgres" value="&lt;b&gt;PostgreSQL 16&lt;/b&gt;&lt;br&gt;:5432 (isolated)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;size=12;" vertex="1" parent="ns-dev">
-          <mxGeometry x="280" y="200" width="130" height="80" as="geometry"/>
+        <mxCell id="dev-frontend" value="Frontend" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#326CE5;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=deploy;" vertex="1" parent="1">
+          <mxGeometry x="260" y="540" width="75" height="72" as="geometry"/>
         </mxCell>
-        <mxCell id="dev-note" value="&lt;i&gt;Shares OCR + OVMS from prod namespace&lt;br&gt;via cross-namespace FQDN&lt;/i&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fillColor=none;strokeColor=none;fontColor=#666666;" vertex="1" parent="ns-dev">
-          <mxGeometry x="150" y="330" width="300" height="40" as="geometry"/>
+        <mxCell id="dev-backend" value="Backend" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#326CE5;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=deploy;" vertex="1" parent="1">
+          <mxGeometry x="460" y="540" width="75" height="72" as="geometry"/>
         </mxCell>
-        <mxCell id="ingress-section" value="Ingress Layer" style="swimlane;startSize=24;fillColor=#e8f4f8;strokeColor=#4d9eba;html=1;fontSize=12;fontStyle=1;" vertex="1" parent="cluster">
-          <mxGeometry x="20" y="790" width="1480" height="280" as="geometry"/>
+        <mxCell id="dev-baileys" value="Baileys" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#326CE5;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=deploy;" vertex="1" parent="1">
+          <mxGeometry x="660" y="540" width="75" height="72" as="geometry"/>
         </mxCell>
-        <mxCell id="traefik" value="&lt;b&gt;Traefik&lt;/b&gt;&lt;br&gt;(kube-system)&lt;br&gt;gestion.local → Dev" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="ingress-section">
-          <mxGeometry x="40" y="50" width="180" height="70" as="geometry"/>
+        <mxCell id="dev-db" value="PostgreSQL" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#326CE5;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=sts;" vertex="1" parent="1">
+          <mxGeometry x="460" y="640" width="75" height="72" as="geometry"/>
         </mxCell>
-        <mxCell id="cf-tunnel" value="&lt;b&gt;Cloudflare Tunnel&lt;/b&gt;&lt;br&gt;gestion.myhomeva.us → Prod" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="ingress-section">
-          <mxGeometry x="300" y="50" width="220" height="70" as="geometry"/>
+        <mxCell id="traefik" value="Traefik" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#326CE5;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=ing;" vertex="1" parent="1">
+          <mxGeometry x="260" y="770" width="75" height="72" as="geometry"/>
         </mxCell>
-        <mxCell id="internet" value="&lt;b&gt;Internet&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="ingress-section">
-          <mxGeometry x="620" y="50" width="100" height="60" as="geometry"/>
-        </mxCell>
-        <mxCell id="lan" value="&lt;b&gt;LAN&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="ingress-section">
-          <mxGeometry x="800" y="50" width="100" height="60" as="geometry"/>
-        </mxCell>
-        <mxCell id="ghcr" value="&lt;b&gt;GHCR&lt;/b&gt;&lt;br&gt;Container Registry" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;size=12;" vertex="1" parent="ingress-section">
-          <mxGeometry x="1000" y="40" width="140" height="70" as="geometry"/>
-        </mxCell>
-        <mxCell id="mailcow" value="&lt;b&gt;Mailcow SMTP&lt;/b&gt;&lt;br&gt;mail.myhomeva.us" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="ingress-section">
-          <mxGeometry x="1220" y="50" width="160" height="60" as="geometry"/>
-        </mxCell>
-        <mxCell id="fdroid-label" value="&lt;b&gt;fdroid.local&lt;/b&gt;&lt;br&gt;HTTP (plain)" style="text;html=1;align=center;fillColor=none;strokeColor=none;fontColor=#666666;" vertex="1" parent="ingress-section">
-          <mxGeometry x="40" y="170" width="140" height="40" as="geometry"/>
-        </mxCell>
-        <mxCell id="e-fe-be" edge="1" parent="1" source="frontend" target="backend" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#333333;">
+        <mxCell id="e-inet-cf" value="tunnel" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1.25;endArrow=classic;endFill=1;endSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="internet" target="cloudflared">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e-be-pg" edge="1" parent="1" source="backend" target="postgres" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#333333;">
+        <mxCell id="e-cf-fe" value="HTTPS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1.25;endArrow=classic;endFill=1;endSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="cloudflared" target="frontend">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e-be-nfs" edge="1" parent="1" source="backend" target="nfs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#333333;">
+        <mxCell id="e-fe-be" value="/api/*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1.25;endArrow=classic;endFill=1;endSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="frontend" target="backend">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e-be-ocr" edge="1" parent="1" source="backend" target="ocr" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#333333;">
+        <mxCell id="e-be-bail" value="HTTP" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1.25;endArrow=classic;endFill=1;endSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="backend" target="baileys">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e-be-ovms" edge="1" parent="1" source="backend" target="ovms" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#333333;">
+        <mxCell id="e-bail-hpa" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1;endArrow=classic;endFill=1;endSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="baileys" target="hpa">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e-be-baileys" edge="1" parent="1" source="backend" target="baileys" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#333333;">
+        <mxCell id="e-be-ocr" value="HTTP" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1.25;endArrow=classic;endFill=1;endSize=8;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="backend" target="ocr">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e-baileys-pg" edge="1" parent="1" source="baileys" target="postgres" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#999999;" value="whatsapp_auth_* only">
+        <mxCell id="e-ocr-ovms" value="HTTP" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1.25;endArrow=classic;endFill=1;endSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="ocr" target="ovms">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e-baileys-be" edge="1" parent="1" source="baileys" target="backend" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#999999;" value="webhooks">
+        <mxCell id="e-hpa-pg" value="SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1.25;endArrow=classic;endFill=1;endSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="hpa" target="postgres">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e-be-smtp" edge="1" parent="1" source="backend" target="mailcow" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#333333;" value="SMTP">
+        <mxCell id="e-be-smtp" value="SMTP" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1;endArrow=classic;endFill=1;endSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="ovms" target="smtp">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e-cf-fe" edge="1" parent="1" source="cf-tunnel" target="frontend" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6c8ebf;" value="HTTPS">
+        <mxCell id="e-be-nfs" value="NFS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1;endArrow=classic;endFill=1;endSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="ovms" target="nfs">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e-inet-cf" edge="1" parent="1" source="internet" target="cf-tunnel" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6c8ebf;">
+        <mxCell id="e-devfe-devbe" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1.25;endArrow=classic;endFill=1;endSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="dev-frontend" target="dev-backend">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e-traefik-devfe" edge="1" parent="1" source="traefik" target="dev-frontend" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d6b656;" value="HTTPS">
+        <mxCell id="e-devbe-devbail" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1.25;endArrow=classic;endFill=1;endSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="dev-backend" target="dev-baileys">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e-lan-traefik" edge="1" parent="1" source="lan" target="traefik" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d6b656;">
+        <mxCell id="e-devbe-devdb" value="SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1.25;endArrow=classic;endFill=1;endSize=8;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="dev-backend" target="dev-db">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e-devfe-devbe" edge="1" parent="1" source="dev-frontend" target="dev-backend" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#333333;">
+        <mxCell id="e-dev-ocr" value="cross-ns" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#666666;strokeWidth=1.25;dashed=1;endArrow=classic;endFill=1;endSize=8;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="dev-backend" target="ocr">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e-devbe-devpg" edge="1" parent="1" source="dev-backend" target="dev-postgres" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#333333;">
+        <mxCell id="e-dev-ovms" value="cross-ns" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#666666;strokeWidth=1.25;dashed=1;endArrow=classic;endFill=1;endSize=8;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="dev-baileys" target="ovms">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e-devbe-ocr" edge="1" parent="1" source="dev-backend" target="ocr" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#9673a6;" value="cross-ns">
-          <mxGeometry relative="1" as="geometry"/>
-        </mxCell>
-        <mxCell id="e-devbe-ovms" edge="1" parent="1" source="dev-backend" target="ovms" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#9673a6;" value="cross-ns">
-          <mxGeometry relative="1" as="geometry"/>
-        </mxCell>
-        <mxCell id="e-cloudflared-inet" edge="1" parent="1" source="cloudflared" target="internet" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6c8ebf;" value="tunnel">
+        <mxCell id="e-traefik-devfe" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1.25;endArrow=classic;endFill=1;endSize=8;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="traefik" target="dev-frontend">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
       </root>
