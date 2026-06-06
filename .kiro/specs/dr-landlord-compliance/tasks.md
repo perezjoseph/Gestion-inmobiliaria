@@ -339,7 +339,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Apply retention logic when tenant is persona_juridica
     - _Requirements: 6.3, 6.4, 6.5, 6.7_
 
-  - [-] 18.3 Wire condominium fee into billing cycle
+  - [x] 18.3 Wire condominium fee into billing cycle
     - When generating billing for contracts with passthrough cuotas, include cuota line item with independent payment tracking
     - _Requirements: 2.3, 2.4, 2.6_
 
