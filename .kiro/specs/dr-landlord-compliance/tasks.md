@@ -237,13 +237,13 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 15. API handlers
-  - [~] 15.1 Implement `handlers/fiscal.rs`
+  - [x] 15.1 Implement `handlers/fiscal.rs`
     - `PUT /api/v1/organizacion/fiscal/tipo-fiscal` — update tipo_fiscal with validation
     - `GET /api/v1/organizacion/fiscal/estado` — return current fiscal state
     - Enforce `AdminOnly` extractor
     - _Requirements: 1.1, 1.5, 1.6, 1.7_
 
-  - [~] 15.2 Implement `handlers/condominios.rs`
+  - [x] 15.2 Implement `handlers/condominios.rs`
     - `POST /api/v1/propiedades/{id}/condominios` — create cuota
     - `PUT /api/v1/propiedades/{id}/condominios/{cuota_id}` — update cuota
     - `GET /api/v1/propiedades/{id}/condominios` — list cuotas
@@ -251,14 +251,14 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Enforce `WriteAccess` extractor
     - _Requirements: 2.1, 2.2, 2.5_
 
-  - [~] 15.3 Implement `handlers/ncf.rs`
+  - [x] 15.3 Implement `handlers/ncf.rs`
     - `GET /api/v1/ncf/secuencias` — list NCF sequences for org
     - `POST /api/v1/ncf/configurar-rango` — configure authorized range
     - `GET /api/v1/ncf/alertas` — check range consumption alerts
     - Enforce `AdminOnly` extractor, gate with `verificar_acceso_fiscal`
     - _Requirements: 7.1, 7.8, 7.9_
 
-  - [~] 15.4 Implement `handlers/reportes_dgii.rs`
+  - [x] 15.4 Implement `handlers/reportes_dgii.rs`
     - `POST /api/v1/reportes-dgii/607` — generate 607 report
     - `POST /api/v1/reportes-dgii/606` — generate 606 report
     - `GET /api/v1/reportes-dgii/preview/{tipo}/{periodo}` — preview report as JSON
@@ -266,7 +266,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Enforce `WriteAccess` extractor, gate with `verificar_acceso_fiscal`
     - _Requirements: 8.1, 8.4, 8.7_
 
-  - [~] 15.5 Implement `handlers/ipi.rs`
+  - [x] 15.5 Implement `handlers/ipi.rs`
     - `GET /api/v1/ipi/calculo` — compute IPI liability
     - `PUT /api/v1/ipi/umbral` — update IPI threshold
     - `GET /api/v1/ipi/copropietarios/{propiedad_id}` — list co-owners

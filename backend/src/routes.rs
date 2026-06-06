@@ -70,7 +70,18 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                 web::scope("/organizacion")
                     .wrap(Governor::new(&write_governor_conf))
                     .route("", web::get().to(handlers::organizaciones::get))
-                    .route("", web::put().to(handlers::organizaciones::update)),
+                    .route("", web::put().to(handlers::organizaciones::update))
+                    .service(
+                        web::scope("/fiscal")
+                            .route(
+                                "/tipo-fiscal",
+                                web::put().to(handlers::fiscal::actualizar_tipo_fiscal),
+                            )
+                            .route(
+                                "/estado",
+                                web::get().to(handlers::fiscal::obtener_estado_fiscal),
+                            ),
+                    ),
             )
             .service(
                 web::scope("/invitaciones")
@@ -104,6 +115,25 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                                 web::put().to(
                                     handlers::servicios_publicos::actualizar_responsabilidad_unidad,
                                 ),
+                            ),
+                    )
+                    .service(
+                        web::scope("/{propiedad_id}/condominios")
+                            .route(
+                                "",
+                                web::post().to(handlers::condominios::crear_cuota_handler),
+                            )
+                            .route(
+                                "",
+                                web::get().to(handlers::condominios::listar_cuotas_handler),
+                            )
+                            .route(
+                                "/{cuota_id}",
+                                web::put().to(handlers::condominios::actualizar_cuota_handler),
+                            )
+                            .route(
+                                "/{cuota_id}",
+                                web::delete().to(handlers::condominios::eliminar_cuota_handler),
                             ),
                     ),
             )
@@ -587,6 +617,56 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route(
                         "/cache/{rnc}",
                         web::delete().to(handlers::dgii::invalidar_cache),
+                    ),
+            )
+            .service(
+                web::scope("/ncf")
+                    .wrap(Governor::new(&write_governor_conf))
+                    .route(
+                        "/secuencias",
+                        web::get().to(handlers::ncf::listar_secuencias),
+                    )
+                    .route(
+                        "/configurar-rango",
+                        web::post().to(handlers::ncf::configurar_rango_handler),
+                    )
+                    .route("/alertas", web::get().to(handlers::ncf::obtener_alertas)),
+            )
+            .service(
+                web::scope("/reportes-dgii")
+                    .wrap(Governor::new(&write_governor_conf))
+                    .route(
+                        "/607",
+                        web::post().to(handlers::reportes_dgii::generar_607_handler),
+                    )
+                    .route(
+                        "/606",
+                        web::post().to(handlers::reportes_dgii::generar_606_handler),
+                    )
+                    .route(
+                        "/preview/{tipo}/{periodo}",
+                        web::get().to(handlers::reportes_dgii::preview_reporte),
+                    )
+                    .route(
+                        "/{id}/estado",
+                        web::put().to(handlers::reportes_dgii::actualizar_estado),
+                    ),
+            )
+            .service(
+                web::scope("/ipi")
+                    .wrap(Governor::new(&write_governor_conf))
+                    .route(
+                        "/calculo",
+                        web::get().to(handlers::ipi::calcular_ipi_handler),
+                    )
+                    .route("/umbral", web::put().to(handlers::ipi::actualizar_umbral))
+                    .route(
+                        "/copropietarios/{propiedad_id}",
+                        web::get().to(handlers::ipi::listar_copropietarios),
+                    )
+                    .route(
+                        "/copropietarios",
+                        web::post().to(handlers::ipi::crear_copropietario),
                     ),
             ),
     );
