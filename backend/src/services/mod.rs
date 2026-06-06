@@ -24,16 +24,22 @@ pub mod firmas;
 #[cfg(test)]
 mod firmas_pbt;
 pub mod fiscal;
+#[cfg(test)]
+mod fiscal_pbt;
 pub mod gastos;
 pub mod gastos_recurrentes;
 pub mod importacion;
+pub mod indexacion;
 pub mod inquilinos;
 pub mod invitaciones;
 pub mod ipc;
 pub mod itbis;
+#[cfg(test)]
+mod itbis_pbt;
 pub mod mail;
 pub mod mantenimiento;
 pub mod mantenimiento_programado;
+pub mod ncf;
 pub mod notificaciones;
 pub mod ocr_client;
 pub mod ocr_mapping;
@@ -46,6 +52,8 @@ pub mod organizaciones;
 pub mod ovms_provider;
 pub mod pago_generacion;
 pub mod pagos;
+#[cfg(test)]
+mod pagos_parciales_pbt;
 pub mod perfil;
 pub mod plantillas;
 #[cfg(test)]

@@ -82,34 +82,34 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
 - [x] 3. Checkpoint - Verify migrations compile and entities are generated
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 4. Fiscal classification service
+- [x] 4. Fiscal classification service
   - [x] 4.1 Implement `services/fiscal.rs`
     - Implement `verificar_acceso_fiscal` — reject informal users accessing ITBIS/NCF/606/607 features with 403 error
     - Implement `actualizar_tipo_fiscal` — validate RNC (DGII check-digit) for persona_juridica, cédula (Luhn) for persona_fisica, reject invalid transitions
     - Wire to existing `validacion_fiscal.rs` for RNC/cédula validation
     - _Requirements: 1.2, 1.3, 1.4, 1.5, 1.6, 1.7_
 
-  - [~] 4.2 Write property tests for fiscal classification (`services/fiscal_pbt.rs`)
+  - [x] 4.2 Write property tests for fiscal classification (`services/fiscal_pbt.rs`)
     - **Property 1: RNC Check-Digit Validation Round Trip**
     - **Property 2: Cédula Luhn Validation Round Trip**
     - **Property 3: Fiscal Feature Access Gate**
     - **Property 4: Tipo Fiscal Transition Requires Valid Identifier**
     - **Validates: Requirements 1.2, 1.3, 1.5, 1.6, 1.7**
 
-- [ ] 5. ITBIS calculation service
+- [x] 5. ITBIS calculation service
   - [x] 5.1 Implement `services/itbis.rs`
     - Implement `calcular_itbis` — apply 18% only when tipo_fiscal is registered AND property is commercial/industrial; zero for residential or informal
     - Implement `calcular_retencion` — 30% retention when tenant is persona_juridica
     - Support configurable rate (16% future-proofing) stored per category
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.7, 6.8, 6.9_
 
-  - [~] 5.2 Write property tests for ITBIS (`services/itbis_pbt.rs`)
+  - [x] 5.2 Write property tests for ITBIS (`services/itbis_pbt.rs`)
     - **Property 8: ITBIS Applicability**
     - **Property 9: Payment Amount Invariant**
     - **Property 10: ITBIS Retention Split**
     - **Validates: Requirements 6.1, 6.2, 6.3, 6.4, 6.7, 6.8**
 
-- [ ] 6. Partial payment and informal receipt service
+- [x] 6. Partial payment and informal receipt service
   - [x] 6.1 Implement partial payment logic in `services/pagos.rs` (extend existing)
     - Implement partial payment recording: validate monto < amount_due, reject if equal
     - Track saldo_pendiente per billing period, mark `pagado` when sum >= amount_due
@@ -122,14 +122,14 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Generate Recibo_Informal with unique sequential referencia_interna (RI-NNNNNN format) for cash payments by informal organizations
     - _Requirements: 3.5, 3.6_
 
-  - [~] 6.3 Write property tests for payments (`services/pagos_parciales_pbt.rs`)
+  - [x] 6.3 Write property tests for payments (`services/pagos_parciales_pbt.rs`)
     - **Property 11: Partial Payment Balance Tracking**
     - **Property 12: FIFO Payment Allocation**
     - **Property 13: Informal Receipt Uniqueness**
     - **Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5, 3.8**
 
 - [ ] 7. NCF/e-CF sequence service
-  - [~] 7.1 Implement `services/ncf.rs`
+  - [x] 7.1 Implement `services/ncf.rs`
     - Implement `asignar_ncf` with `SELECT ... FOR UPDATE` row-level locking for gapless sequential generation
     - Implement retry logic for concurrency conflicts only
     - Validate NCF format: `^[A-Z]\d{10}$` — 'E' prefix for e-CF, 'B' for physical
@@ -146,7 +146,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - **Validates: Requirements 7.1, 7.3, 7.4, 7.5, 7.9**
 
 - [ ] 8. Lease indexation service
-  - [~] 8.1 Implement `services/indexacion.rs`
+  - [x] 8.1 Implement `services/indexacion.rs`
     - Implement `calcular_propuesta_renovacion` — fetch IPC from existing `ipc.rs`, apply formula `monto * (1 + min(ipc, 10%) / 100)`, enforce 10% absolute cap
     - Handle stale IPC data (>90 days): use cached value with warning flag
     - Implement `aprobar_renovacion` — verify calculation integrity, create renewed contrato, record audit trail
