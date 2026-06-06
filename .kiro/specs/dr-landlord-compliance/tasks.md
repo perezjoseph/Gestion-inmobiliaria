@@ -288,7 +288,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
 - [-] 16. Checkpoint - API layer compiles, handler tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 17. Frontend pages (Leptos)
+- [x] 17. Frontend pages (Leptos)
   - [x] 17.1 Create Configuración Fiscal page (`pages/configuracion_fiscal.rs`)
     - Form to set tipo_fiscal, RNC/cédula input with validation feedback, NCF range configuration
     - Route: `/configuracion/fiscal`
@@ -299,12 +299,12 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Route: `/propiedades/{id}/condominios`
     - _Requirements: 2.1, 2.2, 2.3_
 
-  - [-] 17.3 Create Recibos Informales page (`pages/recibos_informales.rs`)
+  - [x] 17.3 Create Recibos Informales page (`pages/recibos_informales.rs`)
     - View/create informal receipts, partial payment recording with notes
     - Route: `/recibos-informales`
     - _Requirements: 3.5, 3.7_
 
-  - [-] 17.4 Create Dashboard Comparativo page (`pages/dashboard_comparativo.rs`)
+  - [x] 17.4 Create Dashboard Comparativo page (`pages/dashboard_comparativo.rs`)
     - Multi-property comparison table, sortable columns, date range and property type filters, currency toggle
     - Route: `/dashboard/comparativo`
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
