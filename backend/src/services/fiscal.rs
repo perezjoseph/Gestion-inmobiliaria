@@ -65,10 +65,10 @@ pub async fn actualizar_tipo_fiscal(
 
     match &nuevo_tipo {
         TipoFiscal::PersonaJuridica => {
-            active.rnc = Set(identificador.map(|s| s.to_string()));
+            active.rnc = Set(identificador.map(std::string::ToString::to_string));
         }
         TipoFiscal::PersonaFisica => {
-            active.cedula = Set(identificador.map(|s| s.to_string()));
+            active.cedula = Set(identificador.map(std::string::ToString::to_string));
         }
         TipoFiscal::Informal => {
             // Keep existing rnc/cedula as-is (may store optionally per requirement 1.4)

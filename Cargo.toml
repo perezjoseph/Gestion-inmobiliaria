@@ -8,8 +8,15 @@ serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 tokio = { version = "1", features = ["full"] }
-sea-orm = { version = "1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros"] }
-sea-orm-migration = { version = "1", features = ["sqlx-postgres", "runtime-tokio-rustls"] }
+sea-orm = { version = "1", features = [
+    "sqlx-postgres",
+    "runtime-tokio-rustls",
+    "macros",
+] }
+sea-orm-migration = { version = "1", features = [
+    "sqlx-postgres",
+    "runtime-tokio-rustls",
+] }
 rust_decimal = { version = "1", features = ["serde-with-str"] }
 thiserror = "1"
 anyhow = "1"
@@ -24,51 +31,51 @@ proptest = "1"
 [workspace.lints.clippy]
 # Enable strict lint groups
 pedantic = { level = "warn", priority = -1 }
-nursery  = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
 
 # ── Pedantic allows (noisy or inapplicable) ────────────
 # We use &String/&Vec in handler signatures where Actix extractors require owned types
-needless_pass_by_value       = "allow"
+needless_pass_by_value = "allow"
 # SeaORM entities and DTOs have many fields — unavoidable
-too_many_lines               = "allow"
+too_many_lines = "allow"
 # Module naming follows domain convention, not clippy's preference
-module_name_repetitions      = "allow"
+module_name_repetitions = "allow"
 # We prefer explicit returns in match arms for clarity
-redundant_else               = "allow"
+redundant_else = "allow"
 # Actix handler signatures require specific types, not impl Trait
-missing_errors_doc           = "allow"
-missing_panics_doc           = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
 # Frontend html! macro generates code that triggers this
-must_use_candidate           = "allow"
+must_use_candidate = "allow"
 # SeaORM generated entities trigger this
-struct_excessive_bools       = "allow"
+struct_excessive_bools = "allow"
 # We use wildcard imports in mod.rs re-exports by convention
-wildcard_imports             = "allow"
+wildcard_imports = "allow"
 # cast_possible_truncation and cast_sign_loss are noisy with Decimal -> f64 conversions
-cast_possible_truncation     = "allow"
-cast_sign_loss               = "allow"
-cast_precision_loss          = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+cast_precision_loss = "allow"
 # items_after_statements is common in test setup code
-items_after_statements       = "allow"
+items_after_statements = "allow"
 # return_self_not_must_use triggers on builder patterns
-return_self_not_must_use     = "allow"
+return_self_not_must_use = "allow"
 
 # ── Nursery allows (unstable or false-positive-heavy) ──
 # These fire on valid async patterns in Actix handlers
-redundant_pub_crate          = "allow"
+redundant_pub_crate = "allow"
 
 # ── Promote key correctness lints to deny ──────────────
-unwrap_used                  = "deny"
-expect_used                  = "deny"
-panic                        = "deny"
-todo                         = "deny"
-unimplemented                = "deny"
-dbg_macro                    = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
 
 # ── Standard Rust lints ────────────────────────────────
 [workspace.lints.rust]
-unsafe_code                  = "deny"
-unused_must_use              = "deny"
+unsafe_code = "deny"
+unused_must_use = "deny"
 
 [profile.release]
 lto = "thin"
@@ -87,6 +94,11 @@ strip = true
 
 [profile.dev]
 debug = "line-tables-only"
+codegen-units = 256
+
+[profile.dev.build-override]
+opt-level = 0
+codegen-units = 256
 
 [profile.test]
 debug = "line-tables-only"

@@ -10,7 +10,7 @@ pub enum TipoFiscal {
 }
 
 impl TipoFiscal {
-    pub fn label(&self) -> &'static str {
+    pub const fn label(&self) -> &'static str {
         match self {
             Self::PersonaJuridica => "Persona Jurídica",
             Self::PersonaFisica => "Persona Física",
@@ -18,7 +18,7 @@ impl TipoFiscal {
         }
     }
 
-    pub fn is_registered(&self) -> bool {
+    pub const fn is_registered(&self) -> bool {
         matches!(self, Self::PersonaJuridica | Self::PersonaFisica)
     }
 }
@@ -35,7 +35,7 @@ impl std::fmt::Display for TipoFiscal {
 }
 
 /// Response from GET /organizacion/fiscal/estado
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct EstadoFiscalResponse {
     pub tipo_fiscal: TipoFiscal,
@@ -54,7 +54,7 @@ pub struct ActualizarTipoFiscalRequest {
 }
 
 /// NCF sequence info
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SecuenciaNcfResponse {
     pub id: String,
@@ -69,11 +69,11 @@ pub struct SecuenciaNcfResponse {
 
 impl SecuenciaNcfResponse {
     pub fn consumo_porcentaje(&self) -> f64 {
-        let total = (self.rango_hasta - self.rango_desde + 1) as f64;
+        let total = f64::from(self.rango_hasta - self.rango_desde + 1);
         if total <= 0.0 {
             return 100.0;
         }
-        let usados = (self.siguiente_numero - self.rango_desde) as f64;
+        let usados = f64::from(self.siguiente_numero - self.rango_desde);
         (usados / total * 100.0).min(100.0)
     }
 

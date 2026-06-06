@@ -1,19 +1,15 @@
-use chrono::{NaiveDate, Utc};
+use chrono::Utc;
 use rust_decimal::Decimal;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    Set,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use uuid::Uuid;
 
-use crate::entities::{cuota_condominio, pago};
+use crate::entities::cuota_condominio;
 use crate::errors::AppError;
 use crate::models::condominios::{
     BillingDesglose, CrearCuotaRequest, CuotaResponse, UpdateCuotaRequest,
 };
 use crate::models::fiscal::TipoFiscal;
 use crate::services::itbis::calcular_itbis;
-use crate::services::pago_generacion::PagoGenerado;
 
 /// Create a new condominium fee record for a property.
 pub async fn crear_cuota(
@@ -145,8 +141,7 @@ pub fn calcular_billing_con_cuota(
     // Determine cuota amount (only if passthrough and present)
     let cuota_monto = cuota
         .filter(|c| c.es_passthrough)
-        .map(|c| c.monto)
-        .unwrap_or(Decimal::ZERO);
+        .map_or(Decimal::ZERO, |c| c.monto);
 
     // Calculate ITBIS on cuota (same rules: commercial + registered)
     let itbis_cuota = if cuota_monto > Decimal::ZERO {

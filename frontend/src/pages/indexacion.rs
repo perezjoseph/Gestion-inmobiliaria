@@ -65,7 +65,7 @@ pub fn indexacion() -> Html {
     };
 
     let on_approved = {
-        let reload = reload.clone();
+        let reload = reload;
         #[allow(clippy::redundant_clone)]
         let selected_contrato = selected_contrato.clone();
         Callback::from(move |()| {

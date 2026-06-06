@@ -4,7 +4,7 @@ use crate::errors::AppError;
 pub const MONEDAS: &[&str] = &["DOP", "USD"];
 pub const METODOS_PAGO: &[&str] = &["efectivo", "transferencia", "cheque", "tarjeta"];
 
-/// DGII-aligned Forma_Pago values (Norma General 07-2018).
+/// DGII-aligned `Forma_Pago` values (Norma General 07-2018).
 /// Superset of `METODOS_PAGO`; used for fiscal/partial payment flows.
 pub const METODOS_PAGO_DGII: &[&str] = &[
     "efectivo",

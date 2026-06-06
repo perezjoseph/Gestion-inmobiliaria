@@ -7,10 +7,7 @@ use sea_orm::{
 };
 use uuid::Uuid;
 
-use crate::entities::{
-    configuracion_ipi, contrato, documento, inquilino, notificacion, pago, propiedad,
-    secuencia_ncf, usuario,
-};
+use crate::entities::{contrato, documento, inquilino, notificacion, pago, propiedad, usuario};
 use crate::errors::AppError;
 use crate::models::PaginatedResponse;
 use crate::models::notificacion::{
@@ -983,7 +980,10 @@ mod tests {
         assert!(TIPOS_NOTIFICACION.contains(&"contrato_por_vencer"));
         assert!(TIPOS_NOTIFICACION.contains(&"documento_vencido"));
         assert!(TIPOS_NOTIFICACION.contains(&"mantenimiento_actualizado"));
-        assert_eq!(TIPOS_NOTIFICACION.len(), 4);
+        assert!(TIPOS_NOTIFICACION.contains(&"indexacion_revision"));
+        assert!(TIPOS_NOTIFICACION.contains(&"ipi_fecha_pago"));
+        assert!(TIPOS_NOTIFICACION.contains(&"ncf_rango_consumo"));
+        assert_eq!(TIPOS_NOTIFICACION.len(), 7);
     }
 
     #[test]

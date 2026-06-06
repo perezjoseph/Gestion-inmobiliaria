@@ -3,10 +3,12 @@ pub mod auditoria;
 pub mod chatbot;
 pub mod configuracion;
 pub mod contrato;
+#[allow(dead_code)]
 pub mod cuota_condominio;
 pub mod dashboard_extra;
 #[allow(dead_code)]
 pub mod documento;
+#[allow(dead_code)]
 pub mod fiscal;
 pub mod gasto;
 pub mod importacion;

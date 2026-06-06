@@ -16,7 +16,7 @@ use crate::types::ipi::{
 #[component]
 pub fn Ipi() -> Html {
     let liability = use_state(|| Option::<IpiLiabilityResponse>::None);
-    let propiedades = use_state(|| Vec::<PropiedadIpiInfo>::new());
+    let propiedades = use_state(Vec::<PropiedadIpiInfo>::new);
     let error = use_state(|| Option::<String>::None);
     let loading = use_state(|| true);
     let reload = use_state(|| 0u32);
@@ -36,9 +36,9 @@ pub fn Ipi() -> Html {
                     Ok(data) => liability.set(Some(data)),
                     Err(err) => error.set(Some(err)),
                 }
-                match api_get::<Vec<PropiedadIpiInfo>>("/ipi/propiedades").await {
-                    Ok(data) => propiedades.set(data),
-                    Err(_) => { /* non-critical, liability is the main data */ }
+                if let Ok(data) = api_get::<Vec<PropiedadIpiInfo>>("/ipi/propiedades").await {
+                    propiedades.set(data)
+                } else { /* non-critical, liability is the main data */
                 }
                 loading.set(false);
             });
@@ -46,7 +46,7 @@ pub fn Ipi() -> Html {
     }
 
     let on_reload = {
-        let reload = reload.clone();
+        let reload = reload;
         Callback::from(move |_: MouseEvent| {
             reload.set(*reload + 1);
         })
@@ -222,7 +222,7 @@ fn PropiedadesBreakdown(props: &PropiedadesBreakdownProps) -> Html {
                                 <td style="text-align: right;">
                                     {p.valor_catastral.map_or_else(
                                         || "No configurado".to_string(),
-                                        |v| format_dop(v)
+                                        format_dop
                                     )}
                                 </td>
                                 <td style={estado_class}>{estado}</td>
@@ -248,7 +248,7 @@ struct CopropietariosSectionProps {
 #[component]
 fn CopropietariosSection(props: &CopropietariosSectionProps) -> Html {
     let propiedad_id = use_state(String::new);
-    let copropietarios = use_state(|| Vec::<CopropietarioResponse>::new());
+    let copropietarios = use_state(Vec::<CopropietarioResponse>::new);
     let loading = use_state(|| false);
     let error = use_state(|| Option::<String>::None);
     let show_form = use_state(|| false);
@@ -338,12 +338,11 @@ fn CopropietariosSection(props: &CopropietariosSectionProps) -> Html {
             let cedula_rnc = cedula_rnc.clone();
             let porcentaje = porcentaje.clone();
 
-            let p_val: f64 = match p_str.parse() {
-                Ok(v) => v,
-                Err(_) => {
-                    error.set(Some("Porcentaje inválido".to_string()));
-                    return;
-                }
+            let p_val: f64 = if let Ok(v) = p_str.parse() {
+                v
+            } else {
+                error.set(Some("Porcentaje inválido".to_string()));
+                return;
             };
 
             let req = CrearCopropietarioRequest {
@@ -361,15 +360,13 @@ fn CopropietariosSection(props: &CopropietariosSectionProps) -> Html {
                         porcentaje.set(String::new());
                         show_form.set(false);
                         // Reload copropietarios list
-                        on_load.emit(MouseEvent::new("click").unwrap_or_else(|_| {
-                            // fallback: just trigger parent reload
-                            web_sys::MouseEvent::new("click").unwrap()
-                        }));
+                        if let Ok(evt) = MouseEvent::new("click") {
+                            on_load.emit(evt);
+                        }
                         // Trigger parent reload for recalculation
-                        on_change.emit(
-                            MouseEvent::new("click")
-                                .unwrap_or_else(|_| web_sys::MouseEvent::new("click").unwrap()),
-                        );
+                        if let Ok(evt) = MouseEvent::new("click") {
+                            on_change.emit(evt);
+                        }
                     }
                     Err(err) => error.set(Some(err)),
                 }
@@ -597,12 +594,11 @@ fn UmbralConfigSection(props: &UmbralConfigSectionProps) -> Html {
         let on_change = props.on_change.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
-            let umbral_val: f64 = match (*umbral).parse() {
-                Ok(v) => v,
-                Err(_) => {
-                    error.set(Some("Umbral inválido".to_string()));
-                    return;
-                }
+            let umbral_val: f64 = if let Ok(v) = (*umbral).parse() {
+                v
+            } else {
+                error.set(Some("Umbral inválido".to_string()));
+                return;
             };
             let req = ConfiguracionIpiRequest {
                 umbral_ipi: umbral_val,
@@ -621,10 +617,9 @@ fn UmbralConfigSection(props: &UmbralConfigSectionProps) -> Html {
                 match api_put::<serde_json::Value, _>("/ipi/umbral", &req).await {
                     Ok(_) => {
                         success.set(true);
-                        on_change.emit(
-                            MouseEvent::new("click")
-                                .unwrap_or_else(|_| web_sys::MouseEvent::new("click").unwrap()),
-                        );
+                        if let Ok(evt) = MouseEvent::new("click") {
+                            on_change.emit(evt);
+                        }
                     }
                     Err(err) => error.set(Some(err)),
                 }

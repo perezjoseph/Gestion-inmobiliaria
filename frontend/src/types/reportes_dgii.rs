@@ -3,21 +3,21 @@ use serde::{Deserialize, Serialize};
 use crate::types::deserialize_f64_from_any;
 
 /// Request body for generating a 606 or 607 report.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PeriodoRequest {
     pub periodo: String,
 }
 
 /// A preview row where each field is rendered as a string for display.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct RegistroPreview {
     pub campos: Vec<String>,
 }
 
 /// A record excluded from report generation due to incomplete fiscal data.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct RegistroExcluido {
     pub razon: String,
@@ -39,7 +39,7 @@ pub struct ReporteGenerado {
 }
 
 /// Preview response from GET /preview/{tipo}/{periodo}.
-/// The backend returns the reporte_dgii entity model directly.
+/// The backend returns the `reporte_dgii` entity model directly.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ReportePreviewResponse {
@@ -59,7 +59,7 @@ pub struct ReportePreviewResponse {
 }
 
 /// Request body for updating report status.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct EstadoRequest {
     pub estado: String,

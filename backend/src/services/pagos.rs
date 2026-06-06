@@ -38,7 +38,7 @@ fn parse_tipo_fiscal(s: &str) -> TipoFiscal {
 ///
 /// This is used for ITBIS retention: only persona jurídica tenants retain 30%.
 fn infer_tenant_tipo_fiscal(cedula: &str) -> TipoFiscal {
-    let digits: String = cedula.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = cedula.chars().filter(char::is_ascii_digit).collect();
     match digits.len() {
         9 => TipoFiscal::PersonaJuridica,
         11 => TipoFiscal::PersonaFisica,
