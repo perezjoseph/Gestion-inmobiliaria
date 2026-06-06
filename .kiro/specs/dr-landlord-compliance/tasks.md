@@ -285,7 +285,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Add route scopes for fiscal, condominios, ncf, reportes-dgii, ipi, indexacion
     - _Requirements: all_
 
-- [-] 16. Checkpoint - API layer compiles, handler tests pass
+- [x] 16. Checkpoint - API layer compiles, handler tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 17. Frontend pages (Leptos)
