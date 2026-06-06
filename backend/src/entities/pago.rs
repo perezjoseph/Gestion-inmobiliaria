@@ -20,6 +20,21 @@ pub struct Model {
     #[sea_orm(column_type = "Decimal(Some((12, 2)))", nullable)]
     pub recargo: Option<Decimal>,
     pub organizacion_id: Uuid,
+    #[sea_orm(column_type = "Decimal(Some((12, 2)))", nullable)]
+    pub monto_base: Option<Decimal>,
+    #[sea_orm(column_type = "Decimal(Some((12, 2)))", nullable)]
+    pub monto_itbis: Option<Decimal>,
+    #[sea_orm(column_type = "Decimal(Some((12, 2)))", nullable)]
+    pub monto_itbis_retenido: Option<Decimal>,
+    pub ncf: Option<String>,
+    pub fecha_comprobante: Option<Date>,
+    pub tipo_ncf: Option<String>,
+    #[sea_orm(default_value = "false")]
+    pub es_parcial: bool,
+    #[sea_orm(column_type = "Decimal(Some((12, 2)))", nullable)]
+    pub saldo_pendiente: Option<Decimal>,
+    #[sea_orm(default_value = "renta")]
+    pub tipo_linea: String,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }

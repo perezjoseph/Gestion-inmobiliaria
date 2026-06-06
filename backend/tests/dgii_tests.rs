@@ -313,6 +313,10 @@ mod dgii_db_tests {
             direccion_fiscal: Set(None),
             representante_legal: Set(None),
             dgii_data: Set(None),
+            tipo_fiscal: Set("informal".to_string()),
+            regimen_pagos: Set(None),
+            fecha_inicio_operaciones: Set(None),
+            is_ecf_certificado: Set(false),
             created_at: Set(now),
             updated_at: Set(now),
         }

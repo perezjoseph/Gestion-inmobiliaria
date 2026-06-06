@@ -42,6 +42,10 @@ async fn create_test_organizacion(db: &DatabaseConnection) -> Uuid {
         direccion_fiscal: Set(None),
         representante_legal: Set(None),
         dgii_data: Set(None),
+        tipo_fiscal: Set("informal".to_string()),
+        regimen_pagos: Set(None),
+        fecha_inicio_operaciones: Set(None),
+        is_ecf_certificado: Set(false),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -92,6 +96,9 @@ async fn create_test_propiedad(db: &DatabaseConnection, org_id: Uuid) -> Uuid {
         estado: Set("disponible".to_string()),
         imagenes: Set(None),
         organizacion_id: Set(org_id),
+        valor_catastral: Set(None),
+        exento_ipi: Set(false),
+        motivo_exencion: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -182,8 +189,8 @@ fn test_crud_cycle() {
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
-                "titulo": "Reparar tubería",
-                "descripcion": "Fuga en el baño",
+                "titulo": "Reparar tuberÃ­a",
+                "descripcion": "Fuga en el baÃ±o",
                 "prioridad": "alta",
                 "costoMonto": "150.00",
                 "costoMoneda": "DOP"
@@ -196,7 +203,7 @@ fn test_crud_cycle() {
         let solicitud_uuid: Uuid = solicitud_id.parse().unwrap();
         assert_eq!(body["estado"], "pendiente");
         assert_eq!(body["prioridad"], "alta");
-        assert_eq!(body["titulo"], "Reparar tubería");
+        assert_eq!(body["titulo"], "Reparar tuberÃ­a");
         assert_eq!(body["propiedadId"], propiedad_id.to_string());
 
         let req = actix_web::test::TestRequest::get()
@@ -206,21 +213,21 @@ fn test_crud_cycle() {
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
         let body: Value = actix_web::test::read_body_json(resp).await;
-        assert_eq!(body["titulo"], "Reparar tubería");
+        assert_eq!(body["titulo"], "Reparar tuberÃ­a");
         assert!(body["notas"].is_array());
 
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/mantenimiento/{solicitud_id}"))
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
-                "titulo": "Reparar tubería urgente",
+                "titulo": "Reparar tuberÃ­a urgente",
                 "prioridad": "urgente"
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
         let body: Value = actix_web::test::read_body_json(resp).await;
-        assert_eq!(body["titulo"], "Reparar tubería urgente");
+        assert_eq!(body["titulo"], "Reparar tuberÃ­a urgente");
         assert_eq!(body["prioridad"], "urgente");
 
         let req = actix_web::test::TestRequest::get()
@@ -340,7 +347,7 @@ fn test_invalid_state_transitions() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let solicitud_id = body["id"].as_str().unwrap().to_string();
 
-        // pendiente → completado (invalid, must go through en_progreso)
+        // pendiente â†’ completado (invalid, must go through en_progreso)
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/mantenimiento/{solicitud_id}/estado"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -357,7 +364,7 @@ fn test_invalid_state_transitions() {
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
 
-        // en_progreso → pendiente (invalid)
+        // en_progreso â†’ pendiente (invalid)
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/mantenimiento/{solicitud_id}/estado"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -374,7 +381,7 @@ fn test_invalid_state_transitions() {
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
 
-        // completado → en_progreso (invalid)
+        // completado â†’ en_progreso (invalid)
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/mantenimiento/{solicitud_id}/estado"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -383,7 +390,7 @@ fn test_invalid_state_transitions() {
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 422);
 
-        // completado → pendiente (invalid)
+        // completado â†’ pendiente (invalid)
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/mantenimiento/{solicitud_id}/estado"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -583,7 +590,7 @@ fn test_access_control() {
             .insert_header(("Authorization", format!("Bearer {viewer_token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
-                "titulo": "No debería crearse"
+                "titulo": "No deberÃ­a crearse"
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -621,7 +628,7 @@ fn test_access_control() {
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/mantenimiento/{solicitud_id}/notas"))
             .insert_header(("Authorization", format!("Bearer {viewer_token}")))
-            .set_json(json!({ "contenido": "No debería crearse" }))
+            .set_json(json!({ "contenido": "No deberÃ­a crearse" }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 403);
@@ -669,7 +676,7 @@ fn test_fk_validations() {
         ))
         .await;
 
-        // Non-existent propiedad_id → 404
+        // Non-existent propiedad_id â†’ 404
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/mantenimiento")
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -681,7 +688,7 @@ fn test_fk_validations() {
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 404);
 
-        // Non-existent inquilino_id → 404
+        // Non-existent inquilino_id â†’ 404
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/mantenimiento")
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -694,7 +701,7 @@ fn test_fk_validations() {
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 404);
 
-        // Unidad not belonging to propiedad → 422
+        // Unidad not belonging to propiedad â†’ 422
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/mantenimiento")
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -729,7 +736,7 @@ fn test_validations() {
         ))
         .await;
 
-        // Empty titulo → 422
+        // Empty titulo â†’ 422
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/mantenimiento")
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -741,7 +748,7 @@ fn test_validations() {
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 422);
 
-        // Invalid prioridad → 422
+        // Invalid prioridad â†’ 422
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/mantenimiento")
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -754,7 +761,7 @@ fn test_validations() {
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 422);
 
-        // Invalid moneda → 422
+        // Invalid moneda â†’ 422
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/mantenimiento")
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -768,7 +775,7 @@ fn test_validations() {
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 422);
 
-        // Negative costo_monto → 422
+        // Negative costo_monto â†’ 422
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/mantenimiento")
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -782,14 +789,14 @@ fn test_validations() {
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 422);
 
-        // Empty note contenido → 422
+        // Empty note contenido â†’ 422
         // First create a solicitud to add a note to
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/mantenimiento")
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
-                "titulo": "Para nota vacía"
+                "titulo": "Para nota vacÃ­a"
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -804,7 +811,7 @@ fn test_validations() {
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 422);
 
-        // Whitespace-only note contenido → 422
+        // Whitespace-only note contenido â†’ 422
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/mantenimiento/{solicitud_id}/notas"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -840,7 +847,7 @@ fn test_auditoria_entries() {
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
-                "titulo": "Auditoría test"
+                "titulo": "AuditorÃ­a test"
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -864,7 +871,7 @@ fn test_auditoria_entries() {
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/mantenimiento/{solicitud_id}"))
             .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(json!({ "titulo": "Auditoría test actualizado" }))
+            .set_json(json!({ "titulo": "AuditorÃ­a test actualizado" }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
@@ -880,7 +887,7 @@ fn test_auditoria_entries() {
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/mantenimiento/{solicitud_id}/notas"))
             .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(json!({ "contenido": "Nota de auditoría" }))
+            .set_json(json!({ "contenido": "Nota de auditorÃ­a" }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 201);
@@ -938,7 +945,7 @@ fn test_default_prioridad() {
         ))
         .await;
 
-        // Create without specifying prioridad → defaults to "media"
+        // Create without specifying prioridad â†’ defaults to "media"
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/mantenimiento")
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -1045,7 +1052,7 @@ fn test_unidad_id_filter_scoped_to_org() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let sol_b1: Uuid = body["id"].as_str().unwrap().parse().unwrap();
 
-        // --- Filter by unidad_a1 as Org A user → only sol_a1 ---
+        // --- Filter by unidad_a1 as Org A user â†’ only sol_a1 ---
         let req = actix_web::test::TestRequest::get()
             .uri(&format!("/api/v1/mantenimiento?unidadId={unidad_a1}"))
             .insert_header(("Authorization", format!("Bearer {token_a}")))
@@ -1074,7 +1081,7 @@ fn test_unidad_id_filter_scoped_to_org() {
             "sol without unidad must NOT be in the results"
         );
 
-        // --- Filter by unidad_a2 as Org A user → only sol_a2 ---
+        // --- Filter by unidad_a2 as Org A user â†’ only sol_a2 ---
         let req = actix_web::test::TestRequest::get()
             .uri(&format!("/api/v1/mantenimiento?unidadId={unidad_a2}"))
             .insert_header(("Authorization", format!("Bearer {token_a}")))
@@ -1093,7 +1100,7 @@ fn test_unidad_id_filter_scoped_to_org() {
             "sol_a2 must be in the results"
         );
 
-        // --- No unidad_id filter as Org A → returns all Org A solicitudes (not Org B) ---
+        // --- No unidad_id filter as Org A â†’ returns all Org A solicitudes (not Org B) ---
         let req = actix_web::test::TestRequest::get()
             .uri("/api/v1/mantenimiento")
             .insert_header(("Authorization", format!("Bearer {token_a}")))
@@ -1184,7 +1191,7 @@ fn test_unidad_id_from_another_org_returns_empty() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let sol_b: Uuid = body["id"].as_str().unwrap().parse().unwrap();
 
-        // --- Org A user filters by unidad_b1 (belongs to Org B) → empty list ---
+        // --- Org A user filters by unidad_b1 (belongs to Org B) â†’ empty list ---
         let req = actix_web::test::TestRequest::get()
             .uri(&format!("/api/v1/mantenimiento?unidadId={unidad_b1}"))
             .insert_header(("Authorization", format!("Bearer {token_a}")))
@@ -1199,7 +1206,7 @@ fn test_unidad_id_from_another_org_returns_empty() {
             data.len()
         );
 
-        // --- Org B user filters by unidad_a1 (belongs to Org A) → empty list ---
+        // --- Org B user filters by unidad_a1 (belongs to Org A) â†’ empty list ---
         let req = actix_web::test::TestRequest::get()
             .uri(&format!("/api/v1/mantenimiento?unidadId={unidad_a1}"))
             .insert_header(("Authorization", format!("Bearer {token_b}")))

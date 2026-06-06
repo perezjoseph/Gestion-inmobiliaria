@@ -42,6 +42,10 @@ async fn create_test_organizacion(db: &DatabaseConnection) -> Uuid {
         direccion_fiscal: Set(None),
         representante_legal: Set(None),
         dgii_data: Set(None),
+        tipo_fiscal: Set("informal".to_string()),
+        regimen_pagos: Set(None),
+        fecha_inicio_operaciones: Set(None),
+        is_ecf_certificado: Set(false),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -92,6 +96,9 @@ async fn create_test_propiedad(db: &DatabaseConnection, org_id: Uuid) -> Uuid {
         estado: Set("disponible".to_string()),
         imagenes: Set(None),
         organizacion_id: Set(org_id),
+        valor_catastral: Set(None),
+        exento_ipi: Set(false),
+        motivo_exencion: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -186,6 +193,15 @@ async fn create_test_pago(
         notas: Set(None),
         recargo: Set(None),
         organizacion_id: Set(org_id),
+        monto_base: Set(None),
+        monto_itbis: Set(None),
+        monto_itbis_retenido: Set(None),
+        ncf: Set(None),
+        fecha_comprobante: Set(None),
+        tipo_ncf: Set(None),
+        es_parcial: Set(false),
+        saldo_pendiente: Set(None),
+        tipo_linea: Set("renta".to_string()),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -251,9 +267,9 @@ fn make_app(
     )
 }
 
-// ── Tests ──────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Tests Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
-/// Test ejecutar tarea manualmente (marcar_pagos_atrasados) → 200 with execution record
+/// Test ejecutar tarea manualmente (marcar_pagos_atrasados) Ã¢â€ â€™ 200 with execution record
 /// Requirements: 7.1, 5.1
 #[test]
 fn test_ejecutar_tarea_manualmente_200() {
@@ -282,7 +298,7 @@ fn test_ejecutar_tarea_manualmente_200() {
     });
 }
 
-/// Test ejecutar tarea con nombre inválido → 404
+/// Test ejecutar tarea con nombre invÃƒÂ¡lido Ã¢â€ â€™ 404
 /// Requirements: 7.2
 #[test]
 fn test_ejecutar_tarea_nombre_invalido_404() {
@@ -302,7 +318,7 @@ fn test_ejecutar_tarea_nombre_invalido_404() {
     });
 }
 
-/// Test ejecutar tarea como gerente → 403
+/// Test ejecutar tarea como gerente Ã¢â€ â€™ 403
 /// Requirements: 7.4
 #[test]
 fn test_ejecutar_tarea_gerente_403() {
@@ -322,7 +338,7 @@ fn test_ejecutar_tarea_gerente_403() {
     });
 }
 
-/// Test ejecutar tarea como visualizador → 403
+/// Test ejecutar tarea como visualizador Ã¢â€ â€™ 403
 /// Requirements: 7.5
 #[test]
 fn test_ejecutar_tarea_visualizador_403() {
@@ -342,7 +358,7 @@ fn test_ejecutar_tarea_visualizador_403() {
     });
 }
 
-/// Test consultar historial → paginated response
+/// Test consultar historial Ã¢â€ â€™ paginated response
 /// Requirements: 8.1
 #[test]
 fn test_consultar_historial_paginado() {
@@ -377,7 +393,7 @@ fn test_consultar_historial_paginado() {
     });
 }
 
-/// Test filtrar historial por nombre_tarea → only matching records
+/// Test filtrar historial por nombre_tarea Ã¢â€ â€™ only matching records
 /// Requirements: 8.2
 #[test]
 fn test_filtrar_historial_por_nombre_tarea() {
@@ -418,7 +434,7 @@ fn test_filtrar_historial_por_nombre_tarea() {
     });
 }
 
-/// Test filtrar historial por exitosa → only matching records
+/// Test filtrar historial por exitosa Ã¢â€ â€™ only matching records
 /// Requirements: 8.3
 #[test]
 fn test_filtrar_historial_por_exitosa() {
@@ -452,7 +468,7 @@ fn test_filtrar_historial_por_exitosa() {
     });
 }
 
-/// Test consultar historial como gerente → 403
+/// Test consultar historial como gerente Ã¢â€ â€™ 403
 /// Requirements: 8.4
 #[test]
 fn test_consultar_historial_gerente_403() {
@@ -627,7 +643,7 @@ fn test_idempotencia_segunda_ejecucion_cero_afectados() {
 
         let app = actix_web::test::init_service(make_app(db.clone())).await;
 
-        // First execution — should affect at least 1 record
+        // First execution Ã¢â‚¬â€ should affect at least 1 record
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/tareas/marcar_pagos_atrasados/ejecutar")
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -637,7 +653,7 @@ fn test_idempotencia_segunda_ejecucion_cero_afectados() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         assert!(body["ejecucion"]["registrosAfectados"].as_i64().unwrap() >= 1);
 
-        // Second execution — should affect 0 records (idempotent)
+        // Second execution Ã¢â‚¬â€ should affect 0 records (idempotent)
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/tareas/marcar_pagos_atrasados/ejecutar")
             .insert_header(("Authorization", format!("Bearer {token}")))

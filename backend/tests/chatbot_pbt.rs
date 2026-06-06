@@ -2,7 +2,7 @@ use proptest::prelude::*;
 use proptest::test_runner::{Config as ProptestConfig, TestRunner};
 use uuid::Uuid;
 
-// ── Custom Strategies ──────────────────────────────────────────────────
+// â”€â”€ Custom Strategies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /// Generate a valid E.164 phone number (+ followed by 7-15 digits, first digit non-zero).
 fn arb_e164_phone() -> impl Strategy<Value = String> {
@@ -21,7 +21,7 @@ fn arb_distinct_org_ids() -> impl Strategy<Value = (Uuid, Uuid)> {
         .prop_map(|(a, b)| (Uuid::from_u128(a), Uuid::from_u128(b)))
 }
 
-// ── Tenant Resolution Model ───────────────────────────────────────────
+// â”€â”€ Tenant Resolution Model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /// Represents a tenant record with phone and organization scope.
 #[derive(Debug, Clone)]
@@ -45,7 +45,7 @@ fn resolve_tenant_in_org(tenants: &[TenantRecord], phone: &str, org_id: Uuid) ->
         .any(|t| t.phone == phone && t.org_id == org_id)
 }
 
-// ── Property Tests ─────────────────────────────────────────────────────
+// â”€â”€ Property Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 3: Organization-Scoped Tenant Resolution Isolation
 // **Validates: Requirements 2.5, 13.2**
@@ -133,15 +133,15 @@ fn test_resolution_requires_both_phone_and_org_id() {
                 },
             ];
 
-            // Correct org + correct phone → match
+            // Correct org + correct phone â†’ match
             prop_assert!(resolve_tenant_in_org(&tenants, &phone_a, org_a));
             prop_assert!(resolve_tenant_in_org(&tenants, &phone_b, org_b));
 
-            // Correct phone + wrong org → no match (isolation)
+            // Correct phone + wrong org â†’ no match (isolation)
             prop_assert!(!resolve_tenant_in_org(&tenants, &phone_a, org_b));
             prop_assert!(!resolve_tenant_in_org(&tenants, &phone_b, org_a));
 
-            // Wrong phone + correct org → no match
+            // Wrong phone + correct org â†’ no match
             prop_assert!(!resolve_tenant_in_org(&tenants, &phone_b, org_a));
             prop_assert!(!resolve_tenant_in_org(&tenants, &phone_a, org_b));
 
@@ -196,7 +196,7 @@ fn test_same_phone_different_orgs_resolved_independently() {
         .unwrap();
 }
 
-// ── Integration Test: record_extraction post-loop wiring ──────────────────────
+// â”€â”€ Integration Test: record_extraction post-loop wiring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: spec-gap-remediation, Task 10.5: Integration test for record_extraction post-loop wiring
 // **Validates: Requirements 8.3, 8.5**
@@ -262,14 +262,14 @@ where
 {
     dotenvy::dotenv().ok();
     if std::env::var("DATABASE_URL").is_err() {
-        eprintln!("⚠ DATABASE_URL not set – skipping integration test");
+        eprintln!("âš  DATABASE_URL not set â€“ skipping integration test");
         return;
     }
     let _guard = crate::GLOBAL_DB_SERIAL
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     let Some((rt, db)) = shared_rt_and_db_chatbot() else {
-        eprintln!("⚠ DB not reachable – skipping integration test");
+        eprintln!("âš  DB not reachable â€“ skipping integration test");
         return;
     };
     rt.block_on(f(db.clone()));
@@ -292,6 +292,10 @@ async fn seed_org(db: &DatabaseConnection) -> Uuid {
         direccion_fiscal: Set(None),
         representante_legal: Set(None),
         dgii_data: Set(None),
+        tipo_fiscal: Set("informal".to_string()),
+        regimen_pagos: Set(None),
+        fecha_inicio_operaciones: Set(None),
+        is_ecf_certificado: Set(false),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -340,6 +344,9 @@ async fn seed_propiedad(db: &DatabaseConnection, org_id: Uuid) -> Uuid {
         estado: Set("ocupada".to_string()),
         imagenes: Set(None),
         organizacion_id: Set(org_id),
+        valor_catastral: Set(None),
+        exento_ipi: Set(false),
+        motivo_exencion: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -355,7 +362,7 @@ async fn seed_inquilino(db: &DatabaseConnection, org_id: Uuid) -> Uuid {
     inquilino::ActiveModel {
         id: Set(id),
         nombre: Set("Juan".to_string()),
-        apellido: Set("Pérez".to_string()),
+        apellido: Set("PÃ©rez".to_string()),
         email: Set(Some(format!("juan+{id}@test.com"))),
         telefono: Set(None),
         cedula: Set(format!("C{}", &id.simple().to_string()[..19])),
@@ -435,7 +442,7 @@ fn test_record_extraction_post_loop_persists_pago() {
             currency: "DOP".to_string(),
             date: Some("2025-06-15".to_string()),
             reference: Some("REF-12345".to_string()),
-            sender_name: Some("Juan Pérez".to_string()),
+            sender_name: Some("Juan PÃ©rez".to_string()),
             recipient: Some("Inmobiliaria Test".to_string()),
             confidence: Confidence::High,
         };
@@ -464,7 +471,7 @@ fn test_record_extraction_post_loop_persists_pago() {
             .await
             .expect("Failed to update extraction with contrato_id");
 
-        // Step 4: Confirm the extraction — this creates the Pago row
+        // Step 4: Confirm the extraction â€” this creates the Pago row
         let confirmed = confirm_receipt(&db, updated_extraction.id, user_id)
             .await
             .expect("confirm_receipt should succeed");

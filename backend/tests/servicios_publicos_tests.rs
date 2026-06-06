@@ -343,6 +343,10 @@ mod servicios_publicos_db_tests {
             direccion_fiscal: Set(None),
             representante_legal: Set(None),
             dgii_data: Set(None),
+            tipo_fiscal: Set("informal".to_string()),
+            regimen_pagos: Set(None),
+            fecha_inicio_operaciones: Set(None),
+            is_ecf_certificado: Set(false),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -393,6 +397,9 @@ mod servicios_publicos_db_tests {
             estado: Set("ocupada".to_string()),
             imagenes: Set(None),
             organizacion_id: Set(org_id),
+            valor_catastral: Set(None),
+            exento_ipi: Set(false),
+            motivo_exencion: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -704,7 +711,7 @@ mod servicios_publicos_db_tests {
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 201);
 
-            // Create a high-consumption gasto — should NOT trigger anomaly (< 3 prior)
+            // Create a high-consumption gasto â€” should NOT trigger anomaly (< 3 prior)
             let req = test::TestRequest::post()
                 .uri("/api/v1/gastos")
                 .insert_header(("Authorization", format!("Bearer {token}")))

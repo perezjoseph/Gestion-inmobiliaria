@@ -42,6 +42,10 @@ async fn create_test_organizacion(db: &DatabaseConnection) -> Uuid {
         direccion_fiscal: Set(None),
         representante_legal: Set(None),
         dgii_data: Set(None),
+        tipo_fiscal: Set("informal".to_string()),
+        regimen_pagos: Set(None),
+        fecha_inicio_operaciones: Set(None),
+        is_ecf_certificado: Set(false),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -92,6 +96,9 @@ async fn create_test_propiedad(db: &DatabaseConnection, org_id: Uuid) -> Uuid {
         estado: Set("disponible".to_string()),
         imagenes: Set(None),
         organizacion_id: Set(org_id),
+        valor_catastral: Set(None),
+        exento_ipi: Set(false),
+        motivo_exencion: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -185,6 +192,15 @@ async fn create_test_pago_vencido(
         notas: Set(None),
         recargo: Set(None),
         organizacion_id: Set(org_id),
+        monto_base: Set(None),
+        monto_itbis: Set(None),
+        monto_itbis_retenido: Set(None),
+        ncf: Set(None),
+        fecha_comprobante: Set(None),
+        tipo_ncf: Set(None),
+        es_parcial: Set(false),
+        saldo_pendiente: Set(None),
+        tipo_linea: Set("renta".to_string()),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -223,7 +239,7 @@ async fn setup_notif_data(db: &DatabaseConnection) -> (Uuid, Uuid, Uuid) {
     (org_id, admin_id, propiedad_id)
 }
 
-// ── Tests ──────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Tests Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 #[test]
 fn test_list_empty_notifications() {
@@ -343,7 +359,7 @@ fn test_filter_by_tipo() {
             .to_request();
         let _ = actix_web::test::call_service(&app, req).await;
 
-        // Filter by tipo=pago_vencido → only matching
+        // Filter by tipo=pago_vencido Ã¢â€ â€™ only matching
         let req = actix_web::test::TestRequest::get()
             .uri("/api/v1/notificaciones?tipo=pago_vencido")
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -355,7 +371,7 @@ fn test_filter_by_tipo() {
             assert_eq!(item["tipo"], "pago_vencido");
         }
 
-        // Filter by tipo that shouldn't exist → empty or only matching
+        // Filter by tipo that shouldn't exist Ã¢â€ â€™ empty or only matching
         let req = actix_web::test::TestRequest::get()
             .uri("/api/v1/notificaciones?tipo=documento_vencido")
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -393,7 +409,7 @@ fn test_filter_by_leida() {
             .to_request();
         let _ = actix_web::test::call_service(&app, req).await;
 
-        // Filter leida=false → all generated are unread
+        // Filter leida=false Ã¢â€ â€™ all generated are unread
         let req = actix_web::test::TestRequest::get()
             .uri("/api/v1/notificaciones?leida=false")
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -406,7 +422,7 @@ fn test_filter_by_leida() {
             assert_eq!(item["leida"], false);
         }
 
-        // Filter leida=true → none yet
+        // Filter leida=true Ã¢â€ â€™ none yet
         let req = actix_web::test::TestRequest::get()
             .uri("/api/v1/notificaciones?leida=true")
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -582,7 +598,7 @@ fn test_mark_another_users_notification_returns_404() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let admin_notif_id = body["data"][0]["id"].as_str().unwrap().to_string();
 
-        // Other user tries to mark admin's notification → 404
+        // Other user tries to mark admin's notification Ã¢â€ â€™ 404
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/notificaciones/{admin_notif_id}/leer"))
             .insert_header(("Authorization", format!("Bearer {other_token}")))
@@ -690,7 +706,7 @@ fn test_generate_twice_deduplication() {
         let first_total = body["total"].as_u64().unwrap();
         assert!(first_total >= 1);
 
-        // Second generation → zero new (deduplication)
+        // Second generation Ã¢â€ â€™ zero new (deduplication)
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/notificaciones/generar")
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -729,7 +745,7 @@ fn test_mantenimiento_state_change_generates_notification() {
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
-                "titulo": "Reparar tubería notif test"
+                "titulo": "Reparar tuberÃƒÂ­a notif test"
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -737,7 +753,7 @@ fn test_mantenimiento_state_change_generates_notification() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let solicitud_id = body["id"].as_str().unwrap().to_string();
 
-        // Change state → en_progreso (generates mantenimiento_actualizado notification)
+        // Change state Ã¢â€ â€™ en_progreso (generates mantenimiento_actualizado notification)
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/mantenimiento/{solicitud_id}/estado"))
             .insert_header(("Authorization", format!("Bearer {token}")))

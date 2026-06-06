@@ -112,6 +112,10 @@ mod db_async {
             direccion_fiscal: Set(None),
             representante_legal: Set(None),
             dgii_data: Set(None),
+            tipo_fiscal: Set("informal".to_string()),
+            regimen_pagos: Set(None),
+            fecha_inicio_operaciones: Set(None),
+            is_ecf_certificado: Set(false),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -141,6 +145,9 @@ mod db_async {
             estado: Set("ocupada".to_string()),
             imagenes: Set(None),
             organizacion_id: Set(org_id),
+            valor_catastral: Set(None),
+            exento_ipi: Set(false),
+            motivo_exencion: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -227,6 +234,15 @@ mod db_async {
             notas: Set(None),
             recargo: Set(None),
             organizacion_id: Set(org_id),
+            monto_base: Set(None),
+            monto_itbis: Set(None),
+            monto_itbis_retenido: Set(None),
+            ncf: Set(None),
+            fecha_comprobante: Set(None),
+            tipo_ncf: Set(None),
+            es_parcial: Set(false),
+            saldo_pendiente: Set(None),
+            tipo_linea: Set("renta".to_string()),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -253,7 +269,7 @@ mod db_async {
         let _ = organizacion::Entity::delete_by_id(org_id).exec(db).await;
     }
 
-    // ── Task 1.3: Cross-tenant receipt access returns 404 ──
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Task 1.3: Cross-tenant receipt access returns 404 Ã¢â€â‚¬Ã¢â€â‚¬
 
     pub fn cross_tenant_receipt_returns_404() {
         with_db(|db| async move {
@@ -319,7 +335,7 @@ mod db_async {
         });
     }
 
-    // ── Cross-tenant access returns 404 for all roles ──
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Cross-tenant access returns 404 for all roles Ã¢â€â‚¬Ã¢â€â‚¬
 
     pub fn cross_tenant_receipt_404_all_roles() {
         with_db(|db| async move {
@@ -359,7 +375,7 @@ mod db_async {
         });
     }
 
-    // ── Non-existent pago returns 404 (not a server error) ──
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Non-existent pago returns 404 (not a server error) Ã¢â€â‚¬Ã¢â€â‚¬
 
     pub fn nonexistent_pago_returns_404() {
         with_db(|db| async move {
@@ -389,7 +405,7 @@ mod db_async {
         });
     }
 
-    // ── Task 1.3: Cross-tenant access logs structured warning ──
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Task 1.3: Cross-tenant access logs structured warning Ã¢â€â‚¬Ã¢â€â‚¬
 
     pub fn cross_tenant_receipt_logs_structured_warning() {
         with_db(|db| async move {
@@ -482,7 +498,7 @@ mod db_async {
                 "Expected structured warning with target 'security.cross_tenant' to be logged. Got: {logs}"
             );
             assert!(
-                logs.contains("Intento de acceso a recibo fuera de la organización"),
+                logs.contains("Intento de acceso a recibo fuera de la organizaciÃƒÂ³n"),
                 "Expected Spanish warning message in log. Got: {logs}"
             );
             assert!(

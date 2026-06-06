@@ -42,6 +42,10 @@ async fn create_test_organizacion(db: &DatabaseConnection) -> Uuid {
         direccion_fiscal: Set(None),
         representante_legal: Set(None),
         dgii_data: Set(None),
+        tipo_fiscal: Set("informal".to_string()),
+        regimen_pagos: Set(None),
+        fecha_inicio_operaciones: Set(None),
+        is_ecf_certificado: Set(false),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -92,6 +96,9 @@ async fn create_test_propiedad(db: &DatabaseConnection, org_id: Uuid) -> Uuid {
         estado: Set("disponible".to_string()),
         imagenes: Set(None),
         organizacion_id: Set(org_id),
+        valor_catastral: Set(None),
+        exento_ipi: Set(false),
+        motivo_exencion: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -134,7 +141,7 @@ async fn cleanup_contrato(db: &DatabaseConnection, contrato_id: Uuid) {
     let _ = contrato::Entity::delete_by_id(contrato_id).exec(db).await;
 }
 
-// ── RBAC tests (no DB required) ─────────────────────────────────────
+// â”€â”€ RBAC tests (no DB required) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[cfg(test)]
 mod pago_generacion_rbac_tests {
@@ -183,7 +190,7 @@ mod pago_generacion_rbac_tests {
         Ok(HttpResponse::Ok().finish())
     }
 
-    // --- POST generar as visualizador → 403 ---
+    // --- POST generar as visualizador â†’ 403 ---
 
     #[actix_web::test]
     async fn generar_rejects_visualizador() {
@@ -279,7 +286,7 @@ mod pago_generacion_rbac_tests {
     }
 }
 
-// ── DB integration tests ────────────────────────────────────────────
+// â”€â”€ DB integration tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn future_contrato_dates(months: i32) -> (String, String) {
     let today = Utc::now().date_naive();
@@ -729,7 +736,7 @@ fn test_preview_pagos_does_not_create_records() {
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
 
-        // Count pagos after preview — should be unchanged
+        // Count pagos after preview â€” should be unchanged
         let count_after = pago::Entity::find()
             .filter(pago::Column::ContratoId.eq(contrato_id))
             .all(&db)
@@ -1017,7 +1024,7 @@ fn test_generar_pagos_deduplication() {
             .await
             .unwrap();
 
-        // POST generar — should only generate the missing pago
+        // POST generar â€” should only generate the missing pago
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/contratos/{contrato_id}/pagos/generar"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -1059,7 +1066,7 @@ fn test_auditoria_entries_for_pago_generation_and_cancellation() {
         ))
         .await;
 
-        // 1. Create contrato → auto-generates pagos → audit "generar_pagos_auto"
+        // 1. Create contrato â†’ auto-generates pagos â†’ audit "generar_pagos_auto"
         let (fecha_inicio, fecha_fin) = future_contrato_dates(6);
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/contratos")
@@ -1095,7 +1102,7 @@ fn test_auditoria_entries_for_pago_generation_and_cancellation() {
             "Should have generar_pagos_auto audit entry"
         );
 
-        // 2. Delete some pagos and manually generate → audit "generar_pagos_manual"
+        // 2. Delete some pagos and manually generate â†’ audit "generar_pagos_manual"
         use realestate_backend::entities::pago;
         let pagos = pago::Entity::find()
             .filter(pago::Column::ContratoId.eq(contrato_uuid))
@@ -1130,7 +1137,7 @@ fn test_auditoria_entries_for_pago_generation_and_cancellation() {
             "Should have gen_pagos_manual audit entry"
         );
 
-        // 3. Terminate contrato → audit "cancelar_pagos"
+        // 3. Terminate contrato â†’ audit "cancelar_pagos"
         let fecha_terminacion = future_termination_date(3);
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/contratos/{contrato_id}/terminar"))

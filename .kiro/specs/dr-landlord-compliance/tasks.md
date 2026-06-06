@@ -6,7 +6,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
 
 ## Tasks
 
-- [ ] 1. Database migrations and entity generation
+- [x] 1. Database migrations and entity generation
   - [x] 1.1 Create migration `m20260601_000001_add_tipo_fiscal_to_organizaciones.rs`
     - Add columns: `tipo_fiscal` (VARCHAR NOT NULL DEFAULT 'informal'), `regimen_pagos` (VARCHAR NULL), `fecha_inicio_operaciones` (DATE NULL), `is_ecf_certificado` (BOOLEAN DEFAULT false)
     - _Requirements: 1.1, 1.8_
@@ -43,27 +43,27 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Create table `copropietarios` per design schema
     - _Requirements: 9.10_
 
-  - [~] 1.10 Generate SeaORM entities for all new and modified tables
+  - [x] 1.10 Generate SeaORM entities for all new and modified tables
     - Run `sea-orm-cli generate entity` or manually write entity modules for: cuota_condominio, secuencia_ncf, reporte_dgii, configuracion_ipi, recibo_informal, copropietario
     - Update existing entities for organizacion, pago, propiedad with new columns
     - Register all entities in `entities/mod.rs`
     - _Requirements: 1.1, 2.1, 3.5, 7.1, 8.7, 9.4, 9.10_
 
 - [ ] 2. Core DTOs and types
-  - [~] 2.1 Create `models/fiscal.rs`
+  - [x] 2.1 Create `models/fiscal.rs`
     - Define `TipoFiscal` enum (PersonaJuridica, PersonaFisica, Informal) with serde and display traits
     - Define `ActualizarTipoFiscalRequest`, `EstadoFiscalResponse`, and related DTOs
     - _Requirements: 1.1, 1.7, 1.8_
 
-  - [~] 2.2 Create `models/itbis.rs`
+  - [x] 2.2 Create `models/itbis.rs`
     - Define `ItbisResult`, `RetencionResult` structs
     - _Requirements: 6.3, 6.4, 6.7_
 
-  - [~] 2.3 Create `models/ncf.rs`
+  - [x] 2.3 Create `models/ncf.rs`
     - Define `TipoNCF` enum (B01, B02, B14, B15), `ConfigurarRangoRequest`, `AlertaRango`, `SecuenciaNcfResponse`
     - _Requirements: 7.2, 7.8, 7.9_
 
-  - [~] 2.4 Create `models/reportes_dgii.rs`
+  - [x] 2.4 Create `models/reportes_dgii.rs`
     - Define `Registro607`, `Registro606`, `ReporteGenerado`, `RegistroExcluido`, `RegistroPreview`
     - _Requirements: 8.2, 8.3, 8.6_
 

@@ -6,9 +6,9 @@ use rust_decimal::Decimal;
 
 use crate::migrations;
 
-// ── Strategies ─────────────────────────────────────────────────────────
+// â”€â”€ Strategies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-/// Deposit amount: positive value suitable for a deposit (100..500_000 cents → 1.00..5000.00)
+/// Deposit amount: positive value suitable for a deposit (100..500_000 cents â†’ 1.00..5000.00)
 fn positive_deposit() -> impl Strategy<Value = Decimal> {
     (100i64..500_000i64).prop_map(|v| Decimal::new(v, 2))
 }
@@ -81,7 +81,7 @@ fn empty_or_whitespace_motivo() -> impl Strategy<Value = Option<String>> {
     ]
 }
 
-// ── Async helpers (Rust 2024: avoid calling async from sync #[test]) ───
+// â”€â”€ Async helpers (Rust 2024: avoid calling async from sync #[test]) â”€â”€â”€
 
 mod pbt_async {
     use actix_web::test;
@@ -189,6 +189,10 @@ mod pbt_async {
             direccion_fiscal: Set(None),
             representante_legal: Set(None),
             dgii_data: Set(None),
+            tipo_fiscal: Set("informal".to_string()),
+            regimen_pagos: Set(None),
+            fecha_inicio_operaciones: Set(None),
+            is_ecf_certificado: Set(false),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -239,6 +243,9 @@ mod pbt_async {
             estado: Set("disponible".to_string()),
             imagenes: Set(None),
             organizacion_id: Set(org_id),
+            valor_catastral: Set(None),
+            exento_ipi: Set(false),
+            motivo_exencion: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -301,7 +308,7 @@ mod pbt_async {
         body
     }
 
-    // ── P1: Deposit status defaults correctly on creation ──
+    // â”€â”€ P1: Deposit status defaults correctly on creation â”€â”€
 
     pub fn p1(deposito: Option<String>) {
         with_db(|db| async move {
@@ -349,7 +356,7 @@ mod pbt_async {
         });
     }
 
-    // ── P2: Valid deposit state transitions set timestamps ──
+    // â”€â”€ P2: Valid deposit state transitions set timestamps â”€â”€
 
     pub fn p2(path: u8, deposit_amount: Decimal) {
         with_db(|db| async move {
@@ -379,7 +386,7 @@ mod pbt_async {
             let body: Value = test::read_body_json(resp).await;
             let contrato_id = body["id"].as_str().unwrap();
 
-            // pendiente → cobrado (always first step)
+            // pendiente â†’ cobrado (always first step)
             let req = test::TestRequest::put()
                 .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
@@ -396,10 +403,10 @@ mod pbt_async {
 
             match path {
                 0 => {
-                    // Just cobrado — already verified above
+                    // Just cobrado â€” already verified above
                 }
                 1 => {
-                    // cobrado → devuelto
+                    // cobrado â†’ devuelto
                     let req = test::TestRequest::put()
                         .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
                         .insert_header(("Authorization", format!("Bearer {token}")))
@@ -415,7 +422,7 @@ mod pbt_async {
                     );
                 }
                 2 => {
-                    // cobrado → retenido
+                    // cobrado â†’ retenido
                     // Use half the deposit as retention amount
                     let half = (deposit_amount / Decimal::new(2, 0)).max(Decimal::new(1, 2));
                     let req = test::TestRequest::put()
@@ -424,7 +431,7 @@ mod pbt_async {
                         .set_json(json!({
                             "estado": "retenido",
                             "montoRetenido": half.to_string(),
-                            "motivoRetencion": "Daños en la propiedad"
+                            "motivoRetencion": "DaÃ±os en la propiedad"
                         }))
                         .to_request();
                     let resp = test::call_service(&app, req).await;
@@ -441,7 +448,7 @@ mod pbt_async {
         });
     }
 
-    // ── P4: Retention requires valid monto and motivo ──
+    // â”€â”€ P4: Retention requires valid monto and motivo â”€â”€
 
     pub fn p4_valid(deposit_amount: Decimal, retention_amount: Decimal, motivo: String) {
         with_db(|db| async move {
@@ -471,7 +478,7 @@ mod pbt_async {
             let body: Value = test::read_body_json(resp).await;
             let contrato_id = body["id"].as_str().unwrap();
 
-            // pendiente → cobrado
+            // pendiente â†’ cobrado
             let req = test::TestRequest::put()
                 .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
@@ -480,7 +487,7 @@ mod pbt_async {
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 200);
 
-            // cobrado → retenido with valid monto and motivo
+            // cobrado â†’ retenido with valid monto and motivo
             let valid = retention_amount > Decimal::ZERO && retention_amount <= deposit_amount;
             let req = test::TestRequest::put()
                 .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
@@ -533,7 +540,7 @@ mod pbt_async {
             let body: Value = test::read_body_json(resp).await;
             let contrato_id = body["id"].as_str().unwrap();
 
-            // pendiente → cobrado
+            // pendiente â†’ cobrado
             let req = test::TestRequest::put()
                 .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
@@ -542,7 +549,7 @@ mod pbt_async {
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 200);
 
-            // cobrado → retenido with valid monto but invalid motivo
+            // cobrado â†’ retenido with valid monto but invalid motivo
             let half = (deposit_amount / Decimal::new(2, 0)).max(Decimal::new(1, 2));
             let mut body = json!({
                 "estado": "retenido",
@@ -565,7 +572,7 @@ mod pbt_async {
         });
     }
 
-    // ── P5: Deposit status change round-trip preserves data ──
+    // â”€â”€ P5: Deposit status change round-trip preserves data â”€â”€
 
     pub fn p5(path: u8, deposit_amount: Decimal) {
         with_db(|db| async move {
@@ -595,7 +602,7 @@ mod pbt_async {
             let body: Value = test::read_body_json(resp).await;
             let contrato_id = body["id"].as_str().unwrap().to_string();
 
-            // pendiente → cobrado
+            // pendiente â†’ cobrado
             let req = test::TestRequest::put()
                 .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
@@ -615,7 +622,7 @@ mod pbt_async {
                     expected_motivo = None;
                 }
                 1 => {
-                    // cobrado → devuelto
+                    // cobrado â†’ devuelto
                     let req = test::TestRequest::put()
                         .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
                         .insert_header(("Authorization", format!("Bearer {token}")))
@@ -627,11 +634,11 @@ mod pbt_async {
                     expected_motivo = None;
                 }
                 _ => {
-                    // cobrado → retenido
+                    // cobrado â†’ retenido
                     let half = (deposit_amount / Decimal::new(2, 0))
                         .max(Decimal::new(1, 2))
                         .round_dp(2);
-                    let motivo = "Daños verificados en inspección";
+                    let motivo = "DaÃ±os verificados en inspecciÃ³n";
                     let req = test::TestRequest::put()
                         .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
                         .insert_header(("Authorization", format!("Bearer {token}")))
@@ -672,7 +679,7 @@ mod pbt_async {
         });
     }
 
-    // ── P6: Invalid estado enum — tested via API ──
+    // â”€â”€ P6: Invalid estado enum â€” tested via API â”€â”€
 
     pub fn p6(bad_estado: String) {
         with_db(|db| async move {
@@ -713,7 +720,7 @@ mod pbt_async {
         });
     }
 
-    // ── P7: Deposit operations on contracts without deposit are rejected ──
+    // â”€â”€ P7: Deposit operations on contracts without deposit are rejected â”€â”€
 
     pub fn p7(deposito: Option<String>) {
         with_db(|db| async move {
@@ -743,7 +750,7 @@ mod pbt_async {
             let body: Value = test::read_body_json(resp).await;
             let contrato_id = body["id"].as_str().unwrap();
 
-            // Attempt to change estado — should be rejected
+            // Attempt to change estado â€” should be rejected
             let req = test::TestRequest::put()
                 .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
                 .insert_header(("Authorization", format!("Bearer {token}")))
@@ -759,7 +766,7 @@ mod pbt_async {
     }
 } // end mod pbt_async
 
-// ── Property test functions ────────────────────────────────────────────
+// â”€â”€ Property test functions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: deposit-tracking, Property 1: Deposit status defaults correctly on creation
 // **Validates: Requirements 1.6, 1.7**
@@ -813,7 +820,7 @@ fn test_invalid_transitions_rejected() {
                 let result = validar_transicion_deposito(&estado_actual, &nuevo_estado);
                 assert!(
                     result.is_err(),
-                    "Transition {estado_actual}→{nuevo_estado} should be rejected"
+                    "Transition {estado_actual}â†’{nuevo_estado} should be rejected"
                 );
                 Ok(())
             },

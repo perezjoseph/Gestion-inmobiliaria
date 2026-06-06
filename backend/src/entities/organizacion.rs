@@ -21,6 +21,12 @@ pub struct Model {
     pub representante_legal: Option<String>,
     #[sea_orm(column_type = "JsonBinary", nullable)]
     pub dgii_data: Option<Json>,
+    #[sea_orm(default_value = "informal")]
+    pub tipo_fiscal: String,
+    pub regimen_pagos: Option<String>,
+    pub fecha_inicio_operaciones: Option<Date>,
+    #[sea_orm(default_value = "false")]
+    pub is_ecf_certificado: bool,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }

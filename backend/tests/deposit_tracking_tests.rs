@@ -46,6 +46,10 @@ async fn create_test_organizacion(db: &DatabaseConnection) -> Uuid {
         direccion_fiscal: Set(None),
         representante_legal: Set(None),
         dgii_data: Set(None),
+        tipo_fiscal: Set("informal".to_string()),
+        regimen_pagos: Set(None),
+        fecha_inicio_operaciones: Set(None),
+        is_ecf_certificado: Set(false),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -96,6 +100,9 @@ async fn create_test_propiedad(db: &DatabaseConnection, org_id: Uuid) -> Uuid {
         estado: Set("disponible".to_string()),
         imagenes: Set(None),
         organizacion_id: Set(org_id),
+        valor_catastral: Set(None),
+        exento_ipi: Set(false),
+        motivo_exencion: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -158,7 +165,7 @@ fn contrato_body(propiedad_id: Uuid, inquilino_id: Uuid, deposito: Option<&str>)
     body
 }
 
-// ── Tests ──────────────────────────────────────────────────────────────
+// â”€â”€ Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[test]
 fn test_create_contrato_with_deposit_sets_pendiente() {
@@ -237,7 +244,7 @@ fn test_full_flow_pendiente_cobrado_devuelto() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let contrato_id = body["id"].as_str().unwrap();
 
-        // pendiente → cobrado
+        // pendiente â†’ cobrado
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -252,7 +259,7 @@ fn test_full_flow_pendiente_cobrado_devuelto() {
             "fecha_cobro_deposito should be set"
         );
 
-        // cobrado → devuelto
+        // cobrado â†’ devuelto
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -294,7 +301,7 @@ fn test_full_flow_pendiente_cobrado_retenido() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let contrato_id = body["id"].as_str().unwrap();
 
-        // pendiente → cobrado
+        // pendiente â†’ cobrado
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -303,14 +310,14 @@ fn test_full_flow_pendiente_cobrado_retenido() {
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
 
-        // cobrado → retenido
+        // cobrado â†’ retenido
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "estado": "retenido",
                 "montoRetenido": "10000",
-                "motivoRetencion": "Daños en la propiedad"
+                "motivoRetencion": "DaÃ±os en la propiedad"
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -319,7 +326,7 @@ fn test_full_flow_pendiente_cobrado_retenido() {
         assert_eq!(body["estadoDeposito"], "retenido");
         assert!(!body["fechaDevolucionDeposito"].is_null());
         assert_eq!(body["montoRetenido"], "10000.00");
-        assert_eq!(body["motivoRetencion"], "Daños en la propiedad");
+        assert_eq!(body["motivoRetencion"], "DaÃ±os en la propiedad");
     });
 }
 
@@ -346,7 +353,7 @@ fn test_invalid_transitions_return_422() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let contrato_id = body["id"].as_str().unwrap();
 
-        // pendiente → devuelto (invalid)
+        // pendiente â†’ devuelto (invalid)
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -357,14 +364,14 @@ fn test_invalid_transitions_return_422() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         assert!(body["message"].as_str().unwrap().contains("cobrado"));
 
-        // pendiente → retenido (invalid)
+        // pendiente â†’ retenido (invalid)
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "estado": "retenido",
                 "montoRetenido": "5000",
-                "motivoRetencion": "Daños"
+                "motivoRetencion": "DaÃ±os"
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -395,7 +402,7 @@ fn test_terminal_states_cannot_transition() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let contrato_id = body["id"].as_str().unwrap();
 
-        // pendiente → cobrado → devuelto
+        // pendiente â†’ cobrado â†’ devuelto
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -410,7 +417,7 @@ fn test_terminal_states_cannot_transition() {
             .to_request();
         let _ = actix_web::test::call_service(&app, req).await;
 
-        // devuelto → cobrado (invalid: terminal state)
+        // devuelto â†’ cobrado (invalid: terminal state)
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -451,7 +458,7 @@ fn test_retention_without_monto_retenido_returns_422() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let contrato_id = body["id"].as_str().unwrap();
 
-        // pendiente → cobrado
+        // pendiente â†’ cobrado
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -459,11 +466,11 @@ fn test_retention_without_monto_retenido_returns_422() {
             .to_request();
         let _ = actix_web::test::call_service(&app, req).await;
 
-        // cobrado → retenido without montoRetenido
+        // cobrado â†’ retenido without montoRetenido
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(json!({"estado": "retenido", "motivoRetencion": "Daños"}))
+            .set_json(json!({"estado": "retenido", "motivoRetencion": "DaÃ±os"}))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 422);
@@ -495,7 +502,7 @@ fn test_retention_with_monto_zero_returns_422() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let contrato_id = body["id"].as_str().unwrap();
 
-        // pendiente → cobrado
+        // pendiente â†’ cobrado
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -503,12 +510,12 @@ fn test_retention_with_monto_zero_returns_422() {
             .to_request();
         let _ = actix_web::test::call_service(&app, req).await;
 
-        // cobrado → retenido with montoRetenido = 0
+        // cobrado â†’ retenido with montoRetenido = 0
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(
-                json!({"estado": "retenido", "montoRetenido": "0", "motivoRetencion": "Daños"}),
+                json!({"estado": "retenido", "montoRetenido": "0", "motivoRetencion": "DaÃ±os"}),
             )
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -541,7 +548,7 @@ fn test_retention_with_monto_exceeding_deposit_returns_422() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let contrato_id = body["id"].as_str().unwrap();
 
-        // pendiente → cobrado
+        // pendiente â†’ cobrado
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -549,12 +556,12 @@ fn test_retention_with_monto_exceeding_deposit_returns_422() {
             .to_request();
         let _ = actix_web::test::call_service(&app, req).await;
 
-        // cobrado → retenido with montoRetenido > deposito
+        // cobrado â†’ retenido with montoRetenido > deposito
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(
-                json!({"estado": "retenido", "montoRetenido": "50000", "motivoRetencion": "Daños"}),
+                json!({"estado": "retenido", "montoRetenido": "50000", "motivoRetencion": "DaÃ±os"}),
             )
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -587,7 +594,7 @@ fn test_retention_without_motivo_returns_422() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         let contrato_id = body["id"].as_str().unwrap();
 
-        // pendiente → cobrado
+        // pendiente â†’ cobrado
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -595,7 +602,7 @@ fn test_retention_without_motivo_returns_422() {
             .to_request();
         let _ = actix_web::test::call_service(&app, req).await;
 
-        // cobrado → retenido without motivoRetencion
+        // cobrado â†’ retenido without motivoRetencion
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -800,7 +807,7 @@ fn test_auditoria_entries_for_estado_changes() {
         let contrato_id = body["id"].as_str().unwrap();
         let contrato_uuid: Uuid = contrato_id.parse().unwrap();
 
-        // pendiente → cobrado
+        // pendiente â†’ cobrado
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -825,7 +832,7 @@ fn test_auditoria_entries_for_estado_changes() {
         assert_eq!(entries[0].cambios["estado_nuevo"], "cobrado");
         assert_eq!(entries[0].cambios["estado_anterior"], "pendiente");
 
-        // cobrado → devuelto
+        // cobrado â†’ devuelto
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/contratos/{contrato_id}/deposito"))
             .insert_header(("Authorization", format!("Bearer {token}")))

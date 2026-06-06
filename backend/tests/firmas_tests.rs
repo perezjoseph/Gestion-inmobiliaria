@@ -50,6 +50,10 @@ async fn create_test_organizacion(db: &DatabaseConnection) -> Uuid {
         direccion_fiscal: Set(None),
         representante_legal: Set(None),
         dgii_data: Set(None),
+        tipo_fiscal: Set("informal".to_string()),
+        regimen_pagos: Set(None),
+        fecha_inicio_operaciones: Set(None),
+        is_ecf_certificado: Set(false),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -107,6 +111,9 @@ async fn create_test_documento(db: &DatabaseConnection, user_id: Uuid, org_id: U
         estado: Set("disponible".to_string()),
         imagenes: Set(None),
         organizacion_id: Set(org_id),
+        valor_catastral: Set(None),
+        exento_ipi: Set(false),
+        motivo_exencion: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -221,10 +228,10 @@ fn valid_firma_imagen_b64() -> String {
     base64::engine::general_purpose::STANDARD.encode(png_bytes)
 }
 
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Test: Authenticated signing flow end-to-end
 // Requirements: 4.1
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[test]
 fn test_authenticated_signing_flow_end_to_end() {
@@ -257,10 +264,10 @@ fn test_authenticated_signing_flow_end_to_end() {
     });
 }
 
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Test: solicitar-firma creates pending record with valid token
 // Requirements: 5.1
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[test]
 fn test_solicitar_firma_creates_pending_record() {
@@ -276,7 +283,7 @@ fn test_solicitar_firma_creates_pending_record() {
             .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
-                "firmanteNombre": "Juan Pérez",
+                "firmanteNombre": "Juan PÃ©rez",
                 "email": "juan@example.com"
             }))
             .to_request();
@@ -313,10 +320,10 @@ fn test_solicitar_firma_creates_pending_record() {
     });
 }
 
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Test: Public token verification (valid, expired, wrong password)
 // Requirements: 5.7, 5.8
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[test]
 fn test_public_token_verification_valid() {
@@ -489,10 +496,10 @@ fn test_public_token_verification_wrong_password() {
     });
 }
 
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Test: Public signing (success, already signed conflict)
 // Requirements: 5.10
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[test]
 fn test_public_signing_success() {
@@ -616,10 +623,10 @@ fn test_public_signing_already_signed_conflict() {
     });
 }
 
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Test: Document sealing after both parties sign
 // Requirements: 6.1
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[test]
 fn test_document_sealing_after_both_parties_sign() {
@@ -701,10 +708,10 @@ fn test_document_sealing_after_both_parties_sign() {
     });
 }
 
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Test: Sealed document rejects content edits (403)
 // Requirements: 6.4
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[test]
 fn test_sealed_document_rejects_content_edits() {
@@ -755,10 +762,10 @@ fn test_sealed_document_rejects_content_edits() {
     });
 }
 
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Test: DOCX export returns valid response with correct headers
 // Requirements: 1.1
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[test]
 fn test_docx_export_returns_valid_response() {
@@ -847,6 +854,9 @@ fn test_docx_export_no_content_returns_400() {
             estado: Set("disponible".to_string()),
             imagenes: Set(None),
             organizacion_id: Set(org_id),
+            valor_catastral: Set(None),
+            exento_ipi: Set(false),
+            motivo_exencion: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -947,10 +957,10 @@ fn test_docx_export_no_content_returns_400() {
     });
 }
 
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Test: Template CRUD operations (create, read, update, soft-delete)
 // Requirements: 2.1, 2.3
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[test]
 fn test_template_crud_create_and_read() {
@@ -967,7 +977,7 @@ fn test_template_crud_create_and_read() {
             .peer_addr(test_peer())
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
-                "nombre": "Contrato Estándar",
+                "nombre": "Contrato EstÃ¡ndar",
                 "tipoDocumento": "contrato",
                 "entityType": "contrato",
                 "contenido": {
@@ -988,7 +998,7 @@ fn test_template_crud_create_and_read() {
 
         let body: Value = actix_web::test::read_body_json(resp).await;
         let plantilla_id = body["id"].as_str().unwrap();
-        assert_eq!(body["nombre"], "Contrato Estándar");
+        assert_eq!(body["nombre"], "Contrato EstÃ¡ndar");
         assert_eq!(body["tipoDocumento"], "contrato");
         assert_eq!(body["entityType"], "contrato");
 
@@ -1006,7 +1016,7 @@ fn test_template_crud_create_and_read() {
         );
 
         let body: Value = actix_web::test::read_body_json(resp).await;
-        assert_eq!(body["nombre"], "Contrato Estándar");
+        assert_eq!(body["nombre"], "Contrato EstÃ¡ndar");
         assert_eq!(body["tipoDocumento"], "contrato");
     });
 }
@@ -1118,10 +1128,10 @@ fn test_template_crud_soft_delete() {
     });
 }
 
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Test: RBAC enforcement (WriteAccess for write endpoints)
 // Requirements: 4.1, 2.1
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[test]
 fn test_rbac_firmar_rejects_unauthenticated() {
@@ -1323,10 +1333,10 @@ fn test_rbac_docx_export_rejects_unauthenticated() {
     });
 }
 
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Test: Mail integration using file-transport (AsyncFileTransport)
 // Requirements: 3.5, 3.6
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 /// A `MailClient` implementation backed by `lettre::AsyncFileTransport`.
 /// Writes `.eml` files to a temp directory for test inspection.
@@ -1359,7 +1369,7 @@ impl realestate_backend::services::mail::MailClient for FileMailClient {
                 .from("no-reply@myhomeva.us".parse().unwrap())
                 .to(msg.to.parse().map_err(|e| {
                     realestate_backend::errors::AppError::Validation(format!(
-                        "Dirección de correo inválida: {e}"
+                        "DirecciÃ³n de correo invÃ¡lida: {e}"
                     ))
                 })?)
                 .subject(&msg.subject)
@@ -1432,7 +1442,7 @@ fn test_mail_file_transport_signing_email() {
         let eml_content = std::fs::read_to_string(entries[0].path()).unwrap();
 
         // Helper: decode MIME Q-encoded and base64 body parts for assertion.
-        // lettre Q-encodes the Subject (spaces → '_', non-ASCII → =XX) and
+        // lettre Q-encodes the Subject (spaces â†’ '_', non-ASCII â†’ =XX) and
         // may base64-encode multipart body parts.
         let decoded_subject = {
             use base64::Engine;
@@ -1482,9 +1492,9 @@ fn test_mail_file_transport_signing_email() {
             if decoded.contains("=?utf-8?q?") || decoded.contains("=?UTF-8?q?") {
                 decoded = decoded
                     .replace('_', " ")
-                    .replace("=C3=B3", "ó")
-                    .replace("=C3=A9", "é")
-                    .replace("=C3=AD", "í")
+                    .replace("=C3=B3", "Ã³")
+                    .replace("=C3=A9", "Ã©")
+                    .replace("=C3=AD", "Ã­")
                     .replace("=?utf-8?q?", "")
                     .replace("=?UTF-8?q?", "")
                     .replace("?=", "");
@@ -1510,7 +1520,7 @@ fn test_mail_file_transport_signing_email() {
                         continue;
                     }
                     if line.starts_with("--") {
-                        // MIME boundary — decode accumulated base64
+                        // MIME boundary â€” decode accumulated base64
                         if let Ok(bytes) =
                             base64::engine::general_purpose::STANDARD.decode(b64_buf.trim())
                         {
@@ -1542,7 +1552,7 @@ fn test_mail_file_transport_signing_email() {
         // Assert Spanish subject
         assert!(
             decoded_subject.contains("Firma electr"),
-            "Email should contain Spanish subject about firma electrónica. Got: {decoded_subject}"
+            "Email should contain Spanish subject about firma electrÃ³nica. Got: {decoded_subject}"
         );
         assert!(
             decoded_subject.contains("contrato"),
@@ -1582,10 +1592,10 @@ fn test_mail_file_transport_signing_email() {
     });
 }
 
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Test: Real Mailcow staging (gated, requires SMTP credentials)
 // Requirements: 3.5, 3.6
-// ═══════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[test]
 #[ignore = "Requires real Mailcow SMTP credentials (SMTP_HOST, SMTP_USER, SMTP_PASS)"]

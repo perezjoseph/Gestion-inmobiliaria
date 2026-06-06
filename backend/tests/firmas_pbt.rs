@@ -4,7 +4,7 @@ use proptest::test_runner::{Config as ProptestConfig, TestRunner};
 
 use crate::migrations;
 
-// ── Strategies ─────────────────────────────────────────────────
+// â”€â”€ Strategies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /// Non-pendiente estado values that should trigger a 409 Conflict.
 fn non_pendiente_estado() -> impl Strategy<Value = String> {
@@ -48,7 +48,7 @@ fn arbitrary_user_agent() -> impl Strategy<Value = String> {
     "[a-zA-Z0-9/ .;()-]{10,50}"
 }
 
-// ── Async helpers ──────────────────────────────────────────────
+// â”€â”€ Async helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 mod pbt_async {
     use chrono::{Duration, Utc};
@@ -100,14 +100,14 @@ mod pbt_async {
     {
         dotenvy::dotenv().ok();
         if std::env::var("DATABASE_URL").is_err() {
-            eprintln!("⚠ DATABASE_URL not set – skipping PBT");
+            eprintln!("âš  DATABASE_URL not set â€“ skipping PBT");
             return;
         }
         let _guard = crate::GLOBAL_DB_SERIAL
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         let Some((rt, db)) = shared_rt_and_db() else {
-            eprintln!("⚠ DB not reachable – skipping PBT");
+            eprintln!("âš  DB not reachable â€“ skipping PBT");
             return;
         };
         rt.block_on(f(db.clone()));
@@ -137,6 +137,10 @@ mod pbt_async {
             direccion_fiscal: Set(None),
             representante_legal: Set(None),
             dgii_data: Set(None),
+            tipo_fiscal: Set("informal".to_string()),
+            regimen_pagos: Set(None),
+            fecha_inicio_operaciones: Set(None),
+            is_ecf_certificado: Set(false),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -179,6 +183,9 @@ mod pbt_async {
             estado: Set("disponible".to_string()),
             imagenes: Set(None),
             organizacion_id: Set(org_id),
+            valor_catastral: Set(None),
+            exento_ipi: Set(false),
+            motivo_exencion: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -296,6 +303,10 @@ mod pbt_async {
                 direccion_fiscal: Set(None),
                 representante_legal: Set(None),
                 dgii_data: Set(None),
+                tipo_fiscal: Set("informal".to_string()),
+                regimen_pagos: Set(None),
+                fecha_inicio_operaciones: Set(None),
+                is_ecf_certificado: Set(false),
                 created_at: Set(now),
                 updated_at: Set(now),
             }
@@ -338,6 +349,9 @@ mod pbt_async {
                 estado: Set("disponible".to_string()),
                 imagenes: Set(None),
                 organizacion_id: Set(org_id),
+                valor_catastral: Set(None),
+                exento_ipi: Set(false),
+                motivo_exencion: Set(None),
                 created_at: Set(now),
                 updated_at: Set(now),
             }
@@ -443,7 +457,7 @@ mod pbt_async {
             .await
             .expect("create sealed documento for P3");
 
-            // Attempt deletion — should fail with Forbidden (403)
+            // Attempt deletion â€” should fail with Forbidden (403)
             let result = documentos::eliminar(&db, doc_id, user_id, org_id).await;
 
             assert!(
@@ -730,7 +744,7 @@ mod pbt_async {
             };
             firma.insert(&db).await.expect("insert firma for PBT");
 
-            // Attempt to sign — should return Conflict (409)
+            // Attempt to sign â€” should return Conflict (409)
             use base64::Engine;
             let firma_imagen_b64 =
                 base64::engine::general_purpose::STANDARD.encode(b"fake-png-data");

@@ -43,6 +43,10 @@ async fn create_test_organizacion(db: &DatabaseConnection) -> Uuid {
         direccion_fiscal: Set(None),
         representante_legal: Set(None),
         dgii_data: Set(None),
+        tipo_fiscal: Set("informal".to_string()),
+        regimen_pagos: Set(None),
+        fecha_inicio_operaciones: Set(None),
+        is_ecf_certificado: Set(false),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -93,6 +97,9 @@ async fn create_test_propiedad(db: &DatabaseConnection, org_id: Uuid) -> Uuid {
         estado: Set("disponible".to_string()),
         imagenes: Set(None),
         organizacion_id: Set(org_id),
+        valor_catastral: Set(None),
+        exento_ipi: Set(false),
+        motivo_exencion: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
     }
@@ -144,7 +151,7 @@ fn make_app(
     )
 }
 
-// ── Tests ──────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Tests Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 fn future_date_range() -> (String, String) {
     let today = Utc::now().date_naive();
@@ -169,7 +176,7 @@ fn future_fecha_pago() -> String {
         .to_string()
 }
 
-/// Test: Create contrato with recargo_porcentaje and dias_gracia → fields stored and returned
+/// Test: Create contrato with recargo_porcentaje and dias_gracia Ã¢â€ â€™ fields stored and returned
 /// Requirements: 1.1, 1.2, 1.7
 #[test]
 fn test_create_contrato_with_recargo_fields() {
@@ -205,7 +212,7 @@ fn test_create_contrato_with_recargo_fields() {
     });
 }
 
-/// Test: Create contrato without recargo fields → NULL values returned
+/// Test: Create contrato without recargo fields Ã¢â€ â€™ NULL values returned
 /// Requirements: 1.3, 1.4
 #[test]
 fn test_create_contrato_without_recargo_fields() {
@@ -239,7 +246,7 @@ fn test_create_contrato_without_recargo_fields() {
     });
 }
 
-/// Test: Update contrato recargo_porcentaje and dias_gracia → fields updated
+/// Test: Update contrato recargo_porcentaje and dias_gracia Ã¢â€ â€™ fields updated
 /// Requirements: 1.5, 1.6
 #[test]
 fn test_update_contrato_recargo_fields() {
@@ -288,7 +295,7 @@ fn test_update_contrato_recargo_fields() {
     });
 }
 
-/// Test: Create contrato with recargo_porcentaje < 0 → 422
+/// Test: Create contrato with recargo_porcentaje < 0 Ã¢â€ â€™ 422
 /// Requirements: 1.5
 #[test]
 fn test_create_contrato_recargo_porcentaje_negative_422() {
@@ -319,7 +326,7 @@ fn test_create_contrato_recargo_porcentaje_negative_422() {
     });
 }
 
-/// Test: Create contrato with recargo_porcentaje > 100 → 422
+/// Test: Create contrato with recargo_porcentaje > 100 Ã¢â€ â€™ 422
 /// Requirements: 1.5
 #[test]
 fn test_create_contrato_recargo_porcentaje_over_100_422() {
@@ -350,7 +357,7 @@ fn test_create_contrato_recargo_porcentaje_over_100_422() {
     });
 }
 
-/// Test: Create contrato with dias_gracia < 0 → 422
+/// Test: Create contrato with dias_gracia < 0 Ã¢â€ â€™ 422
 /// Requirements: 1.6
 #[test]
 fn test_create_contrato_dias_gracia_negative_422() {
@@ -381,7 +388,7 @@ fn test_create_contrato_dias_gracia_negative_422() {
     });
 }
 
-/// Test: GET /configuracion/recargo when not set → NULL
+/// Test: GET /configuracion/recargo when not set Ã¢â€ â€™ NULL
 /// Requirements: 3.4
 #[test]
 fn test_get_recargo_config_not_set_returns_null() {
@@ -410,7 +417,7 @@ fn test_get_recargo_config_not_set_returns_null() {
     });
 }
 
-/// Test: PUT /configuracion/recargo with valid value → stored and returned
+/// Test: PUT /configuracion/recargo with valid value Ã¢â€ â€™ stored and returned
 /// Requirements: 3.1, 3.3
 #[test]
 fn test_put_recargo_config_valid_value() {
@@ -445,7 +452,7 @@ fn test_put_recargo_config_valid_value() {
     });
 }
 
-/// Test: PUT /configuracion/recargo with invalid value → 422
+/// Test: PUT /configuracion/recargo with invalid value Ã¢â€ â€™ 422
 /// Requirements: 3.2
 #[test]
 fn test_put_recargo_config_invalid_value_422() {
@@ -480,7 +487,7 @@ fn test_put_recargo_config_invalid_value_422() {
     });
 }
 
-/// Test: PUT /configuracion/recargo as non-admin → 403
+/// Test: PUT /configuracion/recargo as non-admin Ã¢â€ â€™ 403
 /// Requirements: 3.1
 #[test]
 fn test_put_recargo_config_non_admin_403() {
@@ -503,7 +510,7 @@ fn test_put_recargo_config_non_admin_403() {
     });
 }
 
-/// Test: mark_overdue with dias_gracia → respects grace period
+/// Test: mark_overdue with dias_gracia Ã¢â€ â€™ respects grace period
 /// Requirements: 6.1, 6.2, 6.3
 #[test]
 fn test_mark_overdue_respects_grace_period() {
@@ -559,6 +566,15 @@ fn test_mark_overdue_respects_grace_period() {
             notas: Set(None),
             recargo: Set(None),
             organizacion_id: Set(org_id),
+            monto_base: Set(None),
+            monto_itbis: Set(None),
+            monto_itbis_retenido: Set(None),
+            ncf: Set(None),
+            fecha_comprobante: Set(None),
+            tipo_ncf: Set(None),
+            es_parcial: Set(false),
+            saldo_pendiente: Set(None),
+            tipo_linea: Set("renta".to_string()),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -581,6 +597,15 @@ fn test_mark_overdue_respects_grace_period() {
             notas: Set(None),
             recargo: Set(None),
             organizacion_id: Set(org_id),
+            monto_base: Set(None),
+            monto_itbis: Set(None),
+            monto_itbis_retenido: Set(None),
+            ncf: Set(None),
+            fecha_comprobante: Set(None),
+            tipo_ncf: Set(None),
+            es_parcial: Set(false),
+            saldo_pendiente: Set(None),
+            tipo_linea: Set("renta".to_string()),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -666,6 +691,15 @@ fn test_mark_overdue_calculates_recargo_contrato_porcentaje() {
             notas: Set(None),
             recargo: Set(None),
             organizacion_id: Set(org_id),
+            monto_base: Set(None),
+            monto_itbis: Set(None),
+            monto_itbis_retenido: Set(None),
+            ncf: Set(None),
+            fecha_comprobante: Set(None),
+            tipo_ncf: Set(None),
+            es_parcial: Set(false),
+            saldo_pendiente: Set(None),
+            tipo_linea: Set("renta".to_string()),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -709,7 +743,7 @@ fn test_mark_overdue_calculates_recargo_org_default() {
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
 
-        // Create contrato WITHOUT recargo_porcentaje (NULL → falls back to org)
+        // Create contrato WITHOUT recargo_porcentaje (NULL Ã¢â€ â€™ falls back to org)
         use realestate_backend::entities::contrato;
         let contrato_id = Uuid::new_v4();
         let now = Utc::now().into();
@@ -730,7 +764,7 @@ fn test_mark_overdue_calculates_recargo_org_default() {
             fecha_devolucion_deposito: Set(None),
             monto_retenido: Set(None),
             motivo_retencion: Set(None),
-            recargo_porcentaje: Set(None), // NULL → use org default
+            recargo_porcentaje: Set(None), // NULL Ã¢â€ â€™ use org default
             dias_gracia: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
@@ -755,6 +789,15 @@ fn test_mark_overdue_calculates_recargo_org_default() {
             notas: Set(None),
             recargo: Set(None),
             organizacion_id: Set(org_id),
+            monto_base: Set(None),
+            monto_itbis: Set(None),
+            monto_itbis_retenido: Set(None),
+            ncf: Set(None),
+            fecha_comprobante: Set(None),
+            tipo_ncf: Set(None),
+            es_parcial: Set(false),
+            saldo_pendiente: Set(None),
+            tipo_linea: Set("renta".to_string()),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -777,7 +820,7 @@ fn test_mark_overdue_calculates_recargo_org_default() {
     });
 }
 
-/// Test: mark_overdue with both NULL → recargo stays NULL
+/// Test: mark_overdue with both NULL Ã¢â€ â€™ recargo stays NULL
 /// Requirements: 4.3, 5.4
 #[test]
 fn test_mark_overdue_both_null_recargo_stays_null() {
@@ -839,6 +882,15 @@ fn test_mark_overdue_both_null_recargo_stays_null() {
             notas: Set(None),
             recargo: Set(None),
             organizacion_id: Set(org_id),
+            monto_base: Set(None),
+            monto_itbis: Set(None),
+            monto_itbis_retenido: Set(None),
+            ncf: Set(None),
+            fecha_comprobante: Set(None),
+            tipo_ncf: Set(None),
+            es_parcial: Set(false),
+            saldo_pendiente: Set(None),
+            tipo_linea: Set("renta".to_string()),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -861,7 +913,7 @@ fn test_mark_overdue_both_null_recargo_stays_null() {
     });
 }
 
-/// Test: Manual update estado to "atrasado" → recargo calculated
+/// Test: Manual update estado to "atrasado" Ã¢â€ â€™ recargo calculated
 /// Requirements: 5.2
 #[test]
 fn test_manual_update_estado_atrasado_calculates_recargo() {
@@ -926,7 +978,7 @@ fn test_manual_update_estado_atrasado_calculates_recargo() {
     });
 }
 
-/// Test: Update estado from "atrasado" to "pagado" → recargo cleared to NULL
+/// Test: Update estado from "atrasado" to "pagado" Ã¢â€ â€™ recargo cleared to NULL
 /// Requirements: 5.2
 #[test]
 fn test_update_estado_atrasado_to_pagado_clears_recargo() {
@@ -985,7 +1037,7 @@ fn test_update_estado_atrasado_to_pagado_clears_recargo() {
         let body: Value = actix_web::test::read_body_json(resp).await;
         assert_eq!(body["recargo"], "1500.00"); // 15000 * 10%
 
-        // Now mark as pagado → recargo should be cleared
+        // Now mark as pagado Ã¢â€ â€™ recargo should be cleared
         let fecha_pago = future_fecha_pago();
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/pagos/{pago_id}"))

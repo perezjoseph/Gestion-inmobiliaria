@@ -4,7 +4,7 @@ use proptest::test_runner::{Config as ProptestConfig, TestRunner};
 
 use crate::migrations;
 
-// ── Custom Strategies ──────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Custom Strategies Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 /// Random monto as `i64` cents (`1..99_999_999`) to build `Decimal` with scale 2.
 fn monto_cents() -> impl Strategy<Value = i64> {
@@ -44,7 +44,7 @@ fn grace_days() -> impl Strategy<Value = i32> {
     1i32..=30i32
 }
 
-// ── Async helpers module ───────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Async helpers module Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 mod pbt_async {
     use chrono::Utc;
@@ -96,14 +96,14 @@ mod pbt_async {
     {
         dotenvy::dotenv().ok();
         if std::env::var("DATABASE_URL").is_err() {
-            eprintln!("⚠ DATABASE_URL not set – skipping PBT");
+            eprintln!("Ã¢Å¡Â  DATABASE_URL not set Ã¢â‚¬â€œ skipping PBT");
             return;
         }
         let _guard = crate::GLOBAL_DB_SERIAL
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         let Some((rt, db)) = shared_rt_and_db() else {
-            eprintln!("⚠ DB not reachable – skipping PBT");
+            eprintln!("Ã¢Å¡Â  DB not reachable Ã¢â‚¬â€œ skipping PBT");
             return;
         };
         rt.block_on(f(db.clone()));
@@ -127,6 +127,10 @@ mod pbt_async {
             direccion_fiscal: Set(None),
             representante_legal: Set(None),
             dgii_data: Set(None),
+            tipo_fiscal: Set("informal".to_string()),
+            regimen_pagos: Set(None),
+            fecha_inicio_operaciones: Set(None),
+            is_ecf_certificado: Set(false),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -156,6 +160,9 @@ mod pbt_async {
             estado: Set("disponible".to_string()),
             imagenes: Set(None),
             organizacion_id: Set(org_id),
+            valor_catastral: Set(None),
+            exento_ipi: Set(false),
+            motivo_exencion: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -269,6 +276,15 @@ mod pbt_async {
             notas: Set(None),
             recargo: Set(None),
             organizacion_id: Set(org_id),
+            monto_base: Set(None),
+            monto_itbis: Set(None),
+            monto_itbis_retenido: Set(None),
+            ncf: Set(None),
+            fecha_comprobante: Set(None),
+            tipo_ncf: Set(None),
+            es_parcial: Set(false),
+            saldo_pendiente: Set(None),
+            tipo_linea: Set("renta".to_string()),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -298,11 +314,11 @@ mod pbt_async {
             .await;
     }
 
-    // ── P1: Cálculo de recargo es correcto (pure function) ─────────────
-    // No DB needed — tests calcular_recargo directly.
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P1: CÃƒÂ¡lculo de recargo es correcto (pure function) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    // No DB needed Ã¢â‚¬â€ tests calcular_recargo directly.
     // Handled inline in the test function below.
 
-    // ── P2: Round-trip de campos de contrato ───────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P2: Round-trip de campos de contrato Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p2(recargo_hundredths: i64, dias_gracia: i32) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -342,7 +358,7 @@ mod pbt_async {
         });
     }
 
-    // ── P3: Resolución contrato tiene prioridad ────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P3: ResoluciÃƒÂ³n contrato tiene prioridad Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p3(contrato_pct_hundredths: i64, org_pct_hundredths: i64) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -390,7 +406,7 @@ mod pbt_async {
         });
     }
 
-    // ── P4: Resolución fallback a organización ─────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P4: ResoluciÃƒÂ³n fallback a organizaciÃƒÂ³n Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p4(org_pct_hundredths: i64) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -411,7 +427,7 @@ mod pbt_async {
                 propiedad_id,
                 inquilino_id,
                 org_id,
-                None, // NULL → fallback to org
+                None, // NULL Ã¢â€ â€™ fallback to org
                 None,
             )
             .await;
@@ -437,7 +453,7 @@ mod pbt_async {
         });
     }
 
-    // ── P5: Resolución ambos NULL produce None ─────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P5: ResoluciÃƒÂ³n ambos NULL produce None Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p5() {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -467,7 +483,7 @@ mod pbt_async {
         });
     }
 
-    // ── P6: Validación de rango de porcentaje ──────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P6: ValidaciÃƒÂ³n de rango de porcentaje Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p6(invalid_pct_hundredths: i64) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -508,7 +524,7 @@ mod pbt_async {
         });
     }
 
-    // ── P7: Validación de dias_gracia no negativo ──────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P7: ValidaciÃƒÂ³n de dias_gracia no negativo Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p7(negative_dias: i32) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -539,7 +555,7 @@ mod pbt_async {
         });
     }
 
-    // ── P8: Período de gracia retrasa atraso ───────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P8: PerÃƒÂ­odo de gracia retrasa atraso Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p8(dias_gracia: i32, monto_cents: i64) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -563,7 +579,7 @@ mod pbt_async {
             .await;
 
             // Pago 1: overdue by 1 day (within grace if dias_gracia >= 1)
-            // fecha_vencimiento = today - 1 → effective_due = today - 1 + dias_gracia
+            // fecha_vencimiento = today - 1 Ã¢â€ â€™ effective_due = today - 1 + dias_gracia
             // If dias_gracia >= 1, effective_due >= today, so NOT overdue
             let yesterday = Utc::now().date_naive() - chrono::Duration::days(1);
             let pago_within_id = insert_pago_raw(&db, contrato_id, org_id, monto, yesterday).await;
@@ -608,7 +624,7 @@ mod pbt_async {
         });
     }
 
-    // ── P9: Recargo se calcula al marcar atrasado ──────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P9: Recargo se calcula al marcar atrasado Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p9(monto_cents: i64, pct_hundredths: i64) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -628,7 +644,7 @@ mod pbt_async {
                 inquilino_id,
                 org_id,
                 Some(porcentaje),
-                None, // no grace → overdue immediately after fecha_vencimiento
+                None, // no grace Ã¢â€ â€™ overdue immediately after fecha_vencimiento
             )
             .await;
 
@@ -662,7 +678,7 @@ mod pbt_async {
         });
     }
 
-    // ── P10: Recargo con porcentaje 0 produce 0.00 ─────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P10: Recargo con porcentaje 0 produce 0.00 Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p10(monto_cents: i64) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -714,9 +730,9 @@ mod pbt_async {
     }
 } // end pbt_async
 
-// ── Test functions ─────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Test functions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
-// Feature: late-fees, Property 1: Cálculo de recargo es correcto
+// Feature: late-fees, Property 1: CÃƒÂ¡lculo de recargo es correcto
 // **Validates: Requirements 5.1, 5.3**
 #[test]
 fn test_calculo_recargo_correcto() {
@@ -771,7 +787,7 @@ fn test_contrato_recargo_roundtrip() {
         .unwrap();
 }
 
-// Feature: late-fees, Property 3: Resolución contrato tiene prioridad
+// Feature: late-fees, Property 3: ResoluciÃƒÂ³n contrato tiene prioridad
 // **Validates: Requirements 4.1**
 #[test]
 fn test_resolucion_contrato_prioridad() {
@@ -793,7 +809,7 @@ fn test_resolucion_contrato_prioridad() {
         .unwrap();
 }
 
-// Feature: late-fees, Property 4: Resolución fallback a organización
+// Feature: late-fees, Property 4: ResoluciÃƒÂ³n fallback a organizaciÃƒÂ³n
 // **Validates: Requirements 4.2**
 #[test]
 fn test_resolucion_fallback_org() {
@@ -809,7 +825,7 @@ fn test_resolucion_fallback_org() {
         .unwrap();
 }
 
-// Feature: late-fees, Property 5: Resolución ambos NULL produce None
+// Feature: late-fees, Property 5: ResoluciÃƒÂ³n ambos NULL produce None
 // **Validates: Requirements 4.3, 5.4**
 #[test]
 fn test_resolucion_ambos_null() {
@@ -825,7 +841,7 @@ fn test_resolucion_ambos_null() {
         .unwrap();
 }
 
-// Feature: late-fees, Property 6: Validación de rango de porcentaje
+// Feature: late-fees, Property 6: ValidaciÃƒÂ³n de rango de porcentaje
 // **Validates: Requirements 1.5, 3.2**
 #[test]
 fn test_validacion_rango_porcentaje() {
@@ -841,7 +857,7 @@ fn test_validacion_rango_porcentaje() {
         .unwrap();
 }
 
-// Feature: late-fees, Property 7: Validación de dias_gracia no negativo
+// Feature: late-fees, Property 7: ValidaciÃƒÂ³n de dias_gracia no negativo
 // **Validates: Requirements 1.6**
 #[test]
 fn test_validacion_dias_gracia_negativo() {
@@ -857,7 +873,7 @@ fn test_validacion_dias_gracia_negativo() {
         .unwrap();
 }
 
-// Feature: late-fees, Property 8: Período de gracia retrasa el marcado de atraso
+// Feature: late-fees, Property 8: PerÃƒÂ­odo de gracia retrasa el marcado de atraso
 // **Validates: Requirements 6.1, 6.2, 6.3**
 #[test]
 fn test_periodo_gracia_retrasa_atraso() {

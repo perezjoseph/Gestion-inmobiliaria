@@ -70,6 +70,15 @@ pub async fn create<C: ConnectionTrait>(
         notas: Set(input.notas),
         recargo: Set(None),
         organizacion_id: Set(organizacion_id),
+        monto_base: Set(None),
+        monto_itbis: Set(None),
+        monto_itbis_retenido: Set(None),
+        ncf: Set(None),
+        fecha_comprobante: Set(None),
+        tipo_ncf: Set(None),
+        es_parcial: Set(false),
+        saldo_pendiente: Set(None),
+        tipo_linea: Set("renta".to_string()),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -298,7 +307,7 @@ pub async fn bulk_marcar_pagado<C: ConnectionTrait>(
             "Los siguientes pagos no están en estado pendiente/atrasado: {}",
             non_updatable
                 .iter()
-                .map(|id| id.to_string())
+                .map(std::string::ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(", ")
         )));

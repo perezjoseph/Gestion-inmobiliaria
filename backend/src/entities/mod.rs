@@ -10,7 +10,10 @@ pub mod chatbot_eval_suite;
 pub mod chatbot_receipt_extraction;
 #[allow(dead_code)]
 pub mod configuracion;
+pub mod configuracion_ipi;
 pub mod contrato;
+pub mod copropietario;
+pub mod cuota_condominio;
 pub mod desahucio;
 #[allow(dead_code)]
 pub mod documento;
@@ -30,8 +33,11 @@ pub mod plantilla_documento;
 pub mod prelude;
 pub mod preview_index;
 pub mod propiedad;
+pub mod recibo_informal;
 pub mod registro_auditoria;
+pub mod reporte_dgii;
 pub mod responsabilidad_servicio;
+pub mod secuencia_ncf;
 pub mod solicitud_mantenimiento;
 pub mod unidad;
 pub mod usuario;

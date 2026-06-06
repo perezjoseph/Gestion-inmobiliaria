@@ -93,6 +93,9 @@ pub async fn create<C: ConnectionTrait>(
         estado: Set(input.estado.unwrap_or_else(|| "disponible".to_string())),
         imagenes: Set(input.imagenes.or(Some(serde_json::json!([])))),
         organizacion_id: Set(org_id),
+        valor_catastral: Set(None),
+        exento_ipi: Set(false),
+        motivo_exencion: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
     };

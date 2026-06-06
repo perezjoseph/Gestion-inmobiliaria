@@ -292,8 +292,8 @@ pub async fn delete<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Generates gastos from active recurring templates whose proxima_fecha <= today.
-/// Advances proxima_fecha after generating each gasto.
+/// Generates gastos from active recurring templates whose `proxima_fecha` <= today.
+/// Advances `proxima_fecha` after generating each gasto.
 /// Called by the background scheduler.
 pub async fn generar_gastos_pendientes(db: &DatabaseConnection) -> Result<i64, AppError> {
     let today = Utc::now().date_naive();

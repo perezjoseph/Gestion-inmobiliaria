@@ -316,6 +316,10 @@ async fn register_new_org(
         direccion_fiscal: Set(org_direccion_fiscal),
         representante_legal: Set(org_representante_legal),
         dgii_data: Set(None),
+        tipo_fiscal: Set("informal".to_string()),
+        regimen_pagos: Set(None),
+        fecha_inicio_operaciones: Set(None),
+        is_ecf_certificado: Set(false),
         created_at: Set(now),
         updated_at: Set(now),
     };

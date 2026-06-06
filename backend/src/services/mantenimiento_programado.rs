@@ -290,7 +290,7 @@ pub async fn delete<C: ConnectionTrait>(
 }
 
 /// Generates solicitudes de mantenimiento from active scheduled templates
-/// whose proxima_fecha <= today. Advances proxima_fecha after generating each solicitud.
+/// whose `proxima_fecha` <= today. Advances `proxima_fecha` after generating each solicitud.
 /// Called by the background scheduler.
 pub async fn generar_solicitudes_pendientes(db: &DatabaseConnection) -> Result<i64, AppError> {
     let today = Utc::now().date_naive();

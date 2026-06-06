@@ -4,7 +4,7 @@ use proptest::test_runner::{Config as ProptestConfig, TestRunner};
 
 use crate::migrations;
 
-// ── Custom Strategies ──────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Custom Strategies Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 /// Random pago estado: pendiente, pagado, or atrasado.
 fn pago_estado() -> impl Strategy<Value = String> {
@@ -57,7 +57,7 @@ fn tarea_invalida() -> impl Strategy<Value = String> {
     })
 }
 
-// ── Async helpers module ───────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Async helpers module Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 mod pbt_async {
     use chrono::Utc;
@@ -110,14 +110,14 @@ mod pbt_async {
     {
         dotenvy::dotenv().ok();
         if std::env::var("DATABASE_URL").is_err() {
-            eprintln!("⚠ DATABASE_URL not set – skipping PBT");
+            eprintln!("Ã¢Å¡Â  DATABASE_URL not set Ã¢â‚¬â€œ skipping PBT");
             return;
         }
         let _guard = crate::GLOBAL_DB_SERIAL
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         let Some((rt, db)) = shared_rt_and_db() else {
-            eprintln!("⚠ DB not reachable – skipping PBT");
+            eprintln!("Ã¢Å¡Â  DB not reachable Ã¢â‚¬â€œ skipping PBT");
             return;
         };
         rt.block_on(f(db.clone()));
@@ -141,6 +141,10 @@ mod pbt_async {
             direccion_fiscal: Set(None),
             representante_legal: Set(None),
             dgii_data: Set(None),
+            tipo_fiscal: Set("informal".to_string()),
+            regimen_pagos: Set(None),
+            fecha_inicio_operaciones: Set(None),
+            is_ecf_certificado: Set(false),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -170,6 +174,9 @@ mod pbt_async {
             estado: Set("disponible".to_string()),
             imagenes: Set(None),
             organizacion_id: Set(org_id),
+            valor_catastral: Set(None),
+            exento_ipi: Set(false),
+            motivo_exencion: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -262,6 +269,15 @@ mod pbt_async {
             notas: Set(None),
             recargo: Set(None),
             organizacion_id: Set(org_id),
+            monto_base: Set(None),
+            monto_itbis: Set(None),
+            monto_itbis_retenido: Set(None),
+            ncf: Set(None),
+            fecha_comprobante: Set(None),
+            tipo_ncf: Set(None),
+            es_parcial: Set(false),
+            saldo_pendiente: Set(None),
+            tipo_linea: Set("renta".to_string()),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -389,7 +405,7 @@ mod pbt_async {
         }
     }
 
-    // ── P1: Idempotencia de marcar pagos atrasados ─────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P1: Idempotencia de marcar pagos atrasados Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p1(estados: Vec<String>, offsets: Vec<i64>) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -418,7 +434,7 @@ mod pbt_async {
             cleanup_pagos(&db, &pago_ids).await;
         });
     }
-    // ── P2: Idempotencia de marcar contratos vencidos ─────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P2: Idempotencia de marcar contratos vencidos Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p2(estados: Vec<String>, offsets: Vec<i64>) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -454,7 +470,7 @@ mod pbt_async {
         });
     }
 
-    // ── P4: Registro de ejecución completo ───────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P4: Registro de ejecuciÃƒÂ³n completo Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p4(nombre_tarea: String) {
         with_db(|db| async move {
             let result = realestate_backend::services::background_jobs::ejecutar_tarea_por_nombre(
@@ -495,7 +511,7 @@ mod pbt_async {
         });
     }
 
-    // ── P3: Idempotencia de marcar documentos vencidos ────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P3: Idempotencia de marcar documentos vencidos Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p3(estados: Vec<String>, offsets: Vec<i64>) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -528,7 +544,7 @@ mod pbt_async {
             cleanup_documentos(&db, &doc_ids).await;
         });
     }
-    // ── P5: Nombre de tarea inválido retorna 404 ──────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P5: Nombre de tarea invÃƒÂ¡lido retorna 404 Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p5(nombre_invalido: String) {
         with_db(|db| async move {
             let result = realestate_backend::services::background_jobs::ejecutar_tarea_por_nombre(
@@ -549,7 +565,7 @@ mod pbt_async {
         });
     }
 
-    // ── P6: Historial ordenado por fecha descendente ──────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P6: Historial ordenado por fecha descendente Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p6(tareas: Vec<String>) {
         with_db(|db| async move {
             use realestate_backend::models::background_jobs::HistorialQuery;
@@ -588,7 +604,7 @@ mod pbt_async {
         });
     }
 
-    // ── P7: Filtrado del historial retorna solo registros coincidentes ─
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P7: Filtrado del historial retorna solo registros coincidentes Ã¢â€â‚¬
     pub fn p7(tareas: Vec<String>, filtro_nombre: String) {
         with_db(|db| async move {
             use realestate_backend::models::background_jobs::HistorialQuery;
@@ -643,7 +659,7 @@ mod pbt_async {
             }
         });
     }
-    // ── P8: Post-condición de marcar pagos atrasados ─────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P8: Post-condiciÃƒÂ³n de marcar pagos atrasados Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p8(estados: Vec<String>, offsets: Vec<i64>) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -687,7 +703,7 @@ mod pbt_async {
         });
     }
 
-    // ── P9: Post-condición de marcar contratos vencidos ──────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P9: Post-condiciÃƒÂ³n de marcar contratos vencidos Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p9(estados: Vec<String>, offsets: Vec<i64>) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -736,7 +752,7 @@ mod pbt_async {
         });
     }
 
-    // ── P10: Post-condición de marcar documentos vencidos ─────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P10: Post-condiciÃƒÂ³n de marcar documentos vencidos Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p10(estados: Vec<String>, offsets: Vec<i64>) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -784,7 +800,7 @@ mod pbt_async {
     }
 } // end pbt_async
 
-// ── Test functions ─────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Test functions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 // Feature: background-jobs, Property 1: Idempotencia de marcar pagos atrasados
 // **Validates: Requirements 1.1, 1.4**
@@ -864,7 +880,7 @@ fn test_idempotencia_marcar_documentos() {
         .unwrap();
 }
 
-// Feature: background-jobs, Property 4: Registro de ejecución completo
+// Feature: background-jobs, Property 4: Registro de ejecuciÃƒÂ³n completo
 // **Validates: Requirements 5.1**
 #[test]
 fn test_registro_ejecucion_completo() {
@@ -880,7 +896,7 @@ fn test_registro_ejecucion_completo() {
         .unwrap();
 }
 
-// Feature: background-jobs, Property 5: Nombre de tarea inválido retorna 404
+// Feature: background-jobs, Property 5: Nombre de tarea invÃƒÂ¡lido retorna 404
 // **Validates: Requirements 7.2**
 #[test]
 fn test_nombre_tarea_invalido_404() {
@@ -934,7 +950,7 @@ fn test_filtrado_historial() {
         .unwrap();
 }
 
-// Feature: background-jobs, Property 8: Post-condición de marcar pagos atrasados
+// Feature: background-jobs, Property 8: Post-condiciÃƒÂ³n de marcar pagos atrasados
 // **Validates: Requirements 1.1**
 #[test]
 fn test_postcondicion_pagos_atrasados() {
@@ -960,7 +976,7 @@ fn test_postcondicion_pagos_atrasados() {
         .unwrap();
 }
 
-// Feature: background-jobs, Property 9: Post-condición de marcar contratos vencidos
+// Feature: background-jobs, Property 9: Post-condiciÃƒÂ³n de marcar contratos vencidos
 // **Validates: Requirements 2.1**
 #[test]
 fn test_postcondicion_contratos_vencidos() {
@@ -986,7 +1002,7 @@ fn test_postcondicion_contratos_vencidos() {
         .unwrap();
 }
 
-// Feature: background-jobs, Property 10: Post-condición de marcar documentos vencidos
+// Feature: background-jobs, Property 10: Post-condiciÃƒÂ³n de marcar documentos vencidos
 // **Validates: Requirements 3.1**
 #[test]
 fn test_postcondicion_documentos_vencidos() {

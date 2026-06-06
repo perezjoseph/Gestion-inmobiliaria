@@ -4,7 +4,7 @@ use proptest::test_runner::{Config as ProptestConfig, TestRunner};
 
 use crate::migrations;
 
-// ── Custom Strategies ──────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Custom Strategies Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 fn valid_tipo() -> impl Strategy<Value = String> {
     prop_oneof![
@@ -37,7 +37,7 @@ fn read_unread_mix_count() -> impl Strategy<Value = (usize, usize)> {
     (1usize..4usize, 1usize..4usize)
 }
 
-// ── Async helpers module ───────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Async helpers module Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 mod pbt_async {
     use chrono::Utc;
@@ -90,14 +90,14 @@ mod pbt_async {
     {
         dotenvy::dotenv().ok();
         if std::env::var("DATABASE_URL").is_err() {
-            eprintln!("⚠ DATABASE_URL not set – skipping PBT");
+            eprintln!("Ã¢Å¡Â  DATABASE_URL not set Ã¢â‚¬â€œ skipping PBT");
             return;
         }
         let _guard = crate::GLOBAL_DB_SERIAL
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         let Some((rt, db)) = shared_rt_and_db() else {
-            eprintln!("⚠ DB not reachable – skipping PBT");
+            eprintln!("Ã¢Å¡Â  DB not reachable Ã¢â‚¬â€œ skipping PBT");
             return;
         };
         rt.block_on(f(db.clone()));
@@ -121,6 +121,10 @@ mod pbt_async {
             direccion_fiscal: Set(None),
             representante_legal: Set(None),
             dgii_data: Set(None),
+            tipo_fiscal: Set("informal".to_string()),
+            regimen_pagos: Set(None),
+            fecha_inicio_operaciones: Set(None),
+            is_ecf_certificado: Set(false),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -186,7 +190,7 @@ mod pbt_async {
             .await;
     }
 
-    // ── P1: Listing returns only user's notifications ──────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P1: Listing returns only user's notifications Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p1(tipo: String, count: usize) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -218,7 +222,7 @@ mod pbt_async {
         });
     }
 
-    // ── P2: List ordering invariant ────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P2: List ordering invariant Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p2(count: usize) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -248,7 +252,7 @@ mod pbt_async {
         });
     }
 
-    // ── P3: Filtering returns only matching records ────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P3: Filtering returns only matching records Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p3(tipo: String, filter_leida: bool) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -309,7 +313,7 @@ mod pbt_async {
         });
     }
 
-    // ── P4: Unread count consistency ───────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P4: Unread count consistency Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p4(num_read: usize, num_unread: usize) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -363,7 +367,7 @@ mod pbt_async {
         });
     }
 
-    // ── P5: Mark as read is idempotent ─────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P5: Mark as read is idempotent Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p5(tipo: String) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -398,7 +402,7 @@ mod pbt_async {
         });
     }
 
-    // ── P6: Mark all updates only unread ───────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P6: Mark all updates only unread Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p6(num_read: usize, num_unread: usize) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -428,7 +432,7 @@ mod pbt_async {
         });
     }
 
-    // ── P7: Notification deduplication ─────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P7: Notification deduplication Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p7() {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -447,7 +451,7 @@ mod pbt_async {
                 .unwrap();
             let first_total = resp1.total;
 
-            // Second generation — should produce zero new
+            // Second generation Ã¢â‚¬â€ should produce zero new
             let resp2 = notificaciones::generar_notificaciones(&db, org_id)
                 .await
                 .unwrap();
@@ -474,7 +478,7 @@ mod pbt_async {
         });
     }
 
-    // ── P8: Generated notifications have correct fields ────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P8: Generated notifications have correct fields Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p8() {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -527,7 +531,7 @@ mod pbt_async {
         });
     }
 
-    // ── P9: Cross-user isolation on mark operations ────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P9: Cross-user isolation on mark operations Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p9(count: usize) {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -579,7 +583,7 @@ mod pbt_async {
         });
     }
 
-    // ── P10: New notifications default to unread ───────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ P10: New notifications default to unread Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     pub fn p10() {
         with_db(|db| async move {
             let org_id = create_org(&db).await;
@@ -614,7 +618,7 @@ mod pbt_async {
         });
     }
 
-    // ── Data helpers for generator tests ───────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Data helpers for generator tests Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
     async fn create_propiedad(db: &DatabaseConnection, org_id: Uuid) -> Uuid {
         use realestate_backend::entities::propiedad;
@@ -637,6 +641,9 @@ mod pbt_async {
             estado: Set("disponible".to_string()),
             imagenes: Set(None),
             organizacion_id: Set(org_id),
+            valor_catastral: Set(None),
+            exento_ipi: Set(false),
+            motivo_exencion: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -729,6 +736,15 @@ mod pbt_async {
             notas: Set(None),
             recargo: Set(None),
             organizacion_id: Set(org_id),
+            monto_base: Set(None),
+            monto_itbis: Set(None),
+            monto_itbis_retenido: Set(None),
+            ncf: Set(None),
+            fecha_comprobante: Set(None),
+            tipo_ncf: Set(None),
+            es_parcial: Set(false),
+            saldo_pendiente: Set(None),
+            tipo_linea: Set("renta".to_string()),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -739,7 +755,7 @@ mod pbt_async {
     }
 } // end pbt_async
 
-// ── Test functions ─────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Test functions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 // Feature: notification-system, Property 1: Listing returns only user's notifications
 // **Validates: Requirements 2.4, 3.2**

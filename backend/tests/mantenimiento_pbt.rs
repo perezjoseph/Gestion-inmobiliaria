@@ -182,6 +182,10 @@ mod pbt_async {
             direccion_fiscal: Set(None),
             representante_legal: Set(None),
             dgii_data: Set(None),
+            tipo_fiscal: Set("informal".to_string()),
+            regimen_pagos: Set(None),
+            fecha_inicio_operaciones: Set(None),
+            is_ecf_certificado: Set(false),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -232,6 +236,9 @@ mod pbt_async {
             estado: Set("disponible".to_string()),
             imagenes: Set(None),
             organizacion_id: Set(org_id),
+            valor_catastral: Set(None),
+            exento_ipi: Set(false),
+            motivo_exencion: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -956,7 +963,7 @@ mod pbt_async {
             let sol_b_id: Uuid = body_b["id"].as_str().unwrap().parse().unwrap();
 
             if use_cross_org_unidad {
-                // Query org_a's list with unidad_b (belongs to org_b) → must return empty
+                // Query org_a's list with unidad_b (belongs to org_b) â†’ must return empty
                 let req = test::TestRequest::get()
                     .uri(&format!("/api/v1/mantenimiento?unidadId={unidad_b}"))
                     .insert_header(("Authorization", format!("Bearer {token_a}")))
@@ -971,7 +978,7 @@ mod pbt_async {
                     data.len()
                 );
             } else {
-                // Query org_a's list with unidad_a → must return only matching rows
+                // Query org_a's list with unidad_a â†’ must return only matching rows
                 let req = test::TestRequest::get()
                     .uri(&format!("/api/v1/mantenimiento?unidadId={unidad_a}"))
                     .insert_header(("Authorization", format!("Bearer {token_a}")))
@@ -1021,7 +1028,7 @@ mod pbt_async {
     }
 } // end mod pbt_async
 
-// ── Property test functions ──
+// â”€â”€ Property test functions â”€â”€
 
 // Feature: mantenimiento, Property 1: Creation round-trip preserves data
 // **Validates: Requirements 1.1, 2.5, 6.4**
@@ -1141,7 +1148,7 @@ fn test_invalid_transitions_rejected() {
                 let result = validar_transicion(&estado_actual, &nuevo_estado);
                 assert!(
                     result.is_err(),
-                    "Transition {estado_actual}→{nuevo_estado} should be rejected"
+                    "Transition {estado_actual}â†’{nuevo_estado} should be rejected"
                 );
                 Ok(())
             },

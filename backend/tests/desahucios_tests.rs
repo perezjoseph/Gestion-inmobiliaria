@@ -351,6 +351,10 @@ mod desahucios_db_tests {
             direccion_fiscal: Set(None),
             representante_legal: Set(None),
             dgii_data: Set(None),
+            tipo_fiscal: Set("informal".to_string()),
+            regimen_pagos: Set(None),
+            fecha_inicio_operaciones: Set(None),
+            is_ecf_certificado: Set(false),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -401,6 +405,9 @@ mod desahucios_db_tests {
             estado: Set("ocupada".to_string()),
             imagenes: Set(None),
             organizacion_id: Set(org_id),
+            valor_catastral: Set(None),
+            exento_ipi: Set(false),
+            motivo_exencion: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -417,7 +424,7 @@ mod desahucios_db_tests {
         inquilino::ActiveModel {
             id: Set(id),
             nombre: Set("Juan".to_string()),
-            apellido: Set("Pérez".to_string()),
+            apellido: Set("PÃ©rez".to_string()),
             cedula: Set(format!("001-{}-0001", Uuid::new_v4().as_simple())[..13].to_string()),
             telefono: Set(Some("809-555-0001".to_string())),
             email: Set(Some(format!("inquilino+{id}@test.com"))),

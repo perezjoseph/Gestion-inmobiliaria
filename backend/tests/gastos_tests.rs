@@ -370,6 +370,10 @@ mod db_async {
             direccion_fiscal: Set(None),
             representante_legal: Set(None),
             dgii_data: Set(None),
+            tipo_fiscal: Set("informal".to_string()),
+            regimen_pagos: Set(None),
+            fecha_inicio_operaciones: Set(None),
+            is_ecf_certificado: Set(false),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -420,6 +424,9 @@ mod db_async {
             estado: Set("disponible".to_string()),
             imagenes: Set(None),
             organizacion_id: Set(org_id),
+            valor_catastral: Set(None),
+            exento_ipi: Set(false),
+            motivo_exencion: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -456,7 +463,7 @@ mod db_async {
                 .set_json(json!({
                     "propiedadId": propiedad_id,
                     "categoria": "mantenimiento",
-                    "descripcion": "Reparación de techo",
+                    "descripcion": "ReparaciÃ³n de techo",
                     "monto": "15000.50",
                     "moneda": "DOP",
                     "fechaGasto": "2025-04-01",
@@ -470,7 +477,7 @@ mod db_async {
             let gasto_id = body["id"].as_str().unwrap().to_string();
             assert_eq!(body["estado"], "pendiente");
             assert_eq!(body["categoria"], "mantenimiento");
-            assert_eq!(body["descripcion"], "Reparación de techo");
+            assert_eq!(body["descripcion"], "ReparaciÃ³n de techo");
             assert_eq!(body["moneda"], "DOP");
 
             let req = test::TestRequest::get()
@@ -492,7 +499,7 @@ mod db_async {
             assert_eq!(resp.status(), 200);
             let updated: Value = test::read_body_json(resp).await;
             assert_eq!(updated["estado"], "pagado");
-            assert_eq!(updated["descripcion"], "Reparación de techo");
+            assert_eq!(updated["descripcion"], "ReparaciÃ³n de techo");
 
             let req = test::TestRequest::delete()
                 .uri(&format!("/api/v1/gastos/{gasto_id}"))
@@ -534,7 +541,7 @@ mod db_async {
                     .set_json(json!({
                         "propiedadId": propiedad_id,
                         "categoria": "mantenimiento",
-                        "descripcion": format!("Gasto paginación {i}"),
+                        "descripcion": format!("Gasto paginaciÃ³n {i}"),
                         "monto": "1000",
                         "moneda": "DOP",
                         "fechaGasto": "2025-04-01"
@@ -749,7 +756,7 @@ mod db_async {
 
             let csv = format!(
                 "propiedad_id,categoria,descripcion,monto,moneda,fecha_gasto\n\
-                 {propiedad_id},mantenimiento,Reparación tubería,5000.00,DOP,2025-04-01\n\
+                 {propiedad_id},mantenimiento,ReparaciÃ³n tuberÃ­a,5000.00,DOP,2025-04-01\n\
                  {propiedad_id},impuestos,Impuesto predial,12000.00,DOP,2025-04-15"
             );
             let boundary = "----TestBoundary";
@@ -1179,6 +1186,10 @@ mod gastos_utility_db_tests {
             direccion_fiscal: Set(None),
             representante_legal: Set(None),
             dgii_data: Set(None),
+            tipo_fiscal: Set("informal".to_string()),
+            regimen_pagos: Set(None),
+            fecha_inicio_operaciones: Set(None),
+            is_ecf_certificado: Set(false),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -1229,6 +1240,9 @@ mod gastos_utility_db_tests {
             estado: Set("disponible".to_string()),
             imagenes: Set(None),
             organizacion_id: Set(org_id),
+            valor_catastral: Set(None),
+            exento_ipi: Set(false),
+            motivo_exencion: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -1644,6 +1658,10 @@ mod gastos_categoria_and_utility_tests {
             direccion_fiscal: Set(None),
             representante_legal: Set(None),
             dgii_data: Set(None),
+            tipo_fiscal: Set("informal".to_string()),
+            regimen_pagos: Set(None),
+            fecha_inicio_operaciones: Set(None),
+            is_ecf_certificado: Set(false),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -1694,6 +1712,9 @@ mod gastos_categoria_and_utility_tests {
             estado: Set("disponible".to_string()),
             imagenes: Set(None),
             organizacion_id: Set(org_id),
+            valor_catastral: Set(None),
+            exento_ipi: Set(false),
+            motivo_exencion: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -1774,7 +1795,7 @@ mod gastos_categoria_and_utility_tests {
                 let body: Value = test::read_body_json(resp).await;
                 let message = body["message"].as_str().unwrap_or("");
                 assert!(
-                    message.contains("Categoría de gasto no válida"),
+                    message.contains("CategorÃ­a de gasto no vÃ¡lida"),
                     "Expected Spanish error message for '{invalid_cat}', got: {message}"
                 );
             }
