@@ -345,7 +345,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - **Status: `calcular_billing_con_cuota` implemented but payment record insertion from cuotas not wired into billing flow**
     - _Requirements: 2.3, 2.4, 2.6_
 
-  - [ ] 18.4 Implement notification triggers
+  - [x] 18.4 Implement notification triggers
     - 60-day contract expiration notification for indexation review
     - 30-day IPI payment deadline notification
     - NCF range 80% consumption alert notification
