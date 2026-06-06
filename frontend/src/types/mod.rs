@@ -3,12 +3,16 @@ pub mod auditoria;
 pub mod chatbot;
 pub mod configuracion;
 pub mod contrato;
+pub mod cuota_condominio;
 pub mod dashboard_extra;
 #[allow(dead_code)]
 pub mod documento;
+pub mod fiscal;
 pub mod gasto;
 pub mod importacion;
+pub mod indexacion;
 pub mod inquilino;
+pub mod ipi;
 pub mod mantenimiento;
 pub mod notificacion;
 pub mod ocr;
@@ -16,6 +20,7 @@ pub mod pago;
 pub mod pago_generacion;
 pub mod propiedad;
 pub mod reporte;
+pub mod reportes_dgii;
 pub mod unidad;
 pub mod usuario;
 

@@ -18,6 +18,7 @@ use crate::pages::documentos_por_vencer::DocumentosPorVencer;
 use crate::pages::firma_publica::FirmaPublica;
 use crate::pages::gastos::Gastos;
 use crate::pages::importar::Importar;
+use crate::pages::indexacion::Indexacion;
 use crate::pages::inquilinos::Inquilinos;
 use crate::pages::login::Login;
 use crate::pages::mantenimiento::Mantenimiento;
@@ -123,6 +124,8 @@ pub enum Route {
     AuditoriaPage,
     #[at("/importar")]
     Importar,
+    #[at("/indexacion")]
+    Indexacion,
     #[at("/mantenimiento")]
     Mantenimiento,
     #[at("/notificaciones")]
@@ -173,6 +176,7 @@ fn switch(routes: Route) -> Html {
         Route::Perfil => html! { <ProtectedRoute><Perfil /></ProtectedRoute> },
         Route::AuditoriaPage => html! { <ProtectedRoute><Auditoria /></ProtectedRoute> },
         Route::Importar => html! { <ProtectedRoute><Importar /></ProtectedRoute> },
+        Route::Indexacion => html! { <ProtectedRoute><Indexacion /></ProtectedRoute> },
         Route::Mantenimiento => html! { <ProtectedRoute><Mantenimiento /></ProtectedRoute> },
         Route::Notificaciones => html! { <ProtectedRoute><Notificaciones /></ProtectedRoute> },
         Route::Configuracion => html! { <ProtectedRoute><Configuracion /></ProtectedRoute> },

@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/name: mailserver
 spec:
   type: LoadBalancer
-  externalTrafficPolicy: Local
+  externalTrafficPolicy: Cluster
   selector:
     app.kubernetes.io/name: mailserver
   ports:

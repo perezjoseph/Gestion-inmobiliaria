@@ -281,7 +281,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Enforce `WriteAccess` extractor
     - _Requirements: 5.1, 5.3, 5.4, 5.6, 5.7_
 
-  - [~] 15.7 Register all new handlers in `routes.rs`
+  - [-] 15.7 Register all new handlers in `routes.rs`
     - Add route scopes for fiscal, condominios, ncf, reportes-dgii, ipi, indexacion
     - _Requirements: all_
 
@@ -289,37 +289,37 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 17. Frontend pages (Leptos)
-  - [~] 17.1 Create Configuración Fiscal page (`pages/configuracion_fiscal.rs`)
+  - [-] 17.1 Create Configuración Fiscal page (`pages/configuracion_fiscal.rs`)
     - Form to set tipo_fiscal, RNC/cédula input with validation feedback, NCF range configuration
     - Route: `/configuracion/fiscal`
     - _Requirements: 1.1, 1.2, 1.3, 7.8_
 
-  - [~] 17.2 Create Cuotas Condominio component (`pages/condominios.rs`)
+  - [-] 17.2 Create Cuotas Condominio component (`pages/condominios.rs`)
     - CRUD interface for condominium fees per property, passthrough toggle, billing preview
     - Route: `/propiedades/{id}/condominios`
     - _Requirements: 2.1, 2.2, 2.3_
 
-  - [~] 17.3 Create Recibos Informales page (`pages/recibos_informales.rs`)
+  - [-] 17.3 Create Recibos Informales page (`pages/recibos_informales.rs`)
     - View/create informal receipts, partial payment recording with notes
     - Route: `/recibos-informales`
     - _Requirements: 3.5, 3.7_
 
-  - [~] 17.4 Create Dashboard Comparativo page (`pages/dashboard_comparativo.rs`)
+  - [-] 17.4 Create Dashboard Comparativo page (`pages/dashboard_comparativo.rs`)
     - Multi-property comparison table, sortable columns, date range and property type filters, currency toggle
     - Route: `/dashboard/comparativo`
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-  - [~] 17.5 Create Indexación page (`pages/indexacion.rs`)
+  - [x] 17.5 Create Indexación page (`pages/indexacion.rs`)
     - List upcoming renewals, show IPC proposal vs current amount, approve/override flow
     - Route: `/indexacion`
     - _Requirements: 5.1, 5.3, 5.4, 5.8_
 
-  - [~] 17.6 Create Reportes DGII page (`pages/reportes_dgii.rs`)
+  - [x] 17.6 Create Reportes DGII page (`pages/reportes_dgii.rs`)
     - Generate/preview 606/607 reports, show excluded records, download pipe-delimited TXT, mark as submitted
     - Route: `/reportes-dgii`
     - _Requirements: 8.1, 8.4, 8.6, 8.7_
 
-  - [~] 17.7 Create IPI page (`pages/ipi.rs`)
+  - [x] 17.7 Create IPI page (`pages/ipi.rs`)
     - Display IPI liability breakdown, manage copropietarios, configure threshold, show payment deadlines
     - Route: `/ipi`
     - _Requirements: 9.1, 9.4, 9.6, 9.10_
