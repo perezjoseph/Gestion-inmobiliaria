@@ -30,7 +30,7 @@ spec:
             - name: ROUNDCUBEMAIL_DEFAULT_HOST
               value: mailserver.mail.svc.cluster.local
             - name: ROUNDCUBEMAIL_DEFAULT_PORT
-              value: "993"
+              value: "143"
             - name: ROUNDCUBEMAIL_SMTP_SERVER
               value: mailserver.mail.svc.cluster.local
             - name: ROUNDCUBEMAIL_SMTP_PORT

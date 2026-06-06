@@ -26,6 +26,10 @@ spec:
       port: 587
       targetPort: 587
       protocol: TCP
+    - name: imap
+      port: 143
+      targetPort: 143
+      protocol: TCP
     - name: imap-implicit
       port: 993
       targetPort: 993

@@ -668,6 +668,22 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                         "/copropietarios",
                         web::post().to(handlers::ipi::crear_copropietario),
                     ),
+            )
+            .service(
+                web::scope("/indexacion")
+                    .wrap(Governor::new(&write_governor_conf))
+                    .route(
+                        "/propuesta/{contrato_id}",
+                        web::get().to(handlers::indexacion::obtener_propuesta),
+                    )
+                    .route(
+                        "/aprobar/{contrato_id}",
+                        web::post().to(handlers::indexacion::aprobar_renovacion_handler),
+                    )
+                    .route(
+                        "/proximos-vencer",
+                        web::get().to(handlers::indexacion::proximos_vencer),
+                    ),
             ),
     );
 }

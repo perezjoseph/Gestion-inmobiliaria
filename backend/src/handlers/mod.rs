@@ -17,6 +17,7 @@ pub mod fiscal;
 pub mod gastos;
 pub mod gastos_recurrentes;
 pub mod importacion;
+pub mod indexacion;
 pub mod inquilinos;
 pub mod invitaciones;
 pub mod ipc;

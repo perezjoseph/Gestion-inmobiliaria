@@ -69,6 +69,9 @@ spec:
             - name: esmtp-explicit
               containerPort: 587
               protocol: TCP
+            - name: imap
+              containerPort: 143
+              protocol: TCP
             - name: imap-implicit
               containerPort: 993
               protocol: TCP

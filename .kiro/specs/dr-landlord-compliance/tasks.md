@@ -274,7 +274,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Enforce `WriteAccess` extractor
     - _Requirements: 9.1, 9.5, 9.6, 9.10_
 
-  - [~] 15.6 Implement `handlers/indexacion.rs`
+  - [x] 15.6 Implement `handlers/indexacion.rs`
     - `GET /api/v1/indexacion/propuesta/{contrato_id}` — get renewal proposal
     - `POST /api/v1/indexacion/aprobar/{contrato_id}` — approve renewal
     - `GET /api/v1/indexacion/proximos-vencer` — list contracts expiring within 60 days
