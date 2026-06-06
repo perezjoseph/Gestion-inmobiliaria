@@ -10,6 +10,7 @@ pub mod chatbot;
 pub mod chatbot_evals;
 #[cfg(test)]
 mod chatbot_pbt;
+pub mod condominios;
 pub mod configuracion;
 pub mod contratos;
 pub mod crypto;

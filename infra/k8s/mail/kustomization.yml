@@ -8,3 +8,5 @@ resources:
   - configmap.yml
   - deployment.yml
   - service.yml
+  - roundcube.yml
+  - ingress.yml

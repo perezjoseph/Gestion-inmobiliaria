@@ -162,7 +162,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - **Validates: Requirements 5.1, 5.2, 5.7, 5.9, 5.10**
 
 - [ ] 9. Condominium fee service
-  - [~] 9.1 Implement `services/condominios.rs`
+  - [x] 9.1 Implement `services/condominios.rs`
     - CRUD for cuota_condominio records (crear, actualizar, listar, eliminar)
     - Implement `calcular_billing_con_cuota` — separate line item for cuota, apply ITBIS to cuota if commercial + registered
     - Enforce temporal boundary: new amounts apply only to billing periods starting after change effective date

@@ -1,0 +1,43 @@
+# Roundcube webmail at https://mail.local
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: roundcube-https
+  namespace: mail
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`mail.local`)
+      kind: Rule
+      services:
+        - name: roundcube
+          port: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: roundcube-http
+  namespace: mail
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`mail.local`)
+      kind: Rule
+      middlewares:
+        - name: redirect-https
+      services:
+        - name: roundcube
+          port: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-https
+  namespace: mail
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
