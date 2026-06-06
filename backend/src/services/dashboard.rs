@@ -756,7 +756,7 @@ pub fn calcular_rentabilidad_neta(
 /// - DOP to USD: `amount / tasa_cambio`
 /// - USD to DOP: `amount * tasa_cambio`
 /// - Same currency: no conversion
-fn normalizar_moneda(
+pub(crate) fn normalizar_moneda(
     monto: Decimal,
     moneda_origen: &str,
     moneda_destino: &str,

@@ -17,6 +17,8 @@ pub mod configuracion;
 pub mod contratos;
 pub mod crypto;
 pub mod dashboard;
+#[cfg(test)]
+mod dashboard_comparativo_pbt;
 pub mod desahucios;
 pub mod dgii;
 pub mod documento_editor;
@@ -39,6 +41,8 @@ pub mod inquilinos;
 pub mod invitaciones;
 pub mod ipc;
 pub mod ipi;
+#[cfg(test)]
+mod ipi_pbt;
 pub mod itbis;
 #[cfg(test)]
 mod itbis_pbt;
@@ -72,6 +76,8 @@ pub mod recibos;
 pub mod recibos_informales;
 pub mod reportes;
 pub mod reportes_dgii;
+#[cfg(test)]
+mod reportes_dgii_pbt;
 pub mod servicios_publicos;
 pub mod unidades;
 pub mod usuarios;

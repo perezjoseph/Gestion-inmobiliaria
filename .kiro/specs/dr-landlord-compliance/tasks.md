@@ -179,7 +179,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
 - [~] 10. Checkpoint - Verify all service modules compile and unit tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 11. IPI property tax service
+- [x] 11. IPI property tax service
   - [x] 11.1 Implement `services/ipi.rs`
     - Implement `calcular_ipi` — sum valor_catastral excluding exento_ipi properties, compute `max(0, total - umbral) * 0.01`
     - IPI applies regardless of tipo_fiscal (informal included)
@@ -189,12 +189,12 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Display cross-organization ownership warning
     - _Requirements: 9.1, 9.2, 9.3, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10_
 
-  - [~] 11.2 Write property tests for IPI (`services/ipi_pbt.rs`)
+  - [x] 11.2 Write property tests for IPI (`services/ipi_pbt.rs`)
     - **Property 27: IPI Calculation**
     - **Property 28: IPI Co-Owner Proportional Split**
     - **Validates: Requirements 9.1, 9.2, 9.7, 9.8, 9.10**
 
-- [ ] 12. DGII 606/607 report generation service
+- [x] 12. DGII 606/607 report generation service
   - [x] 12.1 Implement `services/reportes_dgii.rs`
     - Implement `generar_607` — filter payments by fecha_pago within requested month, format per Norma 07-2018 fields
     - Implement `generar_606` — filter expenses by fecha_pago within requested month
@@ -206,7 +206,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Track report status: borrador/enviado, prevent double-submission
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9_
 
-  - [~] 12.2 Write property tests for reports (`services/reportes_dgii_pbt.rs`)
+  - [x] 12.2 Write property tests for reports (`services/reportes_dgii_pbt.rs`)
     - **Property 20: Report 607 Monthly Filtering**
     - **Property 21: Report 607 Field Completeness**
     - **Property 22: Report 606 Field Completeness**
@@ -216,7 +216,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - **Property 26: Residential Income in 607 Has Zero ITBIS**
     - **Validates: Requirements 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.8, 8.9**
 
-- [ ] 13. Multi-property dashboard service
+- [x] 13. Multi-property dashboard service
   - [x] 13.1 Implement dashboard comparison logic in `services/dashboard.rs` (extend existing)
     - Compute per-property analytics: ingresos totales, gastos totales, rentabilidad neta, tasa de ocupación, morosidad %, cuotas condominio totales
     - Support filtering by tipo_propiedad (residencial, comercial, mixto)
@@ -227,7 +227,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Show valor_catastral per property for IPI contribution visibility
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8_
 
-  - [~] 13.2 Write property tests for dashboard (`services/dashboard_comparativo_pbt.rs`)
+  - [x] 13.2 Write property tests for dashboard (`services/dashboard_comparativo_pbt.rs`)
     - **Property 29: Dashboard Date Range Filtering**
     - **Property 30: Rentabilidad Neta Formula**
     - **Property 31: Currency Normalization**
