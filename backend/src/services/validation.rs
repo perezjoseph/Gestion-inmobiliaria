@@ -4,6 +4,19 @@ use crate::errors::AppError;
 pub const MONEDAS: &[&str] = &["DOP", "USD"];
 pub const METODOS_PAGO: &[&str] = &["efectivo", "transferencia", "cheque", "tarjeta"];
 
+/// DGII-aligned Forma_Pago values (Norma General 07-2018).
+/// Superset of `METODOS_PAGO`; used for fiscal/partial payment flows.
+pub const METODOS_PAGO_DGII: &[&str] = &[
+    "efectivo",
+    "transferencia",
+    "cheque",
+    "tarjeta_credito",
+    "tarjeta_debito",
+    "credito",
+    "permuta",
+    "otro",
+];
+
 pub fn validate_enum(field_name: &str, value: &str, allowed: &[&str]) -> Result<(), AppError> {
     if !allowed.contains(&value) {
         return Err(AppError::Validation(format!(

@@ -1,4 +1,5 @@
 use chrono::Utc;
+use rust_decimal::Decimal;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
     PaginatorTrait, QueryFilter, QueryOrder, Set,
@@ -12,7 +13,7 @@ use crate::models::pago::{CreatePagoRequest, PagoListQuery, PagoResponse, Update
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
 use crate::services::{
     recargos,
-    validation::{METODOS_PAGO, MONEDAS, validate_enum},
+    validation::{METODOS_PAGO, METODOS_PAGO_DGII, MONEDAS, validate_enum},
 };
 
 const ESTADOS_PAGO: &[&str] = &["pendiente", "pagado", "atrasado", "cancelado"];
@@ -441,4 +442,153 @@ pub async fn mark_overdue(db: &DatabaseConnection) -> Result<u64, AppError> {
     }
 
     Ok(affected_count)
+}
+
+/// Registers a partial payment against the oldest unpaid billing period (FIFO).
+///
+/// - Validates `monto` is strictly less than the period's remaining balance.
+///   If monto equals the full amount due, rejects with a validation error
+///   (caller should use the regular full-payment flow instead).
+/// - Updates `saldo_pendiente` for the billing period.
+/// - Marks the period as `pagado` when total payments >= amount due.
+/// - Cascades any surplus to the next unpaid period (pago adelantado).
+///
+/// Returns all pago records created during this operation (one per period touched).
+pub async fn registrar_pago_parcial<C: ConnectionTrait>(
+    db: &C,
+    contrato_id: Uuid,
+    monto: Decimal,
+    metodo_pago: &str,
+    notas: Option<&str>,
+    org_id: Uuid,
+) -> Result<Vec<pago::Model>, AppError> {
+    validate_enum("metodo_pago", metodo_pago, METODOS_PAGO_DGII)?;
+
+    if monto <= Decimal::ZERO {
+        return Err(AppError::Validation(
+            "El monto debe ser mayor a cero".to_string(),
+        ));
+    }
+
+    // Verify contrato exists and belongs to org
+    let contrato_model = contrato::Entity::find_by_id(contrato_id)
+        .filter(contrato::Column::OrganizacionId.eq(org_id))
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
+
+    // Find all unpaid periods for this contrato, ordered by fecha_vencimiento (FIFO)
+    let unpaid_periods = pago::Entity::find()
+        .filter(pago::Column::ContratoId.eq(contrato_id))
+        .filter(pago::Column::OrganizacionId.eq(org_id))
+        .filter(pago::Column::Estado.is_in(["pendiente", "atrasado"]))
+        .filter(pago::Column::EsParcial.eq(false))
+        .order_by_asc(pago::Column::FechaVencimiento)
+        .all(db)
+        .await?;
+
+    if unpaid_periods.is_empty() {
+        return Err(AppError::Validation(
+            "No hay períodos pendientes de pago para este contrato".to_string(),
+        ));
+    }
+
+    // Calculate total owed across all unpaid periods
+    let total_owed: Decimal = unpaid_periods
+        .iter()
+        .map(|p| balance_remaining(p, &contrato_model))
+        .sum();
+
+    if monto > total_owed {
+        return Err(AppError::Validation(
+            "Monto excede el total adeudado".to_string(),
+        ));
+    }
+
+    let mut remaining = monto;
+    let mut created_records = Vec::new();
+
+    for period in &unpaid_periods {
+        if remaining <= Decimal::ZERO {
+            break;
+        }
+
+        let amount_due = balance_remaining(period, &contrato_model);
+
+        if amount_due <= Decimal::ZERO {
+            continue;
+        }
+
+        // For the first period, if monto exactly equals amount_due and there's no
+        // surplus scenario, reject — caller should use full payment flow.
+        if created_records.is_empty() && remaining == amount_due && unpaid_periods.len() == 1 {
+            return Err(AppError::Validation(
+                "El monto es igual al saldo pendiente. Use el flujo de pago completo en vez de pago parcial".to_string(),
+            ));
+        }
+
+        let applied = remaining.min(amount_due);
+        remaining -= applied;
+
+        let new_balance = amount_due - applied;
+        let is_fully_paid = new_balance <= Decimal::ZERO;
+
+        // Create the partial payment record
+        let now = Utc::now().into();
+        let pago_id = Uuid::new_v4();
+        let today = Utc::now().date_naive();
+
+        let partial_record = pago::ActiveModel {
+            id: Set(pago_id),
+            contrato_id: Set(contrato_id),
+            monto: Set(applied),
+            moneda: Set(contrato_model.moneda.clone()),
+            fecha_pago: Set(Some(today)),
+            fecha_vencimiento: Set(period.fecha_vencimiento),
+            metodo_pago: Set(Some(metodo_pago.to_string())),
+            estado: Set("pagado".to_string()),
+            notas: Set(notas.map(str::to_string)),
+            recargo: Set(None),
+            organizacion_id: Set(org_id),
+            monto_base: Set(None),
+            monto_itbis: Set(None),
+            monto_itbis_retenido: Set(None),
+            ncf: Set(None),
+            fecha_comprobante: Set(None),
+            tipo_ncf: Set(None),
+            es_parcial: Set(true),
+            saldo_pendiente: Set(Some(new_balance)),
+            tipo_linea: Set("renta".to_string()),
+            created_at: Set(now),
+            updated_at: Set(now),
+        };
+
+        let record = partial_record.insert(db).await?;
+        created_records.push(record);
+
+        // Update the original period record
+        let mut active: pago::ActiveModel = period.clone().into();
+        if is_fully_paid {
+            active.estado = Set("pagado".to_string());
+            active.saldo_pendiente = Set(Some(Decimal::ZERO));
+        } else {
+            active.saldo_pendiente = Set(Some(new_balance));
+        }
+        active.updated_at = Set(Utc::now().into());
+        active.update(db).await?;
+    }
+
+    Ok(created_records)
+}
+
+/// Computes the remaining balance for a billing period.
+/// If `saldo_pendiente` is already set (from a prior partial payment), use that.
+/// Otherwise, the full amount due is the period's `monto` plus any recargo.
+fn balance_remaining(period: &pago::Model, _contrato: &contrato::Model) -> Decimal {
+    if let Some(saldo) = period.saldo_pendiente {
+        return saldo;
+    }
+    // The amount due for the period is the original monto (which equals monto_mensual
+    // at generation time) plus any applied recargo.
+    period.monto + period.recargo.unwrap_or(Decimal::ZERO)
 }

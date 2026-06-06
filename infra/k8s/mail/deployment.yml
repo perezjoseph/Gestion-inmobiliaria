@@ -22,8 +22,7 @@ spec:
     spec:
       automountServiceAccountToken: false
       hostname: mail
-      hostNetwork: true # required for real client IP (SPF checks, fail2ban)
-      dnsPolicy: ClusterFirstWithHostNet
+      dnsPolicy: ClusterFirst
       nodeSelector:
         kubernetes.io/hostname: coreos
       tolerations:

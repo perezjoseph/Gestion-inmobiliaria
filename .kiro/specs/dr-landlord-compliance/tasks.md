@@ -83,7 +83,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 4. Fiscal classification service
-  - [~] 4.1 Implement `services/fiscal.rs`
+  - [x] 4.1 Implement `services/fiscal.rs`
     - Implement `verificar_acceso_fiscal` — reject informal users accessing ITBIS/NCF/606/607 features with 403 error
     - Implement `actualizar_tipo_fiscal` — validate RNC (DGII check-digit) for persona_juridica, cédula (Luhn) for persona_fisica, reject invalid transitions
     - Wire to existing `validacion_fiscal.rs` for RNC/cédula validation
@@ -97,7 +97,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - **Validates: Requirements 1.2, 1.3, 1.5, 1.6, 1.7**
 
 - [ ] 5. ITBIS calculation service
-  - [~] 5.1 Implement `services/itbis.rs`
+  - [x] 5.1 Implement `services/itbis.rs`
     - Implement `calcular_itbis` — apply 18% only when tipo_fiscal is registered AND property is commercial/industrial; zero for residential or informal
     - Implement `calcular_retencion` — 30% retention when tenant is persona_juridica
     - Support configurable rate (16% future-proofing) stored per category
@@ -110,7 +110,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - **Validates: Requirements 6.1, 6.2, 6.3, 6.4, 6.7, 6.8**
 
 - [ ] 6. Partial payment and informal receipt service
-  - [~] 6.1 Implement partial payment logic in `services/pagos.rs` (extend existing)
+  - [x] 6.1 Implement partial payment logic in `services/pagos.rs` (extend existing)
     - Implement partial payment recording: validate monto < amount_due, reject if equal
     - Track saldo_pendiente per billing period, mark `pagado` when sum >= amount_due
     - Implement FIFO allocation for payments without fecha_vencimiento reference
@@ -118,7 +118,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Support all DGII-aligned metodo_pago values
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.7, 3.8, 3.9_
 
-  - [~] 6.2 Implement `services/recibos_informales.rs`
+  - [x] 6.2 Implement `services/recibos_informales.rs`
     - Generate Recibo_Informal with unique sequential referencia_interna (RI-NNNNNN format) for cash payments by informal organizations
     - _Requirements: 3.5, 3.6_
 

@@ -1,0 +1,32 @@
+# LoadBalancer service with externalTrafficPolicy: Local
+# to preserve real client IPs for SPF checks.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailserver
+  namespace: mail
+  labels:
+    app.kubernetes.io/name: mailserver
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector:
+    app.kubernetes.io/name: mailserver
+  ports:
+    - name: smtp
+      port: 25
+      targetPort: 25
+      protocol: TCP
+    - name: esmtp-implicit
+      port: 465
+      targetPort: 465
+      protocol: TCP
+    - name: esmtp-explicit
+      port: 587
+      targetPort: 587
+      protocol: TCP
+    - name: imap-implicit
+      port: 993
+      targetPort: 993
+      protocol: TCP
