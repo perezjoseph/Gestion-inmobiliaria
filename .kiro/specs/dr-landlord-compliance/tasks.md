@@ -343,7 +343,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - When generating billing for contracts with passthrough cuotas, include cuota line item with independent payment tracking
     - _Requirements: 2.3, 2.4, 2.6_
 
-  - [-] 18.4 Implement notification triggers
+  - [x] 18.4 Implement notification triggers
     - 60-day contract expiration notification for indexation review
     - 30-day IPI payment deadline notification
     - NCF range 80% consumption alert notification
