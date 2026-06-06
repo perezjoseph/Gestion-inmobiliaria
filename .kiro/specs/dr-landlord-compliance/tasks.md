@@ -328,7 +328,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Add routes for all new pages, update navigation menu
     - _Requirements: all_
 
-- [ ] 18. Integration wiring and notification system
+- [x] 18. Integration wiring and notification system
   - [x] 18.1 Wire NCF assignment into payment flow
     - After payment is marked `pagado` for registered org, call `asignar_ncf` to assign appropriate NCF type based on tenant fiscal status
     - Handle NCF failure gracefully (payment stays pagado, flag for manual resolution)
@@ -349,7 +349,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - NCF range 80% consumption alert notification
     - _Requirements: 5.7, 9.4, 7.9_
 
-  - [~] 18.5 Write integration tests for end-to-end flows
+  - [x] 18.5 Write integration tests for end-to-end flows
     - Payment flow: create pago → ITBIS → NCF assignment → 607 inclusion
     - Lease renewal: proposal → approval → new contrato with audit trail
     - IPI calculation across multiple properties with co-owners
