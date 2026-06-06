@@ -236,7 +236,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
 - [x] 14. Checkpoint - All services implemented and tested
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 15. API handlers
+- [x] 15. API handlers
   - [x] 15.1 Implement `handlers/fiscal.rs`
     - `PUT /api/v1/organizacion/fiscal/tipo-fiscal` — update tipo_fiscal with validation
     - `GET /api/v1/organizacion/fiscal/estado` — return current fiscal state
@@ -281,7 +281,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Enforce `WriteAccess` extractor
     - _Requirements: 5.1, 5.3, 5.4, 5.6, 5.7_
 
-  - [-] 15.7 Register all new handlers in `routes.rs`
+  - [x] 15.7 Register all new handlers in `routes.rs`
     - Add route scopes for fiscal, condominios, ncf, reportes-dgii, ipi, indexacion
     - _Requirements: all_
 
