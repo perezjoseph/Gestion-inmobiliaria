@@ -27,6 +27,21 @@ pub struct UpdatePagoRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct BulkMarcarPagadoRequest {
+    pub pago_ids: Vec<Uuid>,
+    pub fecha_pago: NaiveDate,
+    pub metodo_pago: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkMarcarPagadoResponse {
+    pub actualizados: u64,
+    pub ids: Vec<Uuid>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PagoListQuery {
     pub contrato_id: Option<Uuid>,
     pub estado: Option<String>,

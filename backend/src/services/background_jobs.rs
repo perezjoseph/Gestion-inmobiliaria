@@ -36,6 +36,8 @@ pub const TAREAS_VALIDAS: &[&str] = &[
     "generar_notificaciones",
     "limpiar_conversaciones_chatbot",
     "actualizar_ipc",
+    "generar_gastos_recurrentes",
+    "generar_mantenimiento_programado",
 ];
 
 const INTERVALO_POR_DEFECTO_SECS: u64 = 86_400;
@@ -150,6 +152,8 @@ async fn ejecutar_tarea_con_registro(
         "generar_notificaciones" => ejecutar_generar_notificaciones(&db).await,
         "limpiar_conversaciones_chatbot" => ejecutar_limpiar_conversaciones_chatbot(&db).await,
         "actualizar_ipc" => ejecutar_actualizar_ipc(&db).await,
+        "generar_gastos_recurrentes" => ejecutar_generar_gastos_recurrentes(&db).await,
+        "generar_mantenimiento_programado" => ejecutar_generar_mantenimiento_programado(&db).await,
         _ => {
             return Err(AppError::NotFound(format!("Tarea no encontrada: {nombre}")));
         }
@@ -219,6 +223,18 @@ async fn ejecutar_actualizar_ipc(db: &DatabaseConnection) -> Result<i64, AppErro
     Ok(rows)
 }
 
+async fn ejecutar_generar_gastos_recurrentes(db: &DatabaseConnection) -> Result<i64, AppError> {
+    let rows = super::gastos_recurrentes::generar_gastos_pendientes(db).await?;
+    Ok(rows)
+}
+
+async fn ejecutar_generar_mantenimiento_programado(
+    db: &DatabaseConnection,
+) -> Result<i64, AppError> {
+    let rows = super::mantenimiento_programado::generar_solicitudes_pendientes(db).await?;
+    Ok(rows)
+}
+
 async fn registrar_ejecucion(
     db: &DatabaseConnection,
     nombre: &str,
@@ -250,13 +266,15 @@ mod tests {
 
     #[test]
     fn tareas_validas_contains_expected_names() {
-        assert_eq!(TAREAS_VALIDAS.len(), 6);
+        assert_eq!(TAREAS_VALIDAS.len(), 8);
         assert!(TAREAS_VALIDAS.contains(&"marcar_pagos_atrasados"));
         assert!(TAREAS_VALIDAS.contains(&"marcar_contratos_vencidos"));
         assert!(TAREAS_VALIDAS.contains(&"marcar_documentos_vencidos"));
         assert!(TAREAS_VALIDAS.contains(&"generar_notificaciones"));
         assert!(TAREAS_VALIDAS.contains(&"limpiar_conversaciones_chatbot"));
         assert!(TAREAS_VALIDAS.contains(&"actualizar_ipc"));
+        assert!(TAREAS_VALIDAS.contains(&"generar_gastos_recurrentes"));
+        assert!(TAREAS_VALIDAS.contains(&"generar_mantenimiento_programado"));
     }
 
     #[test]

@@ -1,0 +1,161 @@
+use sea_orm_migration::prelude::*;
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(MantenimientoProgramado::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(MantenimientoProgramado::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(MantenimientoProgramado::PropiedadId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MantenimientoProgramado::UnidadId)
+                            .uuid()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(MantenimientoProgramado::Titulo)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MantenimientoProgramado::Descripcion)
+                            .text()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(MantenimientoProgramado::Prioridad)
+                            .string_len(20)
+                            .not_null()
+                            .default("media"),
+                    )
+                    .col(
+                        ColumnDef::new(MantenimientoProgramado::NombreProveedor)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(MantenimientoProgramado::TelefonoProveedor)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(MantenimientoProgramado::EmailProveedor)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(MantenimientoProgramado::CostoEstimado)
+                            .decimal_len(12, 2)
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(MantenimientoProgramado::CostoMoneda)
+                            .string_len(3)
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(MantenimientoProgramado::Frecuencia)
+                            .string_len(20)
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MantenimientoProgramado::ProximaFecha)
+                            .date()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MantenimientoProgramado::Activo)
+                            .boolean()
+                            .not_null()
+                            .default(true),
+                    )
+                    .col(
+                        ColumnDef::new(MantenimientoProgramado::OrganizacionId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MantenimientoProgramado::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MantenimientoProgramado::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_mantenimiento_programado_org_activo")
+                    .table(MantenimientoProgramado::Table)
+                    .col(MantenimientoProgramado::OrganizacionId)
+                    .col(MantenimientoProgramado::Activo)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_mantenimiento_programado_proxima_fecha")
+                    .table(MantenimientoProgramado::Table)
+                    .col(MantenimientoProgramado::ProximaFecha)
+                    .to_owned(),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(
+                Table::drop()
+                    .table(MantenimientoProgramado::Table)
+                    .to_owned(),
+            )
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum MantenimientoProgramado {
+    Table,
+    Id,
+    PropiedadId,
+    UnidadId,
+    Titulo,
+    Descripcion,
+    Prioridad,
+    NombreProveedor,
+    TelefonoProveedor,
+    EmailProveedor,
+    CostoEstimado,
+    CostoMoneda,
+    Frecuencia,
+    ProximaFecha,
+    Activo,
+    OrganizacionId,
+    CreatedAt,
+    UpdatedAt,
+}

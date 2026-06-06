@@ -719,6 +719,100 @@ pub(crate) async fn generar_deposito_devolucion(
     Ok(count)
 }
 
+/// Días de anticipación para notificar pagos próximos a vencer.
+const DIAS_ANTICIPACION_PAGO: i64 = 5;
+
+pub(crate) async fn generar_pagos_por_vencer(
+    db: &DatabaseConnection,
+    organizacion_id: Uuid,
+) -> Result<u64, AppError> {
+    let today = Utc::now().date_naive();
+    let limit_date = today + chrono::Duration::days(DIAS_ANTICIPACION_PAGO);
+
+    let pagos = pago::Entity::find()
+        .filter(pago::Column::OrganizacionId.eq(organizacion_id))
+        .filter(pago::Column::Estado.eq("pendiente"))
+        .filter(pago::Column::FechaVencimiento.gte(today))
+        .filter(pago::Column::FechaVencimiento.lte(limit_date))
+        .all(db)
+        .await?;
+
+    if pagos.is_empty() {
+        return Ok(0);
+    }
+
+    // Batch-fetch contratos
+    let contrato_ids: Vec<Uuid> = pagos.iter().map(|p| p.contrato_id).collect();
+    let contratos = contrato::Entity::find()
+        .filter(contrato::Column::Id.is_in(contrato_ids))
+        .all(db)
+        .await?;
+    let contrato_map: HashMap<Uuid, &contrato::Model> =
+        contratos.iter().map(|c| (c.id, c)).collect();
+
+    // Batch-fetch propiedades
+    let propiedad_ids: Vec<Uuid> = contratos.iter().map(|c| c.propiedad_id).collect();
+    let propiedades = propiedad::Entity::find()
+        .filter(propiedad::Column::Id.is_in(propiedad_ids))
+        .all(db)
+        .await?;
+    let propiedad_map: HashMap<Uuid, &propiedad::Model> =
+        propiedades.iter().map(|p| (p.id, p)).collect();
+
+    let usuario_ids = usuarios_activos_organizacion(db, organizacion_id).await?;
+    if usuario_ids.is_empty() {
+        return Ok(0);
+    }
+
+    let pago_ids: Vec<Uuid> = pagos.iter().map(|p| p.id).collect();
+    let existing = batch_existing_notifications(db, "pago_por_vencer", "pago", &pago_ids).await?;
+
+    let now = Utc::now().into();
+    let mut count: u64 = 0;
+    let mut batch: Vec<notificacion::ActiveModel> = Vec::new();
+
+    for pago_model in &pagos {
+        let propiedad_titulo = contrato_map
+            .get(&pago_model.contrato_id)
+            .and_then(|c| propiedad_map.get(&c.propiedad_id))
+            .map_or("Propiedad", |p| p.titulo.as_str());
+
+        let dias_restantes = (pago_model.fecha_vencimiento - today).num_days();
+
+        for &uid in &usuario_ids {
+            if existing.contains(&(pago_model.id, uid)) {
+                continue;
+            }
+
+            batch.push(notificacion::ActiveModel {
+                id: Set(Uuid::new_v4()),
+                tipo: Set("pago_por_vencer".to_string()),
+                titulo: Set(format!("Pago próximo - {propiedad_titulo}")),
+                mensaje: Set(format!(
+                    "El pago de {} {} vence en {} días ({})",
+                    pago_model.monto,
+                    pago_model.moneda,
+                    dias_restantes,
+                    pago_model.fecha_vencimiento.format("%d/%m/%Y")
+                )),
+                leida: Set(false),
+                entity_type: Set("pago".to_string()),
+                entity_id: Set(pago_model.id),
+                usuario_id: Set(uid),
+                organizacion_id: Set(organizacion_id),
+                created_at: Set(now),
+            });
+            count += 1;
+        }
+    }
+
+    if !batch.is_empty() {
+        notificacion::Entity::insert_many(batch).exec(db).await?;
+    }
+
+    Ok(count)
+}
+
 pub async fn generar_notificaciones(
     db: &DatabaseConnection,
     organizacion_id: Uuid,
@@ -728,6 +822,7 @@ pub async fn generar_notificaciones(
     let documento_vencido = generar_documentos_vencidos(db, organizacion_id).await?;
     let contrato_renovacion = generar_renovacion_reminders(db, organizacion_id).await?;
     let deposito_devolucion = generar_deposito_devolucion(db, organizacion_id).await?;
+    let pago_por_vencer = generar_pagos_por_vencer(db, organizacion_id).await?;
 
     Ok(GenerarNotificacionesResponse {
         pago_vencido,
@@ -735,11 +830,13 @@ pub async fn generar_notificaciones(
         documento_vencido,
         contrato_renovacion,
         deposito_devolucion,
+        pago_por_vencer,
         total: pago_vencido
             + contrato_por_vencer
             + documento_vencido
             + contrato_renovacion
-            + deposito_devolucion,
+            + deposito_devolucion
+            + pago_por_vencer,
     })
 }
 

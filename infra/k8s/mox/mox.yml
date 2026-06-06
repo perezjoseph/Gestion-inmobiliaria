@@ -1,0 +1,112 @@
+# Mox mail server — single container, host network mode.
+# Mox requires host networking for incoming connection IP access (spam filtering)
+# and to bind standard mail ports directly.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mox
+  namespace: mox
+  labels:
+    app.kubernetes.io/name: mox
+    app.kubernetes.io/part-of: realestate
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mox
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mox
+    spec:
+      automountServiceAccountToken: false
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        kubernetes.io/hostname: coreos
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: mox
+          image: r.xmox.nl/mox:v0.0.14
+          workingDir: /mox
+          env:
+            - name: MOX_DOCKER
+              value: "yes"
+          volumeMounts:
+            - name: config
+              mountPath: /mox/config
+            - name: data
+              mountPath: /mox/data
+            - name: web
+              mountPath: /mox/web
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+              ephemeral-storage: 64Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+              ephemeral-storage: 256Mi
+          readinessProbe:
+            tcpSocket:
+              port: 587
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 25
+            initialDelaySeconds: 10
+            periodSeconds: 30
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: mox-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: mox-data
+        - name: web
+          persistentVolumeClaim:
+            claimName: mox-web
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mox-config
+  namespace: mox
+spec:
+  storageClassName: local-path
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 512Mi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mox-data
+  namespace: mox
+spec:
+  storageClassName: local-path
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mox-web
+  namespace: mox
+spec:
+  storageClassName: local-path
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 512Mi

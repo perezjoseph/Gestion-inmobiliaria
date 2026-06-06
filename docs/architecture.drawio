@@ -1,0 +1,190 @@
+<mxfile host="Electron" agent="Kiro">
+  <diagram id="main" name="Arquitectura">
+    <mxGraphModel dx="1344" dy="963" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1600" pageHeight="1200" background="#ffffff" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="layer-infra" parent="0" value="Infraestructura" />
+        <mxCell id="k8s-boundary" parent="layer-infra" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#90A4AE;strokeWidth=1;dashed=1;dashPattern=8 4;arcSize=4;" value="" vertex="1">
+          <mxGeometry height="780" width="900" x="150" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="k8s-label" parent="layer-infra" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontStyle=2;fillColor=none;strokeColor=none;fontColor=#546E7A;" value="☸ Kubernetes (k3s) — namespace: realestate" vertex="1">
+          <mxGeometry height="20" width="300" x="375" y="925" as="geometry" />
+        </mxCell>
+        <mxCell id="db-box" parent="layer-infra" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#C62828;strokeWidth=2;arcSize=6;" value="" vertex="1">
+          <mxGeometry height="70" width="200" x="500" y="800" as="geometry" />
+        </mxCell>
+        <mxCell id="db-title" parent="layer-infra" style="text;html=1;align=center;verticalAlign=top;fontSize=12;fontStyle=1;fillColor=none;strokeColor=none;fontColor=#B71C1C;" value="PostgreSQL 16 · :5432" vertex="1">
+          <mxGeometry height="20" width="180" x="510" y="808" as="geometry" />
+        </mxCell>
+        <mxCell id="db-desc" parent="layer-infra" style="text;html=1;align=center;verticalAlign=top;fontSize=9;fillColor=none;strokeColor=none;" value="10Gi PVC · UUIDs · DECIMAL · TIMESTAMPTZ" vertex="1">
+          <mxGeometry height="30" width="180" x="510" y="832" as="geometry" />
+        </mxCell>
+        <mxCell id="nfs-box" parent="layer-infra" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECEFF1;strokeColor=#607D8B;fontSize=10;fontStyle=1;" value="NFS Uploads&#xa;5Gi RWX" vertex="1">
+          <mxGeometry height="40" width="120" x="280" y="810" as="geometry" />
+        </mxCell>
+        <mxCell id="smtp-box" parent="layer-infra" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECEFF1;strokeColor=#607D8B;fontSize=10;fontStyle=1;" value="Mailcow SMTP&#xa;Correos" vertex="1">
+          <mxGeometry height="40" width="120" x="800" y="810" as="geometry" />
+        </mxCell>
+        <mxCell id="monitoring-box" parent="layer-infra" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECEFF1;strokeColor=#607D8B;fontSize=10;fontStyle=1;" value="Prometheus + Grafana" vertex="1">
+          <mxGeometry height="30" width="180" x="510" y="890" as="geometry" />
+        </mxCell>
+        <mxCell id="layer-services" parent="0" value="Servicios" />
+        <mxCell id="baileys-box" parent="layer-services" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#7B1FA2;strokeWidth=2;arcSize=6;" value="" vertex="1">
+          <mxGeometry height="70" width="180" x="170" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="baileys-title" parent="layer-services" style="text;html=1;align=center;verticalAlign=top;fontSize=12;fontStyle=1;fillColor=none;strokeColor=none;fontColor=#6A1B9A;" value="Baileys · :3100" vertex="1">
+          <mxGeometry height="20" width="160" x="180" y="535" as="geometry" />
+        </mxCell>
+        <mxCell id="baileys-desc" parent="layer-services" style="text;html=1;align=center;verticalAlign=top;fontSize=9;fillColor=none;strokeColor=none;" value="Node.js · WhatsApp gateway&#xa;Encrypted sessions" vertex="1">
+          <mxGeometry height="35" width="160" x="180" y="558" as="geometry" />
+        </mxCell>
+        <mxCell id="ocr-box" parent="layer-services" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#F9A825;strokeWidth=2;arcSize=6;" value="" vertex="1">
+          <mxGeometry height="70" width="180" x="170" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="ocr-title" parent="layer-services" style="text;html=1;align=center;verticalAlign=top;fontSize=12;fontStyle=1;fillColor=none;strokeColor=none;fontColor=#F57F17;" value="OCR Service · :8000" vertex="1">
+          <mxGeometry height="20" width="160" x="180" y="655" as="geometry" />
+        </mxCell>
+        <mxCell id="ocr-desc" parent="layer-services" style="text;html=1;align=center;verticalAlign=top;fontSize=9;fillColor=none;strokeColor=none;" value="Python · PaddleOCR&#xa;OpenVINO · Intel i915 GPU" vertex="1">
+          <mxGeometry height="35" width="160" x="180" y="678" as="geometry" />
+        </mxCell>
+        <mxCell id="ovms-box" parent="layer-services" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;strokeWidth=2;arcSize=6;" value="" vertex="1">
+          <mxGeometry height="70" width="180" x="850" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="ovms-title" parent="layer-services" style="text;html=1;align=center;verticalAlign=top;fontSize=12;fontStyle=1;fillColor=none;strokeColor=none;fontColor=#BF360C;" value="OVMS (LLM) · :8000" vertex="1">
+          <mxGeometry height="20" width="160" x="860" y="535" as="geometry" />
+        </mxCell>
+        <mxCell id="ovms-desc" parent="layer-services" style="text;html=1;align=center;verticalAlign=top;fontSize=9;fillColor=none;strokeColor=none;" value="OpenVINO Model Server&#xa;Qwen3-30B-A3B · Intel Xe GPU" vertex="1">
+          <mxGeometry height="35" width="160" x="860" y="558" as="geometry" />
+        </mxCell>
+        <mxCell id="layer-app" parent="0" value="Aplicación" />
+        <mxCell id="ingress" parent="layer-app" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3CD;strokeColor=#FFC107;fontStyle=1;fontSize=11;shadow=1;" value="Traefik Ingress · HTTPS&#xa;gestion.local" vertex="1">
+          <mxGeometry height="50" width="240" x="480" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend-box" parent="layer-app" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1976D2;strokeWidth=2;arcSize=6;" value="" vertex="1">
+          <mxGeometry height="70" width="320" x="440" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend-title" parent="layer-app" style="text;html=1;align=center;verticalAlign=top;fontSize=12;fontStyle=1;fillColor=none;strokeColor=none;fontColor=#1565C0;" value="Frontend · Caddy :8443" vertex="1">
+          <mxGeometry height="20" width="280" x="460" y="318" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend-desc" parent="layer-app" style="text;html=1;align=center;verticalAlign=top;fontSize=9;fillColor=none;strokeColor=none;" value="Yew (Rust → WASM) · Tailwind CSS · TLS · Reverse proxy" vertex="1">
+          <mxGeometry height="25" width="280" x="460" y="342" as="geometry" />
+        </mxCell>
+        <mxCell id="backend-box" parent="layer-app" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;strokeWidth=2;arcSize=6;" value="" vertex="1">
+          <mxGeometry height="120" width="400" x="400" y="440" as="geometry" />
+        </mxCell>
+        <mxCell id="backend-title" parent="layer-app" style="text;html=1;align=center;verticalAlign=top;fontSize=12;fontStyle=1;fillColor=none;strokeColor=none;fontColor=#2E7D32;" value="Backend (× 2 réplicas) · Actix-web :8080" vertex="1">
+          <mxGeometry height="20" width="360" x="420" y="448" as="geometry" />
+        </mxCell>
+        <mxCell id="backend-desc" parent="layer-app" style="text;html=1;align=center;verticalAlign=top;fontSize=10;fillColor=none;strokeColor=none;" value="Rust · SeaORM · JWT + RBAC · Rate limiting&#xa;Background jobs · Prometheus metrics" vertex="1">
+          <mxGeometry height="30" width="360" x="420" y="472" as="geometry" />
+        </mxCell>
+        <mxCell id="backend-domains" parent="layer-app" style="text;html=1;align=center;verticalAlign=top;fontSize=8;fillColor=none;strokeColor=none;fontColor=#666666;" value="auth · propiedades · inquilinos · contratos · pagos · gastos · mantenimiento&#xa;reportes · documentos · chatbot · notificaciones · configuracion · importacion" vertex="1">
+          <mxGeometry height="40" width="360" x="420" y="510" as="geometry" />
+        </mxCell>
+        <mxCell id="layer-clients" parent="0" value="Clientes" />
+        <mxCell id="user-web" parent="layer-clients" style="shape=mxgraph.azure.user;whiteSpace=wrap;html=1;fillColor=#1976D2;strokeColor=none;fontColor=#333333;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;" value="Administrador&#xa;(Navegador)" vertex="1">
+          <mxGeometry height="50" width="40" x="370" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="user-mobile" parent="layer-clients" style="shape=mxgraph.azure.user;whiteSpace=wrap;html=1;fillColor=#388E3C;strokeColor=none;fontColor=#333333;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;" value="Administrador&#xa;(Android)" vertex="1">
+          <mxGeometry height="50" width="40" x="580" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="user-wa" parent="layer-clients" style="shape=mxgraph.azure.user;whiteSpace=wrap;html=1;fillColor=#7B1FA2;strokeColor=none;fontColor=#333333;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;" value="Inquilino&#xa;(WhatsApp)" vertex="1">
+          <mxGeometry height="50" width="40" x="790" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="layer-connections" parent="0" value="Conexiones" />
+        <mxCell id="e-web-ingress" edge="1" parent="layer-connections" source="user-web" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1976D2;strokeWidth=2;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" target="ingress">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="390" y="150" />
+              <mxPoint x="540" y="150" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-web-ingress-lbl" connectable="0" parent="e-web-ingress" style="edgeLabel;fontSize=9;labelBackgroundColor=#ffffff;" value="HTTPS" vertex="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-mobile-ingress" edge="1" parent="layer-connections" source="user-mobile" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#388E3C;strokeWidth=2;" target="ingress">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-mobile-ingress-lbl" connectable="0" parent="e-mobile-ingress" style="edgeLabel;fontSize=9;labelBackgroundColor=#ffffff;" value="HTTPS" vertex="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-wa-baileys" edge="1" parent="layer-connections" source="user-wa" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#7B1FA2;strokeWidth=2;" target="baileys-box">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="810" y="180" />
+              <mxPoint x="260" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-wa-baileys-lbl" connectable="0" parent="e-wa-baileys" style="edgeLabel;fontSize=9;labelBackgroundColor=#ffffff;" value="WA Protocol" vertex="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ingress-fe" edge="1" parent="layer-connections" source="ingress" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1976D2;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="frontend-box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-fe-be" edge="1" parent="layer-connections" source="frontend-box" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1976D2;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="backend-box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-fe-be-lbl" connectable="0" parent="e-fe-be" style="edgeLabel;fontSize=10;fontStyle=1;labelBackgroundColor=#ffffff;" value="/api/*" vertex="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-be-db" edge="1" parent="layer-connections" source="backend-box" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#C62828;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="db-box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-be-db-lbl" connectable="0" parent="e-be-db" style="edgeLabel;fontSize=9;labelBackgroundColor=#ffffff;" value="SeaORM" vertex="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-be-baileys" edge="1" parent="layer-connections" source="backend-box" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#7B1FA2;strokeWidth=2;exitX=0;exitY=0.4;entryX=1;entryY=0.5;" target="baileys-box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-be-baileys-lbl" connectable="0" parent="e-be-baileys" style="edgeLabel;fontSize=9;labelBackgroundColor=#ffffff;" value="HTTP" vertex="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-baileys-be" edge="1" parent="layer-connections" source="baileys-box" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#7B1FA2;strokeWidth=1;dashed=1;exitX=1;exitY=0.8;entryX=0;entryY=0.7;" target="backend-box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-baileys-be-lbl" connectable="0" parent="e-baileys-be" style="edgeLabel;fontSize=8;fontColor=#7B1FA2;labelBackgroundColor=#ffffff;" value="webhook" vertex="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-be-ocr" edge="1" parent="layer-connections" source="backend-box" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#F9A825;strokeWidth=2;exitX=0;exitY=0.8;entryX=1;entryY=0.5;" target="ocr-box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-be-ocr-lbl" connectable="0" parent="e-be-ocr" style="edgeLabel;fontSize=9;labelBackgroundColor=#ffffff;" value="HTTP" vertex="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-be-ovms" edge="1" parent="layer-connections" source="backend-box" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="ovms-box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-be-ovms-lbl" connectable="0" parent="e-be-ovms" style="edgeLabel;fontSize=9;labelBackgroundColor=#ffffff;" value="OpenAI API" vertex="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-be-nfs" edge="1" parent="layer-connections" source="backend-box" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#607D8B;strokeWidth=1;dashed=1;exitX=0.25;exitY=1;entryX=0.5;entryY=0;" target="nfs-box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-be-smtp" edge="1" parent="layer-connections" source="backend-box" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#607D8B;strokeWidth=1;dashed=1;exitX=0.75;exitY=1;entryX=0.5;entryY=0;" target="smtp-box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-baileys-db" edge="1" parent="layer-connections" source="baileys-box" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#C62828;strokeWidth=1;dashed=1;exitX=0.5;exitY=1;entryX=0;entryY=0.5;" target="db-box">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="460" y="600" />
+              <mxPoint x="460" y="835" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-baileys-db-lbl" connectable="0" parent="e-baileys-db" style="edgeLabel;fontSize=8;fontColor=#C62828;labelBackgroundColor=#ffffff;" value="sessions only (isolated role)" vertex="1">
+          <mxGeometry relative="1" x="-0.3" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-be-mon" edge="1" parent="layer-connections" source="db-box" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#607D8B;strokeWidth=1;dashed=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="monitoring-box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-be-mon-lbl" connectable="0" parent="e-be-mon" style="edgeLabel;fontSize=8;labelBackgroundColor=#ffffff;" value="metrics scrape" vertex="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

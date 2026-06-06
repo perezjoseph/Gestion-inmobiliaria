@@ -24,12 +24,14 @@ pub mod firmas;
 #[cfg(test)]
 mod firmas_pbt;
 pub mod gastos;
+pub mod gastos_recurrentes;
 pub mod importacion;
 pub mod inquilinos;
 pub mod invitaciones;
 pub mod ipc;
 pub mod mail;
 pub mod mantenimiento;
+pub mod mantenimiento_programado;
 pub mod notificaciones;
 pub mod ocr_client;
 pub mod ocr_mapping;

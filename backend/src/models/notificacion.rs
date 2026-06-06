@@ -58,6 +58,7 @@ pub struct GenerarNotificacionesResponse {
     pub documento_vencido: u64,
     pub contrato_renovacion: u64,
     pub deposito_devolucion: u64,
+    pub pago_por_vencer: u64,
     pub total: u64,
 }
 
@@ -216,7 +217,8 @@ mod tests {
             documento_vencido: 1,
             contrato_renovacion: 4,
             deposito_devolucion: 2,
-            total: 12,
+            pago_por_vencer: 1,
+            total: 13,
         };
         let json = serde_json::to_value(&resp).unwrap();
         assert!(json.get("pagoVencido").is_some());
@@ -229,7 +231,9 @@ mod tests {
         assert_eq!(json["contratoRenovacion"], 4);
         assert!(json.get("depositoDevolucion").is_some());
         assert_eq!(json["depositoDevolucion"], 2);
-        assert_eq!(json["total"], 12);
+        assert!(json.get("pagoPorVencer").is_some());
+        assert_eq!(json["pagoPorVencer"], 1);
+        assert_eq!(json["total"], 13);
         // Verify snake_case keys are absent
         assert!(json.get("pago_vencido").is_none());
         assert!(json.get("contrato_por_vencer").is_none());

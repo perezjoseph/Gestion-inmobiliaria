@@ -131,8 +131,14 @@ pub async fn run_eval(
     )
     .unwrap_or_default();
 
-    chatbot_evals::create_run(db.get_ref(), run_id, suite.id, org_id, agent_config_snapshot)
-        .await?;
+    chatbot_evals::create_run(
+        db.get_ref(),
+        run_id,
+        suite.id,
+        org_id,
+        agent_config_snapshot,
+    )
+    .await?;
 
     // Execute the eval suite
     let runner = EvalRunner::new(&ai_module, db.get_ref());

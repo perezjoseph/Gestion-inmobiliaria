@@ -252,6 +252,104 @@ pub async fn delete<C: ConnectionTrait>(
     Ok(())
 }
 
+pub async fn bulk_marcar_pagado<C: ConnectionTrait>(
+    db: &C,
+    org_id: Uuid,
+    pago_ids: &[Uuid],
+    fecha_pago: chrono::NaiveDate,
+    metodo_pago: &str,
+    usuario_id: Uuid,
+) -> Result<u64, AppError> {
+    use crate::services::validation::{METODOS_PAGO, validate_enum};
+
+    validate_enum("metodo_pago", metodo_pago, METODOS_PAGO)?;
+
+    if pago_ids.is_empty() {
+        return Ok(0);
+    }
+
+    if pago_ids.len() > 100 {
+        return Err(AppError::Validation(
+            "Máximo 100 pagos por operación masiva".to_string(),
+        ));
+    }
+
+    // Verify all pagos exist, belong to org, and are in updatable state
+    let pagos = pago::Entity::find()
+        .filter(pago::Column::Id.is_in(pago_ids.to_vec()))
+        .filter(pago::Column::OrganizacionId.eq(org_id))
+        .all(db)
+        .await?;
+
+    if pagos.len() != pago_ids.len() {
+        return Err(AppError::Validation(
+            "Uno o más pagos no fueron encontrados en la organización".to_string(),
+        ));
+    }
+
+    let non_updatable: Vec<Uuid> = pagos
+        .iter()
+        .filter(|p| p.estado != "pendiente" && p.estado != "atrasado")
+        .map(|p| p.id)
+        .collect();
+
+    if !non_updatable.is_empty() {
+        return Err(AppError::Validation(format!(
+            "Los siguientes pagos no están en estado pendiente/atrasado: {}",
+            non_updatable
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )));
+    }
+
+    let now = Utc::now().fixed_offset();
+    let result = pago::Entity::update_many()
+        .col_expr(
+            pago::Column::Estado,
+            sea_orm::sea_query::Expr::value("pagado"),
+        )
+        .col_expr(
+            pago::Column::FechaPago,
+            sea_orm::sea_query::Expr::value(fecha_pago),
+        )
+        .col_expr(
+            pago::Column::MetodoPago,
+            sea_orm::sea_query::Expr::value(metodo_pago),
+        )
+        .col_expr(
+            pago::Column::Recargo,
+            sea_orm::sea_query::Expr::value(Option::<rust_decimal::Decimal>::None),
+        )
+        .col_expr(
+            pago::Column::UpdatedAt,
+            sea_orm::sea_query::Expr::value(now),
+        )
+        .filter(pago::Column::Id.is_in(pago_ids.to_vec()))
+        .exec(db)
+        .await?;
+
+    auditoria::registrar_best_effort(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "pago".to_string(),
+            entity_id: Uuid::nil(),
+            accion: "bulk_marcar_pagado".to_string(),
+            cambios: serde_json::json!({
+                "pago_ids": pago_ids,
+                "fecha_pago": fecha_pago,
+                "metodo_pago": metodo_pago,
+                "actualizados": result.rows_affected,
+            }),
+        },
+    )
+    .await;
+
+    Ok(result.rows_affected)
+}
+
 pub async fn mark_overdue(db: &DatabaseConnection) -> Result<u64, AppError> {
     let today = Utc::now().date_naive();
 

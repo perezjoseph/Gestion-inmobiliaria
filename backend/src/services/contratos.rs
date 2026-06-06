@@ -11,7 +11,7 @@ use crate::errors::AppError;
 use crate::models::PaginatedResponse;
 use crate::models::contrato::{
     CambiarEstadoDepositoRequest, ContratoResponse, CreateContratoRequest, RenovarContratoRequest,
-    TerminarContratoRequest, UpdateContratoRequest,
+    SugerenciaRenovacionResponse, TerminarContratoRequest, UpdateContratoRequest,
 };
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
 use crate::services::pago_generacion::{PagoGenerado, calcular_pagos, validar_dia_vencimiento};
@@ -635,6 +635,57 @@ pub async fn delete(
     txn.commit().await?;
 
     Ok(())
+}
+
+/// Suggests renewal parameters for a contract based on IPC data.
+/// Returns the current monthly amount, the maximum allowed by law (IPC capped at 10%),
+/// and the suggested new start date.
+pub async fn sugerir_renovacion(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    contrato_id: Uuid,
+) -> Result<SugerenciaRenovacionResponse, AppError> {
+    let contrato_record = contrato::Entity::find_by_id(contrato_id)
+        .filter(contrato::Column::OrganizacionId.eq(org_id))
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
+
+    if contrato_record.estado != "activo" {
+        return Err(AppError::Validation(
+            "Solo se puede sugerir renovación para contratos activos".to_string(),
+        ));
+    }
+
+    let ipc_data = super::ipc::obtener_ipc_actual(db).await?;
+
+    let (monto_maximo, ipc_porcentaje) = match ipc_data {
+        Some(data) => {
+            let max =
+                super::ipc::calcular_monto_maximo(contrato_record.monto_mensual, data.valor_ipc);
+            (Some(max), Some(data.valor_ipc))
+        }
+        None => (None, None),
+    };
+
+    let fecha_inicio_sugerida = contrato_record
+        .fecha_fin
+        .succ_opt()
+        .unwrap_or(contrato_record.fecha_fin);
+
+    // Suggest same duration as current contract
+    let duracion_dias = (contrato_record.fecha_fin - contrato_record.fecha_inicio).num_days();
+    let fecha_fin_sugerida = fecha_inicio_sugerida + Duration::days(duracion_dias);
+
+    Ok(SugerenciaRenovacionResponse {
+        contrato_id,
+        monto_actual: contrato_record.monto_mensual,
+        moneda: contrato_record.moneda,
+        monto_maximo_permitido: monto_maximo,
+        ipc_porcentaje,
+        fecha_inicio_sugerida,
+        fecha_fin_sugerida,
+    })
 }
 
 pub async fn renovar(

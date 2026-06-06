@@ -89,6 +89,18 @@ pub struct CambiarEstadoDepositoRequest {
     pub motivo_retencion: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SugerenciaRenovacionResponse {
+    pub contrato_id: Uuid,
+    pub monto_actual: Decimal,
+    pub moneda: String,
+    pub monto_maximo_permitido: Option<Decimal>,
+    pub ipc_porcentaje: Option<Decimal>,
+    pub fecha_inicio_sugerida: NaiveDate,
+    pub fecha_fin_sugerida: NaiveDate,
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {

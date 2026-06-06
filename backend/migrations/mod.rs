@@ -34,7 +34,18 @@ pub mod m20260512_000003_create_responsabilidad_servicios;
 pub mod m20260512_000004_create_cache_dgii;
 pub mod m20260513_000001_create_preview_index;
 pub mod m20260514_000001_add_agent_config_and_eval_tables;
+pub mod m20260601_000001_add_tipo_fiscal_to_organizaciones;
+pub mod m20260601_000002_add_fiscal_columns_to_pagos;
+pub mod m20260601_000003_add_catastral_to_propiedades;
+pub mod m20260601_000004_create_cuotas_condominio;
+pub mod m20260601_000005_create_secuencias_ncf;
+pub mod m20260601_000006_create_reportes_dgii;
+pub mod m20260601_000007_create_configuraciones_ipi;
+pub mod m20260601_000008_create_recibos_informales;
+pub mod m20260601_000009_create_copropietarios;
 pub mod m20260606_000001_add_missing_indexes;
+pub mod m20260606_000002_create_gastos_recurrentes;
+pub mod m20260606_000003_create_mantenimiento_programado;
 
 use sea_orm_migration::prelude::*;
 
@@ -80,6 +91,17 @@ impl MigratorTrait for Migrator {
             Box::new(m20260513_000001_create_preview_index::Migration),
             Box::new(m20260514_000001_add_agent_config_and_eval_tables::Migration),
             Box::new(m20260606_000001_add_missing_indexes::Migration),
+            Box::new(m20260606_000002_create_gastos_recurrentes::Migration),
+            Box::new(m20260606_000003_create_mantenimiento_programado::Migration),
+            Box::new(m20260601_000001_add_tipo_fiscal_to_organizaciones::Migration),
+            Box::new(m20260601_000002_add_fiscal_columns_to_pagos::Migration),
+            Box::new(m20260601_000003_add_catastral_to_propiedades::Migration),
+            Box::new(m20260601_000004_create_cuotas_condominio::Migration),
+            Box::new(m20260601_000005_create_secuencias_ncf::Migration),
+            Box::new(m20260601_000006_create_reportes_dgii::Migration),
+            Box::new(m20260601_000007_create_configuraciones_ipi::Migration),
+            Box::new(m20260601_000008_create_recibos_informales::Migration),
+            Box::new(m20260601_000009_create_copropietarios::Migration),
         ]
     }
 }

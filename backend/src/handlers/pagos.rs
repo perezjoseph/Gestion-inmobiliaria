@@ -5,7 +5,10 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::middleware::rbac::{AdminOnly, WriteAccess};
-use crate::models::pago::{CreatePagoRequest, PagoListQuery, UpdatePagoRequest};
+use crate::models::pago::{
+    BulkMarcarPagadoRequest, BulkMarcarPagadoResponse, CreatePagoRequest, PagoListQuery,
+    UpdatePagoRequest,
+};
 use crate::services::auth::Claims;
 use crate::services::pagos;
 
@@ -127,4 +130,38 @@ pub async fn delete(
     pagos::delete(&txn, org_id, id, usuario_id).await?;
     txn.commit().await?;
     Ok(HttpResponse::NoContent().finish())
+}
+
+pub async fn bulk_marcar_pagado(
+    db: web::Data<DatabaseConnection>,
+    access: WriteAccess,
+    body: web::Json<BulkMarcarPagadoRequest>,
+) -> Result<HttpResponse, AppError> {
+    let usuario_id = access.0.sub;
+    let org_id = access.0.organizacion_id;
+    let dto = body.into_inner();
+
+    if !VALID_METODOS_PAGO.contains(&dto.metodo_pago.as_str()) {
+        return Err(AppError::Validation(format!(
+            "Método de pago inválido. Valores permitidos: {}",
+            VALID_METODOS_PAGO.join(", ")
+        )));
+    }
+
+    let txn = db.begin().await?;
+    let count = pagos::bulk_marcar_pagado(
+        &txn,
+        org_id,
+        &dto.pago_ids,
+        dto.fecha_pago,
+        &dto.metodo_pago,
+        usuario_id,
+    )
+    .await?;
+    txn.commit().await?;
+
+    Ok(HttpResponse::Ok().json(BulkMarcarPagadoResponse {
+        actualizados: count,
+        ids: dto.pago_ids,
+    }))
 }

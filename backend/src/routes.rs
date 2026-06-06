@@ -137,6 +137,10 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                         web::post().to(handlers::contratos::renovar),
                     )
                     .route(
+                        "/{id}/sugerir-renovacion",
+                        web::get().to(handlers::contratos::sugerir_renovacion),
+                    )
+                    .route(
                         "/{id}/terminar",
                         web::post().to(handlers::contratos::terminar),
                     )
@@ -157,6 +161,10 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(
                 web::scope("/pagos")
                     .wrap(Governor::new(&write_governor_conf))
+                    .route(
+                        "/bulk/marcar-pagado",
+                        web::post().to(handlers::pagos::bulk_marcar_pagado),
+                    )
                     .route("", web::get().to(handlers::pagos::list))
                     .route("", web::post().to(handlers::pagos::create))
                     .route("/{id}", web::get().to(handlers::pagos::get_by_id))
@@ -174,6 +182,26 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                         "/resumen-categorias",
                         web::get().to(handlers::gastos::resumen_categorias),
                     )
+                    .route(
+                        "/recurrentes",
+                        web::get().to(handlers::gastos_recurrentes::list),
+                    )
+                    .route(
+                        "/recurrentes",
+                        web::post().to(handlers::gastos_recurrentes::create),
+                    )
+                    .route(
+                        "/recurrentes/{id}",
+                        web::get().to(handlers::gastos_recurrentes::get_by_id),
+                    )
+                    .route(
+                        "/recurrentes/{id}",
+                        web::put().to(handlers::gastos_recurrentes::update),
+                    )
+                    .route(
+                        "/recurrentes/{id}",
+                        web::delete().to(handlers::gastos_recurrentes::delete),
+                    )
                     .route("", web::get().to(handlers::gastos::list))
                     .route("", web::post().to(handlers::gastos::create))
                     .route("/{id}", web::get().to(handlers::gastos::get_by_id))
@@ -183,6 +211,26 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(
                 web::scope("/mantenimiento")
                     .wrap(Governor::new(&write_governor_conf))
+                    .route(
+                        "/programado",
+                        web::get().to(handlers::mantenimiento_programado::list),
+                    )
+                    .route(
+                        "/programado",
+                        web::post().to(handlers::mantenimiento_programado::create),
+                    )
+                    .route(
+                        "/programado/{id}",
+                        web::get().to(handlers::mantenimiento_programado::get_by_id),
+                    )
+                    .route(
+                        "/programado/{id}",
+                        web::put().to(handlers::mantenimiento_programado::update),
+                    )
+                    .route(
+                        "/programado/{id}",
+                        web::delete().to(handlers::mantenimiento_programado::delete),
+                    )
                     .route("", web::get().to(handlers::mantenimiento::list))
                     .route("", web::post().to(handlers::mantenimiento::create))
                     .route("/{id}", web::get().to(handlers::mantenimiento::get_by_id))

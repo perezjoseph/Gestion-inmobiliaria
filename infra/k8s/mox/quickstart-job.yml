@@ -1,0 +1,66 @@
+# One-time Job to run mox quickstart and generate initial config.
+# Run this ONCE before deploying the main mox deployment.
+# After it completes, the mox-config PVC will have the generated files.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mox-quickstart
+  namespace: mox
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      automountServiceAccountToken: false
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        kubernetes.io/hostname: coreos
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      restartPolicy: Never
+      containers:
+        - name: quickstart
+          image: r.xmox.nl/mox:v0.0.14
+          workingDir: /mox
+          command:
+            - sh
+            - -c
+            - |
+              if [ -f /mox/config/mox.conf ]; then
+                echo "Config already exists, skipping quickstart."
+                exit 0
+              fi
+              mkdir -p /mox/config /mox/data /mox/web
+              mox quickstart -hostname mail.myhomeva.us no-reply@myhomeva.us 0
+          env:
+            - name: MOX_DOCKER
+              value: "yes"
+          volumeMounts:
+            - name: config
+              mountPath: /mox/config
+            - name: data
+              mountPath: /mox/data
+            - name: web
+              mountPath: /mox/web
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+              ephemeral-storage: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+              ephemeral-storage: 256Mi
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: mox-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: mox-data
+        - name: web
+          persistentVolumeClaim:
+            claimName: mox-web
