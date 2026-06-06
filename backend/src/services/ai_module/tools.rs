@@ -24,7 +24,7 @@ pub struct PaymentReceipt {
 }
 
 /// Input provided by the LLM when invoking the `extract_receipt` tool.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ExtractReceiptInput {
     pub image_base64: String,
     #[serde(default)]
