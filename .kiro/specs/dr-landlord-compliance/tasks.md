@@ -128,7 +128,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - **Property 13: Informal Receipt Uniqueness**
     - **Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5, 3.8**
 
-- [ ] 7. NCF/e-CF sequence service
+- [x] 7. NCF/e-CF sequence service
   - [x] 7.1 Implement `services/ncf.rs`
     - Implement `asignar_ncf` with `SELECT ... FOR UPDATE` row-level locking for gapless sequential generation
     - Implement retry logic for concurrency conflicts only
@@ -139,13 +139,13 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Handle NCF assignment failure gracefully: payment stays `pagado`, flagged for manual resolution
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 7.10, 7.11_
 
-  - [~] 7.2 Write property tests for NCF (`services/ncf_pbt.rs`)
+  - [x] 7.2 Write property tests for NCF (`services/ncf_pbt.rs`)
     - **Property 17: NCF Sequential Gapless Generation**
     - **Property 18: NCF Format Compliance**
     - **Property 19: NCF Range Boundary Enforcement**
     - **Validates: Requirements 7.1, 7.3, 7.4, 7.5, 7.9**
 
-- [ ] 8. Lease indexation service
+- [x] 8. Lease indexation service
   - [x] 8.1 Implement `services/indexacion.rs`
     - Implement `calcular_propuesta_renovacion` — fetch IPC from existing `ipc.rs`, apply formula `monto * (1 + min(ipc, 10%) / 100)`, enforce 10% absolute cap
     - Handle stale IPC data (>90 days): use cached value with warning flag
@@ -155,13 +155,13 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Indexation applies per contract anniversary, not calendar year
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 5.10_
 
-  - [~] 8.2 Write property tests for indexation (`services/indexacion_pbt.rs`)
+  - [x] 8.2 Write property tests for indexation (`services/indexacion_pbt.rs`)
     - **Property 14: Rent Indexation Formula with Legal Cap**
     - **Property 15: Indexation 60-Day Trigger**
     - **Property 16: Indexation Anniversary Alignment**
     - **Validates: Requirements 5.1, 5.2, 5.7, 5.9, 5.10**
 
-- [ ] 9. Condominium fee service
+- [x] 9. Condominium fee service
   - [x] 9.1 Implement `services/condominios.rs`
     - CRUD for cuota_condominio records (crear, actualizar, listar, eliminar)
     - Implement `calcular_billing_con_cuota` — separate line item for cuota, apply ITBIS to cuota if commercial + registered
@@ -170,7 +170,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Track cuota payment status independently from base rent
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8_
 
-  - [~] 9.2 Write property tests for condominiums (`services/condominios_pbt.rs`)
+  - [x] 9.2 Write property tests for condominiums (`services/condominios_pbt.rs`)
     - **Property 5: Billing Desglose with Condominium Fee**
     - **Property 6: Condominium Fee Change Temporal Boundary**
     - **Property 7: Condominium Fee Increase Uncapped**
@@ -180,7 +180,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 11. IPI property tax service
-  - [~] 11.1 Implement `services/ipi.rs`
+  - [x] 11.1 Implement `services/ipi.rs`
     - Implement `calcular_ipi` — sum valor_catastral excluding exento_ipi properties, compute `max(0, total - umbral) * 0.01`
     - IPI applies regardless of tipo_fiscal (informal included)
     - Implement co-owner proportional split per 2026 Supreme Court ruling
@@ -195,7 +195,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - **Validates: Requirements 9.1, 9.2, 9.7, 9.8, 9.10**
 
 - [ ] 12. DGII 606/607 report generation service
-  - [~] 12.1 Implement `services/reportes_dgii.rs`
+  - [x] 12.1 Implement `services/reportes_dgii.rs`
     - Implement `generar_607` — filter payments by fecha_pago within requested month, format per Norma 07-2018 fields
     - Implement `generar_606` — filter expenses by fecha_pago within requested month
     - Implement `formatear_linea_607` and `formatear_linea_606` — pipe-delimited formatting

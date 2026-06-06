@@ -11,6 +11,8 @@ pub mod chatbot_evals;
 #[cfg(test)]
 mod chatbot_pbt;
 pub mod condominios;
+#[cfg(test)]
+mod condominios_pbt;
 pub mod configuracion;
 pub mod contratos;
 pub mod crypto;
@@ -31,9 +33,12 @@ pub mod gastos;
 pub mod gastos_recurrentes;
 pub mod importacion;
 pub mod indexacion;
+#[cfg(test)]
+mod indexacion_pbt;
 pub mod inquilinos;
 pub mod invitaciones;
 pub mod ipc;
+pub mod ipi;
 pub mod itbis;
 #[cfg(test)]
 mod itbis_pbt;
@@ -41,6 +46,8 @@ pub mod mail;
 pub mod mantenimiento;
 pub mod mantenimiento_programado;
 pub mod ncf;
+#[cfg(test)]
+mod ncf_pbt;
 pub mod notificaciones;
 pub mod ocr_client;
 pub mod ocr_mapping;
@@ -64,6 +71,7 @@ pub mod recargos;
 pub mod recibos;
 pub mod recibos_informales;
 pub mod reportes;
+pub mod reportes_dgii;
 pub mod servicios_publicos;
 pub mod unidades;
 pub mod usuarios;
