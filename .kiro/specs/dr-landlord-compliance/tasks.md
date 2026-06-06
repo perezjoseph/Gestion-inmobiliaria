@@ -289,7 +289,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 17. Frontend pages (Leptos)
-  - [-] 17.1 Create Configuración Fiscal page (`pages/configuracion_fiscal.rs`)
+  - [x] 17.1 Create Configuración Fiscal page (`pages/configuracion_fiscal.rs`)
     - Form to set tipo_fiscal, RNC/cédula input with validation feedback, NCF range configuration
     - Route: `/configuracion/fiscal`
     - _Requirements: 1.1, 1.2, 1.3, 7.8_
