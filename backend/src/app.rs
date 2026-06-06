@@ -16,11 +16,33 @@ use crate::routes;
 use crate::services::mail::{MailClient, OutgoingMail, SmtpMailClient};
 use crate::services::ocr_preview::PreviewStore;
 
-async fn health() -> HttpResponse {
-    HttpResponse::Ok().json(serde_json::json!({"status": "ok"}))
+async fn health(db: web::Data<DatabaseConnection>) -> HttpResponse {
+    use sea_orm::ConnectionTrait;
+    let db_ok = db.execute_unprepared("SELECT 1").await.is_ok();
+    if db_ok {
+        HttpResponse::Ok().json(serde_json::json!({"status": "ok"}))
+    } else {
+        HttpResponse::ServiceUnavailable()
+            .json(serde_json::json!({"status": "degraded", "db": "unreachable"}))
+    }
 }
 
-async fn metrics_handler(_claims: crate::services::auth::Claims) -> HttpResponse {
+async fn metrics_handler(_claims: crate::middleware::rbac::AdminOnly) -> HttpResponse {
+    use prometheus::Encoder;
+    let encoder = prometheus::TextEncoder::new();
+    let metric_families = prometheus::default_registry().gather();
+    let mut buffer = Vec::new();
+    encoder
+        .encode(&metric_families, &mut buffer)
+        .unwrap_or_default();
+    HttpResponse::Ok()
+        .content_type("text/plain; version=0.0.4")
+        .body(buffer)
+}
+
+/// Internal metrics endpoint for Prometheus scraping (no auth required).
+/// Protected by NetworkPolicy — only monitoring namespace can reach it.
+async fn internal_metrics() -> HttpResponse {
     use prometheus::Encoder;
     let encoder = prometheus::TextEncoder::new();
     let metric_families = prometheus::default_registry().gather();
@@ -46,14 +68,25 @@ async fn serve_upload(
     }
 
     let full_path = format!("{upload_dir}/{requested_path}");
-    let canonical_dir = std::fs::canonicalize(&upload_dir)
-        .map_err(|_| AppError::NotFound("Directorio no encontrado".to_string()))?;
-    let canonical_file = std::fs::canonicalize(&full_path)
-        .map_err(|_| AppError::NotFound("Archivo no encontrado".to_string()))?;
+    let upload_dir_clone = upload_dir.clone();
+    let full_path_clone = full_path.clone();
 
-    if !canonical_file.starts_with(&canonical_dir) {
-        return Err(AppError::Forbidden("Acceso denegado".to_string()));
-    }
+    // Perform canonicalization on a blocking thread
+    let canonical_file =
+        tokio::task::spawn_blocking(move || -> Result<std::path::PathBuf, AppError> {
+            let canonical_dir = std::fs::canonicalize(&upload_dir_clone)
+                .map_err(|_| AppError::NotFound("Directorio no encontrado".to_string()))?;
+            let canonical_file = std::fs::canonicalize(&full_path_clone)
+                .map_err(|_| AppError::NotFound("Archivo no encontrado".to_string()))?;
+
+            if !canonical_file.starts_with(&canonical_dir) {
+                return Err(AppError::Forbidden("Acceso denegado".to_string()));
+            }
+
+            Ok(canonical_file)
+        })
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error en tarea: {e}")))??;
 
     actix_files::NamedFile::open_async(&canonical_file)
         .await
@@ -116,6 +149,11 @@ pub fn create_app(
             .into()
         });
 
+    // Limit multipart uploads to 20 MB total
+    let multipart_cfg = actix_multipart::form::MultipartFormConfig::default()
+        .total_limit(20 * 1024 * 1024)
+        .memory_limit(2 * 1024 * 1024);
+
     // Construct the mail client from SMTP env vars (graceful fallback if not configured)
     let mail_client: Arc<dyn MailClient> = match SmtpConfig::from_env() {
         Ok(smtp_cfg) => match SmtpMailClient::from_config(&smtp_cfg) {
@@ -144,8 +182,10 @@ pub fn create_app(
         .app_data(preview_store)
         .app_data(web::Data::new(mail_client))
         .app_data(json_cfg)
+        .app_data(multipart_cfg)
         .route("/health", web::get().to(health))
         .route("/metrics", web::get().to(metrics_handler))
+        .route("/internal/metrics", web::get().to(internal_metrics))
         .configure(routes::configure)
         .route("/uploads/{path:.*}", web::get().to(serve_upload))
 }

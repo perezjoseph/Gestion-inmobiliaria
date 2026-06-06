@@ -16,7 +16,6 @@
         "file://../../AGENTS.md",
         "file://../../.kiro/steering/**/*.md",
         "file://../../.kiro/settings/lsp.json",
-        "skill://../../.kiro/skills/ci-fix-typescript/SKILL.md",
         "skill://../../.kiro/skills/verify-fix-loop/SKILL.md"
     ],
     "hooks": {

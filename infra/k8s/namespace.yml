@@ -4,3 +4,11 @@ metadata:
   name: realestate
   labels:
     app.kubernetes.io/part-of: realestate
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: realestate-dev
+  labels:
+    app.kubernetes.io/part-of: realestate
+    environment: dev

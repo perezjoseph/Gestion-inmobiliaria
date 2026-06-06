@@ -1,0 +1,13 @@
+# Shared resources: deployed once in the 'realestate' namespace,
+# accessible by both dev and prod environments cross-namespace.
+# These are GPU-bound or singleton services that shouldn't be duplicated.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: realestate
+
+resources:
+  - ocr-service.yml
+  - ovms.yml
+  - fdroid-repo.yml
+  - ingress-fdroid.yml

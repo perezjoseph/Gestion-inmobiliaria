@@ -8,6 +8,7 @@ target-verify/
 .env
 .env.local
 .env.*.local
+infra/k8s/app/overlays/*/secrets.yml
 
 # Editor / OS clutter
 .DS_Store

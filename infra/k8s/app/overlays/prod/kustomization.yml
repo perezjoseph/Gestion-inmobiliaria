@@ -1,0 +1,56 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: realestate
+
+resources:
+  - ../../base
+  - namespace.yml
+  - cloudflare-tunnel.yml
+  - hpa.yml
+  - pdb.yml
+
+# Prod-specific patches
+patches:
+  # Set CORS_ORIGIN and ENVIRONMENT for prod
+  - target:
+      kind: Deployment
+      name: backend
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/env/2/value
+        value: "production"
+      - op: replace
+        path: /spec/template/spec/containers/0/env/3/value
+        value: "https://gestion.myhomeva.us"
+  # Add mailcow-smtp and bcrd secrets to prod backend
+  - target:
+      kind: Deployment
+      name: backend
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/envFrom/-
+        value:
+          secretRef:
+            name: mailcow-smtp
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: BCRD_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: realestate-bcrd-secret
+              key: BCRD_API_TOKEN
+
+configMapGenerator:
+  - name: caddyfile
+    files:
+      - Caddyfile
+
+images:
+  - name: ghcr.io/perezjoseph/realestate-backend
+    newTag: latest
+  - name: ghcr.io/perezjoseph/realestate-frontend
+    newTag: latest
+  - name: ghcr.io/perezjoseph/realestate-baileys
+    newTag: latest

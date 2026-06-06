@@ -1,0 +1,117 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ovms-models-pvc
+  namespace: realestate
+spec:
+  storageClassName: local-path
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 25Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ovms
+  namespace: realestate
+  labels:
+    app.kubernetes.io/name: ovms
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ovms
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ovms
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/hostname: inference
+      containers:
+        - name: ovms
+          image: openvino/model_server:latest-gpu
+          args:
+            - "--config_path"
+            - "/models/config.json"
+            - "--port"
+            - "9000"
+            - "--rest_port"
+            - "8000"
+            - "--metrics_enable"
+          ports:
+            - containerPort: 8000
+          resources:
+            requests:
+              cpu: 500m
+              memory: 16Gi
+              ephemeral-storage: 128Mi
+              gpu.intel.com/xe: "1"
+            limits:
+              cpu: 4000m
+              memory: 20Gi
+              ephemeral-storage: 512Mi
+              gpu.intel.com/xe: "1"
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /v1/config
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /v1/config
+              port: 8000
+            initialDelaySeconds: 180
+            periodSeconds: 30
+            timeoutSeconds: 10
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 5000
+            runAsGroup: 44
+            allowPrivilegeEscalation: false
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: ovms-models-pvc
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ovms-config
+  namespace: realestate
+data:
+  config.json: |
+    {
+      "model_config_list": [],
+      "mediapipe_config_list": [
+        {
+          "name": "Qwen3-30B-A3B-Instruct-2507-int4-ov",
+          "base_path": "/models/Qwen3-30B-A3B-Instruct-2507-int4-ov"
+        }
+      ]
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ovms
+  namespace: realestate
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ovms
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP

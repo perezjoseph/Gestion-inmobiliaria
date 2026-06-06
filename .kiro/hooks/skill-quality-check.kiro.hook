@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Skill Quality Check",
+  "description": "When a SKILL.md file is edited, verify it has valid frontmatter (name + description required), the description is under 1024 chars with specific trigger keywords, the body is under 500 lines with references for detailed content, and no overlap with existing steering files.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      ".kiro/skills/**/SKILL.md"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Check the edited SKILL.md and FIX any issues found — do not just report them. Apply these checks and auto-correct in place: (1) Valid YAML frontmatter with 'name' (kebab-case, max 64 chars) and 'description' (max 1024 chars) — if missing or malformed, add/fix it. (2) Description must contain specific trigger keywords — if missing, rewrite the description to include them. (3) Body over 500 lines — extract detail into references/ files and replace with pointers. (4) Overlap with steering files (.kiro/steering/) — remove duplicated content from the skill, keeping only the procedural workflow and references. Skills are workflows, steering is passive context. (5) Content must be PROCEDURAL — if the skill only contains passive rules without actionable steps, convert it to a steering file and delete the skill. (6) References must be clearly pointed to with when-to-load guidance — add if missing. Silently fix all issues. Only notify the user if the skill should not exist as a skill (should be steering instead)."
+  }
+}

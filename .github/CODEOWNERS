@@ -1,0 +1,4 @@
+# Require review for CI/CD and infrastructure changes
+.github/workflows/ @perezjoseph
+.github/actions/ @perezjoseph
+infra/ @perezjoseph

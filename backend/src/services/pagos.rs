@@ -304,10 +304,16 @@ pub async fn mark_overdue(db: &DatabaseConnection) -> Result<u64, AppError> {
     let affected_count = result.rows_affected;
 
     let mut recargos_calculated: u64 = 0;
-    for (pago_id, contrato_model) in &recargo_candidates {
-        if (recargos::aplicar_recargo(db, *pago_id, contrato_model).await?).is_some() {
-            recargos_calculated += 1;
-        }
+    // Process recargos concurrently in batches to avoid sequential N+1
+    for chunk in recargo_candidates.chunks(20) {
+        let futures: Vec<_> = chunk
+            .iter()
+            .map(|(pago_id, contrato_model)| {
+                recargos::aplicar_recargo(db, *pago_id, contrato_model)
+            })
+            .collect();
+        let results = futures_util::future::try_join_all(futures).await?;
+        recargos_calculated += results.iter().filter(|r| r.is_some()).count() as u64;
     }
 
     if affected_count > 0 {

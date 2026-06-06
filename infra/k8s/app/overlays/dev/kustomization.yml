@@ -1,0 +1,39 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: realestate-dev
+
+resources:
+  - ../../base
+  - namespace.yml
+  - ingress.yml
+
+# Dev uses the same images but with lower replica counts
+patches:
+  # Single replica for dev backend (no HPA needed)
+  - target:
+      kind: Deployment
+      name: backend
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: replace
+        path: /spec/template/spec/containers/0/env/2/value
+        value: "development"
+      - op: replace
+        path: /spec/template/spec/containers/0/env/3/value
+        value: "https://gestion.local"
+
+configMapGenerator:
+  - name: caddyfile
+    files:
+      - Caddyfile
+
+images:
+  - name: ghcr.io/perezjoseph/realestate-backend
+    newTag: latest
+  - name: ghcr.io/perezjoseph/realestate-frontend
+    newTag: latest
+  - name: ghcr.io/perezjoseph/realestate-baileys
+    newTag: latest

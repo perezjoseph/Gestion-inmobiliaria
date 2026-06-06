@@ -23,10 +23,13 @@ flowchart TD
     UploadSem --> Trigger
 
     Trigger[workflow_run trigger fires<br/>kiro-autofix-trigger.yml]
-    Trigger --> Branch{Branch<br/>== main?}
+    Trigger --> BuildQueue[autofix-build-queue job<br/>runs for ALL branches]
+    Trigger --> MainCheck{Branch<br/>== main<br/>AND push?}
 
-    Branch -->|No| BuildQueue[autofix-build-queue job]
-    Branch -->|Yes, deploy failed| DeployFix[kiro-autofix-deploy<br/>single artifact]
+    MainCheck -->|No| NoDeployFix([Deploy autofix<br/>not applicable])
+    MainCheck -->|Yes| DeployPrecheck{Deploy artifact<br/>present?}
+    DeployPrecheck -->|Yes| DeployFix[kiro-autofix-deploy<br/>single artifact]
+    DeployPrecheck -->|No| DeploySkip([Deploy autofix skipped<br/>CI failed before deploy stage])
 
     BuildQueue --> Checkout[Checkout branch<br/>fetch-depth: 0<br/>persist-credentials: true]
     Checkout --> CountAttempts{Prior kiro-bot<br/>commits at HEAD<br/>≥ MAX_ATTEMPTS?}
@@ -61,10 +64,10 @@ flowchart TD
     classDef process fill:#cce5ff,stroke:#004085
     classDef decision fill:#fff3cd,stroke:#856404
 
-    class Done,Skip success
+    class Done,Skip,DeploySkip,NoDeployFix success
     class Fail,Notify,PushFail failure
     class CI,Semgrep,UploadCI,UploadSem,Trigger,Checkout,Setup,ListArtifacts,Download,Loop,Fixup,Push,NewCI,DeployFix,KubeFix,BuildQueue process
-    class CIJobs,SemgrepJobs,Branch,CountAttempts,HasArtifacts,CumulativeVerify decision
+    class CIJobs,SemgrepJobs,MainCheck,CountAttempts,HasArtifacts,CumulativeVerify,DeployPrecheck decision
 ```
 
 ## Sequential queue (the loop body)

@@ -1,0 +1,122 @@
+# Prometheus alerting rules for the realestate application
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alerts
+  namespace: monitoring
+data:
+  alerts.yml: |
+    groups:
+      - name: backend
+        rules:
+          - alert: HighErrorRate
+            expr: |
+              sum(rate(api_http_requests_total{status=~"5.."}[5m]))
+              / sum(rate(api_http_requests_total[5m])) > 0.01
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Backend error rate > 1% for 5 minutes"
+              description: "{{ $value | humanizePercentage }} of requests are failing"
+
+          - alert: HighLatencyP95
+            expr: |
+              histogram_quantile(0.95, sum(rate(api_http_requests_duration_seconds_bucket[5m])) by (le))
+              > 2
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "P95 latency > 2s for 5 minutes"
+
+          - alert: PodRestarts
+            expr: |
+              increase(kube_pod_container_status_restarts_total{namespace="realestate"}[1h]) > 3
+            for: 0m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Pod {{ $labels.pod }} restarted {{ $value }} times in 1h"
+
+          - alert: PodNotReady
+            expr: |
+              kube_pod_status_ready{namespace="realestate", condition="true"} == 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Pod {{ $labels.pod }} not ready for 5 minutes"
+
+      - name: database
+        rules:
+          - alert: DatabaseConnectionPoolExhausted
+            expr: |
+              sea_orm_pool_active_connections / sea_orm_pool_max_connections > 0.9
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "DB connection pool > 90% utilization"
+
+          - alert: DatabaseDown
+            expr: |
+              up{job="backend"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Backend is down (health check failing)"
+
+      - name: infrastructure
+        rules:
+          - alert: DiskUsageHigh
+            expr: |
+              (node_filesystem_size_bytes - node_filesystem_avail_bytes)
+              / node_filesystem_size_bytes > 0.85
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Disk usage > 85% on {{ $labels.instance }}"
+
+          - alert: DiskUsageCritical
+            expr: |
+              (node_filesystem_size_bytes - node_filesystem_avail_bytes)
+              / node_filesystem_size_bytes > 0.95
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Disk usage > 95% on {{ $labels.instance }}"
+
+          - alert: HighMemoryUsage
+            expr: |
+              (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+              / node_memory_MemTotal_bytes > 0.9
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Memory usage > 90% on {{ $labels.instance }}"
+
+      - name: backups
+        rules:
+          - alert: BackupJobFailed
+            expr: |
+              kube_job_status_failed{namespace="realestate", job_name=~"db-backup.*"} > 0
+            for: 0m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Database backup job failed"
+
+          - alert: BackupJobMissing
+            expr: |
+              time() - kube_job_status_completion_time{namespace="realestate", job_name=~"db-backup.*"}
+              > 129600
+            for: 0m
+            labels:
+              severity: warning
+            annotations:
+              summary: "No successful backup in 36 hours"

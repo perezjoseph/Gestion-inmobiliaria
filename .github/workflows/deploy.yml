@@ -142,11 +142,14 @@ jobs:
         run: |
           kubectl create configmap caddyfile \
             --namespace realestate \
-            --from-file=Caddyfile=infra/caddy/Caddyfile \
+            --from-file=Caddyfile=infra/k8s/app/overlays/prod/Caddyfile \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Deploy application manifests
-        run: kubectl apply -k infra/k8s/app/
+      - name: Deploy shared resources
+        run: kubectl apply -k infra/k8s/app/shared/
+
+      - name: Deploy production application manifests
+        run: kubectl apply -k infra/k8s/app/overlays/prod/
 
       - name: Update container images by digest
         id: deploy

@@ -275,6 +275,7 @@ pub(crate) async fn generar_pagos_vencidos(
 
     let now = Utc::now().into();
     let mut count: u64 = 0;
+    let mut batch: Vec<notificacion::ActiveModel> = Vec::new();
 
     for pago_model in &pagos {
         let propiedad_titulo = contrato_map
@@ -289,7 +290,7 @@ pub(crate) async fn generar_pagos_vencidos(
                 continue;
             }
 
-            let active = notificacion::ActiveModel {
+            batch.push(notificacion::ActiveModel {
                 id: Set(Uuid::new_v4()),
                 tipo: Set("pago_vencido".to_string()),
                 titulo: Set(format!("Pago vencido - {propiedad_titulo}")),
@@ -303,10 +304,13 @@ pub(crate) async fn generar_pagos_vencidos(
                 usuario_id: Set(uid),
                 organizacion_id: Set(organizacion_id),
                 created_at: Set(now),
-            };
-            active.insert(db).await?;
+            });
             count += 1;
         }
+    }
+
+    if !batch.is_empty() {
+        notificacion::Entity::insert_many(batch).exec(db).await?;
     }
 
     Ok(count)
@@ -351,6 +355,7 @@ pub(crate) async fn generar_contratos_por_vencer(
 
     let now = Utc::now().into();
     let mut count: u64 = 0;
+    let mut batch: Vec<notificacion::ActiveModel> = Vec::new();
 
     for contrato_model in &contratos {
         let propiedad_titulo = propiedad_map
@@ -364,7 +369,7 @@ pub(crate) async fn generar_contratos_por_vencer(
                 continue;
             }
 
-            let active = notificacion::ActiveModel {
+            batch.push(notificacion::ActiveModel {
                 id: Set(Uuid::new_v4()),
                 tipo: Set("contrato_por_vencer".to_string()),
                 titulo: Set(format!("Contrato por vencer - {propiedad_titulo}")),
@@ -379,10 +384,13 @@ pub(crate) async fn generar_contratos_por_vencer(
                 usuario_id: Set(uid),
                 organizacion_id: Set(organizacion_id),
                 created_at: Set(now),
-            };
-            active.insert(db).await?;
+            });
             count += 1;
         }
+    }
+
+    if !batch.is_empty() {
+        notificacion::Entity::insert_many(batch).exec(db).await?;
     }
 
     Ok(count)
@@ -470,6 +478,7 @@ pub(crate) async fn generar_documentos_vencidos(
 
     let now = Utc::now().into();
     let mut count: u64 = 0;
+    let mut batch: Vec<notificacion::ActiveModel> = Vec::new();
 
     for doc in &org_docs {
         let Some(fecha_venc) = doc.fecha_vencimiento else {
@@ -481,7 +490,7 @@ pub(crate) async fn generar_documentos_vencidos(
                 continue;
             }
 
-            let active = notificacion::ActiveModel {
+            batch.push(notificacion::ActiveModel {
                 id: Set(Uuid::new_v4()),
                 tipo: Set("documento_vencido".to_string()),
                 titulo: Set(format!("Documento por vencer - {}", doc.filename)),
@@ -495,10 +504,13 @@ pub(crate) async fn generar_documentos_vencidos(
                 usuario_id: Set(uid),
                 organizacion_id: Set(organizacion_id),
                 created_at: Set(now),
-            };
-            active.insert(db).await?;
+            });
             count += 1;
         }
+    }
+
+    if !batch.is_empty() {
+        notificacion::Entity::insert_many(batch).exec(db).await?;
     }
 
     Ok(count)
@@ -549,6 +561,7 @@ pub(crate) async fn generar_renovacion_reminders(
 
     let now = Utc::now().into();
     let mut count: u64 = 0;
+    let mut batch: Vec<notificacion::ActiveModel> = Vec::new();
 
     for contrato_model in &contratos {
         let days_remaining = (contrato_model.fecha_fin - today).num_days();
@@ -568,7 +581,7 @@ pub(crate) async fn generar_renovacion_reminders(
                     continue;
                 }
 
-                let active = notificacion::ActiveModel {
+                batch.push(notificacion::ActiveModel {
                     id: Set(Uuid::new_v4()),
                     tipo: Set("contrato_renovacion".to_string()),
                     titulo: Set(format!("Renovación de contrato - {threshold} días")),
@@ -582,11 +595,14 @@ pub(crate) async fn generar_renovacion_reminders(
                     usuario_id: Set(uid),
                     organizacion_id: Set(organizacion_id),
                     created_at: Set(now),
-                };
-                active.insert(db).await?;
+                });
                 count += 1;
             }
         }
+    }
+
+    if !batch.is_empty() {
+        notificacion::Entity::insert_many(batch).exec(db).await?;
     }
 
     Ok(count)
@@ -647,6 +663,7 @@ pub(crate) async fn generar_deposito_devolucion(
     let today = Utc::now();
     let now = today.into();
     let mut count: u64 = 0;
+    let mut batch: Vec<notificacion::ActiveModel> = Vec::new();
 
     for contrato_model in &contratos {
         // Use updated_at as proxy for termination date
@@ -679,7 +696,7 @@ pub(crate) async fn generar_deposito_devolucion(
                 )
             };
 
-            let active = notificacion::ActiveModel {
+            batch.push(notificacion::ActiveModel {
                 id: Set(Uuid::new_v4()),
                 tipo: Set(tipo.to_string()),
                 titulo: Set("Depósito pendiente de devolución".to_string()),
@@ -690,10 +707,13 @@ pub(crate) async fn generar_deposito_devolucion(
                 usuario_id: Set(uid),
                 organizacion_id: Set(organizacion_id),
                 created_at: Set(now),
-            };
-            active.insert(db).await?;
+            });
             count += 1;
         }
+    }
+
+    if !batch.is_empty() {
+        notificacion::Entity::insert_many(batch).exec(db).await?;
     }
 
     Ok(count)
@@ -748,13 +768,14 @@ pub async fn crear_notificacion_mantenimiento<C: sea_orm::ConnectionTrait>(
 
     let now = Utc::now().into();
     let mut count: u64 = 0;
+    let mut batch: Vec<notificacion::ActiveModel> = Vec::new();
 
     for uid in usuario_ids {
         if existing.contains(&uid) {
             continue;
         }
 
-        let active = notificacion::ActiveModel {
+        batch.push(notificacion::ActiveModel {
             id: Set(Uuid::new_v4()),
             tipo: Set("mantenimiento_actualizado".to_string()),
             titulo: Set(format!("Mantenimiento actualizado - {titulo_solicitud}")),
@@ -767,9 +788,12 @@ pub async fn crear_notificacion_mantenimiento<C: sea_orm::ConnectionTrait>(
             usuario_id: Set(uid),
             organizacion_id: Set(organizacion_id),
             created_at: Set(now),
-        };
-        active.insert(db).await?;
+        });
         count += 1;
+    }
+
+    if !batch.is_empty() {
+        notificacion::Entity::insert_many(batch).exec(db).await?;
     }
 
     Ok(count)

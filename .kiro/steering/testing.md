@@ -1,6 +1,6 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: ["**/*_pbt.rs"]
+fileMatchPattern: ["**/*_pbt.rs", "**/*_tests.rs", "**/tests/**/*.rs"]
 ---
 
 # Testing Rules

@@ -259,28 +259,40 @@ pub async fn upload(
     let upload_dir = get_upload_dir();
     // entity_type is validated against an allowlist; entity_id is a Uuid (no traversal possible)
     let dir_path = format!("{upload_dir}/{entity_type}/{entity_id}");
-    std::fs::create_dir_all(&dir_path)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error creando directorio: {e}")))?;
 
     let file_uuid = Uuid::new_v4();
     let stored_filename = format!("{file_uuid}-{safe_filename}");
     let full_path = format!("{dir_path}/{stored_filename}");
 
-    // Verify the resolved path stays within the upload directory
-    let canonical_dir = std::fs::canonicalize(&upload_dir)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error resolviendo directorio: {e}")))?;
-    // Write the file first so canonicalize can resolve it
-    std::fs::write(&full_path, file_data)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error escribiendo archivo: {e}")))?;
-    let canonical_file = std::fs::canonicalize(&full_path)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error resolviendo ruta: {e}")))?;
-    if !canonical_file.starts_with(&canonical_dir) {
-        // Remove the file that escaped the upload directory
-        let _ = std::fs::remove_file(&full_path);
-        return Err(AppError::Validation(
-            "Ruta de archivo fuera del directorio permitido".to_string(),
-        ));
-    }
+    // Perform filesystem operations on a blocking thread to avoid starving the async runtime
+    let upload_dir_clone = upload_dir.clone();
+    let dir_path_clone = dir_path.clone();
+    let full_path_clone = full_path.clone();
+    tokio::task::spawn_blocking(move || -> Result<(), AppError> {
+        std::fs::create_dir_all(&dir_path_clone)
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error creando directorio: {e}")))?;
+
+        let canonical_dir = std::fs::canonicalize(&upload_dir_clone).map_err(|e| {
+            AppError::Internal(anyhow::anyhow!("Error resolviendo directorio: {e}"))
+        })?;
+
+        std::fs::write(&full_path_clone, &file_data)
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error escribiendo archivo: {e}")))?;
+
+        let canonical_file = std::fs::canonicalize(&full_path_clone)
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Error resolviendo ruta: {e}")))?;
+
+        if !canonical_file.starts_with(&canonical_dir) {
+            let _ = std::fs::remove_file(&full_path_clone);
+            return Err(AppError::Validation(
+                "Ruta de archivo fuera del directorio permitido".to_string(),
+            ));
+        }
+
+        Ok(())
+    })
+    .await
+    .map_err(|e| AppError::Internal(anyhow::anyhow!("Error en tarea de escritura: {e}")))??;
 
     let relative_path = format!("{entity_type}/{entity_id}/{stored_filename}");
     let id = Uuid::new_v4();
@@ -342,9 +354,6 @@ pub async fn listar_documentos(
 ) -> Result<Vec<DocumentoResponse>, AppError> {
     // Verify entity belongs to caller's org
     verificar_entidad_pertenece_a_org(db, entity_type, entity_id, organizacion_id).await?;
-
-    // Ensure expired docs are flagged before listing
-    marcar_vencidos(db).await?;
 
     let mut query = documento::Entity::find()
         .filter(documento::Column::EntityType.eq(entity_type))
@@ -489,7 +498,12 @@ pub async fn eliminar(
     // Delete file from disk (best-effort — don't fail if file is already gone)
     let upload_dir = get_upload_dir();
     let full_path = format!("{upload_dir}/{}", doc.file_path);
-    let _ = std::fs::remove_file(&full_path);
+    let full_path_clone = full_path.clone();
+    tokio::task::spawn_blocking(move || {
+        let _ = std::fs::remove_file(&full_path_clone);
+    })
+    .await
+    .ok();
 
     // Capture metadata for audit before deleting the record
     let audit_cambios = serde_json::json!({
@@ -696,9 +710,6 @@ pub async fn cumplimiento(
     // Verify entity belongs to caller's org
     verificar_entidad_pertenece_a_org(db, entity_type, entity_id, organizacion_id).await?;
 
-    // Ensure expired docs are flagged
-    marcar_vencidos(db).await?;
-
     // Fetch all documents for this entity
     let docs = documento::Entity::find()
         .filter(documento::Column::EntityType.eq(entity_type))
@@ -766,16 +777,49 @@ pub async fn por_vencer(
         .all(db)
         .await?;
 
-    // Filter documents by org ownership through parent entities
-    let mut owned_docs = Vec::new();
-    for doc in docs {
-        if verificar_entidad_pertenece_a_org(db, &doc.entity_type, doc.entity_id, organizacion_id)
-            .await
-            .is_ok()
-        {
-            owned_docs.push(model_to_response(doc));
-        }
+    // Batch-resolve org ownership instead of N+1 per-doc queries
+    use std::collections::{HashMap, HashSet};
+
+    let mut ids_by_type: HashMap<&str, Vec<Uuid>> = HashMap::new();
+    for doc in &docs {
+        ids_by_type
+            .entry(doc.entity_type.as_str())
+            .or_default()
+            .push(doc.entity_id);
     }
+
+    let mut owned_entity_ids: HashSet<Uuid> = HashSet::new();
+
+    if let Some(ids) = ids_by_type.get("propiedad") {
+        let owned = propiedad::Entity::find()
+            .filter(propiedad::Column::Id.is_in(ids.clone()))
+            .filter(propiedad::Column::OrganizacionId.eq(organizacion_id))
+            .all(db)
+            .await?;
+        owned_entity_ids.extend(owned.iter().map(|p| p.id));
+    }
+    if let Some(ids) = ids_by_type.get("inquilino") {
+        let owned = inquilino::Entity::find()
+            .filter(inquilino::Column::Id.is_in(ids.clone()))
+            .filter(inquilino::Column::OrganizacionId.eq(organizacion_id))
+            .all(db)
+            .await?;
+        owned_entity_ids.extend(owned.iter().map(|i| i.id));
+    }
+    if let Some(ids) = ids_by_type.get("contrato") {
+        let owned = contrato::Entity::find()
+            .filter(contrato::Column::Id.is_in(ids.clone()))
+            .filter(contrato::Column::OrganizacionId.eq(organizacion_id))
+            .all(db)
+            .await?;
+        owned_entity_ids.extend(owned.iter().map(|c| c.id));
+    }
+
+    let owned_docs: Vec<DocumentoResponse> = docs
+        .into_iter()
+        .filter(|doc| owned_entity_ids.contains(&doc.entity_id))
+        .map(model_to_response)
+        .collect();
 
     Ok(owned_docs)
 }

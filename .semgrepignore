@@ -1,5 +1,7 @@
 # Rust build artifacts
 target/
+target-verify/
+target-test/
 
 # Auto-generated test framework cache (Hypothesis/Starlette)
 ocr-service/.hypothesis/

@@ -199,6 +199,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             )
             .service(
                 web::scope("/dashboard")
+                    .wrap(Governor::new(&write_governor_conf))
                     .route("/stats", web::get().to(handlers::dashboard::stats))
                     .route(
                         "/ocupacion-tendencia",
@@ -221,7 +222,11 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                         web::get().to(handlers::dashboard::gastos_comparacion),
                     ),
             )
-            .service(web::scope("/auditoria").route("", web::get().to(handlers::auditoria::list)))
+            .service(
+                web::scope("/auditoria")
+                    .wrap(Governor::new(&write_governor_conf))
+                    .route("", web::get().to(handlers::auditoria::list)),
+            )
             .service(
                 web::scope("/usuarios")
                     .wrap(Governor::new(&write_governor_conf))
@@ -424,7 +429,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             )
             .service({
                 #[allow(unused_mut)]
-                let mut evals_scope = web::scope("/chatbot/evals");
+                let mut evals_scope =
+                    web::scope("/chatbot/evals").wrap(Governor::new(&write_governor_conf));
                 #[cfg(feature = "evals")]
                 {
                     evals_scope = evals_scope

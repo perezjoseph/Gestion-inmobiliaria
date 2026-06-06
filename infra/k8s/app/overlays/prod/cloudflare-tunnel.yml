@@ -1,0 +1,101 @@
+# Cloudflare Tunnel: exposes the app to the internet without opening ports.
+# Prerequisites:
+#   1. Install cloudflared: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
+#   2. Authenticate: cloudflared tunnel login
+#   3. Create tunnel: cloudflared tunnel create realestate-prod
+#   4. Create K8s secret with credentials:
+#      kubectl -n realestate create secret generic cloudflare-tunnel-credentials \
+#        --from-file=credentials.json=$HOME/.cloudflared/<TUNNEL_ID>.json
+#   5. Configure DNS: cloudflared tunnel route dns realestate-prod gestion.myhomeva.us
+#   6. Update TUNNEL_ID below with your tunnel ID
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared
+  namespace: realestate
+  labels:
+    app.kubernetes.io/name: cloudflared
+    app.kubernetes.io/component: tunnel
+    app.kubernetes.io/part-of: realestate
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cloudflared
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cloudflared
+        app.kubernetes.io/component: tunnel
+        app.kubernetes.io/part-of: realestate
+    spec:
+      automountServiceAccountToken: false
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cloudflared
+          image: cloudflare/cloudflared:2024.12.2
+          args:
+            - tunnel
+            - --config
+            - /etc/cloudflared/config.yml
+            - run
+          volumeMounts:
+            - name: config
+              mountPath: /etc/cloudflared/config.yml
+              subPath: config.yml
+              readOnly: true
+            - name: credentials
+              mountPath: /etc/cloudflared/credentials.json
+              subPath: credentials.json
+              readOnly: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+              ephemeral-storage: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+              ephemeral-storage: 64Mi
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 2000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: config
+          configMap:
+            name: cloudflare-tunnel-config
+        - name: credentials
+          secret:
+            secretName: cloudflare-tunnel-credentials
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudflare-tunnel-config
+  namespace: realestate
+data:
+  config.yml: |
+    # Replace <TUNNEL_ID> with your actual tunnel ID
+    tunnel: <TUNNEL_ID>
+    credentials-file: /etc/cloudflared/credentials.json
+    metrics: 0.0.0.0:2000
+    no-autoupdate: true
+
+    ingress:
+      - hostname: gestion.myhomeva.us
+        service: https://frontend:8443
+        originRequest:
+          noTLSVerify: true
+      - service: http_status:404

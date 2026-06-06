@@ -1,11 +1,11 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: "**/ai_module.rs,**/ovms_provider.rs"
+fileMatchPattern: ["**/ai_module.rs", "**/ovms_provider.rs"]
 ---
 
 # Rig Framework Rules
 
-When implementing or modifying Rig-related code (`CompletionModel`, agents, tools, streaming, hooks), always check Rig documentation via Context7 (library ID: `/websites/rs_rig-core`) before proceeding if unsure about trait signatures, type bounds, or API patterns. Do not guess — Rig's API changes between versions and has strict trait bounds (`GetTokenUsage`, `Clone + Unpin + Send + Sync + Serialize + DeserializeOwned`).
+Project-specific types and patterns for our OVMS-backed Rig integration. Rig's API changes between versions and has strict trait bounds (`GetTokenUsage`, `Clone + Unpin + Send + Sync + Serialize + DeserializeOwned`).
 
 ## Architecture
 

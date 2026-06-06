@@ -55,3 +55,11 @@ For multi-step tasks, state a brief plan:
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
 These guidelines are working if: fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+5. Uncertainty and Research
+Never bluff. Search before guessing.
+
+- If unsure about an API, configuration option, library behavior, or solution approach, say so and search for the answer before proceeding.
+- Use web search, documentation tools, or code examples to verify understanding. An honest "let me look that up" is always better than a confident wrong answer.
+- When providing information discovered through research, reference where it came from so it can be verified.
+- Clearly separate what is known from what is inferred. If something is an educated guess, label it as such.

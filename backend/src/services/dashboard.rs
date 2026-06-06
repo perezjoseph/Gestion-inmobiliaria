@@ -86,38 +86,39 @@ pub async fn get_stats(db: &DatabaseConnection, org_id: Uuid) -> Result<Dashboar
 
     // Org-scoped document counts: documents are polymorphic (entity_type/entity_id),
     // so we must join through parent entities that have organizacion_id.
+    // Only select IDs to avoid loading full entity models into memory.
     let (org_propiedad_ids, org_inquilino_ids, org_contrato_ids) = tokio::try_join!(
         async {
             Ok::<Vec<Uuid>, AppError>(
                 propiedad::Entity::find()
+                    .select_only()
+                    .column(propiedad::Column::Id)
                     .filter(propiedad::Column::OrganizacionId.eq(org_id))
+                    .into_tuple::<Uuid>()
                     .all(db)
-                    .await?
-                    .iter()
-                    .map(|p| p.id)
-                    .collect(),
+                    .await?,
             )
         },
         async {
             Ok::<Vec<Uuid>, AppError>(
                 inquilino::Entity::find()
+                    .select_only()
+                    .column(inquilino::Column::Id)
                     .filter(inquilino::Column::OrganizacionId.eq(org_id))
+                    .into_tuple::<Uuid>()
                     .all(db)
-                    .await?
-                    .iter()
-                    .map(|i| i.id)
-                    .collect(),
+                    .await?,
             )
         },
         async {
             Ok::<Vec<Uuid>, AppError>(
                 contrato::Entity::find()
+                    .select_only()
+                    .column(contrato::Column::Id)
                     .filter(contrato::Column::OrganizacionId.eq(org_id))
+                    .into_tuple::<Uuid>()
                     .all(db)
-                    .await?
-                    .iter()
-                    .map(|c| c.id)
-                    .collect(),
+                    .await?,
             )
         },
     )?;

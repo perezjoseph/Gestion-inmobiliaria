@@ -1,0 +1,15 @@
+# F-Droid repo: http://fdroid.local (plain HTTP — repo index is signed separately)
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: fdroid-repo
+  namespace: realestate
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`fdroid.local`)
+      kind: Rule
+      services:
+        - name: fdroid-repo
+          port: 80

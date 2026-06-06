@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Agent Config Validation",
+  "description": "When an agent config is edited, verify JSON schema correctness (for .json) or valid frontmatter (for .md), check that file:// and skill:// resource paths resolve correctly relative to the config location, and verify hook matchers use internal tool names (fs_write not write).",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      ".kiro/agents/*"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Check the edited agent config for: (1) For .json files: valid JSON, correct schema fields (name, prompt, tools, allowedTools, resources, hooks, model), (2) file:// paths resolve relative to the config file directory (not workspace root), (3) skill:// resources point to existing SKILL.md files, (4) Hook matchers use internal tool names (fs_write, fs_read, execute_bash, str_replace) not category names (write, read, shell), (5) allowedTools does not use '*' (must list specific patterns), (6) Agent has a CLEAR RESTRICTED ROLE — agents are autonomous executors with constrained tool access and specific responsibilities. If the agent description is too broad (covers everything) or too narrow (just a single command), flag it. Agents should be specialized workers (planner, reviewer, coder, researcher), not general-purpose or what a skill could handle. Fix technical issues silently, report role concerns."
+  }
+}

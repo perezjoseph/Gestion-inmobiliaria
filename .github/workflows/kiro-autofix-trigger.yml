@@ -498,7 +498,7 @@ jobs:
             echo "present=false" >> "$GITHUB_OUTPUT"
             echo "::notice::kiro-deploy-diagnostics not found in run ${CI_RUN_ID}."
             echo "::notice::CI on main failed before the deploy stage produced diagnostics."
-            echo "::notice::Build-stage failures on main are not auto-fixed (autofix-build-queue is restricted to non-main branches)."
+            echo "::notice::Build-stage failures on main ARE handled by autofix-build-queue (runs for all branches including main) — check that job's outcome for diag-* artifact processing."
           fi
 
   # ── Deploy Autofix: triggered when CI fails on main (deploy stage) ──

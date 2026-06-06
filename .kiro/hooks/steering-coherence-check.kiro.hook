@@ -11,6 +11,6 @@
   },
   "then": {
     "type": "askAgent",
-    "prompt": "A new steering file was just created. Check: (1) Does it duplicate rules already in AGENTS.md or other always-on steering files? (2) Is the fileMatchPattern correctly scoped to the files it protects? (3) Does it conflict with any existing steering file? If duplication or conflicts exist, fix them by removing the duplicate from the less-specific location."
+    "prompt": "A new steering file was just created. Check and FIX in place — do not just report: (1) If it duplicates rules already in AGENTS.md or other always-on steering files, remove the duplicate from the less-specific location. (2) If the fileMatchPattern is missing or incorrectly scoped, fix it to target only the files it protects. (3) If it conflicts with an existing steering file, resolve the conflict by keeping the more specific rule and removing the broader one. Apply all fixes silently."
   }
 }

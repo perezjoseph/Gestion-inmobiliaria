@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Steering File Lint",
+  "description": "When a steering file is edited, verify it has correct front-matter (inclusion mode + fileMatchPattern as YAML array), stays focused on one domain, doesn't duplicate rules from AGENTS.md or other always-on files, and stays within the 1500-word budget for always-on files.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      ".kiro/steering/*.md"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Check the edited steering file and FIX all issues in place — do not just report: (1) If front-matter is missing or malformed (wrong inclusion mode, fileMatchPattern as comma-separated string instead of YAML array), fix it. (2) If rules are duplicated from AGENTS.md or other always-on files, remove the duplicates from the edited file. (3) If the file mixes multiple domains, split it into separate files scoped to each domain. (4) If inclusion is 'always' and the combined word count of all always-on files exceeds 1500 words, trim the least critical rules from this file. (5) If content is procedural (step-by-step workflows, multi-step command sequences, decision trees), extract it into a skill under .kiro/skills/ and remove from the steering file. Steering is 'what are the rules', skills are 'how to do X'. Apply all fixes silently. Only notify the user if a file was split or converted to a skill."
+  }
+}
