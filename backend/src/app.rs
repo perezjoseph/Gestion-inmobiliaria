@@ -41,7 +41,7 @@ async fn metrics_handler(_claims: crate::middleware::rbac::AdminOnly) -> HttpRes
 }
 
 /// Internal metrics endpoint for Prometheus scraping (no auth required).
-/// Protected by NetworkPolicy — only monitoring namespace can reach it.
+/// Protected by `NetworkPolicy` — only monitoring namespace can reach it.
 async fn internal_metrics() -> HttpResponse {
     use prometheus::Encoder;
     let encoder = prometheus::TextEncoder::new();

@@ -272,6 +272,7 @@ impl completion::GetTokenUsage for OvmsCompletionResponse {
             total_tokens: u.total_tokens,
             cached_input_tokens: 0,
             cache_creation_input_tokens: 0,
+            reasoning_tokens: 0,
         })
     }
 }
@@ -516,6 +517,7 @@ fn ovms_response_to_rig(
             total_tokens: 0,
             cached_input_tokens: 0,
             cache_creation_input_tokens: 0,
+            reasoning_tokens: 0,
         },
         |u| completion::Usage {
             input_tokens: u.prompt_tokens,
@@ -523,6 +525,7 @@ fn ovms_response_to_rig(
             total_tokens: u.total_tokens,
             cached_input_tokens: 0,
             cache_creation_input_tokens: 0,
+            reasoning_tokens: 0,
         },
     );
 

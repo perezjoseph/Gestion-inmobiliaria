@@ -268,6 +268,7 @@ pub async fn upload(
     let upload_dir_clone = upload_dir.clone();
     let dir_path_clone = dir_path.clone();
     let full_path_clone = full_path.clone();
+    let file_data_owned = file_data.to_vec();
     tokio::task::spawn_blocking(move || -> Result<(), AppError> {
         std::fs::create_dir_all(&dir_path_clone)
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Error creando directorio: {e}")))?;
@@ -276,7 +277,7 @@ pub async fn upload(
             AppError::Internal(anyhow::anyhow!("Error resolviendo directorio: {e}"))
         })?;
 
-        std::fs::write(&full_path_clone, &file_data)
+        std::fs::write(&full_path_clone, &file_data_owned)
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Error escribiendo archivo: {e}")))?;
 
         let canonical_file = std::fs::canonicalize(&full_path_clone)
