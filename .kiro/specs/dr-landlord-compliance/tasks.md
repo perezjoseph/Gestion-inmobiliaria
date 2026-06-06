@@ -294,7 +294,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Route: `/configuracion/fiscal`
     - _Requirements: 1.1, 1.2, 1.3, 7.8_
 
-  - [-] 17.2 Create Cuotas Condominio component (`pages/condominios.rs`)
+  - [x] 17.2 Create Cuotas Condominio component (`pages/condominios.rs`)
     - CRUD interface for condominium fees per property, passthrough toggle, billing preview
     - Route: `/propiedades/{id}/condominios`
     - _Requirements: 2.1, 2.2, 2.3_
