@@ -285,7 +285,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Add route scopes for fiscal, condominios, ncf, reportes-dgii, ipi, indexacion
     - _Requirements: all_
 
-- [~] 16. Checkpoint - API layer compiles, handler tests pass
+- [-] 16. Checkpoint - API layer compiles, handler tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 17. Frontend pages (Leptos)
@@ -324,26 +324,26 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Route: `/ipi`
     - _Requirements: 9.1, 9.4, 9.6, 9.10_
 
-  - [~] 17.8 Register all new pages in frontend router (`app.rs`)
+  - [x] 17.8 Register all new pages in frontend router (`app.rs`)
     - Add routes for all new pages, update navigation menu
     - _Requirements: all_
 
 - [ ] 18. Integration wiring and notification system
-  - [~] 18.1 Wire NCF assignment into payment flow
+  - [x] 18.1 Wire NCF assignment into payment flow
     - After payment is marked `pagado` for registered org, call `asignar_ncf` to assign appropriate NCF type based on tenant fiscal status
     - Handle NCF failure gracefully (payment stays pagado, flag for manual resolution)
     - _Requirements: 7.4, 7.6, 7.7_
 
-  - [~] 18.2 Wire ITBIS calculation into payment creation
+  - [x] 18.2 Wire ITBIS calculation into payment creation
     - During payment creation for commercial/industrial contracts under registered orgs, call `calcular_itbis` and store monto_base/monto_itbis
     - Apply retention logic when tenant is persona_juridica
     - _Requirements: 6.3, 6.4, 6.5, 6.7_
 
-  - [~] 18.3 Wire condominium fee into billing cycle
+  - [-] 18.3 Wire condominium fee into billing cycle
     - When generating billing for contracts with passthrough cuotas, include cuota line item with independent payment tracking
     - _Requirements: 2.3, 2.4, 2.6_
 
-  - [~] 18.4 Implement notification triggers
+  - [-] 18.4 Implement notification triggers
     - 60-day contract expiration notification for indexation review
     - 30-day IPI payment deadline notification
     - NCF range 80% consumption alert notification

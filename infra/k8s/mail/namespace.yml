@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: mail
-  labels:
-    app.kubernetes.io/name: docker-mailserver
-    app.kubernetes.io/part-of: realestate

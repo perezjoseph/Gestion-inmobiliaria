@@ -7,7 +7,10 @@ use sea_orm::{
 };
 use uuid::Uuid;
 
-use crate::entities::{contrato, documento, inquilino, notificacion, pago, propiedad, usuario};
+use crate::entities::{
+    configuracion_ipi, contrato, documento, inquilino, notificacion, pago, propiedad,
+    secuencia_ncf, usuario,
+};
 use crate::errors::AppError;
 use crate::models::PaginatedResponse;
 use crate::models::notificacion::{
@@ -19,6 +22,9 @@ pub const TIPOS_NOTIFICACION: &[&str] = &[
     "contrato_por_vencer",
     "documento_vencido",
     "mantenimiento_actualizado",
+    "indexacion_revision",
+    "ipi_fecha_pago",
+    "ncf_rango_consumo",
 ];
 
 pub const DIAS_ANTICIPACION: i64 = 30;

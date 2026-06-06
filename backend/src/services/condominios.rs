@@ -1,15 +1,19 @@
-use chrono::Utc;
+use chrono::{NaiveDate, Utc};
 use rust_decimal::Decimal;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    Set,
+};
 use uuid::Uuid;
 
-use crate::entities::cuota_condominio;
+use crate::entities::{cuota_condominio, pago};
 use crate::errors::AppError;
 use crate::models::condominios::{
     BillingDesglose, CrearCuotaRequest, CuotaResponse, UpdateCuotaRequest,
 };
 use crate::models::fiscal::TipoFiscal;
 use crate::services::itbis::calcular_itbis;
+use crate::services::pago_generacion::PagoGenerado;
 
 /// Create a new condominium fee record for a property.
 pub async fn crear_cuota(

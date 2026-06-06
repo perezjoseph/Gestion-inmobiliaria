@@ -10,9 +10,12 @@ use crate::components::layout::sidebar::Sidebar;
 use crate::pages::auditoria::Auditoria;
 use crate::pages::calendario::Calendario;
 use crate::pages::categorias_gastos::CategoriasGastos;
+use crate::pages::condominios::Condominios;
 use crate::pages::configuracion::Configuracion;
+use crate::pages::configuracion_fiscal::ConfiguracionFiscal;
 use crate::pages::contratos::Contratos;
 use crate::pages::dashboard::Dashboard;
+use crate::pages::dashboard_comparativo::DashboardComparativo;
 use crate::pages::documento_editor::DocumentoEditorPage;
 use crate::pages::documentos_por_vencer::DocumentosPorVencer;
 use crate::pages::firma_publica::FirmaPublica;
@@ -20,6 +23,7 @@ use crate::pages::gastos::Gastos;
 use crate::pages::importar::Importar;
 use crate::pages::indexacion::Indexacion;
 use crate::pages::inquilinos::Inquilinos;
+use crate::pages::ipi::Ipi;
 use crate::pages::login::Login;
 use crate::pages::mantenimiento::Mantenimiento;
 use crate::pages::notificaciones::Notificaciones;
@@ -27,8 +31,10 @@ use crate::pages::pagos::Pagos;
 use crate::pages::perfil::Perfil;
 use crate::pages::plantillas::Plantillas;
 use crate::pages::propiedades::Propiedades;
+use crate::pages::recibos_informales::RecibosInformales;
 use crate::pages::registro::Registro;
 use crate::pages::reportes::Reportes;
+use crate::pages::reportes_dgii::ReportesDgii;
 use crate::pages::usuarios::Usuarios;
 use crate::services::api::api_get;
 use crate::services::auth::{clear_token, get_token, set_token};
@@ -134,6 +140,18 @@ pub enum Route {
     Configuracion,
     #[at("/configuracion/chatbot")]
     ConfiguracionChatbot,
+    #[at("/configuracion/fiscal")]
+    ConfiguracionFiscal,
+    #[at("/propiedades/:id/condominios")]
+    Condominios { id: String },
+    #[at("/recibos-informales")]
+    RecibosInformales,
+    #[at("/dashboard/comparativo")]
+    DashboardComparativo,
+    #[at("/reportes-dgii")]
+    ReportesDgii,
+    #[at("/ipi")]
+    Ipi,
     #[at("/plantillas")]
     Plantillas,
     #[at("/calendario")]
@@ -181,6 +199,20 @@ fn switch(routes: Route) -> Html {
         Route::Notificaciones => html! { <ProtectedRoute><Notificaciones /></ProtectedRoute> },
         Route::Configuracion => html! { <ProtectedRoute><Configuracion /></ProtectedRoute> },
         Route::ConfiguracionChatbot => html! { <ProtectedRoute><Configuracion /></ProtectedRoute> },
+        Route::ConfiguracionFiscal => {
+            html! { <ProtectedRoute><ConfiguracionFiscal /></ProtectedRoute> }
+        }
+        Route::Condominios { id } => {
+            html! { <ProtectedRoute><Condominios propiedad_id={id} /></ProtectedRoute> }
+        }
+        Route::RecibosInformales => {
+            html! { <ProtectedRoute><RecibosInformales /></ProtectedRoute> }
+        }
+        Route::DashboardComparativo => {
+            html! { <ProtectedRoute><DashboardComparativo /></ProtectedRoute> }
+        }
+        Route::ReportesDgii => html! { <ProtectedRoute><ReportesDgii /></ProtectedRoute> },
+        Route::Ipi => html! { <ProtectedRoute><Ipi /></ProtectedRoute> },
         Route::Plantillas => html! { <ProtectedRoute><Plantillas /></ProtectedRoute> },
         Route::Calendario => html! { <ProtectedRoute><Calendario /></ProtectedRoute> },
         Route::DocumentosPorVencer => {

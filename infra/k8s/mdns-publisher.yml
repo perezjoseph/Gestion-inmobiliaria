@@ -64,7 +64,7 @@ data:
 
     from zeroconf import Zeroconf, ServiceInfo
 
-    NAMES = ["gestion.local.", "fdroid.local.", "xpumanager.local.", "grafana.local.", "mail.local."]
+    NAMES = ["gestion.local.", "fdroid.local.", "xpumanager.local.", "grafana.local."]
 
     def get_host_ip():
         """Get the primary LAN IP address."""

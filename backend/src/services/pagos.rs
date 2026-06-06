@@ -4,17 +4,47 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
     PaginatorTrait, QueryFilter, QueryOrder, Set,
 };
+use tracing::warn;
 use uuid::Uuid;
 
-use crate::entities::{contrato, pago};
+use crate::entities::{contrato, inquilino, organizacion, pago, propiedad};
 use crate::errors::AppError;
 use crate::models::PaginatedResponse;
+use crate::models::fiscal::TipoFiscal;
+use crate::models::ncf::TipoNCF;
 use crate::models::pago::{CreatePagoRequest, PagoListQuery, PagoResponse, UpdatePagoRequest};
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
 use crate::services::{
-    recargos,
+    itbis, ncf, recargos,
     validation::{METODOS_PAGO, METODOS_PAGO_DGII, MONEDAS, validate_enum},
 };
+
+/// Parse a database string into a `TipoFiscal` enum value.
+/// Defaults to `Informal` for unrecognized values.
+fn parse_tipo_fiscal(s: &str) -> TipoFiscal {
+    match s {
+        "persona_juridica" => TipoFiscal::PersonaJuridica,
+        "persona_fisica" => TipoFiscal::PersonaFisica,
+        _ => TipoFiscal::Informal,
+    }
+}
+
+/// Infer the fiscal type of a tenant based on their cédula.
+///
+/// In the DR context:
+/// - A 9-digit identifier suggests an RNC (persona jurídica / company)
+/// - An 11-digit cédula suggests an individual (persona física)
+/// - Anything else defaults to Informal
+///
+/// This is used for ITBIS retention: only persona jurídica tenants retain 30%.
+fn infer_tenant_tipo_fiscal(cedula: &str) -> TipoFiscal {
+    let digits: String = cedula.chars().filter(|c| c.is_ascii_digit()).collect();
+    match digits.len() {
+        9 => TipoFiscal::PersonaJuridica,
+        11 => TipoFiscal::PersonaFisica,
+        _ => TipoFiscal::Informal,
+    }
+}
 
 const ESTADOS_PAGO: &[&str] = &["pendiente", "pagado", "atrasado", "cancelado"];
 
@@ -50,11 +80,50 @@ pub async fn create<C: ConnectionTrait>(
         validate_enum("metodo_pago", metodo_pago, METODOS_PAGO)?;
     }
 
-    contrato::Entity::find_by_id(input.contrato_id)
+    let contrato_model = contrato::Entity::find_by_id(input.contrato_id)
         .filter(contrato::Column::OrganizacionId.eq(organizacion_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
+
+    // Look up propiedad and organizacion to determine ITBIS applicability
+    let propiedad_model = propiedad::Entity::find_by_id(contrato_model.propiedad_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Propiedad no encontrada".to_string()))?;
+
+    let org_model = organizacion::Entity::find_by_id(organizacion_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Organización no encontrada".to_string()))?;
+
+    let tipo_fiscal = parse_tipo_fiscal(&org_model.tipo_fiscal);
+
+    // Calculate ITBIS based on org fiscal type and property type
+    let itbis_result = itbis::calcular_itbis(
+        input.monto,
+        &propiedad_model.tipo_propiedad,
+        &tipo_fiscal,
+        None,
+    );
+
+    // Determine tenant retention: look up inquilino's cedula to infer fiscal type
+    let monto_itbis_retenido = if itbis_result.monto_itbis > Decimal::ZERO {
+        let inquilino_model = inquilino::Entity::find_by_id(contrato_model.inquilino_id)
+            .one(db)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Inquilino no encontrado".to_string()))?;
+
+        let tenant_tipo_fiscal = infer_tenant_tipo_fiscal(&inquilino_model.cedula);
+        let retencion = itbis::calcular_retencion(itbis_result.monto_itbis, &tenant_tipo_fiscal);
+        if retencion.monto_retenido > Decimal::ZERO {
+            Some(retencion.monto_retenido)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
 
     let now = Utc::now().into();
     let id = Uuid::new_v4();
@@ -62,7 +131,7 @@ pub async fn create<C: ConnectionTrait>(
     let model = pago::ActiveModel {
         id: Set(id),
         contrato_id: Set(input.contrato_id),
-        monto: Set(input.monto),
+        monto: Set(itbis_result.monto_total),
         moneda: Set(input.moneda.unwrap_or_else(|| "DOP".to_string())),
         fecha_pago: Set(input.fecha_pago),
         fecha_vencimiento: Set(input.fecha_vencimiento),
@@ -71,9 +140,9 @@ pub async fn create<C: ConnectionTrait>(
         notas: Set(input.notas),
         recargo: Set(None),
         organizacion_id: Set(organizacion_id),
-        monto_base: Set(None),
-        monto_itbis: Set(None),
-        monto_itbis_retenido: Set(None),
+        monto_base: Set(Some(itbis_result.monto_base)),
+        monto_itbis: Set(Some(itbis_result.monto_itbis)),
+        monto_itbis_retenido: Set(monto_itbis_retenido),
         ncf: Set(None),
         fecha_comprobante: Set(None),
         tipo_ncf: Set(None),
@@ -579,6 +648,95 @@ pub async fn registrar_pago_parcial<C: ConnectionTrait>(
     }
 
     Ok(created_records)
+}
+
+/// Determine the appropriate NCF type based on the tenant's fiscal characteristics.
+///
+/// Per DGII classification:
+/// - B01 (Crédito Fiscal): issued to tenants who are persona jurídica or persona física registrada
+/// - B02 (Consumo Final): issued to unregistered individuals (default for tenants with cédula only)
+/// - B14 (Régimen Especial): issued to entities in special tax regimes
+/// - B15 (Gubernamental): issued to government entities
+///
+/// Currently, the inquilino entity only stores cédula, so most tenants default to B02.
+/// This function is extensible for future tenant fiscal classification.
+#[allow(clippy::missing_const_for_fn)]
+fn determinar_tipo_ncf_para_inquilino(_inquilino: &inquilino::Model) -> TipoNCF {
+    // All tenants in the current schema are individuals with a cédula.
+    // They receive B02 (Consumo Final) since they don't have a registered RNC
+    // for fiscal credit purposes.
+    TipoNCF::B02
+}
+
+/// Attempt to assign an NCF to a payment that has transitioned to `pagado`.
+///
+/// This is a best-effort operation: if NCF assignment fails for any reason,
+/// the payment remains `pagado` without an NCF and is flagged for manual resolution
+/// via a warning log.
+///
+/// Only attempts NCF assignment when the organization is registered (`persona_juridica`
+/// or `persona_fisica`). Informal organizations do not issue NCFs.
+pub async fn intentar_asignar_ncf(
+    db: &DatabaseConnection,
+    pago_id: Uuid,
+    contrato_id: Uuid,
+    org_id: Uuid,
+) -> Result<(), AppError> {
+    // Fetch the organization to check fiscal type
+    let org = organizacion::Entity::find_by_id(org_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Organización no encontrada".to_string()))?;
+
+    // Only registered organizations issue NCFs
+    if org.tipo_fiscal == "informal" {
+        return Ok(());
+    }
+
+    // Fetch the contrato to get the inquilino
+    let contrato_model = contrato::Entity::find_by_id(contrato_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
+
+    // Fetch the inquilino to determine NCF type
+    let inquilino_model = inquilino::Entity::find_by_id(contrato_model.inquilino_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Inquilino no encontrado".to_string()))?;
+
+    let tipo_ncf = determinar_tipo_ncf_para_inquilino(&inquilino_model);
+    let fecha_comprobante = Utc::now().date_naive();
+
+    // Attempt NCF assignment — handle failure gracefully
+    match ncf::asignar_ncf(db, org_id, tipo_ncf.clone(), fecha_comprobante).await {
+        Ok(ncf_string) => {
+            // Success: store the NCF on the pago record
+            let pago_model = pago::Entity::find_by_id(pago_id)
+                .one(db)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Pago no encontrado".to_string()))?;
+
+            let mut active: pago::ActiveModel = pago_model.into();
+            active.ncf = Set(Some(ncf_string));
+            active.fecha_comprobante = Set(Some(fecha_comprobante));
+            active.tipo_ncf = Set(Some(tipo_ncf.to_string()));
+            active.updated_at = Set(Utc::now().into());
+            active.update(db).await?;
+        }
+        Err(e) => {
+            // Failure: log warning, leave payment as pagado without NCF.
+            // The payment is flagged for manual resolution by having ncf = None.
+            warn!(
+                pago_id = %pago_id,
+                org_id = %org_id,
+                error = %e,
+                "Error al asignar NCF al pago. El pago permanece pagado sin NCF para resolución manual"
+            );
+        }
+    }
+
+    Ok(())
 }
 
 /// Computes the remaining balance for a billing period.

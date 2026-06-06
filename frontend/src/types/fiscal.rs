@@ -91,3 +91,12 @@ pub struct ConfigurarRangoRequest {
     pub rango_desde: i32,
     pub rango_hasta: i32,
 }
+
+/// Alert when NCF range is nearing exhaustion
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AlertaRango {
+    pub tipo_ncf: String,
+    pub consumo_porcentaje: f64,
+    pub restantes: i32,
+}
