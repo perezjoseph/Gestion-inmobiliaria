@@ -217,7 +217,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - **Validates: Requirements 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.8, 8.9**
 
 - [ ] 13. Multi-property dashboard service
-  - [~] 13.1 Implement dashboard comparison logic in `services/dashboard.rs` (extend existing)
+  - [x] 13.1 Implement dashboard comparison logic in `services/dashboard.rs` (extend existing)
     - Compute per-property analytics: ingresos totales, gastos totales, rentabilidad neta, tasa de ocupación, morosidad %, cuotas condominio totales
     - Support filtering by tipo_propiedad (residencial, comercial, mixto)
     - Normalize monetary values to single display currency using Banco Central exchange rate
