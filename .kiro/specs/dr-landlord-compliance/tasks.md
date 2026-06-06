@@ -289,7 +289,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 17. Frontend pages (Leptos)
-  - [ ] 17.1 Create Configuración Fiscal page (`pages/configuracion_fiscal.rs`)
+  - [x] 17.1 Create Configuración Fiscal page (`pages/configuracion_fiscal.rs`)
     - Form to set tipo_fiscal, RNC/cédula input with validation feedback, NCF range configuration
     - Route: `/configuracion/fiscal`
     - **Status: stub only — page renders static placeholder HTML, no API calls, no use of fiscal types**
@@ -340,7 +340,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Apply retention logic when tenant is persona_juridica
     - _Requirements: 6.3, 6.4, 6.5, 6.7_
 
-  - [ ] 18.3 Wire condominium fee into billing cycle
+  - [x] 18.3 Wire condominium fee into billing cycle
     - When generating billing for contracts with passthrough cuotas, include cuota line item with independent payment tracking
     - **Status: `calcular_billing_con_cuota` implemented but payment record insertion from cuotas not wired into billing flow**
     - _Requirements: 2.3, 2.4, 2.6_
