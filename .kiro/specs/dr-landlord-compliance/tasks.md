@@ -49,7 +49,7 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Register all entities in `entities/mod.rs`
     - _Requirements: 1.1, 2.1, 3.5, 7.1, 8.7, 9.4, 9.10_
 
-- [ ] 2. Core DTOs and types
+- [x] 2. Core DTOs and types
   - [x] 2.1 Create `models/fiscal.rs`
     - Define `TipoFiscal` enum (PersonaJuridica, PersonaFisica, Informal) with serde and display traits
     - Define `ActualizarTipoFiscalRequest`, `EstadoFiscalResponse`, and related DTOs
@@ -67,15 +67,15 @@ This implementation adds Dominican Republic fiscal compliance capabilities to th
     - Define `Registro607`, `Registro606`, `ReporteGenerado`, `RegistroExcluido`, `RegistroPreview`
     - _Requirements: 8.2, 8.3, 8.6_
 
-  - [~] 2.5 Create `models/ipi.rs`
+  - [x] 2.5 Create `models/ipi.rs`
     - Define `IpiLiabilityResponse`, `CopropietarioResponse`, `ConfiguracionIpiRequest`
     - _Requirements: 9.1, 9.6, 9.10_
 
-  - [~] 2.6 Create `models/indexacion.rs`
+  - [x] 2.6 Create `models/indexacion.rs`
     - Define `PropuestaRenovacion`, `AprobarRenovacionRequest`, `ContratoProximoVencer`
     - _Requirements: 5.1, 5.3, 5.6_
 
-  - [~] 2.7 Create `models/condominios.rs`
+  - [x] 2.7 Create `models/condominios.rs`
     - Define `CrearCuotaRequest`, `UpdateCuotaRequest`, `CuotaResponse`, `BillingDesglose`
     - _Requirements: 2.1, 2.3, 2.4_
 

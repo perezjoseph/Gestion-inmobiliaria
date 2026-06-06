@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: mox
+  name: mail
   labels:
-    app.kubernetes.io/name: mox
+    app.kubernetes.io/name: docker-mailserver
     app.kubernetes.io/part-of: realestate
