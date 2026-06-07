@@ -27,9 +27,6 @@ data:
       - job_name: "xpumanager"
         scheme: http
         metrics_path: "/metrics"
-        basic_auth:
-          username: 'xpumadmin'
-          password: 'Xpum@2024'
         static_configs:
           - targets: ["xpumanager.default.svc.cluster.local:29999"]
             labels:
