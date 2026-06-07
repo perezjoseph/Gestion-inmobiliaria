@@ -12,16 +12,31 @@ use prometheus::{
     register_int_gauge,
 };
 
+/// Unwraps a metric registration result, aborting the process on failure.
+/// Metric registration only fails if a duplicate metric name is registered,
+/// which indicates a programming error that cannot be recovered at runtime.
+fn unwrap_metric<T, E: std::fmt::Display>(result: Result<T, E>, name: &str) -> T {
+    match result {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("Fatal: failed to register metric '{name}': {e}");
+            std::process::abort();
+        }
+    }
+}
+
 // ─── Authentication ──────────────────────────────────────────────────────────
 
 /// Total login attempts partitioned by outcome.
 /// Labels: `result` = "success" | "failed" | "locked"
 pub static AUTH_LOGIN_ATTEMPTS: LazyLock<IntCounterVec> = LazyLock::new(|| {
-    register_int_counter_vec!(
-        Opts::new("auth_login_attempts_total", "Total login attempts"),
-        &["result"]
+    unwrap_metric(
+        register_int_counter_vec!(
+            Opts::new("auth_login_attempts_total", "Total login attempts"),
+            &["result"]
+        ),
+        "auth_login_attempts_total",
     )
-    .expect("metric: auth_login_attempts_total")
 });
 
 // ─── Payments ────────────────────────────────────────────────────────────────
@@ -30,65 +45,77 @@ pub static AUTH_LOGIN_ATTEMPTS: LazyLock<IntCounterVec> = LazyLock::new(|| {
 /// Labels: `metodo` = "efectivo" | "transferencia" | "cheque" | "tarjeta"
 ///         `moneda` = "DOP" | "USD"
 pub static PAGOS_PROCESADOS: LazyLock<IntCounterVec> = LazyLock::new(|| {
-    register_int_counter_vec!(
-        Opts::new("pagos_procesados_total", "Total pagos registrados"),
-        &["metodo", "moneda"]
+    unwrap_metric(
+        register_int_counter_vec!(
+            Opts::new("pagos_procesados_total", "Total pagos registrados"),
+            &["metodo", "moneda"]
+        ),
+        "pagos_procesados_total",
     )
-    .expect("metric: pagos_procesados_total")
 });
 
 /// Current count of overdue payments (gauge, updated by background job).
 pub static PAGOS_ATRASADOS: LazyLock<IntGauge> = LazyLock::new(|| {
-    register_int_gauge!(Opts::new("pagos_atrasados", "Pagos actualmente atrasados"))
-        .expect("metric: pagos_atrasados")
+    unwrap_metric(
+        register_int_gauge!(Opts::new("pagos_atrasados", "Pagos actualmente atrasados")),
+        "pagos_atrasados",
+    )
 });
 
 // ─── Contracts ───────────────────────────────────────────────────────────────
 
 /// Current count of active contracts (gauge, updated by background job).
 pub static CONTRATOS_ACTIVOS: LazyLock<IntGauge> = LazyLock::new(|| {
-    register_int_gauge!(Opts::new(
+    unwrap_metric(
+        register_int_gauge!(Opts::new(
+            "contratos_activos",
+            "Contratos actualmente activos"
+        )),
         "contratos_activos",
-        "Contratos actualmente activos"
-    ))
-    .expect("metric: contratos_activos")
+    )
 });
 
 /// Total contract state transitions.
 /// Labels: `from` = previous state, `to` = new state
 pub static CONTRATOS_TRANSICIONES: LazyLock<IntCounterVec> = LazyLock::new(|| {
-    register_int_counter_vec!(
-        Opts::new(
-            "contratos_transiciones_total",
-            "Transiciones de estado de contratos"
+    unwrap_metric(
+        register_int_counter_vec!(
+            Opts::new(
+                "contratos_transiciones_total",
+                "Transiciones de estado de contratos"
+            ),
+            &["from", "to"]
         ),
-        &["from", "to"]
+        "contratos_transiciones_total",
     )
-    .expect("metric: contratos_transiciones_total")
 });
 
 // ─── Maintenance ─────────────────────────────────────────────────────────────
 
 /// Current count of pending maintenance requests (gauge).
 pub static MANTENIMIENTO_PENDIENTE: LazyLock<IntGauge> = LazyLock::new(|| {
-    register_int_gauge!(Opts::new(
+    unwrap_metric(
+        register_int_gauge!(Opts::new(
+            "mantenimiento_pendiente",
+            "Solicitudes de mantenimiento pendientes"
+        )),
         "mantenimiento_pendiente",
-        "Solicitudes de mantenimiento pendientes"
-    ))
-    .expect("metric: mantenimiento_pendiente")
+    )
 });
 
 /// Total maintenance requests created, by priority.
 /// Labels: `prioridad` = "baja" | "media" | "alta" | "urgente"
 pub static MANTENIMIENTO_CREADAS: LazyLock<IntCounterVec> = LazyLock::new(|| {
-    register_int_counter_vec!(
-        Opts::new(
-            "mantenimiento_creadas_total",
-            "Solicitudes de mantenimiento creadas"
+    unwrap_metric(
+        register_int_counter_vec!(
+            Opts::new(
+                "mantenimiento_creadas_total",
+                "Solicitudes de mantenimiento creadas"
+            ),
+            &["prioridad"]
         ),
-        &["prioridad"]
+        "mantenimiento_creadas_total",
     )
-    .expect("metric: mantenimiento_creadas_total")
 });
 
 // ─── Database ────────────────────────────────────────────────────────────────
@@ -96,41 +123,47 @@ pub static MANTENIMIENTO_CREADAS: LazyLock<IntCounterVec> = LazyLock::new(|| {
 /// Histogram of database query durations by service domain.
 /// Labels: `domain` = "pagos" | "contratos" | "propiedades" | etc.
 pub static DB_QUERY_DURATION: LazyLock<HistogramVec> = LazyLock::new(|| {
-    register_histogram_vec!(
-        HistogramOpts::new(
-            "db_query_duration_seconds",
-            "Duración de consultas a la base de datos"
-        )
-        .buckets(vec![
-            0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5
-        ]),
-        &["domain"]
+    unwrap_metric(
+        register_histogram_vec!(
+            HistogramOpts::new(
+                "db_query_duration_seconds",
+                "Duración de consultas a la base de datos"
+            )
+            .buckets(vec![
+                0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5
+            ]),
+            &["domain"]
+        ),
+        "db_query_duration_seconds",
     )
-    .expect("metric: db_query_duration_seconds")
 });
 
 // ─── AI / Chatbot ────────────────────────────────────────────────────────────
 
 /// Histogram of AI inference response times.
 pub static AI_INFERENCE_DURATION: LazyLock<Histogram> = LazyLock::new(|| {
-    register_histogram!(
-        HistogramOpts::new(
-            "ai_inference_duration_seconds",
-            "Duración de inferencia AI (chatbot)"
-        )
-        .buckets(vec![0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0])
+    unwrap_metric(
+        register_histogram!(
+            HistogramOpts::new(
+                "ai_inference_duration_seconds",
+                "Duración de inferencia AI (chatbot)"
+            )
+            .buckets(vec![0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0])
+        ),
+        "ai_inference_duration_seconds",
     )
-    .expect("metric: ai_inference_duration_seconds")
 });
 
 /// Total AI requests by outcome.
 /// Labels: `result` = "success" | "error" | "timeout"
 pub static AI_REQUESTS: LazyLock<IntCounterVec> = LazyLock::new(|| {
-    register_int_counter_vec!(
-        Opts::new("ai_requests_total", "Total solicitudes AI"),
-        &["result"]
+    unwrap_metric(
+        register_int_counter_vec!(
+            Opts::new("ai_requests_total", "Total solicitudes AI"),
+            &["result"]
+        ),
+        "ai_requests_total",
     )
-    .expect("metric: ai_requests_total")
 });
 
 // ─── Notifications ───────────────────────────────────────────────────────────
@@ -138,11 +171,13 @@ pub static AI_REQUESTS: LazyLock<IntCounterVec> = LazyLock::new(|| {
 /// Total notifications sent by channel.
 /// Labels: `channel` = "whatsapp" | "email"
 pub static NOTIFICACIONES_ENVIADAS: LazyLock<IntCounterVec> = LazyLock::new(|| {
-    register_int_counter_vec!(
-        Opts::new("notificaciones_enviadas_total", "Notificaciones enviadas"),
-        &["channel", "result"]
+    unwrap_metric(
+        register_int_counter_vec!(
+            Opts::new("notificaciones_enviadas_total", "Notificaciones enviadas"),
+            &["channel", "result"]
+        ),
+        "notificaciones_enviadas_total",
     )
-    .expect("metric: notificaciones_enviadas_total")
 });
 
 // ─── Expenses ────────────────────────────────────────────────────────────────
@@ -150,31 +185,37 @@ pub static NOTIFICACIONES_ENVIADAS: LazyLock<IntCounterVec> = LazyLock::new(|| {
 /// Total expenses recorded by category.
 /// Labels: `categoria`, `moneda`
 pub static GASTOS_REGISTRADOS: LazyLock<IntCounterVec> = LazyLock::new(|| {
-    register_int_counter_vec!(
-        Opts::new("gastos_registrados_total", "Gastos registrados"),
-        &["categoria", "moneda"]
+    unwrap_metric(
+        register_int_counter_vec!(
+            Opts::new("gastos_registrados_total", "Gastos registrados"),
+            &["categoria", "moneda"]
+        ),
+        "gastos_registrados_total",
     )
-    .expect("metric: gastos_registrados_total")
 });
 
 // ─── Active Users ────────────────────────────────────────────────────────────
 
 /// Tracks the number of active API sessions (approximation via recent JWT validations).
 pub static USUARIOS_ACTIVOS: LazyLock<IntGauge> = LazyLock::new(|| {
-    register_int_gauge!(Opts::new(
+    unwrap_metric(
+        register_int_gauge!(Opts::new(
+            "usuarios_activos",
+            "Usuarios activos estimados (última hora)"
+        )),
         "usuarios_activos",
-        "Usuarios activos estimados (última hora)"
-    ))
-    .expect("metric: usuarios_activos")
+    )
 });
 
 /// Total HTTP requests that resulted in 401/403, by endpoint.
 pub static AUTH_REJECTIONS: LazyLock<IntCounter> = LazyLock::new(|| {
-    register_int_counter!(Opts::new(
+    unwrap_metric(
+        register_int_counter!(Opts::new(
+            "auth_rejections_total",
+            "Solicitudes rechazadas por autenticación/autorización"
+        )),
         "auth_rejections_total",
-        "Solicitudes rechazadas por autenticación/autorización"
-    ))
-    .expect("metric: auth_rejections_total")
+    )
 });
 
 /// Force-initialize all metrics so they appear in /metrics even before first use.
