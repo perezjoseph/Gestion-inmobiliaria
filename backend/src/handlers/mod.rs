@@ -32,6 +32,7 @@ pub mod pagos;
 pub mod perfil;
 pub mod propiedades;
 pub mod recibos;
+pub mod recibos_informales;
 pub mod reportes;
 pub mod reportes_dgii;
 pub mod servicios_publicos;

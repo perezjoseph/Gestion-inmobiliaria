@@ -71,7 +71,7 @@ This plan addresses 9 external attack vectors identified during a security audit
     - In `backend/src/handlers/ocr.rs` `ocr_extract()`: call `validate_magic_bytes` after reading file data
     - _Requirements: 4.1, 4.3_
 
-- [ ] 6. JWT token improvements
+- [x] 6. JWT token improvements
   - [x] 6.1 Create database migration for `password_changed_at`
     - Create `m{date}_000001_add_password_changed_at.rs`
     - Add `password_changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` to `usuarios`
@@ -102,7 +102,7 @@ This plan addresses 9 external attack vectors identified during a security audit
     - Return 401 if user is inactive or password changed after token issuance
     - _Requirements: 8.3, 8.4_
 
-  - [~] 6.6 Invalidate cache on password change and user deactivation
+  - [x] 6.6 Invalidate cache on password change and user deactivation
     - In password change service: update `password_changed_at` in DB, call `cache.invalidate(user_id)`
     - In user deactivation service: call `cache.invalidate(user_id)` after setting `activo = false`
     - Log `event=password_changed` and `event=user_deactivated` with user_id

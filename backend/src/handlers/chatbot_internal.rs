@@ -3,10 +3,11 @@ use sea_orm::DatabaseConnection;
 
 use crate::config::AppConfig;
 use crate::errors::AppError;
-use crate::models::chatbot::{Capabilities, FaqEntry, IncomingWebhookPayload, SendMessageRequest};
+use crate::models::chatbot::{Capabilities, FaqEntry, IncomingWebhookPayload};
 use crate::services::ai_module::{
     AiModule, ChatbotPersona, ConversationEntry, ProcessMessageContext, TenantContext, UserMessage,
 };
+use crate::services::baileys_client::BaileysClient;
 use crate::services::chatbot;
 use crate::services::crypto::constant_time_eq;
 
@@ -37,6 +38,7 @@ pub async fn incoming_webhook(
     req: HttpRequest,
     config: web::Data<AppConfig>,
     db: web::Data<DatabaseConnection>,
+    baileys: Option<web::Data<BaileysClient>>,
     payload: web::Json<IncomingWebhookPayload>,
 ) -> Result<HttpResponse, AppError> {
     let chatbot_env = &config.chatbot;
@@ -303,25 +305,21 @@ pub async fn incoming_webhook(
     };
 
     // Send reply via Baileys Service
-    let send_url = format!(
-        "{}/sessions/{}/send",
-        chatbot_env.baileys_service_url, org_id
-    );
-
-    let send_body = SendMessageRequest {
-        recipient_phone: payload.sender_phone.clone(),
-        content: reply_text,
-        message_type: "text".to_string(),
-    };
-
-    let client = reqwest::Client::new();
-    let send_result = client.post(&send_url).json(&send_body).send().await;
-
-    if let Err(e) = send_result {
+    if let Some(ref client) = baileys {
+        if let Err(e) = client
+            .send_message(org_id, &payload.sender_phone, &reply_text)
+            .await
+        {
+            tracing::error!(
+                organizacion_id = %org_id,
+                error = %e,
+                "Error enviando respuesta via Baileys"
+            );
+        }
+    } else {
         tracing::error!(
             organizacion_id = %org_id,
-            error = %e,
-            "Error enviando respuesta via Baileys"
+            "BaileysClient no disponible — no se pudo enviar respuesta"
         );
     }
 

@@ -5,6 +5,7 @@ use crate::entities::usuario;
 use crate::errors::AppError;
 use crate::models::usuario::UsuarioResponse;
 use crate::services::auth::{hash_password, verify_password};
+use crate::services::user_security_cache::UserSecurityCache;
 
 pub async fn obtener_perfil(
     db: &DatabaseConnection,
@@ -88,6 +89,7 @@ pub async fn cambiar_password(
     user_id: Uuid,
     password_actual: &str,
     password_nuevo: &str,
+    cache: &UserSecurityCache,
 ) -> Result<(), AppError> {
     // Validate password lengths to prevent DoS via Argon2 on huge inputs
     if password_actual.len() > 128 {
@@ -121,7 +123,11 @@ pub async fn cambiar_password(
     let new_hash = hash_password(password_nuevo)?;
     let mut active: usuario::ActiveModel = record.into();
     active.password_hash = Set(new_hash);
+    active.password_changed_at = Set(chrono::Utc::now().into());
     active.update(db).await?;
+
+    cache.invalidate(user_id);
+    tracing::info!(event = "password_changed", user_id = %user_id, "Password changed");
 
     Ok(())
 }

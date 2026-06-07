@@ -640,6 +640,11 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     ),
             )
             .service(
+                web::scope("/recibos-informales")
+                    .wrap(Governor::new(&write_governor_conf))
+                    .route("", web::post().to(handlers::recibos_informales::crear)),
+            )
+            .service(
                 web::scope("/ncf")
                     .wrap(Governor::new(&write_governor_conf))
                     .route(

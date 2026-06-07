@@ -8,6 +8,7 @@ use crate::entities::usuario;
 use crate::errors::AppError;
 use crate::models::PaginatedResponse;
 use crate::models::usuario::UsuarioResponse;
+use crate::services::user_security_cache::UserSecurityCache;
 use crate::services::validation::validate_enum;
 
 const ROLES: &[&str] = &["admin", "gerente", "visualizador"];
@@ -76,6 +77,7 @@ pub async fn desactivar(
     db: &DatabaseConnection,
     id: Uuid,
     org_id: Uuid,
+    cache: &UserSecurityCache,
 ) -> Result<UsuarioResponse, AppError> {
     let record = usuario::Entity::find_by_id(id)
         .filter(usuario::Column::OrganizacionId.eq(org_id))
@@ -87,6 +89,10 @@ pub async fn desactivar(
     active.activo = Set(false);
 
     let updated = active.update(db).await?;
+
+    cache.invalidate(id);
+    tracing::info!(event = "user_deactivated", user_id = %id, "User deactivated");
+
     Ok(UsuarioResponse::from(updated))
 }
 

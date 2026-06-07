@@ -19,6 +19,12 @@ pub struct UserSecurityCache {
     cache: DashMap<Uuid, UserSecurityState>,
 }
 
+impl Default for UserSecurityCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UserSecurityCache {
     pub fn new() -> Self {
         Self {
@@ -75,6 +81,7 @@ impl UserSecurityCache {
     }
 }
 
+#[allow(clippy::missing_const_for_fn)]
 fn is_valid(state: &UserSecurityState, iat: i64) -> bool {
     if !state.activo {
         return false;

@@ -5,6 +5,7 @@ use serde::Deserialize;
 use crate::errors::AppError;
 use crate::services::auth::Claims;
 use crate::services::perfil;
+use crate::services::user_security_cache::UserSecurityCache;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -65,6 +66,7 @@ pub async fn actualizar(
 
 pub async fn cambiar_password(
     db: web::Data<DatabaseConnection>,
+    cache: web::Data<UserSecurityCache>,
     claims: Claims,
     body: web::Json<CambiarPasswordRequest>,
 ) -> Result<HttpResponse, AppError> {
@@ -74,9 +76,9 @@ pub async fn cambiar_password(
         claims.sub,
         &input.password_actual,
         &input.password_nuevo,
+        cache.get_ref(),
     )
     .await?;
-    tracing::info!(user_id = %claims.sub, "Password changed");
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "message": "Contraseña actualizada exitosamente"
     })))

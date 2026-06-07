@@ -20,6 +20,7 @@ pub async fn register(
     }
 }
 
+#[allow(clippy::future_not_send)]
 pub async fn login(
     req: HttpRequest,
     db: web::Data<DatabaseConnection>,

@@ -6,6 +6,7 @@ use uuid::Uuid;
 use crate::errors::AppError;
 use crate::middleware::rbac::AdminOnly;
 use crate::models::usuario::CambiarRolRequest;
+use crate::services::user_security_cache::UserSecurityCache;
 use crate::services::usuarios;
 
 const VALID_ROLES: &[&str] = &["admin", "gerente", "visualizador"];
@@ -63,11 +64,13 @@ pub async fn activar(
 
 pub async fn desactivar(
     db: web::Data<DatabaseConnection>,
+    cache: web::Data<UserSecurityCache>,
     admin: AdminOnly,
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
-    let result = usuarios::desactivar(db.get_ref(), id, admin.0.organizacion_id).await?;
+    let result =
+        usuarios::desactivar(db.get_ref(), id, admin.0.organizacion_id, cache.get_ref()).await?;
     tracing::info!(admin_id = %admin.0.sub, target_user_id = %id, action = "desactivar", "User deactivated");
     Ok(HttpResponse::Ok().json(result))
 }

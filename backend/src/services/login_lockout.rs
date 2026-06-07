@@ -53,6 +53,7 @@ impl LoginLockout {
 
     /// Record a failed login attempt. Returns `Some(LockoutInfo)` if this
     /// failure triggered a lockout.
+    #[allow(clippy::significant_drop_tightening)]
     pub fn record_failure(&self, email: &str) -> Option<LockoutInfo> {
         let now = Instant::now();
 
