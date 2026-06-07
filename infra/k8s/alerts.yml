@@ -208,3 +208,32 @@ data:
               severity: warning
             annotations:
               summary: "Account lockouts detected — possible brute force"
+
+      - name: monitoring
+        rules:
+          - alert: PrometheusDown
+            expr: absent(up{job="prometheus"})
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Prometheus is down"
+              description: "Prometheus self-scrape target is not responding"
+
+          - alert: TargetDown
+            expr: up == 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Scrape target is down"
+              description: "{{ $labels.job }}/{{ $labels.instance }} is unreachable"
+
+          - alert: GpuOverheating
+            expr: xpum_gpu_temperature > 85
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "GPU temperature critical"
+              description: "GPU temperature on {{ $labels.instance }} exceeds 85°C"

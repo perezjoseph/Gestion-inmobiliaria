@@ -94,7 +94,7 @@ Fix five operational defects in the Kubernetes monitoring stack: deploy kube-sta
     - _Preservation: CPU limits/requests, storage path, retention time, all other Prometheus settings unchanged_
     - _Requirements: 2.3_
 
-  - [~] 3.5 Add self-monitoring alert rules
+  - [x] 3.5 Add self-monitoring alert rules
     - In `infra/k8s/alerts.yml`, add a new `monitoring` group with three rules:
     - `PrometheusDown`: expr `absent(up{job="prometheus"})` for 5m, severity critical
     - `TargetDown`: expr `up == 0` for 5m, severity critical
