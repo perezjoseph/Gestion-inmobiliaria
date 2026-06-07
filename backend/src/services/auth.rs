@@ -16,6 +16,8 @@ use crate::errors::AppError;
 use crate::models::usuario::{LoginRequest, LoginResponse, RegisterRequest, UserResponse};
 use crate::services::{invitaciones, validacion_fiscal};
 
+pub use crate::services::user_security_cache::UserSecurityCache;
+
 /// Result of the public register endpoint.
 /// New-org registrations return only the `User` DTO (no token).
 /// Invitation registrations return the full login response (token + user).

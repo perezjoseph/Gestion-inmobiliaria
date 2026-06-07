@@ -5,8 +5,7 @@ use std::pin::Pin;
 
 use crate::config::AppConfig;
 use crate::errors::AppError;
-use crate::services::auth::{Claims, decode_jwt};
-use crate::services::user_security_cache::UserSecurityCache;
+use crate::services::auth::{Claims, UserSecurityCache, decode_jwt};
 
 impl FromRequest for Claims {
     type Error = AppError;

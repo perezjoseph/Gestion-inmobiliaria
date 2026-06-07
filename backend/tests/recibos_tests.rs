@@ -79,10 +79,32 @@ mod db_async {
         }
     }
 
-    fn make_token_for_org(org_id: Uuid, rol: &str) -> String {
+    async fn create_user(db: &DatabaseConnection, org_id: Uuid, rol: &str) -> Uuid {
+        use realestate_backend::entities::usuario;
+        let id = Uuid::new_v4();
+        let now = Utc::now().into();
+        usuario::ActiveModel {
+            id: Set(id),
+            nombre: Set(format!("Test {rol}")),
+            email: Set(format!("{rol}+{id}@test.com")),
+            password_hash: Set("not_used".to_string()),
+            rol: Set(rol.to_string()),
+            activo: Set(true),
+            organizacion_id: Set(org_id),
+            created_at: Set(now),
+            updated_at: Set(now),
+            password_changed_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .expect("Failed to create test usuario");
+        id
+    }
+
+    fn make_token(user_id: Uuid, org_id: Uuid, rol: &str) -> String {
         let claims = Claims {
-            sub: Uuid::new_v4(),
-            email: format!("user-{}@test.com", Uuid::new_v4()),
+            sub: user_id,
+            email: format!("user-{}@test.com", user_id),
             rol: rol.to_string(),
             organizacion_id: org_id,
             jti: Uuid::new_v4(),
@@ -90,6 +112,11 @@ mod db_async {
             exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
         };
         encode_jwt(&claims, JWT_SECRET).unwrap()
+    }
+
+    async fn make_token_for_org(db: &DatabaseConnection, org_id: Uuid, rol: &str) -> String {
+        let user_id = create_user(db, org_id, rol).await;
+        make_token(user_id, org_id, rol)
     }
 
     fn make_app_data()
@@ -291,7 +318,7 @@ mod db_async {
             let app = test::init_service(create_app(db.clone(), config, make_app_data())).await;
 
             // Request org_b's pago receipt as a user from org_a
-            let token_a = make_token_for_org(org_a, "admin");
+            let token_a = make_token_for_org(&db, org_a, "admin").await;
             let req = test::TestRequest::get()
                 .uri(&format!("/api/v1/pagos/{pago_b}/recibo"))
                 .insert_header(("Authorization", format!("Bearer {token_a}")))
@@ -312,7 +339,7 @@ mod db_async {
             );
 
             // Verify same-org access works (org_b user can get the receipt)
-            let token_b = make_token_for_org(org_b, "admin");
+            let token_b = make_token_for_org(&db, org_b, "admin").await;
             let req = test::TestRequest::get()
                 .uri(&format!("/api/v1/pagos/{pago_b}/recibo"))
                 .insert_header(("Authorization", format!("Bearer {token_b}")))
@@ -356,7 +383,7 @@ mod db_async {
 
             // All roles from org_a should get 404 when accessing org_b's receipt
             for role in &["admin", "gerente", "visualizador"] {
-                let token = make_token_for_org(org_a, role);
+                let token = make_token_for_org(&db, org_a, role).await;
                 let req = test::TestRequest::get()
                     .uri(&format!("/api/v1/pagos/{pago_b}/recibo"))
                     .insert_header(("Authorization", format!("Bearer {token}")))
@@ -387,7 +414,7 @@ mod db_async {
 
             let app = test::init_service(create_app(db.clone(), config, make_app_data())).await;
 
-            let token = make_token_for_org(org, "admin");
+            let token = make_token_for_org(&db, org, "admin").await;
             let fake_pago = Uuid::new_v4();
             let req = test::TestRequest::get()
                 .uri(&format!("/api/v1/pagos/{fake_pago}/recibo"))
@@ -469,7 +496,7 @@ mod db_async {
             let app = test::init_service(create_app(db.clone(), config, make_app_data())).await;
 
             // Request org_b's pago receipt as a user from org_a
-            let token_a = make_token_for_org(org_a, "admin");
+            let token_a = make_token_for_org(&db, org_a, "admin").await;
             let req = test::TestRequest::get()
                 .uri(&format!("/api/v1/pagos/{pago_b}/recibo"))
                 .insert_header(("Authorization", format!("Bearer {token_a}")))

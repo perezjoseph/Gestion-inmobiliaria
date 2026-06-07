@@ -84,10 +84,33 @@ mod pbt_async {
         }
     }
 
-    fn make_token_for_org(org_id: Uuid, rol: &str) -> String {
+    async fn create_user(db: &DatabaseConnection, org_id: Uuid, rol: &str) -> Uuid {
+        use realestate_backend::entities::usuario;
+        let id = Uuid::new_v4();
+        let now = Utc::now().into();
+        usuario::ActiveModel {
+            id: Set(id),
+            nombre: Set(format!("Test {rol}")),
+            email: Set(format!("{rol}+{id}@test.com")),
+            password_hash: Set("not_used".to_string()),
+            rol: Set(rol.to_string()),
+            activo: Set(true),
+            organizacion_id: Set(org_id),
+            created_at: Set(now),
+            updated_at: Set(now),
+            password_changed_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .expect("Failed to create test usuario");
+        id
+    }
+
+    async fn make_token_for_org(db: &DatabaseConnection, org_id: Uuid, rol: &str) -> String {
+        let user_id = create_user(db, org_id, rol).await;
         let claims = Claims {
-            sub: Uuid::new_v4(),
-            email: format!("user-{}@test.com", Uuid::new_v4()),
+            sub: user_id,
+            email: format!("user-{}@test.com", user_id),
             rol: rol.to_string(),
             organizacion_id: org_id,
             jti: Uuid::new_v4(),
@@ -305,7 +328,7 @@ mod pbt_async {
             let pago_id = create_pago(&db, org_b, contrato_id).await;
 
             // Create a token for a user in org_a (the attacker)
-            let token = make_token_for_org(org_a, &rol);
+            let token = make_token_for_org(&db, org_a, &rol).await;
 
             let app = test::init_service(create_app(
                 db.clone(),
