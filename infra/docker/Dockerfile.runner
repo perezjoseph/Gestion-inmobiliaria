@@ -141,7 +141,14 @@ RUN ARCHIVE="/tmp/gh.tar.gz" \
        --connect-timeout 15 --max-time 120 \
        https://cli.kiro.dev/install | HOME=/home/runner bash \
     && ln -sf /home/runner/.local/bin/kiro-cli /usr/local/bin/kiro-cli \
-    && chown -R runner:runner /home/runner/.local
+    && chown -R runner:runner /home/runner/.local \
+    && KIRO_VER=$(kiro-cli --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1) \
+    && echo "Installed kiro-cli version: ${KIRO_VER}" \
+    && MIN_VER="2.4.0" \
+    && if [ "$(printf '%s\n' "$MIN_VER" "$KIRO_VER" | sort -V | head -1)" != "$MIN_VER" ]; then \
+         echo "ERROR: kiro-cli ${KIRO_VER} is below minimum required ${MIN_VER} (needs --effort support)" >&2; \
+         exit 1; \
+       fi
 
 # ── Android SDK (cmdline-tools + platform 36 + build-tools 36) ──
 # Prebaked to avoid ~500MB download on every Android CI job.
