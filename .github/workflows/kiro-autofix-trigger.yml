@@ -367,7 +367,7 @@ jobs:
             # Invoke the autofix agent with per-artifact timeout.
             AGENT_EXIT=0
             timeout "${ARTIFACT_TIMEOUT}" \
-              kiro-cli --agent autofix chat --no-interactive --trust-all-tools \
+              kiro-cli chat --agent autofix --model claude-opus-4.6 --effort max --no-interactive --trust-all-tools \
                 "$PROMPT" \
               || AGENT_EXIT=$?
 

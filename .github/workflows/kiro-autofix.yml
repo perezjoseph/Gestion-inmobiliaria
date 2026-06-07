@@ -211,7 +211,7 @@ jobs:
           fi
 
           set +e
-          kiro-cli --agent autofix chat --no-interactive --trust-all-tools \
+          kiro-cli chat --agent autofix --model claude-opus-4.6 --effort max --no-interactive --trust-all-tools \
             "Fix ${STAGE} failure on branch ${BRANCH}. Diagnostics at KIRO_DIAGNOSTICS_FILE."
           AGENT_EXIT=$?
           set -e
