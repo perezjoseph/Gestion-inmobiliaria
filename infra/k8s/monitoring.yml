@@ -33,14 +33,12 @@ data:
               node: "inference"
 
       - job_name: "node-exporter"
+        dns_sd_configs:
+          - names: ['node-exporter.monitoring.svc.cluster.local']
+            type: A
+            port: 9100
         static_configs:
-          - targets: ["192.168.88.112:9100"]
-            labels:
-              node: "coreos"
-          - targets: ["192.168.88.115:9100"]
-            labels:
-              node: "inference"
-          - targets: ["192.168.88.22:9100"]
+          - targets: ['192.168.88.22:9100']
             labels:
               node: "networkstorage"
 

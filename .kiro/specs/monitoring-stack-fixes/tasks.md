@@ -104,7 +104,7 @@ Fix five operational defects in the Kubernetes monitoring stack: deploy kube-sta
     - _Preservation: All existing alert groups (backend, database, infrastructure, backups, slo, business) unchanged_
     - _Requirements: 2.4_
 
-  - [~] 3.6 Replace hardcoded node IPs with dns_sd_configs for in-cluster nodes
+  - [x] 3.6 Replace hardcoded node IPs with dns_sd_configs for in-cluster nodes
     - In `infra/k8s/monitoring.yml`, replace the node-exporter job's static_configs entries for coreos (192.168.88.112) and inference (192.168.88.115) with a `dns_sd_configs` entry pointing to `node-exporter.monitoring.svc.cluster.local` port 9100
     - Keep a separate static_configs entry for networkstorage (192.168.88.22:9100) with `node: "networkstorage"` label since it's external to the cluster
     - _Bug_Condition: scrapeConfigUsesHardcodedIP(job, nodeType) for in-cluster nodes (coreos, inference)_
