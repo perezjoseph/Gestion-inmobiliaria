@@ -87,7 +87,7 @@ Fix five operational defects in the Kubernetes monitoring stack: deploy kube-sta
     - _Preservation: reject_old_samples_max_age: 168h, max_query_series: 500, and all other limits_config values unchanged_
     - _Requirements: 2.2_
 
-  - [~] 3.4 Increase Prometheus memory limit
+  - [x] 3.4 Increase Prometheus memory limit
     - In `infra/k8s/monitoring.yml`, change Prometheus container `resources.limits.memory` from `512Mi` to `1536Mi` and `resources.requests.memory` from `256Mi` to `512Mi`
     - _Bug_Condition: prometheusMemoryLimit <= 512Mi with 30d retention and 5+ scrape jobs_
     - _Expected_Behavior: Memory limit 1536Mi prevents OOM kills under realistic cardinality_
