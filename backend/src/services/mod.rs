@@ -82,6 +82,7 @@ pub mod reportes_dgii;
 mod reportes_dgii_pbt;
 pub mod servicios_publicos;
 pub mod unidades;
+pub mod user_security_cache;
 pub mod usuarios;
 pub mod validacion_fiscal;
 pub mod validation;

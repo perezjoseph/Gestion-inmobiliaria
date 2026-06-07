@@ -82,7 +82,7 @@ This plan addresses 9 external attack vectors identified during a security audit
     - Add `password_changed_at: DateTimeWithTimeZone` to `backend/src/entities/usuario.rs`
     - _Requirements: 8.4_
 
-  - [~] 6.3 Create `backend/src/services/user_security_cache.rs`
+  - [x] 6.3 Create `backend/src/services/user_security_cache.rs`
     - Implement `UserSecurityCache` with `DashMap<Uuid, UserSecurityState>`
     - `is_token_valid(db, user_id, iat)`: check user activo + password_changed_at vs iat, with 60s cache TTL
     - `invalidate(user_id)`: remove from cache (called on deactivation/password change)
