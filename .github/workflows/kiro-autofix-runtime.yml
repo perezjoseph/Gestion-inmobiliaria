@@ -1,0 +1,214 @@
+name: Kiro Autofix (runtime)
+
+# Triggered externally (webhook, alertmanager, K8s watcher, etc.) when
+# the application hits a critical runtime error. Collects the error
+# context and runs Kiro to produce a fix.
+#
+# Modes:
+#   pr   — creates a branch + pull request for human review (default)
+#   yolo — pushes the fix directly to main without review
+#
+# Trigger via GitHub API:
+#   POST /repos/{owner}/{repo}/actions/workflows/kiro-autofix-runtime.yml/dispatches
+#   { "ref": "main", "inputs": { "error-context": "...", "mode": "pr" } }
+
+on:
+  workflow_dispatch:
+    inputs:
+      error-context:
+        description: "Error logs, stack trace, or description of the runtime failure"
+        type: string
+        required: true
+      mode:
+        description: "Fix delivery mode: 'pr' (branch + pull request) or 'yolo' (push directly to main)"
+        type: choice
+        options:
+          - pr
+          - yolo
+        default: "pr"
+      branch:
+        description: "Target branch (used as base for PR mode, push target for yolo mode)"
+        type: string
+        required: false
+        default: "main"
+
+permissions: {}
+
+concurrency:
+  group: kiro-autofix-runtime-${{ github.event.inputs.branch }}
+  cancel-in-progress: false
+
+env:
+  MAX_ATTEMPTS: "3"
+
+jobs:
+  autofix-runtime:
+    name: "Runtime Autofix (${{ inputs.mode }})"
+    runs-on: arc-runner-dind
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Validate required secrets
+        env:
+          KIRO_GITHUB_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+          KIRO_API: ${{ secrets.KIRO_API }}
+        run: |
+          umask 077
+          missing=()
+          [ -z "${KIRO_GITHUB_TOKEN}" ] && missing+=("KIRO_GITHUB_TOKEN")
+          [ -z "${KIRO_API}" ] && missing+=("KIRO_API")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing secret(s): ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Checkout target branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0
+          token: ${{ secrets.KIRO_GITHUB_TOKEN }}
+          persist-credentials: true
+
+      - name: Create fix branch (PR mode)
+        if: inputs.mode == 'pr'
+        run: |
+          BRANCH_NAME="autofix/runtime-$(date +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH_NAME"
+          echo "FIX_BRANCH=$BRANCH_NAME" >> "$GITHUB_ENV"
+
+      - name: Rust setup
+        uses: ./.github/actions/rust-setup
+        with:
+          components: rustfmt,clippy
+          targets: x86_64-unknown-linux-musl,wasm32-unknown-unknown
+
+      - name: Write diagnostics file
+        run: |
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/runtime-diag"
+          cat > "${RUNNER_TEMP}/runtime-diag/context.txt" << 'DIAG_EOF'
+          ${{ inputs.error-context }}
+          DIAG_EOF
+          echo "KIRO_DIAGNOSTICS_FILE=${RUNNER_TEMP}/runtime-diag/context.txt" >> "$GITHUB_ENV"
+
+      - name: Count prior autofix attempts
+        id: attempts
+        run: |
+          umask 077
+          count=0
+          while [ "$count" -lt 50 ]; do
+            email=$(git log --format='%ae' -n 1 "HEAD~$count" 2>/dev/null || true)
+            if [ -z "$email" ]; then break; fi
+            case "$email" in
+              kiro-bot@*) count=$((count + 1)) ;;
+              *) break ;;
+            esac
+          done
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          if [ "$count" -ge "${MAX_ATTEMPTS}" ]; then
+            echo "::error::Runtime autofix limit reached ($count attempts). Manual intervention required."
+            exit 1
+          fi
+          echo "Attempt $((count + 1)) of ${MAX_ATTEMPTS}"
+
+      - name: Run Kiro CLI agent
+        id: kiro
+        env:
+          KIRO_API_KEY: ${{ secrets.KIRO_API }}
+          KIRO_COMMIT_MSG_FILE: ${{ runner.temp }}/kiro-commit-message.txt
+        run: |
+          umask 077
+          PROMPT="Fix a critical runtime error in the application. The error context is at ${KIRO_DIAGNOSTICS_FILE}. Read it carefully and fix the root cause. Write your commit message to \$KIRO_COMMIT_MSG_FILE when done."
+
+          set +e
+          kiro-cli chat --agent autofix --model claude-opus-4.6 --effort max \
+            --no-interactive --trust-all-tools "$PROMPT"
+          AGENT_EXIT=$?
+          set -e
+
+          echo "agent_exit=${AGENT_EXIT}" >> "$GITHUB_OUTPUT"
+          if [ "$AGENT_EXIT" -ne 0 ]; then
+            echo "::warning::Kiro agent exited with code ${AGENT_EXIT}"
+          fi
+
+      - name: Check for changes
+        id: changes
+        run: |
+          git add -A
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No changes produced by Kiro"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit fixes
+        if: steps.changes.outputs.has_changes == 'true'
+        env:
+          KIRO_COMMIT_MSG_FILE: ${{ runner.temp }}/kiro-commit-message.txt
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          umask 077
+          git config user.name "kiro-bot"
+          git config user.email "kiro-bot@users.noreply.github.com"
+
+          if [ -s "${KIRO_COMMIT_MSG_FILE}" ]; then
+            if ! grep -qF "Workflow run:" "${KIRO_COMMIT_MSG_FILE}"; then
+              printf '\nWorkflow run: %s\n' "$RUN_URL" >> "${KIRO_COMMIT_MSG_FILE}"
+            fi
+            git commit -F "${KIRO_COMMIT_MSG_FILE}"
+          else
+            git commit -m "fix(runtime): auto-fix critical runtime error via Kiro CLI" \
+              -m "Workflow run: ${RUN_URL}"
+          fi
+
+      - name: Push to main (yolo mode)
+        if: inputs.mode == 'yolo' && steps.changes.outputs.has_changes == 'true'
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            git fetch origin "${{ inputs.branch }}"
+            if ! git merge-base --is-ancestor "origin/${{ inputs.branch }}" HEAD; then
+              git rebase "origin/${{ inputs.branch }}" || { git rebase --abort; exit 1; }
+            fi
+            git push origin HEAD:"${{ inputs.branch }}"
+
+      - name: Push branch and create PR (pr mode)
+        if: inputs.mode == 'pr' && steps.changes.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          git push -u origin "${FIX_BRANCH}"
+
+          BODY="## Runtime Autofix
+
+          Kiro detected a critical runtime error and produced this fix automatically.
+
+          **Error context:**
+          \`\`\`
+          $(head -c 2000 "${KIRO_DIAGNOSTICS_FILE}")
+          \`\`\`
+
+          **Mode:** Pull Request (human review required)
+          **Triggered by:** ${RUN_URL}
+
+          > ⚠️ Review carefully before merging — this is an automated fix for a production issue."
+
+          gh pr create \
+            --base "${{ inputs.branch }}" \
+            --head "${FIX_BRANCH}" \
+            --title "fix(runtime): auto-fix critical runtime error" \
+            --body "$BODY"
+
+      - name: Fail if agent produced no fix
+        if: steps.changes.outputs.has_changes == 'false'
+        run: |
+          echo "::error::Kiro agent did not produce any changes for the runtime error."
+          exit 1

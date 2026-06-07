@@ -1,0 +1,387 @@
+# Alertmanager + GitHub webhook bridge
+# Triggers kiro-autofix-runtime.yml when critical alerts fire.
+#
+# Prerequisites:
+#   kubectl create secret generic alertmanager-github \
+#     --namespace monitoring \
+#     --from-literal=token=ghp_YOUR_FINE_GRAINED_PAT
+#
+# Required PAT scopes (fine-grained, this repo only):
+#   - Actions: Read and write (trigger workflow_dispatch)
+#   - Contents: Read (needed for dispatch ref validation)
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+data:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+
+    route:
+      receiver: "default"
+      group_by: ["alertname", "namespace"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      routes:
+        # Only route code-fixable critical alerts to the autofix bridge
+        - receiver: "kiro-autofix"
+          matchers:
+            - severity = "critical"
+            - alertname =~ "HighErrorRate|PodRestarts|PodNotReady|DatabaseDown|DatabaseConnectionPoolExhausted"
+          group_wait: 60s
+          group_interval: 30m
+          repeat_interval: 4h
+          continue: true
+        # Infrastructure alerts (disk, memory) are not code-fixable
+        - receiver: "default"
+          matchers:
+            - severity = "critical"
+            - alertname =~ "DiskUsage.*|HighMemoryUsage"
+
+    receivers:
+      - name: "default"
+      - name: "kiro-autofix"
+        webhook_configs:
+          - url: "http://alertmanager-github-bridge.monitoring.svc.cluster.local:9095/webhook"
+            send_resolved: false
+            max_alerts: 3
+
+    inhibit_rules:
+      # If backend is completely down, suppress HighErrorRate (redundant)
+      - source_matchers:
+          - alertname = "DatabaseDown"
+        target_matchers:
+          - alertname = "HighErrorRate"
+        equal: ["namespace"]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  labels:
+    app: alertmanager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: alertmanager
+          image: docker.io/prom/alertmanager:v0.28.1
+          args:
+            - "--config.file=/etc/alertmanager/alertmanager.yml"
+            - "--storage.path=/alertmanager"
+            - "--log.level=warn"
+          ports:
+            - containerPort: 9093
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alertmanager/alertmanager.yml
+              subPath: alertmanager.yml
+            - name: data
+              mountPath: /alertmanager
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+              ephemeral-storage: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+              ephemeral-storage: 64Mi
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 9093
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: alertmanager-config
+        - name: data
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: monitoring
+spec:
+  selector:
+    app: alertmanager
+  ports:
+    - port: 9093
+      targetPort: 9093
+---
+# GitHub webhook bridge — receives Alertmanager webhooks and triggers
+# kiro-autofix-runtime.yml via the GitHub Actions API.
+# Runs a minimal Python HTTP server (~15MB RAM).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: github-bridge-script
+  namespace: monitoring
+data:
+  bridge.py: |
+    """Alertmanager → GitHub Actions workflow_dispatch bridge."""
+    import http.server
+    import json
+    import os
+    import sys
+    import urllib.request
+    import urllib.error
+    import hashlib
+    import time
+
+    GITHUB_OWNER = os.environ["GITHUB_OWNER"]
+    GITHUB_REPO = os.environ["GITHUB_REPO"]
+    GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
+    MODE = os.environ.get("MODE", "pr")
+    PORT = int(os.environ.get("PORT", "9095"))
+
+    # Simple in-memory rate limiting and deduplication
+    MAX_TRIGGERS_PER_HOUR = int(os.environ.get("MAX_TRIGGERS_PER_HOUR", "3"))
+    DEDUP_WINDOW_SECS = int(os.environ.get("DEDUP_WINDOW_SECS", "1800"))  # 30 min
+
+    trigger_timestamps: list[float] = []
+    seen_fingerprints: dict[str, float] = {}
+
+    def is_rate_limited() -> bool:
+        cutoff = time.time() - 3600
+        recent = [t for t in trigger_timestamps if t > cutoff]
+        return len(recent) >= MAX_TRIGGERS_PER_HOUR
+
+    def is_duplicate(fp: str) -> bool:
+        last = seen_fingerprints.get(fp, 0)
+        return (time.time() - last) < DEDUP_WINDOW_SECS
+
+    def record_trigger(fp: str) -> None:
+        now = time.time()
+        trigger_timestamps.append(now)
+        seen_fingerprints[fp] = now
+        # Evict old entries
+        cutoff = now - 7200
+        trigger_timestamps[:] = [t for t in trigger_timestamps if t > cutoff]
+        for k in list(seen_fingerprints):
+            if seen_fingerprints[k] < cutoff:
+                del seen_fingerprints[k]
+
+    def build_context(alerts: list[dict]) -> str:
+        lines = ["=== PROMETHEUS ALERT → KIRO AUTOFIX ===", ""]
+        for alert in alerts:
+            labels = alert.get("labels", {})
+            annotations = alert.get("annotations", {})
+            lines.append(f"Alert: {labels.get('alertname', 'unknown')}")
+            lines.append(f"Severity: {labels.get('severity', 'unknown')}")
+            lines.append(f"Status: {alert.get('status', 'unknown')}")
+            lines.append(f"Started: {alert.get('startsAt', 'unknown')}")
+            lines.append(f"Summary: {annotations.get('summary', 'N/A')}")
+            lines.append(f"Description: {annotations.get('description', 'N/A')}")
+            lines.append(f"Labels: {json.dumps(labels)}")
+            lines.append("")
+        lines.append("=== INSTRUCTIONS ===")
+        lines.append("This is an automated alert from Prometheus via Alertmanager.")
+        lines.append("Investigate the root cause in the backend code and fix it.")
+        lines.append("Check backend/src/ for the relevant handlers and services.")
+        lines.append("Run cargo clippy and cargo test after your fix.")
+        return "\n".join(lines)
+
+    def trigger_workflow(context: str) -> bool:
+        url = (
+            f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
+            f"/actions/workflows/kiro-autofix-runtime.yml/dispatches"
+        )
+        payload = json.dumps({
+            "ref": "main",
+            "inputs": {
+                "error-context": context[:60000],
+                "mode": MODE,
+            },
+        }).encode()
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {GITHUB_TOKEN}",
+                "Accept": "application/vnd.github.v3+json",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return resp.status == 204
+        except urllib.error.HTTPError as e:
+            print(f"GitHub API error: {e.code} {e.read().decode()}", file=sys.stderr)
+            return False
+        except Exception as e:
+            print(f"Request failed: {e}", file=sys.stderr)
+            return False
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            if self.path != "/webhook":
+                self.send_response(404)
+                self.end_headers()
+                return
+
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length)
+            try:
+                data = json.loads(body)
+            except json.JSONDecodeError:
+                self.send_response(400)
+                self.end_headers()
+                return
+
+            alerts = data.get("alerts", [])
+            if not alerts:
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"no alerts")
+                return
+
+            # Fingerprint based on alert names + group key
+            fp_input = data.get("groupKey", "") + "|" + "|".join(
+                a.get("labels", {}).get("alertname", "") for a in alerts
+            )
+            fp = hashlib.sha256(fp_input.encode()).hexdigest()[:16]
+
+            if is_rate_limited():
+                print(f"Rate limited. Skipping {fp}", file=sys.stderr)
+                self.send_response(429)
+                self.end_headers()
+                self.wfile.write(b"rate limited")
+                return
+
+            if is_duplicate(fp):
+                print(f"Duplicate {fp}. Skipping.", file=sys.stderr)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"duplicate")
+                return
+
+            context = build_context(alerts)
+            if trigger_workflow(context):
+                record_trigger(fp)
+                print(f"Triggered workflow for {fp}")
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"triggered")
+            else:
+                self.send_response(502)
+                self.end_headers()
+                self.wfile.write(b"github api failed")
+
+        def do_GET(self):
+            if self.path == "/health":
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"ok")
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+        def log_message(self, format, *args):
+            # Suppress default access logs; only errors go to stderr
+            pass
+
+    if __name__ == "__main__":
+        server = http.server.HTTPServer(("0.0.0.0", PORT), Handler)
+        print(f"GitHub bridge listening on :{PORT}", file=sys.stderr)
+        server.serve_forever()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager-github-bridge
+  namespace: monitoring
+  labels:
+    app: alertmanager-github-bridge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager-github-bridge
+  template:
+    metadata:
+      labels:
+        app: alertmanager-github-bridge
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: bridge
+          image: docker.io/python:3.12-alpine
+          command: ["python", "/app/bridge.py"]
+          ports:
+            - containerPort: 9095
+          env:
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: alertmanager-github
+                  key: token
+            - name: GITHUB_OWNER
+              value: "perezjoseph"
+            - name: GITHUB_REPO
+              value: "Gestion-inmobiliaria"
+            - name: MODE
+              value: "pr"
+            - name: MAX_TRIGGERS_PER_HOUR
+              value: "3"
+            - name: DEDUP_WINDOW_SECS
+              value: "1800"
+          volumeMounts:
+            - name: script
+              mountPath: /app
+              readOnly: true
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+              ephemeral-storage: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+              ephemeral-storage: 32Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 9095
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+      volumes:
+        - name: script
+          configMap:
+            name: github-bridge-script
+            defaultMode: 0444
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-github-bridge
+  namespace: monitoring
+spec:
+  selector:
+    app: alertmanager-github-bridge
+  ports:
+    - port: 9095
+      targetPort: 9095

@@ -96,6 +96,14 @@ spec:
       ports:
         - port: 8443
           protocol: TCP
+    # Allow Cloudflare Tunnel
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cloudflared
+      ports:
+        - port: 8443
+          protocol: TCP
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
