@@ -46,11 +46,13 @@ reqwest = { version = "0.13", default-features = false, features = [
     "stream",
 ] }
 regex = "1"
-rig = { package = "rig-core", version = "0.37", default-features = false, features = ["rustls"] }
+rig = { package = "rig-core", version = "0.37", default-features = false, features = [
+    "rustls",
+] }
 schemars = "1"
 eventsource-stream = "0.2"
 async-stream = "0.3"
-dashmap = "6"
+dashmap = "6.2.1"
 docx-rs = "0.4"
 rand = "0.10"
 base64 = "0.22"

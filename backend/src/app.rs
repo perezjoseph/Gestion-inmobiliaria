@@ -13,6 +13,7 @@ use tracing_actix_web::TracingLogger;
 use crate::config::{AppConfig, SmtpConfig};
 use crate::errors::AppError;
 use crate::routes;
+use crate::services::login_lockout::LoginLockout;
 use crate::services::mail::{MailClient, OutgoingMail, SmtpMailClient};
 use crate::services::ocr_preview::PreviewStore;
 
@@ -154,6 +155,19 @@ pub fn create_app(
         .total_limit(20 * 1024 * 1024)
         .memory_limit(2 * 1024 * 1024);
 
+    // Create login lockout tracker and spawn background cleanup task
+    let lockout = web::Data::new(LoginLockout::new());
+    {
+        let lockout_clone = lockout.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(5 * 60));
+            loop {
+                interval.tick().await;
+                lockout_clone.cleanup();
+            }
+        });
+    }
+
     // Construct the mail client from SMTP env vars (graceful fallback if not configured)
     let mail_client: Arc<dyn MailClient> = match SmtpConfig::from_env() {
         Ok(smtp_cfg) => match SmtpMailClient::from_config(&smtp_cfg) {
@@ -180,6 +194,7 @@ pub fn create_app(
         .app_data(web::Data::new(db))
         .app_data(web::Data::new(config))
         .app_data(preview_store)
+        .app_data(lockout)
         .app_data(web::Data::new(mail_client))
         .app_data(json_cfg)
         .app_data(multipart_cfg)
