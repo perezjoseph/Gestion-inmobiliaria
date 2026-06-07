@@ -128,6 +128,14 @@ pub async fn create<C: ConnectionTrait>(
     let now = Utc::now().into();
     let id = Uuid::new_v4();
 
+    // Save metric labels before fields are moved into the ActiveModel
+    let metric_metodo = input
+        .metodo_pago
+        .as_deref()
+        .unwrap_or("sin_especificar")
+        .to_string();
+    let metric_moneda = input.moneda.as_deref().unwrap_or("DOP").to_string();
+
     let model = pago::ActiveModel {
         id: Set(id),
         contrato_id: Set(input.contrato_id),
@@ -157,10 +165,7 @@ pub async fn create<C: ConnectionTrait>(
 
     // Track payment metric
     crate::metrics::PAGOS_PROCESADOS
-        .with_label_values(&[
-            input.metodo_pago.as_deref().unwrap_or("sin_especificar"),
-            input.moneda.as_deref().unwrap_or("DOP"),
-        ])
+        .with_label_values(&[&metric_metodo, &metric_moneda])
         .inc();
 
     auditoria::registrar_best_effort(
