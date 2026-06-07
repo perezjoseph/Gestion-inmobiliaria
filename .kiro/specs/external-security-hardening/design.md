@@ -360,11 +360,35 @@ struct UserSecurityState {
 
 ## Correctness Properties
 
-1. **Rate limit consistency**: Every external request MUST be attributed to a real client IP. If all trusted headers are absent, the system falls back to peer_addr — never to a default/shared IP that would group unrelated clients.
-2. **Lockout monotonicity**: Once an account is locked, it stays locked for the full 15-minute window. Concurrent requests cannot reset the counter by racing.
-3. **Token invalidity is immediate**: Deactivating a user or changing a password takes effect within the cache TTL (60 seconds max).
-4. **Magic byte validation is non-bypassable**: The check occurs after file data is fully read into memory and before any storage or processing call.
-5. **Body size limits are defense-in-depth**: Both Caddy (25MB) and the backend (20MB multipart, 1MB JSON) enforce limits. The tighter backend limit is the effective one for valid requests; the Caddy limit catches malformed/oversized payloads before they consume backend resources.
+### Property 1: Rate Limit IP Attribution
+
+Every external request MUST be attributed to a real client IP. If all trusted headers are absent, the system falls back to peer_addr — never to a default/shared IP that would group unrelated clients.
+
+**Validates: Requirements 1.1, 1.2, 1.3, 1.4**
+
+### Property 2: Lockout Monotonicity
+
+Once an account is locked, it stays locked for the full 15-minute window. Concurrent requests cannot reset the counter by racing.
+
+**Validates: Requirements 2.2, 2.3**
+
+### Property 3: Token Invalidity Propagation
+
+Deactivating a user or changing a password takes effect within the cache TTL (60 seconds max). No token issued before the security event can be used after the cache refreshes.
+
+**Validates: Requirements 8.3, 8.4**
+
+### Property 4: Magic Byte Non-Bypassability
+
+The magic byte check occurs after file data is fully read into memory and before any storage or processing call. No code path can skip the validation.
+
+**Validates: Requirements 4.1, 4.3**
+
+### Property 5: Defense-in-Depth Body Limits
+
+Both Caddy (25MB) and the backend (20MB multipart, 1MB JSON) enforce limits. The tighter backend limit is the effective one for valid requests; the Caddy limit catches malformed/oversized payloads before they consume backend resources.
+
+**Validates: Requirements 5.1, 5.2**
 
 ## Error Handling
 

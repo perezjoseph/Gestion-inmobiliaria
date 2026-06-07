@@ -339,7 +339,7 @@ spec:
             - name: GITHUB_REPO
               value: "Gestion-inmobiliaria"
             - name: MODE
-              value: "pr"
+              value: "yolo"
             - name: MAX_TRIGGERS_PER_HOUR
               value: "3"
             - name: DEDUP_WINDOW_SECS
