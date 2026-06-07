@@ -48,7 +48,7 @@ This plan addresses 9 external attack vectors identified during a security audit
     - Match the base Caddyfile security headers
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 5.1, 5.2_
 
-- [~] 4. Checkpoint — verify rate limiter, lockout, and Caddy changes compile/work
+- [x] 4. Checkpoint — verify rate limiter, lockout, and Caddy changes compile/work
   - Build backend with `cargo check`
   - Run rate_limit and login_lockout unit tests
   - Verify Caddyfile syntax is valid (caddy fmt or caddy validate)
