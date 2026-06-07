@@ -1,0 +1,609 @@
+{
+    "annotations": {
+        "list": [
+            {
+                "builtIn": 1,
+                "datasource": {
+                    "type": "grafana",
+                    "uid": "-- Grafana --"
+                },
+                "enable": true,
+                "hide": true,
+                "iconColor": "rgba(0, 211, 255, 1)",
+                "name": "Annotations & Alerts",
+                "type": "dashboard"
+            }
+        ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "id": null,
+    "links": [],
+    "panels": [
+        {
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            },
+            "id": 1,
+            "title": "Service Level Objectives",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "description": "Percentage of requests returning non-5xx status in the selected window. SLO target: 99.5%",
+            "fieldConfig": {
+                "defaults": {
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 99
+                            },
+                            {
+                                "color": "green",
+                                "value": 99.5
+                            }
+                        ]
+                    },
+                    "min": 95,
+                    "max": 100,
+                    "unit": "percent",
+                    "decimals": 3
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 8,
+                "x": 0,
+                "y": 1
+            },
+            "id": 2,
+            "options": {
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showThresholdLabels": true,
+                "showThresholdMarkers": true
+            },
+            "title": "Availability SLO (Target: 99.5%)",
+            "type": "gauge",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "(1 - (sum(increase(api_http_requests_total{job=\"backend\", environment=\"$environment\", status=~\"5..\"}[$__range])) / sum(increase(api_http_requests_total{job=\"backend\", environment=\"$environment\"}[$__range])))) * 100",
+                    "legendFormat": "Availability",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "description": "Percentage of requests completing within 500ms. SLO target: 95%",
+            "fieldConfig": {
+                "defaults": {
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 90
+                            },
+                            {
+                                "color": "green",
+                                "value": 95
+                            }
+                        ]
+                    },
+                    "min": 80,
+                    "max": 100,
+                    "unit": "percent",
+                    "decimals": 2
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 8,
+                "x": 8,
+                "y": 1
+            },
+            "id": 3,
+            "options": {
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showThresholdLabels": true,
+                "showThresholdMarkers": true
+            },
+            "title": "Latency SLO (Target: 95% < 500ms)",
+            "type": "gauge",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "sum(increase(api_http_requests_duration_seconds_bucket{job=\"backend\", environment=\"$environment\", le=\"0.5\"}[$__range])) / sum(increase(api_http_requests_duration_seconds_count{job=\"backend\", environment=\"$environment\"}[$__range])) * 100",
+                    "legendFormat": "Latency SLO",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "description": "Remaining error budget for the availability SLO (0.5% of total requests allowed to fail)",
+            "fieldConfig": {
+                "defaults": {
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 25
+                            },
+                            {
+                                "color": "green",
+                                "value": 50
+                            }
+                        ]
+                    },
+                    "min": 0,
+                    "max": 100,
+                    "unit": "percent",
+                    "decimals": 1
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 8,
+                "x": 16,
+                "y": 1
+            },
+            "id": 4,
+            "options": {
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showThresholdLabels": true,
+                "showThresholdMarkers": true
+            },
+            "title": "Error Budget Remaining",
+            "type": "gauge",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "clamp_min((1 - (sum(increase(api_http_requests_total{job=\"backend\", environment=\"$environment\", status=~\"5..\"}[$__range])) / (sum(increase(api_http_requests_total{job=\"backend\", environment=\"$environment\"}[$__range])) * 0.005))) * 100, 0)",
+                    "legendFormat": "Budget remaining",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 7
+            },
+            "id": 5,
+            "title": "Burn Rate",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "description": "Error budget burn rate. A value of 1 means budget is being consumed at exactly the rate allowed. >1 means burning faster than sustainable.",
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "drawStyle": "line",
+                        "fillOpacity": 10,
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "thresholdsStyle": {
+                            "mode": "line+area"
+                        }
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "transparent",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 14.4
+                            }
+                        ]
+                    },
+                    "unit": "short",
+                    "decimals": 2
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 8
+            },
+            "id": 6,
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom"
+                },
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                }
+            },
+            "title": "Availability Burn Rate (1h window)",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "(sum(rate(api_http_requests_total{job=\"backend\", environment=\"$environment\", status=~\"5..\"}[1h])) / sum(rate(api_http_requests_total{job=\"backend\", environment=\"$environment\"}[1h]))) / 0.005",
+                    "legendFormat": "1h burn rate",
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "(sum(rate(api_http_requests_total{job=\"backend\", environment=\"$environment\", status=~\"5..\"}[6h])) / sum(rate(api_http_requests_total{job=\"backend\", environment=\"$environment\"}[6h]))) / 0.005",
+                    "legendFormat": "6h burn rate",
+                    "refId": "B"
+                }
+            ]
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "description": "Latency budget burn rate. Ratio of requests exceeding 500ms vs. the 5% budget allowed.",
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "drawStyle": "line",
+                        "fillOpacity": 10,
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "thresholdsStyle": {
+                            "mode": "line+area"
+                        }
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "transparent",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 14.4
+                            }
+                        ]
+                    },
+                    "unit": "short",
+                    "decimals": 2
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 8
+            },
+            "id": 7,
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom"
+                },
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                }
+            },
+            "title": "Latency Burn Rate (1h window)",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "(1 - (sum(rate(api_http_requests_duration_seconds_bucket{job=\"backend\", environment=\"$environment\", le=\"0.5\"}[1h])) / sum(rate(api_http_requests_duration_seconds_count{job=\"backend\", environment=\"$environment\"}[1h])))) / 0.05",
+                    "legendFormat": "1h burn rate",
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "(1 - (sum(rate(api_http_requests_duration_seconds_bucket{job=\"backend\", environment=\"$environment\", le=\"0.5\"}[6h])) / sum(rate(api_http_requests_duration_seconds_count{job=\"backend\", environment=\"$environment\"}[6h])))) / 0.05",
+                    "legendFormat": "6h burn rate",
+                    "refId": "B"
+                }
+            ]
+        },
+        {
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 16
+            },
+            "id": 8,
+            "title": "SLO Trend",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "drawStyle": "line",
+                        "fillOpacity": 5,
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "thresholdsStyle": {
+                            "mode": "line"
+                        }
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "green",
+                                "value": 99.5
+                            }
+                        ]
+                    },
+                    "unit": "percent",
+                    "decimals": 3,
+                    "min": 98
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 17
+            },
+            "id": 9,
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom"
+                },
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                }
+            },
+            "title": "Availability Over Time (rolling 1h)",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "(1 - (sum(rate(api_http_requests_total{job=\"backend\", environment=\"$environment\", status=~\"5..\"}[1h])) / sum(rate(api_http_requests_total{job=\"backend\", environment=\"$environment\"}[1h])))) * 100",
+                    "legendFormat": "Availability %",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "drawStyle": "line",
+                        "fillOpacity": 5,
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "thresholdsStyle": {
+                            "mode": "line"
+                        }
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "green",
+                                "value": 95
+                            }
+                        ]
+                    },
+                    "unit": "percent",
+                    "decimals": 2,
+                    "min": 80
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 17
+            },
+            "id": 10,
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom"
+                },
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                }
+            },
+            "title": "Latency SLO Over Time (rolling 1h, % < 500ms)",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "sum(rate(api_http_requests_duration_seconds_bucket{job=\"backend\", environment=\"$environment\", le=\"0.5\"}[1h])) / sum(rate(api_http_requests_duration_seconds_count{job=\"backend\", environment=\"$environment\"}[1h])) * 100",
+                    "legendFormat": "% requests < 500ms",
+                    "refId": "A"
+                }
+            ]
+        }
+    ],
+    "refresh": "1m",
+    "schemaVersion": 39,
+    "tags": [
+        "slo",
+        "backend",
+        "reliability"
+    ],
+    "templating": {
+        "list": [
+            {
+                "current": {},
+                "hide": 0,
+                "includeAll": false,
+                "label": "Datasource",
+                "multi": false,
+                "name": "datasource",
+                "options": [],
+                "query": "prometheus",
+                "queryValue": "",
+                "refresh": 1,
+                "regex": "",
+                "skipUrlSync": false,
+                "type": "datasource"
+            },
+            {
+                "current": {
+                    "selected": true,
+                    "text": "production",
+                    "value": "production"
+                },
+                "hide": 0,
+                "includeAll": false,
+                "label": "Environment",
+                "multi": false,
+                "name": "environment",
+                "options": [
+                    {
+                        "selected": true,
+                        "text": "production",
+                        "value": "production"
+                    },
+                    {
+                        "selected": false,
+                        "text": "development",
+                        "value": "development"
+                    }
+                ],
+                "query": "production,development",
+                "queryValue": "",
+                "skipUrlSync": false,
+                "type": "custom"
+            }
+        ]
+    },
+    "time": {
+        "from": "now-7d",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "Service Level Objectives",
+    "uid": "slo-dashboard",
+    "version": 1,
+    "weekStart": ""
+}

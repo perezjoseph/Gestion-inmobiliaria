@@ -21,7 +21,10 @@
             "type": "row"
         },
         {
-            "datasource": null,
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
             "fieldConfig": {
                 "defaults": {
                     "color": {
@@ -73,7 +76,10 @@
             "type": "timeseries"
         },
         {
-            "datasource": null,
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
             "fieldConfig": {
                 "defaults": {
                     "color": {
@@ -120,7 +126,10 @@
             "type": "timeseries"
         },
         {
-            "datasource": null,
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
             "fieldConfig": {
                 "defaults": {
                     "color": {
@@ -167,7 +176,10 @@
             "type": "timeseries"
         },
         {
-            "datasource": null,
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
             "fieldConfig": {
                 "defaults": {
                     "color": {
@@ -211,7 +223,7 @@
             },
             "targets": [
                 {
-                    "expr": "vllm:gpu_cache_usage_perc{job=\"vllm\"}",
+                    "expr": "vllm:kv_cache_usage_perc{job=\"vllm\"}",
                     "legendFormat": "GPU KV Cache",
                     "refId": "A"
                 }
@@ -220,7 +232,10 @@
             "type": "gauge"
         },
         {
-            "datasource": null,
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
             "fieldConfig": {
                 "defaults": {
                     "color": {
@@ -267,7 +282,10 @@
             "type": "timeseries"
         },
         {
-            "datasource": null,
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
             "fieldConfig": {
                 "defaults": {
                     "color": {
@@ -314,7 +332,10 @@
             "type": "timeseries"
         },
         {
-            "datasource": null,
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
             "fieldConfig": {
                 "defaults": {
                     "color": {
@@ -354,223 +375,43 @@
             ],
             "title": "Completed Requests (by reason)",
             "type": "timeseries"
-        },
-        {
-            "collapsed": false,
-            "gridPos": {
-                "h": 1,
-                "w": 24,
-                "x": 0,
-                "y": 25
-            },
-            "id": 101,
-            "title": "OVMS - Request Metrics",
-            "type": "row"
-        },
-        {
-            "datasource": null,
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "drawStyle": "line",
-                        "lineWidth": 1,
-                        "fillOpacity": 10,
-                        "spanNulls": false
-                    },
-                    "unit": "short"
-                }
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 0,
-                "y": 26
-            },
-            "id": 8,
-            "options": {
-                "legend": {
-                    "displayMode": "list",
-                    "placement": "bottom"
-                },
-                "tooltip": {
-                    "mode": "multi"
-                }
-            },
-            "targets": [
-                {
-                    "expr": "sum(rate(ovms_requests_success{job=\"ovms\"}[5m]))",
-                    "legendFormat": "Success/s",
-                    "refId": "A"
-                },
-                {
-                    "expr": "sum(rate(ovms_requests_fail{job=\"ovms\"}[5m]))",
-                    "legendFormat": "Fail/s",
-                    "refId": "B"
-                }
-            ],
-            "title": "OVMS Request Rate",
-            "type": "timeseries"
-        },
-        {
-            "datasource": null,
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "drawStyle": "line",
-                        "lineWidth": 1,
-                        "fillOpacity": 10,
-                        "spanNulls": false
-                    },
-                    "unit": "s"
-                }
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 12,
-                "y": 26
-            },
-            "id": 9,
-            "options": {
-                "legend": {
-                    "displayMode": "list",
-                    "placement": "bottom"
-                },
-                "tooltip": {
-                    "mode": "multi"
-                }
-            },
-            "targets": [
-                {
-                    "expr": "histogram_quantile(0.5, sum(rate(ovms_request_time_us_bucket{job=\"ovms\"}[5m])) by (le)) / 1e6",
-                    "legendFormat": "p50",
-                    "refId": "A"
-                },
-                {
-                    "expr": "histogram_quantile(0.95, sum(rate(ovms_request_time_us_bucket{job=\"ovms\"}[5m])) by (le)) / 1e6",
-                    "legendFormat": "p95",
-                    "refId": "B"
-                },
-                {
-                    "expr": "histogram_quantile(0.99, sum(rate(ovms_request_time_us_bucket{job=\"ovms\"}[5m])) by (le)) / 1e6",
-                    "legendFormat": "p99",
-                    "refId": "C"
-                }
-            ],
-            "title": "OVMS Request Latency",
-            "type": "timeseries"
-        },
-        {
-            "datasource": null,
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "drawStyle": "line",
-                        "lineWidth": 1,
-                        "fillOpacity": 10,
-                        "spanNulls": false
-                    },
-                    "unit": "short"
-                }
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 0,
-                "y": 34
-            },
-            "id": 10,
-            "options": {
-                "legend": {
-                    "displayMode": "list",
-                    "placement": "bottom"
-                },
-                "tooltip": {
-                    "mode": "multi"
-                }
-            },
-            "targets": [
-                {
-                    "expr": "ovms_current_requests{job=\"ovms\"}",
-                    "legendFormat": "Current Requests",
-                    "refId": "A"
-                }
-            ],
-            "title": "OVMS Current Requests",
-            "type": "timeseries"
-        },
-        {
-            "datasource": null,
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "drawStyle": "line",
-                        "lineWidth": 1,
-                        "fillOpacity": 10,
-                        "spanNulls": false
-                    },
-                    "unit": "s"
-                }
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 12,
-                "y": 34
-            },
-            "id": 11,
-            "options": {
-                "legend": {
-                    "displayMode": "list",
-                    "placement": "bottom"
-                },
-                "tooltip": {
-                    "mode": "multi"
-                }
-            },
-            "targets": [
-                {
-                    "expr": "histogram_quantile(0.5, sum(rate(ovms_inference_time_us_bucket{job=\"ovms\"}[5m])) by (le)) / 1e6",
-                    "legendFormat": "p50",
-                    "refId": "A"
-                },
-                {
-                    "expr": "histogram_quantile(0.95, sum(rate(ovms_inference_time_us_bucket{job=\"ovms\"}[5m])) by (le)) / 1e6",
-                    "legendFormat": "p95",
-                    "refId": "B"
-                }
-            ],
-            "title": "OVMS Inference Time",
-            "type": "timeseries"
         }
     ],
     "schemaVersion": 36,
     "style": "dark",
     "tags": [
         "vllm",
-        "ovms",
         "inference"
     ],
     "templating": {
-        "list": []
+        "list": [
+            {
+                "current": {
+                    "selected": true,
+                    "text": "Prometheus",
+                    "value": "Prometheus"
+                },
+                "hide": 0,
+                "includeAll": false,
+                "label": "Datasource",
+                "multi": false,
+                "name": "datasource",
+                "options": [],
+                "query": "prometheus",
+                "queryValue": "",
+                "refresh": 1,
+                "regex": "",
+                "skipUrlSync": false,
+                "type": "datasource"
+            }
+        ]
     },
     "time": {
         "from": "now-1h",
         "to": "now"
     },
-    "title": "LLM Inference (vLLM + OVMS)",
+    "refresh": "30s",
+    "title": "vLLM Inference",
     "uid": "llm-inference",
     "version": 1
 }

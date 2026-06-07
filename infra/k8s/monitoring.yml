@@ -28,7 +28,7 @@ data:
         scheme: http
         metrics_path: "/metrics"
         static_configs:
-          - targets: ["xpumanager.default.svc.cluster.local:29999"]
+          - targets: ["xpumanager.default.svc.cluster.local:9273"]
             labels:
               node: "inference"
 
@@ -157,6 +157,15 @@ data:
         url: http://prometheus.monitoring.svc.cluster.local:9090
         isDefault: true
         editable: true
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki.monitoring.svc.cluster.local:3100
+        isDefault: false
+        editable: true
+        jsonData:
+          timeout: 60
+          maxLines: 1000
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -167,14 +176,23 @@ data:
   dashboards.yaml: |
     apiVersion: 1
     providers:
-      - name: 'default'
+      - name: 'infrastructure'
         orgId: 1
         folder: 'Infrastructure'
         type: file
         disableDeletion: false
         editable: true
         options:
-          path: /var/lib/grafana/dashboards
+          path: /var/lib/grafana/dashboards/infrastructure
+          foldersFromFilesStructure: false
+      - name: 'application'
+        orgId: 1
+        folder: 'Application'
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/application
           foldersFromFilesStructure: false
 ---
 # Grafana deployment
@@ -195,7 +213,7 @@ spec:
     spec:
       containers:
         - name: grafana
-          image: docker.io/grafana/grafana:11.6.0
+          image: docker.io/grafana/grafana:11.6.14
           env:
             - name: GF_SECURITY_ADMIN_PASSWORD
               valueFrom:
@@ -206,6 +224,10 @@ spec:
               value: "admin"
             - name: GF_PATHS_DATA
               value: "/var/lib/grafana/data"
+            - name: GF_INSTALL_PLUGINS
+              value: "grafana-lokiexplore-app"
+            - name: GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS
+              value: "grafana-lokiexplore-app"
           ports:
             - containerPort: 3000
           volumeMounts:
@@ -213,15 +235,26 @@ spec:
               mountPath: /etc/grafana/provisioning/datasources
             - name: dashboard-providers
               mountPath: /etc/grafana/provisioning/dashboards
+            # Infrastructure dashboards
             - name: dashboard-xpum
-              mountPath: /var/lib/grafana/dashboards/xpum-dashboard.json
+              mountPath: /var/lib/grafana/dashboards/infrastructure/xpum-dashboard.json
               subPath: xpum-dashboard.json
             - name: dashboard-node
-              mountPath: /var/lib/grafana/dashboards/node-exporter-dashboard.json
+              mountPath: /var/lib/grafana/dashboards/infrastructure/node-exporter-dashboard.json
               subPath: node-exporter-dashboard.json
             - name: dashboard-vllm
-              mountPath: /var/lib/grafana/dashboards/vllm-dashboard.json
+              mountPath: /var/lib/grafana/dashboards/infrastructure/vllm-dashboard.json
               subPath: vllm-dashboard.json
+            - name: dashboard-logs
+              mountPath: /var/lib/grafana/dashboards/infrastructure/logs-dashboard.json
+              subPath: logs-dashboard.json
+            # Application dashboards
+            - name: dashboard-backend-api
+              mountPath: /var/lib/grafana/dashboards/application/backend-api-dashboard.json
+              subPath: backend-api-dashboard.json
+            - name: dashboard-slo
+              mountPath: /var/lib/grafana/dashboards/application/slo-dashboard.json
+              subPath: slo-dashboard.json
             - name: grafana-data
               mountPath: /var/lib/grafana/data
           resources:
@@ -247,6 +280,15 @@ spec:
         - name: dashboard-vllm
           configMap:
             name: grafana-dashboard-vllm
+        - name: dashboard-logs
+          configMap:
+            name: grafana-dashboard-logs
+        - name: dashboard-backend-api
+          configMap:
+            name: grafana-dashboard-backend-api
+        - name: dashboard-slo
+          configMap:
+            name: grafana-dashboard-slo
         - name: grafana-data
           persistentVolumeClaim:
             claimName: grafana-pvc

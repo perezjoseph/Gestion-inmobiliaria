@@ -15,71 +15,36 @@ spec:
         app: xpumanager
     spec:
       automountServiceAccountToken: false
+      hostPID: true
       nodeSelector:
         kubernetes.io/hostname: inference
       containers:
-        # xpumd daemon: collects GPU telemetry via Level Zero
-        - name: xpumd
-          image: intel/xpumanager:v1.2.27
-          command: ["/usr/bin/xpumd"]
-          env:
-            - name: SPDLOG_LEVEL
-              value: info
-            - name: XPUM_METRICS
-              value: "0-38"
-          securityContext:
-            privileged: true
-          volumeMounts:
-            - name: devdri
-              mountPath: /dev/dri
-            - name: sockdir
-              mountPath: /tmp
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-              ephemeral-storage: 32Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
-              ephemeral-storage: 128Mi
-        # Python exporter: exposes Prometheus /metrics via gunicorn
-        - name: exporter
-          image: intel/xpumanager:v1.2.27
-          workingDir: /usr/lib/xpum/rest
-          command:
-            - gunicorn
-            - --bind
-            - "0.0.0.0:29999"
-            - --worker-connections
-            - "64"
-            - --worker-class
-            - gthread
-            - --workers
-            - "1"
-            - --threads
-            - "4"
-            - "xpum_rest_main:main()"
-          env:
-            - name: XPUM_EXPORTER_NO_AUTH
-              value: "1"
-            - name: XPUM_EXPORTER_ONLY
-              value: "1"
-            - name: XPUM_REST_NO_TLS
-              value: "1"
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
+        - name: qmmd
+          image: intel/metrics-manager:2026.1.0-rc2
+          command: ["sh", "-c"]
+          args:
+            - |
+              if command -v qmmd >/dev/null 2>&1; then
+                exec qmmd -d 0000:04:00.0 -p 9273 -i 0.0.0.0
+              else
+                # Fallback: patch supervisord to pass device to qmassa, then start
+                sed -i 's|command=qmassa|command=qmassa -d 0000:04:00.0|' /etc/supervisor/supervisord.conf
+                exec /usr/local/bin/supervisord -c /etc/supervisor/supervisord.conf
+              fi
           ports:
-            - containerPort: 29999
+            - containerPort: 9273
               name: metrics
           volumeMounts:
-            - name: sockdir
-              mountPath: /tmp
+            - name: sys
+              mountPath: /sys
+              readOnly: true
+            - name: run
+              mountPath: /run
+              readOnly: true
             - name: devdri
               mountPath: /dev/dri
-              readOnly: true
+          securityContext:
+            privileged: true
           resources:
             requests:
               cpu: 50m
@@ -92,30 +57,33 @@ spec:
           startupProbe:
             httpGet:
               path: /metrics
-              port: 29999
+              port: 9273
             failureThreshold: 12
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /healtz
-              port: 29999
+              path: /metrics
+              port: 9273
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /healtz
-              port: 29999
+              path: /metrics
+              port: 9273
             periodSeconds: 15
             timeoutSeconds: 5
             failureThreshold: 3
       volumes:
+        - name: sys
+          hostPath:
+            path: /sys
+        - name: run
+          hostPath:
+            path: /run
         - name: devdri
           hostPath:
             path: /dev/dri
-        - name: sockdir
-          emptyDir:
-            medium: Memory
 ---
 apiVersion: v1
 kind: Service
@@ -127,8 +95,8 @@ spec:
     app: xpumanager
   type: ClusterIP
   ports:
-    - port: 29999
-      targetPort: 29999
+    - port: 9273
+      targetPort: 9273
       name: metrics
 ---
 # Expose via Traefik at xpumanager.local
@@ -145,4 +113,4 @@ spec:
       kind: Rule
       services:
         - name: xpumanager
-          port: 29999
+          port: 9273

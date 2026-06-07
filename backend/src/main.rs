@@ -17,6 +17,9 @@ async fn main() -> std::io::Result<()> {
         .with_env_filter(EnvFilter::from_default_env())
         .init();
 
+    // Register all custom Prometheus metrics eagerly so they appear in /metrics from boot.
+    realestate_backend::metrics::init();
+
     let config = AppConfig::from_env().expect("Error cargando configuración");
 
     let db = Database::connect(config.connect_options())

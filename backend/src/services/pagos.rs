@@ -155,6 +155,14 @@ pub async fn create<C: ConnectionTrait>(
 
     let record = model.insert(db).await?;
 
+    // Track payment metric
+    crate::metrics::PAGOS_PROCESADOS
+        .with_label_values(&[
+            input.metodo_pago.as_deref().unwrap_or("sin_especificar"),
+            input.moneda.as_deref().unwrap_or("DOP"),
+        ])
+        .inc();
+
     auditoria::registrar_best_effort(
         db,
         CreateAuditoriaEntry {

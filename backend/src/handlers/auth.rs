@@ -41,6 +41,9 @@ pub async fn login(
             retry_after_seconds = info.retry_after_seconds,
             "Login attempt blocked — account locked"
         );
+        crate::metrics::AUTH_LOGIN_ATTEMPTS
+            .with_label_values(&["locked"])
+            .inc();
         return Ok(HttpResponse::TooManyRequests().json(serde_json::json!({
             "error": "account_locked",
             "retry_after_seconds": info.retry_after_seconds
@@ -50,11 +53,17 @@ pub async fn login(
     match auth::login(db.get_ref(), input, &config.jwt_secret).await {
         Ok(response) => {
             lockout.record_success(&email);
+            crate::metrics::AUTH_LOGIN_ATTEMPTS
+                .with_label_values(&["success"])
+                .inc();
             tracing::info!(user_id = %response.user.id, "Successful login");
             Ok(HttpResponse::Ok().json(response))
         }
         Err(e) => {
             let lockout_info = lockout.record_failure(&email);
+            crate::metrics::AUTH_LOGIN_ATTEMPTS
+                .with_label_values(&["failed"])
+                .inc();
 
             tracing::warn!(
                 event = "login_failed",

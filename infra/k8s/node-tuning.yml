@@ -1,0 +1,60 @@
+# Node tuning DaemonSet — applies sysctl settings on all nodes at boot.
+# Fixes: "failed to create fsnotify watcher: too many open files"
+# Caused by Alloy (log collector) exhausting default inotify limits.
+#
+# Apply: kubectl apply -f infra/k8s/node-tuning.yml
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-tuning
+  namespace: kube-system
+  labels:
+    app: node-tuning
+spec:
+  selector:
+    matchLabels:
+      app: node-tuning
+  template:
+    metadata:
+      labels:
+        app: node-tuning
+    spec:
+      # hostPID required to apply sysctl on the host kernel
+      hostPID: true # nosec: needed to tune host kernel parameters
+      automountServiceAccountToken: false
+      tolerations:
+        - operator: Exists
+      initContainers:
+        - name: sysctl
+          image: docker.io/library/busybox:1.37
+          # privileged required for sysctl -w on host
+          securityContext:
+            privileged: true # nosec: required for host sysctl tuning
+          command:
+            - sh
+            - -c
+            - |
+              sysctl -w fs.inotify.max_user_watches=524288
+              sysctl -w fs.inotify.max_user_instances=1024
+          resources:
+            requests:
+              cpu: 1m
+              memory: 4Mi
+              ephemeral-storage: 1Mi
+            limits:
+              cpu: 10m
+              memory: 8Mi
+              ephemeral-storage: 1Mi
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.10
+          resources:
+            requests:
+              cpu: 1m
+              memory: 4Mi
+              ephemeral-storage: 1Mi
+            limits:
+              cpu: 1m
+              memory: 4Mi
+              ephemeral-storage: 1Mi

@@ -120,3 +120,91 @@ data:
               severity: warning
             annotations:
               summary: "No successful backup in 36 hours"
+
+      - name: slo
+        rules:
+          # Multi-window burn rate alerts (Google SRE approach)
+          # SLO: 99.5% availability over 7 days → error budget = 0.5%
+          # 14.4x burn rate over 1h = exhausts 7-day budget in 6h (page immediately)
+          - alert: SLOAvailabilityBurnRateCritical
+            expr: |
+              (
+                sum(rate(api_http_requests_total{job="backend", environment="production", status=~"5.."}[1h]))
+                / sum(rate(api_http_requests_total{job="backend", environment="production"}[1h]))
+              ) > (14.4 * 0.005)
+              and
+              (
+                sum(rate(api_http_requests_total{job="backend", environment="production", status=~"5.."}[5m]))
+                / sum(rate(api_http_requests_total{job="backend", environment="production"}[5m]))
+              ) > (14.4 * 0.005)
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Availability SLO burn rate critical (14.4x over 1h)"
+              description: "Error budget will be exhausted in ~6 hours at this rate"
+
+          # 6x burn rate over 6h = exhausts budget in ~28h (ticket)
+          - alert: SLOAvailabilityBurnRateHigh
+            expr: |
+              (
+                sum(rate(api_http_requests_total{job="backend", environment="production", status=~"5.."}[6h]))
+                / sum(rate(api_http_requests_total{job="backend", environment="production"}[6h]))
+              ) > (6 * 0.005)
+              and
+              (
+                sum(rate(api_http_requests_total{job="backend", environment="production", status=~"5.."}[30m]))
+                / sum(rate(api_http_requests_total{job="backend", environment="production"}[30m]))
+              ) > (6 * 0.005)
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Availability SLO burn rate elevated (6x over 6h)"
+              description: "Error budget will be exhausted in ~28 hours at this rate"
+
+          # Latency SLO: 95% of requests < 500ms
+          - alert: SLOLatencyBurnRateCritical
+            expr: |
+              (
+                1 - (
+                  sum(rate(api_http_requests_duration_seconds_bucket{job="backend", environment="production", le="0.5"}[1h]))
+                  / sum(rate(api_http_requests_duration_seconds_count{job="backend", environment="production"}[1h]))
+                )
+              ) > (14.4 * 0.05)
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Latency SLO burn rate critical (14.4x over 1h)"
+              description: "Too many requests exceeding 500ms threshold"
+
+      - name: business
+        rules:
+          - alert: HighOverduePayments
+            expr: |
+              pagos_atrasados > 30
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "{{ $value }} overdue payments — above threshold (30)"
+
+          - alert: AIInferenceDown
+            expr: |
+              sum(rate(ai_requests_total{result="error"}[10m]))
+              / sum(rate(ai_requests_total[10m])) > 0.5
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "AI chatbot error rate > 50% for 5 minutes"
+
+          - alert: LoginBruteForce
+            expr: |
+              sum(rate(auth_login_attempts_total{result="locked"}[5m])) > 0.1
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Account lockouts detected — possible brute force"

@@ -61,8 +61,25 @@ flowchart LR
 ```
 k8s/
 ├── namespace.yml              # realestate namespace
+├── monitoring.yml             # Prometheus + Grafana + Node Exporter
+├── alerts.yml                 # Prometheus alerting rules
+├── alertmanager.yml           # Alertmanager + GitHub webhook bridge
+├── logging.yml                # Loki + Alloy log collection
+├── xpumanager.yml             # Intel GPU metrics
 ├── mdns-publisher.yml         # mDNS responder for gestion.local
-├── traefik-config.yml         # Traefik middleware and config
+├── traefik-config.yml         # Traefik middleware and config (pins version)
+├── node-tuning.yml            # DaemonSet: sysctl inotify limits for Alloy
+├── cleanup-orphaned-ingress.sh # One-time script: remove stale IngressRoutes
+├── dashboards/
+│   ├── README.md              # Dashboard management instructions
+│   ├── infrastructure/        # Grafana "Infrastructure" folder
+│   │   ├── grafana-xpum-dashboard.json
+│   │   ├── grafana-node-exporter-dashboard.json
+│   │   ├── grafana-vllm-dashboard.json
+│   │   └── grafana-logs-dashboard.json
+│   └── application/           # Grafana "Application" folder
+│       ├── grafana-backend-api-dashboard.json
+│       └── grafana-slo-dashboard.json
 ├── app/
 │   ├── kustomization.yml      # kustomize entry point
 │   ├── secret.yml             # secret templates (DO NOT commit real values)
