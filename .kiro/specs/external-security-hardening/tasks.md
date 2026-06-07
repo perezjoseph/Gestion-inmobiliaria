@@ -41,8 +41,8 @@ This plan addresses 9 external attack vectors identified during a security audit
     - Ensure attempted password is NOT logged
     - _Requirements: 9.1, 9.2, 9.3_
 
-- [ ] 3. Add security headers and body size limits to production Caddyfile
-  - [~] 3.1 Update `infra/k8s/app/overlays/prod/Caddyfile`
+- [x] 3. Add security headers and body size limits to production Caddyfile
+  - [x] 3.1 Update `infra/k8s/app/overlays/prod/Caddyfile`
     - Add global `header` block with: HSTS, X-Content-Type-Options, X-Frame-Options DENY, Referrer-Policy, Permissions-Policy, CSP (with wasm-unsafe-eval for Yew), X-XSS-Protection 0, -Server
     - Add `request_body { max_size 25MB }` to `/api/*` and `/uploads/*` handlers
     - Match the base Caddyfile security headers
