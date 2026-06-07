@@ -24,7 +24,6 @@ pub struct PersonaUpdate {
     pub language: Option<String>,
     pub tone: Option<String>,
     pub greeting: Option<String>,
-    pub system_prompt: Option<String>,
 }
 
 #[component]
@@ -32,12 +31,10 @@ pub fn PersonaStep(props: &PersonaStepProps) -> Html {
     let initial_name = props.config.display_name.clone().unwrap_or_default();
     let initial_tone = props.config.tone.clone().unwrap_or_default();
     let initial_greeting = props.config.greeting.clone().unwrap_or_default();
-    let initial_prompt = props.config.system_prompt.clone().unwrap_or_default();
 
     let display_name = use_state(|| initial_name);
     let tone = use_state(|| initial_tone);
     let greeting = use_state(|| initial_greeting);
-    let system_prompt = use_state(|| initial_prompt);
     let dirty = use_state(|| false);
 
     let mark_dirty = {
@@ -75,22 +72,11 @@ pub fn PersonaStep(props: &PersonaStepProps) -> Html {
         })
     };
 
-    let on_prompt_input = {
-        let system_prompt = system_prompt.clone();
-        let mark_dirty = mark_dirty.clone();
-        Callback::from(move |e: InputEvent| {
-            let el: web_sys::HtmlTextAreaElement = e.target_unchecked_into();
-            system_prompt.set(el.value());
-            mark_dirty();
-        })
-    };
-
     let on_save = {
         let on_change = props.on_change.clone();
         let display_name = display_name.clone();
         let tone = tone.clone();
         let greeting = greeting.clone();
-        let system_prompt = system_prompt.clone();
         let dirty = dirty.clone();
         Callback::from(move |_: MouseEvent| {
             on_change.emit(PersonaUpdate {
@@ -98,7 +84,6 @@ pub fn PersonaStep(props: &PersonaStepProps) -> Html {
                 language: None,
                 tone: Some((*tone).clone()),
                 greeting: Some((*greeting).clone()),
-                system_prompt: Some((*system_prompt).clone()),
             });
             dirty.set(false);
         })
@@ -184,21 +169,6 @@ pub fn PersonaStep(props: &PersonaStepProps) -> Html {
                         placeholder="Mensaje de bienvenida para nuevos contactos"
                         value={(*greeting).clone()}
                         oninput={on_greeting_input}
-                    />
-                </div>
-
-                <div>
-                    <label for="persona-prompt" class="gi-label">
-                        {"Instrucciones adicionales (opcional)"}
-                    </label>
-                    <textarea
-                        id="persona-prompt"
-                        class="gi-input"
-                        rows="4"
-                        maxlength="2000"
-                        placeholder="Ej: Evite dar cifras exactas sin verificar. Use RD$ para montos en pesos."
-                        value={(*system_prompt).clone()}
-                        oninput={on_prompt_input}
                     />
                 </div>
 

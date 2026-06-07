@@ -1,11 +1,13 @@
-use crate::services::api::{BASE_URL, api_get, api_post, api_put};
+use crate::services::api::{BASE_URL, api_delete, api_get, api_post, api_put};
 use crate::types::chatbot::{
-    ChatbotConfigResponse, ChatbotConfigUpdateRequest, ConnectionStatusResponse,
-    ConversationListItem, ReceiptConfirmRequest, ReceiptExtractionResponse, ReceiptRejectRequest,
-    TestChatRequest, TestChatResponse,
+    BatchUpdateRequest, ChatbotConfigResponse, ChatbotConfigUpdateRequest,
+    ConnectionStatusResponse, ConversationListItem, CreateGuidanceRuleRequest, GuidanceRule,
+    ReceiptConfirmRequest, ReceiptExtractionResponse, ReceiptRejectRequest, TestChatRequest,
+    TestChatResponse, UpdateGuidanceRuleRequest,
 };
 
 const CHATBOT_PATH: &str = "/chatbot";
+const GUIDANCE_RULES_PATH: &str = "/chatbot/guidance-rules";
 
 /// Returns the full URL for the streaming test chat endpoint.
 pub fn test_chat_stream_url() -> String {
@@ -68,4 +70,33 @@ pub async fn reject_receipt(
     request: &ReceiptRejectRequest,
 ) -> Result<ReceiptExtractionResponse, String> {
     api_post(&format!("{CHATBOT_PATH}/receipts/{id}/reject"), request).await
+}
+
+// --- Guidance Rules API ---
+
+#[allow(clippy::future_not_send)]
+pub async fn create_guidance_rule(
+    request: &CreateGuidanceRuleRequest,
+) -> Result<GuidanceRule, String> {
+    api_post(GUIDANCE_RULES_PATH, request).await
+}
+
+#[allow(clippy::future_not_send)]
+pub async fn update_guidance_rule(
+    id: &str,
+    request: &UpdateGuidanceRuleRequest,
+) -> Result<GuidanceRule, String> {
+    api_put(&format!("{GUIDANCE_RULES_PATH}/{id}"), request).await
+}
+
+#[allow(clippy::future_not_send)]
+pub async fn delete_guidance_rule(id: &str) -> Result<(), String> {
+    api_delete(&format!("{GUIDANCE_RULES_PATH}/{id}")).await
+}
+
+#[allow(clippy::future_not_send)]
+pub async fn batch_update_guidance_rules(
+    request: &BatchUpdateRequest,
+) -> Result<Vec<GuidanceRule>, String> {
+    api_put(&format!("{GUIDANCE_RULES_PATH}/batch"), request).await
 }

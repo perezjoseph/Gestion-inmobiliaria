@@ -2,6 +2,66 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::deserialize_f64_from_any;
 
+// --- Guidance Rules ---
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum GuidanceCategory {
+    EstiloComunicacion,
+    ContextoClarificacion,
+    Escalamiento,
+    Politicas,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GuidanceRule {
+    pub id: String,
+    pub category: GuidanceCategory,
+    pub instruction: String,
+    pub enabled: bool,
+    pub is_template: bool,
+    pub sort_order: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateGuidanceRuleRequest {
+    pub category: GuidanceCategory,
+    pub instruction: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateGuidanceRuleRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instruction: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort_order: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchUpdateItem {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort_order: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchUpdateRequest {
+    pub rules: Vec<BatchUpdateItem>,
+}
+
 // --- Configuration DTOs ---
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -32,7 +92,7 @@ pub struct ChatbotConfigResponse {
     pub language: String,
     pub tone: Option<String>,
     pub greeting: Option<String>,
-    pub system_prompt: Option<String>,
+    pub guidance_rules: Vec<GuidanceRule>,
     pub faqs: Option<Vec<FaqEntry>>,
     pub policies: Option<String>,
     pub sender_policy: String,
@@ -58,8 +118,6 @@ pub struct ChatbotConfigUpdateRequest {
     pub tone: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub greeting: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub system_prompt: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub faqs: Option<Vec<FaqEntry>>,
     #[serde(skip_serializing_if = "Option::is_none")]

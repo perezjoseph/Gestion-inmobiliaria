@@ -81,18 +81,18 @@ Replace the monolithic `system_prompt` freetext with structured, categorized gui
   - Ensure all existing chatbot tests still pass with updated DTOs.
   - Verify compose_system_prompt produces correct output with sample guidance rules.
 
-- [ ] 6. Frontend types and API
-  - [~] 6.1 Add guidance rule types to `types/chatbot.rs`
+- [x] 6. Frontend types and API
+  - [x] 6.1 Add guidance rule types to `types/chatbot.rs`
     - `GuidanceRule` struct with all fields
     - `GuidanceCategory` enum
     - `CreateGuidanceRuleRequest`, `UpdateGuidanceRuleRequest`, `BatchUpdateRequest`
     - _Requirements: 7.1_
 
-  - [~] 6.2 Add API functions to `services/chatbot.rs`
+  - [x] 6.2 Add API functions to `services/chatbot.rs`
     - `create_guidance_rule`, `update_guidance_rule`, `delete_guidance_rule`, `batch_update_guidance_rules`
     - _Requirements: 7.1_
 
-  - [~] 6.3 Update `ChatbotConfigResponse` type
+  - [x] 6.3 Update `ChatbotConfigResponse` type
     - Add `guidance_rules: Vec<GuidanceRule>` field
     - Remove `system_prompt` and `agent_config` fields
     - _Requirements: 7.1_
