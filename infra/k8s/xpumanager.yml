@@ -29,41 +29,66 @@ spec:
     spec:
       automountServiceAccountToken: false
       nodeName: inference
-      containers:
-        - name: xpumanager
-          image: docker.io/library/ubuntu:24.04
+      initContainers:
+        - name: gen-credentials
+          image: intel/xpumanager:latest
           command:
             - /bin/bash
             - -c
             - |
-              apt-get update
-              apt-get install -y software-properties-common curl python3 python3-pip
-              add-apt-repository -y ppa:kobuk-team/intel-graphics
-              apt-get update
-              apt-get install -y intel-level-zero-gpu level-zero intel-gsc
-              curl -Lo /tmp/xpumanager.deb https://github.com/intel/xpumanager/releases/download/v1.3.6/xpumanager_1.3.6_20260206.143628.1004f6cb.u24.04_amd64.deb
-              dpkg -i /tmp/xpumanager.deb || apt-get install -f -y
-              pip3 install -r /usr/lib/xpum/rest/requirements.txt --break-system-packages
-              mkdir -p /usr/lib/xpum/rest/conf
-              cd /usr/lib/xpum && echo -e 'Xpum@2024\nXpum@2024' | python3 rest_config.py
-              cp /opt/scripts/wsgi.py /usr/lib/xpum/rest/wsgi.py
-              /usr/bin/xpumd &
-              sleep 3
-              cd /usr/lib/xpum/rest && exec gunicorn -b 0.0.0.0:29999 -c gunicorn.conf.py wsgi:app --error-logfile -
+              mkdir -p /conf
+              cd /usr/lib/xpum
+              echo -e 'Xpum@2024\nXpum@2024' | python3 rest/rest_config.py
+              cp -r rest/conf/* /conf/
+          volumeMounts:
+            - name: rest-conf
+              mountPath: /conf
+          securityContext:
+            runAsUser: 0
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      containers:
+        - name: xpumanager
+          image: intel/xpumanager:latest
+          env:
+            - name: XPUM_REST_NO_TLS
+              value: "1"
+            - name: XPUM_METRICS
+              value: "0-38"
           securityContext:
             privileged: true
           ports:
             - containerPort: 29999
-              name: rest-api
+              name: metrics
+          volumeMounts:
+            - name: devdri
+              mountPath: /dev/dri
+            - name: rest-conf
+              mountPath: /usr/lib/xpum/rest/conf
+              readOnly: true
           resources:
             requests:
-              cpu: 50m
+              cpu: 100m
               memory: 256Mi
-              ephemeral-storage: 64Mi
+              ephemeral-storage: 32Mi
             limits:
               cpu: 500m
               memory: 512Mi
-              ephemeral-storage: 1Gi
+              ephemeral-storage: 128Mi
+          startupProbe:
+            httpGet:
+              path: /rest/v1/version
+              port: 29999
+              httpHeaders:
+                - name: Authorization
+                  value: Basic eHB1bWFkbWluOlhwdW1AMjAyNA==
+            failureThreshold: 12
+            periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /rest/v1/version
@@ -71,7 +96,6 @@ spec:
               httpHeaders:
                 - name: Authorization
                   value: Basic eHB1bWFkbWluOlhwdW1AMjAyNA==
-            initialDelaySeconds: 120
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
@@ -82,22 +106,15 @@ spec:
               httpHeaders:
                 - name: Authorization
                   value: Basic eHB1bWFkbWluOlhwdW1AMjAyNA==
-            initialDelaySeconds: 120
             periodSeconds: 15
             timeoutSeconds: 5
             failureThreshold: 3
-          volumeMounts:
-            - name: dri
-              mountPath: /dev/dri
-            - name: scripts
-              mountPath: /opt/scripts
       volumes:
-        - name: dri
+        - name: devdri
           hostPath:
             path: /dev/dri
-        - name: scripts
-          configMap:
-            name: xpumanager-scripts
+        - name: rest-conf
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

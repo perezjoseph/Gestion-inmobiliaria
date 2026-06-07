@@ -35,31 +35,23 @@ spec:
         kubernetes.io/hostname: inference
       containers:
         - name: vllm
-          image: intelanalytics/ipex-llm-serving-xpu:0.2.0-b2
+          image: intel/vllm:0.17.0-xpu
           command: ["bash", "-c"]
           args:
             - |
-              export SYCL_CACHE_PERSISTENT=1
-              export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2
-              export VLLM_USE_V1=0
-              export LOAD_IN_LOW_BIT="sym_int4"
-              export IPEX_LLM_LOWBIT=$LOAD_IN_LOW_BIT
-              python -m ipex_llm.vllm.xpu.entrypoints.openai.api_server \
-                --port 8000 \
-                --model "Qwen/Qwen3-30B-A3B" \
-                --served-model-name "Qwen3-30B-A3B" \
-                --trust-remote-code \
-                --gpu-memory-utilization 0.90 \
-                --device xpu \
-                --dtype float16 \
+              VLLM_WORKER_MULTIPROC_METHOD=spawn vllm serve Qwen/Qwen3-30B-A3B-GPTQ-Int4 \
+                --dtype=float16 \
                 --enforce-eager \
-                --load-in-low-bit $LOAD_IN_LOW_BIT \
-                --max-model-len 4096 \
+                --port 8000 \
+                --host 0.0.0.0 \
+                --block-size 64 \
+                --gpu-memory-util 0.9 \
+                --no-enable-prefix-caching \
+                --trust-remote-code \
                 --max-num-batched-tokens 4096 \
-                --max-num-seqs 16 \
-                --block-size 8 \
-                --download-dir /llm/models \
-                --disable-async-output-proc \
+                --max-model-len 4096 \
+                --quantization gptq \
+                --download-dir /models \
                 --enable-auto-tool-choice \
                 --tool-call-parser hermes
           ports:
@@ -68,7 +60,15 @@ spec:
             - name: HOME
               value: /root
             - name: HF_HOME
-              value: /llm/models
+              value: /models
+            - name: SYCL_UR_USE_LEVEL_ZERO_V2
+              value: "0"
+            - name: PYTORCH_ALLOC_CONF
+              value: "expandable_segments:True"
+            - name: PYTORCH_CUDA_ALLOC_CONF
+              value: "expandable_segments:True"
+            - name: ZE_FLAT_DEVICE_HIERARCHY
+              value: "FLAT"
           resources:
             requests:
               cpu: 500m
@@ -82,23 +82,30 @@ spec:
               gpu.intel.com/xe: "1"
           volumeMounts:
             - name: models
-              mountPath: /llm/models
+              mountPath: /models
             - name: shm
               mountPath: /dev/shm
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 60
           readinessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 600
             periodSeconds: 30
             timeoutSeconds: 10
           livenessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 1800
             periodSeconds: 60
             timeoutSeconds: 10
+            failureThreshold: 5
           securityContext:
             privileged: true
       volumes:
@@ -108,7 +115,7 @@ spec:
         - name: shm
           emptyDir:
             medium: Memory
-            sizeLimit: 16Gi
+            sizeLimit: 10Gi
 ---
 apiVersion: v1
 kind: Service

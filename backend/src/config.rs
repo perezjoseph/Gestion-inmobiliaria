@@ -70,7 +70,7 @@ impl ChatbotEnvConfig {
             std::env::var("VLLM_ENDPOINT").unwrap_or_else(|_| "http://vllm:8000/v1".to_string());
 
         let vllm_chat_model = std::env::var("VLLM_CHAT_MODEL")
-            .unwrap_or_else(|_| "/models/Qwen3-30B-A3B-Instruct".to_string());
+            .unwrap_or_else(|_| "Qwen/Qwen3-30B-A3B-GPTQ-Int4".to_string());
 
         let ai_chat_timeout_secs = std::env::var("AI_CHAT_TIMEOUT_SECS")
             .unwrap_or_else(|_| "30".to_string())

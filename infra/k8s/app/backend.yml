@@ -142,18 +142,9 @@ spec:
           envFrom:
             - secretRef:
                 name: realestate-db-url
-<<<<<<< HEAD
-=======
-            # mailcow-smtp secret keys:
-            #   SMTP_HOST=mail.myhomeva.us
-            #   SMTP_PORT (e.g. 587)
-            #   SMTP_USER
-            #   SMTP_PASS
-            #   SMTP_FROM=no-reply@myhomeva.us
             - secretRef:
                 name: mailcow-smtp
                 optional: true
->>>>>>> 554b18de14fbaa0863aee2f779962a0f314b572d
           env:
             - name: JWT_SECRET
               valueFrom:
@@ -187,7 +178,7 @@ spec:
             - name: VLLM_ENDPOINT
               value: http://vllm-inference:8000/v1
             - name: VLLM_CHAT_MODEL
-              value: Qwen/Qwen3-30B-A3B
+              value: Qwen/Qwen3-30B-A3B-GPTQ-Int4
             - name: AI_CHAT_TIMEOUT_SECS
               value: "30"
           volumeMounts:

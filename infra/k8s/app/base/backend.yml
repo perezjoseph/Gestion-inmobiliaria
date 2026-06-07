@@ -67,7 +67,7 @@ spec:
             - name: VLLM_ENDPOINT
               value: http://vllm-inference.realestate.svc.cluster.local:8000/v1
             - name: VLLM_CHAT_MODEL
-              value: Qwen/Qwen3-30B-A3B
+              value: Qwen/Qwen3-30B-A3B-GPTQ-Int4
             - name: AI_CHAT_TIMEOUT_SECS
               value: "30"
             - name: RUST_LOG

@@ -21,6 +21,7 @@ data:
     scrape_configs:
       - job_name: "xpumanager"
         scheme: http
+        metrics_path: "/metrics"
         basic_auth:
           username: 'xpumadmin'
           password: 'Xpum@2024'
