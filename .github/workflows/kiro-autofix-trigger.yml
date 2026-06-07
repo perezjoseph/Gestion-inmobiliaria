@@ -304,7 +304,6 @@ jobs:
           ARTIFACTS_JSON: ${{ steps.list.outputs.artifacts }}
           GIT_HISTORY_FILE: ${{ steps.history.outputs.history_log }}
           QUEUE_RUNS: ${{ steps.attempts.outputs.queue_runs }}
-          ARTIFACT_TIMEOUT: "900"
         run: |
           umask 077
           ATTEMPT_DISPLAY=$((QUEUE_RUNS + 1))
@@ -323,7 +322,7 @@ jobs:
               continue
             fi
 
-            echo "::group::Processing ${artifact} (timeout: ${ARTIFACT_TIMEOUT}s)"
+            echo "::group::Processing ${artifact}"
 
             # Truncate diagnostics if oversized to protect context window.
             CTX_BYTES=$(wc -c < "$CONTEXT_PATH")
@@ -364,19 +363,12 @@ jobs:
             # Build the positional prompt with context the agent can act on immediately.
             PROMPT="Fix CI failure from artifact '${artifact}' (queue position ${POS}/${TOTAL}). Read the diagnostics file at \$KIRO_DIAGNOSTICS_FILE. Read prior attempt history at \$KIRO_GIT_HISTORY_FILE. Write your commit message to \$KIRO_COMMIT_MSG_FILE when done."
 
-            # Invoke the autofix agent with per-artifact timeout.
+            # Invoke the autofix agent (no per-artifact timeout; job-level
+            # timeout-minutes guards against runaway execution).
             AGENT_EXIT=0
-            timeout "${ARTIFACT_TIMEOUT}" \
-              kiro-cli chat --agent autofix --model claude-opus-4.6 --effort max --no-interactive --trust-all-tools \
+            kiro-cli chat --agent autofix --model claude-opus-4.6 --effort max --no-interactive --trust-all-tools \
                 "$PROMPT" \
               || AGENT_EXIT=$?
-
-            # timeout exits 124 when the command is killed.
-            if [ "$AGENT_EXIT" -eq 124 ]; then
-              echo "::warning::Agent timed out after ${ARTIFACT_TIMEOUT}s for ${artifact}; stopping queue."
-              echo "::endgroup::"
-              break
-            fi
 
             # Detect ANY change in working tree (tracked, staged, OR untracked).
             git add -A
