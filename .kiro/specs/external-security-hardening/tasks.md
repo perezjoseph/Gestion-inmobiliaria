@@ -28,7 +28,7 @@ This plan addresses 9 external attack vectors identified during a security audit
     - Add unit tests: counter increment, lockout at threshold, reset on success, expiry
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6_
 
-  - [-] 2.3 Integrate lockout into auth handler and app setup
+  - [x] 2.3 Integrate lockout into auth handler and app setup
     - Register `LoginLockout` as `web::Data` in `backend/src/app.rs`
     - Spawn background cleanup task (every 5 minutes) in app startup
     - In `backend/src/handlers/auth.rs` `login()`: call `lockout.check()` before attempting login, call `record_failure()` on failure, `record_success()` on success
