@@ -45,7 +45,7 @@ Fix five operational defects in the Kubernetes monitoring stack: deploy kube-sta
   - Mark task complete when test is written, run, and failure is documented
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [~] 2. Write preservation property tests (BEFORE implementing fix)
+- [x] 2. Write preservation property tests (BEFORE implementing fix)
   - **Property 2: Preservation** - Existing Monitoring Configuration Unchanged
   - **IMPORTANT**: Follow observation-first methodology
   - Observe: All existing alert rules in alerts.yml (backend, database, infrastructure, backups, slo, business groups) have specific expressions, thresholds, for durations, and severity labels
