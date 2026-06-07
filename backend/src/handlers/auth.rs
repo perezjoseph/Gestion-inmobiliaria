@@ -1,3 +1,5 @@
+use std::net::IpAddr;
+
 use actix_web::{HttpRequest, HttpResponse, web};
 use sea_orm::DatabaseConnection;
 
@@ -20,17 +22,28 @@ pub async fn register(
     }
 }
 
-pub async fn login(
+pub fn login(
     req: HttpRequest,
     db: web::Data<DatabaseConnection>,
     config: web::Data<AppConfig>,
     lockout: web::Data<LoginLockout>,
     body: web::Json<LoginRequest>,
-) -> Result<HttpResponse, AppError> {
+) -> impl std::future::Future<Output = Result<HttpResponse, AppError>> {
     let input = body.into_inner();
     let email = input.email.clone();
     let client_ip = extract_client_ip_from_request(&req);
 
+    login_inner(db, config, lockout, input, email, client_ip)
+}
+
+async fn login_inner(
+    db: web::Data<DatabaseConnection>,
+    config: web::Data<AppConfig>,
+    lockout: web::Data<LoginLockout>,
+    input: LoginRequest,
+    email: String,
+    client_ip: IpAddr,
+) -> Result<HttpResponse, AppError> {
     // Check lockout BEFORE attempting login (Req 2.7: does not reveal if email exists)
     if let Err(info) = lockout.check(&email) {
         tracing::warn!(
