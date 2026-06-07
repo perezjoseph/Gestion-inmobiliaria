@@ -58,6 +58,8 @@ spec:
           env:
             - name: XPUM_REST_NO_TLS
               value: "1"
+            - name: XPUM_EXPORTER_NO_AUTH
+              value: "1"
             - name: XPUM_METRICS
               value: "0-38"
           securityContext:
