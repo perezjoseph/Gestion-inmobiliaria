@@ -53,7 +53,7 @@ This plan addresses 9 external attack vectors identified during a security audit
   - Run rate_limit and login_lockout unit tests
   - Verify Caddyfile syntax is valid (caddy fmt or caddy validate)
 
-- [ ] 5. Implement file upload magic byte validation
+- [x] 5. Implement file upload magic byte validation
   - [x] 5.1 Create `backend/src/services/file_validation.rs`
     - Implement `validate_magic_bytes(data: &[u8], content_type: &str) -> Result<(), AppError>`
     - Support: JPEG (FF D8 FF), PNG (89 50 4E 47), PDF (%PDF), DOCX/XLSX (PK 50 4B 03 04)
@@ -67,7 +67,7 @@ This plan addresses 9 external attack vectors identified during a security audit
     - Determine content type from extension (existing logic), then validate bytes match
     - _Requirements: 4.1, 4.3_
 
-  - [~] 5.3 Integrate magic byte validation into OCR handler
+  - [x] 5.3 Integrate magic byte validation into OCR handler
     - In `backend/src/handlers/ocr.rs` `ocr_extract()`: call `validate_magic_bytes` after reading file data
     - _Requirements: 4.1, 4.3_
 

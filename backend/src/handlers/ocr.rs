@@ -113,6 +113,8 @@ pub async fn ocr_extract(
         ));
     }
 
+    crate::services::file_validation::validate_magic_bytes(&file_data, content_type)?;
+
     let client = OcrClient::new()?;
     let ocr_result = match client
         .extract(&file_data, fname, content_type, document_type.as_deref())
