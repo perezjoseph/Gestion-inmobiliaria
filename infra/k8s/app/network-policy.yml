@@ -140,12 +140,12 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-ovms-ingress
+  name: allow-vllm-ingress
   namespace: realestate
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: ovms
+      app.kubernetes.io/name: vllm
   policyTypes:
     - Ingress
   ingress:

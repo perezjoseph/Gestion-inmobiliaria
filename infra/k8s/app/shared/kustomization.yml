@@ -8,6 +8,6 @@ namespace: realestate
 
 resources:
   - ocr-service.yml
-  - ovms.yml
+  - vllm.yml
   - fdroid-repo.yml
   - ingress-fdroid.yml

@@ -5,11 +5,11 @@ fileMatchPattern: ["**/ai_module.rs", "**/ovms_provider.rs"]
 
 # Rig Framework Rules
 
-Project-specific types and patterns for our OVMS-backed Rig integration. Rig's API changes between versions and has strict trait bounds (`GetTokenUsage`, `Clone + Unpin + Send + Sync + Serialize + DeserializeOwned`).
+Project-specific types and patterns for our vLLM-backed Rig integration. Rig's API changes between versions and has strict trait bounds (`GetTokenUsage`, `Clone + Unpin + Send + Sync + Serialize + DeserializeOwned`).
 
 ## Architecture
 
-All LLM calls go through `OvmsCompletionModel` (implements `rig::completion::CompletionModel`). No direct HTTP calls to OVMS outside `ovms_provider.rs`. The OVMS endpoint is `/v3/chat/completions` and omits the `id` field in responses (by design, documented as unsupported).
+All LLM calls go through `OvmsCompletionModel` (implements `rig::completion::CompletionModel`). No direct HTTP calls to vLLM outside `ovms_provider.rs`. The vLLM endpoint is `/v1/chat/completions` (standard OpenAI-compatible API). vLLM includes the `id` field in responses (unlike OVMS which omitted it), but `#[serde(default)]` on `id` is kept for safety.
 
 ## Key types
 
@@ -25,4 +25,4 @@ All LLM calls go through `OvmsCompletionModel` (implements `rig::completion::Com
 1. Verify trait bounds match rig-core 0.37 (check `CompletionModel`, `GetTokenUsage`)
 2. Use `rig::message::ToolChoice` not `rig::completion::ToolChoice`
 3. Streaming requires `eventsource-stream` for SSE parsing
-4. OVMS response has no `id` field — always use `#[serde(default)]`
+4. Keep `#[serde(default)]` on response `id` field for backward compatibility

@@ -46,10 +46,10 @@ data:
         static_configs:
           - targets: ["backend.realestate.svc.cluster.local:8080"]
 
-      - job_name: "ovms"
+      - job_name: "vllm"
         metrics_path: "/metrics"
         static_configs:
-          - targets: ["ovms.realestate.svc.cluster.local:8000"]
+          - targets: ["vllm.realestate.svc.cluster.local:8000"]
             labels:
               node: "inference"
 ---

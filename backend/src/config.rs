@@ -41,8 +41,8 @@ impl SmtpConfig {
 pub struct ChatbotEnvConfig {
     pub baileys_service_url: String,
     pub baileys_internal_token: String,
-    pub ovms_endpoint: String,
-    pub ovms_chat_model: String,
+    pub vllm_endpoint: String,
+    pub vllm_chat_model: String,
     pub ai_chat_timeout_secs: u64,
 }
 
@@ -66,11 +66,11 @@ impl ChatbotEnvConfig {
         let baileys_service_url = std::env::var("BAILEYS_SERVICE_URL")
             .unwrap_or_else(|_| "http://baileys:3100".to_string());
 
-        let ovms_endpoint =
-            std::env::var("OVMS_ENDPOINT").unwrap_or_else(|_| "http://ovms:8000/v3".to_string());
+        let vllm_endpoint =
+            std::env::var("VLLM_ENDPOINT").unwrap_or_else(|_| "http://vllm:8000/v1".to_string());
 
-        let ovms_chat_model = std::env::var("OVMS_CHAT_MODEL")
-            .unwrap_or_else(|_| "Qwen3-30B-A3B-Instruct-2507-int4-ov".to_string());
+        let vllm_chat_model = std::env::var("VLLM_CHAT_MODEL")
+            .unwrap_or_else(|_| "/models/Qwen3-30B-A3B-Instruct".to_string());
 
         let ai_chat_timeout_secs = std::env::var("AI_CHAT_TIMEOUT_SECS")
             .unwrap_or_else(|_| "30".to_string())
@@ -80,8 +80,8 @@ impl ChatbotEnvConfig {
         Ok(Self {
             baileys_service_url,
             baileys_internal_token,
-            ovms_endpoint,
-            ovms_chat_model,
+            vllm_endpoint,
+            vllm_chat_model,
             ai_chat_timeout_secs,
         })
     }
@@ -96,8 +96,8 @@ impl ChatbotEnvConfig {
         Self {
             baileys_service_url: "http://baileys:3100".to_string(),
             baileys_internal_token: "a".repeat(32),
-            ovms_endpoint: "http://ovms:8000/v3".to_string(),
-            ovms_chat_model: "test-model".to_string(),
+            vllm_endpoint: "http://vllm:8000/v1".to_string(),
+            vllm_chat_model: "test-model".to_string(),
             ai_chat_timeout_secs: 30,
         }
     }
@@ -263,8 +263,8 @@ mod tests {
             env::remove_var("DB_SQLX_LOGGING");
             env::remove_var("BAILEYS_INTERNAL_TOKEN");
             env::remove_var("BAILEYS_SERVICE_URL");
-            env::remove_var("OVMS_ENDPOINT");
-            env::remove_var("OVMS_CHAT_MODEL");
+            env::remove_var("VLLM_ENDPOINT");
+            env::remove_var("VLLM_CHAT_MODEL");
             env::remove_var("AI_CHAT_TIMEOUT_SECS");
         }
     }
@@ -439,14 +439,14 @@ mod tests {
         let cfg = ChatbotEnvConfig::for_testing();
 
         assert_eq!(cfg.baileys_service_url, "http://baileys:3100");
-        assert_eq!(cfg.ovms_endpoint, "http://ovms:8000/v3");
+        assert_eq!(cfg.vllm_endpoint, "http://vllm:8000/v1");
         assert_eq!(cfg.ai_chat_timeout_secs, 30);
         assert!(
             cfg.baileys_internal_token.len() >= 32,
             "token must satisfy from_env() length check"
         );
         assert!(
-            !cfg.ovms_chat_model.is_empty(),
+            !cfg.vllm_chat_model.is_empty(),
             "model name must not be empty"
         );
     }

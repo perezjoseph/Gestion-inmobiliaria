@@ -183,7 +183,7 @@ impl AiModule {
     /// Creates a new [`AiModule`] from the chatbot environment configuration.
     /// Uses the custom [`OvmsCompletionModel`] that handles OVMS's missing `id` field.
     pub fn new(config: &ChatbotEnvConfig) -> Result<Self, anyhow::Error> {
-        let model = OvmsCompletionModel::new(&config.ovms_chat_model, &config.ovms_endpoint);
+        let model = OvmsCompletionModel::new(&config.vllm_chat_model, &config.vllm_endpoint);
 
         Ok(Self {
             model,
