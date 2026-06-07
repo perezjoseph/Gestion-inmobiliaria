@@ -66,8 +66,8 @@ impl ChatbotEnvConfig {
         let baileys_service_url = std::env::var("BAILEYS_SERVICE_URL")
             .unwrap_or_else(|_| "http://baileys:3100".to_string());
 
-        let vllm_endpoint =
-            std::env::var("VLLM_ENDPOINT").unwrap_or_else(|_| "http://vllm:8000/v1".to_string());
+        let vllm_endpoint = std::env::var("VLLM_ENDPOINT")
+            .unwrap_or_else(|_| "http://vllm-inference:8000/v1".to_string());
 
         let vllm_chat_model = std::env::var("VLLM_CHAT_MODEL")
             .unwrap_or_else(|_| "Qwen/Qwen3-30B-A3B-GPTQ-Int4".to_string());
