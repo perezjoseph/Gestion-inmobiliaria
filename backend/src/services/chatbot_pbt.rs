@@ -2539,8 +2539,10 @@ fn system_prompt_ignores_deprecated_system_prompt_field() {
         ..Default::default()
     });
 
+    // Use a distinctive prefix so generated strings never accidentally match
+    // normal prompt output (e.g. single spaces, common words).
     runner
-        .run(&arb_nonempty_string(), |sys_prompt| {
+        .run(&"SYSPROMPT_[A-Za-z0-9]{5,40}", |sys_prompt| {
             let config = ChatbotPersona {
                 tone: None,
                 greeting: None,

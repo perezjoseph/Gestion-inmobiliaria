@@ -135,7 +135,7 @@ Replace the monolithic `system_prompt` freetext with structured, categorized gui
     - ARIA labels on toggles, keyboard navigation for expand/collapse, role attributes on rule list
     - _Requirements: 9.3_
 
-- [~] 10. Final checkpoint — Full build passes
+- [x] 10. Final checkpoint — Full build passes
   - Backend: cargo fmt, clippy, tests pass.
   - Frontend: cargo fmt, clippy pass.
   - Guidance rules display, toggle, create, delete all working end-to-end.
