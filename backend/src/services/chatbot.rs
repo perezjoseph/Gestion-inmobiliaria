@@ -20,6 +20,7 @@ use crate::models::chatbot::{
     CurrencyTotal, FaqEntry, GuidanceCategory, GuidanceRule, PaymentDetail,
     UpdateGuidanceRuleRequest, format_currency,
 };
+use crate::services::auditoria::{self, CreateAuditoriaEntry};
 use crate::services::validation::validate_enum;
 
 const SENDER_POLICIES: &[&str] = &["tenants_only", "tenants_and_prospects", "allowlist"];
@@ -1648,6 +1649,7 @@ pub async fn create_guidance_rule(
     db: &DatabaseConnection,
     org_id: Uuid,
     req: CreateGuidanceRuleRequest,
+    usuario_id: Uuid,
 ) -> Result<GuidanceRule, AppError> {
     validate_instruction(&req.instruction)?;
 
@@ -1680,6 +1682,22 @@ pub async fn create_guidance_rule(
     rules.push(rule.clone());
     save_guidance_rules(db, config, &rules).await?;
 
+    auditoria::registrar_best_effort(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "guidance_rule".to_string(),
+            entity_id: rule.id,
+            accion: "crear".to_string(),
+            cambios: serde_json::json!({
+                "category": rule.category,
+                "instruction": rule.instruction,
+                "enabled": rule.enabled,
+            }),
+        },
+    )
+    .await;
+
     Ok(rule)
 }
 
@@ -1692,6 +1710,7 @@ pub async fn update_guidance_rule(
     org_id: Uuid,
     rule_id: Uuid,
     req: UpdateGuidanceRuleRequest,
+    usuario_id: Uuid,
 ) -> Result<GuidanceRule, AppError> {
     let (config, mut rules) = load_guidance_rules(db, org_id).await?;
 
@@ -1722,6 +1741,18 @@ pub async fn update_guidance_rule(
         )));
     }
 
+    // Build cambios JSON tracking what changed
+    let mut cambios = serde_json::Map::new();
+    if let Some(ref instruction) = req.instruction {
+        cambios.insert("instruction".to_string(), serde_json::json!(instruction));
+    }
+    if let Some(enabled) = req.enabled {
+        cambios.insert("enabled".to_string(), serde_json::json!(enabled));
+    }
+    if let Some(sort_order) = req.sort_order {
+        cambios.insert("sort_order".to_string(), serde_json::json!(sort_order));
+    }
+
     // Apply updates
     let rule = &mut rules[rule_idx];
     if let Some(instruction) = req.instruction {
@@ -1738,6 +1769,18 @@ pub async fn update_guidance_rule(
     let updated = rule.clone();
     save_guidance_rules(db, config, &rules).await?;
 
+    auditoria::registrar_best_effort(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "guidance_rule".to_string(),
+            entity_id: rule_id,
+            accion: "actualizar".to_string(),
+            cambios: serde_json::Value::Object(cambios),
+        },
+    )
+    .await;
+
     Ok(updated)
 }
 
@@ -1748,6 +1791,7 @@ pub async fn delete_guidance_rule(
     db: &DatabaseConnection,
     org_id: Uuid,
     rule_id: Uuid,
+    usuario_id: Uuid,
 ) -> Result<(), AppError> {
     let (config, mut rules) = load_guidance_rules(db, org_id).await?;
 
@@ -1762,8 +1806,23 @@ pub async fn delete_guidance_rule(
         ));
     }
 
-    rules.remove(rule_idx);
+    let deleted_rule = rules.remove(rule_idx);
     save_guidance_rules(db, config, &rules).await?;
+
+    auditoria::registrar_best_effort(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "guidance_rule".to_string(),
+            entity_id: rule_id,
+            accion: "eliminar".to_string(),
+            cambios: serde_json::json!({
+                "category": deleted_rule.category,
+                "instruction": deleted_rule.instruction,
+            }),
+        },
+    )
+    .await;
 
     Ok(())
 }

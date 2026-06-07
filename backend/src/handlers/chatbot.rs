@@ -735,9 +735,13 @@ pub async fn create_guidance_rule_handler(
     claims: WriteAccess,
     body: web::Json<CreateGuidanceRuleRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let rule =
-        chatbot::create_guidance_rule(db.get_ref(), claims.0.organizacion_id, body.into_inner())
-            .await?;
+    let rule = chatbot::create_guidance_rule(
+        db.get_ref(),
+        claims.0.organizacion_id,
+        body.into_inner(),
+        claims.0.sub,
+    )
+    .await?;
     Ok(HttpResponse::Created().json(rule))
 }
 
@@ -754,6 +758,7 @@ pub async fn update_guidance_rule_handler(
         claims.0.organizacion_id,
         rule_id,
         body.into_inner(),
+        claims.0.sub,
     )
     .await?;
     Ok(HttpResponse::Ok().json(rule))
@@ -768,7 +773,13 @@ pub async fn delete_guidance_rule_handler(
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
     let rule_id = path.into_inner();
-    chatbot::delete_guidance_rule(db.get_ref(), claims.0.organizacion_id, rule_id).await?;
+    chatbot::delete_guidance_rule(
+        db.get_ref(),
+        claims.0.organizacion_id,
+        rule_id,
+        claims.0.sub,
+    )
+    .await?;
     Ok(HttpResponse::NoContent().finish())
 }
 

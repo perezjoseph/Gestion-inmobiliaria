@@ -5,6 +5,7 @@ use yew::prelude::*;
 use crate::components::chatbot::bot_state_card::BotStateCard;
 use crate::components::chatbot::capabilities_step::CapabilitiesStep;
 use crate::components::chatbot::connection_step::ConnectionStep;
+use crate::components::chatbot::guidance_rules_step::GuidanceRulesStep;
 use crate::components::chatbot::knowledge_step::KnowledgeStep;
 use crate::components::chatbot::persona_step::{PersonaStep, PersonaUpdate};
 use crate::components::chatbot::sender_policy_step::SenderPolicyStep;
@@ -39,6 +40,7 @@ enum SaveStatus {
 enum Section {
     Connection,
     Persona,
+    GuidanceRules,
     Capabilities,
     Knowledge,
     Senders,
@@ -49,6 +51,7 @@ impl Section {
         match self {
             Self::Connection => "Conexión",
             Self::Persona => "Personalidad",
+            Self::GuidanceRules => "Reglas del agente",
             Self::Capabilities => "Capacidades",
             Self::Knowledge => "Conocimiento",
             Self::Senders => "Remitentes",
@@ -59,6 +62,7 @@ impl Section {
         match self {
             Self::Connection => "section-connection",
             Self::Persona => "section-persona",
+            Self::GuidanceRules => "section-guidance-rules",
             Self::Capabilities => "section-capabilities",
             Self::Knowledge => "section-knowledge",
             Self::Senders => "section-senders",
@@ -431,6 +435,12 @@ fn SettingsColumn(props: &SettingsColumnProps) -> Html {
                 on_toggle={props.on_toggle_section.clone()}
             />
 
+            <GuidanceRulesSection
+                open={props.open_section == Some(Section::GuidanceRules)}
+                rules={cfg.guidance_rules.clone()}
+                on_toggle={props.on_toggle_section.clone()}
+            />
+
             <CapabilitiesSection
                 open={props.open_section == Some(Section::Capabilities)}
                 capabilities={cfg.capabilities.clone()}
@@ -629,6 +639,37 @@ fn PersonaSection(props: &PersonaSectionProps) -> Html {
             on_toggle={props.on_toggle.clone()}
         >
             <PersonaStep config={props.cfg.clone()} on_change={on_change} />
+        </AccordionSection>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct GuidanceRulesSectionProps {
+    open: bool,
+    rules: Vec<crate::types::chatbot::GuidanceRule>,
+    on_toggle: Callback<Section>,
+}
+
+#[component]
+fn GuidanceRulesSection(props: &GuidanceRulesSectionProps) -> Html {
+    let active_count = props.rules.iter().filter(|r| r.enabled).count();
+    let summary = format!("{active_count} de {} reglas activas", props.rules.len());
+
+    // Trigger a page-level config reload when rules change.
+    // For now, this is a no-op callback since rule CRUD is handled inside
+    // the step component via its own API calls + local state refresh.
+    let on_change = Callback::from(|()| {
+        // Future: trigger config reload from parent if needed
+    });
+
+    html! {
+        <AccordionSection
+            section={Section::GuidanceRules}
+            open={props.open}
+            summary={AttrValue::from(summary)}
+            on_toggle={props.on_toggle.clone()}
+        >
+            <GuidanceRulesStep rules={props.rules.clone()} on_change={on_change} />
         </AccordionSection>
     }
 }

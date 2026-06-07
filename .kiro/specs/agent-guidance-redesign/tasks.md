@@ -97,8 +97,8 @@ Replace the monolithic `system_prompt` freetext with structured, categorized gui
     - Remove `system_prompt` and `agent_config` fields
     - _Requirements: 7.1_
 
-- [ ] 7. Frontend component
-  - [~] 7.1 Create `components/chatbot/guidance_rules_step.rs`
+- [x] 7. Frontend component
+  - [x] 7.1 Create `components/chatbot/guidance_rules_step.rs`
     - Main component with collapsible category sections
     - Each rule row: toggle switch, instruction text, lock icon (templates), edit/delete buttons (custom)
     - Active count display ("X/30 reglas activas")
@@ -107,17 +107,17 @@ Replace the monolithic `system_prompt` freetext with structured, categorized gui
     - Auto-save on toggle changes (debounced via parent save_config callback)
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8_
 
-  - [~] 7.2 Update `pages/chatbot_config.rs`
+  - [x] 7.2 Update `pages/chatbot_config.rs`
     - Import and render `GuidanceRulesStep` as a new section
     - Pass guidance_rules from config state and save callback
     - _Requirements: 7.1_
 
-  - [~] 7.3 Update `components/chatbot/persona_step.rs`
+  - [x] 7.3 Update `components/chatbot/persona_step.rs`
     - Remove the "Instrucciones adicionales" textarea (system_prompt field)
     - Remove system_prompt from `PersonaUpdate` struct
     - _Requirements: 7.1_
 
-  - [~] 7.4 Register component in `components/chatbot/mod.rs`
+  - [x] 7.4 Register component in `components/chatbot/mod.rs`
     - Add `pub mod guidance_rules_step;`
     - _Requirements: 7.1_
 
@@ -126,12 +126,12 @@ Replace the monolithic `system_prompt` freetext with structured, categorized gui
   - Verify toggle changes persist via API.
   - Verify custom rule creation and deletion works.
 
-- [ ] 9. Audit and non-functional
-  - [~] 9.1 Add audit logging for guidance rule mutations
+- [x] 9. Audit and non-functional
+  - [x] 9.1 Add audit logging for guidance rule mutations
     - Log create, update, delete operations through existing `registros_auditoria` system
     - _Requirements: 9.1_
 
-  - [~] 9.2 Add accessibility attributes to GuidanceRulesStep
+  - [x] 9.2 Add accessibility attributes to GuidanceRulesStep
     - ARIA labels on toggles, keyboard navigation for expand/collapse, role attributes on rule list
     - _Requirements: 9.3_
 

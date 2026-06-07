@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: driver-check
+  namespace: realestate
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: inference
+  hostPID: true
+  restartPolicy: Never
+  containers:
+    - name: driver-check
+      image: fedora:44
+      command:
+        - bash
+        - -c
+        - |
+          nsenter -t 1 -m -- rpm -q intel-compute-runtime level-zero intel-level-zero 2>&1
+          echo "---rpm-ostree-status---"
+          nsenter -t 1 -m -- rpm-ostree status 2>&1 | head -30
+          echo "---level-zero-version---"
+          nsenter -t 1 -m -- ls /usr/lib64/libze_loader.so* 2>&1
+          nsenter -t 1 -m -- cat /usr/share/doc/intel-compute-runtime/version 2>/dev/null || echo "no version file"
+      securityContext:
+        privileged: true
