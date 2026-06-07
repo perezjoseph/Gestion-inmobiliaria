@@ -65,15 +65,15 @@ Replace the monolithic `system_prompt` freetext with structured, categorized gui
     - `update_chatbot_config`: stop reading/writing `system_prompt` and `agent_config` from user input
     - _Requirements: 4.1, 4.2, 6.1, 6.4, 8.3, 8.4_
 
-- [ ] 4. Backend handlers and routes
-  - [~] 4.1 Add handler functions in `handlers/chatbot.rs`
+- [x] 4. Backend handlers and routes
+  - [x] 4.1 Add handler functions in `handlers/chatbot.rs`
     - `create_guidance_rule_handler`: POST, requires WriteAccess, validates input, calls service
     - `update_guidance_rule_handler`: PUT with path param, requires WriteAccess
     - `delete_guidance_rule_handler`: DELETE with path param, requires WriteAccess
     - `batch_update_guidance_rules_handler`: PUT, requires WriteAccess
     - _Requirements: 4.3, 4.4, 4.5, 4.6, 4.7_
 
-  - [~] 4.2 Register new routes in `routes.rs`
+  - [x] 4.2 Register new routes in `routes.rs`
     - Add route scope under `/api/v1/chatbot/guidance-rules`
     - _Requirements: 4.3, 4.4, 4.5, 4.6_
 

@@ -505,6 +505,26 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                         web::post().to(handlers::chatbot::reject_receipt),
                     ),
             )
+            .service(
+                web::scope("/chatbot/guidance-rules")
+                    .wrap(Governor::new(&write_governor_conf))
+                    .route(
+                        "",
+                        web::post().to(handlers::chatbot::create_guidance_rule_handler),
+                    )
+                    .route(
+                        "/batch",
+                        web::put().to(handlers::chatbot::batch_update_guidance_rules_handler),
+                    )
+                    .route(
+                        "/{id}",
+                        web::put().to(handlers::chatbot::update_guidance_rule_handler),
+                    )
+                    .route(
+                        "/{id}",
+                        web::delete().to(handlers::chatbot::delete_guidance_rule_handler),
+                    ),
+            )
             .service({
                 #[allow(unused_mut)]
                 let mut evals_scope =

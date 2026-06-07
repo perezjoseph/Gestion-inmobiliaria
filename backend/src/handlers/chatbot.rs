@@ -8,9 +8,10 @@ use crate::config::AppConfig;
 use crate::errors::AppError;
 use crate::middleware::rbac::WriteAccess;
 use crate::models::chatbot::{
-    Capabilities, ChatbotConfigUpdateRequest, ClearHandoffRequest, ConversationMessage, FaqEntry,
-    HandoffStatusResponse, ReceiptConfirmRequest, ReceiptExtractionResponse, TestChatRequest,
-    TestChatResponse,
+    BatchUpdateRequest, Capabilities, ChatbotConfigUpdateRequest, ClearHandoffRequest,
+    ConversationMessage, CreateGuidanceRuleRequest, FaqEntry, HandoffStatusResponse,
+    ReceiptConfirmRequest, ReceiptExtractionResponse, TestChatRequest, TestChatResponse,
+    UpdateGuidanceRuleRequest,
 };
 use crate::services::ai_module::{
     AiModule, ChatbotPersona, ConversationEntry, ProcessMessageContext, UserMessage,
@@ -724,4 +725,64 @@ pub async fn clear_handoff(
         sender_phone: body.sender_phone.clone(),
         handoff_status: "none".to_string(),
     }))
+}
+
+// --- Guidance Rule Handlers ---
+
+/// POST `/api/v1/chatbot/guidance-rules` — create a custom guidance rule.
+pub async fn create_guidance_rule_handler(
+    db: web::Data<DatabaseConnection>,
+    claims: WriteAccess,
+    body: web::Json<CreateGuidanceRuleRequest>,
+) -> Result<HttpResponse, AppError> {
+    let rule =
+        chatbot::create_guidance_rule(db.get_ref(), claims.0.organizacion_id, body.into_inner())
+            .await?;
+    Ok(HttpResponse::Created().json(rule))
+}
+
+/// PUT `/api/v1/chatbot/guidance-rules/{id}` — update a guidance rule.
+pub async fn update_guidance_rule_handler(
+    db: web::Data<DatabaseConnection>,
+    claims: WriteAccess,
+    path: web::Path<Uuid>,
+    body: web::Json<UpdateGuidanceRuleRequest>,
+) -> Result<HttpResponse, AppError> {
+    let rule_id = path.into_inner();
+    let rule = chatbot::update_guidance_rule(
+        db.get_ref(),
+        claims.0.organizacion_id,
+        rule_id,
+        body.into_inner(),
+    )
+    .await?;
+    Ok(HttpResponse::Ok().json(rule))
+}
+
+/// DELETE `/api/v1/chatbot/guidance-rules/{id}` — delete a custom guidance rule.
+///
+/// Returns 403 if the rule is a template.
+pub async fn delete_guidance_rule_handler(
+    db: web::Data<DatabaseConnection>,
+    claims: WriteAccess,
+    path: web::Path<Uuid>,
+) -> Result<HttpResponse, AppError> {
+    let rule_id = path.into_inner();
+    chatbot::delete_guidance_rule(db.get_ref(), claims.0.organizacion_id, rule_id).await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+/// PUT `/api/v1/chatbot/guidance-rules/batch` — batch update enabled/sort_order for multiple rules.
+pub async fn batch_update_guidance_rules_handler(
+    db: web::Data<DatabaseConnection>,
+    claims: WriteAccess,
+    body: web::Json<BatchUpdateRequest>,
+) -> Result<HttpResponse, AppError> {
+    let rules = chatbot::batch_update_guidance_rules(
+        db.get_ref(),
+        claims.0.organizacion_id,
+        body.into_inner(),
+    )
+    .await?;
+    Ok(HttpResponse::Ok().json(rules))
 }
