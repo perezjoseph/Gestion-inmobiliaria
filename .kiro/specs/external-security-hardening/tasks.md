@@ -108,7 +108,7 @@ This plan addresses 9 external attack vectors identified during a security audit
     - Log `event=password_changed` and `event=user_deactivated` with user_id
     - _Requirements: 8.3, 8.4, 9.1_
 
-- [~] 7. Checkpoint — verify JWT changes compile and tests pass
+- [x] 7. Checkpoint — verify JWT changes compile and tests pass
   - `cargo check` and run existing auth tests
   - Verify new migration applies cleanly
 
