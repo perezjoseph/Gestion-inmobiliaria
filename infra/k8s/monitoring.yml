@@ -49,7 +49,14 @@ data:
       - job_name: "vllm"
         metrics_path: "/metrics"
         static_configs:
-          - targets: ["vllm.realestate.svc.cluster.local:8000"]
+          - targets: ["vllm-inference.realestate.svc.cluster.local:8000"]
+            labels:
+              node: "inference"
+
+      - job_name: "ovms"
+        metrics_path: "/metrics"
+        static_configs:
+          - targets: ["ovms.realestate.svc.cluster.local:8000"]
             labels:
               node: "inference"
 ---
@@ -157,7 +164,7 @@ data:
     providers:
       - name: 'default'
         orgId: 1
-        folder: 'Intel GPU'
+        folder: 'Infrastructure'
         type: file
         disableDeletion: false
         editable: true
@@ -207,6 +214,9 @@ spec:
             - name: dashboard-node
               mountPath: /var/lib/grafana/dashboards/node-exporter-dashboard.json
               subPath: node-exporter-dashboard.json
+            - name: dashboard-vllm
+              mountPath: /var/lib/grafana/dashboards/vllm-dashboard.json
+              subPath: vllm-dashboard.json
             - name: grafana-data
               mountPath: /var/lib/grafana/data
           resources:
@@ -229,6 +239,9 @@ spec:
         - name: dashboard-node
           configMap:
             name: grafana-dashboard-node
+        - name: dashboard-vllm
+          configMap:
+            name: grafana-dashboard-vllm
         - name: grafana-data
           persistentVolumeClaim:
             claimName: grafana-pvc

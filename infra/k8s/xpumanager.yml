@@ -8,54 +8,96 @@ data:
     from xpum_rest_main import main
     app = main()
 ---
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: xpumanager
   namespace: default
   labels:
     app: xpumanager
 spec:
-  nodeName: inference
-  restartPolicy: Always
-  containers:
-    - name: xpumanager
-      image: docker.io/library/ubuntu:24.04
-      command:
-        - /bin/bash
-        - -c
-        - |
-          apt-get update
-          apt-get install -y software-properties-common curl python3 python3-pip
-          add-apt-repository -y ppa:kobuk-team/intel-graphics
-          apt-get update
-          apt-get install -y intel-level-zero-gpu level-zero intel-gsc
-          curl -Lo /tmp/xpumanager.deb https://github.com/intel/xpumanager/releases/download/v1.3.6/xpumanager_1.3.6_20260206.143628.1004f6cb.u24.04_amd64.deb
-          dpkg -i /tmp/xpumanager.deb || apt-get install -f -y
-          pip3 install -r /usr/lib/xpum/rest/requirements.txt --break-system-packages
-          mkdir -p /usr/lib/xpum/rest/conf
-          cd /usr/lib/xpum && echo -e 'Xpum@2024\nXpum@2024' | python3 rest_config.py
-          cp /opt/scripts/wsgi.py /usr/lib/xpum/rest/wsgi.py
-          /usr/bin/xpumd &
-          sleep 3
-          cd /usr/lib/xpum/rest && exec gunicorn -b 0.0.0.0:29999 -c gunicorn.conf.py wsgi:app --error-logfile -
-      securityContext:
-        privileged: true
-      ports:
-        - containerPort: 29999
-          name: rest-api
-      volumeMounts:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: xpumanager
+  template:
+    metadata:
+      labels:
+        app: xpumanager
+    spec:
+      automountServiceAccountToken: false
+      nodeName: inference
+      containers:
+        - name: xpumanager
+          image: docker.io/library/ubuntu:24.04
+          command:
+            - /bin/bash
+            - -c
+            - |
+              apt-get update
+              apt-get install -y software-properties-common curl python3 python3-pip
+              add-apt-repository -y ppa:kobuk-team/intel-graphics
+              apt-get update
+              apt-get install -y intel-level-zero-gpu level-zero intel-gsc
+              curl -Lo /tmp/xpumanager.deb https://github.com/intel/xpumanager/releases/download/v1.3.6/xpumanager_1.3.6_20260206.143628.1004f6cb.u24.04_amd64.deb
+              dpkg -i /tmp/xpumanager.deb || apt-get install -f -y
+              pip3 install -r /usr/lib/xpum/rest/requirements.txt --break-system-packages
+              mkdir -p /usr/lib/xpum/rest/conf
+              cd /usr/lib/xpum && echo -e 'Xpum@2024\nXpum@2024' | python3 rest_config.py
+              cp /opt/scripts/wsgi.py /usr/lib/xpum/rest/wsgi.py
+              /usr/bin/xpumd &
+              sleep 3
+              cd /usr/lib/xpum/rest && exec gunicorn -b 0.0.0.0:29999 -c gunicorn.conf.py wsgi:app --error-logfile -
+          securityContext:
+            privileged: true
+          ports:
+            - containerPort: 29999
+              name: rest-api
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+              ephemeral-storage: 64Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+              ephemeral-storage: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /rest/v1/version
+              port: 29999
+              httpHeaders:
+                - name: Authorization
+                  value: Basic eHB1bWFkbWluOlhwdW1AMjAyNA==
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /rest/v1/version
+              port: 29999
+              httpHeaders:
+                - name: Authorization
+                  value: Basic eHB1bWFkbWluOlhwdW1AMjAyNA==
+            initialDelaySeconds: 120
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: dri
+              mountPath: /dev/dri
+            - name: scripts
+              mountPath: /opt/scripts
+      volumes:
         - name: dri
-          mountPath: /dev/dri
+          hostPath:
+            path: /dev/dri
         - name: scripts
-          mountPath: /opt/scripts
-  volumes:
-    - name: dri
-      hostPath:
-        path: /dev/dri
-    - name: scripts
-      configMap:
-        name: xpumanager-scripts
+          configMap:
+            name: xpumanager-scripts
 ---
 apiVersion: v1
 kind: Service
