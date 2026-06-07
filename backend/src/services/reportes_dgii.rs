@@ -660,13 +660,17 @@ pub async fn calcular_itbis_neto(
     })
 }
 
-/// Preview a report: find an existing borrador for the given org, type, and period.
+/// Preview an existing borrador report for a given tipo and periodo.
 pub async fn preview_reporte(
     db: &DatabaseConnection,
     org_id: Uuid,
     tipo: &str,
     periodo: &str,
 ) -> Result<reporte_dgii::Model, AppError> {
+    use crate::services::fiscal::obtener_org_con_acceso_fiscal;
+
+    obtener_org_con_acceso_fiscal(db, org_id).await?;
+
     if tipo != "606" && tipo != "607" {
         return Err(AppError::Validation(
             "Tipo de reporte debe ser '606' o '607'".to_string(),
@@ -692,6 +696,10 @@ pub async fn actualizar_estado_reporte(
     reporte_id: Uuid,
     estado: &str,
 ) -> Result<reporte_dgii::Model, AppError> {
+    use crate::services::fiscal::obtener_org_con_acceso_fiscal;
+
+    obtener_org_con_acceso_fiscal(db, org_id).await?;
+
     if estado != "enviado" {
         return Err(AppError::Validation(
             "Estado solo puede ser 'enviado'".to_string(),

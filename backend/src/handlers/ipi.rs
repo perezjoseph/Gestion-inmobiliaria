@@ -59,7 +59,6 @@ pub async fn crear_copropietario(
 ) -> Result<HttpResponse, AppError> {
     let org_id = user.0.organizacion_id;
     let req = body.into_inner();
-
     let result = ipi::crear_copropietario(
         db.get_ref(),
         org_id,
@@ -69,6 +68,5 @@ pub async fn crear_copropietario(
         req.porcentaje_propiedad,
     )
     .await?;
-
     Ok(HttpResponse::Created().json(result))
 }

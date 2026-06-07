@@ -26,7 +26,7 @@ pub async fn actualizar_tipo_fiscal(
     )
     .await?;
 
-    let response = fiscal::build_estado_fiscal_response(&updated);
+    let response = fiscal::obtener_estado_fiscal_from_model(&updated);
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -38,7 +38,6 @@ pub async fn obtener_estado_fiscal(
     admin: AdminOnly,
 ) -> Result<HttpResponse, AppError> {
     let org_id = admin.0.organizacion_id;
-    let org = fiscal::obtener_organizacion(db.get_ref(), org_id).await?;
-    let response = fiscal::build_estado_fiscal_response(&org);
+    let response = fiscal::obtener_estado_fiscal(db.get_ref(), org_id).await?;
     Ok(HttpResponse::Ok().json(response))
 }

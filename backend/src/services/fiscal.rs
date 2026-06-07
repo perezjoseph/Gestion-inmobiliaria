@@ -19,19 +19,34 @@ pub fn verificar_acceso_fiscal(org: &organizacion::Model) -> Result<(), AppError
     Ok(())
 }
 
-/// Fetch an organization by ID, returning 404 if not found.
-pub async fn obtener_organizacion(
+/// Fetch an organization by ID and verify it has fiscal access.
+pub async fn obtener_org_con_acceso_fiscal(
     db: &DatabaseConnection,
     org_id: Uuid,
 ) -> Result<organizacion::Model, AppError> {
-    organizacion::Entity::find_by_id(org_id)
+    let org = organizacion::Entity::find_by_id(org_id)
         .one(db)
         .await?
-        .ok_or_else(|| AppError::NotFound("Organización no encontrada".to_string()))
+        .ok_or_else(|| AppError::NotFound("Organización no encontrada".to_string()))?;
+    verificar_acceso_fiscal(&org)?;
+    Ok(org)
+}
+
+/// Retrieve the current fiscal state of an organization.
+pub async fn obtener_estado_fiscal(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+) -> Result<EstadoFiscalResponse, AppError> {
+    let org = organizacion::Entity::find_by_id(org_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Organización no encontrada".to_string()))?;
+
+    Ok(obtener_estado_fiscal_from_model(&org))
 }
 
 /// Build the fiscal state response from an organization model.
-pub fn build_estado_fiscal_response(org: &organizacion::Model) -> EstadoFiscalResponse {
+pub fn obtener_estado_fiscal_from_model(org: &organizacion::Model) -> EstadoFiscalResponse {
     let tipo_fiscal = match org.tipo_fiscal.as_str() {
         "persona_juridica" => TipoFiscal::PersonaJuridica,
         "persona_fisica" => TipoFiscal::PersonaFisica,

@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::middleware::rbac::WriteAccess;
-use crate::services::fiscal::{obtener_organizacion, verificar_acceso_fiscal};
+use crate::services::fiscal::obtener_org_con_acceso_fiscal;
 use crate::services::reportes_dgii;
 
 #[derive(Deserialize)]
@@ -24,8 +24,7 @@ pub async fn generar_607_handler(
     user: WriteAccess,
     body: web::Json<PeriodoRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let org = obtener_organizacion(db.get_ref(), user.0.organizacion_id).await?;
-    verificar_acceso_fiscal(&org)?;
+    obtener_org_con_acceso_fiscal(db.get_ref(), user.0.organizacion_id).await?;
 
     let reporte = reportes_dgii::generar_607(
         db.get_ref(),
@@ -44,8 +43,7 @@ pub async fn generar_606_handler(
     user: WriteAccess,
     body: web::Json<PeriodoRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let org = obtener_organizacion(db.get_ref(), user.0.organizacion_id).await?;
-    verificar_acceso_fiscal(&org)?;
+    obtener_org_con_acceso_fiscal(db.get_ref(), user.0.organizacion_id).await?;
 
     let reporte = reportes_dgii::generar_606(
         db.get_ref(),
@@ -64,14 +62,10 @@ pub async fn preview_reporte(
     user: WriteAccess,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, AppError> {
-    let org = obtener_organizacion(db.get_ref(), user.0.organizacion_id).await?;
-    verificar_acceso_fiscal(&org)?;
-
     let (tipo, periodo) = path.into_inner();
     let reporte =
         reportes_dgii::preview_reporte(db.get_ref(), user.0.organizacion_id, &tipo, &periodo)
             .await?;
-
     Ok(HttpResponse::Ok().json(reporte))
 }
 
@@ -82,9 +76,6 @@ pub async fn actualizar_estado(
     path: web::Path<Uuid>,
     body: web::Json<EstadoRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let org = obtener_organizacion(db.get_ref(), user.0.organizacion_id).await?;
-    verificar_acceso_fiscal(&org)?;
-
     let id = path.into_inner();
     let updated = reportes_dgii::actualizar_estado_reporte(
         db.get_ref(),
@@ -93,6 +84,5 @@ pub async fn actualizar_estado(
         &body.estado,
     )
     .await?;
-
     Ok(HttpResponse::Ok().json(updated))
 }

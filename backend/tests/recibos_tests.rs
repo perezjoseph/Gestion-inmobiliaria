@@ -498,7 +498,7 @@ mod db_async {
                 "Expected structured warning with target 'security.cross_tenant' to be logged. Got: {logs}"
             );
             assert!(
-                logs.contains("Intento de acceso a recibo fuera de la organizaciÃƒÂ³n"),
+                logs.contains("Intento de acceso a recibo fuera de la organiza"),
                 "Expected Spanish warning message in log. Got: {logs}"
             );
             assert!(
