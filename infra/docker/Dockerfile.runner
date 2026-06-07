@@ -165,7 +165,7 @@ ENV PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/build-tools/3
 # rust-analyzer, typescript-language-server, pyrefly provide rich
 # type-aware diagnostics as feedback sensors during the verify-fix loop.
 
-# Node.js 20 LTS — required for typescript-language-server and skills CLI (npx)
+# Node.js 20 LTS — required for typescript-language-server
 ARG NODE_MAJOR=20
 RUN curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
        --connect-timeout 15 --max-time 60 \

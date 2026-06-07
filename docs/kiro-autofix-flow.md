@@ -37,7 +37,7 @@ flowchart TD
     CountAttempts -->|Yes| Notify[Comment on PR:<br/>manual intervention<br/>required]
     Notify --> Fail([Job fails])
 
-    CountAttempts -->|No| Setup[Rust setup +<br/>install kiro-cli]
+    CountAttempts -->|No| Setup[Rust setup +<br/>verify LSP servers on PATH]
     Setup --> ListArtifacts[gh api lists<br/>diag-* artifacts<br/>priority-sorted]
 
     ListArtifacts --> HasArtifacts{Artifacts<br/>found?}

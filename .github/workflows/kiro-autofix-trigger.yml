@@ -295,18 +295,6 @@ jobs:
           git config user.name "kiro-bot"
           git config user.email "kiro-bot@users.noreply.github.com"
 
-      - name: Install community skills
-        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
-        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
-        with:
-          timeout_minutes: 10
-          max_attempts: 3
-          retry_wait_seconds: 10
-          command: |
-            npx skills add warpdotdev/common-skills@diagnose-ci-failures -g -y
-            npx skills add warpdotdev/common-skills@fix-errors -g -y
-            npx skills add warpdotdev/oz-skills@ci-fix -g -y
-
       - name: Process queue (one Kiro run + one commit per artifact)
         id: queue
         if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
@@ -316,12 +304,14 @@ jobs:
           ARTIFACTS_JSON: ${{ steps.list.outputs.artifacts }}
           GIT_HISTORY_FILE: ${{ steps.history.outputs.history_log }}
           QUEUE_RUNS: ${{ steps.attempts.outputs.queue_runs }}
+          ARTIFACT_TIMEOUT: "900"
         run: |
           umask 077
           ATTEMPT_DISPLAY=$((QUEUE_RUNS + 1))
           COMMITS_MADE=0
           TOTAL=$(echo "$ARTIFACTS_JSON" | jq 'length')
           POS=0
+          FIXED_FILES=""
 
           # Iterate through artifacts in priority order
           while IFS= read -r artifact; do
@@ -333,7 +323,7 @@ jobs:
               continue
             fi
 
-            echo "::group::Processing ${artifact}"
+            echo "::group::Processing ${artifact} (timeout: ${ARTIFACT_TIMEOUT}s)"
 
             # Truncate diagnostics if oversized to protect context window.
             CTX_BYTES=$(wc -c < "$CONTEXT_PATH")
@@ -347,17 +337,46 @@ jobs:
               EFFECTIVE_CTX="$CONTEXT_PATH"
             fi
 
+            # Skip artifacts whose errors reference only files already fixed by prior queue items.
+            if [ -n "$FIXED_FILES" ]; then
+              DIAG_FILES=$(grep -oP '(?:^|\s)(\S+\.(?:rs|ts|tsx|kt|kts))' "$EFFECTIVE_CTX" | sort -u || true)
+              ALL_COVERED=true
+              while IFS= read -r dfile; do
+                [ -z "$dfile" ] && continue
+                dfile_trimmed=$(echo "$dfile" | xargs)
+                if ! echo "$FIXED_FILES" | grep -qF "$dfile_trimmed"; then
+                  ALL_COVERED=false
+                  break
+                fi
+              done <<< "$DIAG_FILES"
+              if [ "$ALL_COVERED" = true ] && [ -n "$DIAG_FILES" ]; then
+                echo "::notice::Skipping ${artifact}: all referenced files were already fixed by prior queue items"
+                echo "::endgroup::"
+                continue
+              fi
+            fi
+
             # Set environment variables for the agent
             export KIRO_DIAGNOSTICS_FILE="$EFFECTIVE_CTX"
             export KIRO_COMMIT_MSG_FILE="${RUNNER_TEMP}/kiro-commit-message-${artifact}.txt"
+            export KIRO_GIT_HISTORY_FILE="$GIT_HISTORY_FILE"
 
-            # Invoke the autofix agent with minimal positional prompt.
-            # The system prompt (loaded from .kiro/prompts/autofix-system.md) contains
-            # all behavioral instructions; the positional prompt only provides context.
+            # Build the positional prompt with context the agent can act on immediately.
+            PROMPT="Fix CI failure from artifact '${artifact}' (queue position ${POS}/${TOTAL}). Read the diagnostics file at \$KIRO_DIAGNOSTICS_FILE. Read prior attempt history at \$KIRO_GIT_HISTORY_FILE. Write your commit message to \$KIRO_COMMIT_MSG_FILE when done."
+
+            # Invoke the autofix agent with per-artifact timeout.
             AGENT_EXIT=0
-            kiro-cli --agent autofix chat --no-interactive --trust-all-tools \
-              "Fix artifact: ${artifact} (queue position ${POS}/${TOTAL}). Diagnostics at KIRO_DIAGNOSTICS_FILE." \
+            timeout "${ARTIFACT_TIMEOUT}" \
+              kiro-cli --agent autofix chat --no-interactive --trust-all-tools \
+                "$PROMPT" \
               || AGENT_EXIT=$?
+
+            # timeout exits 124 when the command is killed.
+            if [ "$AGENT_EXIT" -eq 124 ]; then
+              echo "::warning::Agent timed out after ${ARTIFACT_TIMEOUT}s for ${artifact}; stopping queue."
+              echo "::endgroup::"
+              break
+            fi
 
             # Detect ANY change in working tree (tracked, staged, OR untracked).
             git add -A
@@ -372,6 +391,10 @@ jobs:
               continue
             fi
 
+            # Track which files were fixed for deduplication of later artifacts.
+            NEWLY_FIXED=$(git diff --cached --name-only)
+            FIXED_FILES="${FIXED_FILES}"$'\n'"${NEWLY_FIXED}"
+
             # Commit locally — no push yet (push happens once at end of queue).
             # Ensure every queued commit ends with the Workflow run trailer for
             # the queue-run counter to detect.
@@ -382,10 +405,7 @@ jobs:
               git commit -F "$KIRO_COMMIT_MSG_FILE"
             else
               echo "::warning::Kiro did not produce a commit message for ${artifact}; using fallback."
-              git commit -m "fix(autofix): resolve ${artifact}
-
-          Kiro did not write a descriptive commit message. Inspect the diff for details.
-          Workflow run: ${RUN_URL}"
+              git commit -m "fix(autofix): resolve ${artifact}" -m "Kiro did not write a descriptive commit message. Inspect the diff for details." -m "Workflow run: ${RUN_URL}"
             fi
             COMMITS_MADE=$((COMMITS_MADE + 1))
             echo "Commit ${COMMITS_MADE} created for ${artifact}"

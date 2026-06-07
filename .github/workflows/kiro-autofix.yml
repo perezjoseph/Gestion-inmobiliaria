@@ -193,18 +193,6 @@ jobs:
           } > "$HISTORY_LOG"
           echo "history_log=$HISTORY_LOG" >> "$GITHUB_OUTPUT"
 
-      - name: Install community skills
-        if: steps.attempts.outputs.exceeded == 'false'
-        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
-        with:
-          timeout_minutes: 10
-          max_attempts: 3
-          retry_wait_seconds: 10
-          command: |
-            npx skills add warpdotdev/common-skills@diagnose-ci-failures -g -y
-            npx skills add warpdotdev/common-skills@fix-errors -g -y
-            npx skills add warpdotdev/oz-skills@ci-fix -g -y
-
       - name: Run Kiro CLI agent to fix errors
         id: kiro
         if: steps.attempts.outputs.exceeded == 'false'
