@@ -248,6 +248,7 @@ fn validate_faqs(faqs: &[FaqEntry]) -> Result<(), AppError> {
 ///
 /// Rules:
 /// - `blocked_patterns`: each must be a valid regex, max 20 entries
+#[allow(dead_code)]
 pub(crate) fn validate_agent_config(
     config: &crate::models::chatbot::AgentConfig,
 ) -> Result<(), AppError> {
