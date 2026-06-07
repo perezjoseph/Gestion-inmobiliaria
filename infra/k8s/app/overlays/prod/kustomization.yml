@@ -23,16 +23,11 @@ patches:
       - op: replace
         path: /spec/template/spec/containers/0/env/3/value
         value: "https://gestion.myhomeva.us"
-  # Add mailcow-smtp and bcrd secrets to prod backend
+  # Add bcrd secret to prod backend
   - target:
       kind: Deployment
       name: backend
     patch: |
-      - op: add
-        path: /spec/template/spec/containers/0/envFrom/-
-        value:
-          secretRef:
-            name: mailcow-smtp
       - op: add
         path: /spec/template/spec/containers/0/env/-
         value:

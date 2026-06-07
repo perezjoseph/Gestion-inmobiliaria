@@ -96,7 +96,7 @@ impl ChatbotEnvConfig {
         Self {
             baileys_service_url: "http://baileys:3100".to_string(),
             baileys_internal_token: "a".repeat(32),
-            vllm_endpoint: "http://vllm:8000/v1".to_string(),
+            vllm_endpoint: "http://vllm-inference:8000/v1".to_string(),
             vllm_chat_model: "test-model".to_string(),
             ai_chat_timeout_secs: 30,
         }
@@ -439,7 +439,7 @@ mod tests {
         let cfg = ChatbotEnvConfig::for_testing();
 
         assert_eq!(cfg.baileys_service_url, "http://baileys:3100");
-        assert_eq!(cfg.vllm_endpoint, "http://vllm:8000/v1");
+        assert_eq!(cfg.vllm_endpoint, "http://vllm-inference:8000/v1");
         assert_eq!(cfg.ai_chat_timeout_secs, 30);
         assert!(
             cfg.baileys_internal_token.len() >= 32,

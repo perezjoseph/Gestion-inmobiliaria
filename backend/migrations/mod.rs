@@ -46,6 +46,8 @@ pub mod m20260601_000009_create_copropietarios;
 pub mod m20260606_000001_add_missing_indexes;
 pub mod m20260606_000002_create_gastos_recurrentes;
 pub mod m20260606_000003_create_mantenimiento_programado;
+pub mod m20260607_000001_add_guidance_rules_to_chatbot_config;
+pub mod m20260607_000002_seed_guidance_rule_templates;
 
 use sea_orm_migration::prelude::*;
 
@@ -102,6 +104,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260601_000007_create_configuraciones_ipi::Migration),
             Box::new(m20260601_000008_create_recibos_informales::Migration),
             Box::new(m20260601_000009_create_copropietarios::Migration),
+            Box::new(m20260607_000001_add_guidance_rules_to_chatbot_config::Migration),
+            Box::new(m20260607_000002_seed_guidance_rule_templates::Migration),
         ]
     }
 }

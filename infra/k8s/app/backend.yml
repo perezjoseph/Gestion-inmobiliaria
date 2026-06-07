@@ -117,7 +117,7 @@ metadata:
     app.kubernetes.io/component: api
     app.kubernetes.io/part-of: realestate
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: backend
@@ -142,14 +142,6 @@ spec:
           envFrom:
             - secretRef:
                 name: realestate-db-url
-            # mailcow-smtp secret keys:
-            #   SMTP_HOST=mail.myhomeva.us
-            #   SMTP_PORT (e.g. 587)
-            #   SMTP_USER
-            #   SMTP_PASS
-            #   SMTP_FROM=no-reply@myhomeva.us
-            - secretRef:
-                name: mailcow-smtp
           env:
             - name: JWT_SECRET
               valueFrom:
@@ -181,9 +173,9 @@ spec:
             - name: DB_MIN_CONNECTIONS
               value: "1"
             - name: VLLM_ENDPOINT
-              value: http://vllm:8000/v1
+              value: http://vllm-inference:8000/v1
             - name: VLLM_CHAT_MODEL
-              value: /models/Qwen3-30B-A3B-Instruct
+              value: Qwen/Qwen3-30B-A3B
             - name: AI_CHAT_TIMEOUT_SECS
               value: "30"
           volumeMounts:

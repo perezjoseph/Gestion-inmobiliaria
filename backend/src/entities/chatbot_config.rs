@@ -33,6 +33,8 @@ pub struct Model {
     pub retention_days: i32,
     #[sea_orm(column_type = "JsonBinary")]
     pub agent_config: Json,
+    #[sea_orm(column_type = "JsonBinary")]
+    pub guidance_rules: Json,
     pub updated_by: Option<Uuid>,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
