@@ -35,14 +35,20 @@ template:
       - name: init-dind-externals
         image: ghcr.io/perezjoseph/realestate-runner:latest
         imagePullPolicy: Always
-        command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
+        command:
+          ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
         volumeMounts:
           - name: dind-externals
             mountPath: /home/runner/tmpDir
       - name: init-nfs-permissions
         image: ghcr.io/perezjoseph/realestate-runner:latest
         imagePullPolicy: Always
-        command: ["sh", "-c", "find /mnt/registry /mnt/git /mnt/sccache /mnt/target -not -perm 777 -print0 2>/dev/null | xargs -0 -P4 -r chmod 777; true"]
+        command:
+          [
+            "sh",
+            "-c",
+            "find /mnt/registry /mnt/git /mnt/sccache /mnt/target -not -perm 777 -print0 2>/dev/null | xargs -0 -P4 -r chmod 777; true",
+          ]
         securityContext:
           runAsUser: 0
         volumeMounts:
@@ -137,6 +143,14 @@ template:
         - name: attempts
           value: "3"
     affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: kubernetes.io/hostname
+                  operator: NotIn
+                  values:
+                    - NetworkStorage
       podAntiAffinity:
         preferredDuringSchedulingIgnoredDuringExecution:
           - weight: 50
