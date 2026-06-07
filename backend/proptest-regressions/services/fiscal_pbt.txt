@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 7b6aa62a4d97446951d64c82acb6778a9d4626eefb2bb71eb4213973987d1f13 # shrinks to prefix = [1, 7, 3, 2, 9, 2, 1, 2], mutation_idx = 7, offset = 9
+cc 60927bd2aabb8e151ce07b6a9db663fbfdaa27d0693093f933570879848edc8b # shrinks to invalid = "206229613"

@@ -245,32 +245,6 @@ fn validate_faqs(faqs: &[FaqEntry]) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Validate the `AgentConfig` payload.
-///
-/// Rules:
-/// - `blocked_patterns`: each must be a valid regex, max 20 entries
-pub(crate) fn validate_agent_config(
-    config: &crate::models::chatbot::AgentConfig,
-) -> Result<(), AppError> {
-    if let Some(ref guardrails) = config.guardrails {
-        if let Some(ref patterns) = guardrails.blocked_patterns {
-            if patterns.len() > 20 {
-                return Err(AppError::Validation(
-                    "blocked_patterns no puede tener más de 20 entradas".to_string(),
-                ));
-            }
-            for (i, pattern) in patterns.iter().enumerate() {
-                if regex::Regex::new(pattern).is_err() {
-                    return Err(AppError::Validation(format!(
-                        "blocked_patterns[{i}]: regex inválido '{pattern}'"
-                    )));
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
 // --- Guidance Rules Template Seeding ---
 
 /// Returns the 16 predefined template guidance rules for new organizations.

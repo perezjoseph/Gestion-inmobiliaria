@@ -14,7 +14,7 @@ use proptest::test_runner::{Config as ProptestConfig, TestRunner};
 use crate::models::chatbot::{Confidence, map_confidence};
 use crate::services::chatbot::{check_sender_policy_no_db, is_phone_in_allowlist};
 
-// ── Custom Strategies ──────────────────────────────────────────────────
+// â”€â”€ Custom Strategies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /// Generate a valid E.164 phone number for testing.
 fn arb_e164_phone() -> impl Strategy<Value = String> {
@@ -39,7 +39,7 @@ fn arb_unrecognized_policy() -> impl Strategy<Value = String> {
     })
 }
 
-// ── Property 2: Sender Policy Correctness ────────────────────────────────────
+// â”€â”€ Property 2: Sender Policy Correctness â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 2: Sender Policy Correctness
 // **Validates: Requirements 2.1, 2.2, 2.3**
@@ -208,9 +208,9 @@ fn check_sender_policy_allowlist_correctness() {
         .expect("check_sender_policy_allowlist_correctness failed");
 }
 
-// ── Strategies for Phone Number E.164 Validation ───────────────────────
+// â”€â”€ Strategies for Phone Number E.164 Validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-/// Generate a valid E.164 phone number: '+' followed by 2–15 digits where the first digit is 1–9.
+/// Generate a valid E.164 phone number: '+' followed by 2â€“15 digits where the first digit is 1â€“9.
 fn valid_e164() -> impl Strategy<Value = String> {
     (1u8..=9, prop::collection::vec(0u8..=9, 1..=14)).prop_map(|(first, rest)| {
         let mut s = String::with_capacity(16);
@@ -301,7 +301,7 @@ fn valid_country_code() -> impl Strategy<Value = String> {
     ]
 }
 
-// ── Property 21: Phone Number E.164 Validation ────────────────────────────────
+// â”€â”€ Property 21: Phone Number E.164 Validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 use crate::services::chatbot::{enforce_config_role, normalize_phone, validate_e164};
 
@@ -442,7 +442,7 @@ fn normalize_phone_is_idempotent() {
         .expect("normalize_phone_is_idempotent failed");
 }
 
-// ── Property 14: Retention Cleanup Correctness ────────────────────────────────
+// â”€â”€ Property 14: Retention Cleanup Correctness â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 use chrono::{Duration, Utc};
 use sea_orm::prelude::DateTimeWithTimeZone;
@@ -485,7 +485,7 @@ fn arb_timestamp_offset_days() -> impl Strategy<Value = i64> {
     -730i64..=730 // up to 2 years in either direction
 }
 
-/// Generate a valid retention_days value (1–365).
+/// Generate a valid retention_days value (1â€“365).
 fn arb_retention_days() -> impl Strategy<Value = i64> {
     1i64..=365
 }
@@ -595,7 +595,7 @@ fn retention_cleanup_preserves_recent_messages() {
         .expect("retention_cleanup_preserves_recent_messages failed");
 }
 
-/// Property 14c: Partition is exhaustive — every message is either kept or deleted, never both, never lost.
+/// Property 14c: Partition is exhaustive â€” every message is either kept or deleted, never both, never lost.
 #[test]
 fn retention_cleanup_partition_is_exhaustive() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -648,7 +648,7 @@ fn retention_cleanup_partition_is_exhaustive() {
         .expect("retention_cleanup_partition_is_exhaustive failed");
 }
 
-/// Property 14d: The cutoff boundary is strict — a message exactly at the boundary is preserved.
+/// Property 14d: The cutoff boundary is strict â€” a message exactly at the boundary is preserved.
 /// `cleanup_expired` uses `created_at < cutoff` (strict less-than), so messages at exactly
 /// `now - retention_days` are preserved (since `created_at < cutoff` is false when equal).
 #[test]
@@ -688,7 +688,7 @@ fn retention_cleanup_boundary_message_is_preserved() {
         .expect("retention_cleanup_boundary_message_is_preserved failed");
 }
 
-// ── Strategies for Conversation History Windowing ──────────────────────
+// â”€â”€ Strategies for Conversation History Windowing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 use chrono::DateTime;
 
@@ -711,12 +711,12 @@ fn arb_message_list(max_len: usize) -> impl Strategy<Value = Vec<TimestampedMess
     })
 }
 
-/// Generate a valid history_limit (1–50, matching config validation).
+/// Generate a valid history_limit (1â€“50, matching config validation).
 fn arb_history_limit() -> impl Strategy<Value = usize> {
     1..=50usize
 }
 
-// ── Property 6: Conversation History Windowing ────────────────────────────────
+// â”€â”€ Property 6: Conversation History Windowing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 6: Conversation History Windowing
 // **Validates: Requirements 3.2, 7.2**
@@ -797,34 +797,34 @@ fn history_windowing_returns_most_recent() {
         .expect("history_windowing_returns_most_recent failed");
 }
 
-// ── Strategies for Configuration Round-Trip ────────────────────────────
+// â”€â”€ Strategies for Configuration Round-Trip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 use crate::entities::chatbot_config;
 use crate::models::chatbot::{Capabilities, ChatbotConfigUpdateRequest, FaqEntry};
 use crate::services::chatbot::{config_model_to_response, validate_config};
 
-/// Generate a valid display_name (1–100 bytes, ASCII to avoid multi-byte issues).
+/// Generate a valid display_name (1â€“100 bytes, ASCII to avoid multi-byte issues).
 fn valid_display_name() -> impl Strategy<Value = String> {
     "[A-Za-z0-9 ]{1,100}"
 }
 
-/// Generate a valid tone (1–50 bytes, ASCII to avoid multi-byte issues).
+/// Generate a valid tone (1â€“50 bytes, ASCII to avoid multi-byte issues).
 fn valid_tone() -> impl Strategy<Value = String> {
     "[a-z]{1,50}"
 }
 
-/// Generate a valid FAQ entry (question 1–200 bytes, answer 1–200 bytes, ASCII).
+/// Generate a valid FAQ entry (question 1â€“200 bytes, answer 1â€“200 bytes, ASCII).
 fn valid_faq_entry() -> impl Strategy<Value = FaqEntry> {
     ("[A-Za-z0-9 ?]{1,200}", "[A-Za-z0-9 .]{1,200}")
         .prop_map(|(question, answer)| FaqEntry { question, answer })
 }
 
-/// Generate a valid FAQ list (0–10 entries for test speed).
+/// Generate a valid FAQ list (0â€“10 entries for test speed).
 fn valid_faqs() -> impl Strategy<Value = Vec<FaqEntry>> {
     prop::collection::vec(valid_faq_entry(), 0..=10)
 }
 
-/// Generate valid policies text (0–500 bytes, ASCII).
+/// Generate valid policies text (0â€“500 bytes, ASCII).
 fn valid_policies() -> impl Strategy<Value = String> {
     "[A-Za-z0-9 .\n]{0,500}"
 }
@@ -866,12 +866,12 @@ fn valid_capabilities() -> impl Strategy<Value = Capabilities> {
         )
 }
 
-/// Generate a valid history_limit (1–50).
+/// Generate a valid history_limit (1â€“50).
 fn valid_history_limit() -> impl Strategy<Value = i32> {
     1..=50i32
 }
 
-/// Generate a valid retention_days (1–365).
+/// Generate a valid retention_days (1â€“365).
 fn valid_retention_days() -> impl Strategy<Value = i32> {
     1..=365i32
 }
@@ -968,7 +968,7 @@ fn build_model_from_input(input: &ChatbotConfigUpdateRequest) -> chatbot_config:
     }
 }
 
-// ── Property 17: Configuration Round-Trip ────────────────────────────────────
+// â”€â”€ Property 17: Configuration Round-Trip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 17: Configuration Round-Trip
 /// **Validates: Requirements 9.2, 9.3, 9.4, 9.5**
@@ -1113,7 +1113,7 @@ fn config_round_trip_preserves_all_fields() {
         .expect("config_round_trip_preserves_all_fields failed");
 }
 
-// ── Property 8: Confidence Level Mapping ──────────────────────────────────────
+// â”€â”€ Property 8: Confidence Level Mapping â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 8: Confidence Level Mapping
 // **Validates: Requirement 4.2**
@@ -1186,7 +1186,7 @@ fn confidence_low_threshold() {
         .expect("confidence_low_threshold failed");
 }
 
-/// Property 8d: Mapping is exhaustive — every score in [0.0, 1.0] maps to exactly one level.
+/// Property 8d: Mapping is exhaustive â€” every score in [0.0, 1.0] maps to exactly one level.
 #[test]
 fn confidence_mapping_exhaustive() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1211,7 +1211,7 @@ fn confidence_mapping_exhaustive() {
         .expect("confidence_mapping_exhaustive failed");
 }
 
-/// Property 8e: Mapping is monotonic — higher scores never map to lower confidence levels.
+/// Property 8e: Mapping is monotonic â€” higher scores never map to lower confidence levels.
 /// Confidence ordering: High > Medium > Low.
 #[test]
 fn confidence_mapping_monotonic() {
@@ -1261,7 +1261,7 @@ fn confidence_mapping_monotonic() {
         .expect("confidence_mapping_monotonic failed");
 }
 
-// ── Property 9: Confidence-Based Receipt Routing ──────────────────────────────
+// â”€â”€ Property 9: Confidence-Based Receipt Routing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 9: Confidence-Based Receipt Routing
 // **Validates: Requirements 4.3, 4.4**
@@ -1294,7 +1294,7 @@ fn determine_extraction_status(
     "pending_confirmation"
 }
 
-/// Property 9a: High confidence with resolved tenant → status is `pending_confirmation`.
+/// Property 9a: High confidence with resolved tenant â†’ status is `pending_confirmation`.
 #[test]
 fn receipt_routing_high_confidence_resolved_tenant() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1317,7 +1317,7 @@ fn receipt_routing_high_confidence_resolved_tenant() {
         .expect("receipt_routing_high_confidence_resolved_tenant failed");
 }
 
-/// Property 9b: Medium or Low confidence → status is `pending_confirmation` regardless of tenant resolution.
+/// Property 9b: Medium or Low confidence â†’ status is `pending_confirmation` regardless of tenant resolution.
 #[test]
 fn receipt_routing_medium_low_always_pending_confirmation() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1375,7 +1375,7 @@ fn receipt_routing_always_pending_confirmation() {
         .expect("receipt_routing_always_pending_confirmation failed");
 }
 
-// ── Strategies for Balance and Currency Formatting ─────────────────────
+// â”€â”€ Strategies for Balance and Currency Formatting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 use rust_decimal::Decimal;
 
@@ -1445,7 +1445,7 @@ fn calculate_balance(payments: &[TestPayment]) -> std::collections::HashMap<Stri
     totals
 }
 
-// ── Property 10: Balance Calculation Correctness ──────────────────────────────
+// â”€â”€ Property 10: Balance Calculation Correctness â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 10: Balance Calculation Correctness
 // **Validates: Requirements 5.1, 5.3**
@@ -1534,7 +1534,7 @@ fn balance_excludes_paid_payments() {
         .expect("balance_excludes_paid_payments failed");
 }
 
-/// Property 10c: Balance never mixes currencies — each currency total is independent.
+/// Property 10c: Balance never mixes currencies â€” each currency total is independent.
 #[test]
 fn balance_never_mixes_currencies() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1582,7 +1582,7 @@ fn balance_empty_payments_produces_empty_totals() {
     );
 }
 
-// ── Property 11: Currency Formatting ──────────────────────────────────────────
+// â”€â”€ Property 11: Currency Formatting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 11: Currency Formatting
 // **Validates: Requirements 5.1, 5.3**
@@ -1673,7 +1673,7 @@ fn currency_format_has_two_decimal_places() {
             |(amount, currency)| {
                 let formatted = format_currency(amount, &currency);
 
-                // Find the last '.' in the string — it should be followed by exactly 2 digits
+                // Find the last '.' in the string â€” it should be followed by exactly 2 digits
                 let dot_pos = formatted.rfind('.');
                 prop_assert!(
                     dot_pos.is_some(),
@@ -1708,7 +1708,7 @@ fn currency_format_has_two_decimal_places() {
         .expect("currency_format_has_two_decimal_places failed");
 }
 
-/// Property 11d: Currency symbols never mix — DOP symbol never appears with USD input and vice versa.
+/// Property 11d: Currency symbols never mix â€” DOP symbol never appears with USD input and vice versa.
 #[test]
 fn currency_format_never_mixes_symbols() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1742,19 +1742,19 @@ fn currency_format_never_mixes_symbols() {
         .expect("currency_format_never_mixes_symbols failed");
 }
 
-// ── Strategies for Maintenance Request Defaults ────────────────────────
+// â”€â”€ Strategies for Maintenance Request Defaults â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 use crate::services::chatbot::resolve_maintenance_defaults;
 
 /// Valid priorities for maintenance requests.
 const TEST_VALID_PRIORITIES: &[&str] = &["baja", "media", "alta", "urgente"];
 
-/// Generate a valid maintenance description (2–1000 chars).
+/// Generate a valid maintenance description (2â€“1000 chars).
 fn arb_valid_description() -> impl Strategy<Value = String> {
     "[A-Za-z0-9 .,!?]{2,200}"
 }
 
-/// Generate an invalid description (too short: 0–1 chars).
+/// Generate an invalid description (too short: 0â€“1 chars).
 fn arb_short_description() -> impl Strategy<Value = String> {
     prop_oneof![Just(String::new()), "[a-z]{1,1}",]
 }
@@ -1781,7 +1781,7 @@ fn arb_invalid_priority() -> impl Strategy<Value = String> {
     })
 }
 
-// ── Property 12: Maintenance Request Defaults and Linking ─────────────────────
+// â”€â”€ Property 12: Maintenance Request Defaults and Linking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 12: Maintenance Request Defaults and Linking
 // **Validates: Requirements 6.1, 6.2**
@@ -1923,7 +1923,7 @@ fn maintenance_always_linked_to_property() {
         .expect("maintenance_always_linked_to_property failed");
 }
 
-/// Property 12d: Description validation — too short (< 2 chars) is rejected.
+/// Property 12d: Description validation â€” too short (< 2 chars) is rejected.
 #[test]
 fn maintenance_rejects_short_description() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1951,7 +1951,7 @@ fn maintenance_rejects_short_description() {
         .expect("maintenance_rejects_short_description failed");
 }
 
-/// Property 12e: Description validation — too long (> 1000 chars) is rejected.
+/// Property 12e: Description validation â€” too long (> 1000 chars) is rejected.
 #[test]
 fn maintenance_rejects_long_description() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2010,7 +2010,7 @@ fn maintenance_rejects_invalid_priority() {
         .expect("maintenance_rejects_invalid_priority failed");
 }
 
-// ── Pure Models for Receipt Status Transitions ────────────────────────────────
+// â”€â”€ Pure Models for Receipt Status Transitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /// Valid receipt extraction statuses.
 const RECEIPT_STATUS_PENDING: &str = "pending_confirmation";
@@ -2048,7 +2048,7 @@ enum TransitionResult {
 }
 
 /// Pure model of the confirm receipt status transition.
-/// Mirrors `confirm_receipt`: only transitions from `pending_confirmation` → `confirmed`.
+/// Mirrors `confirm_receipt`: only transitions from `pending_confirmation` â†’ `confirmed`.
 fn try_confirm(extraction: &TestReceiptExtraction, user_id: Uuid) -> TransitionResult {
     if extraction.status != RECEIPT_STATUS_PENDING {
         return TransitionResult::Rejected;
@@ -2060,7 +2060,7 @@ fn try_confirm(extraction: &TestReceiptExtraction, user_id: Uuid) -> TransitionR
 }
 
 /// Pure model of the reject receipt status transition.
-/// Mirrors `reject_receipt`: only transitions from `pending_confirmation` → `rejected`.
+/// Mirrors `reject_receipt`: only transitions from `pending_confirmation` â†’ `rejected`.
 fn try_reject(extraction: &TestReceiptExtraction) -> TransitionResult {
     if extraction.status != RECEIPT_STATUS_PENDING {
         return TransitionResult::Rejected;
@@ -2071,7 +2071,7 @@ fn try_reject(extraction: &TestReceiptExtraction) -> TransitionResult {
     }
 }
 
-// ── Strategies for Receipt Status Transitions ─────────────────────────────────
+// â”€â”€ Strategies for Receipt Status Transitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /// Generate a receipt extraction status.
 fn arb_receipt_status() -> impl Strategy<Value = String> {
@@ -2115,7 +2115,7 @@ fn arb_extraction_list(max_len: usize) -> impl Strategy<Value = Vec<TestReceiptE
     })
 }
 
-// ── Property 15: Pending Receipts Visibility ──────────────────────────────────
+// â”€â”€ Property 15: Pending Receipts Visibility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 15: Pending Receipts Visibility
 // **Validates: Requirement 8.1**
@@ -2225,7 +2225,7 @@ fn pending_receipts_scoped_to_org() {
         .expect("pending_receipts_scoped_to_org failed");
 }
 
-// ── Property 16: Receipt Status Transitions ───────────────────────────────────
+// â”€â”€ Property 16: Receipt Status Transitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 16: Receipt Status Transitions
 // **Validates: Requirements 8.2, 8.3**
@@ -2444,7 +2444,7 @@ fn pending_only_transitions_to_confirmed_or_rejected() {
         .expect("pending_only_transitions_to_confirmed_or_rejected failed");
 }
 
-// ── Property 5: System Prompt Composition Completeness ────────────────────────
+// â”€â”€ Property 5: System Prompt Composition Completeness â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 5: System Prompt Composition Completeness
 // **Validates: Requirement 3.1**
@@ -2453,10 +2453,10 @@ use crate::services::ai_module::{ChatbotPersona, TenantContext, compose_system_p
 
 /// Generate a non-empty arbitrary string for persona fields.
 fn arb_nonempty_string() -> impl Strategy<Value = String> {
-    "[A-Za-z0-9 áéíóúñ]{1,80}"
+    "[A-Za-z0-9 Ã¡Ã©Ã­Ã³ÃºÃ±]{1,80}"
 }
 
-/// Generate an arbitrary FAQ list (1–10 entries with non-empty Q&A).
+/// Generate an arbitrary FAQ list (1â€“10 entries with non-empty Q&A).
 fn arb_faq_list() -> impl Strategy<Value = Vec<FaqEntry>> {
     prop::collection::vec(
         (arb_nonempty_string(), arb_nonempty_string()).prop_map(|(q, a)| FaqEntry {
@@ -2788,7 +2788,7 @@ fn system_prompt_composition_completeness_combined() {
         .expect("system_prompt_composition_completeness_combined failed");
 }
 
-// ── Property 7: Tool Registration Matches Capabilities ────────────────────────
+// â”€â”€ Property 7: Tool Registration Matches Capabilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 7: Tool Registration Matches Capabilities
 // **Validates: Requirements 3.5, 3.6**
@@ -2819,7 +2819,7 @@ fn expected_tools_for_capabilities(caps: &Capabilities) -> HashSet<&'static str>
 }
 
 /// Property 7a: For any combination of capability booleans, the returned tool set
-/// matches exactly the expected set — no more, no fewer.
+/// matches exactly the expected set â€” no more, no fewer.
 #[test]
 fn tool_registration_matches_capabilities_exactly() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2937,7 +2937,7 @@ fn enabled_capabilities_always_produce_tools() {
         .expect("enabled_capabilities_always_produce_tools failed");
 }
 
-// ── Property 19: Internal Webhook Authentication ──────────────────────────────
+// â”€â”€ Property 19: Internal Webhook Authentication â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 19: Internal Webhook Authentication
 // **Validates: Requirements 10.1, 10.2**
@@ -2953,9 +2953,9 @@ enum AuthResult {
 
 /// Pure model of the internal webhook authentication logic.
 /// Given a configured secret and an optional provided token:
-/// - If token is None (missing header) → reject
-/// - If token does not match secret → reject
-/// - If token matches secret → accept
+/// - If token is None (missing header) â†’ reject
+/// - If token does not match secret â†’ reject
+/// - If token matches secret â†’ accept
 fn authenticate_webhook(configured_secret: &str, provided_token: Option<&str>) -> AuthResult {
     provided_token.map_or(AuthResult::Rejected, |token| {
         if constant_time_eq(token.as_bytes(), configured_secret.as_bytes()) {
@@ -3047,7 +3047,7 @@ fn webhook_auth_missing_token_always_rejected() {
         .expect("webhook_auth_missing_token_always_rejected failed");
 }
 
-/// Property 19d: Constant-time comparison — equal strings return true, different strings return false.
+/// Property 19d: Constant-time comparison â€” equal strings return true, different strings return false.
 /// This tests the actual `constant_time_eq` implementation directly.
 #[test]
 fn webhook_auth_constant_time_eq_correctness() {
@@ -3074,7 +3074,7 @@ fn webhook_auth_constant_time_eq_correctness() {
         .expect("webhook_auth_constant_time_eq_correctness failed");
 }
 
-// ── Property 4: Unauthorized Senders Do Not Invoke AI ─────────────────────────
+// â”€â”€ Property 4: Unauthorized Senders Do Not Invoke AI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 4: Unauthorized Senders Do Not Invoke AI
 // **Validates: Requirements 2.4, 9.7**
@@ -3093,9 +3093,9 @@ enum AiInvocationDecision {
 /// determines whether the AI_Module should be invoked.
 ///
 /// This mirrors the logic in `chatbot_internal.rs`:
-/// - Step 2: if `!cfg.activo` → discard (Skip)
-/// - Step 3: if `!is_allowed` → discard (Skip)
-/// - Otherwise → proceed to AI invocation (Invoke)
+/// - Step 2: if `!cfg.activo` â†’ discard (Skip)
+/// - Step 3: if `!is_allowed` â†’ discard (Skip)
+/// - Otherwise â†’ proceed to AI invocation (Invoke)
 fn pipeline_decision(activo: bool, sender_authorized: bool) -> AiInvocationDecision {
     if !activo {
         return AiInvocationDecision::Skip;
@@ -3183,7 +3183,7 @@ fn ai_invoked_only_when_active_and_authorized() {
         .expect("ai_invoked_only_when_active_and_authorized failed");
 }
 
-/// Property 4d: Integration with sender policy — combining `activo` flag with
+/// Property 4d: Integration with sender policy â€” combining `activo` flag with
 /// `check_sender_policy_no_db` results. For policies that can be resolved without DB
 /// (tenants_and_prospects, allowlist, unrecognized), the pipeline decision is deterministic.
 #[test]
@@ -3239,14 +3239,14 @@ fn pipeline_decision_with_sender_policy() {
                     );
                 }
             }
-            // tenants_only returns None (needs DB) — skip those cases
+            // tenants_only returns None (needs DB) â€” skip those cases
 
             Ok(())
         })
         .expect("pipeline_decision_with_sender_policy failed");
 }
 
-// ── Property 18: Role-Based Access Control for Configuration ──────────────────
+// â”€â”€ Property 18: Role-Based Access Control for Configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 18: Role-Based Access Control for Configuration
 // **Validates: Requirement 9.6**
@@ -3306,7 +3306,7 @@ fn rbac_non_admin_roles_always_forbidden() {
         .expect("rbac_non_admin_roles_always_forbidden failed");
 }
 
-// ── Property 20: Handoff Ceases AI Responses ──────────────────────────────────
+// â”€â”€ Property 20: Handoff Ceases AI Responses â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 20: Handoff Ceases AI Responses
 // **Validates: Requirement 11.3**
@@ -3314,9 +3314,9 @@ fn rbac_non_admin_roles_always_forbidden() {
 /// Handoff state machine states.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HandoffState {
-    /// No handoff active — AI processes messages normally.
+    /// No handoff active â€” AI processes messages normally.
     None,
-    /// Awaiting human operator — AI is NOT invoked.
+    /// Awaiting human operator â€” AI is NOT invoked.
     AwaitingHuman,
 }
 
@@ -3456,7 +3456,7 @@ fn handoff_cleared_ai_resumes() {
 }
 
 /// Property 20c: Setting handoff then clearing it returns to normal operation.
-/// For any sequence of messages after set→clear, AI is always invoked.
+/// For any sequence of messages after setâ†’clear, AI is always invoked.
 #[test]
 fn handoff_set_then_clear_returns_to_normal() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -3484,7 +3484,7 @@ fn handoff_set_then_clear_returns_to_normal() {
                 prop_assert_eq!(
                     state,
                     HandoffState::None,
-                    "State must be None after set→clear cycle"
+                    "State must be None after setâ†’clear cycle"
                 );
 
                 // All subsequent messages should invoke AI
@@ -3492,7 +3492,7 @@ fn handoff_set_then_clear_returns_to_normal() {
                 for (i, action) in messages.iter().enumerate() {
                     prop_assert!(
                         should_invoke_ai(current),
-                        "Message #{}: AI should be invoked after set→clear (state={:?})",
+                        "Message #{}: AI should be invoked after setâ†’clear (state={:?})",
                         i,
                         current
                     );
@@ -3549,7 +3549,7 @@ fn handoff_ai_invocation_consistent_with_state() {
         .expect("handoff_ai_invocation_consistent_with_state failed");
 }
 
-/// Property 20e: SetHandoff is idempotent — setting handoff when already awaiting
+/// Property 20e: SetHandoff is idempotent â€” setting handoff when already awaiting
 /// keeps the state as AwaitingHuman.
 #[test]
 fn handoff_set_is_idempotent() {
@@ -3582,7 +3582,7 @@ fn handoff_set_is_idempotent() {
         .expect("handoff_set_is_idempotent failed");
 }
 
-// ── Property 13: Conversation Persistence Completeness ────────────────────────
+// â”€â”€ Property 13: Conversation Persistence Completeness â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Feature: whatsapp-ai-assistant, Property 13: Conversation Persistence Completeness
 // **Validates: Requirement 7.1**
@@ -3637,7 +3637,7 @@ fn arb_message_type() -> impl Strategy<Value = String> {
 
 /// Generate non-empty message content.
 fn arb_message_content() -> impl Strategy<Value = String> {
-    "[A-Za-z0-9 .,!?áéíóúñ]{1,500}"
+    "[A-Za-z0-9 .,!?Ã¡Ã©Ã­Ã³ÃºÃ±]{1,500}"
 }
 
 /// Property 13a: For any valid inputs, the persisted record has non-null sender_phone,
@@ -3833,235 +3833,4 @@ fn conversation_persistence_generates_valid_id() {
             },
         )
         .expect("conversation_persistence_generates_valid_id failed");
-}
-
-// ── Property 8: Blocked Pattern Regex Validation ──────────────────────────────
-
-// Feature: native-rig-agent-guardrails, Property 8: Blocked Pattern Regex Validation
-// **Validates: Requirements 6.8**
-
-use crate::models::chatbot::{AgentConfig, GuardrailOverrides};
-use crate::services::chatbot::validate_agent_config;
-
-/// Generate a valid regex pattern string.
-fn arb_valid_regex() -> impl Strategy<Value = String> {
-    prop_oneof![
-        Just(r"\d+".to_string()),
-        Just(r"[a-z]+".to_string()),
-        Just(r"foo|bar".to_string()),
-        Just(r"^\w+$".to_string()),
-        Just(r"test.*pattern".to_string()),
-        Just(r"(abc)+".to_string()),
-        Just(r"[0-9]{2,4}".to_string()),
-        Just(r"\bword\b".to_string()),
-        "[a-zA-Z0-9.]{1,30}".prop_map(|s| s), // literal strings are valid regexes
-    ]
-}
-
-/// Generate an invalid regex pattern string (unclosed brackets, unmatched parens, etc.).
-fn arb_invalid_regex() -> impl Strategy<Value = String> {
-    prop_oneof![
-        Just("[unclosed".to_string()),
-        Just("(unmatched".to_string()),
-        Just("[z-a]".to_string()),
-        Just("*invalid".to_string()),
-        Just("(?P<>bad)".to_string()),
-        Just("\\".to_string()),
-        Just("(?i".to_string()),
-        Just("[".to_string()),
-        Just("(".to_string()),
-        Just("(?P<name".to_string()),
-    ]
-}
-
-/// Generate a list of 0–20 valid regex patterns.
-fn arb_valid_patterns(max_len: usize) -> impl Strategy<Value = Vec<String>> {
-    prop::collection::vec(arb_valid_regex(), 0..=max_len)
-}
-
-/// Property 8: FOR ALL AgentConfig values, `validate_agent_config` returns Ok
-/// if and only if all patterns are valid regexes AND count ≤ 20.
-#[test]
-fn blocked_pattern_valid_regexes_within_limit_pass() {
-    let mut runner = TestRunner::new(ProptestConfig {
-        cases: crate::test_support::pbt_cases(),
-        ..Default::default()
-    });
-
-    runner
-        .run(&arb_valid_patterns(20), |patterns| {
-            let config = AgentConfig {
-                guardrails: Some(GuardrailOverrides {
-                    blocked_patterns: Some(patterns.clone()),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            };
-
-            let result = validate_agent_config(&config);
-            prop_assert!(
-                result.is_ok(),
-                "Valid patterns (count={}) should pass validation, got: {:?}",
-                patterns.len(),
-                result.err()
-            );
-            Ok(())
-        })
-        .expect("blocked_pattern_valid_regexes_within_limit_pass failed");
-}
-
-/// Property 8: Any invalid regex in blocked_patterns causes validation to fail.
-#[test]
-fn blocked_pattern_invalid_regex_fails() {
-    let mut runner = TestRunner::new(ProptestConfig {
-        cases: crate::test_support::pbt_cases(),
-        ..Default::default()
-    });
-
-    runner
-        .run(
-            &(arb_valid_patterns(10), arb_invalid_regex()),
-            |(mut patterns, invalid)| {
-                // Insert the invalid pattern at a random position
-                patterns.push(invalid.clone());
-
-                let config = AgentConfig {
-                    guardrails: Some(GuardrailOverrides {
-                        blocked_patterns: Some(patterns),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                };
-
-                let result = validate_agent_config(&config);
-                prop_assert!(
-                    result.is_err(),
-                    "Invalid regex '{}' should cause validation to fail",
-                    invalid
-                );
-                Ok(())
-            },
-        )
-        .expect("blocked_pattern_invalid_regex_fails failed");
-}
-
-/// Property 8: More than 20 patterns causes validation to fail regardless of validity.
-#[test]
-fn blocked_pattern_exceeding_max_count_fails() {
-    let mut runner = TestRunner::new(ProptestConfig {
-        cases: crate::test_support::pbt_cases(),
-        ..Default::default()
-    });
-
-    runner
-        .run(
-            &prop::collection::vec(arb_valid_regex(), 21..=40),
-            |patterns| {
-                let config = AgentConfig {
-                    guardrails: Some(GuardrailOverrides {
-                        blocked_patterns: Some(patterns.clone()),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                };
-
-                let result = validate_agent_config(&config);
-                prop_assert!(
-                    result.is_err(),
-                    "More than 20 patterns (count={}) should fail validation",
-                    patterns.len()
-                );
-                Ok(())
-            },
-        )
-        .expect("blocked_pattern_exceeding_max_count_fails failed");
-}
-
-/// Property 8: Empty patterns list always passes validation.
-#[test]
-fn blocked_pattern_empty_list_passes() {
-    let mut runner = TestRunner::new(ProptestConfig {
-        cases: crate::test_support::pbt_cases(),
-        ..Default::default()
-    });
-
-    runner
-        .run(&any::<bool>(), |_| {
-            let config = AgentConfig {
-                guardrails: Some(GuardrailOverrides {
-                    blocked_patterns: Some(vec![]),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            };
-
-            let result = validate_agent_config(&config);
-            prop_assert!(
-                result.is_ok(),
-                "Empty patterns list should pass validation, got: {:?}",
-                result.err()
-            );
-            Ok(())
-        })
-        .expect("blocked_pattern_empty_list_passes failed");
-}
-
-/// Property 8: No guardrails at all passes validation.
-#[test]
-fn blocked_pattern_no_guardrails_passes() {
-    let mut runner = TestRunner::new(ProptestConfig {
-        cases: crate::test_support::pbt_cases(),
-        ..Default::default()
-    });
-
-    runner
-        .run(&any::<bool>(), |_| {
-            let config = AgentConfig {
-                guardrails: None,
-                ..Default::default()
-            };
-
-            let result = validate_agent_config(&config);
-            prop_assert!(
-                result.is_ok(),
-                "No guardrails should pass validation, got: {:?}",
-                result.err()
-            );
-            Ok(())
-        })
-        .expect("blocked_pattern_no_guardrails_passes failed");
-}
-
-/// Property 8: Exactly 20 valid patterns passes validation (boundary).
-#[test]
-fn blocked_pattern_exactly_20_valid_passes() {
-    let mut runner = TestRunner::new(ProptestConfig {
-        cases: crate::test_support::pbt_cases(),
-        ..Default::default()
-    });
-
-    runner
-        .run(
-            &prop::collection::vec(arb_valid_regex(), 20..=20),
-            |patterns| {
-                prop_assert_eq!(patterns.len(), 20);
-
-                let config = AgentConfig {
-                    guardrails: Some(GuardrailOverrides {
-                        blocked_patterns: Some(patterns),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                };
-
-                let result = validate_agent_config(&config);
-                prop_assert!(
-                    result.is_ok(),
-                    "Exactly 20 valid patterns should pass validation, got: {:?}",
-                    result.err()
-                );
-                Ok(())
-            },
-        )
-        .expect("blocked_pattern_exactly_20_valid_passes failed");
 }

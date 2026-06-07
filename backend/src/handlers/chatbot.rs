@@ -783,7 +783,7 @@ pub async fn delete_guidance_rule_handler(
     Ok(HttpResponse::NoContent().finish())
 }
 
-/// PUT `/api/v1/chatbot/guidance-rules/batch` — batch update enabled/sort_order for multiple rules.
+/// PUT `/api/v1/chatbot/guidance-rules/batch` — Batch-update `enabled` and `sort_order` for multiple rules.
 pub async fn batch_update_guidance_rules_handler(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,

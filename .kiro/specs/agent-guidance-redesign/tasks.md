@@ -77,7 +77,7 @@ Replace the monolithic `system_prompt` freetext with structured, categorized gui
     - Add route scope under `/api/v1/chatbot/guidance-rules`
     - _Requirements: 4.3, 4.4, 4.5, 4.6_
 
-- [~] 5. Checkpoint — Backend compiles and tests pass
+- [x] 5. Checkpoint — Backend compiles and tests pass
   - Ensure all existing chatbot tests still pass with updated DTOs.
   - Verify compose_system_prompt produces correct output with sample guidance rules.
 

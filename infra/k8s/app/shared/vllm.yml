@@ -38,7 +38,7 @@ spec:
           image: intel/vllm:latest
           command: ["vllm", "serve"]
           args:
-            - "Qwen/Qwen3-30B-A3B"
+            - "Qwen/Qwen3-8B"
             - "--dtype=bfloat16"
             - "--enforce-eager"
             - "--port"
