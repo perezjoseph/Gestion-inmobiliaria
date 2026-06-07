@@ -48,6 +48,7 @@ pub mod m20260606_000002_create_gastos_recurrentes;
 pub mod m20260606_000003_create_mantenimiento_programado;
 pub mod m20260607_000001_add_guidance_rules_to_chatbot_config;
 pub mod m20260607_000002_seed_guidance_rule_templates;
+pub mod m20260608_000001_add_password_changed_at;
 
 use sea_orm_migration::prelude::*;
 
@@ -106,6 +107,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260601_000009_create_copropietarios::Migration),
             Box::new(m20260607_000001_add_guidance_rules_to_chatbot_config::Migration),
             Box::new(m20260607_000002_seed_guidance_rule_templates::Migration),
+            Box::new(m20260608_000001_add_password_changed_at::Migration),
         ]
     }
 }

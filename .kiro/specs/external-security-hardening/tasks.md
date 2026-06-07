@@ -72,7 +72,7 @@ This plan addresses 9 external attack vectors identified during a security audit
     - _Requirements: 4.1, 4.3_
 
 - [ ] 6. JWT token improvements
-  - [~] 6.1 Create database migration for `password_changed_at`
+  - [x] 6.1 Create database migration for `password_changed_at`
     - Create `m{date}_000001_add_password_changed_at.rs`
     - Add `password_changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` to `usuarios`
     - Backfill existing rows: `SET password_changed_at = created_at`

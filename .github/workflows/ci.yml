@@ -371,7 +371,8 @@ jobs:
     name: Deploy
     needs: [containers, ocr-container, baileys-container]
     if: >-
-      github.ref == 'refs/heads/main' && github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') &&
+      github.event_name == 'push' &&
       needs.containers.result == 'success' &&
       (needs.ocr-container.result == 'success' || needs.ocr-container.result == 'skipped') &&
       (needs.baileys-container.result == 'success' || needs.baileys-container.result == 'skipped')
@@ -388,6 +389,8 @@ jobs:
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_DATA }}
+      DEV_POSTGRES_PASSWORD: ${{ secrets.DEV_POSTGRES_PASSWORD }}
+      DEV_JWT_SECRET: ${{ secrets.DEV_JWT_SECRET }}
 
   # ── Stage 4: Kiro Autofix ──
   # Autofix is handled by a separate workflow_run-triggered workflow

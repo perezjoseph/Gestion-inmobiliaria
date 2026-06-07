@@ -1,6 +1,6 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: ["baileys-service/**/*", "backend/migrations/**/*whatsapp*", "infra/k8s/app/baileys.yml"]
+fileMatchPattern: ["baileys-service/**/*", "backend/migrations/**/*whatsapp*", "infra/k8s/app/base/baileys.yml"]
 ---
 
 # Baileys Session Persistence
