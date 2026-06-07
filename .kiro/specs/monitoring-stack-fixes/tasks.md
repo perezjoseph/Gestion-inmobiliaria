@@ -79,7 +79,7 @@ Fix five operational defects in the Kubernetes monitoring stack: deploy kube-sta
     - _Preservation: Existing scrape_configs (xpumanager, node-exporter, backend, backend-dev, vllm) unchanged_
     - _Requirements: 2.1_
 
-  - [~] 3.3 Add Loki compactor retention configuration
+  - [x] 3.3 Add Loki compactor retention configuration
     - In `infra/k8s/logging.yml`, add `retention_enabled: true` and `delete_request_store: filesystem` to the `compactor` section
     - Add `retention_period: 336h` to the `limits_config` section
     - _Bug_Condition: lokiRetentionConfigured(config) is false — compactor has no retention fields_
