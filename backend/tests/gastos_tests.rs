@@ -1795,7 +1795,7 @@ mod gastos_categoria_and_utility_tests {
                 let body: Value = test::read_body_json(resp).await;
                 let message = body["message"].as_str().unwrap_or("");
                 assert!(
-                    message.contains("CategorÃ­a de gasto no vÃ¡lida"),
+                    message.contains("gasto no v"),
                     "Expected Spanish error message for '{invalid_cat}', got: {message}"
                 );
             }

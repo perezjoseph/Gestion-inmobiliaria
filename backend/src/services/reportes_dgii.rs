@@ -660,6 +660,74 @@ pub async fn calcular_itbis_neto(
     })
 }
 
+/// Preview an existing borrador report for a given tipo and periodo.
+pub async fn preview_reporte(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    tipo: &str,
+    periodo: &str,
+) -> Result<reporte_dgii::Model, AppError> {
+    use crate::services::fiscal::obtener_org_con_acceso_fiscal;
+
+    obtener_org_con_acceso_fiscal(db, org_id).await?;
+
+    if tipo != "606" && tipo != "607" {
+        return Err(AppError::Validation(
+            "Tipo de reporte debe ser '606' o '607'".to_string(),
+        ));
+    }
+
+    reporte_dgii::Entity::find()
+        .filter(reporte_dgii::Column::OrganizacionId.eq(org_id))
+        .filter(reporte_dgii::Column::TipoReporte.eq(tipo))
+        .filter(reporte_dgii::Column::Periodo.eq(periodo))
+        .filter(reporte_dgii::Column::Estado.eq("borrador"))
+        .one(db)
+        .await?
+        .ok_or_else(|| {
+            AppError::NotFound("Reporte no encontrado. Genere el reporte primero.".to_string())
+        })
+}
+
+/// Mark a report as "enviado".
+pub async fn actualizar_estado_reporte(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    reporte_id: Uuid,
+    estado: &str,
+) -> Result<reporte_dgii::Model, AppError> {
+    use crate::services::fiscal::obtener_org_con_acceso_fiscal;
+
+    obtener_org_con_acceso_fiscal(db, org_id).await?;
+
+    if estado != "enviado" {
+        return Err(AppError::Validation(
+            "Estado solo puede ser 'enviado'".to_string(),
+        ));
+    }
+
+    let reporte = reporte_dgii::Entity::find_by_id(reporte_id)
+        .filter(reporte_dgii::Column::OrganizacionId.eq(org_id))
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Reporte no encontrado".to_string()))?;
+
+    if reporte.estado == "enviado" {
+        return Err(AppError::Conflict(
+            "Reporte ya fue enviado a DGII para este período".to_string(),
+        ));
+    }
+
+    let now = chrono::Utc::now().into();
+    let mut active: reporte_dgii::ActiveModel = reporte.into();
+    active.estado = Set("enviado".to_string());
+    active.submitted_at = Set(Some(now));
+    active.updated_at = Set(now);
+
+    let updated = active.update(db).await?;
+    Ok(updated)
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {

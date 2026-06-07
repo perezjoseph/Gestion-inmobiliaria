@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use crate::entities::organizacion;
 use crate::errors::AppError;
-use crate::models::fiscal::TipoFiscal;
+use crate::models::fiscal::{EstadoFiscalResponse, TipoFiscal};
 use crate::services::validacion_fiscal::{validar_cedula, validar_rnc};
 
 /// Verify that the organization has fiscal access (is not informal).
@@ -17,6 +17,51 @@ pub fn verificar_acceso_fiscal(org: &organizacion::Model) -> Result<(), AppError
         ));
     }
     Ok(())
+}
+
+/// Fetch an organization by ID and verify it has fiscal access.
+pub async fn obtener_org_con_acceso_fiscal(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+) -> Result<organizacion::Model, AppError> {
+    let org = organizacion::Entity::find_by_id(org_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Organización no encontrada".to_string()))?;
+    verificar_acceso_fiscal(&org)?;
+    Ok(org)
+}
+
+/// Retrieve the current fiscal state of an organization.
+pub async fn obtener_estado_fiscal(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+) -> Result<EstadoFiscalResponse, AppError> {
+    let org = organizacion::Entity::find_by_id(org_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Organización no encontrada".to_string()))?;
+
+    Ok(obtener_estado_fiscal_from_model(&org))
+}
+
+/// Build the fiscal state response from an organization model.
+pub fn obtener_estado_fiscal_from_model(org: &organizacion::Model) -> EstadoFiscalResponse {
+    let tipo_fiscal = match org.tipo_fiscal.as_str() {
+        "persona_juridica" => TipoFiscal::PersonaJuridica,
+        "persona_fisica" => TipoFiscal::PersonaFisica,
+        _ => TipoFiscal::Informal,
+    };
+
+    EstadoFiscalResponse {
+        tipo_fiscal,
+        rnc: org.rnc.clone(),
+        cedula_rnc: org.cedula.clone(),
+        razon_social: org.razon_social.clone(),
+        regimen_pagos: org.regimen_pagos.clone(),
+        fecha_inicio_operaciones: org.fecha_inicio_operaciones,
+        is_ecf_certificado: org.is_ecf_certificado,
+    }
 }
 
 /// Update the fiscal type of an organization, validating the identifier before persisting.

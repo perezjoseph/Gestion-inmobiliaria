@@ -242,6 +242,48 @@ pub async fn verificar_consumo_rango(
     Ok(alertas)
 }
 
+/// List all NCF sequences for an organization (with fiscal access check).
+pub async fn listar_secuencias(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+) -> Result<Vec<SecuenciaNcfResponse>, AppError> {
+    use crate::services::fiscal::obtener_org_con_acceso_fiscal;
+
+    obtener_org_con_acceso_fiscal(db, org_id).await?;
+
+    let secuencias = secuencia_ncf::Entity::find()
+        .filter(secuencia_ncf::Column::OrganizacionId.eq(org_id))
+        .all(db)
+        .await?;
+
+    let responses = secuencias.iter().map(to_response).collect();
+
+    Ok(responses)
+}
+
+/// Get NCF range consumption alerts (with fiscal access check).
+pub async fn obtener_alertas(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+) -> Result<Vec<AlertaRango>, AppError> {
+    use crate::services::fiscal::obtener_org_con_acceso_fiscal;
+
+    obtener_org_con_acceso_fiscal(db, org_id).await?;
+    verificar_consumo_rango(db, org_id).await
+}
+
+/// Configure an NCF range (with fiscal access check).
+pub async fn configurar_rango_con_acceso(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    input: ConfigurarRangoRequest,
+) -> Result<SecuenciaNcfResponse, AppError> {
+    use crate::services::fiscal::obtener_org_con_acceso_fiscal;
+
+    obtener_org_con_acceso_fiscal(db, org_id).await?;
+    configurar_rango(db, org_id, input).await
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 /// Map `TipoNCF` to its 2-digit type code for NCF string construction.
