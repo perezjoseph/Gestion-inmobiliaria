@@ -68,6 +68,7 @@ pub struct EstadoRequest {
 /// Result of ITBIS neto calculation (607 ITBIS - 606 ITBIS).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_field_names)]
 pub struct ItbisNetoResult {
     #[serde(deserialize_with = "deserialize_f64_from_any")]
     pub itbis_cobrado: f64,
