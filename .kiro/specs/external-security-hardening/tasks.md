@@ -131,8 +131,8 @@ This plan addresses 9 external attack vectors identified during a security audit
     - Document Secret creation in cloudflare-tunnel.yml comment pattern
     - _Requirements: 7.3, 7.4_
 
-- [ ] 9. Remove vLLM privileged mode
-  - [~] 9.1 Update `infra/k8s/app/shared/vllm.yml` security context
+- [x] 9. Remove vLLM privileged mode
+  - [x] 9.1 Update `infra/k8s/app/shared/vllm.yml` security context
     - Remove `privileged: true`
     - Add `allowPrivilegeEscalation: false`
     - Keep GPU resource request (`gpu.intel.com/xe: "1"`) which handles device access
