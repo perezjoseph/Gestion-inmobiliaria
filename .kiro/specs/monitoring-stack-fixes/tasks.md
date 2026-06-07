@@ -62,7 +62,7 @@ Fix five operational defects in the Kubernetes monitoring stack: deploy kube-sta
   - Mark task complete when tests are written, run, and passing on unfixed code
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
 
-- [ ] 3. Fix for monitoring stack infrastructure defects
+- [x] 3. Fix for monitoring stack infrastructure defects
 
   - [x] 3.1 Create kube-state-metrics manifest
     - Create new file `infra/k8s/kube-state-metrics.yml`
@@ -121,7 +121,7 @@ Fix five operational defects in the Kubernetes monitoring stack: deploy kube-sta
     - **EXPECTED OUTCOME**: Test PASSES (confirms all five bugs are fixed)
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-  - [~] 3.8 Verify preservation tests still pass
+  - [x] 3.8 Verify preservation tests still pass
     - **Property 2: Preservation** - Existing Monitoring Configuration Unchanged
     - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
     - Run preservation property tests from step 2
