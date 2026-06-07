@@ -150,6 +150,7 @@ spec:
             #   SMTP_FROM=no-reply@myhomeva.us
             - secretRef:
                 name: mailcow-smtp
+                optional: true
           env:
             - name: JWT_SECRET
               valueFrom:
