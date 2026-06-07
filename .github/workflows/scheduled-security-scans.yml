@@ -230,11 +230,11 @@ jobs:
           extra-context: "CodeQL analysis for Java/Kotlin failed. Check the SARIF results in GitHub Security tab."
 
   # ══════════════════════════════════════════════════════════════════════════════
-  # Semgrep
+  # Semgrep — unified scan (App rules + community rule packs in one job)
   # ══════════════════════════════════════════════════════════════════════════════
 
   semgrep:
-    name: Semgrep CI
+    name: Semgrep
     runs-on: arc-runner-dind
     permissions:
       contents: read
@@ -247,9 +247,27 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Run Semgrep CI
-        id: scan
+      - name: Run Semgrep CI (App-managed rules)
+        id: scan-ci
         run: semgrep ci 2>&1 | tee "${RUNNER_TEMP}/semgrep-ci-output.txt"
+
+      - name: Run community rule packs (language + security + infra)
+        id: scan-community
+        if: "!cancelled()"
+        run: |
+          semgrep scan \
+            --config "p/rust" \
+            --config "p/kotlin" \
+            --config "p/python" \
+            --config "p/fastapi" \
+            --config "p/owasp-top-ten" \
+            --config "p/trailofbits" \
+            --config "p/supply-chain" \
+            --config "p/docker" \
+            --config "p/dockerfile" \
+            --config "p/kubernetes" \
+            --config "p/github-actions" \
+            --error 2>&1 | tee "${RUNNER_TEMP}/semgrep-community-output.txt"
 
       - name: Collect diagnostics
         if: failure()
@@ -258,59 +276,8 @@ jobs:
           job-name: "scheduled-security-scans / semgrep"
           artifact-suffix: semgrep-ci
           step-outcomes: |
-            scan=${{ steps.scan.outcome }}
+            scan-ci=${{ steps.scan-ci.outcome }}
+            scan-community=${{ steps.scan-community.outcome }}
           output-files: |
             ${{ runner.temp }}/semgrep-ci-output.txt
-
-  semgrep-community:
-    name: Semgrep Community Rules
-    runs-on: arc-runner-dind
-    permissions:
-      contents: read
-    container:
-      image: semgrep/semgrep
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - name: Run enterprise security rules (SOC 1/2/3)
-        id: scan
-        run: |
-          semgrep scan \
-            --config "p/rust" \
-            --config "p/kotlin" \
-            --config "p/java" \
-            --config "p/python" \
-            --config "p/fastapi" \
-            --config "p/owasp-top-ten" \
-            --config "p/cwe-top-25" \
-            --config "p/command-injection" \
-            --config "p/sql-injection" \
-            --config "p/xss" \
-            --config "p/jwt" \
-            --config "p/insecure-transport" \
-            --config "p/secrets" \
-            --config "p/security-audit" \
-            --config "p/trailofbits" \
-            --config "p/supply-chain" \
-            --config "p/docker" \
-            --config "p/dockerfile" \
-            --config "p/kubernetes" \
-            --config "p/github-actions" \
-            --config "p/r2c-security-audit" \
-            --config "p/r2c-best-practices" \
-            --config "p/gitleaks" \
-            --config "p/default" \
-            --error 2>&1 | tee "${RUNNER_TEMP}/semgrep-community-output.txt"
-
-      - name: Collect diagnostics
-        if: failure()
-        uses: ./.github/actions/collect-diagnostics
-        with:
-          job-name: "scheduled-security-scans / semgrep-community"
-          artifact-suffix: semgrep-community
-          step-outcomes: |
-            scan=${{ steps.scan.outcome }}
-          output-files: |
             ${{ runner.temp }}/semgrep-community-output.txt

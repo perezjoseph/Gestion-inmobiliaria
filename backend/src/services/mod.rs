@@ -25,6 +25,7 @@ pub mod documento_editor;
 #[cfg(test)]
 mod documento_editor_pbt;
 pub mod documentos;
+pub mod file_validation;
 pub mod firmas;
 #[cfg(test)]
 mod firmas_pbt;

@@ -54,7 +54,7 @@ This plan addresses 9 external attack vectors identified during a security audit
   - Verify Caddyfile syntax is valid (caddy fmt or caddy validate)
 
 - [ ] 5. Implement file upload magic byte validation
-  - [~] 5.1 Create `backend/src/services/file_validation.rs`
+  - [x] 5.1 Create `backend/src/services/file_validation.rs`
     - Implement `validate_magic_bytes(data: &[u8], content_type: &str) -> Result<(), AppError>`
     - Support: JPEG (FF D8 FF), PNG (89 50 4E 47), PDF (%PDF), DOCX/XLSX (PK 50 4B 03 04)
     - Return AppError::Validation with clear Spanish message on mismatch
