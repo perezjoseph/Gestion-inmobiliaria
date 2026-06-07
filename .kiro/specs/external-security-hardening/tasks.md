@@ -112,7 +112,7 @@ This plan addresses 9 external attack vectors identified during a security audit
   - `cargo check` and run existing auth tests
   - Verify new migration applies cleanly
 
-- [ ] 8. Internal service authentication
+- [x] 8. Internal service authentication
   - [x] 8.1 Add OCR service bearer token to backend
     - Add `ocr_service_token: Option<String>` to `AppConfig` (from `OCR_SERVICE_TOKEN` env var)
     - In `OcrClient::new()`: read token from env
@@ -124,7 +124,7 @@ This plan addresses 9 external attack vectors identified during a security audit
     - In vLLM client requests: add `Authorization: Bearer <key>` header when configured
     - _Requirements: 7.4, 7.5_
 
-  - [~] 8.3 Update K8s deployment manifests for internal service tokens
+  - [x] 8.3 Update K8s deployment manifests for internal service tokens
     - Add `OCR_SERVICE_TOKEN` env var to backend deployment (from Secret)
     - Add `VLLM_API_KEY` env var to backend deployment (from Secret)
     - Add `--api-key` argument to vLLM deployment args (from env var)

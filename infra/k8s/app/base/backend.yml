@@ -72,6 +72,18 @@ spec:
               value: "30"
             - name: RUST_LOG
               value: "realestate_backend=info,actix_web=info"
+            - name: OCR_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: realestate-internal-service-tokens
+                  key: ocr-service-token
+                  optional: true
+            - name: VLLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: realestate-internal-service-tokens
+                  key: vllm-api-key
+                  optional: true
           volumeMounts:
             - name: uploads
               mountPath: /app/uploads
