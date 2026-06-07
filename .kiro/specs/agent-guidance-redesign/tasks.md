@@ -121,7 +121,7 @@ Replace the monolithic `system_prompt` freetext with structured, categorized gui
     - Add `pub mod guidance_rules_step;`
     - _Requirements: 7.1_
 
-- [~] 8. Checkpoint — Frontend compiles and renders correctly
+- [x] 8. Checkpoint — Frontend compiles and renders correctly
   - Verify the guidance rules section displays rules grouped by category.
   - Verify toggle changes persist via API.
   - Verify custom rule creation and deletion works.
