@@ -72,7 +72,7 @@ Fix five operational defects in the Kubernetes monitoring stack: deploy kube-sta
     - _Preservation: No existing manifests modified_
     - _Requirements: 2.1_
 
-  - [~] 3.2 Add kube-state-metrics scrape job to Prometheus config
+  - [x] 3.2 Add kube-state-metrics scrape job to Prometheus config
     - Add new `scrape_configs` entry in `infra/k8s/monitoring.yml` ConfigMap for job `kube-state-metrics` targeting `kube-state-metrics.monitoring.svc.cluster.local:8080`
     - _Bug_Condition: alerts reference kube_* metrics but no scrape job collects them_
     - _Expected_Behavior: Prometheus scrapes KSM and evaluates KSM-dependent alerts_
