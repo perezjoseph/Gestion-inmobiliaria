@@ -64,7 +64,7 @@ Fix five operational defects in the Kubernetes monitoring stack: deploy kube-sta
 
 - [ ] 3. Fix for monitoring stack infrastructure defects
 
-  - [~] 3.1 Create kube-state-metrics manifest
+  - [x] 3.1 Create kube-state-metrics manifest
     - Create new file `infra/k8s/kube-state-metrics.yml`
     - Include ServiceAccount, ClusterRole (list/watch on pods, jobs, deployments, nodes, namespaces, replicasets, statefulsets), ClusterRoleBinding, Deployment (registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.15.0, port 8080), and Service in monitoring namespace
     - _Bug_Condition: kubeStateMetricsDeployed(namespace) is false_
