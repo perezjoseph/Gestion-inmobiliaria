@@ -112,7 +112,7 @@ Fix five operational defects in the Kubernetes monitoring stack: deploy kube-sta
     - _Preservation: networkstorage target (192.168.88.22:9100) with node="networkstorage" label preserved as static_configs_
     - _Requirements: 2.5_
 
-  - [~] 3.7 Verify bug condition exploration test now passes
+  - [x] 3.7 Verify bug condition exploration test now passes
     - **Property 1: Expected Behavior** - Monitoring Stack Defects Resolved
     - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
     - The test from task 1 encodes the expected behavior for all five defects
