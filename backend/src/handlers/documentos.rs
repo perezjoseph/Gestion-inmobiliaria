@@ -106,6 +106,8 @@ pub async fn upload(
         AppError::Validation("El campo 'tipo_documento' es requerido".to_string())
     })?;
 
+    crate::services::file_validation::validate_magic_bytes(&file_data, &mime_type)?;
+
     let result = documentos::upload(
         db.get_ref(),
         &path.entity_type,
@@ -317,6 +319,8 @@ pub async fn digitalizar(
         .ok_or_else(|| AppError::Validation("Nombre de archivo no proporcionado".to_string()))?;
     let mime_type = content_type
         .ok_or_else(|| AppError::Validation("Tipo de contenido no proporcionado".to_string()))?;
+
+    crate::services::file_validation::validate_magic_bytes(&file_data, &mime_type)?;
 
     let result = documento_editor::digitalizar(
         db.get_ref(),

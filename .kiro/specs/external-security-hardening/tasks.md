@@ -62,7 +62,7 @@ This plan addresses 9 external attack vectors identified during a security audit
     - Add unit tests for each file type + rejection cases
     - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-  - [~] 5.2 Integrate magic byte validation into document upload handler
+  - [x] 5.2 Integrate magic byte validation into document upload handler
     - In `backend/src/handlers/documentos.rs` `upload()`: call `validate_magic_bytes` after reading file bytes, before calling storage service
     - Determine content type from extension (existing logic), then validate bytes match
     - _Requirements: 4.1, 4.3_
