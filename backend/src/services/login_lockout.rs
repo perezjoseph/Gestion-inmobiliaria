@@ -78,6 +78,7 @@ impl LoginLockout {
         if entry.count >= MAX_FAILURES {
             let locked_until = now + LOCKOUT_DURATION;
             entry.locked_until = Some(locked_until);
+            drop(entry);
             let remaining = locked_until.duration_since(now).as_secs();
             return Some(LockoutInfo {
                 retry_after_seconds: remaining.max(1),

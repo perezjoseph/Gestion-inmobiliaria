@@ -20,7 +20,7 @@ pub async fn register(
     }
 }
 
-#[allow(clippy::future_not_send)]
+#[allow(clippy::future_not_send)] // actix-web HttpRequest is !Send by design
 pub async fn login(
     req: HttpRequest,
     db: web::Data<DatabaseConnection>,
