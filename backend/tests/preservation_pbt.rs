@@ -338,10 +338,22 @@ fn test_compose_system_prompt_is_deterministic() {
                 let policies_ref = policies.as_deref();
 
                 // Call compose_system_prompt twice with identical inputs
-                let result1 =
-                    compose_system_prompt(&persona, tenant_ref, &faqs, policies_ref, &handoff_kw);
-                let result2 =
-                    compose_system_prompt(&persona, tenant_ref, &faqs, policies_ref, &handoff_kw);
+                let result1 = compose_system_prompt(
+                    &persona,
+                    tenant_ref,
+                    &faqs,
+                    policies_ref,
+                    &handoff_kw,
+                    &[],
+                );
+                let result2 = compose_system_prompt(
+                    &persona,
+                    tenant_ref,
+                    &faqs,
+                    policies_ref,
+                    &handoff_kw,
+                    &[],
+                );
 
                 // Property: same inputs always produce same output
                 prop_assert_eq!(
@@ -380,16 +392,8 @@ fn test_compose_system_prompt_is_deterministic() {
                     );
                 }
 
-                // Property: if system_prompt is set, it appears in the output
-                if let Some(ref sp) = persona.system_prompt {
-                    prop_assert!(
-                        result1.contains(sp),
-                        "System prompt must contain the system_prompt override when set. \
-                     system_prompt: {:?}, Prompt: {:?}",
-                        sp,
-                        result1
-                    );
-                }
+                // Property: system_prompt field is deprecated and no longer included
+                // (replaced by guidance rules)
 
                 // Property: if tenant context is set, tenant name appears in the output
                 if let Some(ref ctx) = tenant_ctx {

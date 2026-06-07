@@ -263,7 +263,7 @@ impl<'a> EvalRunner<'a> {
         &self,
         case: &EvalCase,
         organizacion_id: &Uuid,
-        agent_config: &AgentConfig,
+        _agent_config: &AgentConfig,
     ) -> EvalCaseResult {
         let persona = ChatbotPersona {
             tone: Some("profesional".to_string()),
@@ -295,7 +295,7 @@ impl<'a> EvalRunner<'a> {
             db: self.db,
             organizacion_id: *organizacion_id,
             sender_phone: "eval-runner",
-            agent_config: agent_config.clone(),
+            guidance_rules: &[],
         };
 
         match self.ai_module.process_message(&ctx).await {

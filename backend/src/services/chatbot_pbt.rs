@@ -2489,7 +2489,7 @@ fn system_prompt_contains_tone_when_present() {
                 language: "es-DO".to_string(),
             };
 
-            let prompt = compose_system_prompt(&config, None, &[], None, &[]);
+            let prompt = compose_system_prompt(&config, None, &[], None, &[], &[]);
             prop_assert!(
                 prompt.contains(&tone),
                 "Prompt must contain tone '{}', got: '{}'",
@@ -2518,7 +2518,7 @@ fn system_prompt_contains_greeting_when_present() {
                 language: "es-DO".to_string(),
             };
 
-            let prompt = compose_system_prompt(&config, None, &[], None, &[]);
+            let prompt = compose_system_prompt(&config, None, &[], None, &[], &[]);
             prop_assert!(
                 prompt.contains(&greeting),
                 "Prompt must contain greeting '{}', got: '{}'",
@@ -2530,9 +2530,10 @@ fn system_prompt_contains_greeting_when_present() {
         .expect("system_prompt_contains_greeting_when_present failed");
 }
 
-/// Property 5c: When system_prompt is Some, the composed prompt contains it.
+/// Property 5c: The deprecated system_prompt field is no longer included in the composed prompt
+/// (replaced by guidance rules).
 #[test]
-fn system_prompt_contains_system_prompt_override_when_present() {
+fn system_prompt_ignores_deprecated_system_prompt_field() {
     let mut runner = TestRunner::new(ProptestConfig {
         cases: crate::test_support::pbt_cases(),
         ..Default::default()
@@ -2547,16 +2548,16 @@ fn system_prompt_contains_system_prompt_override_when_present() {
                 language: "es-DO".to_string(),
             };
 
-            let prompt = compose_system_prompt(&config, None, &[], None, &[]);
+            let prompt = compose_system_prompt(&config, None, &[], None, &[], &[]);
             prop_assert!(
-                prompt.contains(&sys_prompt),
-                "Prompt must contain system_prompt '{}', got: '{}'",
+                !prompt.contains(&sys_prompt),
+                "Prompt must NOT contain deprecated system_prompt '{}', got: '{}'",
                 sys_prompt,
                 prompt
             );
             Ok(())
         })
-        .expect("system_prompt_contains_system_prompt_override_when_present failed");
+        .expect("system_prompt_ignores_deprecated_system_prompt_field failed");
 }
 
 /// Property 5d: Every FAQ question and answer appears in the composed prompt.
@@ -2576,7 +2577,7 @@ fn system_prompt_contains_all_faq_entries() {
                 language: "es-DO".to_string(),
             };
 
-            let prompt = compose_system_prompt(&config, None, &faqs, None, &[]);
+            let prompt = compose_system_prompt(&config, None, &faqs, None, &[], &[]);
 
             for (i, faq) in faqs.iter().enumerate() {
                 prop_assert!(
@@ -2616,7 +2617,7 @@ fn system_prompt_contains_policies_when_present() {
                 language: "es-DO".to_string(),
             };
 
-            let prompt = compose_system_prompt(&config, None, &[], Some(&policies), &[]);
+            let prompt = compose_system_prompt(&config, None, &[], Some(&policies), &[], &[]);
             prop_assert!(
                 prompt.contains(&policies),
                 "Prompt must contain policies '{}', got: '{}'",
@@ -2646,7 +2647,7 @@ fn system_prompt_contains_tenant_name_when_resolved() {
             };
             let tenant = TenantContext { name: name.clone() };
 
-            let prompt = compose_system_prompt(&config, Some(&tenant), &[], None, &[]);
+            let prompt = compose_system_prompt(&config, Some(&tenant), &[], None, &[], &[]);
             prop_assert!(
                 prompt.contains(&name),
                 "Prompt must contain tenant name '{}', got: '{}'",
@@ -2675,7 +2676,7 @@ fn system_prompt_contains_handoff_keywords_when_provided() {
                 language: "es-DO".to_string(),
             };
 
-            let prompt = compose_system_prompt(&config, None, &[], None, &keywords);
+            let prompt = compose_system_prompt(&config, None, &[], None, &keywords, &[]);
 
             for (i, kw) in keywords.iter().enumerate() {
                 prop_assert!(
@@ -2692,7 +2693,7 @@ fn system_prompt_contains_handoff_keywords_when_provided() {
 }
 
 /// Property 5 (combined): For any full persona configuration with all fields populated,
-/// the composed system prompt contains ALL elements simultaneously.
+/// the composed system prompt contains ALL active elements simultaneously.
 #[test]
 fn system_prompt_composition_completeness_combined() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2703,7 +2704,6 @@ fn system_prompt_composition_completeness_combined() {
     let strategy = (
         arb_nonempty_string(),  // tone
         arb_nonempty_string(),  // greeting
-        arb_nonempty_string(),  // system_prompt
         arb_nonempty_string(),  // tenant name
         arb_faq_list(),         // faqs
         arb_nonempty_string(),  // policies
@@ -2713,11 +2713,11 @@ fn system_prompt_composition_completeness_combined() {
     runner
         .run(
             &strategy,
-            |(tone, greeting, sys_prompt, tenant_name, faqs, policies, keywords)| {
+            |(tone, greeting, tenant_name, faqs, policies, keywords)| {
                 let config = ChatbotPersona {
                     tone: Some(tone.clone()),
                     greeting: Some(greeting.clone()),
-                    system_prompt: Some(sys_prompt.clone()),
+                    system_prompt: None,
                     language: "es-DO".to_string(),
                 };
                 let tenant = TenantContext {
@@ -2730,6 +2730,7 @@ fn system_prompt_composition_completeness_combined() {
                     &faqs,
                     Some(&policies),
                     &keywords,
+                    &[],
                 );
 
                 // Tone
@@ -2743,12 +2744,6 @@ fn system_prompt_composition_completeness_combined() {
                     prompt.contains(&greeting),
                     "Combined: prompt must contain greeting '{}'",
                     greeting
-                );
-                // System prompt override
-                prop_assert!(
-                    prompt.contains(&sys_prompt),
-                    "Combined: prompt must contain system_prompt '{}'",
-                    sys_prompt
                 );
                 // Tenant name
                 prop_assert!(

@@ -35,7 +35,7 @@ spec:
         kubernetes.io/hostname: inference
       containers:
         - name: vllm
-          image: intel/vllm:0.10.2-xpu
+          image: intel/vllm:latest
           command: ["vllm", "serve"]
           args:
             - "Qwen/Qwen3-30B-A3B"
@@ -52,7 +52,6 @@ spec:
             - "--block-size"
             - "64"
             - "--download-dir=/models"
-            - "--disable-log-requests"
             - "--enable-auto-tool-choice"
             - "--tool-call-parser=hermes"
           ports:

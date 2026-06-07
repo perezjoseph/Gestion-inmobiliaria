@@ -8,9 +8,9 @@ use crate::config::AppConfig;
 use crate::errors::AppError;
 use crate::middleware::rbac::WriteAccess;
 use crate::models::chatbot::{
-    AgentConfig, Capabilities, ChatbotConfigUpdateRequest, ClearHandoffRequest,
-    ConversationMessage, FaqEntry, HandoffStatusResponse, ReceiptConfirmRequest,
-    ReceiptExtractionResponse, TestChatRequest, TestChatResponse,
+    Capabilities, ChatbotConfigUpdateRequest, ClearHandoffRequest, ConversationMessage, FaqEntry,
+    HandoffStatusResponse, ReceiptConfirmRequest, ReceiptExtractionResponse, TestChatRequest,
+    TestChatResponse,
 };
 use crate::services::ai_module::{
     AiModule, ChatbotPersona, ConversationEntry, ProcessMessageContext, UserMessage,
@@ -501,6 +501,9 @@ pub async fn test_chat(
     let ai_module = AiModule::new(chatbot_env)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error inicializando AI module: {e}")))?;
 
+    let guidance_rules: Vec<crate::models::chatbot::GuidanceRule> =
+        serde_json::from_value(saved_config.guidance_rules.clone()).unwrap_or_default();
+
     let ctx = ProcessMessageContext {
         config: &persona,
         tenant_context: None, // No tenant context in test mode
@@ -513,7 +516,7 @@ pub async fn test_chat(
         db: db.get_ref(),
         organizacion_id: org_id,
         sender_phone: "test",
-        agent_config: AgentConfig::default(),
+        guidance_rules: &guidance_rules,
     };
 
     match ai_module.process_message(&ctx).await {
@@ -618,12 +621,16 @@ pub async fn test_chat_stream(
             (persona, faqs, policies, handoff_keywords)
         };
 
+    let guidance_rules: Vec<crate::models::chatbot::GuidanceRule> =
+        serde_json::from_value(saved_config.guidance_rules.clone()).unwrap_or_default();
+
     let system_prompt = compose_system_prompt(
         &persona,
         None,
         &faqs,
         policies.as_deref(),
         &handoff_keywords,
+        &guidance_rules,
     );
 
     let mut chat_history: Vec<rig::completion::Message> = Vec::with_capacity(request.history.len());

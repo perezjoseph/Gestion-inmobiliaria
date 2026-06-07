@@ -142,6 +142,18 @@ spec:
           envFrom:
             - secretRef:
                 name: realestate-db-url
+<<<<<<< HEAD
+=======
+            # mailcow-smtp secret keys:
+            #   SMTP_HOST=mail.myhomeva.us
+            #   SMTP_PORT (e.g. 587)
+            #   SMTP_USER
+            #   SMTP_PASS
+            #   SMTP_FROM=no-reply@myhomeva.us
+            - secretRef:
+                name: mailcow-smtp
+                optional: true
+>>>>>>> 554b18de14fbaa0863aee2f779962a0f314b572d
           env:
             - name: JWT_SECRET
               valueFrom:

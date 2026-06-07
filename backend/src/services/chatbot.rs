@@ -15,8 +15,10 @@ use crate::entities::{
 use crate::errors::AppError;
 use crate::models::PaginatedResponse;
 use crate::models::chatbot::{
-    BalanceResponse, Capabilities, ChatbotConfigResponse, ChatbotConfigUpdateRequest, Confidence,
-    ConversationListResponse, CurrencyTotal, FaqEntry, PaymentDetail, format_currency,
+    BalanceResponse, BatchUpdateRequest, Capabilities, ChatbotConfigResponse,
+    ChatbotConfigUpdateRequest, Confidence, ConversationListResponse, CreateGuidanceRuleRequest,
+    CurrencyTotal, FaqEntry, GuidanceCategory, GuidanceRule, PaymentDetail,
+    UpdateGuidanceRuleRequest, format_currency,
 };
 use crate::services::validation::validate_enum;
 
@@ -142,7 +144,8 @@ pub async fn upsert_config<C: ConnectionTrait>(
             history_limit: Set(input.history_limit.unwrap_or(10)),
             retention_days: Set(input.retention_days.unwrap_or(90)),
             agent_config: Set(serde_json::json!({})),
-            guidance_rules: Set(serde_json::json!([])),
+            guidance_rules: Set(serde_json::to_value(seed_template_rules())
+                .unwrap_or_else(|_| serde_json::json!([]))),
             updated_by: Set(Some(user_id)),
             created_at: Set(now),
             updated_at: Set(now),
@@ -265,6 +268,73 @@ pub(crate) fn validate_agent_config(
         }
     }
     Ok(())
+}
+
+// --- Guidance Rules Template Seeding ---
+
+/// Returns the 16 predefined template guidance rules for new organizations.
+/// All rules are enabled by default and marked as templates (cannot be deleted).
+pub fn seed_template_rules() -> Vec<GuidanceRule> {
+    let now = Utc::now();
+    let mut rules = Vec::with_capacity(16);
+    let mut sort = 0i32;
+
+    let templates: &[(GuidanceCategory, &[&str])] = &[
+        (
+            GuidanceCategory::EstiloComunicacion,
+            &[
+                "Tratar a todos los inquilinos de 'usted', nunca de 'tú'",
+                "Incluir siempre el símbolo de moneda (RD$ o US$) al mencionar montos",
+                "Mantener mensajes cortos: máximo 3 oraciones por respuesta",
+                "Responder siempre en español, sin importar el idioma del mensaje recibido",
+            ],
+        ),
+        (
+            GuidanceCategory::ContextoClarificacion,
+            &[
+                "Antes de compartir cualquier dato financiero, confirmar la identidad del inquilino pidiendo nombre y número de unidad",
+                "Si el inquilino pregunta por un balance sin especificar unidad, preguntar cuál unidad antes de responder",
+                "Si hay ambigüedad sobre cuál contrato se refiere, listar los contratos activos y pedir que elija",
+            ],
+        ),
+        (
+            GuidanceCategory::Escalamiento,
+            &[
+                "Si el inquilino menciona 'abogado', 'tribunal', 'demanda' o 'acción legal', transferir inmediatamente a un humano sin hacer más preguntas",
+                "Si el inquilino reporta una emergencia (inundación, fuga de gas, incendio, fallo eléctrico), transferir a humano inmediatamente",
+                "Si el inquilino pide hablar con una persona real o dice 'humano', 'agente' o 'hablar con alguien', respetar su solicitud y transferir",
+                "Si el inquilino repite la misma pregunta 3 veces sin obtener la respuesta deseada, ofrecer transferencia a un humano",
+            ],
+        ),
+        (
+            GuidanceCategory::Politicas,
+            &[
+                "Nunca compartir datos bancarios del propietario o la administración",
+                "Nunca revelar información personal de otros inquilinos (nombres, balances, unidades)",
+                "No confirmar la recepción de un pago sin verificar primero en el sistema",
+                "No dar consejos legales ni financieros — derivar al profesional correspondiente",
+                "No compartir términos de contrato con personas que no sean parte del contrato",
+            ],
+        ),
+    ];
+
+    for (category, instructions) in templates {
+        for instruction in *instructions {
+            rules.push(GuidanceRule {
+                id: Uuid::new_v4(),
+                category: category.clone(),
+                instruction: (*instruction).to_string(),
+                enabled: true,
+                is_template: true,
+                sort_order: sort,
+                created_at: now,
+                updated_at: now,
+            });
+            sort += 1;
+        }
+    }
+
+    rules
 }
 
 // --- Role Enforcement ---
@@ -1501,6 +1571,249 @@ pub async fn confirmar_preview(
     txn.commit().await?;
 
     Ok(result)
+}
+
+// --- Guidance Rules CRUD ---
+
+/// Maximum number of active (enabled) rules per organization.
+const MAX_ACTIVE_RULES: usize = 30;
+/// Maximum instruction length in characters.
+const MAX_INSTRUCTION_CHARS: usize = 500;
+
+/// Loads the guidance rules from the `chatbot_config` for an org.
+/// Returns (the config model, parsed rules).
+async fn load_guidance_rules(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+) -> Result<(chatbot_config::Model, Vec<GuidanceRule>), AppError> {
+    let config = chatbot_config::Entity::find()
+        .filter(chatbot_config::Column::OrganizacionId.eq(org_id))
+        .one(db)
+        .await?
+        .ok_or_else(|| {
+            AppError::NotFound(
+                "Configuración de chatbot no encontrada para la organización".to_string(),
+            )
+        })?;
+
+    let rules: Vec<GuidanceRule> =
+        serde_json::from_value(config.guidance_rules.clone()).unwrap_or_default();
+
+    Ok((config, rules))
+}
+
+/// Persists guidance rules back to the `chatbot_config` row.
+async fn save_guidance_rules(
+    db: &DatabaseConnection,
+    config: chatbot_config::Model,
+    rules: &[GuidanceRule],
+) -> Result<(), AppError> {
+    let rules_json = serde_json::to_value(rules).map_err(|e| {
+        AppError::Internal(anyhow::anyhow!("Error serializando guidance_rules: {e}"))
+    })?;
+
+    let mut active: chatbot_config::ActiveModel = config.into();
+    active.guidance_rules = Set(rules_json);
+    active.updated_at = Set(Utc::now().into());
+    active.update(db).await?;
+    Ok(())
+}
+
+/// Validates a guidance rule instruction: non-empty and max 500 characters.
+fn validate_instruction(instruction: &str) -> Result<(), AppError> {
+    let char_count = instruction.chars().count();
+    if char_count == 0 {
+        return Err(AppError::Validation(
+            "La instrucción no puede estar vacía".to_string(),
+        ));
+    }
+    if char_count > MAX_INSTRUCTION_CHARS {
+        return Err(AppError::Validation(format!(
+            "La instrucción no puede exceder {MAX_INSTRUCTION_CHARS} caracteres (tiene {char_count})"
+        )));
+    }
+    Ok(())
+}
+
+/// Counts active (enabled) rules in a slice.
+fn count_active(rules: &[GuidanceRule]) -> usize {
+    rules.iter().filter(|r| r.enabled).count()
+}
+
+/// Create a new custom guidance rule.
+///
+/// Validates instruction (non-empty, max 500 chars), checks active count < 30,
+/// assigns UUID and timestamps, appends to the JSONB array.
+pub async fn create_guidance_rule(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    req: CreateGuidanceRuleRequest,
+) -> Result<GuidanceRule, AppError> {
+    validate_instruction(&req.instruction)?;
+
+    let (config, mut rules) = load_guidance_rules(db, org_id).await?;
+
+    let enabled = req.enabled.unwrap_or(true);
+
+    // Check active count limit when the new rule will be enabled
+    if enabled && count_active(&rules) >= MAX_ACTIVE_RULES {
+        return Err(AppError::Validation(format!(
+            "No se pueden tener más de {MAX_ACTIVE_RULES} reglas activas"
+        )));
+    }
+
+    let now = Utc::now();
+    #[allow(clippy::cast_possible_wrap)]
+    let sort_order = rules.len() as i32;
+
+    let rule = GuidanceRule {
+        id: Uuid::new_v4(),
+        category: req.category,
+        instruction: req.instruction,
+        enabled,
+        is_template: false,
+        sort_order,
+        created_at: now,
+        updated_at: now,
+    };
+
+    rules.push(rule.clone());
+    save_guidance_rules(db, config, &rules).await?;
+
+    Ok(rule)
+}
+
+/// Update an existing guidance rule.
+///
+/// Finds by ID, validates template constraints (cannot change instruction on templates),
+/// validates active count on enable, updates fields.
+pub async fn update_guidance_rule(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    rule_id: Uuid,
+    req: UpdateGuidanceRuleRequest,
+) -> Result<GuidanceRule, AppError> {
+    let (config, mut rules) = load_guidance_rules(db, org_id).await?;
+
+    let rule_idx = rules
+        .iter()
+        .position(|r| r.id == rule_id)
+        .ok_or_else(|| AppError::NotFound(format!("Regla no encontrada: {rule_id}")))?;
+
+    // Template constraint: cannot change instruction
+    if rules[rule_idx].is_template && req.instruction.is_some() {
+        return Err(AppError::Forbidden(
+            "No se puede modificar la instrucción de una regla predefinida".to_string(),
+        ));
+    }
+
+    // Validate instruction if provided
+    if let Some(ref instruction) = req.instruction {
+        validate_instruction(instruction)?;
+    }
+
+    // Check active count limit if enabling a currently-disabled rule
+    if req.enabled == Some(true)
+        && !rules[rule_idx].enabled
+        && count_active(&rules) >= MAX_ACTIVE_RULES
+    {
+        return Err(AppError::Validation(format!(
+            "No se pueden tener más de {MAX_ACTIVE_RULES} reglas activas"
+        )));
+    }
+
+    // Apply updates
+    let rule = &mut rules[rule_idx];
+    if let Some(instruction) = req.instruction {
+        rule.instruction = instruction;
+    }
+    if let Some(enabled) = req.enabled {
+        rule.enabled = enabled;
+    }
+    if let Some(sort_order) = req.sort_order {
+        rule.sort_order = sort_order;
+    }
+    rule.updated_at = Utc::now();
+
+    let updated = rule.clone();
+    save_guidance_rules(db, config, &rules).await?;
+
+    Ok(updated)
+}
+
+/// Delete a guidance rule.
+///
+/// Finds by ID, rejects if `is_template`, removes from JSONB array.
+pub async fn delete_guidance_rule(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    rule_id: Uuid,
+) -> Result<(), AppError> {
+    let (config, mut rules) = load_guidance_rules(db, org_id).await?;
+
+    let rule_idx = rules
+        .iter()
+        .position(|r| r.id == rule_id)
+        .ok_or_else(|| AppError::NotFound(format!("Regla no encontrada: {rule_id}")))?;
+
+    if rules[rule_idx].is_template {
+        return Err(AppError::Forbidden(
+            "No se puede eliminar una regla predefinida".to_string(),
+        ));
+    }
+
+    rules.remove(rule_idx);
+    save_guidance_rules(db, config, &rules).await?;
+
+    Ok(())
+}
+
+/// Batch-update multiple guidance rules (`enabled`/`sort_order` changes in one write).
+///
+/// Validates each item exists, applies `enabled`/`sort_order` changes,
+/// and enforces the active count limit across the final state.
+pub async fn batch_update_guidance_rules(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    req: BatchUpdateRequest,
+) -> Result<Vec<GuidanceRule>, AppError> {
+    let (config, mut rules) = load_guidance_rules(db, org_id).await?;
+
+    let now = Utc::now();
+
+    for item in &req.rules {
+        let rule_idx = rules
+            .iter()
+            .position(|r| r.id == item.id)
+            .ok_or_else(|| AppError::NotFound(format!("Regla no encontrada: {}", item.id)))?;
+
+        let rule = &mut rules[rule_idx];
+        if let Some(enabled) = item.enabled {
+            rule.enabled = enabled;
+        }
+        if let Some(sort_order) = item.sort_order {
+            rule.sort_order = sort_order;
+        }
+        rule.updated_at = now;
+    }
+
+    // Validate active count after all changes applied
+    if count_active(&rules) > MAX_ACTIVE_RULES {
+        return Err(AppError::Validation(format!(
+            "No se pueden tener más de {MAX_ACTIVE_RULES} reglas activas"
+        )));
+    }
+
+    save_guidance_rules(db, config, &rules).await?;
+
+    // Return the updated rules that were part of the batch
+    let updated_ids: Vec<Uuid> = req.rules.iter().map(|item| item.id).collect();
+    let updated_rules: Vec<GuidanceRule> = rules
+        .into_iter()
+        .filter(|r| updated_ids.contains(&r.id))
+        .collect();
+
+    Ok(updated_rules)
 }
 
 #[cfg(test)]

@@ -3,9 +3,7 @@ use sea_orm::DatabaseConnection;
 
 use crate::config::AppConfig;
 use crate::errors::AppError;
-use crate::models::chatbot::{
-    AgentConfig, Capabilities, FaqEntry, IncomingWebhookPayload, SendMessageRequest,
-};
+use crate::models::chatbot::{Capabilities, FaqEntry, IncomingWebhookPayload, SendMessageRequest};
 use crate::services::ai_module::{
     AiModule, ChatbotPersona, ConversationEntry, ProcessMessageContext, TenantContext, UserMessage,
 };
@@ -202,8 +200,8 @@ pub async fn incoming_webhook(
         },
     };
 
-    let agent_config: AgentConfig =
-        serde_json::from_value(cfg.agent_config.clone()).unwrap_or_default();
+    let guidance_rules: Vec<crate::models::chatbot::GuidanceRule> =
+        serde_json::from_value(cfg.guidance_rules.clone()).unwrap_or_default();
 
     let ctx = ProcessMessageContext {
         config: &persona,
@@ -217,7 +215,7 @@ pub async fn incoming_webhook(
         db: db.get_ref(),
         organizacion_id: org_id,
         sender_phone: &payload.sender_phone,
-        agent_config,
+        guidance_rules: &guidance_rules,
     };
 
     let ai_result = ai_module.process_message(&ctx).await;

@@ -23,8 +23,8 @@ use crate::config::ChatbotEnvConfig;
 use crate::entities::{contrato, pago};
 use crate::errors::AppError;
 use crate::models::chatbot::{
-    AgentConfig, BalanceResponse, Capabilities, FaqEntry, GuardrailOverrides,
-    ToolRegistrationStrategy, format_currency,
+    AgentConfig, BalanceResponse, Capabilities, FaqEntry, GuardrailOverrides, GuidanceCategory,
+    GuidanceRule, ToolRegistrationStrategy, format_currency,
 };
 use crate::services::ocr_client::OcrClient;
 use crate::services::ovms_provider::OvmsCompletionModel;
@@ -175,8 +175,8 @@ pub struct ProcessMessageContext<'a> {
     pub db: &'a DatabaseConnection,
     pub organizacion_id: Uuid,
     pub sender_phone: &'a str,
-    /// Per-organization agent configuration. Defaults to `AgentConfig::default()`.
-    pub agent_config: AgentConfig,
+    /// Parsed guidance rules from the chatbot config JSONB.
+    pub guidance_rules: &'a [GuidanceRule],
 }
 
 impl AiModule {
@@ -215,10 +215,11 @@ impl AiModule {
             ctx.faqs,
             ctx.policies,
             ctx.handoff_keywords,
+            ctx.guidance_rules,
         );
 
-        // 2. Resolve AgentConfig
-        let resolved = ctx.agent_config.resolve();
+        // 2. Resolve AgentConfig from hardcoded defaults (no longer user-configurable)
+        let resolved = AgentConfig::default().resolve();
 
         // 3. Build shared state for the hook
         let captured_receipt: Arc<Mutex<Option<PaymentReceipt>>> = Arc::new(Mutex::new(None));
@@ -380,38 +381,34 @@ impl AiModule {
 }
 
 /// Composes a system prompt from the organization's persona configuration,
-/// FAQs, policies, tenant context, and handoff keywords.
+/// guidance rules, FAQs, policies, tenant context, and handoff keywords.
 ///
-/// The resulting prompt is a structured string that includes all provided
-/// elements so the LLM has full context for generating responses.
+/// Enabled guidance rules are grouped by category and formatted with Spanish
+/// section headers. Disabled rules and empty categories are omitted entirely.
 pub fn compose_system_prompt(
     config: &ChatbotPersona,
     tenant_context: Option<&TenantContext>,
     faqs: &[FaqEntry],
     policies: Option<&str>,
     handoff_keywords: &[String],
+    guidance_rules: &[GuidanceRule],
 ) -> String {
     let mut sections: Vec<String> = Vec::with_capacity(8);
 
-    // Base system prompt override (if provided)
-    if let Some(system_prompt) = &config.system_prompt {
-        sections.push(system_prompt.clone());
-    }
-
-    // Language and tone
+    // Persona section — tone, language, greeting
     if let Some(tone) = &config.tone {
         sections.push(format!("Tono: {tone}"));
     }
     sections.push(format!("Idioma: {}", config.language));
 
-    // Tenant context
-    if let Some(ctx) = tenant_context {
-        sections.push(format!("Inquilino: {}", ctx.name));
-    }
-
-    // Greeting
     if let Some(greeting) = &config.greeting {
         sections.push(format!("Saludo: {greeting}"));
+    }
+
+    // Guidance rules section
+    let rules_section = format_guidance_rules(guidance_rules);
+    if !rules_section.is_empty() {
+        sections.push(rules_section);
     }
 
     // FAQs
@@ -430,6 +427,11 @@ pub fn compose_system_prompt(
         }
     }
 
+    // Tenant context
+    if let Some(ctx) = tenant_context {
+        sections.push(format!("Inquilino: {}", ctx.name));
+    }
+
     // Handoff keywords
     if !handoff_keywords.is_empty() {
         sections.push(format!(
@@ -439,6 +441,66 @@ pub fn compose_system_prompt(
     }
 
     sections.join("\n\n")
+}
+
+/// Formats enabled guidance rules into a structured section with category headers.
+///
+/// Returns an empty string if there are zero enabled rules. Otherwise returns:
+/// ```text
+/// ## Reglas de comportamiento
+///
+/// ### Estilo de comunicación
+/// - instruction 1
+/// - instruction 2
+///
+/// ### Escalamiento
+/// - instruction 3
+/// ```
+fn format_guidance_rules(rules: &[GuidanceRule]) -> String {
+    // Filter to enabled rules only
+    let enabled: Vec<&GuidanceRule> = rules.iter().filter(|r| r.enabled).collect();
+
+    if enabled.is_empty() {
+        return String::new();
+    }
+
+    // Category ordering and their Spanish display names
+    let categories = [
+        (
+            GuidanceCategory::EstiloComunicacion,
+            "Estilo de comunicación",
+        ),
+        (
+            GuidanceCategory::ContextoClarificacion,
+            "Contexto y clarificación",
+        ),
+        (GuidanceCategory::Escalamiento, "Escalamiento"),
+        (GuidanceCategory::Politicas, "Políticas"),
+    ];
+
+    let mut section = String::from("## Reglas de comportamiento");
+
+    for (category, header) in &categories {
+        let mut cat_rules: Vec<&GuidanceRule> = enabled
+            .iter()
+            .filter(|r| &r.category == category)
+            .copied()
+            .collect();
+
+        if cat_rules.is_empty() {
+            continue;
+        }
+
+        // Sort by sort_order within category
+        cat_rules.sort_by_key(|r| r.sort_order);
+
+        let _ = write!(section, "\n\n### {header}");
+        for rule in cat_rules {
+            let _ = write!(section, "\n- {}", rule.instruction);
+        }
+    }
+
+    section
 }
 
 // =============================================================================
@@ -845,14 +907,13 @@ mod tests {
             &faqs,
             Some(policies),
             &handoff_keywords,
+            &[],
         );
 
         // Tone keyword present
         assert!(prompt.contains("profesional"));
         // Greeting present
         assert!(prompt.contains("Bienvenido a su asistente"));
-        // System prompt override present
-        assert!(prompt.contains("Eres un asistente de gestión inmobiliaria."));
         // Tenant name present
         assert!(prompt.contains("Juan Pérez"));
         // All FAQ Q&A pairs present
@@ -877,7 +938,7 @@ mod tests {
             language: "es-DO".to_string(),
         };
 
-        let prompt = compose_system_prompt(&config, None, &[], None, &[]);
+        let prompt = compose_system_prompt(&config, None, &[], None, &[], &[]);
 
         assert!(prompt.contains("Idioma: es-DO"));
         // Should not contain optional section headers when empty
@@ -885,6 +946,7 @@ mod tests {
         assert!(!prompt.contains("Políticas:"));
         assert!(!prompt.contains("Palabras clave"));
         assert!(!prompt.contains("Inquilino:"));
+        assert!(!prompt.contains("Reglas de comportamiento"));
     }
 
     #[test]
@@ -899,12 +961,160 @@ mod tests {
             name: "María García".to_string(),
         };
 
-        let prompt = compose_system_prompt(&config, Some(&tenant), &[], None, &[]);
+        let prompt = compose_system_prompt(&config, Some(&tenant), &[], None, &[], &[]);
 
         assert!(prompt.contains("amigable"));
         assert!(prompt.contains("Hola!"));
         assert!(prompt.contains("María García"));
         assert!(!prompt.contains("Preguntas frecuentes:"));
+    }
+
+    #[test]
+    fn compose_system_prompt_with_guidance_rules() {
+        use chrono::Utc;
+
+        let config = ChatbotPersona {
+            tone: Some("profesional".to_string()),
+            greeting: None,
+            system_prompt: None,
+            language: "es-DO".to_string(),
+        };
+
+        let now = Utc::now();
+        let rules = vec![
+            GuidanceRule {
+                id: Uuid::new_v4(),
+                category: GuidanceCategory::EstiloComunicacion,
+                instruction: "Tratar a todos de usted".to_string(),
+                enabled: true,
+                is_template: true,
+                sort_order: 1,
+                created_at: now,
+                updated_at: now,
+            },
+            GuidanceRule {
+                id: Uuid::new_v4(),
+                category: GuidanceCategory::EstiloComunicacion,
+                instruction: "Responder en español".to_string(),
+                enabled: true,
+                is_template: true,
+                sort_order: 2,
+                created_at: now,
+                updated_at: now,
+            },
+            GuidanceRule {
+                id: Uuid::new_v4(),
+                category: GuidanceCategory::Escalamiento,
+                instruction: "Transferir si menciona abogado".to_string(),
+                enabled: true,
+                is_template: true,
+                sort_order: 1,
+                created_at: now,
+                updated_at: now,
+            },
+            GuidanceRule {
+                id: Uuid::new_v4(),
+                category: GuidanceCategory::Politicas,
+                instruction: "Nunca compartir datos bancarios".to_string(),
+                enabled: false, // disabled — should NOT appear
+                is_template: true,
+                sort_order: 1,
+                created_at: now,
+                updated_at: now,
+            },
+        ];
+
+        let prompt = compose_system_prompt(&config, None, &[], None, &[], &rules);
+
+        // Header present
+        assert!(prompt.contains("## Reglas de comportamiento"));
+        // Estilo section with both enabled rules
+        assert!(prompt.contains("### Estilo de comunicación"));
+        assert!(prompt.contains("- Tratar a todos de usted"));
+        assert!(prompt.contains("- Responder en español"));
+        // Escalamiento section
+        assert!(prompt.contains("### Escalamiento"));
+        assert!(prompt.contains("- Transferir si menciona abogado"));
+        // Disabled rule excluded
+        assert!(!prompt.contains("Nunca compartir datos bancarios"));
+        // Políticas section omitted (only rule is disabled)
+        assert!(!prompt.contains("### Políticas"));
+        // ContextoClarificacion section omitted (no rules)
+        assert!(!prompt.contains("### Contexto y clarificación"));
+    }
+
+    #[test]
+    fn compose_system_prompt_all_rules_disabled_omits_header() {
+        use chrono::Utc;
+
+        let config = ChatbotPersona {
+            tone: None,
+            greeting: None,
+            system_prompt: None,
+            language: "es-DO".to_string(),
+        };
+
+        let now = Utc::now();
+        let rules = vec![GuidanceRule {
+            id: Uuid::new_v4(),
+            category: GuidanceCategory::Politicas,
+            instruction: "Some rule".to_string(),
+            enabled: false,
+            is_template: true,
+            sort_order: 1,
+            created_at: now,
+            updated_at: now,
+        }];
+
+        let prompt = compose_system_prompt(&config, None, &[], None, &[], &rules);
+
+        // No guidance section at all
+        assert!(!prompt.contains("Reglas de comportamiento"));
+    }
+
+    #[test]
+    fn compose_system_prompt_rules_sorted_by_sort_order() {
+        use chrono::Utc;
+
+        let config = ChatbotPersona {
+            tone: None,
+            greeting: None,
+            system_prompt: None,
+            language: "es-DO".to_string(),
+        };
+
+        let now = Utc::now();
+        let rules = vec![
+            GuidanceRule {
+                id: Uuid::new_v4(),
+                category: GuidanceCategory::Escalamiento,
+                instruction: "Second rule".to_string(),
+                enabled: true,
+                is_template: false,
+                sort_order: 2,
+                created_at: now,
+                updated_at: now,
+            },
+            GuidanceRule {
+                id: Uuid::new_v4(),
+                category: GuidanceCategory::Escalamiento,
+                instruction: "First rule".to_string(),
+                enabled: true,
+                is_template: false,
+                sort_order: 1,
+                created_at: now,
+                updated_at: now,
+            },
+        ];
+
+        let prompt = compose_system_prompt(&config, None, &[], None, &[], &rules);
+
+        let first_pos = prompt.find("First rule").unwrap();
+        let second_pos = prompt.find("Second rule").unwrap();
+        assert!(
+            first_pos < second_pos,
+            "Rules should be sorted by sort_order"
+        );
     }
 
     // --- get_enabled_tools tests ---

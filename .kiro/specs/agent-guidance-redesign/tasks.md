@@ -34,32 +34,32 @@ Replace the monolithic `system_prompt` freetext with structured, categorized gui
     - Remove `system_prompt` and `agent_config` from update request
     - _Requirements: 4.1, 4.2, 6.1, 6.4_
 
-- [ ] 3. Backend service logic
-  - [~] 3.1 Implement guidance rule CRUD in `services/chatbot.rs`
+- [x] 3. Backend service logic
+  - [x] 3.1 Implement guidance rule CRUD in `services/chatbot.rs`
     - `create_guidance_rule`: validate instruction (non-empty, max 500 chars), validate active count < 30, assign UUID and timestamps, append to JSONB array
     - `update_guidance_rule`: find by ID, validate template constraints (cannot change instruction on templates), validate active count on enable, update fields
     - `delete_guidance_rule`: find by ID, reject if `is_template`, remove from JSONB array
     - `batch_update_guidance_rules`: validate each item, apply enabled/sort_order changes in one write
     - _Requirements: 1.4, 1.5, 1.6, 3.1, 3.2, 3.3, 3.4, 4.3, 4.4, 4.5, 4.6_
 
-  - [~] 3.2 Implement `seed_template_rules` function
+  - [x] 3.2 Implement `seed_template_rules` function
     - Returns the default Vec of 16 template GuidanceRule structs
     - Called during org chatbot config creation (existing `create_chatbot_config` path)
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6_
 
-  - [~] 3.3 Update `compose_system_prompt` in `services/ai_module/mod.rs`
+  - [x] 3.3 Update `compose_system_prompt` in `services/ai_module/mod.rs`
     - Accept `&[GuidanceRule]` instead of `system_prompt: Option<&str>`
     - Filter to enabled rules, group by category, format into prompt sections
     - Omit category sections with no enabled rules
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6_
 
-  - [~] 3.4 Update `process_message` in AI module
+  - [x] 3.4 Update `process_message` in AI module
     - Parse `guidance_rules` from chatbot config model into `Vec<GuidanceRule>`
     - Pass enabled rules to updated `compose_system_prompt`
     - Remove `agent_config` from `ProcessMessageContext` (use hardcoded defaults internally)
     - _Requirements: 5.1, 6.2, 6.3_
 
-  - [~] 3.5 Update chatbot config service functions
+  - [x] 3.5 Update chatbot config service functions
     - `get_chatbot_config`: deserialize guidance_rules from JSONB, include in response
     - `create_chatbot_config`: call `seed_template_rules` to populate initial rules
     - `update_chatbot_config`: stop reading/writing `system_prompt` and `agent_config` from user input
