@@ -16,6 +16,8 @@ use crate::pages::configuracion_fiscal::ConfiguracionFiscal;
 use crate::pages::contratos::Contratos;
 use crate::pages::dashboard::Dashboard;
 use crate::pages::dashboard_comparativo::DashboardComparativo;
+use crate::pages::desahucios::Desahucios;
+use crate::pages::dgii::Dgii;
 use crate::pages::documento_editor::DocumentoEditorPage;
 use crate::pages::documentos_por_vencer::DocumentosPorVencer;
 use crate::pages::firma_publica::FirmaPublica;
@@ -23,10 +25,13 @@ use crate::pages::gastos::Gastos;
 use crate::pages::importar::Importar;
 use crate::pages::indexacion::Indexacion;
 use crate::pages::inquilinos::Inquilinos;
+use crate::pages::invitaciones::Invitaciones;
 use crate::pages::ipi::Ipi;
 use crate::pages::login::Login;
 use crate::pages::mantenimiento::Mantenimiento;
+use crate::pages::ncf::Ncf;
 use crate::pages::notificaciones::Notificaciones;
+use crate::pages::organizacion::OrganizacionPage;
 use crate::pages::pagos::Pagos;
 use crate::pages::perfil::Perfil;
 use crate::pages::plantillas::Plantillas;
@@ -35,6 +40,8 @@ use crate::pages::recibos_informales::RecibosInformales;
 use crate::pages::registro::Registro;
 use crate::pages::reportes::Reportes;
 use crate::pages::reportes_dgii::ReportesDgii;
+use crate::pages::servicios_publicos::ServiciosPublicos;
+use crate::pages::tareas::Tareas;
 use crate::pages::usuarios::Usuarios;
 use crate::services::api::api_get;
 use crate::services::auth::{clear_token, get_token, set_token};
@@ -171,6 +178,20 @@ pub enum Route {
     },
     #[at("/firmas/:token")]
     FirmaPublica { token: String },
+    #[at("/desahucios")]
+    Desahucios,
+    #[at("/ncf")]
+    Ncf,
+    #[at("/tareas")]
+    Tareas,
+    #[at("/invitaciones")]
+    Invitaciones,
+    #[at("/organizacion")]
+    Organizacion,
+    #[at("/dgii")]
+    Dgii,
+    #[at("/servicios-publicos")]
+    ServiciosPublicos,
     #[not_found]
     #[at("/404")]
     NotFound,
@@ -231,6 +252,15 @@ fn switch(routes: Route) -> Html {
         } => html! {
             <ProtectedRoute><DocumentoEditorPage entity_type={entity_type} entity_id={entity_id} documento_id={Some(documento_id)} /></ProtectedRoute>
         },
+        Route::Desahucios => html! { <ProtectedRoute><Desahucios /></ProtectedRoute> },
+        Route::Ncf => html! { <ProtectedRoute><Ncf /></ProtectedRoute> },
+        Route::Tareas => html! { <ProtectedRoute><Tareas /></ProtectedRoute> },
+        Route::Invitaciones => html! { <ProtectedRoute><Invitaciones /></ProtectedRoute> },
+        Route::Organizacion => html! { <ProtectedRoute><OrganizacionPage /></ProtectedRoute> },
+        Route::Dgii => html! { <ProtectedRoute><Dgii /></ProtectedRoute> },
+        Route::ServiciosPublicos => {
+            html! { <ProtectedRoute><ServiciosPublicos /></ProtectedRoute> }
+        }
         Route::NotFound => {
             html! {
                 <div class="gi-empty-state">

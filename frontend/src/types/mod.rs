@@ -7,6 +7,10 @@ pub mod contrato;
 pub mod cuota_condominio;
 pub mod dashboard_extra;
 #[allow(dead_code)]
+pub mod desahucio;
+#[allow(dead_code)]
+pub mod dgii;
+#[allow(dead_code)]
 pub mod documento;
 #[allow(dead_code)]
 pub mod fiscal;
@@ -14,15 +18,25 @@ pub mod gasto;
 pub mod importacion;
 pub mod indexacion;
 pub mod inquilino;
+#[allow(dead_code)]
+pub mod invitacion;
 pub mod ipi;
 pub mod mantenimiento;
+#[allow(dead_code)]
+pub mod ncf;
 pub mod notificacion;
 pub mod ocr;
+#[allow(dead_code)]
+pub mod organizacion;
 pub mod pago;
 pub mod pago_generacion;
 pub mod propiedad;
 pub mod reporte;
 pub mod reportes_dgii;
+#[allow(dead_code)]
+pub mod servicio_publico;
+#[allow(dead_code)]
+pub mod tarea;
 pub mod unidad;
 pub mod usuario;
 

@@ -144,6 +144,78 @@ fn icon_plantillas() -> Html {
     }
 }
 
+fn icon_desahucios() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 21V9l9-6 9 6v12"/>
+            <line x1="3" y1="21" x2="21" y2="21"/>
+            <line x1="9" y1="21" x2="9" y2="12"/>
+            <line x1="15" y1="21" x2="15" y2="12"/>
+            <line x1="2" y1="3" x2="22" y2="21"/>
+        </svg>
+    }
+}
+
+fn icon_dgii() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="18" rx="2"/>
+            <path d="M8 7h8"/>
+            <path d="M8 11h8"/>
+            <path d="M8 15h4"/>
+        </svg>
+    }
+}
+
+fn icon_servicios_publicos() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+    }
+}
+
+fn icon_ncf() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+            <rect x="9" y="3" width="6" height="4" rx="1"/>
+            <path d="M9 14l2 2 4-4"/>
+        </svg>
+    }
+}
+
+fn icon_tareas() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+    }
+}
+
+fn icon_invitaciones() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+        </svg>
+    }
+}
+
+fn icon_organizacion() -> Html {
+    html! {
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 21h18"/>
+            <path d="M5 21V7l8-4v18"/>
+            <path d="M19 21V11l-6-4"/>
+            <path d="M9 9v.01"/>
+            <path d="M9 12v.01"/>
+            <path d="M9 15v.01"/>
+            <path d="M9 18v.01"/>
+        </svg>
+    }
+}
+
 #[component]
 pub fn Sidebar(props: &SidebarProps) -> Html {
     let current_route = use_route::<Route>();
@@ -255,6 +327,13 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                                 {"Mantenimiento"}
                             </Link<Route>>
                         </li>
+                        <li onclick={make_click(on_nav_click.clone())}>
+                            <Link<Route> to={Route::Desahucios}
+                                classes={classes!(link_class(&Route::Desahucios))}>
+                                {icon_desahucios()}
+                                {"Desahucios"}
+                            </Link<Route>>
+                        </li>
                     </ul>
                 </div>
                 // Herramientas
@@ -286,6 +365,20 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                                     {"Plantillas"}
                                 </Link<Route>>
                             </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::Dgii}
+                                    classes={classes!(link_class(&Route::Dgii))}>
+                                    {icon_dgii()}
+                                    {"DGII"}
+                                </Link<Route>>
+                            </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::ServiciosPublicos}
+                                    classes={classes!(link_class(&Route::ServiciosPublicos))}>
+                                    {icon_servicios_publicos()}
+                                    {"Servicios Públicos"}
+                                </Link<Route>>
+                            </li>
                         }
                     </ul>
                 </div>
@@ -307,6 +400,34 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                                     classes={classes!(link_class(&Route::AuditoriaPage))}>
                                     {icon_audit()}
                                     {"Auditoría"}
+                                </Link<Route>>
+                            </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::Ncf}
+                                    classes={classes!(link_class(&Route::Ncf))}>
+                                    {icon_ncf()}
+                                    {"NCF"}
+                                </Link<Route>>
+                            </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::Tareas}
+                                    classes={classes!(link_class(&Route::Tareas))}>
+                                    {icon_tareas()}
+                                    {"Tareas"}
+                                </Link<Route>>
+                            </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::Invitaciones}
+                                    classes={classes!(link_class(&Route::Invitaciones))}>
+                                    {icon_invitaciones()}
+                                    {"Invitaciones"}
+                                </Link<Route>>
+                            </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::Organizacion}
+                                    classes={classes!(link_class(&Route::Organizacion))}>
+                                    {icon_organizacion()}
+                                    {"Organización"}
                                 </Link<Route>>
                             </li>
                         }
