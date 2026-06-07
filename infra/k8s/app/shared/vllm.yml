@@ -35,34 +35,35 @@ spec:
         kubernetes.io/hostname: inference
       containers:
         - name: vllm
-          image: intel/vllm:latest
-          command: ["python", "-m", "vllm.entrypoints.openai.api_server"]
+          image: intel/vllm:0.10.2-xpu
+          command: ["vllm", "serve"]
           args:
-            - "--model"
             - "Qwen/Qwen3-30B-A3B"
-            - "--host"
-            - "0.0.0.0"
+            - "--dtype=bfloat16"
+            - "--enforce-eager"
             - "--port"
             - "8000"
-            - "--dtype"
-            - "auto"
-            - "--max-model-len"
-            - "4096"
-            - "--gpu-memory-utilization"
-            - "0.95"
-            - "--quantization"
-            - "bitsandbytes"
-            - "--load-format"
-            - "bitsandbytes"
+            - "--host"
+            - "0.0.0.0"
+            - "--gpu-memory-util=0.9"
+            - "--no-enable-prefix-caching"
+            - "--max-model-len=4096"
+            - "--max-num-batched-tokens=4096"
+            - "--block-size"
+            - "64"
+            - "--download-dir=/models"
+            - "--disable-log-requests"
             - "--enable-auto-tool-choice"
-            - "--tool-call-parser"
-            - "hermes"
-            - "--reasoning-parser"
-            - "deepseek_r1"
-            - "--download-dir"
-            - "/models"
+            - "--tool-call-parser=hermes"
           ports:
             - containerPort: 8000
+          env:
+            - name: HOME
+              value: /tmp
+            - name: HF_HOME
+              value: /models
+            - name: ZE_FLAT_DEVICE_HIERARCHY
+              value: "FLAT"
           resources:
             requests:
               cpu: 500m
@@ -77,29 +78,30 @@ spec:
           volumeMounts:
             - name: models
               mountPath: /models
+            - name: shm
+              mountPath: /dev/shm
           readinessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 120
+            initialDelaySeconds: 300
             periodSeconds: 30
             timeoutSeconds: 10
           livenessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 180
-            periodSeconds: 30
+            initialDelaySeconds: 600
+            periodSeconds: 60
             timeoutSeconds: 10
-          env:
-            - name: HOME
-              value: /tmp
-          securityContext:
-            allowPrivilegeEscalation: false
       volumes:
         - name: models
           persistentVolumeClaim:
             claimName: vllm-models-pvc
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 10Gi
 ---
 apiVersion: v1
 kind: Service

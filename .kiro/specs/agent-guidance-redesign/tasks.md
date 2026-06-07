@@ -20,15 +20,15 @@ Replace the monolithic `system_prompt` freetext with structured, categorized gui
     - Add `guidance_rules: serde_json::Value` to the SeaORM entity
     - _Requirements: 1.1, 1.3_
 
-- [ ] 2. Backend DTOs and types
-  - [~] 2.1 Add guidance types to `models/chatbot.rs`
+- [x] 2. Backend DTOs and types
+  - [x] 2.1 Add guidance types to `models/chatbot.rs`
     - Define `GuidanceRule` struct (id, category, instruction, enabled, is_template, sort_order, created_at, updated_at)
     - Define `GuidanceCategory` enum (EstiloComunicacion, ContextoClarificacion, Escalamiento, Politicas)
     - Define `CreateGuidanceRuleRequest`, `UpdateGuidanceRuleRequest`, `BatchUpdateItem`, `BatchUpdateRequest`
     - Define `GuidanceRuleResponse` (same as GuidanceRule, serialized with camelCase)
     - _Requirements: 1.1, 1.2, 4.3, 4.4, 4.5, 4.6_
 
-  - [~] 2.2 Update `ChatbotConfigResponse` and `ChatbotConfigUpdateRequest`
+  - [x] 2.2 Update `ChatbotConfigResponse` and `ChatbotConfigUpdateRequest`
     - Add `guidance_rules: Vec<GuidanceRuleResponse>` to response
     - Remove `agent_config` from response
     - Remove `system_prompt` and `agent_config` from update request

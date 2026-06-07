@@ -150,6 +150,73 @@ pub struct ResolvedAgentConfig {
     pub guardrails: GuardrailOverrides,
 }
 
+// --- Guidance Rules ---
+
+/// Category for a guidance rule, mapping to sections in the assembled system prompt.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum GuidanceCategory {
+    EstiloComunicacion,
+    ContextoClarificacion,
+    Escalamiento,
+    Politicas,
+}
+
+/// A single behavioral instruction for the chatbot agent.
+/// Stored as JSONB array in `chatbot_config.guidance_rules`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GuidanceRule {
+    pub id: Uuid,
+    pub category: GuidanceCategory,
+    pub instruction: String,
+    pub enabled: bool,
+    pub is_template: bool,
+    pub sort_order: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Response type for guidance rule endpoints. Same shape as `GuidanceRule` (already camelCase + Serialize).
+pub type GuidanceRuleResponse = GuidanceRule;
+
+/// Request body to create a new custom guidance rule.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateGuidanceRuleRequest {
+    pub category: GuidanceCategory,
+    pub instruction: String,
+    /// Defaults to `true` if not provided.
+    pub enabled: Option<bool>,
+}
+
+/// Request body to update an existing guidance rule.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateGuidanceRuleRequest {
+    pub instruction: Option<String>,
+    pub enabled: Option<bool>,
+    pub sort_order: Option<i32>,
+}
+
+/// A single item within a batch update request.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchUpdateItem {
+    pub id: Uuid,
+    pub enabled: Option<bool>,
+    pub sort_order: Option<i32>,
+}
+
+/// Request body for batch-updating multiple guidance rules (reorder / bulk toggle).
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchUpdateRequest {
+    pub rules: Vec<BatchUpdateItem>,
+}
+
+// --- Chatbot Config Response ---
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatbotConfigResponse {
@@ -161,7 +228,6 @@ pub struct ChatbotConfigResponse {
     pub language: String,
     pub tone: Option<String>,
     pub greeting: Option<String>,
-    pub system_prompt: Option<String>,
     pub faqs: Option<Vec<FaqEntry>>,
     pub policies: Option<String>,
     pub sender_policy: String,
@@ -170,7 +236,7 @@ pub struct ChatbotConfigResponse {
     pub handoff_keywords: Option<Vec<String>>,
     pub history_limit: i32,
     pub retention_days: i32,
-    pub agent_config: AgentConfig,
+    pub guidance_rules: Vec<GuidanceRule>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -190,7 +256,6 @@ pub struct ChatbotConfigUpdateRequest {
     pub language: Option<String>,
     pub tone: Option<String>,
     pub greeting: Option<String>,
-    pub system_prompt: Option<String>,
     pub faqs: Option<Vec<FaqEntry>>,
     pub policies: Option<String>,
     pub sender_policy: Option<String>,
@@ -199,8 +264,6 @@ pub struct ChatbotConfigUpdateRequest {
     pub handoff_keywords: Option<Vec<String>>,
     pub history_limit: Option<i32>,
     pub retention_days: Option<i32>,
-    /// Agent behavior configuration (optional). Full replacement on PUT.
-    pub agent_config: Option<AgentConfig>,
 }
 
 // --- Webhook DTOs ---
@@ -513,7 +576,6 @@ mod tests {
             language: "es-DO".to_string(),
             tone: Some("profesional".to_string()),
             greeting: None,
-            system_prompt: None,
             faqs: None,
             policies: None,
             sender_policy: "tenants_only".to_string(),
@@ -528,7 +590,7 @@ mod tests {
             handoff_keywords: None,
             history_limit: 10,
             retention_days: 90,
-            agent_config: AgentConfig::default(),
+            guidance_rules: vec![],
             created_at: now,
             updated_at: now,
         };
@@ -540,6 +602,7 @@ mod tests {
         assert!(json.get("historyLimit").is_some());
         assert!(json.get("retentionDays").is_some());
         assert!(json.get("createdAt").is_some());
+        assert!(json.get("guidanceRules").is_some());
         assert_eq!(json["activo"], false);
         assert_eq!(json["language"], "es-DO");
     }

@@ -15,8 +15,8 @@ use crate::entities::{
 use crate::errors::AppError;
 use crate::models::PaginatedResponse;
 use crate::models::chatbot::{
-    AgentConfig, BalanceResponse, Capabilities, ChatbotConfigResponse, ChatbotConfigUpdateRequest,
-    Confidence, ConversationListResponse, CurrencyTotal, FaqEntry, PaymentDetail, format_currency,
+    BalanceResponse, Capabilities, ChatbotConfigResponse, ChatbotConfigUpdateRequest, Confidence,
+    ConversationListResponse, CurrencyTotal, FaqEntry, PaymentDetail, format_currency,
 };
 use crate::services::validation::validate_enum;
 
@@ -117,7 +117,7 @@ pub async fn upsert_config<C: ConnectionTrait>(
                 .unwrap_or_else(|| "es-DO".to_string())),
             tone: Set(input.tone.clone()),
             greeting: Set(input.greeting.clone()),
-            system_prompt: Set(input.system_prompt.clone()),
+            system_prompt: Set(None),
             faqs: Set(input
                 .faqs
                 .as_ref()
@@ -141,10 +141,7 @@ pub async fn upsert_config<C: ConnectionTrait>(
                 .map(|k| serde_json::to_value(k).unwrap_or_default())),
             history_limit: Set(input.history_limit.unwrap_or(10)),
             retention_days: Set(input.retention_days.unwrap_or(90)),
-            agent_config: Set(input.agent_config.as_ref().map_or_else(
-                || serde_json::json!({}),
-                |c| serde_json::to_value(c).unwrap_or_default(),
-            )),
+            agent_config: Set(serde_json::json!({})),
             guidance_rules: Set(serde_json::json!([])),
             updated_by: Set(Some(user_id)),
             created_at: Set(now),
@@ -214,10 +211,6 @@ pub fn validate_config(input: &ChatbotConfigUpdateRequest) -> Result<(), AppErro
                 "retention_days debe estar entre 1 y 365".to_string(),
             ));
         }
-    }
-
-    if let Some(ref agent_config) = input.agent_config {
-        validate_agent_config(agent_config)?;
     }
 
     Ok(())
@@ -308,9 +301,6 @@ fn apply_update_fields(
     if let Some(ref greeting) = input.greeting {
         active.greeting = Set(Some(greeting.clone()));
     }
-    if let Some(ref system_prompt) = input.system_prompt {
-        active.system_prompt = Set(Some(system_prompt.clone()));
-    }
     if let Some(ref faqs) = input.faqs {
         active.faqs = Set(Some(serde_json::to_value(faqs).unwrap_or_default()));
     }
@@ -336,10 +326,6 @@ fn apply_update_fields(
     }
     if let Some(retention_days) = input.retention_days {
         active.retention_days = Set(retention_days);
-    }
-    // Full replacement semantics: if agent_config is provided, replace the entire JSONB value
-    if let Some(ref agent_config) = input.agent_config {
-        active.agent_config = Set(serde_json::to_value(agent_config).unwrap_or_default());
     }
 }
 
@@ -394,7 +380,6 @@ pub(crate) fn config_model_to_response(
         language: model.language,
         tone: model.tone,
         greeting: model.greeting,
-        system_prompt: model.system_prompt,
         faqs,
         policies: model.policies,
         sender_policy: model.sender_policy,
@@ -403,7 +388,7 @@ pub(crate) fn config_model_to_response(
         handoff_keywords,
         history_limit: model.history_limit,
         retention_days: model.retention_days,
-        agent_config: serde_json::from_value(model.agent_config).unwrap_or_default(),
+        guidance_rules: serde_json::from_value(model.guidance_rules).unwrap_or_default(),
         created_at: model.created_at.into(),
         updated_at: model.updated_at.into(),
     })
@@ -420,7 +405,6 @@ fn default_config_response(org_id: Uuid) -> ChatbotConfigResponse {
         language: "es-DO".to_string(),
         tone: None,
         greeting: None,
-        system_prompt: None,
         faqs: None,
         policies: None,
         sender_policy: "tenants_only".to_string(),
@@ -435,7 +419,7 @@ fn default_config_response(org_id: Uuid) -> ChatbotConfigResponse {
         handoff_keywords: None,
         history_limit: 10,
         retention_days: 90,
-        agent_config: AgentConfig::default(),
+        guidance_rules: vec![],
         created_at: now,
         updated_at: now,
     }
@@ -1654,7 +1638,6 @@ mod tests {
             language: Some("es-DO".to_string()),
             tone: Some("profesional".to_string()),
             greeting: Some("Hola!".to_string()),
-            system_prompt: Some("Eres un asistente.".to_string()),
             faqs: Some(vec![FaqEntry {
                 question: "¿Cómo pago?".to_string(),
                 answer: "Puede pagar por transferencia.".to_string(),
@@ -1672,7 +1655,6 @@ mod tests {
             handoff_keywords: Some(vec!["hablar con humano".to_string()]),
             history_limit: Some(20),
             retention_days: Some(180),
-            agent_config: None,
         };
         assert!(validate_config(&input).is_ok());
     }
@@ -1685,7 +1667,6 @@ mod tests {
             language: None,
             tone: None,
             greeting: None,
-            system_prompt: None,
             faqs: None,
             policies: None,
             sender_policy: None,
@@ -1694,7 +1675,6 @@ mod tests {
             handoff_keywords: None,
             history_limit: None,
             retention_days: None,
-            agent_config: None,
         };
         assert!(validate_config(&input).is_ok());
     }
@@ -1941,7 +1921,6 @@ mod tests {
             language: None,
             tone: None,
             greeting: None,
-            system_prompt: None,
             faqs: None,
             policies: None,
             sender_policy: None,
@@ -1950,114 +1929,6 @@ mod tests {
             handoff_keywords: None,
             history_limit: None,
             retention_days: None,
-            agent_config: None,
         }
-    }
-
-    // ── AgentConfig validation tests ───────────────────────────────
-
-    #[test]
-    fn validate_config_accepts_valid_agent_config() {
-        let input = ChatbotConfigUpdateRequest {
-            agent_config: Some(crate::models::chatbot::AgentConfig {
-                max_turns: Some(10),
-                temperature: Some(0.7),
-                max_tokens: Some(2048),
-                tool_registration: None,
-                guardrails: Some(crate::models::chatbot::GuardrailOverrides {
-                    blocked_patterns: Some(vec![
-                        r"\b\d{3}-\d{2}-\d{4}\b".to_string(),
-                        r"(?i)password".to_string(),
-                    ]),
-                    ..Default::default()
-                }),
-            }),
-            ..default_update()
-        };
-        assert!(validate_config(&input).is_ok());
-    }
-
-    #[test]
-    fn validate_config_rejects_invalid_regex_in_blocked_patterns() {
-        let input = ChatbotConfigUpdateRequest {
-            agent_config: Some(crate::models::chatbot::AgentConfig {
-                guardrails: Some(crate::models::chatbot::GuardrailOverrides {
-                    blocked_patterns: Some(vec![
-                        r"valid_pattern".to_string(),
-                        r"[invalid".to_string(), // unclosed bracket
-                    ]),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            ..default_update()
-        };
-        let err = validate_config(&input).unwrap_err();
-        let msg = err.to_string();
-        assert!(msg.contains("blocked_patterns[1]"));
-        assert!(msg.contains("[invalid"));
-    }
-
-    #[test]
-    fn validate_config_rejects_more_than_20_blocked_patterns() {
-        let patterns: Vec<String> = (0..21).map(|i| format!("pattern_{i}")).collect();
-        let input = ChatbotConfigUpdateRequest {
-            agent_config: Some(crate::models::chatbot::AgentConfig {
-                guardrails: Some(crate::models::chatbot::GuardrailOverrides {
-                    blocked_patterns: Some(patterns),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            ..default_update()
-        };
-        let err = validate_config(&input).unwrap_err();
-        let msg = err.to_string();
-        assert!(msg.contains("más de 20"));
-    }
-
-    #[test]
-    fn validate_config_accepts_exactly_20_blocked_patterns() {
-        let patterns: Vec<String> = (0..20).map(|i| format!("pattern_{i}")).collect();
-        let input = ChatbotConfigUpdateRequest {
-            agent_config: Some(crate::models::chatbot::AgentConfig {
-                guardrails: Some(crate::models::chatbot::GuardrailOverrides {
-                    blocked_patterns: Some(patterns),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            ..default_update()
-        };
-        assert!(validate_config(&input).is_ok());
-    }
-
-    #[test]
-    fn validate_config_accepts_agent_config_without_guardrails() {
-        let input = ChatbotConfigUpdateRequest {
-            agent_config: Some(crate::models::chatbot::AgentConfig {
-                max_turns: Some(5),
-                guardrails: None,
-                ..Default::default()
-            }),
-            ..default_update()
-        };
-        assert!(validate_config(&input).is_ok());
-    }
-
-    #[test]
-    fn validate_config_accepts_guardrails_without_blocked_patterns() {
-        let input = ChatbotConfigUpdateRequest {
-            agent_config: Some(crate::models::chatbot::AgentConfig {
-                guardrails: Some(crate::models::chatbot::GuardrailOverrides {
-                    blocked_patterns: None,
-                    output_safety_enabled: Some(false),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            ..default_update()
-        };
-        assert!(validate_config(&input).is_ok());
     }
 }

@@ -907,7 +907,6 @@ fn valid_config_update() -> impl Strategy<Value = ChatbotConfigUpdateRequest> {
                     language: Some("es-DO".to_string()),
                     tone: Some(tone),
                     greeting: Some("Bienvenido".to_string()),
-                    system_prompt: Some("Eres un asistente.".to_string()),
                     faqs: Some(faqs),
                     policies: Some(policies),
                     sender_policy: Some(sender_policy),
@@ -916,7 +915,6 @@ fn valid_config_update() -> impl Strategy<Value = ChatbotConfigUpdateRequest> {
                     handoff_keywords: Some(vec!["hablar con humano".to_string()]),
                     history_limit: Some(history_limit),
                     retention_days: Some(retention_days),
-                    agent_config: None,
                 }
             },
         )
@@ -938,7 +936,7 @@ fn build_model_from_input(input: &ChatbotConfigUpdateRequest) -> chatbot_config:
             .unwrap_or_else(|| "es-DO".to_string()),
         tone: input.tone.clone(),
         greeting: input.greeting.clone(),
-        system_prompt: input.system_prompt.clone(),
+        system_prompt: None,
         faqs: input
             .faqs
             .as_ref()
@@ -962,11 +960,8 @@ fn build_model_from_input(input: &ChatbotConfigUpdateRequest) -> chatbot_config:
             .map(|k| serde_json::to_value(k).unwrap()),
         history_limit: input.history_limit.unwrap_or(10),
         retention_days: input.retention_days.unwrap_or(90),
-        agent_config: input
-            .agent_config
-            .as_ref()
-            .map(|a| serde_json::to_value(a).unwrap())
-            .unwrap_or_else(|| serde_json::json!({})),
+        agent_config: serde_json::json!({}),
+        guidance_rules: serde_json::json!([]),
         updated_by: Some(Uuid::new_v4()),
         created_at: now,
         updated_at: now,
@@ -1020,11 +1015,6 @@ fn config_round_trip_preserves_all_fields() {
                 response.greeting.as_deref(),
                 input.greeting.as_deref(),
                 "greeting mismatch"
-            );
-            prop_assert_eq!(
-                response.system_prompt.as_deref(),
-                input.system_prompt.as_deref(),
-                "system_prompt mismatch"
             );
 
             // Capability toggles (Requirement 9.3)
