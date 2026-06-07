@@ -129,7 +129,7 @@ Fix five operational defects in the Kubernetes monitoring stack: deploy kube-sta
     - Confirm all existing alert rules, scrape configs, Loki settings, and networkstorage target are unchanged
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
 
-- [~] 4. Checkpoint - Ensure all tests pass
+- [x] 4. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
   - Verify kube-state-metrics manifest is valid YAML with correct structure
   - Verify monitoring.yml changes are syntactically correct
