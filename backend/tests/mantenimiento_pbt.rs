@@ -209,6 +209,7 @@ mod pbt_async {
             organizacion_id: Set(org_id),
             created_at: Set(now),
             updated_at: Set(now),
+            password_changed_at: Set(now),
         }
         .insert(db)
         .await

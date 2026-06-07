@@ -336,6 +336,7 @@ async fn register_new_org(
         organizacion_id: Set(org_id),
         created_at: Set(now),
         updated_at: Set(now),
+        password_changed_at: Set(now),
     };
     let user = user_model.insert(&txn).await?;
 
@@ -374,6 +375,7 @@ async fn register_with_invitation(
         organizacion_id: Set(inv.organizacion_id),
         created_at: Set(now),
         updated_at: Set(now),
+        password_changed_at: Set(now),
     };
     let user = user_model.insert(&txn).await?;
 

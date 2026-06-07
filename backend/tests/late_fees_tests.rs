@@ -70,6 +70,7 @@ async fn create_test_usuario(db: &DatabaseConnection, rol: &str, org_id: Uuid) -
         organizacion_id: Set(org_id),
         created_at: Set(now),
         updated_at: Set(now),
+        password_changed_at: Set(now),
     }
     .insert(db)
     .await

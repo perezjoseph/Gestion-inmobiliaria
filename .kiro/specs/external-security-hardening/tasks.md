@@ -78,7 +78,7 @@ This plan addresses 9 external attack vectors identified during a security audit
     - Backfill existing rows: `SET password_changed_at = created_at`
     - _Requirements: 8.4_
 
-  - [~] 6.2 Update usuario entity with `password_changed_at` field
+  - [x] 6.2 Update usuario entity with `password_changed_at` field
     - Add `password_changed_at: DateTimeWithTimeZone` to `backend/src/entities/usuario.rs`
     - _Requirements: 8.4_
 
