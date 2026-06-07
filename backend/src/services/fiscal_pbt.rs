@@ -78,8 +78,8 @@ fn invalid_rnc() -> impl Strategy<Value = String> {
         "[0-9]{1,8}",
         // Too long (10-15 digits)
         "[0-9]{10,15}",
-        // Correct length but with letters
-        "[a-z0-9]{9}",
+        // Correct length but contains at least one letter (guaranteed non-numeric)
+        "[a-z][a-z0-9]{8}",
         // Empty
         Just(String::new()),
     ]
@@ -92,8 +92,8 @@ fn invalid_cedula() -> impl Strategy<Value = String> {
         "[0-9]{1,10}",
         // Too long (12-15 digits)
         "[0-9]{12,15}",
-        // Correct length but with letters
-        "[a-z0-9]{11}",
+        // Correct length but contains at least one letter (guaranteed non-numeric)
+        "[a-z][a-z0-9]{10}",
         // Empty
         Just(String::new()),
     ]
