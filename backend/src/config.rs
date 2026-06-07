@@ -43,6 +43,7 @@ pub struct ChatbotEnvConfig {
     pub baileys_internal_token: String,
     pub vllm_endpoint: String,
     pub vllm_chat_model: String,
+    pub vllm_api_key: Option<String>,
     pub ai_chat_timeout_secs: u64,
 }
 
@@ -72,6 +73,8 @@ impl ChatbotEnvConfig {
         let vllm_chat_model = std::env::var("VLLM_CHAT_MODEL")
             .unwrap_or_else(|_| "Qwen/Qwen3-30B-A3B-GPTQ-Int4".to_string());
 
+        let vllm_api_key = std::env::var("VLLM_API_KEY").ok().filter(|s| !s.is_empty());
+
         let ai_chat_timeout_secs = std::env::var("AI_CHAT_TIMEOUT_SECS")
             .unwrap_or_else(|_| "30".to_string())
             .parse::<u64>()
@@ -82,6 +85,7 @@ impl ChatbotEnvConfig {
             baileys_internal_token,
             vllm_endpoint,
             vllm_chat_model,
+            vllm_api_key,
             ai_chat_timeout_secs,
         })
     }
@@ -98,6 +102,7 @@ impl ChatbotEnvConfig {
             baileys_internal_token: "a".repeat(32),
             vllm_endpoint: "http://vllm-inference:8000/v1".to_string(),
             vllm_chat_model: "test-model".to_string(),
+            vllm_api_key: None,
             ai_chat_timeout_secs: 30,
         }
     }

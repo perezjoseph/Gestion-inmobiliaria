@@ -149,6 +149,7 @@ pub struct OvmsCompletionModel {
     pub(crate) client: reqwest::Client,
     pub(crate) model_name: String,
     pub(crate) endpoint: String,
+    pub(crate) api_key: Option<String>,
 }
 
 impl OvmsCompletionModel {
@@ -157,11 +158,16 @@ impl OvmsCompletionModel {
     /// `endpoint` should be the base URL including the version path,
     /// e.g. `http://ovms:8000/v3`. The `/chat/completions` suffix is appended
     /// automatically.
-    pub fn new(model_name: impl Into<String>, endpoint: impl Into<String>) -> Self {
+    pub fn new(
+        model_name: impl Into<String>,
+        endpoint: impl Into<String>,
+        api_key: Option<String>,
+    ) -> Self {
         Self {
             client: reqwest::Client::new(),
             model_name: model_name.into(),
             endpoint: endpoint.into(),
+            api_key,
         }
     }
 }
@@ -177,6 +183,7 @@ impl completion::CompletionModel for OvmsCompletionModel {
             client: reqwest::Client::new(),
             model_name: model.into(),
             endpoint: String::new(),
+            api_key: None,
         }
     }
 
@@ -189,10 +196,16 @@ impl completion::CompletionModel for OvmsCompletionModel {
 
         let url = format!("{}/chat/completions", self.endpoint);
 
-        let response = self
+        let mut request_builder = self
             .client
             .post(&url)
-            .header("Content-Type", "application/json")
+            .header("Content-Type", "application/json");
+
+        if let Some(key) = &self.api_key {
+            request_builder = request_builder.header("Authorization", format!("Bearer {key}"));
+        }
+
+        let response = request_builder
             .json(&ovms_request)
             .send()
             .await
@@ -223,10 +236,16 @@ impl completion::CompletionModel for OvmsCompletionModel {
 
         let url = format!("{}/chat/completions", self.endpoint);
 
-        let response = self
+        let mut request_builder = self
             .client
             .post(&url)
-            .header("Content-Type", "application/json")
+            .header("Content-Type", "application/json");
+
+        if let Some(key) = &self.api_key {
+            request_builder = request_builder.header("Authorization", format!("Bearer {key}"));
+        }
+
+        let response = request_builder
             .json(&ovms_request)
             .send()
             .await

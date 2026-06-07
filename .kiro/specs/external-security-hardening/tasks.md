@@ -119,7 +119,7 @@ This plan addresses 9 external attack vectors identified during a security audit
     - In `OcrClient::extract()`: add `Authorization: Bearer <token>` header when token is configured
     - _Requirements: 7.1, 7.3_
 
-  - [~] 8.2 Add vLLM API key to backend
+  - [x] 8.2 Add vLLM API key to backend
     - Add `vllm_api_key: Option<String>` to `ChatbotEnvConfig` (from `VLLM_API_KEY` env var)
     - In vLLM client requests: add `Authorization: Bearer <key>` header when configured
     - _Requirements: 7.4, 7.5_

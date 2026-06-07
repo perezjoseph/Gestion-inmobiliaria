@@ -621,7 +621,11 @@ pub async fn test_chat_stream(
         output_schema: None,
     };
 
-    let model = OvmsCompletionModel::new(&chatbot_env.vllm_chat_model, &chatbot_env.vllm_endpoint);
+    let model = OvmsCompletionModel::new(
+        &chatbot_env.vllm_chat_model,
+        &chatbot_env.vllm_endpoint,
+        chatbot_env.vllm_api_key.clone(),
+    );
 
     let mut streaming_response =
         rig::completion::CompletionModel::stream(&model, completion_request)
