@@ -18,7 +18,7 @@ ignore = [
     "RUSTSEC-2021-0140",
     # proc-macro-error2 unmaintained: transitive dep from sea-bae -> sea-orm-macros -> sea-orm.
     # No safe upgrade available until sea-orm drops this dependency.
-    "RUSTSEC-0000-0000",
+    "RUSTSEC-2026-0173",
 ]
 
 [licenses]
