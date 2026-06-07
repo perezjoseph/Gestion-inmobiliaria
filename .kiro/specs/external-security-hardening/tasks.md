@@ -13,7 +13,7 @@ This plan addresses 9 external attack vectors identified during a security audit
     - Add unit tests for header priority logic
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 2. Implement account lockout on failed login
+- [x] 2. Implement account lockout on failed login
   - [x] 2.1 Add `dashmap` dependency to `backend/Cargo.toml`
     - Research latest stable version and pin it
     - _Requirements: 2.6_
@@ -35,7 +35,7 @@ This plan addresses 9 external attack vectors identified during a security audit
     - Return HTTP 429 with `{"error": "account_locked", "retry_after_seconds": N}` when locked
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.7_
 
-  - [~] 2.4 Add security event logging for lockout
+  - [x] 2.4 Add security event logging for lockout
     - Log `event=login_failed` with email + client_ip on every failed attempt
     - Log `event=account_locked` with email + client_ip + locked_until when lockout triggers
     - Ensure attempted password is NOT logged

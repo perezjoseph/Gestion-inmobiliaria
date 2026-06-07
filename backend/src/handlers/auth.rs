@@ -1,8 +1,9 @@
-use actix_web::{HttpResponse, web};
+use actix_web::{HttpRequest, HttpResponse, web};
 use sea_orm::DatabaseConnection;
 
 use crate::config::AppConfig;
 use crate::errors::AppError;
+use crate::middleware::rate_limit::extract_client_ip_from_request;
 use crate::models::usuario::{LoginRequest, RegisterRequest};
 use crate::services::auth::{self, RegisterResult};
 use crate::services::login_lockout::LoginLockout;
@@ -20,6 +21,7 @@ pub async fn register(
 }
 
 pub async fn login(
+    req: HttpRequest,
     db: web::Data<DatabaseConnection>,
     config: web::Data<AppConfig>,
     lockout: web::Data<LoginLockout>,
@@ -27,12 +29,14 @@ pub async fn login(
 ) -> Result<HttpResponse, AppError> {
     let input = body.into_inner();
     let email = input.email.clone();
+    let client_ip = extract_client_ip_from_request(&req);
 
     // Check lockout BEFORE attempting login (Req 2.7: does not reveal if email exists)
     if let Err(info) = lockout.check(&email) {
         tracing::warn!(
             event = "login_blocked_lockout",
             email = %email,
+            client_ip = %client_ip,
             retry_after_seconds = info.retry_after_seconds,
             "Login attempt blocked — account locked"
         );
@@ -49,8 +53,25 @@ pub async fn login(
             Ok(HttpResponse::Ok().json(response))
         }
         Err(e) => {
-            lockout.record_failure(&email);
-            tracing::warn!(email = %email, "Failed login attempt");
+            let lockout_info = lockout.record_failure(&email);
+
+            tracing::warn!(
+                event = "login_failed",
+                email = %email,
+                client_ip = %client_ip,
+                "Failed login attempt"
+            );
+
+            if let Some(info) = lockout_info {
+                tracing::warn!(
+                    event = "account_locked",
+                    email = %email,
+                    client_ip = %client_ip,
+                    retry_after_seconds = info.retry_after_seconds,
+                    "Account locked due to repeated failures"
+                );
+            }
+
             Err(e)
         }
     }

@@ -48,6 +48,15 @@ data:
         metrics_path: "/internal/metrics"
         static_configs:
           - targets: ["backend.realestate.svc.cluster.local:8080"]
+            labels:
+              environment: "production"
+
+      - job_name: "backend-dev"
+        metrics_path: "/internal/metrics"
+        static_configs:
+          - targets: ["backend.realestate-dev.svc.cluster.local:8080"]
+            labels:
+              environment: "development"
 
       - job_name: "vllm"
         metrics_path: "/metrics"
