@@ -17,6 +17,7 @@ use crate::services::ai_module::{
     AiModule, ChatbotPersona, ConversationEntry, ProcessMessageContext, UserMessage,
     compose_system_prompt,
 };
+use crate::services::baileys_client::BaileysClient;
 use crate::services::chatbot;
 use crate::services::ovms_provider::OvmsCompletionModel;
 
@@ -51,108 +52,66 @@ pub async fn update_config(
 /// Calls `POST /sessions/{realmId}/start` on the `Baileys` sidecar and returns
 /// the QR code data or current connection status.
 pub async fn connect(
-    app_config: web::Data<AppConfig>,
+    baileys: Option<web::Data<BaileysClient>>,
     claims: WriteAccess,
 ) -> Result<HttpResponse, AppError> {
-    let chatbot_config = &app_config.chatbot;
-
-    let realm_id = claims.0.organizacion_id;
-    let url = format!(
-        "{}/sessions/{}/start",
-        chatbot_config.baileys_service_url, realm_id
-    );
-
-    let client = reqwest::Client::new();
-    let response = client.post(&url).send().await.map_err(|e| {
-        AppError::Internal(anyhow::anyhow!("Error conectando al servicio Baileys: {e}"))
-    })?;
-
-    let status = response.status();
-    let body: serde_json::Value = response.json().await.map_err(|e| {
+    let client = baileys.ok_or_else(|| {
         AppError::Internal(anyhow::anyhow!(
-            "Error procesando respuesta de Baileys: {e}"
+            "BaileysClient no configurado — servicio WhatsApp no disponible"
         ))
     })?;
 
-    if status.is_success() {
-        Ok(HttpResponse::Ok().json(normalize_baileys_response(&body)))
-    } else {
-        Err(AppError::Internal(anyhow::anyhow!(
-            "Baileys respondió con estado {status}"
-        )))
-    }
+    let realm_id = claims.0.organizacion_id;
+    let response = client.start_session(realm_id).await?;
+
+    let body = serde_json::to_value(&response)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error serializando respuesta: {e}")))?;
+
+    Ok(HttpResponse::Ok().json(normalize_baileys_response(&body)))
 }
 
 /// POST `/api/v1/chatbot/disconnect` — disconnect `WhatsApp` session via `Baileys` Service.
 ///
 /// Calls `POST /sessions/{realmId}/stop` on the `Baileys` sidecar.
 pub async fn disconnect(
-    app_config: web::Data<AppConfig>,
+    baileys: Option<web::Data<BaileysClient>>,
     claims: WriteAccess,
 ) -> Result<HttpResponse, AppError> {
-    let chatbot_config = &app_config.chatbot;
-
-    let realm_id = claims.0.organizacion_id;
-    let url = format!(
-        "{}/sessions/{}/stop",
-        chatbot_config.baileys_service_url, realm_id
-    );
-
-    let client = reqwest::Client::new();
-    let response = client.post(&url).send().await.map_err(|e| {
-        AppError::Internal(anyhow::anyhow!("Error conectando al servicio Baileys: {e}"))
-    })?;
-
-    let status = response.status();
-    let body: serde_json::Value = response.json().await.map_err(|e| {
+    let client = baileys.ok_or_else(|| {
         AppError::Internal(anyhow::anyhow!(
-            "Error procesando respuesta de Baileys: {e}"
+            "BaileysClient no configurado — servicio WhatsApp no disponible"
         ))
     })?;
 
-    if status.is_success() {
-        Ok(HttpResponse::Ok().json(normalize_baileys_response(&body)))
-    } else {
-        Err(AppError::Internal(anyhow::anyhow!(
-            "Baileys respondió con estado {status}"
-        )))
-    }
+    let realm_id = claims.0.organizacion_id;
+    let response = client.stop_session(realm_id).await?;
+
+    let body = serde_json::to_value(&response)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error serializando respuesta: {e}")))?;
+
+    Ok(HttpResponse::Ok().json(normalize_baileys_response(&body)))
 }
 
 /// GET `/api/v1/chatbot/status` — get current `WhatsApp` connection status.
 ///
 /// Calls `GET /sessions/{realmId}/status` on the `Baileys` sidecar.
 pub async fn status(
-    app_config: web::Data<AppConfig>,
+    baileys: Option<web::Data<BaileysClient>>,
     claims: WriteAccess,
 ) -> Result<HttpResponse, AppError> {
-    let chatbot_config = &app_config.chatbot;
-
-    let realm_id = claims.0.organizacion_id;
-    let url = format!(
-        "{}/sessions/{}/status",
-        chatbot_config.baileys_service_url, realm_id
-    );
-
-    let client = reqwest::Client::new();
-    let response = client.get(&url).send().await.map_err(|e| {
-        AppError::Internal(anyhow::anyhow!("Error conectando al servicio Baileys: {e}"))
-    })?;
-
-    let status_code = response.status();
-    let body: serde_json::Value = response.json().await.map_err(|e| {
+    let client = baileys.ok_or_else(|| {
         AppError::Internal(anyhow::anyhow!(
-            "Error procesando respuesta de Baileys: {e}"
+            "BaileysClient no configurado — servicio WhatsApp no disponible"
         ))
     })?;
 
-    if status_code.is_success() {
-        Ok(HttpResponse::Ok().json(normalize_baileys_response(&body)))
-    } else {
-        Err(AppError::Internal(anyhow::anyhow!(
-            "Baileys respondió con estado {status_code}"
-        )))
-    }
+    let realm_id = claims.0.organizacion_id;
+    let response = client.get_status(realm_id).await?;
+
+    let body = serde_json::to_value(&response)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error serializando respuesta: {e}")))?;
+
+    Ok(HttpResponse::Ok().json(normalize_baileys_response(&body)))
 }
 
 // --- Conversation Query Params ---

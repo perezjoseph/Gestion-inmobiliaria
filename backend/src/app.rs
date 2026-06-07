@@ -13,9 +13,11 @@ use tracing_actix_web::TracingLogger;
 use crate::config::{AppConfig, SmtpConfig};
 use crate::errors::AppError;
 use crate::routes;
+use crate::services::baileys_client::BaileysClient;
 use crate::services::login_lockout::LoginLockout;
 use crate::services::mail::{MailClient, OutgoingMail, SmtpMailClient};
 use crate::services::ocr_preview::PreviewStore;
+use crate::services::user_security_cache::UserSecurityCache;
 
 async fn health(db: web::Data<DatabaseConnection>) -> HttpResponse {
     use sea_orm::ConnectionTrait;
@@ -186,7 +188,19 @@ pub fn create_app(
         }
     };
 
-    actix_web::App::new()
+    // Construct BaileysClient from chatbot config (always available since chatbot is required)
+    let baileys_client = match BaileysClient::new(&config.chatbot) {
+        Ok(client) => {
+            tracing::info!("BaileysClient configurado correctamente");
+            Some(web::Data::new(client))
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "Error creando BaileysClient — endpoints de WhatsApp deshabilitados");
+            None
+        }
+    };
+
+    let mut app = actix_web::App::new()
         .wrap(prometheus)
         .wrap(crate::middleware::security_headers::SecurityHeaders)
         .wrap(TracingLogger::default())
@@ -195,6 +209,7 @@ pub fn create_app(
         .app_data(web::Data::new(config))
         .app_data(preview_store)
         .app_data(lockout)
+        .app_data(web::Data::new(UserSecurityCache::new()))
         .app_data(web::Data::new(mail_client))
         .app_data(json_cfg)
         .app_data(multipart_cfg)
@@ -202,7 +217,13 @@ pub fn create_app(
         .route("/metrics", web::get().to(metrics_handler))
         .route("/internal/metrics", web::get().to(internal_metrics))
         .configure(routes::configure)
-        .route("/uploads/{path:.*}", web::get().to(serve_upload))
+        .route("/uploads/{path:.*}", web::get().to(serve_upload));
+
+    if let Some(baileys) = baileys_client {
+        app = app.app_data(baileys);
+    }
+
+    app
 }
 
 /// No-op mail client used when SMTP is not configured.

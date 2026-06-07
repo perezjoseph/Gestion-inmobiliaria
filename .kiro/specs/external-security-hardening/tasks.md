@@ -96,7 +96,7 @@ This plan addresses 9 external attack vectors identified during a security audit
     - Update `decode_jwt` validation to require `jti` and `iat` claims
     - _Requirements: 8.1, 8.5_
 
-  - [~] 6.5 Integrate user security cache into auth middleware
+  - [x] 6.5 Integrate user security cache into auth middleware
     - Register `UserSecurityCache` as `web::Data` in `backend/src/app.rs`
     - In auth middleware (`backend/src/middleware/auth.rs`), after decoding JWT: call `cache.is_token_valid(db, claims.sub, claims.iat)`
     - Return 401 if user is inactive or password changed after token issuance

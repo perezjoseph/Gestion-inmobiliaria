@@ -1,6 +1,9 @@
 use super::Claims;
 use crate::errors::AppError;
 
+use std::future::Future;
+use std::pin::Pin;
+
 #[allow(dead_code)]
 pub fn check_role(claims: &Claims, allowed_roles: &[&str]) -> Result<(), AppError> {
     if allowed_roles.contains(&claims.rol.as_str()) {
@@ -15,34 +18,40 @@ pub struct WriteAccess(pub Claims);
 
 impl actix_web::FromRequest for AdminOnly {
     type Error = AppError;
-    type Future = std::future::Ready<Result<Self, Self::Error>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self, Self::Error>>>>;
 
     fn from_request(
         req: &actix_web::HttpRequest,
         payload: &mut actix_web::dev::Payload,
     ) -> Self::Future {
-        let claims = Claims::from_request(req, payload).into_inner();
-        std::future::ready(match claims {
-            Ok(c) if c.rol == "admin" => Ok(Self(c)),
-            Ok(_) => Err(AppError::Forbidden("Acceso denegado".to_string())),
-            Err(e) => Err(e),
+        let claims_fut = Claims::from_request(req, payload);
+        Box::pin(async move {
+            let claims = claims_fut.await?;
+            if claims.rol == "admin" {
+                Ok(Self(claims))
+            } else {
+                Err(AppError::Forbidden("Acceso denegado".to_string()))
+            }
         })
     }
 }
 
 impl actix_web::FromRequest for WriteAccess {
     type Error = AppError;
-    type Future = std::future::Ready<Result<Self, Self::Error>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self, Self::Error>>>>;
 
     fn from_request(
         req: &actix_web::HttpRequest,
         payload: &mut actix_web::dev::Payload,
     ) -> Self::Future {
-        let claims = Claims::from_request(req, payload).into_inner();
-        std::future::ready(match claims {
-            Ok(c) if c.rol == "admin" || c.rol == "gerente" => Ok(Self(c)),
-            Ok(_) => Err(AppError::Forbidden("Acceso denegado".to_string())),
-            Err(e) => Err(e),
+        let claims_fut = Claims::from_request(req, payload);
+        Box::pin(async move {
+            let claims = claims_fut.await?;
+            if claims.rol == "admin" || claims.rol == "gerente" {
+                Ok(Self(claims))
+            } else {
+                Err(AppError::Forbidden("Acceso denegado".to_string()))
+            }
         })
     }
 }
