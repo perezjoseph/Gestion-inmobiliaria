@@ -15,7 +15,7 @@ RUN apt-get update -qq \
        libfreetype6 \
        libfontconfig1 \
        libglib2.0-0 \
-       libasound2 \
+       libasound2t64 \
     && curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors \
        --connect-timeout 15 --max-time 60 \
        -o /tmp/corretto-key.pub \
@@ -153,8 +153,10 @@ RUN ARCHIVE="/tmp/gh.tar.gz" \
     && KIRO_VER=$(kiro-cli --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1 || true) \
     && echo "Detected kiro-cli version: ${KIRO_VER:-UNKNOWN}" \
     && MIN_VER="2.4.0" \
-    && if [ -z "$KIRO_VER" ] || [ "$(printf '%s\n' "$MIN_VER" "$KIRO_VER" | sort -V | head -1)" != "$MIN_VER" ]; then \
-         echo "ERROR: kiro-cli ${KIRO_VER:-UNKNOWN} is below minimum required ${MIN_VER} (needs --effort support)" >&2; \
+    && if [ -z "$KIRO_VER" ] || \
+         [ "$(printf '%s\n' "$MIN_VER" "$KIRO_VER" \
+           | sort -V | head -1)" != "$MIN_VER" ]; then \
+         echo "ERROR: kiro-cli ${KIRO_VER:-UNKNOWN} below min ${MIN_VER}" >&2; \
          echo "Binary details:" >&2; \
          file "$KIRO_BIN" >&2; \
          ldd "$KIRO_BIN" 2>&1 | head -20 >&2 || true; \
