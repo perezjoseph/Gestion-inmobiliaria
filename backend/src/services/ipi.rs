@@ -1,11 +1,11 @@
 use chrono::{Datelike, NaiveDate, Utc};
 use rust_decimal::Decimal;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use uuid::Uuid;
 
 use crate::entities::{configuracion_ipi, copropietario, propiedad};
 use crate::errors::AppError;
-use crate::models::ipi::{CopropietarioResponse, IpiLiabilityResponse};
+use crate::models::ipi::{ConfiguracionIpiRequest, CopropietarioResponse, IpiLiabilityResponse};
 
 /// Calculate total IPI liability for an organization.
 ///
@@ -162,6 +162,96 @@ pub async fn detectar_propiedad_cruzada(
          lo que puede afectar el cálculo del umbral IPI por contribuyente: {}",
         unique_affected.join(", ")
     )))
+}
+
+/// Update or create the IPI threshold configuration for an organization and year.
+pub async fn actualizar_umbral(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    req: ConfiguracionIpiRequest,
+) -> Result<configuracion_ipi::Model, AppError> {
+    if req.umbral_ipi <= Decimal::ZERO {
+        return Err(AppError::Validation(
+            "El umbral IPI debe ser mayor a cero".to_string(),
+        ));
+    }
+
+    if req.fecha_pago_1 >= req.fecha_pago_2 {
+        return Err(AppError::Validation(
+            "La primera fecha de pago debe ser anterior a la segunda".to_string(),
+        ));
+    }
+
+    let existing = configuracion_ipi::Entity::find()
+        .filter(configuracion_ipi::Column::OrganizacionId.eq(org_id))
+        .filter(configuracion_ipi::Column::Anio.eq(req.anio))
+        .one(db)
+        .await?;
+
+    let result = if let Some(existing_model) = existing {
+        let mut active: configuracion_ipi::ActiveModel = existing_model.into();
+        active.umbral_ipi = Set(req.umbral_ipi);
+        active.fecha_pago_1 = Set(req.fecha_pago_1);
+        active.fecha_pago_2 = Set(req.fecha_pago_2);
+        active.updated_at = Set(chrono::Utc::now().into());
+        active.update(db).await?
+    } else {
+        let new_config = configuracion_ipi::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            organizacion_id: Set(org_id),
+            umbral_ipi: Set(req.umbral_ipi),
+            anio: Set(req.anio),
+            fecha_pago_1: Set(req.fecha_pago_1),
+            fecha_pago_2: Set(req.fecha_pago_2),
+            created_at: Set(chrono::Utc::now().into()),
+            updated_at: Set(chrono::Utc::now().into()),
+        };
+        new_config.insert(db).await?
+    };
+
+    Ok(result)
+}
+
+/// Create a new co-owner record for a property.
+pub async fn crear_copropietario(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    propiedad_id: Uuid,
+    nombre: String,
+    cedula_rnc: String,
+    porcentaje_propiedad: Decimal,
+) -> Result<copropietario::Model, AppError> {
+    if nombre.trim().is_empty() {
+        return Err(AppError::Validation(
+            "El nombre no puede estar vacío".to_string(),
+        ));
+    }
+
+    if cedula_rnc.trim().is_empty() {
+        return Err(AppError::Validation(
+            "La cédula/RNC no puede estar vacía".to_string(),
+        ));
+    }
+
+    if porcentaje_propiedad <= Decimal::ZERO || porcentaje_propiedad > Decimal::new(100, 0) {
+        return Err(AppError::Validation(
+            "El porcentaje de propiedad debe estar entre 0 y 100".to_string(),
+        ));
+    }
+
+    let new_copropietario = copropietario::ActiveModel {
+        id: Set(Uuid::new_v4()),
+        propiedad_id: Set(propiedad_id),
+        nombre: Set(nombre),
+        cedula_rnc: Set(cedula_rnc),
+        porcentaje_propiedad: Set(porcentaje_propiedad),
+        organizacion_id: Set(org_id),
+        created_at: Set(chrono::Utc::now().into()),
+        updated_at: Set(chrono::Utc::now().into()),
+    };
+
+    let result = new_copropietario.insert(db).await?;
+    Ok(result)
 }
 
 /// Validate that copropietario percentages sum to exactly 100% for a property.

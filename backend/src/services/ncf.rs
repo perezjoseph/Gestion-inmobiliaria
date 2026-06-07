@@ -207,6 +207,20 @@ pub fn validar_formato_ncf(ncf: &str) -> Result<(), AppError> {
 
 /// Check range consumption for all active NCF sequences of an organization.
 ///
+/// List all NCF sequences for an organization.
+pub async fn listar_secuencias(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+) -> Result<Vec<SecuenciaNcfResponse>, AppError> {
+    let secuencias = secuencia_ncf::Entity::find()
+        .filter(secuencia_ncf::Column::OrganizacionId.eq(org_id))
+        .all(db)
+        .await?;
+
+    let responses: Vec<SecuenciaNcfResponse> = secuencias.iter().map(to_response).collect();
+    Ok(responses)
+}
+
 /// Returns alerts for sequences that have consumed >= 80% of their range.
 pub async fn verificar_consumo_rango(
     db: &DatabaseConnection,

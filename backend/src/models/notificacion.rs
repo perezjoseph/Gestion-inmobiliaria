@@ -59,6 +59,8 @@ pub struct GenerarNotificacionesResponse {
     pub contrato_renovacion: u64,
     pub deposito_devolucion: u64,
     pub pago_por_vencer: u64,
+    pub ipi_fecha_pago: u64,
+    pub ncf_rango_consumo: u64,
     pub total: u64,
 }
 
@@ -218,7 +220,9 @@ mod tests {
             contrato_renovacion: 4,
             deposito_devolucion: 2,
             pago_por_vencer: 1,
-            total: 13,
+            ipi_fecha_pago: 2,
+            ncf_rango_consumo: 3,
+            total: 18,
         };
         let json = serde_json::to_value(&resp).unwrap();
         assert!(json.get("pagoVencido").is_some());
@@ -233,10 +237,16 @@ mod tests {
         assert_eq!(json["depositoDevolucion"], 2);
         assert!(json.get("pagoPorVencer").is_some());
         assert_eq!(json["pagoPorVencer"], 1);
-        assert_eq!(json["total"], 13);
+        assert!(json.get("ipiFechaPago").is_some());
+        assert_eq!(json["ipiFechaPago"], 2);
+        assert!(json.get("ncfRangoConsumo").is_some());
+        assert_eq!(json["ncfRangoConsumo"], 3);
+        assert_eq!(json["total"], 18);
         // Verify snake_case keys are absent
         assert!(json.get("pago_vencido").is_none());
         assert!(json.get("contrato_por_vencer").is_none());
         assert!(json.get("documento_vencido").is_none());
+        assert!(json.get("ipi_fecha_pago").is_none());
+        assert!(json.get("ncf_rango_consumo").is_none());
     }
 }

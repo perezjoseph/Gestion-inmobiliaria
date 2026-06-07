@@ -7,7 +7,7 @@ use sea_orm::{
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::entities::{contrato, inquilino, organizacion, pago, propiedad};
+use crate::entities::{contrato, cuota_condominio, inquilino, organizacion, pago, propiedad};
 use crate::errors::AppError;
 use crate::models::PaginatedResponse;
 use crate::models::fiscal::TipoFiscal;
@@ -166,6 +166,59 @@ pub async fn create<C: ConnectionTrait>(
         },
     )
     .await;
+
+    // Wire passthrough cuota_condominio into billing as a separate pago record
+    let active_cuotas = cuota_condominio::Entity::find()
+        .filter(cuota_condominio::Column::PropiedadId.eq(propiedad_model.id))
+        .filter(cuota_condominio::Column::OrganizacionId.eq(organizacion_id))
+        .filter(cuota_condominio::Column::EsPassthrough.eq(true))
+        .filter(cuota_condominio::Column::FechaInicio.lte(input.fecha_vencimiento))
+        .all(db)
+        .await?;
+
+    for cuota in &active_cuotas {
+        // Skip cuotas that have ended before the payment due date
+        if let Some(fecha_fin) = cuota.fecha_fin {
+            if fecha_fin <= input.fecha_vencimiento {
+                continue;
+            }
+        }
+
+        let cuota_itbis_result = itbis::calcular_itbis(
+            cuota.monto,
+            &propiedad_model.tipo_propiedad,
+            &tipo_fiscal,
+            None,
+        );
+
+        let cuota_id = Uuid::new_v4();
+        let cuota_pago = pago::ActiveModel {
+            id: Set(cuota_id),
+            contrato_id: Set(input.contrato_id),
+            monto: Set(cuota_itbis_result.monto_total),
+            moneda: Set(cuota.moneda.clone()),
+            fecha_pago: Set(None),
+            fecha_vencimiento: Set(input.fecha_vencimiento),
+            metodo_pago: Set(None),
+            estado: Set("pendiente".to_string()),
+            notas: Set(None),
+            recargo: Set(None),
+            organizacion_id: Set(organizacion_id),
+            monto_base: Set(Some(cuota_itbis_result.monto_base)),
+            monto_itbis: Set(Some(cuota_itbis_result.monto_itbis)),
+            monto_itbis_retenido: Set(None),
+            ncf: Set(None),
+            fecha_comprobante: Set(None),
+            tipo_ncf: Set(None),
+            es_parcial: Set(false),
+            saldo_pendiente: Set(None),
+            tipo_linea: Set("cuota_condominio".to_string()),
+            created_at: Set(now),
+            updated_at: Set(now),
+        };
+
+        cuota_pago.insert(db).await?;
+    }
 
     Ok(PagoResponse::from(record))
 }

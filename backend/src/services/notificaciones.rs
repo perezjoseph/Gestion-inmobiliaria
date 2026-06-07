@@ -827,6 +827,10 @@ pub async fn generar_notificaciones(
     let deposito_devolucion = generar_deposito_devolucion(db, organizacion_id).await?;
     let pago_por_vencer = generar_pagos_por_vencer(db, organizacion_id).await?;
 
+    // TODO(18.4): ipi_fecha_pago and ncf_rango_consumo generators not yet implemented
+    let ipi_fecha_pago = 0u64;
+    let ncf_rango_consumo = 0u64;
+
     Ok(GenerarNotificacionesResponse {
         pago_vencido,
         contrato_por_vencer,
@@ -834,12 +838,16 @@ pub async fn generar_notificaciones(
         contrato_renovacion,
         deposito_devolucion,
         pago_por_vencer,
+        ipi_fecha_pago,
+        ncf_rango_consumo,
         total: pago_vencido
             + contrato_por_vencer
             + documento_vencido
             + contrato_renovacion
             + deposito_devolucion
-            + pago_por_vencer,
+            + pago_por_vencer
+            + ipi_fecha_pago
+            + ncf_rango_consumo,
     })
 }
 

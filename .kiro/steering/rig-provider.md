@@ -22,7 +22,7 @@ All LLM calls go through `OvmsCompletionModel` (implements `rig::completion::Com
 
 ## Checklist before changes
 
-1. Verify trait bounds match rig-core 0.36 (check `CompletionModel`, `GetTokenUsage`)
+1. Verify trait bounds match rig-core 0.37 (check `CompletionModel`, `GetTokenUsage`)
 2. Use `rig::message::ToolChoice` not `rig::completion::ToolChoice`
 3. Streaming requires `eventsource-stream` for SSE parsing
 4. OVMS response has no `id` field — always use `#[serde(default)]`
