@@ -46,6 +46,7 @@ mod ipi_pbt;
 pub mod itbis;
 #[cfg(test)]
 mod itbis_pbt;
+pub mod login_lockout;
 pub mod mail;
 pub mod mantenimiento;
 pub mod mantenimiento_programado;

@@ -27,20 +27,26 @@ data:
       group_interval: 5m
       repeat_interval: 4h
       routes:
-        # Only route code-fixable critical alerts to the autofix bridge
+        # Only route code-fixable application alerts to the autofix bridge.
+        # Excludes: infrastructure (disk, memory), backups, security scans.
         - receiver: "kiro-autofix"
           matchers:
             - severity = "critical"
-            - alertname =~ "HighErrorRate|PodRestarts|PodNotReady|DatabaseDown|DatabaseConnectionPoolExhausted"
+            - alertname =~ "HighErrorRate|PodNotReady|DatabaseDown|DatabaseConnectionPoolExhausted"
           group_wait: 60s
           group_interval: 30m
           repeat_interval: 4h
-          continue: true
-        # Infrastructure alerts (disk, memory) are not code-fixable
+        # PodRestarts at warning level — still code-fixable (panics, OOMs)
+        - receiver: "kiro-autofix"
+          matchers:
+            - alertname = "PodRestarts"
+          group_wait: 60s
+          group_interval: 30m
+          repeat_interval: 4h
+        # Infrastructure and backup alerts are NOT routed to autofix
         - receiver: "default"
           matchers:
-            - severity = "critical"
-            - alertname =~ "DiskUsage.*|HighMemoryUsage"
+            - alertname =~ "DiskUsage.*|HighMemoryUsage|BackupJob.*|HighLatencyP95"
 
     receivers:
       - name: "default"
@@ -181,22 +187,53 @@ data:
 
     def build_context(alerts: list[dict]) -> str:
         lines = ["=== PROMETHEUS ALERT → KIRO AUTOFIX ===", ""]
+        is_security = False
         for alert in alerts:
             labels = alert.get("labels", {})
             annotations = alert.get("annotations", {})
+            desc = annotations.get("description", "")
+            summary = annotations.get("summary", "")
+            alert_text = f"{summary} {desc}".lower()
+
+            # Detect security indicators in alert context
+            security_keywords = [
+                "unauthorized", "forbidden", "401", "403",
+                "injection", "sqli", "xss", "csrf",
+                "auth", "token", "jwt", "expired",
+                "brute force", "rate limit exceeded",
+                "permission denied", "access denied",
+                "invalid signature", "tampered",
+            ]
+            if any(kw in alert_text for kw in security_keywords):
+                is_security = True
+
             lines.append(f"Alert: {labels.get('alertname', 'unknown')}")
             lines.append(f"Severity: {labels.get('severity', 'unknown')}")
             lines.append(f"Status: {alert.get('status', 'unknown')}")
             lines.append(f"Started: {alert.get('startsAt', 'unknown')}")
-            lines.append(f"Summary: {annotations.get('summary', 'N/A')}")
-            lines.append(f"Description: {annotations.get('description', 'N/A')}")
+            lines.append(f"Summary: {summary}")
+            lines.append(f"Description: {desc}")
             lines.append(f"Labels: {json.dumps(labels)}")
             lines.append("")
-        lines.append("=== INSTRUCTIONS ===")
-        lines.append("This is an automated alert from Prometheus via Alertmanager.")
-        lines.append("Investigate the root cause in the backend code and fix it.")
-        lines.append("Check backend/src/ for the relevant handlers and services.")
-        lines.append("Run cargo clippy and cargo test after your fix.")
+
+        if is_security:
+            lines.append("=== SECURITY ISSUE DETECTED ===")
+            lines.append("This alert contains indicators of a security vulnerability.")
+            lines.append("Priority: PATCH THE VULNERABILITY IMMEDIATELY.")
+            lines.append("")
+            lines.append("=== SECURITY FIX INSTRUCTIONS ===")
+            lines.append("1. Identify the attack vector from the error context above.")
+            lines.append("2. Add input validation, sanitization, or auth checks as needed.")
+            lines.append("3. Never suppress the error — fix the root cause.")
+            lines.append("4. Check for similar patterns in adjacent handlers.")
+            lines.append("5. Ensure the fix follows OWASP best practices.")
+            lines.append("6. Run cargo clippy and cargo test after your fix.")
+        else:
+            lines.append("=== INSTRUCTIONS ===")
+            lines.append("This is an automated alert from Prometheus via Alertmanager.")
+            lines.append("Investigate the root cause in the backend code and fix it.")
+            lines.append("Check backend/src/ for the relevant handlers and services.")
+            lines.append("Run cargo clippy and cargo test after your fix.")
         return "\n".join(lines)
 
     def trigger_workflow(context: str) -> bool:

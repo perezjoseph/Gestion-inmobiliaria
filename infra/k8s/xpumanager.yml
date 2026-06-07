@@ -1,24 +1,11 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: xpumanager-scripts
-  namespace: default
-data:
-  wsgi.py: |
-    from xpum_rest_main import main
-    app = main()
----
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   name: xpumanager
   namespace: default
   labels:
     app: xpumanager
 spec:
-  replicas: 1
-  strategy:
-    type: Recreate
   selector:
     matchLabels:
       app: xpumanager
@@ -28,51 +15,25 @@ spec:
         app: xpumanager
     spec:
       automountServiceAccountToken: false
-      nodeName: inference
-      initContainers:
-        - name: gen-credentials
-          image: intel/xpumanager:latest
-          command:
-            - /bin/bash
-            - -c
-            - |
-              mkdir -p /conf
-              cd /usr/lib/xpum
-              echo -e 'Xpum@2024\nXpum@2024' | python3 rest/rest_config.py
-              cp -r rest/conf/* /conf/
-          volumeMounts:
-            - name: rest-conf
-              mountPath: /conf
-          securityContext:
-            runAsUser: 0
-          resources:
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              cpu: 200m
-              memory: 128Mi
+      nodeSelector:
+        kubernetes.io/hostname: inference
       containers:
-        - name: xpumanager
-          image: intel/xpumanager:latest
+        # xpumd daemon: collects GPU telemetry via Level Zero
+        - name: xpumd
+          image: intel/xpumanager:v1.2.27
+          command: ["/usr/bin/xpumd"]
           env:
-            - name: XPUM_REST_NO_TLS
-              value: "1"
-            - name: XPUM_EXPORTER_NO_AUTH
-              value: "1"
+            - name: SPDLOG_LEVEL
+              value: info
             - name: XPUM_METRICS
               value: "0-38"
           securityContext:
             privileged: true
-          ports:
-            - containerPort: 29999
-              name: metrics
           volumeMounts:
             - name: devdri
               mountPath: /dev/dri
-            - name: rest-conf
-              mountPath: /usr/lib/xpum/rest/conf
-              readOnly: true
+            - name: sockdir
+              mountPath: /tmp
           resources:
             requests:
               cpu: 100m
@@ -82,32 +43,69 @@ spec:
               cpu: 500m
               memory: 512Mi
               ephemeral-storage: 128Mi
+        # Python exporter: exposes Prometheus /metrics via gunicorn
+        - name: exporter
+          image: intel/xpumanager:v1.2.27
+          workingDir: /usr/lib/xpum/rest
+          command:
+            - gunicorn
+            - --bind
+            - "0.0.0.0:29999"
+            - --worker-connections
+            - "64"
+            - --worker-class
+            - gthread
+            - --workers
+            - "1"
+            - --threads
+            - "4"
+            - "xpum_rest_main:main()"
+          env:
+            - name: XPUM_EXPORTER_NO_AUTH
+              value: "1"
+            - name: XPUM_EXPORTER_ONLY
+              value: "1"
+            - name: XPUM_REST_NO_TLS
+              value: "1"
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          ports:
+            - containerPort: 29999
+              name: metrics
+          volumeMounts:
+            - name: sockdir
+              mountPath: /tmp
+            - name: devdri
+              mountPath: /dev/dri
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+              ephemeral-storage: 32Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+              ephemeral-storage: 64Mi
           startupProbe:
             httpGet:
-              path: /rest/v1/version
+              path: /metrics
               port: 29999
-              httpHeaders:
-                - name: Authorization
-                  value: Basic eHB1bWFkbWluOlhwdW1AMjAyNA==
             failureThreshold: 12
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /rest/v1/version
+              path: /healtz
               port: 29999
-              httpHeaders:
-                - name: Authorization
-                  value: Basic eHB1bWFkbWluOlhwdW1AMjAyNA==
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /rest/v1/version
+              path: /healtz
               port: 29999
-              httpHeaders:
-                - name: Authorization
-                  value: Basic eHB1bWFkbWluOlhwdW1AMjAyNA==
             periodSeconds: 15
             timeoutSeconds: 5
             failureThreshold: 3
@@ -115,8 +113,9 @@ spec:
         - name: devdri
           hostPath:
             path: /dev/dri
-        - name: rest-conf
-          emptyDir: {}
+        - name: sockdir
+          emptyDir:
+            medium: Memory
 ---
 apiVersion: v1
 kind: Service
@@ -130,7 +129,7 @@ spec:
   ports:
     - port: 29999
       targetPort: 29999
-      name: rest-api
+      name: metrics
 ---
 # Expose via Traefik at xpumanager.local
 apiVersion: traefik.io/v1alpha1
