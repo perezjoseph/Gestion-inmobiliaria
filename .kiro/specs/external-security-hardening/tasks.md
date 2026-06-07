@@ -89,7 +89,7 @@ This plan addresses 9 external attack vectors identified during a security audit
     - Re-export in `backend/src/services/mod.rs`
     - _Requirements: 8.3, 8.4_
 
-  - [~] 6.4 Update JWT claims and auth service
+  - [x] 6.4 Update JWT claims and auth service
     - Add `jti: Uuid` and `iat: i64` to `Claims` struct in `backend/src/services/auth.rs`
     - Set `jti = Uuid::new_v4()` and `iat = Utc::now().timestamp()` in `encode_jwt`
     - Reduce token expiry from 24 hours to 8 hours

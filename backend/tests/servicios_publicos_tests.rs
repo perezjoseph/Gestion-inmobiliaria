@@ -28,6 +28,8 @@ mod servicios_publicos_rbac_tests {
             email: "test@example.com".to_string(),
             rol: rol.to_string(),
             organizacion_id: Uuid::new_v4(),
+            jti: Uuid::new_v4(),
+            iat: Utc::now().timestamp(),
             exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
         };
         encode_jwt(&claims, JWT_SECRET).unwrap()
@@ -320,6 +322,8 @@ mod servicios_publicos_db_tests {
             email: format!("{rol}@test.com"),
             rol: rol.to_string(),
             organizacion_id: org_id,
+            jti: Uuid::new_v4(),
+            iat: Utc::now().timestamp(),
             exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
         };
         encode_jwt(&claims, JWT_SECRET).unwrap()

@@ -11,3 +11,6 @@ resources:
   - vllm.yml
   - fdroid-repo.yml
   - ingress-fdroid.yml
+
+# NOTE: OVMS was removed — vLLM serves the Qwen3 model exclusively now.
+# The ovms.yml file is kept for reference but no longer deployed.

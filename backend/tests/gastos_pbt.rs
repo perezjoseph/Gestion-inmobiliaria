@@ -302,6 +302,8 @@ mod pbt_date_range_async {
             email: "admin@test.com".to_string(),
             rol: "admin".to_string(),
             organizacion_id: org_id,
+            jti: Uuid::new_v4(),
+            iat: Utc::now().timestamp(),
             exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
         };
         encode_jwt(&claims, JWT_SECRET).unwrap()

@@ -32,6 +32,8 @@ pub struct Claims {
     pub email: String,
     pub rol: String,
     pub organizacion_id: Uuid,
+    pub jti: Uuid,
+    pub iat: i64,
     pub exp: usize,
 }
 
@@ -63,7 +65,7 @@ pub fn encode_jwt(claims: &Claims, secret: &str) -> Result<String, AppError> {
 
 pub fn decode_jwt(token: &str, secret: &str) -> Result<Claims, AppError> {
     let mut validation = Validation::new(jsonwebtoken::Algorithm::HS256);
-    validation.set_required_spec_claims(&["exp", "sub"]);
+    validation.set_required_spec_claims(&["exp", "sub", "iat"]);
     validation.leeway = 30;
     validation.validate_nbf = true;
 
@@ -96,12 +98,15 @@ fn build_login_response(
     user: &usuario::Model,
     jwt_secret: &str,
 ) -> Result<LoginResponse, AppError> {
-    let exp = (Utc::now() + chrono::Duration::hours(24)).timestamp() as usize;
+    let now = Utc::now();
+    let exp = (now + chrono::Duration::hours(8)).timestamp() as usize;
     let claims = Claims {
         sub: user.id,
         email: user.email.clone(),
         rol: user.rol.clone(),
         organizacion_id: user.organizacion_id,
+        jti: Uuid::new_v4(),
+        iat: now.timestamp(),
         exp,
     };
     let token = encode_jwt(&claims, jwt_secret)?;
@@ -413,12 +418,15 @@ pub async fn login(
         return Err(AppError::Unauthorized(None));
     }
 
-    let exp = (Utc::now() + chrono::Duration::hours(24)).timestamp() as usize;
+    let now = Utc::now();
+    let exp = (now + chrono::Duration::hours(8)).timestamp() as usize;
     let claims = Claims {
         sub: user.id,
         email: user.email.clone(),
         rol: user.rol.clone(),
         organizacion_id: user.organizacion_id,
+        jti: Uuid::new_v4(),
+        iat: now.timestamp(),
         exp,
     };
 
@@ -484,6 +492,8 @@ mod tests {
             email: "test@example.com".to_string(),
             rol: "admin".to_string(),
             organizacion_id: Uuid::new_v4(),
+            jti: Uuid::new_v4(),
+            iat: Utc::now().timestamp(),
             exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
         };
 
@@ -507,6 +517,8 @@ mod tests {
             email: "test@example.com".to_string(),
             rol: "admin".to_string(),
             organizacion_id: Uuid::new_v4(),
+            jti: Uuid::new_v4(),
+            iat: Utc::now().timestamp(),
             exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
         };
 
@@ -525,6 +537,8 @@ mod tests {
             email: "test@example.com".to_string(),
             rol: "admin".to_string(),
             organizacion_id: Uuid::new_v4(),
+            jti: Uuid::new_v4(),
+            iat: Utc::now().timestamp(),
             exp: 0,
         };
 

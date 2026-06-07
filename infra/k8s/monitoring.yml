@@ -64,13 +64,6 @@ data:
           - targets: ["vllm-inference.realestate.svc.cluster.local:8000"]
             labels:
               node: "inference"
-
-      - job_name: "ovms"
-        metrics_path: "/metrics"
-        static_configs:
-          - targets: ["ovms.realestate.svc.cluster.local:8000"]
-            labels:
-              node: "inference"
 ---
 # Prometheus deployment
 apiVersion: apps/v1

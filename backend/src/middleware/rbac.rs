@@ -58,6 +58,8 @@ mod tests {
             email: "test@example.com".to_string(),
             rol: rol.to_string(),
             organizacion_id: Uuid::nil(),
+            jti: Uuid::new_v4(),
+            iat: 0,
             exp: 9_999_999_999,
         }
     }

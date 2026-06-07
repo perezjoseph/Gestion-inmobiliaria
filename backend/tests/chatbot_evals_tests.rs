@@ -17,6 +17,8 @@ fn make_token_for_org(org_id: Uuid) -> String {
         email: format!("eval-test+{}@example.com", Uuid::new_v4()),
         rol: "gerente".to_string(),
         organizacion_id: org_id,
+        jti: Uuid::new_v4(),
+        iat: Utc::now().timestamp(),
         exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
     };
     encode_jwt(&claims, JWT_SECRET).unwrap()

@@ -159,6 +159,8 @@ mod pbt_async {
             email: format!("{rol}@test.com"),
             rol: rol.to_string(),
             organizacion_id: Uuid::new_v4(),
+            jti: Uuid::new_v4(),
+            iat: Utc::now().timestamp(),
             exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
         };
         encode_jwt(&claims, JWT_SECRET).unwrap()
@@ -911,6 +913,8 @@ mod pbt_async {
                 email: format!("admin+{admin_a}@test.com"),
                 rol: "admin".to_string(),
                 organizacion_id: org_a,
+                jti: Uuid::new_v4(),
+                iat: Utc::now().timestamp(),
                 exp: (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
             };
             let token_a = encode_jwt(&claims_a, JWT_SECRET).unwrap();
@@ -945,6 +949,8 @@ mod pbt_async {
                 email: format!("admin+{admin_b}@test.com"),
                 rol: "admin".to_string(),
                 organizacion_id: org_b,
+                jti: Uuid::new_v4(),
+                iat: Utc::now().timestamp(),
                 exp: (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
             };
             let token_b = encode_jwt(&claims_b, JWT_SECRET).unwrap();

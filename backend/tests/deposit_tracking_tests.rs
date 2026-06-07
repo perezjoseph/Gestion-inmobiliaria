@@ -23,6 +23,8 @@ fn make_token(user_id: Uuid, rol: &str, org_id: Uuid) -> String {
         email: format!("{rol}@test.com"),
         rol: rol.to_string(),
         organizacion_id: org_id,
+        jti: Uuid::new_v4(),
+        iat: Utc::now().timestamp(),
         exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
     };
     encode_jwt(&claims, JWT_SECRET).unwrap()
