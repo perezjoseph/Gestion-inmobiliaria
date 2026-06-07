@@ -1,4 +1,5 @@
 use actix_governor::{KeyExtractor, SimpleKeyExtractionError};
+use actix_web::HttpRequest;
 use actix_web::dev::ServiceRequest;
 use std::net::{IpAddr, Ipv4Addr};
 
@@ -25,11 +26,33 @@ impl KeyExtractor for FallbackPeerIpKeyExtractor {
     }
 }
 
-/// Extract the client IP from the request using the trusted header priority chain:
-/// CF-Connecting-IP → X-Real-Ip → peer_addr.
+/// Extract the client IP from a [`ServiceRequest`] using the trusted header priority chain:
+/// `CF-Connecting-IP` → `X-Real-Ip` → `peer_addr`.
 ///
 /// This function is public so it can be reused for audit logging (Requirement 1.5).
 pub fn extract_client_ip(req: &ServiceRequest) -> IpAddr {
+    req.headers()
+        .get("CF-Connecting-IP")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.parse::<IpAddr>().ok())
+        .or_else(|| {
+            req.headers()
+                .get("X-Real-Ip")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.parse::<IpAddr>().ok())
+        })
+        .unwrap_or_else(|| {
+            req.peer_addr()
+                .map_or(IpAddr::V4(Ipv4Addr::LOCALHOST), |s| s.ip())
+        })
+}
+
+/// Extract the client IP from an [`HttpRequest`] using the same trusted header
+/// priority chain: `CF-Connecting-IP` → `X-Real-Ip` → `peer_addr`.
+///
+/// This variant is intended for use in handlers where only an `HttpRequest` is
+/// available (e.g., security event logging in the login handler).
+pub fn extract_client_ip_from_request(req: &HttpRequest) -> IpAddr {
     req.headers()
         .get("CF-Connecting-IP")
         .and_then(|v| v.to_str().ok())

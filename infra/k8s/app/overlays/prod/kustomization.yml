@@ -36,6 +36,20 @@ patches:
             secretKeyRef:
               name: realestate-bcrd-secret
               key: BCRD_API_TOKEN
+  # Allow dev namespace to reach the prod DB
+  - target:
+      kind: NetworkPolicy
+      name: allow-db-ingress
+    patch: |
+      - op: add
+        path: /spec/ingress/0/from/-
+        value:
+          namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: realestate-dev
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: backend
 
 configMapGenerator:
   - name: caddyfile

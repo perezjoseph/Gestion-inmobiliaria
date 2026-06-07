@@ -8,9 +8,40 @@ resources:
   - namespace.yml
   - ingress.yml
 
-# Dev uses the same images but with lower replica counts
+# Dev shares the prod Postgres instance (different database: realestate_dev).
+# The db Deployment/Service/PVC are removed; backend points cross-namespace.
 patches:
-  # Single replica for dev backend (no HPA needed)
+  # Remove the db Deployment — dev uses the prod Postgres instance
+  - target:
+      kind: Deployment
+      name: db
+    patch: |
+      $patch: delete
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: db
+  # Remove db Service — dev connects cross-namespace
+  - target:
+      kind: Service
+      name: db
+    patch: |
+      $patch: delete
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: db
+  # Remove db PVC — no local storage needed
+  - target:
+      kind: PersistentVolumeClaim
+      name: realestate-db-pvc
+    patch: |
+      $patch: delete
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: realestate-db-pvc
+  # Single replica for dev backend
   - target:
       kind: Deployment
       name: backend

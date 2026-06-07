@@ -27,22 +27,27 @@ data:
       group_interval: 5m
       repeat_interval: 4h
       routes:
-        # Only route code-fixable application alerts to the autofix bridge.
-        # Excludes: infrastructure (disk, memory), backups, security scans.
+        # Production critical alerts → autofix in yolo mode (push to main)
         - receiver: "kiro-autofix"
           matchers:
             - severity = "critical"
+            - namespace = "realestate"
             - alertname =~ "HighErrorRate|PodNotReady|DatabaseDown|DatabaseConnectionPoolExhausted"
           group_wait: 60s
           group_interval: 30m
           repeat_interval: 4h
-        # PodRestarts at warning level — still code-fixable (panics, OOMs)
+        # Production pod restarts (warning) — still code-fixable
         - receiver: "kiro-autofix"
           matchers:
             - alertname = "PodRestarts"
+            - namespace = "realestate"
           group_wait: 60s
           group_interval: 30m
           repeat_interval: 4h
+        # Dev namespace alerts → ignore (dev issues are caught in CI)
+        - receiver: "default"
+          matchers:
+            - namespace = "realestate-dev"
         # Infrastructure and backup alerts are NOT routed to autofix
         - receiver: "default"
           matchers:
