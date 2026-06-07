@@ -113,7 +113,7 @@ This plan addresses 9 external attack vectors identified during a security audit
   - Verify new migration applies cleanly
 
 - [ ] 8. Internal service authentication
-  - [~] 8.1 Add OCR service bearer token to backend
+  - [x] 8.1 Add OCR service bearer token to backend
     - Add `ocr_service_token: Option<String>` to `AppConfig` (from `OCR_SERVICE_TOKEN` env var)
     - In `OcrClient::new()`: read token from env
     - In `OcrClient::extract()`: add `Authorization: Bearer <token>` header when token is configured

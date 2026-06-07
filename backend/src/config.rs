@@ -134,6 +134,7 @@ pub struct AppConfig {
     pub cors_origin: Option<String>,
     pub pool: PoolConfig,
     pub chatbot: ChatbotEnvConfig,
+    pub ocr_service_token: Option<String>,
 }
 
 impl AppConfig {
@@ -177,6 +178,9 @@ impl AppConfig {
 
         let pool = Self::parse_pool_config()?;
         let chatbot = ChatbotEnvConfig::from_env()?;
+        let ocr_service_token = std::env::var("OCR_SERVICE_TOKEN")
+            .ok()
+            .filter(|s| !s.is_empty());
 
         Ok(Self {
             database_url,
@@ -185,6 +189,7 @@ impl AppConfig {
             cors_origin,
             pool,
             chatbot,
+            ocr_service_token,
         })
     }
 
@@ -426,6 +431,7 @@ mod tests {
                 sqlx_logging: true,
             },
             chatbot: ChatbotEnvConfig::for_testing(),
+            ocr_service_token: None,
         };
 
         let opts = config.connect_options();

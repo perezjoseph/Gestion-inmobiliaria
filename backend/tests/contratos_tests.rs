@@ -348,6 +348,7 @@ mod contratos_dr_legal_db_tests {
             jwt_secret: JWT_SECRET.to_string(),
             server_port: 0,
             cors_origin: None,
+            ocr_service_token: None,
         }
     }
 

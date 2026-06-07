@@ -340,6 +340,7 @@ mod db_async {
             jwt_secret: JWT_SECRET.to_string(),
             server_port: 0,
             cors_origin: None,
+            ocr_service_token: None,
         }
     }
 
@@ -1159,6 +1160,7 @@ mod gastos_utility_db_tests {
             jwt_secret: JWT_SECRET.to_string(),
             server_port: 0,
             cors_origin: None,
+            ocr_service_token: None,
         }
     }
 
@@ -1634,6 +1636,7 @@ mod gastos_categoria_and_utility_tests {
             jwt_secret: JWT_SECRET.to_string(),
             server_port: 0,
             cors_origin: None,
+            ocr_service_token: None,
         }
     }
 

@@ -103,5 +103,6 @@ pub fn test_app_config(database_url: impl Into<String>) -> AppConfig {
         cors_origin: None,
         pool: PoolConfig::default(),
         chatbot: ChatbotEnvConfig::for_testing(),
+        ocr_service_token: None,
     }
 }

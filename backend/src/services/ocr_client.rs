@@ -5,17 +5,25 @@ use std::time::Duration;
 pub struct OcrClient {
     base_url: String,
     client: reqwest::Client,
+    token: Option<String>,
 }
 
 impl OcrClient {
     pub fn new() -> Result<Self, AppError> {
         let base_url = std::env::var("OCR_SERVICE_URL")
             .unwrap_or_else(|_| "http://localhost:8000".to_string());
+        let token = std::env::var("OCR_SERVICE_TOKEN")
+            .ok()
+            .filter(|s| !s.is_empty());
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Error creando cliente HTTP: {e}")))?;
-        Ok(Self { base_url, client })
+        Ok(Self {
+            base_url,
+            client,
+            token,
+        })
     }
 
     pub async fn extract(
@@ -40,10 +48,13 @@ impl OcrClient {
 
         let url = format!("{}/ocr/extract", self.base_url);
 
-        let response = self
-            .client
-            .post(&url)
-            .multipart(form)
+        let mut request = self.client.post(&url).multipart(form);
+
+        if let Some(ref t) = self.token {
+            request = request.header("Authorization", format!("Bearer {t}"));
+        }
+
+        let response = request
             .send()
             .await
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Servicio OCR no disponible: {e}")))?;
