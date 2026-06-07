@@ -37,7 +37,7 @@ pub fn Ipi() -> Html {
                     Err(err) => error.set(Some(err)),
                 }
                 if let Ok(data) = api_get::<Vec<PropiedadIpiInfo>>("/ipi/propiedades").await {
-                    propiedades.set(data)
+                    propiedades.set(data);
                 } else { /* non-critical, liability is the main data */
                 }
                 loading.set(false);
