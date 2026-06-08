@@ -103,7 +103,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
 - [x] 5. Checkpoint — Verify compilation and routing
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 6. Add placeholder asset and tests
+- [x] 6. Add placeholder asset and tests
   - [x] 6.1 Create placeholder dashboard preview GIF
     - Add a placeholder GIF at `frontend/assets/dashboard-preview.gif` (can be a minimal placeholder until a real recording is produced)
     - _Requirements: 6.1_
@@ -118,18 +118,18 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - For any FeatureItem definition containing an icon, title, and description, the rendered feature card output SHALL include the icon element, a non-empty title, and a non-empty description string
     - **Validates: Requirements 5.2**
 
-  - [-] 6.4 Write property test for secondary CTA styling consistency
+  - [x] 6.4 Write property test for secondary CTA styling consistency
     - **Property 3: Secondary CTA styling consistency**
     - For any action button rendered on the landing page that is not labeled "Registrarse gratis", it SHALL use secondary styling (outline border without filled accent background) and SHALL NOT use the `#3d8b8b` background color
     - **Validates: Requirements 9.1, 9.3**
 
-  - [-] 6.5 Write unit tests for route mapping and auth redirect
+  - [x] 6.5 Write unit tests for route mapping and auth redirect
     - Verify `/` renders `Landing` component
     - Verify `/login` renders `Login` component
     - Verify authenticated user at `/` redirects to `/dashboard`
     - _Requirements: 1.1, 1.2, 1.4_
 
-- [~] 7. Final checkpoint — Ensure all tests pass
+- [x] 7. Final checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
