@@ -72,7 +72,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     && usermod -aG video ocruser \
     && usermod -aG render ocruser
 
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /app/main.py /app/ocr_engine.py ./
 COPY --from=builder /app/.paddleocr /app/.paddleocr
