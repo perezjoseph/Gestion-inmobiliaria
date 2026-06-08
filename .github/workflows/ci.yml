@@ -95,8 +95,8 @@ jobs:
       is-pr: ${{ github.event_name == 'pull_request' }}
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
-  # Build & Test runs clippy + tests + release build in unified jobs
-  # (one Rust compilation per target instead of three separate ones)
+  # Build & Test runs backend (clippy, test, build in parallel) + frontend.
+  # Coverage only runs on production builds (main push) to keep PR feedback fast.
   build-and-test:
     name: Build & Test
     needs: [changes]

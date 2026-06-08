@@ -7,26 +7,99 @@ on:
         type: boolean
         required: true
       is-production:
-        description: "Whether this is a production build (main push). Controls SBOM generation."
+        description: "Whether this is a production build (main push). Controls SBOM generation and coverage."
         type: boolean
         required: false
         default: false
+    outputs:
+      backend-clippy:
+        description: "Backend clippy result"
+        value: ${{ jobs.backend-clippy.result }}
+      backend-test:
+        description: "Backend test result"
+        value: ${{ jobs.backend-test.result }}
+      backend-build:
+        description: "Backend build result"
+        value: ${{ jobs.backend-build.result }}
+
 permissions: {}
 
 jobs:
-  # ── Backend: clippy → test (with coverage) → release build ──
-  # Single Rust compilation warms sccache; subsequent steps are near-instant.
-  # Runs on dind runner because tests need a postgres service container.
-  backend:
-    name: Backend (Clippy + Test + Build)
+  # ── Backend Clippy (compiles with musl target to warm sccache for release build) ──
+  backend-clippy:
+    name: Backend Clippy
     runs-on: arc-runner-dind
-    timeout-minutes: 60
+    timeout-minutes: 30
     if: ${{ !inputs.is-fork-pr }}
     permissions:
       actions: read
       contents: read
-      id-token: write
-      attestations: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Rust setup
+        id: rust-setup
+        uses: ./.github/actions/rust-setup
+        with:
+          components: clippy
+          targets: x86_64-unknown-linux-musl
+
+      - name: Clippy backend
+        id: clippy
+        run: |
+          umask 077
+          set +e
+          cargo clippy --locked -p realestate-backend --target x86_64-unknown-linux-musl --message-format=json -- -D warnings \
+            > "${RUNNER_TEMP}/clippy-backend.json" 2>"${RUNNER_TEMP}/clippy-backend-stderr.txt"
+          RESULT=$?
+          set -e
+          jq -r 'select(.reason == "compiler-message") | .message.rendered // empty' \
+            "${RUNNER_TEMP}/clippy-backend.json" > "${RUNNER_TEMP}/clippy-backend-output.txt" 2>/dev/null || true
+          if [ $RESULT -ne 0 ]; then
+            if [ -s "${RUNNER_TEMP}/clippy-backend-output.txt" ]; then
+              cat "${RUNNER_TEMP}/clippy-backend-output.txt"
+            else
+              echo "--- stderr (no clippy JSON output -- likely a cargo-level error) ---"
+              cat "${RUNNER_TEMP}/clippy-backend-stderr.txt" 2>/dev/null || true
+            fi
+            echo "::error::backend clippy found warnings/errors."
+            exit 1
+          fi
+
+      - name: Upload clippy backend report
+        if: "!cancelled() && hashFiles(format('{0}/clippy-backend.json', runner.temp)) != ''"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: clippy-backend-report
+          path: ${{ runner.temp }}/clippy-backend.json
+          retention-days: 1
+
+      - name: Collect diagnostics
+        if: failure()
+        uses: ./.github/actions/collect-diagnostics
+        with:
+          job-name: "build-and-test / backend-clippy"
+          artifact-suffix: clippy-backend
+          step-outcomes: |
+            clippy=${{ steps.clippy.outcome }}
+          output-files: |
+            ${{ runner.temp }}/clippy-backend-output.txt
+            ${{ runner.temp }}/clippy-backend-stderr.txt
+
+  # ── Backend Tests (parallel with clippy and build) ──
+  # On PRs: runs tests without coverage (sccache enabled, fast).
+  # On main: runs tests with llvm-cov coverage (sccache disabled, slower but only on merge).
+  backend-test:
+    name: Backend Test
+    runs-on: arc-runner-dind
+    timeout-minutes: 30
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      actions: read
+      contents: read
     env:
       SERVER_PORT: "8080"
       CORS_ORIGIN: http://localhost:8080
@@ -55,41 +128,9 @@ jobs:
         id: rust-setup
         uses: ./.github/actions/rust-setup
         with:
-          components: clippy,llvm-tools-preview
-          targets: x86_64-unknown-linux-musl
+          components: llvm-tools-preview
+          targets: ""
 
-      # ── Phase 1: Clippy (compiles everything, warms sccache) ──
-      - name: Clippy backend
-        id: clippy
-        run: |
-          umask 077
-          set +e
-          cargo clippy --locked -p realestate-backend --message-format=json -- -D warnings \
-            > "${RUNNER_TEMP}/clippy-backend.json" 2>"${RUNNER_TEMP}/clippy-backend-stderr.txt"
-          RESULT=$?
-          set -e
-          jq -r 'select(.reason == "compiler-message") | .message.rendered // empty' \
-            "${RUNNER_TEMP}/clippy-backend.json" > "${RUNNER_TEMP}/clippy-backend-output.txt" 2>/dev/null || true
-          if [ $RESULT -ne 0 ]; then
-            if [ -s "${RUNNER_TEMP}/clippy-backend-output.txt" ]; then
-              cat "${RUNNER_TEMP}/clippy-backend-output.txt"
-            else
-              echo "--- stderr (no clippy JSON output -- likely a cargo-level error) ---"
-              cat "${RUNNER_TEMP}/clippy-backend-stderr.txt" 2>/dev/null || true
-            fi
-            echo "::error::backend clippy found warnings/errors."
-            exit 1
-          fi
-
-      - name: Upload clippy backend report
-        if: "!cancelled() && hashFiles(format('{0}/clippy-backend.json', runner.temp)) != ''"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: clippy-backend-report
-          path: ${{ runner.temp }}/clippy-backend.json
-          retention-days: 1
-
-      # ── Phase 2: Tests with coverage ──
       - name: Mask database credentials
         run: |
           echo "::add-mask::realestate_dev_password"
@@ -120,7 +161,9 @@ jobs:
           docker logs $(docker ps -aq --filter "ancestor=postgres:16" | head -1) >> "${RUNNER_TEMP}/wait-postgres-output.txt" 2>&1 || true
           exit 1
 
+      # ── Coverage path (production only) ──
       - name: Verify cargo-llvm-cov available
+        if: inputs.is-production
         id: install-llvm-cov
         run: |
           if command -v cargo-llvm-cov &>/dev/null; then
@@ -131,12 +174,8 @@ jobs:
           fi
 
       - name: Clean stale llvm-cov target artifacts
+        if: inputs.is-production
         run: |
-          # The persistent CARGO_TARGET_DIR can retain sccache-produced rlibs
-          # from prior runs. cargo-llvm-cov uses a "llvm-cov-target" subdir
-          # and those stale artifacts cause "LLVM error: end of file
-          # unexpectedly encountered" when building aws-lc-sys with coverage
-          # instrumentation. Nuke the subdir to guarantee a clean build.
           COV_TARGET="${CARGO_TARGET_DIR:-target}/llvm-cov-target"
           if [ -d "$COV_TARGET" ]; then
             echo "Removing stale llvm-cov-target: $COV_TARGET"
@@ -144,13 +183,10 @@ jobs:
           fi
 
       - name: Run tests with coverage (llvm-cov)
-        id: tests
+        if: inputs.is-production
+        id: tests-coverage
         env:
           PROPTEST_CASES: "10"
-          # Bypass sccache for coverage builds. sccache + LLVM coverage
-          # instrumentation + cc-built crates (aws-lc-sys) produce truncated
-          # rlib archives ("end of file unexpectedly encountered"). The
-          # release build below still uses sccache for fast incremental CI.
           RUSTC_WRAPPER: ""
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
@@ -163,14 +199,64 @@ jobs:
             exit ${PIPESTATUS[0]}
 
       - name: Upload coverage artifact
-        if: steps.tests.outcome == 'success'
+        if: inputs.is-production && steps.tests-coverage.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: backend-coverage
           path: coverage/lcov.info
           retention-days: 7
 
-      # ── Phase 3: Release build (sccache makes this fast after clippy+test) ──
+      # ── Fast path (PRs — no coverage, sccache enabled) ──
+      - name: Run tests
+        if: ${{ !inputs.is-production }}
+        id: tests-fast
+        env:
+          PROPTEST_CASES: "10"
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 30
+          max_attempts: 2
+          command: |
+            cargo test --locked -p realestate-backend 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
+            exit ${PIPESTATUS[0]}
+
+      - name: Collect diagnostics
+        if: failure()
+        uses: ./.github/actions/collect-diagnostics
+        with:
+          job-name: "build-and-test / backend-test"
+          artifact-suffix: test-backend
+          step-outcomes: |
+            tests-coverage=${{ steps.tests-coverage.outcome }}
+            tests-fast=${{ steps.tests-fast.outcome }}
+          output-files: |
+            ${{ runner.temp }}/test-backend-output.txt
+            ${{ runner.temp }}/wait-postgres-output.txt
+
+  # ── Backend Release Build (parallel with tests, benefits from sccache warmed by clippy on same runner pool) ──
+  backend-build:
+    name: Backend Build
+    runs-on: arc-runner-dind
+    timeout-minutes: 30
+    if: ${{ !inputs.is-fork-pr }}
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Rust setup
+        id: rust-setup
+        uses: ./.github/actions/rust-setup
+        with:
+          components: ""
+          targets: x86_64-unknown-linux-musl
+
       - name: Build backend release binary
         id: build
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
@@ -227,30 +313,39 @@ jobs:
         if: failure()
         uses: ./.github/actions/collect-diagnostics
         with:
-          job-name: "build-and-test / backend"
+          job-name: "build-and-test / backend-build"
           artifact-suffix: build-backend
           step-outcomes: |
-            clippy=${{ steps.clippy.outcome }}
-            tests=${{ steps.tests.outcome }}
             build=${{ steps.build.outcome }}
           output-files: |
-            ${{ runner.temp }}/clippy-backend-output.txt
-            ${{ runner.temp }}/clippy-backend-stderr.txt
-            ${{ runner.temp }}/test-backend-output.txt
             ${{ runner.temp }}/build-backend-output.txt
-            ${{ runner.temp }}/wait-postgres-output.txt
 
+  # ── Backend Summary (runs after all backend jobs) ──
+  backend-summary:
+    name: Backend Summary
+    runs-on: arc-runner-dind
+    timeout-minutes: 5
+    if: ${{ !cancelled() && !inputs.is-fork-pr }}
+    needs: [backend-clippy, backend-test, backend-build]
+    permissions:
+      contents: read
+    steps:
       - name: Write backend summary
-        if: "!cancelled()"
         run: |
           {
             echo "## Backend Results"
             echo "| Check | Status |"
             echo "|-------|--------|"
-            echo "| Clippy | ${{ steps.clippy.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
-            echo "| Tests & Coverage | ${{ steps.tests.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
-            echo "| Release Build | ${{ steps.build.outcome == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| Clippy | ${{ needs.backend-clippy.result == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| Tests | ${{ needs.backend-test.result == 'success' && '✅ Pass' || '❌ Fail' }} |"
+            echo "| Release Build | ${{ needs.backend-build.result == 'success' && '✅ Pass' || '❌ Fail' }} |"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if any backend job failed
+        if: ${{ needs.backend-clippy.result == 'failure' || needs.backend-test.result == 'failure' || needs.backend-build.result == 'failure' }}
+        run: |
+          echo "::error::One or more backend jobs failed"
+          exit 1
 
   # ── Frontend: clippy → test → trunk release build ──
   # Single Rust compilation warms sccache; subsequent steps are near-instant.
