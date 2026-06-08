@@ -1,3 +1,9 @@
+{
+	on_demand_tls {
+		ask http://localhost:8444/ask
+	}
+}
+
 https://:8443 {
 	tls internal {
 		on_demand
@@ -37,5 +43,15 @@ https://:8443 {
 		root * /srv
 		try_files {path} /index.html
 		file_server
+	}
+}
+
+# Internal ask endpoint for on-demand TLS validation
+# Only issues certs for known internal service names
+http://:8444 {
+	handle /ask {
+		@allowed query domain=frontend domain=10.* domain=localhost
+		respond @allowed 200
+		respond 403
 	}
 }

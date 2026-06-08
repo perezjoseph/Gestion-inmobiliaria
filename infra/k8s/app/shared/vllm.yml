@@ -60,7 +60,7 @@ spec:
             - containerPort: 8000
           env:
             - name: HOME
-              value: /root
+              value: /home/vllm
             - name: HF_HOME
               value: /models
             - name: SYCL_UR_USE_LEVEL_ZERO_V2
@@ -93,6 +93,10 @@ spec:
               mountPath: /models
             - name: shm
               mountPath: /dev/shm
+            - name: tmp
+              mountPath: /tmp
+            - name: home
+              mountPath: /home/vllm
           startupProbe:
             httpGet:
               path: /health
@@ -116,7 +120,10 @@ spec:
             timeoutSeconds: 10
             failureThreshold: 5
           securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
       volumes:
         - name: models
           persistentVolumeClaim:
@@ -125,6 +132,12 @@ spec:
           emptyDir:
             medium: Memory
             sizeLimit: 10Gi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        - name: home
+          emptyDir:
+            sizeLimit: 128Mi
 ---
 apiVersion: v1
 kind: Service

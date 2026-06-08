@@ -1,13 +1,178 @@
+use std::collections::HashMap;
+
+use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew_router::prelude::*;
 
 use crate::app::{AuthContext, Route};
+use crate::services::api::api_get;
+use crate::types::DashboardStats;
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const FRECUENTES_KEY: &str = "gi_frecuentes";
+const SIDEBAR_COLLAPSED_KEY: &str = "gi_sidebar_collapsed";
+const MAX_FRECUENTES: usize = 4;
+
+// ─── Props ───────────────────────────────────────────────────────────────────
 
 #[derive(Properties, PartialEq)]
 pub struct SidebarProps {
     pub is_open: bool,
     pub on_nav_click: Callback<()>,
 }
+
+// ─── LocalStorage helpers ────────────────────────────────────────────────────
+
+fn storage_get(key: &str) -> Option<String> {
+    web_sys::window()?
+        .local_storage()
+        .ok()
+        .flatten()?
+        .get_item(key)
+        .ok()
+        .flatten()
+}
+
+fn storage_set(key: &str, value: &str) {
+    if let Some(win) = web_sys::window()
+        && let Ok(Some(storage)) = win.local_storage()
+    {
+        let _ = storage.set_item(key, value);
+    }
+}
+
+// ─── Route helpers ───────────────────────────────────────────────────────────
+
+fn is_trackable_route(route: &Route) -> bool {
+    matches!(
+        route,
+        Route::Dashboard
+            | Route::Propiedades
+            | Route::Inquilinos
+            | Route::Contratos
+            | Route::Pagos
+            | Route::Gastos
+            | Route::Mantenimiento
+            | Route::Desahucios
+            | Route::Reportes
+    )
+}
+
+fn route_to_key(route: &Route) -> &'static str {
+    match route {
+        Route::Dashboard => "dashboard",
+        Route::Propiedades => "propiedades",
+        Route::Inquilinos => "inquilinos",
+        Route::Contratos => "contratos",
+        Route::Pagos => "pagos",
+        Route::Gastos => "gastos",
+        Route::Mantenimiento => "mantenimiento",
+        Route::Desahucios => "desahucios",
+        Route::Reportes => "reportes",
+        _ => "",
+    }
+}
+
+fn key_to_route(key: &str) -> Option<Route> {
+    match key {
+        "dashboard" => Some(Route::Dashboard),
+        "propiedades" => Some(Route::Propiedades),
+        "inquilinos" => Some(Route::Inquilinos),
+        "contratos" => Some(Route::Contratos),
+        "pagos" => Some(Route::Pagos),
+        "gastos" => Some(Route::Gastos),
+        "mantenimiento" => Some(Route::Mantenimiento),
+        "desahucios" => Some(Route::Desahucios),
+        "reportes" => Some(Route::Reportes),
+        _ => None,
+    }
+}
+
+fn route_label(route: &Route) -> &'static str {
+    match route {
+        Route::Dashboard => "Panel de Control",
+        Route::Propiedades => "Propiedades",
+        Route::Inquilinos => "Inquilinos",
+        Route::Contratos => "Contratos",
+        Route::Pagos => "Pagos",
+        Route::Gastos => "Gastos",
+        Route::Mantenimiento => "Mantenimiento",
+        Route::Desahucios => "Desahucios",
+        Route::Reportes => "Reportes",
+        _ => "",
+    }
+}
+
+fn route_icon(route: &Route) -> Html {
+    match route {
+        Route::Dashboard => icon_dashboard(),
+        Route::Propiedades => icon_properties(),
+        Route::Inquilinos => icon_tenants(),
+        Route::Contratos => icon_contracts(),
+        Route::Pagos => icon_payments(),
+        Route::Gastos => icon_expenses(),
+        Route::Mantenimiento => icon_maintenance(),
+        Route::Desahucios => icon_desahucios(),
+        Route::Reportes => icon_reports(),
+        _ => html! {},
+    }
+}
+
+// ─── Frecuentes ──────────────────────────────────────────────────────────────
+
+fn load_visit_counts() -> HashMap<String, u32> {
+    storage_get(FRECUENTES_KEY)
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+fn save_visit_counts(counts: &HashMap<String, u32>) {
+    if let Ok(json) = serde_json::to_string(counts) {
+        storage_set(FRECUENTES_KEY, &json);
+    }
+}
+
+fn increment_visit(route: &Route) {
+    if !is_trackable_route(route) {
+        return;
+    }
+    let key = route_to_key(route);
+    if key.is_empty() {
+        return;
+    }
+    let mut counts = load_visit_counts();
+    *counts.entry(key.to_string()).or_insert(0) += 1;
+    save_visit_counts(&counts);
+}
+
+fn top_frecuentes() -> Vec<Route> {
+    let counts = load_visit_counts();
+    let mut sorted: Vec<_> = counts.into_iter().collect();
+    sorted.sort_by(|a, b| b.1.cmp(&a.1));
+    sorted
+        .into_iter()
+        .take(MAX_FRECUENTES)
+        .filter(|(_, count)| *count >= 3)
+        .filter_map(|(key, _)| key_to_route(&key))
+        .collect()
+}
+
+// ─── Collapsed groups ────────────────────────────────────────────────────────
+
+fn load_collapsed_groups() -> Vec<String> {
+    storage_get(SIDEBAR_COLLAPSED_KEY)
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| vec!["herramientas".to_string(), "sistema".to_string()])
+}
+
+fn save_collapsed_groups(groups: &[String]) {
+    if let Ok(json) = serde_json::to_string(groups) {
+        storage_set(SIDEBAR_COLLAPSED_KEY, &json);
+    }
+}
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
 
 fn icon_dashboard() -> Html {
     html! {
@@ -216,6 +381,24 @@ fn icon_organizacion() -> Html {
     }
 }
 
+// ─── Badge helper ────────────────────────────────────────────────────────────
+
+fn attention_badge(count: u64) -> Html {
+    if count == 0 {
+        return html! {};
+    }
+    let label = if count > 9 {
+        "9+".to_string()
+    } else {
+        count.to_string()
+    };
+    html! {
+        <span class="gi-sidebar-attention-badge">{label}</span>
+    }
+}
+
+// ─── Main Component ──────────────────────────────────────────────────────────
+
 #[component]
 pub fn Sidebar(props: &SidebarProps) -> Html {
     let current_route = use_route::<Route>();
@@ -228,9 +411,37 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
     let is_admin = user_rol == "admin";
     let can_write = user_rol == "admin" || user_rol == "gerente";
 
+    // Collapsed groups state
+    let collapsed_groups = use_state(load_collapsed_groups);
+
+    // Attention badge counts
+    let pagos_atrasados = use_state(|| 0u64);
+    {
+        let pagos_atrasados = pagos_atrasados.clone();
+        use_effect_with((), move |()| {
+            spawn_local(async move {
+                if let Ok(stats) = api_get::<DashboardStats>("/dashboard/stats").await {
+                    pagos_atrasados.set(stats.pagos_atrasados);
+                }
+            });
+        });
+    }
+
+    // Frecuentes tracking
+    let frecuentes = use_state(top_frecuentes);
+    {
+        let current_route = current_route.clone();
+        let frecuentes = frecuentes.clone();
+        use_effect_with(current_route.clone(), move |route| {
+            if let Some(r) = route {
+                increment_visit(r);
+                frecuentes.set(top_frecuentes());
+            }
+        });
+    }
+
     let link_class = |route: &Route| -> String {
         let is_active = match route {
-            // Configuración highlights for both /configuracion and /configuracion/chatbot
             Route::Configuracion => matches!(
                 current_route.as_ref(),
                 Some(Route::Configuracion | Route::ConfiguracionChatbot)
@@ -252,6 +463,82 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
         })
     };
 
+    // Group toggle
+    let make_toggle = |group_id: &'static str| -> Callback<MouseEvent> {
+        let collapsed_groups = collapsed_groups.clone();
+        Callback::from(move |_: MouseEvent| {
+            let mut groups = (*collapsed_groups).clone();
+            if let Some(pos) = groups.iter().position(|g| g == group_id) {
+                groups.remove(pos);
+            } else {
+                groups.push(group_id.to_string());
+            }
+            save_collapsed_groups(&groups);
+            collapsed_groups.set(groups);
+        })
+    };
+
+    let ops_collapsed = collapsed_groups.iter().any(|g| g == "operaciones");
+    let tools_collapsed = collapsed_groups.iter().any(|g| g == "herramientas");
+    let sys_collapsed = collapsed_groups.iter().any(|g| g == "sistema");
+
+    let ops_content_class = if ops_collapsed {
+        "gi-sidebar-group-content"
+    } else {
+        "gi-sidebar-group-content gi-sidebar-group-content-open"
+    };
+    let tools_content_class = if tools_collapsed {
+        "gi-sidebar-group-content"
+    } else {
+        "gi-sidebar-group-content gi-sidebar-group-content-open"
+    };
+    let sys_content_class = if sys_collapsed {
+        "gi-sidebar-group-content"
+    } else {
+        "gi-sidebar-group-content gi-sidebar-group-content-open"
+    };
+
+    let ops_chevron = if ops_collapsed {
+        "gi-group-chevron"
+    } else {
+        "gi-group-chevron gi-group-chevron-open"
+    };
+    let tools_chevron = if tools_collapsed {
+        "gi-group-chevron"
+    } else {
+        "gi-group-chevron gi-group-chevron-open"
+    };
+    let sys_chevron = if sys_collapsed {
+        "gi-group-chevron"
+    } else {
+        "gi-group-chevron gi-group-chevron-open"
+    };
+
+    // Frecuentes section
+    let frecuentes_html = if frecuentes.is_empty() {
+        html! {}
+    } else {
+        html! {
+            <div class="gi-sidebar-group gi-sidebar-frecuentes">
+                <div class="gi-sidebar-group-label">{"Frecuentes"}</div>
+                <ul class="gi-sidebar-nav">
+                    { for frecuentes.iter().map(|route| {
+                        html! {
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={route.clone()}
+                                    classes={classes!(link_class(route))}>
+                                    {route_icon(route)}
+                                    {route_label(route)}
+                                </Link<Route>>
+                            </li>
+                        }
+                    })}
+                </ul>
+                <div class="gi-sidebar-divider" />
+            </div>
+        }
+    };
+
     html! {
         <aside class={format!("gi-sidebar w-64 min-h-screen flex flex-col{open_class}")}
                role="navigation" aria-label="Menú principal">
@@ -265,187 +552,172 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                     </svg>
                 </div>
                 <div>
-                    <span class="text-display gi-sidebar-brand-name">
-                        {"GI"}
-                    </span>
-                    <p class="gi-sidebar-brand-sub">
-                        {"Rep. Dominicana"}
-                    </p>
+                    <span class="text-display gi-sidebar-brand-name">{"GI"}</span>
+                    <p class="gi-sidebar-brand-sub">{"Rep. Dominicana"}</p>
                 </div>
             </div>
-            <nav class="flex-1">
+            <nav class="flex-1 overflow-y-auto">
+                // Frecuentes
+                {frecuentes_html}
+
                 // Operaciones
                 <div class="gi-sidebar-group">
-                    <div class="gi-sidebar-group-label">{"Operaciones"}</div>
-                    <ul class="gi-sidebar-nav">
-                        <li onclick={make_click(on_nav_click.clone())}>
-                            <Link<Route> to={Route::Dashboard}
-                                classes={classes!(link_class(&Route::Dashboard))}>
-                                {icon_dashboard()}
-                                {"Panel de Control"}
-                            </Link<Route>>
-                        </li>
-                        <li onclick={make_click(on_nav_click.clone())}>
-                            <Link<Route> to={Route::Propiedades}
-                                classes={classes!(link_class(&Route::Propiedades))}>
-                                {icon_properties()}
-                                {"Propiedades"}
-                            </Link<Route>>
-                        </li>
-                        <li onclick={make_click(on_nav_click.clone())}>
-                            <Link<Route> to={Route::Inquilinos}
-                                classes={classes!(link_class(&Route::Inquilinos))}>
-                                {icon_tenants()}
-                                {"Inquilinos"}
-                            </Link<Route>>
-                        </li>
-                        <li onclick={make_click(on_nav_click.clone())}>
-                            <Link<Route> to={Route::Contratos}
-                                classes={classes!(link_class(&Route::Contratos))}>
-                                {icon_contracts()}
-                                {"Contratos"}
-                            </Link<Route>>
-                        </li>
-                        <li onclick={make_click(on_nav_click.clone())}>
-                            <Link<Route> to={Route::Pagos}
-                                classes={classes!(link_class(&Route::Pagos))}>
-                                {icon_payments()}
-                                {"Pagos"}
-                            </Link<Route>>
-                        </li>
-                        <li onclick={make_click(on_nav_click.clone())}>
-                            <Link<Route> to={Route::Gastos}
-                                classes={classes!(link_class(&Route::Gastos))}>
-                                {icon_expenses()}
-                                {"Gastos"}
-                            </Link<Route>>
-                        </li>
-                        <li onclick={make_click(on_nav_click.clone())}>
-                            <Link<Route> to={Route::Mantenimiento}
-                                classes={classes!(link_class(&Route::Mantenimiento))}>
-                                {icon_maintenance()}
-                                {"Mantenimiento"}
-                            </Link<Route>>
-                        </li>
-                        <li onclick={make_click(on_nav_click.clone())}>
-                            <Link<Route> to={Route::Desahucios}
-                                classes={classes!(link_class(&Route::Desahucios))}>
-                                {icon_desahucios()}
-                                {"Desahucios"}
-                            </Link<Route>>
-                        </li>
-                    </ul>
+                    <button class="gi-sidebar-group-toggle" onclick={make_toggle("operaciones")}
+                        aria-expanded={(!ops_collapsed).to_string()}>
+                        <span class="gi-sidebar-group-label">{"Operaciones"}</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class={ops_chevron}>
+                            <polyline points="9 18 15 12 9 6"/>
+                        </svg>
+                    </button>
+                    <div class={ops_content_class}>
+                        <ul class="gi-sidebar-nav">
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::Dashboard} classes={classes!(link_class(&Route::Dashboard))}>
+                                    {icon_dashboard()}{"Panel de Control"}
+                                </Link<Route>>
+                            </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::Propiedades} classes={classes!(link_class(&Route::Propiedades))}>
+                                    {icon_properties()}{"Propiedades"}
+                                </Link<Route>>
+                            </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::Inquilinos} classes={classes!(link_class(&Route::Inquilinos))}>
+                                    {icon_tenants()}{"Inquilinos"}
+                                </Link<Route>>
+                            </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::Contratos} classes={classes!(link_class(&Route::Contratos))}>
+                                    {icon_contracts()}{"Contratos"}
+                                </Link<Route>>
+                            </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::Pagos} classes={classes!(link_class(&Route::Pagos))}>
+                                    {icon_payments()}{"Pagos"}
+                                    {attention_badge(*pagos_atrasados)}
+                                </Link<Route>>
+                            </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::Gastos} classes={classes!(link_class(&Route::Gastos))}>
+                                    {icon_expenses()}{"Gastos"}
+                                </Link<Route>>
+                            </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::Mantenimiento} classes={classes!(link_class(&Route::Mantenimiento))}>
+                                    {icon_maintenance()}{"Mantenimiento"}
+                                </Link<Route>>
+                            </li>
+                            <li onclick={make_click(on_nav_click.clone())}>
+                                <Link<Route> to={Route::Desahucios} classes={classes!(link_class(&Route::Desahucios))}>
+                                    {icon_desahucios()}{"Desahucios"}
+                                </Link<Route>>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
+
                 // Herramientas
-                <div class="gi-sidebar-group">
-                    <div class="gi-sidebar-divider" />
-                    if can_write {
-                        <div class="gi-sidebar-group-label">{"Herramientas"}</div>
-                    }
-                    <ul class="gi-sidebar-nav">
-                        <li onclick={make_click(on_nav_click.clone())}>
-                            <Link<Route> to={Route::Reportes}
-                                classes={classes!(link_class(&Route::Reportes))}>
-                                {icon_reports()}
-                                {"Reportes"}
-                            </Link<Route>>
-                        </li>
-                        if can_write {
-                            <li onclick={make_click(on_nav_click.clone())}>
-                                <Link<Route> to={Route::Importar}
-                                    classes={classes!(link_class(&Route::Importar))}>
-                                    {icon_import()}
-                                    {"Importar"}
-                                </Link<Route>>
-                            </li>
-                            <li onclick={make_click(on_nav_click.clone())}>
-                                <Link<Route> to={Route::Plantillas}
-                                    classes={classes!(link_class(&Route::Plantillas))}>
-                                    {icon_plantillas()}
-                                    {"Plantillas"}
-                                </Link<Route>>
-                            </li>
-                            <li onclick={make_click(on_nav_click.clone())}>
-                                <Link<Route> to={Route::Dgii}
-                                    classes={classes!(link_class(&Route::Dgii))}>
-                                    {icon_dgii()}
-                                    {"DGII"}
-                                </Link<Route>>
-                            </li>
-                            <li onclick={make_click(on_nav_click.clone())}>
-                                <Link<Route> to={Route::ServiciosPublicos}
-                                    classes={classes!(link_class(&Route::ServiciosPublicos))}>
-                                    {icon_servicios_publicos()}
-                                    {"Servicios Públicos"}
-                                </Link<Route>>
-                            </li>
-                        }
-                    </ul>
-                </div>
+                if can_write {
+                    <div class="gi-sidebar-group">
+                        <div class="gi-sidebar-divider" />
+                        <button class="gi-sidebar-group-toggle" onclick={make_toggle("herramientas")}
+                            aria-expanded={(!tools_collapsed).to_string()}>
+                            <span class="gi-sidebar-group-label">{"Herramientas"}</span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class={tools_chevron}>
+                                <polyline points="9 18 15 12 9 6"/>
+                            </svg>
+                        </button>
+                        <div class={tools_content_class}>
+                            <ul class="gi-sidebar-nav">
+                                <li onclick={make_click(on_nav_click.clone())}>
+                                    <Link<Route> to={Route::Reportes} classes={classes!(link_class(&Route::Reportes))}>
+                                        {icon_reports()}{"Reportes"}
+                                    </Link<Route>>
+                                </li>
+                                <li onclick={make_click(on_nav_click.clone())}>
+                                    <Link<Route> to={Route::Importar} classes={classes!(link_class(&Route::Importar))}>
+                                        {icon_import()}{"Importar"}
+                                    </Link<Route>>
+                                </li>
+                                <li onclick={make_click(on_nav_click.clone())}>
+                                    <Link<Route> to={Route::Plantillas} classes={classes!(link_class(&Route::Plantillas))}>
+                                        {icon_plantillas()}{"Plantillas"}
+                                    </Link<Route>>
+                                </li>
+                                <li onclick={make_click(on_nav_click.clone())}>
+                                    <Link<Route> to={Route::Dgii} classes={classes!(link_class(&Route::Dgii))}>
+                                        {icon_dgii()}{"DGII"}
+                                    </Link<Route>>
+                                </li>
+                                <li onclick={make_click(on_nav_click.clone())}>
+                                    <Link<Route> to={Route::ServiciosPublicos} classes={classes!(link_class(&Route::ServiciosPublicos))}>
+                                        {icon_servicios_publicos()}{"Servicios Públicos"}
+                                    </Link<Route>>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                }
+
                 // Sistema
                 <div class="gi-sidebar-group">
                     <div class="gi-sidebar-divider" />
-                    <div class="gi-sidebar-group-label">{"Sistema"}</div>
-                    <ul class="gi-sidebar-nav">
-                        if is_admin {
+                    <button class="gi-sidebar-group-toggle" onclick={make_toggle("sistema")}
+                        aria-expanded={(!sys_collapsed).to_string()}>
+                        <span class="gi-sidebar-group-label">{"Sistema"}</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class={sys_chevron}>
+                            <polyline points="9 18 15 12 9 6"/>
+                        </svg>
+                    </button>
+                    <div class={sys_content_class}>
+                        <ul class="gi-sidebar-nav">
+                            if is_admin {
+                                <li onclick={make_click(on_nav_click.clone())}>
+                                    <Link<Route> to={Route::UsuariosPage} classes={classes!(link_class(&Route::UsuariosPage))}>
+                                        {icon_users()}{"Usuarios"}
+                                    </Link<Route>>
+                                </li>
+                                <li onclick={make_click(on_nav_click.clone())}>
+                                    <Link<Route> to={Route::AuditoriaPage} classes={classes!(link_class(&Route::AuditoriaPage))}>
+                                        {icon_audit()}{"Auditoría"}
+                                    </Link<Route>>
+                                </li>
+                                <li onclick={make_click(on_nav_click.clone())}>
+                                    <Link<Route> to={Route::Ncf} classes={classes!(link_class(&Route::Ncf))}>
+                                        {icon_ncf()}{"NCF"}
+                                    </Link<Route>>
+                                </li>
+                                <li onclick={make_click(on_nav_click.clone())}>
+                                    <Link<Route> to={Route::Tareas} classes={classes!(link_class(&Route::Tareas))}>
+                                        {icon_tareas()}{"Tareas"}
+                                    </Link<Route>>
+                                </li>
+                                <li onclick={make_click(on_nav_click.clone())}>
+                                    <Link<Route> to={Route::Invitaciones} classes={classes!(link_class(&Route::Invitaciones))}>
+                                        {icon_invitaciones()}{"Invitaciones"}
+                                    </Link<Route>>
+                                </li>
+                                <li onclick={make_click(on_nav_click.clone())}>
+                                    <Link<Route> to={Route::Organizacion} classes={classes!(link_class(&Route::Organizacion))}>
+                                        {icon_organizacion()}{"Organización"}
+                                    </Link<Route>>
+                                </li>
+                            }
                             <li onclick={make_click(on_nav_click.clone())}>
-                                <Link<Route> to={Route::UsuariosPage}
-                                    classes={classes!(link_class(&Route::UsuariosPage))}>
-                                    {icon_users()}
-                                    {"Usuarios"}
+                                <Link<Route> to={Route::Configuracion} classes={classes!(link_class(&Route::Configuracion))}>
+                                    {icon_settings()}{"Configuración"}
                                 </Link<Route>>
                             </li>
                             <li onclick={make_click(on_nav_click.clone())}>
-                                <Link<Route> to={Route::AuditoriaPage}
-                                    classes={classes!(link_class(&Route::AuditoriaPage))}>
-                                    {icon_audit()}
-                                    {"Auditoría"}
+                                <Link<Route> to={Route::Perfil} classes={classes!(link_class(&Route::Perfil))}>
+                                    {icon_profile()}{"Mi Perfil"}
                                 </Link<Route>>
                             </li>
-                            <li onclick={make_click(on_nav_click.clone())}>
-                                <Link<Route> to={Route::Ncf}
-                                    classes={classes!(link_class(&Route::Ncf))}>
-                                    {icon_ncf()}
-                                    {"NCF"}
-                                </Link<Route>>
-                            </li>
-                            <li onclick={make_click(on_nav_click.clone())}>
-                                <Link<Route> to={Route::Tareas}
-                                    classes={classes!(link_class(&Route::Tareas))}>
-                                    {icon_tareas()}
-                                    {"Tareas"}
-                                </Link<Route>>
-                            </li>
-                            <li onclick={make_click(on_nav_click.clone())}>
-                                <Link<Route> to={Route::Invitaciones}
-                                    classes={classes!(link_class(&Route::Invitaciones))}>
-                                    {icon_invitaciones()}
-                                    {"Invitaciones"}
-                                </Link<Route>>
-                            </li>
-                            <li onclick={make_click(on_nav_click.clone())}>
-                                <Link<Route> to={Route::Organizacion}
-                                    classes={classes!(link_class(&Route::Organizacion))}>
-                                    {icon_organizacion()}
-                                    {"Organización"}
-                                </Link<Route>>
-                            </li>
-                        }
-                        <li onclick={make_click(on_nav_click.clone())}>
-                            <Link<Route> to={Route::Configuracion}
-                                classes={classes!(link_class(&Route::Configuracion))}>
-                                {icon_settings()}
-                                {"Configuración"}
-                            </Link<Route>>
-                        </li>
-                        <li onclick={make_click(on_nav_click.clone())}>
-                            <Link<Route> to={Route::Perfil}
-                                classes={classes!(link_class(&Route::Perfil))}>
-                                {icon_profile()}
-                                {"Mi Perfil"}
-                            </Link<Route>>
-                        </li>
-                    </ul>
+                        </ul>
+                    </div>
                 </div>
             </nav>
             <div class="gi-sidebar-footer">

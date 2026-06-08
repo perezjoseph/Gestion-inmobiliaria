@@ -1,3 +1,4 @@
+pub mod breadcrumb;
 pub mod footer;
 pub mod navbar;
 pub mod notification_bell;

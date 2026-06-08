@@ -12,7 +12,10 @@ use crate::components::common::confidence_input::ConfidenceInput;
 use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::document_gallery::DocumentGallery;
+use crate::components::common::domain_header::{DomainHeader, DomainStat};
+use crate::components::common::drawer::Drawer;
 use crate::components::common::error_banner::ErrorBanner;
+use crate::components::common::mobile_card_list::{MobileCard, MobileCardList};
 use crate::components::common::ocr_scan_button::OcrScanButton;
 use crate::components::common::offline_guard::OfflineGuard;
 use crate::components::common::pagination::Pagination;
@@ -696,7 +699,9 @@ fn render_inquilinos_view(
                 on_clear={on_search_clear}
             />
 
-            if **show_form {
+            <Drawer open={**show_form} on_close={on_cancel.clone().reform(|()| {
+                web_sys::MouseEvent::new("click").unwrap()
+            })} title={if editing.is_some() { "Editar Inquilino" } else { "Nuevo Inquilino" }}>
                 <InquilinoForm
                     is_editing={editing.is_some()}
                     nombre={nombre}
@@ -716,8 +721,15 @@ fn render_inquilinos_view(
                     editing_id={editing_id}
                     token={token}
                 />
-            }
+            </Drawer>
 
+            <DomainHeader>
+                if total > 0 {
+                    <DomainStat label="inquilinos activos" value={total.to_string()} />
+                }
+            </DomainHeader>
+
+            <div class="gi-mobile-hidden">
             <InquilinoList
                 items={(**items).clone()}
                 user_rol={user_rol.to_string()}
@@ -725,12 +737,33 @@ fn render_inquilinos_view(
                 total={total}
                 page={page}
                 per_page={per_page}
-                on_edit={on_edit}
+                on_edit={on_edit.clone()}
                 on_delete={on_delete_click}
                 on_new={on_new}
-                on_page_change={on_page_change}
-                on_per_page_change={on_per_page_change}
+                on_page_change={on_page_change.clone()}
+                on_per_page_change={on_per_page_change.clone()}
             />
+            </div>
+            <MobileCardList>
+                { for items.iter().map(|inq| {
+                    let title = format!("{} {}", inq.nombre, inq.apellido);
+                    let subtitle = inq.cedula.clone();
+                    let detail = inq.telefono.clone().unwrap_or_default();
+                    let ic = inq.clone();
+                    let on_edit_card = on_edit.clone();
+                    let onclick = Callback::from(move |_: MouseEvent| {
+                        on_edit_card.emit(ic.clone());
+                    });
+                    html! {
+                        <MobileCard
+                            title={title}
+                            subtitle={subtitle}
+                            detail={detail}
+                            onclick={Some(onclick)}
+                        />
+                    }
+                })}
+            </MobileCardList>
         </div>
     }
 }

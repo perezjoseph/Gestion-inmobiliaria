@@ -31,6 +31,7 @@ spec:
         app.kubernetes.io/component: database
         app.kubernetes.io/part-of: realestate
     spec:
+      automountServiceAccountToken: false
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
@@ -61,13 +62,17 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+            - name: run
+              mountPath: /var/run/postgresql
           resources:
             requests:
               cpu: 100m
               memory: 256Mi
+              ephemeral-storage: 64Mi
             limits:
               cpu: 500m
               memory: 512Mi
+              ephemeral-storage: 256Mi
           readinessProbe:
             exec:
               command: ["pg_isready", "-U", "realestate"]
@@ -79,11 +84,17 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 10
           securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: realestate-db-pvc
+        - name: run
+          emptyDir:
+            sizeLimit: 16Mi
 ---
 apiVersion: v1
 kind: Service

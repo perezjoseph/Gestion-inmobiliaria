@@ -2,7 +2,7 @@
 # - Backend can reach: db, ocr-service (shared ns), baileys, ovms (shared ns)
 # - Frontend can reach: nothing (Caddy serves static files, Traefik proxies /api to backend)
 # - DB accepts only from: backend, baileys
-# - Deny all ingress by default for pods without explicit policy
+# - Deny all ingress/egress by default for pods without explicit policy
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -12,6 +12,212 @@ spec:
   podSelector: {}
   policyTypes:
     - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+# Allow all pods to reach kube-dns for name resolution
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+# Backend egress: db, baileys, ocr-service, vllm, alloy (telemetry), SMTP
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: db
+      ports:
+        - port: 5432
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: baileys
+      ports:
+        - port: 3100
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ocr-service
+      ports:
+        - port: 8000
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vllm
+      ports:
+        - port: 8000
+          protocol: TCP
+    # Alloy OTLP telemetry
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app: alloy
+      ports:
+        - port: 4317
+          protocol: TCP
+    # SMTP egress (internet — mailcow)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - port: 587
+          protocol: TCP
+---
+# Frontend egress: backend only (reverse proxy)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: backend
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+# Cloudflared egress: frontend (origin) + internet (Cloudflare edge)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cloudflared-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: cloudflared
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: frontend
+      ports:
+        - port: 8443
+          protocol: TCP
+    # Cloudflare edge (internet)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
+        - port: 7844
+          protocol: UDP
+---
+# Baileys egress: db + backend (webhook)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-baileys-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: baileys
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: db
+      ports:
+        - port: 5432
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: backend
+      ports:
+        - port: 8080
+          protocol: TCP
+    # WhatsApp servers (internet)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
+        - port: 5222
+          protocol: TCP
+---
+# DB egress: none needed (only accepts connections)
+# db-backup egress: db only
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-db-backup-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: db-backup
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: db
+      ports:
+        - port: 5432
+          protocol: TCP
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

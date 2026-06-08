@@ -11,7 +11,9 @@ use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::document_gallery::DocumentGallery;
+use crate::components::common::domain_header::{DomainHeader, DomainStat, DomainStatVariant};
 use crate::components::common::error_banner::ErrorBanner;
+use crate::components::common::mobile_card_list::{MobileCard, MobileCardList};
 use crate::components::common::offline_guard::OfflineGuard;
 use crate::components::common::pagination::Pagination;
 use crate::components::common::skeleton::TableSkeleton;
@@ -875,6 +877,30 @@ fn render_tab_button(label: &str, tab_id: &str, detail_tab: &UseStateHandle<Stri
     }
 }
 
+fn render_propiedades_domain_header(items: &UseStateHandle<Vec<Propiedad>>) -> Html {
+    if items.is_empty() {
+        return html! {};
+    }
+    let total = items.len();
+    let ocupadas = items.iter().filter(|p| p.estado == "ocupada").count();
+    let disponibles = items.iter().filter(|p| p.estado == "disponible").count();
+    let mantenimiento = items.iter().filter(|p| p.estado == "mantenimiento").count();
+    let ocupacion = if total > 0 {
+        format!("{:.0}%", (ocupadas as f64 / total as f64) * 100.0)
+    } else {
+        "0%".to_string()
+    };
+    html! {
+        <DomainHeader>
+            <DomainStat label="ocupación" value={ocupacion} variant={DomainStatVariant::Success} />
+            <DomainStat label="disponibles" value={disponibles.to_string()} />
+            if mantenimiento > 0 {
+                <DomainStat label="en mantenimiento" value={mantenimiento.to_string()} variant={DomainStatVariant::Warning} />
+            }
+        </DomainHeader>
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn render_propiedades_view(
     loading: &UseStateHandle<bool>,
@@ -975,6 +1001,8 @@ fn render_propiedades_view(
                 />
             }
 
+            {render_propiedades_domain_header(items)}
+
             <PropiedadFilterBar
                 filter_ciudad={filter_ciudad}
                 filter_tipo={filter_tipo}
@@ -1053,6 +1081,7 @@ fn render_propiedades_view(
                         }
                     }
 
+                    <div class="gi-mobile-hidden">
                     <PropiedadList
                         items={(*(*items)).clone()}
                         user_rol={user_rol.to_string()}
@@ -1064,12 +1093,35 @@ fn render_propiedades_view(
                         page={**page}
                         per_page={**per_page}
                         on_sort={on_sort}
-                        on_edit={on_edit}
+                        on_edit={on_edit.clone()}
                         on_delete={on_delete_click}
-                        on_new={on_new}
-                        on_page_change={on_page_change}
-                        on_per_page_change={on_per_page_change}
+                        on_new={on_new.clone()}
+                        on_page_change={on_page_change.clone()}
+                        on_per_page_change={on_per_page_change.clone()}
                     />
+                    </div>
+                    <MobileCardList>
+                        { for items.iter().map(|p| {
+                            let (badge_cls, badge_label) = estado_badge(&p.estado);
+                            let badge_html = html! { <span class={badge_cls}>{badge_label}</span> };
+                            let subtitle = format!("{}, {}", p.ciudad, p.provincia);
+                            let detail = format!("{} {}", p.moneda, format!("{:.2}", p.precio));
+                            let pc = p.clone();
+                            let on_edit_card = on_edit.clone();
+                            let onclick = Callback::from(move |_: MouseEvent| {
+                                on_edit_card.emit(pc.clone());
+                            });
+                            html! {
+                                <MobileCard
+                                    title={p.titulo.clone()}
+                                    subtitle={subtitle}
+                                    detail={detail}
+                                    badge={badge_html}
+                                    onclick={Some(onclick)}
+                                />
+                            }
+                        })}
+                    </MobileCardList>
                 </>
             }
         </div>

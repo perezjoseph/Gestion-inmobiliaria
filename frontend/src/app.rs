@@ -4,6 +4,7 @@ use yew_router::prelude::*;
 use crate::components::common::command_palette::CommandPalette;
 use crate::components::common::offline_banner::OfflineBanner;
 use crate::components::common::toast::{ToastContainer, ToastContext, ToastState};
+use crate::components::layout::breadcrumb::Breadcrumb;
 use crate::components::layout::footer::Footer;
 use crate::components::layout::navbar::Navbar;
 use crate::components::layout::sidebar::Sidebar;
@@ -358,6 +359,7 @@ pub fn ProtectedRoute(props: &ProtectedRouteProps) -> Html {
                     user_role={user_role}
                     on_toggle_sidebar={on_toggle_sidebar}
                 />
+                <Breadcrumb />
                 <main id="gi-main-content" class="flex-1" style="padding: var(--space-5) var(--space-6);">
                     {props.children.clone()}
                 </main>

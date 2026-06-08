@@ -12,8 +12,11 @@ use crate::components::common::confidence_input::ConfidenceInput;
 use crate::components::common::currency_display::CurrencyDisplay;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::document_gallery::DocumentGallery;
+use crate::components::common::domain_header::{DomainHeader, DomainStat, DomainStatVariant};
+use crate::components::common::drawer::Drawer;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::help_tooltip::HelpTooltip;
+use crate::components::common::mobile_card_list::{MobileCard, MobileCardList};
 use crate::components::common::ocr_scan_button::OcrScanButton;
 use crate::components::common::offline_guard::OfflineGuard;
 use crate::components::common::pagination::Pagination;
@@ -1403,7 +1406,7 @@ fn render_pagos_view(
         form_errors,
         submitting,
         on_submit,
-        on_cancel,
+        on_cancel.clone(),
         confidences,
         on_ocr_result,
         on_confidence_clear,
@@ -1419,21 +1422,60 @@ fn render_pagos_view(
             </div>
             {error_html}
             {delete_html}
+            <DomainHeader>
+                if **total > 0 {
+                    <DomainStat label="total" value={total.to_string()} />
+                }
+                {render_pagos_domain_stats(items)}
+            </DomainHeader>
             <PagoFilterBar
                 filter_contrato={filter_contrato} filter_estado={filter_estado}
                 contratos={(**contratos).clone()} contrato_label={contrato_label.clone()}
                 on_apply={on_filter_apply} on_clear={on_filter_clear}
             />
-            {form_html}
-            <PagoList
-                items={(**items).clone()} user_rol={user_rol.to_string()} headers={headers}
+            <Drawer open={**show_form} on_close={on_cancel.clone().reform(|()| {
+                // Create a synthetic MouseEvent-like close
+                web_sys::MouseEvent::new("click").unwrap()
+            })} title={if editing.is_some() { "Editar Pago" } else { "Nuevo Pago" }}>
+                {form_html}
+            </Drawer>
+            <div class="gi-mobile-hidden">
+                <PagoList
+                    items={(**items).clone()} user_rol={user_rol.to_string()} headers={headers}
+                    total={**total} page={**page} per_page={**per_page}
+                    contrato_label={contrato_label.clone()} on_edit={on_edit.clone()}
+                    on_delete={on_delete_click.clone()} on_new={on_new.clone()}
+                    on_page_change={on_page_change.clone()} on_per_page_change={on_per_page_change.clone()}
+                    selected_ids={(**selected_ids).clone()}
+                    on_toggle_select={Some(on_toggle_select)}
+                    on_select_all={Some(on_select_all)}
+                />
+            </div>
+            <MobileCardList>
+                { for items.iter().map(|p| {
+                    let (badge_cls, badge_label) = estado_badge(&p.estado);
+                    let badge_html = html! { <span class={badge_cls}>{badge_label}</span> };
+                    let subtitle = format_currency(&p.moneda, p.monto);
+                    let detail = format!("Vence: {}", format_date_display(&p.fecha_vencimiento));
+                    let pc = p.clone();
+                    let on_edit_card = on_edit.clone();
+                    let onclick = Callback::from(move |_: MouseEvent| {
+                        on_edit_card.emit(pc.clone());
+                    });
+                    html! {
+                        <MobileCard
+                            title={contrato_label.emit(p.contrato_id.clone())}
+                            subtitle={subtitle}
+                            detail={detail}
+                            badge={badge_html}
+                            onclick={Some(onclick)}
+                        />
+                    }
+                })}
+            </MobileCardList>
+            <Pagination
                 total={**total} page={**page} per_page={**per_page}
-                contrato_label={contrato_label.clone()} on_edit={on_edit}
-                on_delete={on_delete_click} on_new={on_new}
                 on_page_change={on_page_change} on_per_page_change={on_per_page_change}
-                selected_ids={(**selected_ids).clone()}
-                on_toggle_select={Some(on_toggle_select)}
-                on_select_all={Some(on_select_all)}
             />
             <BulkActionBar
                 selected_count={selected_ids.len()}
@@ -1444,6 +1486,21 @@ fn render_pagos_view(
                 </button>
             </BulkActionBar>
         </div>
+    }
+}
+
+fn render_pagos_domain_stats(items: &UseStateHandle<Vec<Pago>>) -> Html {
+    let atrasados = items.iter().filter(|p| p.estado == "atrasado").count();
+    let pendientes = items.iter().filter(|p| p.estado == "pendiente").count();
+    html! {
+        <>
+            if atrasados > 0 {
+                <DomainStat label="atrasados" value={atrasados.to_string()} variant={DomainStatVariant::Error} />
+            }
+            if pendientes > 0 {
+                <DomainStat label="pendientes" value={pendientes.to_string()} variant={DomainStatVariant::Warning} />
+            }
+        </>
     }
 }
 

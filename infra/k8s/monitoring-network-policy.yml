@@ -1,0 +1,176 @@
+# NetworkPolicy for monitoring namespace
+# Restricts ingress to only expected sources for each monitoring component.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# Prometheus: accepts scrape queries from Grafana + remote-write from Tempo
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-ingress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app: prometheus
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: grafana
+        - podSelector:
+            matchLabels:
+              app: tempo
+      ports:
+        - port: 9090
+          protocol: TCP
+---
+# Grafana: accepts traffic from Traefik (LAN ingress)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana-ingress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app: grafana
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 3000
+          protocol: TCP
+---
+# Loki: accepts log pushes from Alloy + queries from Grafana
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-loki-ingress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app: loki
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: alloy
+        - podSelector:
+            matchLabels:
+              app: grafana
+      ports:
+        - port: 3100
+          protocol: TCP
+---
+# Tempo: accepts OTLP traces from Alloy + queries from Grafana
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-tempo-ingress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app: tempo
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: alloy
+      ports:
+        - port: 4317
+          protocol: TCP
+        - port: 4318
+          protocol: TCP
+    - from:
+        - podSelector:
+            matchLabels:
+              app: grafana
+      ports:
+        - port: 3200
+          protocol: TCP
+---
+# Alloy OTLP: accepts traces from app pods in realestate namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alloy-ingress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app: alloy
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: realestate
+      ports:
+        - port: 4317
+          protocol: TCP
+        - port: 4318
+          protocol: TCP
+---
+# Alertmanager: accepts alerts from Prometheus
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alertmanager-ingress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app: alertmanager
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - port: 9093
+          protocol: TCP
+---
+# Node-exporter: accepts scrapes from Prometheus
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-node-exporter-ingress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app: node-exporter
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - port: 9100
+          protocol: TCP
