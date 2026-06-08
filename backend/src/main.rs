@@ -2,20 +2,18 @@ use actix_web::web;
 use realestate_backend::app;
 use realestate_backend::config::AppConfig;
 use realestate_backend::services::ocr_preview::PreviewStore;
+use realestate_backend::telemetry;
 
 #[path = "../migrations/mod.rs"]
 pub mod migrations;
 
 use sea_orm::Database;
 use sea_orm_migration::MigratorTrait;
-use tracing_subscriber::EnvFilter;
 
 #[allow(clippy::expect_used)]
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .init();
+    let _otel_guard = telemetry::init_telemetry();
 
     // Register all custom Prometheus metrics eagerly so they appear in /metrics from boot.
     realestate_backend::metrics::init();

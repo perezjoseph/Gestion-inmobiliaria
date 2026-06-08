@@ -40,6 +40,7 @@ jobs:
   changes:
     name: Detect Changes
     runs-on: arc-runner-dind
+    timeout-minutes: 10
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
@@ -184,7 +185,7 @@ jobs:
           timeout_minutes: 20
           max_attempts: 2
           command: |
-            trivy image --exit-code 0 --severity CRITICAL,HIGH \
+            trivy image --exit-code 1 --severity CRITICAL \
               --no-progress --format table \
               ghcr.io/${{ env.IMAGE_OWNER }}/realestate-baileys@${{ steps.push.outputs.digest }} \
               2>&1 | tee "${RUNNER_TEMP}/trivy-baileys-image.txt"
@@ -285,7 +286,7 @@ jobs:
           timeout_minutes: 20
           max_attempts: 2
           command: |
-            trivy image --exit-code 0 --severity CRITICAL,HIGH \
+            trivy image --exit-code 1 --severity CRITICAL \
               --no-progress --format table \
               ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service@${{ steps.push.outputs.digest }} \
               2>&1 | tee "${RUNNER_TEMP}/trivy-ocr-service-image.txt"
@@ -383,7 +384,7 @@ jobs:
     with:
       backend-digest: ${{ needs.containers.outputs.backend-digest }}
       frontend-digest: ${{ needs.containers.outputs.frontend-digest }}
-      ocr-service-digest: ${{ needs.ocr-container.outputs.digest }}
+      ocr-service-digest: ${{ needs.ocr-container.outputs.digest || '' }}
       baileys-digest: ${{ needs.baileys-container.outputs.digest }}
     secrets:
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}

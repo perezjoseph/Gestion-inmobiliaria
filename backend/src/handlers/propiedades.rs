@@ -10,9 +10,7 @@ use crate::models::propiedad::{
 };
 use crate::services::auth::Claims;
 use crate::services::propiedades;
-
-const VALID_ESTADOS: &[&str] = &["disponible", "ocupada", "mantenimiento"];
-const VALID_MONEDAS: &[&str] = &["DOP", "USD"];
+use crate::services::validation::{ESTADOS_PROPIEDAD, MONEDAS};
 
 fn validate_titulo(titulo: &str) -> Result<(), AppError> {
     if titulo.trim().is_empty() {
@@ -52,20 +50,20 @@ fn validate_precio(precio: &Decimal) -> Result<(), AppError> {
 }
 
 fn validate_estado(estado: &str) -> Result<(), AppError> {
-    if !VALID_ESTADOS.contains(&estado) {
+    if !ESTADOS_PROPIEDAD.contains(&estado) {
         return Err(AppError::Validation(format!(
             "Estado inválido. Valores permitidos: {}",
-            VALID_ESTADOS.join(", ")
+            ESTADOS_PROPIEDAD.join(", ")
         )));
     }
     Ok(())
 }
 
 fn validate_moneda(moneda: &str) -> Result<(), AppError> {
-    if !VALID_MONEDAS.contains(&moneda) {
+    if !MONEDAS.contains(&moneda) {
         return Err(AppError::Validation(format!(
             "Moneda inválida. Valores permitidos: {}",
-            VALID_MONEDAS.join(", ")
+            MONEDAS.join(", ")
         )));
     }
     Ok(())

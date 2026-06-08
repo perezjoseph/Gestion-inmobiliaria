@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::config::ChatbotEnvConfig;
@@ -80,6 +81,7 @@ impl BaileysClient {
     ///
     /// Calls `POST /sessions/{realmId}/start` on the Baileys sidecar.
     /// Returns QR code data or current connection status.
+    #[instrument(name = "baileys.start_session", skip(self), fields(realm_id = %realm_id))]
     pub async fn start_session(&self, realm_id: Uuid) -> Result<StartSessionResponse, AppError> {
         let url = format!("{}/sessions/{}/start", self.base_url, realm_id);
 
@@ -93,6 +95,7 @@ impl BaileysClient {
     /// Sends a `WhatsApp` message to a recipient via the Baileys sidecar.
     ///
     /// Calls `POST /sessions/{realmId}/send` with the phone number and content.
+    #[instrument(name = "baileys.send_message", skip(self, content), fields(realm_id = %realm_id))]
     pub async fn send_message(
         &self,
         realm_id: Uuid,
@@ -122,6 +125,7 @@ impl BaileysClient {
     /// Stops the `WhatsApp` session for the given organization.
     ///
     /// Calls `POST /sessions/{realmId}/stop` on the Baileys sidecar.
+    #[instrument(name = "baileys.stop_session", skip(self), fields(realm_id = %realm_id))]
     pub async fn stop_session(&self, realm_id: Uuid) -> Result<StopSessionResponse, AppError> {
         let url = format!("{}/sessions/{}/stop", self.base_url, realm_id);
 
@@ -135,6 +139,7 @@ impl BaileysClient {
     /// Gets the current connection status for the given organization.
     ///
     /// Calls `GET /sessions/{realmId}/status` on the Baileys sidecar.
+    #[instrument(name = "baileys.get_status", skip(self), fields(realm_id = %realm_id))]
     pub async fn get_status(&self, realm_id: Uuid) -> Result<SessionStatusResponse, AppError> {
         let url = format!("{}/sessions/{}/status", self.base_url, realm_id);
 

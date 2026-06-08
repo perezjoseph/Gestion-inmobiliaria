@@ -10,9 +10,7 @@ use crate::models::gasto::{
 };
 use crate::services::auth::Claims;
 use crate::services::gastos;
-
-const VALID_MONEDAS: &[&str] = &["DOP", "USD"];
-const VALID_ESTADOS: &[&str] = &["pendiente", "pagado", "cancelado"];
+use crate::services::validation::{ESTADOS_GASTO, MONEDAS};
 
 fn validate_create_gasto(dto: &CreateGastoRequest) -> Result<(), AppError> {
     if dto.monto <= Decimal::ZERO {
@@ -25,10 +23,10 @@ fn validate_create_gasto(dto: &CreateGastoRequest) -> Result<(), AppError> {
             "La categoría no puede estar vacía ni exceder 100 caracteres".into(),
         ));
     }
-    if !VALID_MONEDAS.contains(&dto.moneda.as_str()) {
+    if !MONEDAS.contains(&dto.moneda.as_str()) {
         return Err(AppError::Validation(format!(
             "Moneda inválida. Valores permitidos: {}",
-            VALID_MONEDAS.join(", ")
+            MONEDAS.join(", ")
         )));
     }
     Ok(())
@@ -50,18 +48,18 @@ fn validate_update_gasto(dto: &UpdateGastoRequest) -> Result<(), AppError> {
         }
     }
     if let Some(ref moneda) = dto.moneda {
-        if !VALID_MONEDAS.contains(&moneda.as_str()) {
+        if !MONEDAS.contains(&moneda.as_str()) {
             return Err(AppError::Validation(format!(
                 "Moneda inválida. Valores permitidos: {}",
-                VALID_MONEDAS.join(", ")
+                MONEDAS.join(", ")
             )));
         }
     }
     if let Some(ref estado) = dto.estado {
-        if !VALID_ESTADOS.contains(&estado.as_str()) {
+        if !ESTADOS_GASTO.contains(&estado.as_str()) {
             return Err(AppError::Validation(format!(
                 "Estado inválido. Valores permitidos: {}",
-                VALID_ESTADOS.join(", ")
+                ESTADOS_GASTO.join(", ")
             )));
         }
     }

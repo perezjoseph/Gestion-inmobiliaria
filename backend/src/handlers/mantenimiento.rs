@@ -11,10 +11,7 @@ use crate::models::mantenimiento::{
 };
 use crate::services::auth::Claims;
 use crate::services::mantenimiento;
-
-const VALID_ESTADOS: &[&str] = &["pendiente", "en_progreso", "completado"];
-const VALID_PRIORIDADES: &[&str] = &["baja", "media", "alta", "urgente"];
-const VALID_MONEDAS: &[&str] = &["DOP", "USD"];
+use crate::services::validation::{ESTADOS_MANTENIMIENTO, MONEDAS, PRIORIDADES_MANTENIMIENTO};
 
 fn validate_descripcion(descripcion: &str) -> Result<(), AppError> {
     if descripcion.len() > 1000 {
@@ -47,10 +44,10 @@ fn validate_create_solicitud(dto: &CreateSolicitudRequest) -> Result<(), AppErro
         validate_descripcion(descripcion)?;
     }
     if let Some(ref prioridad) = dto.prioridad {
-        if !VALID_PRIORIDADES.contains(&prioridad.as_str()) {
+        if !PRIORIDADES_MANTENIMIENTO.contains(&prioridad.as_str()) {
             return Err(AppError::Validation(format!(
                 "Prioridad inválida. Valores permitidos: {}",
-                VALID_PRIORIDADES.join(", ")
+                PRIORIDADES_MANTENIMIENTO.join(", ")
             )));
         }
     }
@@ -58,10 +55,10 @@ fn validate_create_solicitud(dto: &CreateSolicitudRequest) -> Result<(), AppErro
         validate_costo(costo)?;
     }
     if let Some(ref moneda) = dto.costo_moneda {
-        if !VALID_MONEDAS.contains(&moneda.as_str()) {
+        if !MONEDAS.contains(&moneda.as_str()) {
             return Err(AppError::Validation(format!(
                 "Moneda inválida. Valores permitidos: {}",
-                VALID_MONEDAS.join(", ")
+                MONEDAS.join(", ")
             )));
         }
     }
@@ -73,10 +70,10 @@ fn validate_update_solicitud(dto: &UpdateSolicitudRequest) -> Result<(), AppErro
         validate_descripcion(descripcion)?;
     }
     if let Some(ref prioridad) = dto.prioridad {
-        if !VALID_PRIORIDADES.contains(&prioridad.as_str()) {
+        if !PRIORIDADES_MANTENIMIENTO.contains(&prioridad.as_str()) {
             return Err(AppError::Validation(format!(
                 "Prioridad inválida. Valores permitidos: {}",
-                VALID_PRIORIDADES.join(", ")
+                PRIORIDADES_MANTENIMIENTO.join(", ")
             )));
         }
     }
@@ -84,10 +81,10 @@ fn validate_update_solicitud(dto: &UpdateSolicitudRequest) -> Result<(), AppErro
         validate_costo(costo)?;
     }
     if let Some(ref moneda) = dto.costo_moneda {
-        if !VALID_MONEDAS.contains(&moneda.as_str()) {
+        if !MONEDAS.contains(&moneda.as_str()) {
             return Err(AppError::Validation(format!(
                 "Moneda inválida. Valores permitidos: {}",
-                VALID_MONEDAS.join(", ")
+                MONEDAS.join(", ")
             )));
         }
     }
@@ -95,10 +92,10 @@ fn validate_update_solicitud(dto: &UpdateSolicitudRequest) -> Result<(), AppErro
 }
 
 fn validate_cambiar_estado(dto: &CambiarEstadoRequest) -> Result<(), AppError> {
-    if !VALID_ESTADOS.contains(&dto.estado.as_str()) {
+    if !ESTADOS_MANTENIMIENTO.contains(&dto.estado.as_str()) {
         return Err(AppError::Validation(format!(
             "Estado inválido. Valores permitidos: {}",
-            VALID_ESTADOS.join(", ")
+            ESTADOS_MANTENIMIENTO.join(", ")
         )));
     }
     Ok(())

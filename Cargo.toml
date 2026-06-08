@@ -22,6 +22,9 @@ thiserror = "1"
 anyhow = "1"
 tracing = "0.1"
 futures-util = "0.3"
+opentelemetry = "0.28"
+opentelemetry_sdk = { version = "0.28", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.28", features = ["grpc-tonic"] }
 wasm-bindgen = "0.2.118"
 proptest = "1"
 

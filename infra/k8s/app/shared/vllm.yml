@@ -39,7 +39,7 @@ spec:
           command: ["bash", "-c"]
           args:
             - |
-              VLLM_WORKER_MULTIPROC_METHOD=spawn vllm serve Qwen/Qwen3-30B-A3B-GPTQ-Int4 \
+              VLLM_WORKER_MULTIPROC_METHOD=spawn vllm serve Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound \
                 --dtype=float16 \
                 --enforce-eager \
                 --port 8000 \
@@ -50,6 +50,7 @@ spec:
                 --trust-remote-code \
                 --max-num-batched-tokens 4096 \
                 --max-model-len 4096 \
+                --max-num-seqs 8 \
                 --quantization gptq \
                 --download-dir /models \
                 --enable-auto-tool-choice \
@@ -104,6 +105,7 @@ spec:
             httpGet:
               path: /health
               port: 8000
+            initialDelaySeconds: 10
             periodSeconds: 30
             timeoutSeconds: 10
           livenessProbe:

@@ -6,7 +6,7 @@ fileMatchPattern: ["frontend/**/*.rs", "frontend/Cargo.toml", "frontend/index.ht
 # Frontend
 
 ## Stack
-- Yew 0.21 + Trunk. Functional components with hooks. Tailwind CSS. Routes in `app.rs`.
+- Yew 0.23 + Trunk. Functional components with hooks. Tailwind CSS. Routes in `app.rs`.
 - Yew contexts/reducers for shared state. JWT in localStorage. `gloo-net` 0.6 in `services/api.rs`. Handle 401 -> login redirect.
 
 ## Hooks

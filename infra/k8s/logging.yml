@@ -154,6 +154,32 @@ metadata:
   namespace: monitoring
 data:
   config.alloy: |
+    // ─── OTLP Receiver ───────────────────────────────────────────────
+    // Receives traces (and optionally metrics/logs) from instrumented apps
+    // via OTLP gRPC/HTTP protocol.
+    otelcol.receiver.otlp "default" {
+      grpc {
+        endpoint = "0.0.0.0:4317"
+      }
+      http {
+        endpoint = "0.0.0.0:4318"
+      }
+      output {
+        traces = [otelcol.exporter.otlp.tempo.input]
+      }
+    }
+
+    // Forward traces to Tempo
+    otelcol.exporter.otlp "tempo" {
+      client {
+        endpoint = "tempo.monitoring.svc.cluster.local:4317"
+        tls {
+          insecure = true
+        }
+      }
+    }
+
+    // ─── Log Collection ──────────────────────────────────────────────
     // Discover all pod log files on this node
     local.file_match "pods" {
       path_targets = [{
@@ -248,6 +274,10 @@ spec:
           ports:
             - containerPort: 12345
               name: http
+            - containerPort: 4317
+              name: otlp-grpc
+            - containerPort: 4318
+              name: otlp-http
           volumeMounts:
             - name: config
               mountPath: /etc/alloy/config.alloy
@@ -319,3 +349,20 @@ roleRef:
   kind: ClusterRole
   name: alloy
   apiGroup: rbac.authorization.k8s.io
+---
+# Service for OTLP ingestion — apps send traces here
+apiVersion: v1
+kind: Service
+metadata:
+  name: alloy-otlp
+  namespace: monitoring
+spec:
+  selector:
+    app: alloy
+  ports:
+    - port: 4317
+      targetPort: 4317
+      name: otlp-grpc
+    - port: 4318
+      targetPort: 4318
+      name: otlp-http

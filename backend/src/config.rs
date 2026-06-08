@@ -71,7 +71,7 @@ impl ChatbotEnvConfig {
             std::env::var("VLLM_ENDPOINT").unwrap_or_else(|_| "http://vllm:8000/v1".to_string());
 
         let vllm_chat_model = std::env::var("VLLM_CHAT_MODEL")
-            .unwrap_or_else(|_| "Qwen/Qwen3-30B-A3B-GPTQ-Int4".to_string());
+            .unwrap_or_else(|_| "Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound".to_string());
 
         let vllm_api_key = std::env::var("VLLM_API_KEY").ok().filter(|s| !s.is_empty());
 

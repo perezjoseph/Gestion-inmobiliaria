@@ -87,7 +87,7 @@ jobs:
           timeout_minutes: 20
           max_attempts: 2
           command: |
-            trivy image --exit-code 0 --severity CRITICAL,HIGH \
+            trivy image --exit-code 1 --severity CRITICAL \
               --no-progress --format table \
               ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend@${{ steps.push.outputs.digest }} \
               2>&1 | tee "${RUNNER_TEMP}/trivy-backend-image.txt"
@@ -225,7 +225,7 @@ jobs:
           timeout_minutes: 20
           max_attempts: 2
           command: |
-            trivy image --exit-code 0 --severity CRITICAL,HIGH \
+            trivy image --exit-code 1 --severity CRITICAL \
               --no-progress --format table \
               ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend@${{ steps.push.outputs.digest }} \
               2>&1 | tee "${RUNNER_TEMP}/trivy-frontend-image.txt"

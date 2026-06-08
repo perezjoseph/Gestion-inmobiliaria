@@ -16,6 +16,7 @@ use rig::message::{self, AssistantContent, UserContent};
 use rig::one_or_many::OneOrMany;
 use rig::streaming::{RawStreamingChoice, StreamingCompletionResponse, StreamingResult};
 use serde::{Deserialize, Serialize};
+use tracing::instrument;
 
 use eventsource_stream::Eventsource;
 use futures_util::StreamExt;
@@ -187,6 +188,7 @@ impl completion::CompletionModel for OvmsCompletionModel {
         }
     }
 
+    #[instrument(name = "ovms.completion", skip(self, request), fields(model = %self.model_name))]
     async fn completion(
         &self,
         request: CompletionRequest,

@@ -11,7 +11,8 @@ on:
         required: true
       ocr-service-digest:
         type: string
-        required: true
+        required: false
+        default: ""
       baileys-digest:
         type: string
         required: true
@@ -147,6 +148,39 @@ jobs:
             done
             echo "All dev deployments healthy"
 
+      - name: Smoke tests (dev)
+        id: smoke-tests
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        env:
+          NS: realestate-dev
+        with:
+          timeout_minutes: 5
+          max_attempts: 2
+          command: |
+            # Get a backend pod to exec curl against the service
+            BACKEND_POD=$(kubectl get pods -n ${NS} -l app.kubernetes.io/name=backend \
+              -o jsonpath='{.items[0].metadata.name}')
+
+            # Test backend health endpoint returns 200 with JSON status
+            echo "Testing backend /health..."
+            HEALTH_RESPONSE=$(kubectl exec "$BACKEND_POD" -n ${NS} -- \
+              wget -qO- --timeout=10 http://backend:8080/health 2>&1) || {
+              echo "::error::Backend /health endpoint unreachable"
+              exit 1
+            }
+            echo "Backend /health: $HEALTH_RESPONSE"
+
+            # Test frontend is serving (Caddy returns 200 on /)
+            echo "Testing frontend..."
+            FRONTEND_STATUS=$(kubectl exec "$BACKEND_POD" -n ${NS} -- \
+              wget --spider -qS --timeout=10 http://frontend:80/ 2>&1 | grep "HTTP/" | tail -1) || {
+              echo "::error::Frontend not responding on port 80"
+              exit 1
+            }
+            echo "Frontend status: $FRONTEND_STATUS"
+
+            echo "All smoke tests passed"
+
       - name: Rollback on failure
         if: failure() && steps.deploy.outcome == 'success'
         env:
@@ -229,6 +263,7 @@ jobs:
 
       - name: Verify OCR service attestation
         id: verify-ocr-service
+        if: inputs.ocr-service-digest != ''
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -312,9 +347,11 @@ jobs:
             "frontend=ghcr.io/${IMAGE_OWNER}/realestate-frontend@${FRONTEND_DIGEST}" \
             --namespace ${NS}
 
-          kubectl set image deployment/ocr-service \
-            "ocr-service=ghcr.io/${IMAGE_OWNER}/realestate-ocr-service@${OCR_DIGEST}" \
-            --namespace ${NS}
+          if [ -n "${OCR_DIGEST}" ]; then
+            kubectl set image deployment/ocr-service \
+              "ocr-service=ghcr.io/${IMAGE_OWNER}/realestate-ocr-service@${OCR_DIGEST}" \
+              --namespace ${NS}
+          fi
 
           kubectl set image deployment/baileys \
             "baileys=ghcr.io/${IMAGE_OWNER}/realestate-baileys@${BAILEYS_DIGEST}" \
@@ -325,13 +362,16 @@ jobs:
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         env:
           NS: realestate
+          OCR_DIGEST: ${{ inputs.ocr-service-digest }}
         with:
           timeout_minutes: 15
           max_attempts: 2
           command: |
             kubectl rollout status deployment/backend --namespace ${NS} --timeout=600s
             kubectl rollout status deployment/frontend --namespace ${NS} --timeout=600s
-            kubectl rollout status deployment/ocr-service --namespace ${NS} --timeout=600s
+            if [ -n "${OCR_DIGEST}" ]; then
+              kubectl rollout status deployment/ocr-service --namespace ${NS} --timeout=600s
+            fi
             kubectl rollout status deployment/baileys --namespace ${NS} --timeout=600s
 
       - name: Health check
@@ -339,11 +379,16 @@ jobs:
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         env:
           NS: realestate
+          OCR_DIGEST: ${{ inputs.ocr-service-digest }}
         with:
           timeout_minutes: 10
           max_attempts: 5
           command: |
-            for DEPLOY in backend frontend ocr-service baileys; do
+            DEPLOYS="backend frontend baileys"
+            if [ -n "${OCR_DIGEST}" ]; then
+              DEPLOYS="$DEPLOYS ocr-service"
+            fi
+            for DEPLOY in $DEPLOYS; do
               READY=$(kubectl get deployment "$DEPLOY" -n ${NS} \
                 -o jsonpath='{.status.readyReplicas}')
               DESIRED=$(kubectl get deployment "$DEPLOY" -n ${NS} \
@@ -360,9 +405,14 @@ jobs:
         if: failure() && steps.deploy.outcome == 'success'
         env:
           NS: realestate
+          OCR_DIGEST: ${{ inputs.ocr-service-digest }}
         run: |
           echo "::warning::Deployment health check failed -- rolling back only unhealthy deployments"
-          for DEPLOY in backend frontend ocr-service baileys; do
+          DEPLOYS="backend frontend baileys"
+          if [ -n "${OCR_DIGEST}" ]; then
+            DEPLOYS="$DEPLOYS ocr-service"
+          fi
+          for DEPLOY in $DEPLOYS; do
             READY=$(kubectl get deployment "$DEPLOY" -n ${NS} \
               -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo 0)
             DESIRED=$(kubectl get deployment "$DEPLOY" -n ${NS} \
@@ -379,10 +429,17 @@ jobs:
 
       - name: Collect deployment diagnostics
         if: failure()
+        env:
+          OCR_DIGEST: ${{ inputs.ocr-service-digest }}
         run: |
           umask 077
           mkdir -p "${RUNNER_TEMP}/diag"
           OUT="${RUNNER_TEMP}/diag/context.txt"
+
+          DEPLOYS="backend frontend baileys"
+          if [ -n "${OCR_DIGEST}" ]; then
+            DEPLOYS="$DEPLOYS ocr-service"
+          fi
 
           {
             echo "=== DEPLOYMENT STATUS (kubectl get) ==="
@@ -396,7 +453,7 @@ jobs:
               2>&1 | tail -50 || true
             echo ""
 
-            for DEPLOY in backend frontend ocr-service baileys; do
+            for DEPLOY in $DEPLOYS; do
               echo "=== DEPLOYMENT: ${DEPLOY} ==="
               kubectl describe deployment "$DEPLOY" -n "${NS}" 2>&1 || true
               echo ""
@@ -424,7 +481,7 @@ jobs:
             done
 
             echo "=== ROLLOUT HISTORY ==="
-            for DEPLOY in backend frontend ocr-service baileys; do
+            for DEPLOY in $DEPLOYS; do
               echo "--- ${DEPLOY} ---"
               kubectl rollout history "deployment/${DEPLOY}" -n "${NS}" 2>&1 || true
             done

@@ -8,8 +8,7 @@ use crate::models::desahucio::{
     CreateDesahucioRequest, DesahucioListQuery, UpdateDesahucioRequest,
 };
 use crate::services::desahucios;
-
-const VALID_ESTADOS: &[&str] = &["iniciado", "en_progreso", "completado"];
+use crate::services::validation::ESTADOS_DESAHUCIO;
 
 fn validate_create(dto: &CreateDesahucioRequest) -> Result<(), AppError> {
     if dto.motivo.trim().is_empty() {
@@ -27,10 +26,10 @@ fn validate_create(dto: &CreateDesahucioRequest) -> Result<(), AppError> {
 
 fn validate_update(dto: &UpdateDesahucioRequest) -> Result<(), AppError> {
     if let Some(ref estado) = dto.estado {
-        if !VALID_ESTADOS.contains(&estado.as_str()) {
+        if !ESTADOS_DESAHUCIO.contains(&estado.as_str()) {
             return Err(AppError::Validation(format!(
                 "Estado inválido. Valores permitidos: {}",
-                VALID_ESTADOS.join(", ")
+                ESTADOS_DESAHUCIO.join(", ")
             )));
         }
     }

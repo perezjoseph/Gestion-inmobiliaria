@@ -8,10 +8,13 @@ dashboards/
 │   ├── grafana-xpum-dashboard.json
 │   ├── grafana-node-exporter-dashboard.json
 │   ├── grafana-vllm-dashboard.json
-│   └── grafana-logs-dashboard.json
+│   ├── grafana-logs-dashboard.json
+│   └── grafana-kubernetes-dashboard.json
 └── application/       → "Application" folder in Grafana
     ├── grafana-backend-api-dashboard.json
-    └── grafana-slo-dashboard.json
+    ├── grafana-slo-dashboard.json
+    ├── grafana-database-dashboard.json
+    └── grafana-business-kpi-dashboard.json
 ```
 
 ## Applying Dashboard Changes
@@ -28,6 +31,16 @@ kubectl create configmap grafana-dashboard-backend-api \
 kubectl create configmap grafana-dashboard-slo \
   --namespace monitoring \
   --from-file=slo-dashboard.json=application/grafana-slo-dashboard.json \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create configmap grafana-dashboard-database \
+  --namespace monitoring \
+  --from-file=database-dashboard.json=application/grafana-database-dashboard.json \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create configmap grafana-dashboard-business-kpi \
+  --namespace monitoring \
+  --from-file=business-kpi-dashboard.json=application/grafana-business-kpi-dashboard.json \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # Infrastructure dashboards
@@ -49,6 +62,11 @@ kubectl create configmap grafana-dashboard-vllm \
 kubectl create configmap grafana-dashboard-logs \
   --namespace monitoring \
   --from-file=logs-dashboard.json=infrastructure/grafana-logs-dashboard.json \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create configmap grafana-dashboard-kubernetes \
+  --namespace monitoring \
+  --from-file=kubernetes-dashboard.json=infrastructure/grafana-kubernetes-dashboard.json \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 

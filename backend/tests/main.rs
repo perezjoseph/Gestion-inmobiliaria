@@ -92,6 +92,7 @@ mod unidades_tests;
 mod usuarios_tests;
 
 mod dr_compliance_integration_tests;
+mod security_audit_pbt;
 
 #[cfg(feature = "evals")]
 mod chatbot_evals_tests;

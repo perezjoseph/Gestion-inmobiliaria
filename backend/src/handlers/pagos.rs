@@ -11,10 +11,7 @@ use crate::models::pago::{
 };
 use crate::services::auth::Claims;
 use crate::services::pagos;
-
-const VALID_MONEDAS: &[&str] = &["DOP", "USD"];
-const VALID_ESTADOS: &[&str] = &["pendiente", "pagado", "atrasado"];
-const VALID_METODOS_PAGO: &[&str] = &["efectivo", "transferencia", "cheque", "tarjeta"];
+use crate::services::validation::{ESTADOS_PAGO, METODOS_PAGO, MONEDAS};
 
 fn validate_create_pago(dto: &CreatePagoRequest) -> Result<(), AppError> {
     if dto.monto <= Decimal::ZERO {
@@ -23,18 +20,18 @@ fn validate_create_pago(dto: &CreatePagoRequest) -> Result<(), AppError> {
         ));
     }
     if let Some(ref moneda) = dto.moneda {
-        if !VALID_MONEDAS.contains(&moneda.as_str()) {
+        if !MONEDAS.contains(&moneda.as_str()) {
             return Err(AppError::Validation(format!(
                 "Moneda inválida. Valores permitidos: {}",
-                VALID_MONEDAS.join(", ")
+                MONEDAS.join(", ")
             )));
         }
     }
     if let Some(ref metodo) = dto.metodo_pago {
-        if !VALID_METODOS_PAGO.contains(&metodo.as_str()) {
+        if !METODOS_PAGO.contains(&metodo.as_str()) {
             return Err(AppError::Validation(format!(
                 "Método de pago inválido. Valores permitidos: {}",
-                VALID_METODOS_PAGO.join(", ")
+                METODOS_PAGO.join(", ")
             )));
         }
     }
@@ -50,18 +47,18 @@ fn validate_update_pago(dto: &UpdatePagoRequest) -> Result<(), AppError> {
         }
     }
     if let Some(ref estado) = dto.estado {
-        if !VALID_ESTADOS.contains(&estado.as_str()) {
+        if !ESTADOS_PAGO.contains(&estado.as_str()) {
             return Err(AppError::Validation(format!(
                 "Estado inválido. Valores permitidos: {}",
-                VALID_ESTADOS.join(", ")
+                ESTADOS_PAGO.join(", ")
             )));
         }
     }
     if let Some(ref metodo) = dto.metodo_pago {
-        if !VALID_METODOS_PAGO.contains(&metodo.as_str()) {
+        if !METODOS_PAGO.contains(&metodo.as_str()) {
             return Err(AppError::Validation(format!(
                 "Método de pago inválido. Valores permitidos: {}",
-                VALID_METODOS_PAGO.join(", ")
+                METODOS_PAGO.join(", ")
             )));
         }
     }
@@ -141,10 +138,10 @@ pub async fn bulk_marcar_pagado(
     let org_id = access.0.organizacion_id;
     let dto = body.into_inner();
 
-    if !VALID_METODOS_PAGO.contains(&dto.metodo_pago.as_str()) {
+    if !METODOS_PAGO.contains(&dto.metodo_pago.as_str()) {
         return Err(AppError::Validation(format!(
             "Método de pago inválido. Valores permitidos: {}",
-            VALID_METODOS_PAGO.join(", ")
+            METODOS_PAGO.join(", ")
         )));
     }
 

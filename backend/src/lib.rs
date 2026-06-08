@@ -9,6 +9,7 @@ pub mod middleware;
 pub mod models;
 pub mod routes;
 pub mod services;
+pub mod telemetry;
 
 /// Test utilities available to in-crate `#[cfg(test)]` unit tests.
 #[cfg(test)]

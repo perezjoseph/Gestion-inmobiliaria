@@ -168,6 +168,28 @@ data:
         jsonData:
           timeout: 60
           maxLines: 1000
+          derivedFields:
+            - datasourceUid: tempo
+              matcherRegex: "trace_id=(\\w+)"
+              name: TraceID
+              url: "$${__value.raw}"
+      - name: Tempo
+        type: tempo
+        access: proxy
+        uid: tempo
+        url: http://tempo.monitoring.svc.cluster.local:3200
+        isDefault: false
+        editable: true
+        jsonData:
+          tracesToLogsV2:
+            datasourceUid: loki
+            filterByTraceID: true
+          tracesToMetrics:
+            datasourceUid: prometheus
+          serviceMap:
+            datasourceUid: prometheus
+          nodeGraph:
+            enabled: true
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -257,6 +279,16 @@ spec:
             - name: dashboard-slo
               mountPath: /var/lib/grafana/dashboards/application/slo-dashboard.json
               subPath: slo-dashboard.json
+            - name: dashboard-database
+              mountPath: /var/lib/grafana/dashboards/application/database-dashboard.json
+              subPath: database-dashboard.json
+            - name: dashboard-business-kpi
+              mountPath: /var/lib/grafana/dashboards/application/business-kpi-dashboard.json
+              subPath: business-kpi-dashboard.json
+            # Kubernetes cluster dashboard
+            - name: dashboard-kubernetes
+              mountPath: /var/lib/grafana/dashboards/infrastructure/kubernetes-dashboard.json
+              subPath: kubernetes-dashboard.json
             - name: grafana-data
               mountPath: /var/lib/grafana/data
           resources:
@@ -291,6 +323,15 @@ spec:
         - name: dashboard-slo
           configMap:
             name: grafana-dashboard-slo
+        - name: dashboard-database
+          configMap:
+            name: grafana-dashboard-database
+        - name: dashboard-business-kpi
+          configMap:
+            name: grafana-dashboard-business-kpi
+        - name: dashboard-kubernetes
+          configMap:
+            name: grafana-dashboard-kubernetes
         - name: grafana-data
           persistentVolumeClaim:
             claimName: grafana-pvc

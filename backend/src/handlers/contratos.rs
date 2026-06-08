@@ -18,9 +18,7 @@ use crate::services::contratos;
 use crate::services::pago_generacion::{
     calcular_pagos, filtrar_existentes, validar_dia_vencimiento,
 };
-
-const VALID_ESTADOS: &[&str] = &["activo", "vencido", "cancelado", "finalizado", "terminado"];
-const VALID_MONEDAS: &[&str] = &["DOP", "USD"];
+use crate::services::validation::{ESTADOS_CONTRATO, MONEDAS};
 
 fn validate_create_contrato(dto: &CreateContratoRequest) -> Result<(), AppError> {
     if dto.fecha_inicio >= dto.fecha_fin {
@@ -34,10 +32,10 @@ fn validate_create_contrato(dto: &CreateContratoRequest) -> Result<(), AppError>
         ));
     }
     if let Some(ref moneda) = dto.moneda {
-        if !VALID_MONEDAS.contains(&moneda.as_str()) {
+        if !MONEDAS.contains(&moneda.as_str()) {
             return Err(AppError::Validation(format!(
                 "Moneda inválida. Valores permitidos: {}",
-                VALID_MONEDAS.join(", ")
+                MONEDAS.join(", ")
             )));
         }
     }
@@ -53,10 +51,10 @@ fn validate_update_contrato(dto: &UpdateContratoRequest) -> Result<(), AppError>
         }
     }
     if let Some(ref estado) = dto.estado {
-        if !VALID_ESTADOS.contains(&estado.as_str()) {
+        if !ESTADOS_CONTRATO.contains(&estado.as_str()) {
             return Err(AppError::Validation(format!(
                 "Estado inválido. Valores permitidos: {}",
-                VALID_ESTADOS.join(", ")
+                ESTADOS_CONTRATO.join(", ")
             )));
         }
     }
