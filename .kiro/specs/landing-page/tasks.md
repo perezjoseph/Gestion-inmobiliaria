@@ -6,18 +6,18 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
 
 ## Tasks
 
-- [ ] 1. Create landing component module structure
+- [x] 1. Create landing component module structure
   - [x] 1.1 Create `frontend/src/components/landing/mod.rs` with module declarations and re-exports
     - Declare `pub mod hero; pub mod stats; pub mod how_it_works; pub mod features; pub mod preview; pub mod transparency; pub mod footer;`
     - Re-export all 7 component names: `LandingHero`, `LandingStats`, `LandingHowItWorks`, `LandingFeatures`, `LandingPreview`, `LandingTransparency`, `LandingFooter`
     - _Requirements: 11.1, 11.3_
 
-  - [-] 1.2 Register the landing module in `frontend/src/components/mod.rs`
+  - [x] 1.2 Register the landing module in `frontend/src/components/mod.rs`
     - Add `pub mod landing;` to the existing module declarations
     - _Requirements: 11.1_
 
 - [ ] 2. Implement landing section components (part 1: Hero, Stats, How It Works)
-  - [~] 2.1 Create `frontend/src/components/landing/hero.rs` — Hero section component
+  - [x] 2.1 Create `frontend/src/components/landing/hero.rs` — Hero section component
     - Implement `LandingHero` functional component with headline, supporting paragraph, and two CTA buttons
     - Headline uses `var(--font-display)` (Bitter), body uses `var(--font-body)` (Source Sans 3)
     - Primary CTA "Registrarse gratis" links to `Route::Registro` with `background-color: #3d8b8b`, `px-8 py-3.5 text-lg font-bold text-white`
@@ -26,7 +26,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - Section centered with `max-w-4xl mx-auto`, padding `px-4 py-16 md:py-24`
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 9.1, 9.2, 9.3, 12.3_
 
-  - [~] 2.2 Create `frontend/src/components/landing/stats.rs` — Stats bar component
+  - [-] 2.2 Create `frontend/src/components/landing/stats.rs` — Stats bar component
     - Implement `LandingStats` functional component with horizontal trust indicators
     - Display: GitHub stars indicator (⭐ emoji + text), active development badge (green dot + "Proyecto en desarrollo activo"), free & open-source indicator (🆓 + "100% gratis y código abierto")
     - Use muted styling: `var(--text-tertiary)` text color, `var(--surface-raised)` background, `border-y` with `var(--border-subtle)`
@@ -34,7 +34,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - Green dot for active development: `w-2 h-2 rounded-full` with `background-color: #22c55e`
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 10.1_
 
-  - [~] 2.3 Create `frontend/src/components/landing/how_it_works.rs` — How It Works section component
+  - [-] 2.3 Create `frontend/src/components/landing/how_it_works.rs` — How It Works section component
     - Implement `LandingHowItWorks` functional component with 3 sequential steps
     - Define internal `Step` struct with `number`, `title`, `description` fields and static `STEPS` array
     - Steps: (1) "Registra tus propiedades", (2) "Organiza inquilinos y contratos", (3) "Controla pagos y gastos"
@@ -44,7 +44,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 10.1, 12.1_
 
 - [ ] 3. Implement landing section components (part 2: Features, Preview, Transparency, Footer)
-  - [~] 3.1 Create `frontend/src/components/landing/features.rs` — Features grid component
+  - [-] 3.1 Create `frontend/src/components/landing/features.rs` — Features grid component
     - Implement `LandingFeatures` functional component with a static `FEATURES` array of exactly 6 items
     - Define internal `FeatureItem` struct with `icon`, `title`, `description` fields
     - 6 grouped capabilities: Propiedades y Unidades, Inquilinos y Contratos, Pagos y Cobros, Gastos y Reportes, Mantenimiento, Dashboard en tiempo real
@@ -53,7 +53,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - Responsive grid: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4` within `max-w-6xl mx-auto`
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 10.1, 10.2, 12.1_
 
-  - [~] 3.2 Create `frontend/src/components/landing/preview.rs` — Dashboard preview component
+  - [-] 3.2 Create `frontend/src/components/landing/preview.rs` — Dashboard preview component
     - Implement `LandingPreview` functional component with heading, GIF image, and demo CTA
     - Section heading: "Así se ve por dentro"
     - Image source: `/assets/dashboard-preview.gif` with descriptive `alt` text in Spanish
