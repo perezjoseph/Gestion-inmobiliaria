@@ -53,7 +53,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - Responsive grid: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4` within `max-w-6xl mx-auto`
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 10.1, 10.2, 12.1_
 
-  - [-] 3.2 Create `frontend/src/components/landing/preview.rs` — Dashboard preview component
+  - [x] 3.2 Create `frontend/src/components/landing/preview.rs` — Dashboard preview component
     - Implement `LandingPreview` functional component with heading, GIF image, and demo CTA
     - Section heading: "Así se ve por dentro"
     - Image source: `/assets/dashboard-preview.gif` with descriptive `alt` text in Spanish
