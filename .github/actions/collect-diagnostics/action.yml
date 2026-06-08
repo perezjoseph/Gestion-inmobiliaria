@@ -126,7 +126,7 @@ runs:
         fi
 
         # Find the current job ID by matching the job name
-        JOBS_JSON=$(curl -sf -H "Authorization: Bearer ${TOKEN}" \
+        JOBS_JSON=$(curl -sL -H "Authorization: Bearer ${TOKEN}" \
           -H "Accept: application/vnd.github+json" \
           "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
           2>/dev/null || echo "")
@@ -179,9 +179,9 @@ runs:
             2>/dev/null || echo "Could not extract step details"
         } >> "$OUT"
 
-        # Fetch the full job log (plain text, includes all step output).
+        # Fetch the full job log (plain text, follows 302 redirect to blob storage).
         LOG_FILE="${RUNNER_TEMP}/diag/job-log-raw.txt"
-        HTTP_CODE=$(curl -sf -o "$LOG_FILE" -w "%{http_code}" \
+        HTTP_CODE=$(curl -sL -o "$LOG_FILE" -w "%{http_code}" \
           -H "Authorization: Bearer ${TOKEN}" \
           -H "Accept: application/vnd.github+json" \
           "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/${JOB_ID}/logs" \
