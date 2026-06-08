@@ -80,7 +80,7 @@ This task list implements fixes for 12 security findings from a comprehensive au
 
 - [ ] 3. Fix: Schema migration for tenant isolation
 
-  - [~] 3.1 Create migration `m{date}_000001_add_organizacion_id_to_plantillas.rs`
+  - [x] 3.1 Create migration `m{date}_000001_add_organizacion_id_to_plantillas.rs`
     - Add `organizacion_id UUID NOT NULL` column to `plantilla_documento` with FK to `organizacion(id)`
     - Backfill existing templates to the single existing org
     - Add index on `organizacion_id` for query performance
@@ -102,9 +102,9 @@ This task list implements fixes for 12 security findings from a comprehensive au
     - _Preservation: rellenar() unchanged, own-org CRUD unchanged_
     - _Requirements: 2.1, 3.1_
 
-- [ ] 4. Fix: Payment state transition validation
+- [x] 4. Fix: Payment state transition validation
 
-  - [~] 4.1 Implement state transition map and validation
+  - [x] 4.1 Implement state transition map and validation
     - Add `VALID_TRANSITIONS: &[(&str, &[&str])]` constant in `backend/src/services/pagos.rs`
     - Define: `pendiente → [pagado, atrasado, cancelado]`, `atrasado → [pagado, cancelado]`, `pagado → []`, `cancelado → []`
     - Add `validate_transition(old: &str, new: &str) -> Result<(), AppError>` helper
@@ -115,9 +115,9 @@ This task list implements fixes for 12 security findings from a comprehensive au
     - _Preservation: bulk_marcar_pagado() continues validating pendiente/atrasado → pagado_
     - _Requirements: 2.2, 3.2_
 
-- [ ] 5. Fix: Registration race condition
+- [x] 5. Fix: Registration race condition
 
-  - [~] 5.1 Move uniqueness check inside transaction and handle constraint violation
+  - [x] 5.1 Move uniqueness check inside transaction and handle constraint violation
     - In `backend/src/services/auth.rs`, move `check_email_unique()` call inside the transaction (after `db.begin()`)
     - Add catch for `DbErr::Query` containing "duplicate key" on the user insert
     - Map duplicate key error to `AppError::Conflict("El email ya está registrado")`
@@ -126,9 +126,9 @@ This task list implements fixes for 12 security findings from a comprehensive au
     - _Preservation: Single unique-email registration continues returning JWT_
     - _Requirements: 2.3, 3.3_
 
-- [ ] 6. Fix: Parameterized queries for chatbot
+- [x] 6. Fix: Parameterized queries for chatbot
 
-  - [~] 6.1 Replace format!() with parameterized queries in list_conversations
+  - [x] 6.1 Replace format!() with parameterized queries in list_conversations
     - In `backend/src/services/chatbot.rs`, replace `format!()` count query with `Statement::from_sql_and_values(DbBackend::Postgres, sql, [org_id.into()])`
     - Replace `format!()` paginated query with bind parameters `$1`, `$2`, `$3` for `org_id`, `per_page`, `offset`
     - Verify query results are identical to current behavior
@@ -137,9 +137,9 @@ This task list implements fixes for 12 security findings from a comprehensive au
     - _Preservation: Chatbot AI conversation processing unchanged; same pagination results_
     - _Requirements: 2.4, 3.4_
 
-- [ ] 7. Fix: Audit trail coverage for sensitive operations
+- [x] 7. Fix: Audit trail coverage for sensitive operations
 
-  - [~] 7.1 Add audit calls to administrative operations
+  - [x] 7.1 Add audit calls to administrative operations
     - Add `auditoria::registrar_best_effort()` in `backend/src/services/usuarios.rs`: `cambiar_rol()` (accion: `cambiar_rol`), `activar()` (accion: `activar`), `desactivar()` (accion: `desactivar`)
     - Add audit in `backend/src/services/perfil.rs`: `cambiar_password()` (accion: `cambiar_password`)
     - Add audit in `backend/src/handlers/reportes.rs`: `ingresos_pdf`, `ingresos_xlsx`, `rentabilidad_pdf`, `rentabilidad_xlsx` (accion: `exportar`)

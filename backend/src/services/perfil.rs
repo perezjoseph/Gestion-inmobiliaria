@@ -4,6 +4,7 @@ use uuid::Uuid;
 use crate::entities::usuario;
 use crate::errors::AppError;
 use crate::models::usuario::UsuarioResponse;
+use crate::services::auditoria::{self, CreateAuditoriaEntry};
 use crate::services::auth::{hash_password, verify_password};
 use crate::services::user_security_cache::UserSecurityCache;
 
@@ -128,6 +129,18 @@ pub async fn cambiar_password(
 
     cache.invalidate(user_id);
     tracing::info!(event = "password_changed", user_id = %user_id, "Password changed");
+
+    auditoria::registrar_best_effort(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id: user_id,
+            entity_type: "usuario".to_string(),
+            entity_id: user_id,
+            accion: "cambiar_password".to_string(),
+            cambios: serde_json::json!({}),
+        },
+    )
+    .await;
 
     Ok(())
 }

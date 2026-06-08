@@ -89,6 +89,7 @@ pub async fn importar_propiedades(
         &file_data,
         formato,
         access.0.organizacion_id,
+        access.0.sub,
     )
     .await?;
     Ok(HttpResponse::Ok().json(result))
@@ -107,6 +108,7 @@ pub async fn importar_inquilinos(
         &file_data,
         formato,
         access.0.organizacion_id,
+        access.0.sub,
     )
     .await?;
     Ok(HttpResponse::Ok().json(result))

@@ -9,6 +9,7 @@ use crate::entities::{inquilino, propiedad};
 use crate::errors::AppError;
 use crate::models::gasto::CreateGastoRequest;
 use crate::models::importacion::{ImportError, ImportFormat, ImportResult};
+use crate::services::auditoria::{self, CreateAuditoriaEntry};
 use crate::services::gastos;
 
 fn parse_csv_rows(data: &[u8]) -> Result<Vec<Vec<String>>, AppError> {
@@ -185,6 +186,7 @@ pub async fn importar_propiedades(
     data: &[u8],
     formato: ImportFormat,
     org_id: Uuid,
+    usuario_id: Uuid,
 ) -> Result<ImportResult, AppError> {
     let rows = parse_rows(data, formato)?;
     if rows.is_empty() {
@@ -233,6 +235,24 @@ pub async fn importar_propiedades(
             }
         }
     }
+
+    let import_id = Uuid::new_v4();
+    auditoria::registrar_best_effort(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "importacion".to_string(),
+            entity_id: import_id,
+            accion: "importar".to_string(),
+            cambios: serde_json::json!({
+                "tipo": "propiedades",
+                "total_filas": total_filas,
+                "exitosos": exitosos,
+                "fallidos": fallidos.len(),
+            }),
+        },
+    )
+    .await;
 
     Ok(ImportResult {
         total_filas,
@@ -291,6 +311,7 @@ pub async fn importar_inquilinos(
     data: &[u8],
     formato: ImportFormat,
     organizacion_id: Uuid,
+    usuario_id: Uuid,
 ) -> Result<ImportResult, AppError> {
     let rows = parse_rows(data, formato)?;
     if rows.is_empty() {
@@ -354,6 +375,24 @@ pub async fn importar_inquilinos(
             }
         }
     }
+
+    let import_id = Uuid::new_v4();
+    auditoria::registrar_best_effort(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "importacion".to_string(),
+            entity_id: import_id,
+            accion: "importar".to_string(),
+            cambios: serde_json::json!({
+                "tipo": "inquilinos",
+                "total_filas": total_filas,
+                "exitosos": exitosos,
+                "fallidos": fallidos.len(),
+            }),
+        },
+    )
+    .await;
 
     Ok(ImportResult {
         total_filas,
@@ -504,6 +543,24 @@ pub async fn importar_gastos(
             "El archivo CSV está vacío o no contiene filas válidas".to_string(),
         ));
     }
+
+    let import_id = Uuid::new_v4();
+    auditoria::registrar_best_effort(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "importacion".to_string(),
+            entity_id: import_id,
+            accion: "importar".to_string(),
+            cambios: serde_json::json!({
+                "tipo": "gastos",
+                "total_filas": total_filas,
+                "exitosos": exitosos,
+                "fallidos": fallidos.len(),
+            }),
+        },
+    )
+    .await;
 
     Ok(ImportResult {
         total_filas,

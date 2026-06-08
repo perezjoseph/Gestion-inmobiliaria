@@ -757,7 +757,7 @@ pub async fn list_conversations<C: ConnectionTrait>(
     page: u64,
     per_page: u64,
 ) -> Result<PaginatedResponse<ConversationListResponse>, AppError> {
-    use sea_orm::{DbBackend, FromQueryResult, Statement};
+    use sea_orm::{DbBackend, FromQueryResult, Statement, Value};
 
     // We need a custom query to get distinct sender_phone with aggregates.
     #[derive(Debug, FromQueryResult)]
@@ -771,37 +771,45 @@ pub async fn list_conversations<C: ConnectionTrait>(
 
     let offset = (page - 1) * per_page;
 
-    // Count distinct sender phones
-    let count_sql = format!(
-        "SELECT COUNT(DISTINCT sender_phone) as count FROM chatbot_conversation WHERE organizacion_id = '{org_id}'"
-    );
+    // Count distinct sender phones (parameterized to prevent SQL injection)
+    let count_sql = "SELECT COUNT(DISTINCT sender_phone) as count FROM chatbot_conversation WHERE organizacion_id = $1";
     let count_result: Option<i64> = db
-        .query_one(Statement::from_string(DbBackend::Postgres, count_sql))
+        .query_one(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            count_sql,
+            [Value::from(org_id)],
+        ))
         .await?
         .and_then(|r| r.try_get_by_index::<i64>(0).ok());
     let total = count_result.unwrap_or(0) as u64;
 
-    // Get paginated distinct conversations with latest message
-    let query_sql = format!(
-        "
+    // Get paginated distinct conversations with latest message (parameterized)
+    let query_sql = "
         SELECT DISTINCT ON (sender_phone)
             sender_phone,
             inquilino_id,
             content as last_message,
             created_at as last_message_at,
             (SELECT COUNT(*) FROM chatbot_conversation c2
-             WHERE c2.organizacion_id = '{org_id}' AND c2.sender_phone = chatbot_conversation.sender_phone) as message_count
+             WHERE c2.organizacion_id = $1 AND c2.sender_phone = chatbot_conversation.sender_phone) as message_count
         FROM chatbot_conversation
-        WHERE organizacion_id = '{org_id}'
+        WHERE organizacion_id = $1
         ORDER BY sender_phone, created_at DESC
-        LIMIT {per_page} OFFSET {offset}
-        "
-    );
+        LIMIT $2 OFFSET $3
+        ";
 
     let rows: Vec<ConversationRow> =
-        ConversationRow::find_by_statement(Statement::from_string(DbBackend::Postgres, query_sql))
-            .all(db)
-            .await?;
+        ConversationRow::find_by_statement(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            query_sql,
+            [
+                Value::from(org_id),
+                Value::from(per_page as i64),
+                Value::from(offset as i64),
+            ],
+        ))
+        .all(db)
+        .await?;
 
     let data = rows
         .into_iter()

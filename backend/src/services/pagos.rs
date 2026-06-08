@@ -48,6 +48,35 @@ fn infer_tenant_tipo_fiscal(cedula: &str) -> TipoFiscal {
 
 const ESTADOS_PAGO: &[&str] = &["pendiente", "pagado", "atrasado", "cancelado"];
 
+/// Valid state transitions for payments.
+/// Each entry is (from_state, &[allowed_to_states]).
+const VALID_TRANSITIONS: &[(&str, &[&str])] = &[
+    ("pendiente", &["pagado", "atrasado", "cancelado"]),
+    ("atrasado", &["pagado", "cancelado"]),
+    ("pagado", &[]),
+    ("cancelado", &[]),
+];
+
+/// Validates that a payment state transition is allowed.
+fn validate_transition(old: &str, new: &str) -> Result<(), AppError> {
+    if old == new {
+        return Ok(());
+    }
+    for &(from, allowed) in VALID_TRANSITIONS {
+        if from == old {
+            if allowed.contains(&new) {
+                return Ok(());
+            }
+            return Err(AppError::Validation(format!(
+                "Transición de estado no válida: {old} → {new}"
+            )));
+        }
+    }
+    Err(AppError::Validation(format!(
+        "Transición de estado no válida: {old} → {new}"
+    )))
+}
+
 impl From<pago::Model> for PagoResponse {
     fn from(m: pago::Model) -> Self {
         Self {
@@ -310,6 +339,11 @@ pub async fn update<C: ConnectionTrait>(
     let old_estado = existing.estado.clone();
     let contrato_id = existing.contrato_id;
     let pago_id = existing.id;
+
+    // Validate state transition before applying any changes
+    if let Some(ref estado) = input.estado {
+        validate_transition(&old_estado, estado)?;
+    }
 
     let mut active: pago::ActiveModel = existing.into();
 

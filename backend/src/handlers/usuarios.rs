@@ -45,8 +45,14 @@ pub async fn cambiar_rol(
         )));
     }
 
-    let result =
-        usuarios::cambiar_rol(db.get_ref(), id, admin.0.organizacion_id, &dto.nuevo_rol).await?;
+    let result = usuarios::cambiar_rol(
+        db.get_ref(),
+        id,
+        admin.0.organizacion_id,
+        &dto.nuevo_rol,
+        admin.0.sub,
+    )
+    .await?;
     tracing::info!(admin_id = %admin.0.sub, target_user_id = %id, new_role = %dto.nuevo_rol, "Role changed");
     Ok(HttpResponse::Ok().json(result))
 }
@@ -57,7 +63,7 @@ pub async fn activar(
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
-    let result = usuarios::activar(db.get_ref(), id, admin.0.organizacion_id).await?;
+    let result = usuarios::activar(db.get_ref(), id, admin.0.organizacion_id, admin.0.sub).await?;
     tracing::info!(admin_id = %admin.0.sub, target_user_id = %id, action = "activar", "User activated");
     Ok(HttpResponse::Ok().json(result))
 }
@@ -69,8 +75,14 @@ pub async fn desactivar(
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
-    let result =
-        usuarios::desactivar(db.get_ref(), id, admin.0.organizacion_id, cache.get_ref()).await?;
+    let result = usuarios::desactivar(
+        db.get_ref(),
+        id,
+        admin.0.organizacion_id,
+        admin.0.sub,
+        cache.get_ref(),
+    )
+    .await?;
     tracing::info!(admin_id = %admin.0.sub, target_user_id = %id, action = "desactivar", "User deactivated");
     Ok(HttpResponse::Ok().json(result))
 }

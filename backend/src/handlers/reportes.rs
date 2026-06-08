@@ -1,9 +1,11 @@
 use actix_web::{HttpResponse, web};
 use sea_orm::DatabaseConnection;
 use serde_json::json;
+use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::models::reporte::{HistorialPagosQuery, IngresoReportQuery, RentabilidadReportQuery};
+use crate::services::auditoria::{self, CreateAuditoriaEntry};
 use crate::services::auth::Claims;
 use crate::services::reportes;
 
@@ -35,6 +37,20 @@ pub async fn ingresos_pdf(
     )
     .await?;
     let bytes = reportes::exportar_pdf(&summary)?;
+
+    let report_id = Uuid::new_v4();
+    auditoria::registrar_best_effort(
+        db.get_ref(),
+        CreateAuditoriaEntry {
+            usuario_id: claims.sub,
+            entity_type: "reporte".to_string(),
+            entity_id: report_id,
+            accion: "exportar".to_string(),
+            cambios: serde_json::json!({"formato": "pdf", "tipo": "ingresos"}),
+        },
+    )
+    .await;
+
     Ok(HttpResponse::Ok()
         .content_type("application/pdf")
         .insert_header((
@@ -57,6 +73,20 @@ pub async fn ingresos_xlsx(
     )
     .await?;
     let bytes = reportes::exportar_xlsx(&summary)?;
+
+    let report_id = Uuid::new_v4();
+    auditoria::registrar_best_effort(
+        db.get_ref(),
+        CreateAuditoriaEntry {
+            usuario_id: claims.sub,
+            entity_type: "reporte".to_string(),
+            entity_id: report_id,
+            accion: "exportar".to_string(),
+            cambios: serde_json::json!({"formato": "xlsx", "tipo": "ingresos"}),
+        },
+    )
+    .await;
+
     Ok(HttpResponse::Ok()
         .content_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         .insert_header((
@@ -129,6 +159,20 @@ pub async fn rentabilidad_pdf(
     )
     .await?;
     let bytes = reportes::exportar_rentabilidad_pdf(&summary)?;
+
+    let report_id = Uuid::new_v4();
+    auditoria::registrar_best_effort(
+        db.get_ref(),
+        CreateAuditoriaEntry {
+            usuario_id: claims.sub,
+            entity_type: "reporte".to_string(),
+            entity_id: report_id,
+            accion: "exportar".to_string(),
+            cambios: serde_json::json!({"formato": "pdf", "tipo": "rentabilidad"}),
+        },
+    )
+    .await;
+
     Ok(HttpResponse::Ok()
         .content_type("application/pdf")
         .insert_header((
@@ -151,6 +195,20 @@ pub async fn rentabilidad_xlsx(
     )
     .await?;
     let bytes = reportes::exportar_rentabilidad_xlsx(&summary)?;
+
+    let report_id = Uuid::new_v4();
+    auditoria::registrar_best_effort(
+        db.get_ref(),
+        CreateAuditoriaEntry {
+            usuario_id: claims.sub,
+            entity_type: "reporte".to_string(),
+            entity_id: report_id,
+            accion: "exportar".to_string(),
+            cambios: serde_json::json!({"formato": "xlsx", "tipo": "rentabilidad"}),
+        },
+    )
+    .await;
+
     Ok(HttpResponse::Ok()
         .content_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         .insert_header((

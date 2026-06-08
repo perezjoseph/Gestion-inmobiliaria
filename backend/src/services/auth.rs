@@ -80,6 +80,12 @@ pub fn decode_jwt(token: &str, secret: &str) -> Result<Claims, AppError> {
     Ok(token_data.claims)
 }
 
+/// Check if a database error is a duplicate key constraint violation.
+fn is_duplicate_key_error(err: &sea_orm::DbErr) -> bool {
+    let msg = err.to_string();
+    msg.contains("duplicate key") || msg.contains("unique constraint")
+}
+
 /// Check that no user with the given email exists.
 async fn check_email_unique<C: ConnectionTrait>(db: &C, email: &str) -> Result<(), AppError> {
     let existing = usuario::Entity::find()
@@ -277,13 +283,16 @@ async fn register_new_org(
 
     let password_hash = hash_password(&input.password)?;
 
-    // Check uniqueness before transaction
-    check_email_unique(db, &input.email).await?;
+    // Single transaction: uniqueness checks + create org + user
+    let txn = db.begin().await?;
+
+    // Check uniqueness inside transaction to eliminate race window
+    check_email_unique(&txn, &input.email).await?;
 
     if let Some(ref cedula) = org_cedula {
         let dup = organizacion::Entity::find()
             .filter(organizacion::Column::Cedula.eq(cedula.as_str()))
-            .one(db)
+            .one(&txn)
             .await?;
         if dup.is_some() {
             return Err(AppError::Conflict(
@@ -295,7 +304,7 @@ async fn register_new_org(
     if let Some(ref rnc) = org_rnc {
         let dup = organizacion::Entity::find()
             .filter(organizacion::Column::Rnc.eq(rnc.as_str()))
-            .one(db)
+            .one(&txn)
             .await?;
         if dup.is_some() {
             return Err(AppError::Conflict(
@@ -304,8 +313,6 @@ async fn register_new_org(
         }
     }
 
-    // Single transaction: create org + user
-    let txn = db.begin().await?;
     let now = Utc::now().into();
     let org_id = Uuid::new_v4();
 
@@ -345,7 +352,13 @@ async fn register_new_org(
         updated_at: Set(now),
         password_changed_at: Set(now),
     };
-    let user = user_model.insert(&txn).await?;
+    let user = user_model.insert(&txn).await.map_err(|e| {
+        if is_duplicate_key_error(&e) {
+            AppError::Conflict("El email ya está registrado".to_string())
+        } else {
+            AppError::from(e)
+        }
+    })?;
 
     txn.commit().await?;
 
@@ -364,11 +377,12 @@ async fn register_with_invitation(
 
     let password_hash = hash_password(&input.password)?;
 
-    // Check email uniqueness before transaction
-    check_email_unique(db, &input.email).await?;
-
-    // Single transaction: create user + mark invitation used
+    // Single transaction: check uniqueness + create user + mark invitation used
     let txn = db.begin().await?;
+
+    // Check email uniqueness inside transaction to eliminate race window
+    check_email_unique(&txn, &input.email).await?;
+
     let now = Utc::now().into();
     let user_id = Uuid::new_v4();
 
@@ -384,7 +398,13 @@ async fn register_with_invitation(
         updated_at: Set(now),
         password_changed_at: Set(now),
     };
-    let user = user_model.insert(&txn).await?;
+    let user = user_model.insert(&txn).await.map_err(|e| {
+        if is_duplicate_key_error(&e) {
+            AppError::Conflict("El email ya está registrado".to_string())
+        } else {
+            AppError::from(e)
+        }
+    })?;
 
     // Mark invitation as used
     let mut inv_active: invitacion::ActiveModel = inv.into();

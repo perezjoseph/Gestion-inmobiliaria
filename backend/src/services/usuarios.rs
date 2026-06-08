@@ -8,6 +8,7 @@ use crate::entities::usuario;
 use crate::errors::AppError;
 use crate::models::PaginatedResponse;
 use crate::models::usuario::UsuarioResponse;
+use crate::services::auditoria::{self, CreateAuditoriaEntry};
 use crate::services::user_security_cache::UserSecurityCache;
 use crate::services::validation::validate_enum;
 
@@ -57,6 +58,7 @@ pub async fn cambiar_rol(
     id: Uuid,
     org_id: Uuid,
     nuevo_rol: &str,
+    usuario_id: Uuid,
 ) -> Result<UsuarioResponse, AppError> {
     validate_enum("rol", nuevo_rol, ROLES)?;
 
@@ -70,6 +72,19 @@ pub async fn cambiar_rol(
     active.rol = Set(nuevo_rol.to_string());
 
     let updated = active.update(db).await?;
+
+    auditoria::registrar_best_effort(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "usuario".to_string(),
+            entity_id: id,
+            accion: "cambiar_rol".to_string(),
+            cambios: serde_json::json!({"nuevo_rol": nuevo_rol}),
+        },
+    )
+    .await;
+
     Ok(UsuarioResponse::from(updated))
 }
 
@@ -77,6 +92,7 @@ pub async fn desactivar(
     db: &DatabaseConnection,
     id: Uuid,
     org_id: Uuid,
+    usuario_id: Uuid,
     cache: &UserSecurityCache,
 ) -> Result<UsuarioResponse, AppError> {
     let record = usuario::Entity::find_by_id(id)
@@ -93,6 +109,18 @@ pub async fn desactivar(
     cache.invalidate(id);
     tracing::info!(event = "user_deactivated", user_id = %id, "User deactivated");
 
+    auditoria::registrar_best_effort(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "usuario".to_string(),
+            entity_id: id,
+            accion: "desactivar".to_string(),
+            cambios: serde_json::json!({"activo": false}),
+        },
+    )
+    .await;
+
     Ok(UsuarioResponse::from(updated))
 }
 
@@ -100,6 +128,7 @@ pub async fn activar(
     db: &DatabaseConnection,
     id: Uuid,
     org_id: Uuid,
+    usuario_id: Uuid,
 ) -> Result<UsuarioResponse, AppError> {
     let record = usuario::Entity::find_by_id(id)
         .filter(usuario::Column::OrganizacionId.eq(org_id))
@@ -111,5 +140,18 @@ pub async fn activar(
     active.activo = Set(true);
 
     let updated = active.update(db).await?;
+
+    auditoria::registrar_best_effort(
+        db,
+        CreateAuditoriaEntry {
+            usuario_id,
+            entity_type: "usuario".to_string(),
+            entity_id: id,
+            accion: "activar".to_string(),
+            cambios: serde_json::json!({"activo": true}),
+        },
+    )
+    .await;
+
     Ok(UsuarioResponse::from(updated))
 }
