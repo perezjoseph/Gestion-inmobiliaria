@@ -43,7 +43,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - Layout: `grid-cols-1 md:grid-cols-3 gap-8` within `max-w-5xl mx-auto`
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 10.1, 12.1_
 
-- [ ] 3. Implement landing section components (part 2: Features, Preview, Transparency, Footer)
+- [x] 3. Implement landing section components (part 2: Features, Preview, Transparency, Footer)
   - [x] 3.1 Create `frontend/src/components/landing/features.rs` — Features grid component
     - Implement `LandingFeatures` functional component with a static `FEATURES` array of exactly 6 items
     - Define internal `FeatureItem` struct with `icon`, `title`, `description` fields
@@ -72,7 +72,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - Section uses `var(--surface-raised)` background for visual distinction
     - _Requirements: 7.1, 7.2, 7.3, 9.3, 10.1_
 
-  - [-] 3.4 Create `frontend/src/components/landing/footer.rs` — Landing footer component
+  - [x] 3.4 Create `frontend/src/components/landing/footer.rs` — Landing footer component
     - Implement `LandingFooter` functional component with project name and attribution
     - Display "Gestión Inmobiliaria" and "© 2025 — Proyecto de código abierto"
     - Visually distinct with `border-top` using `var(--border-subtle)` and muted text color `var(--text-tertiary)`
@@ -88,7 +88,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - Wrap in `<div class="min-h-screen">` with `var(--surface-base)` background and `var(--text-primary)` color
     - _Requirements: 1.4, 11.1, 11.3, 14.1, 14.2_
 
-  - [-] 4.2 Register the landing page in `frontend/src/pages/mod.rs`
+  - [x] 4.2 Register the landing page in `frontend/src/pages/mod.rs`
     - Add `pub mod landing;` to the existing module declarations
     - _Requirements: 11.1_
 
