@@ -54,7 +54,7 @@ This task list implements fixes for 12 security findings from a comprehensive au
   - Mark task complete when tests are written, run, and failures are documented
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12_
 
-- [~] 2. Write preservation property tests (BEFORE implementing fixes)
+- [x] 2. Write preservation property tests (BEFORE implementing fixes)
   - **Property 2: Preservation** - Existing Secure Behavior Unchanged
   - **IMPORTANT**: Follow observation-first methodology
   - **GOAL**: Capture baseline behavior for non-buggy inputs so regressions are caught after fixes
