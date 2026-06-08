@@ -16,7 +16,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - Add `pub mod landing;` to the existing module declarations
     - _Requirements: 11.1_
 
-- [ ] 2. Implement landing section components (part 1: Hero, Stats, How It Works)
+- [x] 2. Implement landing section components (part 1: Hero, Stats, How It Works)
   - [x] 2.1 Create `frontend/src/components/landing/hero.rs` — Hero section component
     - Implement `LandingHero` functional component with headline, supporting paragraph, and two CTA buttons
     - Headline uses `var(--font-display)` (Bitter), body uses `var(--font-body)` (Source Sans 3)
@@ -34,7 +34,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - Green dot for active development: `w-2 h-2 rounded-full` with `background-color: #22c55e`
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 10.1_
 
-  - [-] 2.3 Create `frontend/src/components/landing/how_it_works.rs` — How It Works section component
+  - [x] 2.3 Create `frontend/src/components/landing/how_it_works.rs` — How It Works section component
     - Implement `LandingHowItWorks` functional component with 3 sequential steps
     - Define internal `Step` struct with `number`, `title`, `description` fields and static `STEPS` array
     - Steps: (1) "Registra tus propiedades", (2) "Organiza inquilinos y contratos", (3) "Controla pagos y gastos"
