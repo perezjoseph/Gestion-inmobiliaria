@@ -275,6 +275,26 @@ jobs:
           run-id: ${{ env.CI_RUN_ID }}
           github-token: ${{ secrets.KIRO_GITHUB_TOKEN }}
 
+      - name: Verify downloaded artifacts
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
+        run: |
+          echo "=== Downloaded artifact structure ==="
+          find "${RUNNER_TEMP}/all-diag" -type f -exec ls -la {} \; 2>/dev/null || echo "No files found"
+          echo ""
+          for dir in "${RUNNER_TEMP}/all-diag"/*/; do
+            [ -d "$dir" ] || continue
+            artifact_name=$(basename "$dir")
+            ctx="$dir/context.txt"
+            if [ -s "$ctx" ]; then
+              echo "${artifact_name}/context.txt: $(wc -c < "$ctx") bytes, $(wc -l < "$ctx") lines"
+            elif [ -f "$ctx" ]; then
+              echo "::warning::${artifact_name}/context.txt exists but is EMPTY (0 bytes)"
+            else
+              echo "::warning::${artifact_name}/context.txt DOES NOT EXIST"
+              echo "  Files in ${artifact_name}/: $(ls "$dir" 2>/dev/null || echo 'none')"
+            fi
+          done
+
       - name: Build git history of prior attempts
         id: history
         if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
@@ -318,8 +338,30 @@ jobs:
             POS=$((POS + 1))
             CONTEXT_PATH="${RUNNER_TEMP}/all-diag/${artifact}/context.txt"
             if [ ! -s "$CONTEXT_PATH" ]; then
-              echo "::warning::Skipping ${artifact}: context.txt empty or missing"
-              continue
+              # Artifact directory exists but context.txt is empty or missing.
+              # Try to find any file in the artifact directory as fallback.
+              ALT_FILE=$(find "${RUNNER_TEMP}/all-diag/${artifact}/" -type f -size +0 2>/dev/null | head -1)
+              if [ -n "$ALT_FILE" ]; then
+                CONTEXT_PATH="$ALT_FILE"
+                echo "::notice::Using alternative file from ${artifact}: $(basename "$ALT_FILE")"
+              else
+                # Generate minimal context from what we know
+                CONTEXT_PATH="${RUNNER_TEMP}/all-diag/${artifact}/context-generated.txt"
+                {
+                  echo "=== JOB: ${artifact} ==="
+                  echo "The diagnostic artifact was uploaded but context.txt was empty."
+                  echo "This typically means a Docker build/push step failed before any"
+                  echo "output files could be captured."
+                  echo ""
+                  echo "Artifact name: ${artifact}"
+                  echo "CI run: ${CI_RUN_ID}"
+                  echo "Branch: ${BRANCH}"
+                  echo ""
+                  echo "Check the GitHub Actions UI for the full build log."
+                  echo "Look for Dockerfile issues, base image availability, or registry auth errors."
+                } > "$CONTEXT_PATH"
+                echo "::warning::Generated fallback context for ${artifact} (original context.txt was empty)"
+              fi
             fi
 
             echo "::group::Processing ${artifact}"
