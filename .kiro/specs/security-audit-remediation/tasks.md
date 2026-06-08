@@ -238,9 +238,9 @@ This task list implements fixes for 12 security findings from a comprehensive au
     - _Preservation: ENVIRONMENT=production with valid CORS_ORIGIN continues working_
     - _Requirements: 2.12, 3.12_
 
-- [ ] 15. Verify bug condition exploration tests now pass
+- [x] 15. Verify bug condition exploration tests now pass
 
-  - [~] 15.1 Re-run bug condition exploration tests after all fixes
+  - [x] 15.1 Re-run bug condition exploration tests after all fixes
     - **Property 1: Expected Behavior** - Security Vulnerabilities Resolved
     - **IMPORTANT**: Re-run the SAME tests from task 1 — do NOT write new tests
     - The tests from task 1 encode the expected secure behavior for each finding
@@ -249,7 +249,7 @@ This task list implements fixes for 12 security findings from a comprehensive au
     - **EXPECTED OUTCOME**: All tests PASS (confirms bugs are fixed)
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 2.12_
 
-  - [~] 15.2 Re-run preservation tests after all fixes
+  - [x] 15.2 Re-run preservation tests after all fixes
     - **Property 2: Preservation** - Existing Behavior Unchanged
     - **IMPORTANT**: Re-run the SAME tests from task 2 — do NOT write new tests
     - Run `cargo test security_preservation_pbt` on FIXED code
