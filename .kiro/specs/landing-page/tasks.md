@@ -113,7 +113,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - For any Step definition containing a number, title, and description, the rendered step card output SHALL include a visible number element, a non-empty title heading, and a non-empty description paragraph
     - **Validates: Requirements 4.3**
 
-  - [-] 6.3 Write property test for feature card rendering completeness
+  - [x] 6.3 Write property test for feature card rendering completeness
     - **Property 2: Feature card rendering completeness**
     - For any FeatureItem definition containing an icon, title, and description, the rendered feature card output SHALL include the icon element, a non-empty title, and a non-empty description string
     - **Validates: Requirements 5.2**
