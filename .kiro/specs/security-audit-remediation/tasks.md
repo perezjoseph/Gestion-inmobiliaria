@@ -257,7 +257,7 @@ This task list implements fixes for 12 security findings from a comprehensive au
     - Confirm all preservation properties still hold after fixes
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12_
 
-- [~] 16. Checkpoint - Ensure all tests pass
+- [x] 16. Checkpoint - Ensure all tests pass
   - Run full test suite: `cargo test` in backend workspace
   - Verify no compilation errors: `cargo check`
   - Verify no clippy warnings on changed files: `cargo clippy`

@@ -804,8 +804,8 @@ pub async fn list_conversations<C: ConnectionTrait>(
             query_sql,
             [
                 Value::from(org_id),
-                Value::from(per_page as i64),
-                Value::from(offset as i64),
+                Value::from(i64::try_from(per_page).unwrap_or(i64::MAX)),
+                Value::from(i64::try_from(offset).unwrap_or(i64::MAX)),
             ],
         ))
         .all(db)

@@ -247,8 +247,7 @@ pub async fn importar_propiedades(
 
     if total_filas > IMPORT_ROW_LIMIT {
         return Err(AppError::Validation(format!(
-            "El archivo excede el límite de {} filas. Filas encontradas: {}",
-            IMPORT_ROW_LIMIT, total_filas
+            "El archivo excede el límite de {IMPORT_ROW_LIMIT} filas. Filas encontradas: {total_filas}"
         )));
     }
 

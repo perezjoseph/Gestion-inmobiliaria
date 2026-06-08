@@ -49,7 +49,7 @@ fn infer_tenant_tipo_fiscal(cedula: &str) -> TipoFiscal {
 const ESTADOS_PAGO: &[&str] = &["pendiente", "pagado", "atrasado", "cancelado"];
 
 /// Valid state transitions for payments.
-/// Each entry is (from_state, &[allowed_to_states]).
+/// Each entry is (`from_state`, &[`allowed_to_states`]).
 const VALID_TRANSITIONS: &[(&str, &[&str])] = &[
     ("pendiente", &["pagado", "atrasado", "cancelado"]),
     ("atrasado", &["pagado", "cancelado"]),

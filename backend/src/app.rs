@@ -46,6 +46,7 @@ async fn metrics_handler(_claims: crate::middleware::rbac::AdminOnly) -> HttpRes
 /// Internal metrics endpoint for Prometheus scraping.
 /// If `METRICS_TOKEN` is set, requires `Authorization: Bearer <token>`.
 /// Protected by `NetworkPolicy` — only monitoring namespace can reach it.
+#[allow(clippy::future_not_send)]
 async fn internal_metrics(
     config: web::Data<AppConfig>,
     req: actix_web::HttpRequest,
@@ -56,8 +57,7 @@ async fn internal_metrics(
             .get("Authorization")
             .and_then(|v| v.to_str().ok())
             .and_then(|s| s.strip_prefix("Bearer "))
-            .map(|t| t == expected_token.as_str())
-            .unwrap_or(false);
+            .is_some_and(|t| t == expected_token.as_str());
         if !is_valid {
             return HttpResponse::Unauthorized().finish();
         }
