@@ -26,7 +26,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - Section centered with `max-w-4xl mx-auto`, padding `px-4 py-16 md:py-24`
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 9.1, 9.2, 9.3, 12.3_
 
-  - [-] 2.2 Create `frontend/src/components/landing/stats.rs` — Stats bar component
+  - [x] 2.2 Create `frontend/src/components/landing/stats.rs` — Stats bar component
     - Implement `LandingStats` functional component with horizontal trust indicators
     - Display: GitHub stars indicator (⭐ emoji + text), active development badge (green dot + "Proyecto en desarrollo activo"), free & open-source indicator (🆓 + "100% gratis y código abierto")
     - Use muted styling: `var(--text-tertiary)` text color, `var(--surface-raised)` background, `border-y` with `var(--border-subtle)`
