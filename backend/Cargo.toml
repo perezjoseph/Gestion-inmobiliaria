@@ -27,7 +27,7 @@ uuid.workspace = true
 tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-actix-web = "0.7"
-tracing-opentelemetry = "0.29"
+tracing-opentelemetry = "0.33"
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
 opentelemetry-otlp.workspace = true
