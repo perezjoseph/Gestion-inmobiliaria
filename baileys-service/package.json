@@ -10,7 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "7.0.0-rc10",
+    "@whiskeysockets/baileys": "7.0.0-rc13",
     "express": "4.22.1",
     "pg": "^8.21.0",
     "pino": "9.6.0",
