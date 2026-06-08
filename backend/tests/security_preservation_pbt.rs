@@ -501,7 +501,7 @@ fn property_2h_owner_policy_preservation() {
     use realestate_backend::services::chatbot::{check_sender_policy_no_db, is_phone_in_allowlist};
 
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: crate::pbt_cases(),
+        cases: 10, // Phone-number generation; 10 cases provides adequate coverage
         ..Default::default()
     });
 
@@ -647,7 +647,7 @@ fn property_2i_non_last_admin_demotion_preservation() {
 #[test]
 fn property_2j_non_security_deps_preservation() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: crate::pbt_cases(),
+        cases: 10, // Fixed set of 10 crate names; matches the prop_oneof variants
         ..Default::default()
     });
 

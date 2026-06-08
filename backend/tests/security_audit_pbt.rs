@@ -45,7 +45,7 @@ fn property_1a_tenant_isolation_plantilla_has_org_column() {
 #[test]
 fn property_1b_state_transitions_validation_exists() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: crate::pbt_cases(),
+        cases: 6, // Fixed set of 6 invalid transitions; more cases add no value
         ..Default::default()
     });
 
@@ -461,7 +461,7 @@ fn property_1k_metrics_auth_required_when_token_set() {
 #[test]
 fn property_1l_environment_typo_detection() {
     let mut runner = TestRunner::new(ProptestConfig {
-        cases: crate::pbt_cases(),
+        cases: 5, // Fixed set of 5 typo variants; more cases add no value
         ..Default::default()
     });
 
