@@ -34,7 +34,7 @@ jobs:
       IMAGE_TAG: ${{ inputs.is-production && github.sha || format('preprod-{0}', github.sha) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
 
@@ -117,7 +117,7 @@ jobs:
 
       - name: Upload SARIF to GitHub Security
         if: "!cancelled() && hashFiles('backend-image.sarif') != ''"
-        uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
         with:
           sarif_file: backend-image.sarif
           category: trivy-backend-image
@@ -167,7 +167,7 @@ jobs:
       IMAGE_TAG: ${{ inputs.is-production && github.sha || format('preprod-{0}', github.sha) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
 
@@ -188,7 +188,7 @@ jobs:
               insecureSkipVerify = false
 
       - name: Download frontend dist artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: frontend-dist
           path: ${{ runner.temp }}/frontend-artifact
@@ -255,7 +255,7 @@ jobs:
 
       - name: Upload SARIF to GitHub Security
         if: "!cancelled() && hashFiles('frontend-image.sarif') != ''"
-        uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
         with:
           sarif_file: frontend-image.sarif
           category: trivy-frontend-image
