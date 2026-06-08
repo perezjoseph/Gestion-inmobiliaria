@@ -233,10 +233,15 @@ pub struct PlantillaListParams {
 
 pub async fn listar_plantillas(
     db: web::Data<DatabaseConnection>,
-    _claims: Claims,
+    claims: Claims,
     query: web::Query<PlantillaListParams>,
 ) -> Result<HttpResponse, AppError> {
-    let result = plantillas::listar(db.get_ref(), query.entity_type.as_deref()).await?;
+    let result = plantillas::listar(
+        db.get_ref(),
+        claims.organizacion_id,
+        query.entity_type.as_deref(),
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
@@ -380,41 +385,48 @@ pub async fn exportar_pdf(
 
 pub async fn crear_plantilla(
     db: web::Data<DatabaseConnection>,
-    _access: WriteAccess,
+    access: WriteAccess,
     body: web::Json<CrearPlantillaRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let result = plantillas::crear(db.get_ref(), body.into_inner()).await?;
+    let result =
+        plantillas::crear(db.get_ref(), access.0.organizacion_id, body.into_inner()).await?;
     Ok(HttpResponse::Created().json(result))
 }
 
 pub async fn obtener_plantilla(
     db: web::Data<DatabaseConnection>,
-    _claims: Claims,
+    claims: Claims,
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
-    let result = plantillas::obtener(db.get_ref(), id).await?;
+    let result = plantillas::obtener(db.get_ref(), id, claims.organizacion_id).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
 pub async fn actualizar_plantilla(
     db: web::Data<DatabaseConnection>,
-    _access: WriteAccess,
+    access: WriteAccess,
     path: web::Path<Uuid>,
     body: web::Json<ActualizarPlantillaRequest>,
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
-    let result = plantillas::actualizar(db.get_ref(), id, body.into_inner()).await?;
+    let result = plantillas::actualizar(
+        db.get_ref(),
+        id,
+        access.0.organizacion_id,
+        body.into_inner(),
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
 pub async fn eliminar_plantilla(
     db: web::Data<DatabaseConnection>,
-    _access: WriteAccess,
+    access: WriteAccess,
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
-    plantillas::eliminar(db.get_ref(), id).await?;
+    plantillas::eliminar(db.get_ref(), id, access.0.organizacion_id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 

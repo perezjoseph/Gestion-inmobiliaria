@@ -12,10 +12,12 @@ use crate::models::documento::{
 
 pub async fn listar(
     db: &DatabaseConnection,
+    org_id: Uuid,
     entity_type_filter: Option<&str>,
 ) -> Result<Vec<PlantillaResponse>, AppError> {
-    let mut query =
-        plantilla_documento::Entity::find().filter(plantilla_documento::Column::Activo.eq(true));
+    let mut query = plantilla_documento::Entity::find()
+        .filter(plantilla_documento::Column::Activo.eq(true))
+        .filter(plantilla_documento::Column::OrganizacionId.eq(org_id));
 
     if let Some(et) = entity_type_filter {
         query = query.filter(plantilla_documento::Column::EntityType.eq(et));
@@ -41,6 +43,7 @@ pub async fn listar(
 
 pub async fn crear(
     db: &DatabaseConnection,
+    org_id: Uuid,
     input: CrearPlantillaRequest,
 ) -> Result<PlantillaResponse, AppError> {
     if input.nombre.trim().is_empty() {
@@ -59,6 +62,7 @@ pub async fn crear(
 
     let model = plantilla_documento::ActiveModel {
         id: Set(id),
+        organizacion_id: Set(org_id),
         nombre: Set(input.nombre.clone()),
         tipo_documento: Set(input.tipo_documento.clone()),
         entity_type: Set(input.entity_type.clone()),
@@ -81,8 +85,13 @@ pub async fn crear(
 
 // ── Get template by ID ─────────────────────────────────────────
 
-pub async fn obtener(db: &DatabaseConnection, id: Uuid) -> Result<PlantillaResponse, AppError> {
+pub async fn obtener(
+    db: &DatabaseConnection,
+    id: Uuid,
+    org_id: Uuid,
+) -> Result<PlantillaResponse, AppError> {
     let model = plantilla_documento::Entity::find_by_id(id)
+        .filter(plantilla_documento::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Plantilla {id} no encontrada")))?;
@@ -101,9 +110,11 @@ pub async fn obtener(db: &DatabaseConnection, id: Uuid) -> Result<PlantillaRespo
 pub async fn actualizar(
     db: &DatabaseConnection,
     id: Uuid,
+    org_id: Uuid,
     input: ActualizarPlantillaRequest,
 ) -> Result<PlantillaResponse, AppError> {
     let existing = plantilla_documento::Entity::find_by_id(id)
+        .filter(plantilla_documento::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Plantilla {id} no encontrada")))?;
@@ -151,8 +162,9 @@ pub async fn actualizar(
 
 // ── Soft-delete template ───────────────────────────────────────
 
-pub async fn eliminar(db: &DatabaseConnection, id: Uuid) -> Result<(), AppError> {
+pub async fn eliminar(db: &DatabaseConnection, id: Uuid, org_id: Uuid) -> Result<(), AppError> {
     let existing = plantilla_documento::Entity::find_by_id(id)
+        .filter(plantilla_documento::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Plantilla {id} no encontrada")))?;

@@ -852,6 +852,39 @@ pub async fn cleanup_expired<C: ConnectionTrait>(
 
 // --- Balance Query Service ---
 
+/// Queries the outstanding balance for a tenant, with code-level sender verification.
+///
+/// When `sender_policy` is `"tenants_and_prospects"`, verifies that the sender phone
+/// is linked to a known `inquilino` in the organization before executing any balance
+/// query. If no linked tenant is found, returns a polite decline message without
+/// executing the DB balance query.
+///
+/// For other policies (e.g., `"tenants_only"`), the sender is already verified at
+/// the policy gate, so no additional check is needed here.
+pub async fn query_tenant_balance_with_sender_check<C: ConnectionTrait>(
+    db: &C,
+    inquilino_id: Uuid,
+    org_id: Uuid,
+    sender_phone: &str,
+    sender_policy: &str,
+) -> Result<BalanceResponse, AppError> {
+    // Code-level sender verification for "tenants_and_prospects" policy.
+    // Under this policy, any phone can message the chatbot, but balance queries
+    // must only be served to phones linked to a known tenant via find_tenant_by_phone.
+    if sender_policy == "tenants_and_prospects" {
+        let tenant = find_tenant_by_phone(db, sender_phone, org_id).await?;
+        if tenant.is_none() {
+            return Err(AppError::Validation(
+                "Lo siento, no puedo proporcionarte información de saldo. \
+                 Tu número no está vinculado a un inquilino en el sistema."
+                    .to_string(),
+            ));
+        }
+    }
+
+    query_tenant_balance(db, inquilino_id, org_id).await
+}
+
 /// Queries the outstanding balance for a tenant within an organization.
 ///
 /// Finds all payments with status `pendiente` or `atrasado` belonging to

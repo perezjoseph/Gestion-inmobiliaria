@@ -296,6 +296,7 @@ impl<'a> EvalRunner<'a> {
             organizacion_id: *organizacion_id,
             sender_phone: "eval-runner",
             guidance_rules: &[],
+            sender_policy: "tenants_only",
         };
 
         match self.ai_module.process_message(&ctx).await {

@@ -68,6 +68,21 @@ pub async fn cambiar_rol(
         .await?
         .ok_or_else(|| AppError::NotFound("Usuario no encontrado".to_string()))?;
 
+    // Last admin guard: prevent demoting the only active admin in the org
+    if record.rol == "admin" && nuevo_rol != "admin" {
+        let admin_count = usuario::Entity::find()
+            .filter(usuario::Column::OrganizacionId.eq(org_id))
+            .filter(usuario::Column::Rol.eq("admin"))
+            .filter(usuario::Column::Activo.eq(true))
+            .count(db)
+            .await?;
+        if admin_count <= 1 {
+            return Err(AppError::Validation(
+                "No se puede quitar el último administrador de la organización".to_string(),
+            ));
+        }
+    }
+
     let mut active: usuario::ActiveModel = record.into();
     active.rol = Set(nuevo_rol.to_string());
 

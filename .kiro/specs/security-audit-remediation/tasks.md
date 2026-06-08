@@ -78,7 +78,7 @@ This task list implements fixes for 12 security findings from a comprehensive au
   - Mark task complete when tests are written, run, and passing on unfixed code
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12_
 
-- [ ] 3. Fix: Schema migration for tenant isolation
+- [x] 3. Fix: Schema migration for tenant isolation
 
   - [x] 3.1 Create migration `m{date}_000001_add_organizacion_id_to_plantillas.rs`
     - Add `organizacion_id UUID NOT NULL` column to `plantilla_documento` with FK to `organizacion(id)`
@@ -90,7 +90,7 @@ This task list implements fixes for 12 security findings from a comprehensive au
     - _Preservation: plantillas::rellenar() continues to work for own-org entities_
     - _Requirements: 2.1, 3.1_
 
-  - [~] 3.2 Update template CRUD functions with org filtering
+  - [x] 3.2 Update template CRUD functions with org filtering
     - Add `org_id: Uuid` parameter to `listar()`, `obtener()`, `actualizar()`, `eliminar()` in `backend/src/services/plantillas.rs`
     - Filter all queries by `.filter(plantilla_documento::Column::OrganizacionId.eq(org_id))`
     - Set `organizacion_id` on insert in `crear()`
@@ -151,9 +151,9 @@ This task list implements fixes for 12 security findings from a comprehensive au
     - _Preservation: Existing audits (payment/property/contract/maintenance CRUD) unchanged_
     - _Requirements: 2.5, 3.5_
 
-- [ ] 8. Fix: Export row cap
+- [x] 8. Fix: Export row cap
 
-  - [~] 8.1 Add configurable row cap to report exports
+  - [x] 8.1 Add configurable row cap to report exports
     - Add `REPORT_ROW_CAP: u64 = 50_000` constant in `backend/src/services/reportes.rs` (configurable via `REPORT_ROW_CAP` env var)
     - Before building the report, execute a COUNT query for the given filters
     - If count exceeds cap, return `AppError::Validation` with descriptive message before PDF/XLSX generation
@@ -163,9 +163,9 @@ This task list implements fixes for 12 security findings from a comprehensive au
     - _Preservation: Exports below 50k rows generate identical output_
     - _Requirements: 2.6, 3.6_
 
-- [ ] 9. Fix: Import hardening
+- [x] 9. Fix: Import hardening
 
-  - [~] 9.1 Add row limit, transaction wrapping, enum validation, and audit to imports
+  - [x] 9.1 Add row limit, transaction wrapping, enum validation, and audit to imports
     - Add `IMPORT_ROW_LIMIT: usize = 5_000` constant in `backend/src/services/importacion.rs`
     - After parsing rows, check `data_rows.len() > IMPORT_ROW_LIMIT` — reject with `AppError::Validation`
     - Add `ESTADOS_PROPIEDAD` (`disponible`, `ocupada`, `mantenimiento`) and `TIPOS_PROPIEDAD` allowlists
@@ -177,9 +177,9 @@ This task list implements fixes for 12 security findings from a comprehensive au
     - _Preservation: Valid imports with <5k rows and valid enums produce same ImportResult_
     - _Requirements: 2.7, 3.7_
 
-- [ ] 10. Fix: Chatbot balance access control in code
+- [x] 10. Fix: Chatbot balance access control in code
 
-  - [~] 10.1 Add code-level sender verification before balance queries
+  - [x] 10.1 Add code-level sender verification before balance queries
     - In `backend/src/services/chatbot.rs` (AI module caller), before calling `query_tenant_balance()`:
     - Verify sender phone resolves to a known `inquilino` in the org using `find_tenant_by_phone()`
     - If no linked tenant found, return polite decline message without executing the balance query
@@ -189,9 +189,9 @@ This task list implements fixes for 12 security findings from a comprehensive au
     - _Preservation: owner_only policy unchanged; linked tenants still get balance info_
     - _Requirements: 2.8, 3.8_
 
-- [ ] 11. Fix: Last admin guard
+- [x] 11. Fix: Last admin guard
 
-  - [~] 11.1 Add admin count check to cambiar_rol
+  - [x] 11.1 Add admin count check to cambiar_rol
     - In `backend/src/services/usuarios.rs::cambiar_rol()`, after fetching the record:
     - Check if user's current role is `"admin"` AND new role is not `"admin"`
     - If so, count active admins in the org: `usuario::Entity::find().filter(org_id).filter(rol == "admin").filter(activo == true).count(db)`

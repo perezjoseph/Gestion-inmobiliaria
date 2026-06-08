@@ -120,6 +120,7 @@ proptest! {
         // Simulate an active template
         let active_model = plantilla_documento::Model {
             id: Uuid::new_v4(),
+            organizacion_id: Uuid::new_v4(),
             nombre,
             tipo_documento,
             entity_type,

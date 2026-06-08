@@ -112,6 +112,7 @@ mod pbt_async {
         contenido: serde_json::Value,
     ) {
         with_db(|db| async move {
+            let org_id = uuid::Uuid::new_v4();
             let input = CrearPlantillaRequest {
                 nombre: nombre.clone(),
                 tipo_documento: tipo_documento.clone(),
@@ -120,12 +121,12 @@ mod pbt_async {
             };
 
             // Create template via service
-            let created = plantillas::crear(&db, input)
+            let created = plantillas::crear(&db, org_id, input)
                 .await
                 .expect("crear should succeed for valid inputs");
 
             // Read back by ID via service
-            let fetched = plantillas::obtener(&db, created.id)
+            let fetched = plantillas::obtener(&db, created.id, org_id)
                 .await
                 .expect("obtener should find the created template");
 

@@ -218,6 +218,7 @@ pub async fn incoming_webhook(
         organizacion_id: org_id,
         sender_phone: &payload.sender_phone,
         guidance_rules: &guidance_rules,
+        sender_policy: &cfg.sender_policy,
     };
 
     let ai_result = ai_module.process_message(&ctx).await;

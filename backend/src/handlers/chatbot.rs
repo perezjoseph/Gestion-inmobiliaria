@@ -477,6 +477,7 @@ pub async fn test_chat(
         organizacion_id: org_id,
         sender_phone: "test",
         guidance_rules: &guidance_rules,
+        sender_policy: "tenants_only",
     };
 
     match ai_module.process_message(&ctx).await {

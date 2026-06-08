@@ -1,6 +1,9 @@
 use chrono::{NaiveDate, Utc};
 use rust_decimal::Decimal;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
+    TransactionTrait,
+};
 use std::io::Cursor;
 use std::str::FromStr;
 use uuid::Uuid;
@@ -11,6 +14,19 @@ use crate::models::gasto::CreateGastoRequest;
 use crate::models::importacion::{ImportError, ImportFormat, ImportResult};
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
 use crate::services::gastos;
+
+const IMPORT_ROW_LIMIT: usize = 5_000;
+
+const ESTADOS_PROPIEDAD: &[&str] = &["disponible", "ocupada", "mantenimiento"];
+
+const TIPOS_PROPIEDAD: &[&str] = &[
+    "casa",
+    "apartamento",
+    "comercial",
+    "terreno",
+    "local",
+    "oficina",
+];
 
 fn parse_csv_rows(data: &[u8]) -> Result<Vec<Vec<String>>, AppError> {
     let mut reader = csv::ReaderBuilder::new()
@@ -156,6 +172,22 @@ fn process_propiedad_row(
         estado
     };
 
+    if !TIPOS_PROPIEDAD.contains(&tipo_propiedad) {
+        return Err(format!(
+            "tipo_propiedad inválido: '{}'. Valores permitidos: {}",
+            tipo_propiedad,
+            TIPOS_PROPIEDAD.join(", ")
+        ));
+    }
+
+    if !ESTADOS_PROPIEDAD.contains(&estado) {
+        return Err(format!(
+            "estado inválido: '{}'. Valores permitidos: {}",
+            estado,
+            ESTADOS_PROPIEDAD.join(", ")
+        ));
+    }
+
     let now = Utc::now().into();
     Ok(propiedad::ActiveModel {
         id: Set(Uuid::new_v4()),
@@ -212,6 +244,15 @@ pub async fn importar_propiedades(
 
     let data_rows = &rows[1..];
     let total_filas = data_rows.len();
+
+    if total_filas > IMPORT_ROW_LIMIT {
+        return Err(AppError::Validation(format!(
+            "El archivo excede el límite de {} filas. Filas encontradas: {}",
+            IMPORT_ROW_LIMIT, total_filas
+        )));
+    }
+
+    let txn = db.begin().await?;
     let mut exitosos = 0usize;
     let mut fallidos = Vec::new();
 
@@ -225,7 +266,7 @@ pub async fn importar_propiedades(
             }
         };
 
-        match model.insert(db).await {
+        match model.insert(&txn).await {
             Ok(_) => exitosos += 1,
             Err(e) => {
                 fallidos.push(ImportError {
@@ -236,6 +277,8 @@ pub async fn importar_propiedades(
         }
     }
 
+    txn.commit().await?;
+
     let import_id = Uuid::new_v4();
     auditoria::registrar_best_effort(
         db,
@@ -243,7 +286,7 @@ pub async fn importar_propiedades(
             usuario_id,
             entity_type: "importacion".to_string(),
             entity_id: import_id,
-            accion: "importar".to_string(),
+            accion: "importar_propiedades".to_string(),
             cambios: serde_json::json!({
                 "tipo": "propiedades",
                 "total_filas": total_filas,

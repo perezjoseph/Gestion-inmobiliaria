@@ -177,6 +177,9 @@ pub struct ProcessMessageContext<'a> {
     pub sender_phone: &'a str,
     /// Parsed guidance rules from the chatbot config JSONB.
     pub guidance_rules: &'a [GuidanceRule],
+    /// The organization's sender policy (e.g., `"tenants_only"`, `"tenants_and_prospects"`, `"allowlist"`).
+    /// Used by tools to enforce code-level access control.
+    pub sender_policy: &'a str,
 }
 
 impl AiModule {
@@ -250,6 +253,7 @@ impl AiModule {
             ctx.db,
             ctx.organizacion_id,
             ctx.sender_phone,
+            ctx.sender_policy,
             ctx.user_message.image_base64.as_deref(),
         );
 
@@ -534,9 +538,16 @@ pub struct QueryBalanceInput {
 }
 
 /// Rig tool that calls [`query_tenant_balance`](super::chatbot::query_tenant_balance).
+///
+/// When `sender_policy` is `"tenants_and_prospects"`, performs a code-level check
+/// to verify the sender phone is linked to a known tenant before executing any
+/// balance query. This prevents unlinked senders from accessing balance data.
 #[derive(Clone)]
 pub struct QueryBalanceTool {
     pub db: DatabaseConnection,
+    pub sender_phone: String,
+    pub sender_policy: String,
+    pub organizacion_id: Uuid,
 }
 
 impl Tool for QueryBalanceTool {
@@ -560,9 +571,15 @@ impl Tool for QueryBalanceTool {
         let org_id = Uuid::parse_str(&args.organizacion_id)
             .map_err(|e| ChatbotToolError::Validation(format!("organizacion_id inválido: {e}")))?;
 
-        crate::services::chatbot::query_tenant_balance(&self.db, inquilino_id, org_id)
-            .await
-            .map_err(|e| ChatbotToolError::Service(e.to_string()))
+        crate::services::chatbot::query_tenant_balance_with_sender_check(
+            &self.db,
+            inquilino_id,
+            org_id,
+            &self.sender_phone,
+            &self.sender_policy,
+        )
+        .await
+        .map_err(|e| ChatbotToolError::Service(e.to_string()))
     }
 }
 
@@ -839,6 +856,7 @@ pub fn build_tools(
     db: &DatabaseConnection,
     organizacion_id: Uuid,
     sender_phone: &str,
+    sender_policy: &str,
     _image_base64: Option<&str>,
 ) -> Vec<Box<dyn rig::tool::ToolDyn>> {
     let mut tools: Vec<Box<dyn rig::tool::ToolDyn>> = Vec::new();
@@ -853,7 +871,12 @@ pub fn build_tools(
     }
 
     if capabilities.balance_queries {
-        tools.push(Box::new(QueryBalanceTool { db: db.clone() }));
+        tools.push(Box::new(QueryBalanceTool {
+            db: db.clone(),
+            sender_phone: sender_phone.to_string(),
+            sender_policy: sender_policy.to_string(),
+            organizacion_id,
+        }));
         tools.push(Box::new(GetPaymentHistoryTool {
             db: db.clone(),
             organizacion_id,

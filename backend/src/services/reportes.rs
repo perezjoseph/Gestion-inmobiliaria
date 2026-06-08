@@ -17,6 +17,16 @@ use crate::models::reporte::{
     RentabilidadReportQuery, RentabilidadReportRow, RentabilidadReportSummary,
 };
 
+/// Default row cap for report exports. Configurable via `REPORT_ROW_CAP` env var.
+const DEFAULT_REPORT_ROW_CAP: u64 = 50_000;
+
+fn get_report_row_cap() -> u64 {
+    std::env::var("REPORT_ROW_CAP")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_REPORT_ROW_CAP)
+}
+
 pub async fn generar_reporte_ingresos(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -71,6 +81,15 @@ pub async fn generar_reporte_ingresos(
             return Ok(empty_summary(generated_by));
         }
         pago_select = pago_select.filter(pago::Column::ContratoId.is_in(contrato_ids));
+    }
+
+    // Row cap check before fetching all data
+    let row_count = pago_select.clone().count(db).await?;
+    let cap = get_report_row_cap();
+    if row_count > cap {
+        return Err(AppError::Validation(format!(
+            "El reporte excede el límite de {cap} filas. Aplique filtros más específicos."
+        )));
     }
 
     let pagos = pago_select.all(db).await?;
@@ -264,6 +283,33 @@ pub async fn generar_reporte_rentabilidad(
         .await?;
 
     let all_contrato_ids: Vec<uuid::Uuid> = all_contratos.iter().map(|c| c.id).collect();
+
+    // Row cap check before fetching all data
+    let cap = get_report_row_cap();
+    let pago_count = if all_contrato_ids.is_empty() {
+        0
+    } else {
+        pago::Entity::find()
+            .filter(pago::Column::ContratoId.is_in(all_contrato_ids.clone()))
+            .filter(pago::Column::Estado.eq("pagado"))
+            .filter(pago::Column::FechaVencimiento.gte(first_day))
+            .filter(pago::Column::FechaVencimiento.lte(last_day))
+            .count(db)
+            .await?
+    };
+    let gasto_count = gasto::Entity::find()
+        .filter(gasto::Column::PropiedadId.is_in(prop_ids.clone()))
+        .filter(gasto::Column::Estado.eq("pagado"))
+        .filter(gasto::Column::FechaGasto.gte(first_day))
+        .filter(gasto::Column::FechaGasto.lte(last_day))
+        .count(db)
+        .await?;
+    let total_row_count = pago_count + gasto_count;
+    if total_row_count > cap {
+        return Err(AppError::Validation(format!(
+            "El reporte excede el límite de {cap} filas. Aplique filtros más específicos."
+        )));
+    }
 
     // Batch-load all paid pagos for those contratos in the date range
     let all_pagos = if all_contrato_ids.is_empty() {
