@@ -140,6 +140,7 @@ pub struct AppConfig {
     pub pool: PoolConfig,
     pub chatbot: ChatbotEnvConfig,
     pub ocr_service_token: Option<String>,
+    pub metrics_token: Option<String>,
 }
 
 impl AppConfig {
@@ -175,6 +176,11 @@ impl AppConfig {
         let cors_origin = std::env::var("CORS_ORIGIN").ok().filter(|s| !s.is_empty());
 
         let environment = std::env::var("ENVIRONMENT").unwrap_or_default();
+        if environment.to_lowercase().contains("prod") && environment != "production" {
+            return Err(anyhow::anyhow!(
+                "ENVIRONMENT contiene 'prod' pero no es 'production'. Use ENVIRONMENT=production"
+            ));
+        }
         if environment == "production" && cors_origin.is_none() {
             return Err(anyhow::anyhow!(
                 "CORS_ORIGIN debe estar configurado cuando ENVIRONMENT=production"
@@ -187,6 +193,10 @@ impl AppConfig {
             .ok()
             .filter(|s| !s.is_empty());
 
+        let metrics_token = std::env::var("METRICS_TOKEN")
+            .ok()
+            .filter(|s| !s.is_empty());
+
         Ok(Self {
             database_url,
             jwt_secret,
@@ -195,6 +205,7 @@ impl AppConfig {
             pool,
             chatbot,
             ocr_service_token,
+            metrics_token,
         })
     }
 
@@ -437,6 +448,7 @@ mod tests {
             },
             chatbot: ChatbotEnvConfig::for_testing(),
             ocr_service_token: None,
+            metrics_token: None,
         };
 
         let opts = config.connect_options();

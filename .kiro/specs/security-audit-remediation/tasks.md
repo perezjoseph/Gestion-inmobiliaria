@@ -201,9 +201,9 @@ This task list implements fixes for 12 security findings from a comprehensive au
     - _Preservation: Non-last-admin demotion continues succeeding_
     - _Requirements: 2.9, 3.9_
 
-- [ ] 12. Fix: Pin security crates in Cargo.toml
+- [x] 12. Fix: Pin security crates in Cargo.toml
 
-  - [~] 12.1 Pin jsonwebtoken and argon2 to exact versions
+  - [x] 12.1 Pin jsonwebtoken and argon2 to exact versions
     - In `backend/Cargo.toml`, change `jsonwebtoken = "10"` to `jsonwebtoken = "=10.0.1"` (verify current exact version with `cargo metadata` or lock file)
     - Change `argon2 = "0.5"` to `argon2 = "=0.5.3"` (verify current exact version)
     - Run `cargo check` to confirm compilation succeeds
@@ -213,9 +213,9 @@ This task list implements fixes for 12 security findings from a comprehensive au
     - _Preservation: All other crates keep semver ranges_
     - _Requirements: 2.10, 3.10_
 
-- [ ] 13. Fix: Metrics endpoint authentication
+- [x] 13. Fix: Metrics endpoint authentication
 
-  - [~] 13.1 Add bearer token authentication to /internal/metrics
+  - [x] 13.1 Add bearer token authentication to /internal/metrics
     - Read `METRICS_TOKEN` env var at startup and store in `AppConfig` in `backend/src/config.rs`
     - In `backend/src/app.rs` or the metrics handler, if `metrics_token` is `Some(token)`:
       - Extract `Authorization: Bearer <token>` header from request
@@ -227,9 +227,9 @@ This task list implements fixes for 12 security findings from a comprehensive au
     - _Preservation: Valid token requests and unset-token dev environments continue serving metrics_
     - _Requirements: 2.11, 3.11_
 
-- [ ] 14. Fix: Environment variable typo detection
+- [x] 14. Fix: Environment variable typo detection
 
-  - [~] 14.1 Add startup validation for ENVIRONMENT variable
+  - [x] 14.1 Add startup validation for ENVIRONMENT variable
     - In `backend/src/config.rs`, after reading `ENVIRONMENT` env var:
     - If `environment.to_lowercase().contains("prod") && environment != "production"`, hard-fail with: `"ENVIRONMENT contiene 'prod' pero no es 'production'. Use ENVIRONMENT=production"`
     - This catches `"prod"`, `"Production"`, `"PRODUCTION"` without affecting `"development"`, `"staging"`, or empty/unset

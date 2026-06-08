@@ -146,6 +146,7 @@ mod pbt_async {
             server_port: 0,
             cors_origin: None,
             ocr_service_token: None,
+            metrics_token: None,
         }
     }
 

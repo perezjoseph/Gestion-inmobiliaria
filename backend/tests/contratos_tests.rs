@@ -349,6 +349,7 @@ mod contratos_dr_legal_db_tests {
             server_port: 0,
             cors_origin: None,
             ocr_service_token: None,
+            metrics_token: None,
         }
     }
 

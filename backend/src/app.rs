@@ -43,9 +43,26 @@ async fn metrics_handler(_claims: crate::middleware::rbac::AdminOnly) -> HttpRes
         .body(buffer)
 }
 
-/// Internal metrics endpoint for Prometheus scraping (no auth required).
+/// Internal metrics endpoint for Prometheus scraping.
+/// If `METRICS_TOKEN` is set, requires `Authorization: Bearer <token>`.
 /// Protected by `NetworkPolicy` — only monitoring namespace can reach it.
-async fn internal_metrics() -> HttpResponse {
+async fn internal_metrics(
+    config: web::Data<AppConfig>,
+    req: actix_web::HttpRequest,
+) -> HttpResponse {
+    if let Some(ref expected_token) = config.metrics_token {
+        let is_valid = req
+            .headers()
+            .get("Authorization")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.strip_prefix("Bearer "))
+            .map(|t| t == expected_token.as_str())
+            .unwrap_or(false);
+        if !is_valid {
+            return HttpResponse::Unauthorized().finish();
+        }
+    }
+
     use prometheus::Encoder;
     let encoder = prometheus::TextEncoder::new();
     let metric_families = prometheus::default_registry().gather();
