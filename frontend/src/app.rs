@@ -27,6 +27,7 @@ use crate::pages::indexacion::Indexacion;
 use crate::pages::inquilinos::Inquilinos;
 use crate::pages::invitaciones::Invitaciones;
 use crate::pages::ipi::Ipi;
+use crate::pages::landing::Landing;
 use crate::pages::login::Login;
 use crate::pages::mantenimiento::Mantenimiento;
 use crate::pages::ncf::Ncf;
@@ -110,6 +111,8 @@ pub type ThemeContext = UseStateHandle<bool>;
 #[derive(Clone, Debug, Routable, PartialEq, Eq)]
 pub enum Route {
     #[at("/")]
+    Landing,
+    #[at("/login")]
     Login,
     #[at("/dashboard")]
     Dashboard,
@@ -200,6 +203,7 @@ pub enum Route {
 fn switch(routes: Route) -> Html {
     web_sys::console::log_1(&"[INIT] switch".into());
     match routes {
+        Route::Landing => html! { <Landing /> },
         Route::Login => html! { <Login /> },
         Route::Registro => html! { <Registro /> },
         Route::FirmaPublica { token } => html! { <FirmaPublica token={token} /> },
@@ -268,7 +272,7 @@ fn switch(routes: Route) -> Html {
                     <div class="gi-empty-state-title">{"404 — Página no encontrada"}</div>
                     <p class="gi-empty-state-text">{"La página que busca no existe o fue movida."}</p>
                     <div style="margin-top: var(--space-5);">
-                        <Link<Route> to={Route::Login} classes="gi-btn gi-btn-primary">
+                        <Link<Route> to={Route::Landing} classes="gi-btn gi-btn-primary">
                             {"Volver al inicio"}
                         </Link<Route>>
                     </div>

@@ -22,15 +22,13 @@ pub fn LandingHero() -> Html {
             <div class="flex flex-col sm:flex-row gap-3 justify-center">
                 <Link<Route>
                     to={Route::Registro}
-                    classes="w-full sm:w-auto px-8 py-3.5 rounded-lg font-bold text-white text-center text-lg"
-                    style="background-color: #3d8b8b;"
+                    classes="w-full sm:w-auto px-8 py-3.5 rounded-lg font-bold text-white text-center text-lg gi-landing-cta-primary"
                 >
                     {"Registrarse gratis"}
                 </Link<Route>>
                 <Link<Route>
                     to={Route::Login}
-                    classes="w-full sm:w-auto px-6 py-3 rounded-lg font-semibold text-center"
-                    style="border: 1px solid var(--border-default); color: var(--text-primary);"
+                    classes="w-full sm:w-auto px-6 py-3 rounded-lg font-semibold text-center gi-landing-cta-secondary"
                 >
                     {"Ya tengo cuenta"}
                 </Link<Route>>

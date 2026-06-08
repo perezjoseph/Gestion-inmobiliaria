@@ -3930,3 +3930,27 @@ h6,
     transform: scale(1);
   }
 }
+
+/* Landing page CTA buttons */
+.gi-landing-cta-primary {
+  background-color: #3d8b8b;
+  text-decoration: none;
+}
+
+.gi-landing-cta-primary:hover {
+  background-color: #347676;
+}
+
+.gi-landing-cta-secondary {
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.gi-landing-cta-secondary:hover {
+  background-color: var(--color-sand-100);
+}
+
+[data-theme="dark"] .gi-landing-cta-secondary:hover {
+  background-color: oklch(22% 0.012 185);
+}

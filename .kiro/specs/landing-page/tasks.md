@@ -78,7 +78,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - Visually distinct with `border-top` using `var(--border-subtle)` and muted text color `var(--text-tertiary)`
     - _Requirements: 8.1, 8.2, 8.3, 10.1_
 
-- [ ] 4. Implement landing page and route integration
+- [x] 4. Implement landing page and route integration
   - [x] 4.1 Create `frontend/src/pages/landing.rs` — Page-level component with auth redirect
     - Implement `Landing` functional component
     - Use `is_authenticated()` to check JWT in localStorage on mount
@@ -92,7 +92,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - Add `pub mod landing;` to the existing module declarations
     - _Requirements: 11.1_
 
-  - [~] 4.3 Modify `frontend/src/app.rs` — Update Route enum and switch function
+  - [x] 4.3 Modify `frontend/src/app.rs` — Update Route enum and switch function
     - Add `Landing` variant with `#[at("/")]` attribute
     - Change `Login` variant from `#[at("/")]` to `#[at("/login")]`
     - Add `use crate::pages::landing::Landing;` import
@@ -100,7 +100,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - Verify `Route::Registro` remains at `/registro`
     - _Requirements: 1.1, 1.2, 1.3_
 
-- [~] 5. Checkpoint — Verify compilation and routing
+- [x] 5. Checkpoint — Verify compilation and routing
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 6. Add placeholder asset and tests
