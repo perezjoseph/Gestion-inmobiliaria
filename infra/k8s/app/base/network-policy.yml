@@ -84,11 +84,19 @@ spec:
   policyTypes:
     - Ingress
   ingress:
-    # Allow Traefik ingress controller
+    # Allow Traefik ingress controller (LAN)
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 8443
+          protocol: TCP
+    # Allow Cloudflare Tunnel (production internet access)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cloudflared
       ports:
         - port: 8443
           protocol: TCP

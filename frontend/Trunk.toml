@@ -11,3 +11,18 @@ addresses = ["127.0.0.1"]
 port = 8080
 open = false
 fallback = "/index.html"
+
+# Extract Trunk's inline module script into an external file for CSP compliance
+[[hooks]]
+stage = "post_build"
+command = "sh"
+command_arguments = ["scripts/extract-inline-scripts.sh"]
+
+[hooks.windows]
+command = "powershell"
+command_arguments = [
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    "scripts/extract-inline-scripts.ps1",
+]

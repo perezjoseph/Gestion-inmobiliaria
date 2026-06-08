@@ -23,5 +23,5 @@ fileMatchPattern: ["frontend/**/*.rs", "frontend/Cargo.toml", "frontend/index.ht
 - Never create `html!` blocks over 150 lines. The macro generates proportional intermediate allocations, causing WASM OOM in debug and slow compilation. Split into sub-components.
 - Never pass `String`, `Vec`, `HashMap` directly as props. Each render clones the entire structure. Wrap in `Rc<T>` or use `AttrValue` (which is `Rc<str>`) for strings.
 - Never create `Timeout`/`Interval` without storing the handle and returning a cleanup closure. Each render creates a new timer while old ones keep firing on dropped closures.
-- Never load Google Fonts synchronously via `<link>`. Blocks rendering 200-500ms. Use `media="print" onload="this.media='all'"` for async loading.
+- Never load Google Fonts via external `<link>` — violates CSP and blocks rendering. Fonts are self-hosted in `frontend/fonts/` with `@font-face` in `styles/fonts.css`.
 - Never put filter/search input state directly in `use_effect_with` deps. Every keystroke triggers a re-render, re-runs the effect, and fires an API call. Instead, depend only on `(reload_val, page)` and let the "Filtrar" button bump `reload`. For search inputs, use a separate `applied_search` state that is set only on submit (see `inquilinos.rs`).
