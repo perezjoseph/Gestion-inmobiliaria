@@ -114,6 +114,8 @@ jobs:
     with:
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
       is-production: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+      skip-backend: ${{ github.event_name == 'pull_request' && needs.changes.outputs.backend != 'true' && needs.changes.outputs.ci != 'true' }}
+      skip-frontend: ${{ github.event_name == 'pull_request' && needs.changes.outputs.frontend != 'true' && needs.changes.outputs.ci != 'true' }}
 
   # ── Stage 1.5: Baileys Container (Node.js — no Rust dependency, runs parallel with build-and-test) ──
 
@@ -371,15 +373,18 @@ jobs:
           rm -f "${HOME}/.docker/config.json" 2>/dev/null || true
           rm -f ocr-service-image.sarif ocr-service-container-sbom.cdx.json 2>/dev/null || true
 
-  # ── Stage 2: Container Images (after build-and-test + security + lint pass) ──
+  # ── Stage 2: Container Images (after build-and-test + security pass) ──
+  # On PRs, only run when both backend and frontend artifacts are available (neither skipped).
+  # On main pushes, always run (skip inputs are always false).
 
   containers:
     name: Containers
-    needs: [build-and-test, security]
+    needs: [build-and-test, security, changes]
     if: |
       !cancelled() &&
       needs.build-and-test.result == 'success' &&
-      (needs.security.result == 'success' || needs.security.result == 'skipped')
+      (needs.security.result == 'success' || needs.security.result == 'skipped') &&
+      (github.event_name != 'pull_request' || (needs.changes.outputs.backend == 'true' || needs.changes.outputs.ci == 'true'))
     permissions:
       actions: read
       contents: read

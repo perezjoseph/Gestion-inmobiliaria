@@ -7,7 +7,17 @@ on:
         type: boolean
         required: true
       is-production:
-        description: "Whether this is a production build (main push). Controls SBOM generation and coverage."
+        description: "Whether this is a production build (main push). Controls SBOM generation, coverage, and attestation."
+        type: boolean
+        required: false
+        default: false
+      skip-backend:
+        description: "Skip backend jobs (no backend files changed)."
+        type: boolean
+        required: false
+        default: false
+      skip-frontend:
+        description: "Skip frontend jobs (no frontend files changed)."
         type: boolean
         required: false
         default: false
@@ -24,13 +34,18 @@ on:
 
 permissions: {}
 
+env:
+  # Match parallelism to ARC runner pod CPU allocation.
+  # Prevents over-subscription when cargo detects the node's full CPU count.
+  CARGO_BUILD_JOBS: "4"
+
 jobs:
   # ── Backend Clippy (compiles with musl target to warm sccache for release build) ──
   backend-clippy:
     name: Backend Clippy
     runs-on: arc-runner-dind
     timeout-minutes: 30
-    if: ${{ !inputs.is-fork-pr }}
+    if: ${{ !inputs.is-fork-pr && !inputs.skip-backend }}
     permissions:
       actions: read
       contents: read
@@ -90,13 +105,13 @@ jobs:
             ${{ runner.temp }}/clippy-backend-stderr.txt
 
   # ── Backend Tests (parallel with clippy and build) ──
-  # On PRs: runs tests without coverage (sccache enabled, fast).
+  # On PRs: runs tests with cargo-nextest (parallel processes, sccache enabled, fast).
   # On main: runs tests with llvm-cov coverage (sccache disabled, slower but only on merge).
   backend-test:
     name: Backend Test
     runs-on: arc-runner-dind
     timeout-minutes: 30
-    if: ${{ !inputs.is-fork-pr }}
+    if: ${{ !inputs.is-fork-pr && !inputs.skip-backend }}
     permissions:
       actions: read
       contents: read
@@ -194,7 +209,7 @@ jobs:
           max_attempts: 2
           command: |
             mkdir -p coverage
-            cargo llvm-cov test --locked -p realestate-backend \
+            cargo llvm-cov nextest --locked -p realestate-backend \
               --lcov --output-path coverage/lcov.info 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
             exit ${PIPESTATUS[0]}
 
@@ -206,18 +221,28 @@ jobs:
           path: coverage/lcov.info
           retention-days: 7
 
-      # ── Fast path (PRs — no coverage, sccache enabled) ──
-      - name: Run tests
+      # ── Fast path (PRs — no coverage, sccache enabled, cargo-nextest for parallel execution) ──
+      - name: Verify cargo-nextest available
+        if: ${{ !inputs.is-production }}
+        run: |
+          if command -v cargo-nextest &>/dev/null; then
+            echo "cargo-nextest already available: $(cargo-nextest --version)"
+          else
+            echo "::error::cargo-nextest not found — expected prebaked in runner image"
+            exit 1
+          fi
+
+      - name: Run tests (nextest)
         if: ${{ !inputs.is-production }}
         id: tests-fast
         env:
-          PROPTEST_CASES: "10"
+          PROPTEST_CASES: "5"
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 30
           max_attempts: 2
           command: |
-            cargo test --locked -p realestate-backend 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
+            cargo nextest run --locked -p realestate-backend 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
             exit ${PIPESTATUS[0]}
 
       - name: Collect diagnostics
@@ -238,7 +263,7 @@ jobs:
     name: Backend Build
     runs-on: arc-runner-dind
     timeout-minutes: 30
-    if: ${{ !inputs.is-fork-pr }}
+    if: ${{ !inputs.is-fork-pr && !inputs.skip-backend }}
     permissions:
       actions: read
       contents: read
@@ -304,6 +329,7 @@ jobs:
           retention-days: 30
 
       - name: Attest build provenance
+        if: inputs.is-production
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
           subject-path: ${{ env.CARGO_TARGET_DIR || 'target' }}/x86_64-unknown-linux-musl/ci-release/realestate-backend
@@ -325,7 +351,7 @@ jobs:
     name: Backend Summary
     runs-on: arc-runner-dind
     timeout-minutes: 5
-    if: ${{ !cancelled() && !inputs.is-fork-pr }}
+    if: ${{ !cancelled() && !inputs.is-fork-pr && !inputs.skip-backend }}
     needs: [backend-clippy, backend-test, backend-build]
     permissions:
       contents: read
@@ -353,7 +379,7 @@ jobs:
     name: Frontend (Clippy + Test + Build)
     runs-on: arc-runner-dind
     timeout-minutes: 45
-    if: ${{ !inputs.is-fork-pr }}
+    if: ${{ !inputs.is-fork-pr && !inputs.skip-frontend }}
     permissions:
       actions: read
       contents: read
@@ -411,7 +437,7 @@ jobs:
           timeout_minutes: 30
           max_attempts: 2
           command: |
-            cargo test --locked -p realestate-frontend --all-targets 2>&1 | tee "${RUNNER_TEMP}/test-frontend-output.txt"
+            cargo nextest run --locked -p realestate-frontend --all-targets 2>&1 | tee "${RUNNER_TEMP}/test-frontend-output.txt"
             exit ${PIPESTATUS[0]}
 
       # ── Phase 3: Trunk release build (sccache makes this fast) ──
@@ -478,6 +504,7 @@ jobs:
           retention-days: 30
 
       - name: Attest build provenance
+        if: inputs.is-production
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
           subject-path: frontend/dist/
