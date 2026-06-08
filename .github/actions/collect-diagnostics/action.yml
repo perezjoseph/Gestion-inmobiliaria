@@ -5,6 +5,11 @@ description: >
   if-failure conditional. Reads output files you specify and packages them
   into a single diag-* artifact.
 
+  When output files are empty or missing (e.g. infrastructure steps fail
+  before producing logs), this action fetches the current job's logs from
+  the GitHub API as a fallback — guaranteeing that diagnostics always
+  contain actionable context regardless of which step failed.
+
 inputs:
   job-name:
     description: "Human-readable job identifier (e.g. 'build-and-test / backend')"
@@ -28,6 +33,10 @@ inputs:
     description: "Max lines to keep from each output file (0 = no limit)"
     required: false
     default: "200"
+  github-token:
+    description: "GitHub token for fetching job logs via API (falls back to GITHUB_TOKEN env var)"
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -45,12 +54,13 @@ runs:
         umask 077
         mkdir -p "${RUNNER_TEMP}/diag"
         OUT="${RUNNER_TEMP}/diag/context.txt"
+        FILES_FOUND=0
 
         {
           echo "=== JOB: ${JOB_NAME} ==="
 
           if [ -n "${STEP_OUTCOMES}" ]; then
-            echo "=== FAILED STEPS: ${STEP_OUTCOMES} ==="
+            echo "=== STEP OUTCOMES: ${STEP_OUTCOMES} ==="
           fi
           echo ""
 
@@ -59,6 +69,7 @@ runs:
             filepath=$(echo "$filepath" | xargs)  # trim whitespace
             [ -z "$filepath" ] && continue
             if [ -s "$filepath" ]; then
+              FILES_FOUND=$((FILES_FOUND + 1))
               basename_label=$(basename "$filepath")
               echo "=== OUTPUT: ${basename_label} ==="
               if [ "${TAIL_LINES}" -gt 0 ] 2>/dev/null; then
@@ -77,16 +88,162 @@ runs:
           fi
         } > "$OUT"
 
-        # Guarantee non-empty artifact: if context.txt ended up with only
-        # whitespace (no output files existed, no extra context), write a
-        # minimal diagnostic so downstream consumers always get something.
-        if ! grep -q '[^[:space:]]' "$OUT" 2>/dev/null; then
-          echo "=== JOB: ${JOB_NAME} ===" > "$OUT"
-          echo "No output files were found. The failure likely occurred in a step whose logs are only available in the GitHub Actions UI." >> "$OUT"
-          echo "Step outcomes: ${STEP_OUTCOMES:-unknown}" >> "$OUT"
+        echo "FILES_FOUND=${FILES_FOUND}" >> "$GITHUB_ENV"
+        echo "DIAG_OUT=${OUT}" >> "$GITHUB_ENV"
+        echo "Collected ${FILES_FOUND} non-empty output files"
+
+    - name: Fetch job logs from API (fallback when output files are empty)
+      shell: bash
+      env:
+        JOB_NAME: ${{ inputs.job-name }}
+        STEP_OUTCOMES: ${{ inputs.step-outcomes }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        TAIL_LINES: ${{ inputs.tail-lines }}
+      run: |
+        umask 077
+        OUT="${DIAG_OUT}"
+
+        # Only fetch logs if no output files were found
+        if [ "${FILES_FOUND}" -gt 0 ]; then
+          echo "Output files present; skipping API log fetch."
+          exit 0
         fi
 
-        echo "Wrote $(wc -l < "$OUT") lines to $OUT"
+        echo "No output files found — fetching job logs from GitHub API..."
+
+        # Determine token: explicit input > GITHUB_TOKEN env var
+        TOKEN="${INPUT_GITHUB_TOKEN:-${GITHUB_TOKEN}}"
+        if [ -z "$TOKEN" ]; then
+          echo "::warning::No token available for job log fetch. Diagnostics will be minimal."
+          {
+            echo ""
+            echo "=== FALLBACK: NO LOGS AVAILABLE ==="
+            echo "No output files were captured and no GitHub token was available to fetch job logs."
+            echo "Step outcomes: ${STEP_OUTCOMES:-unknown}"
+            echo "Check the GitHub Actions UI: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } >> "$OUT"
+          exit 0
+        fi
+
+        # Find the current job ID by matching the job name
+        JOBS_JSON=$(curl -sf -H "Authorization: Bearer ${TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+          2>/dev/null || echo "")
+
+        if [ -z "$JOBS_JSON" ]; then
+          echo "::warning::Failed to fetch jobs list from API."
+          {
+            echo ""
+            echo "=== FALLBACK: API UNAVAILABLE ==="
+            echo "Could not fetch job list from GitHub API."
+            echo "Step outcomes: ${STEP_OUTCOMES:-unknown}"
+            echo "Check the GitHub Actions UI: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } >> "$OUT"
+          exit 0
+        fi
+
+        # Match job by name (partial match — job names often have matrix suffixes).
+        # Try exact match first, then substring match.
+        JOB_ID=$(echo "$JOBS_JSON" | jq -r \
+          --arg name "$JOB_NAME" \
+          '[.jobs[] | select(.name == $name or (.name | contains($name)) or ($name | contains(.name)))] | sort_by(.name | length) | .[0].id // empty')
+
+        if [ -z "$JOB_ID" ]; then
+          echo "::warning::Could not find job '${JOB_NAME}' in run. Available jobs:"
+          echo "$JOBS_JSON" | jq -r '.jobs[].name' 2>/dev/null || true
+          {
+            echo ""
+            echo "=== FALLBACK: JOB NOT FOUND ==="
+            echo "Could not match job '${JOB_NAME}' in the API response."
+            echo "Step outcomes: ${STEP_OUTCOMES:-unknown}"
+            echo ""
+            echo "=== FAILED STEPS (from API) ==="
+            echo "$JOBS_JSON" | jq -r \
+              '.jobs[] | .steps[]? | select(.conclusion == "failure") | "FAILED: \(.name) (started: \(.started_at // "unknown"))"' \
+              2>/dev/null || echo "Could not extract step details"
+          } >> "$OUT"
+          exit 0
+        fi
+
+        echo "Found job ID: ${JOB_ID} for '${JOB_NAME}'"
+
+        # Extract failed step details from the jobs API (always available,
+        # includes step names, conclusions, and timestamps).
+        {
+          echo ""
+          echo "=== FAILED STEPS (from API) ==="
+          echo "$JOBS_JSON" | jq -r \
+            --argjson id "$JOB_ID" \
+            '.jobs[] | select(.id == $id) | .steps[] | select(.conclusion == "failure") | "FAILED STEP: \(.name)\n  Number: \(.number)\n  Started: \(.started_at // "unknown")\n  Completed: \(.completed_at // "unknown")\n"' \
+            2>/dev/null || echo "Could not extract step details"
+        } >> "$OUT"
+
+        # Fetch the full job log (plain text, includes all step output).
+        LOG_FILE="${RUNNER_TEMP}/diag/job-log-raw.txt"
+        HTTP_CODE=$(curl -sf -o "$LOG_FILE" -w "%{http_code}" \
+          -H "Authorization: Bearer ${TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/${JOB_ID}/logs" \
+          2>/dev/null || echo "000")
+
+        if [ "$HTTP_CODE" = "200" ] && [ -s "$LOG_FILE" ]; then
+          # Extract the last N lines of the raw log, focusing on the
+          # error-producing section. GitHub job logs use timestamps + step
+          # markers — we keep the tail which typically contains the failure.
+          MAX_LOG_LINES="${TAIL_LINES:-200}"
+          [ "$MAX_LOG_LINES" -eq 0 ] && MAX_LOG_LINES=500
+
+          {
+            echo ""
+            echo "=== JOB LOG (last ${MAX_LOG_LINES} lines via API) ==="
+            tail -"${MAX_LOG_LINES}" "$LOG_FILE"
+          } >> "$OUT"
+          rm -f "$LOG_FILE"
+          echo "Successfully fetched and appended job logs."
+        else
+          echo "::warning::Job log fetch returned HTTP ${HTTP_CODE}. Log may not be ready yet."
+          # Logs might not be available immediately. Use the step details
+          # we already captured above — they're always available from the
+          # jobs endpoint and include which step failed.
+          {
+            echo ""
+            echo "=== NOTE: Job logs not yet available (HTTP ${HTTP_CODE}) ==="
+            echo "The job log endpoint returned ${HTTP_CODE}. This can happen when"
+            echo "the job just completed and logs are still being processed."
+            echo "The failed step details above should provide enough context."
+            echo "Full logs available at: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } >> "$OUT"
+        fi
+
+    - name: Validate diagnostics are non-empty
+      shell: bash
+      env:
+        JOB_NAME: ${{ inputs.job-name }}
+        STEP_OUTCOMES: ${{ inputs.step-outcomes }}
+      run: |
+        umask 077
+        OUT="${DIAG_OUT}"
+
+        # Final guarantee: if context.txt has only the header and whitespace,
+        # write a meaningful minimum so autofix never gets an empty file.
+        if ! grep -q '[^[:space:]]' "$OUT" 2>/dev/null || [ ! -s "$OUT" ]; then
+          {
+            echo "=== JOB: ${JOB_NAME} ==="
+            echo "No output files were found and job log fetch failed."
+            echo "Step outcomes: ${STEP_OUTCOMES:-unknown}"
+            echo "The failure occurred in a step whose logs could not be captured."
+            echo "Check the GitHub Actions UI: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } > "$OUT"
+        fi
+
+        BYTE_COUNT=$(wc -c < "$OUT")
+        LINE_COUNT=$(wc -l < "$OUT")
+        echo "Final diagnostics: ${LINE_COUNT} lines, ${BYTE_COUNT} bytes"
+
+        if [ "$BYTE_COUNT" -lt 50 ]; then
+          echo "::warning::Diagnostics file is suspiciously small (${BYTE_COUNT} bytes). Autofix may struggle."
+        fi
 
     - name: Upload diagnostics artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2

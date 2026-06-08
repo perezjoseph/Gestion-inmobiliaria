@@ -124,6 +124,7 @@ jobs:
       needs.changes.outputs.baileys-service == 'true' ||
       needs.changes.outputs.ci == 'true'
     permissions:
+      actions: read
       contents: read
       packages: write
       security-events: write
@@ -224,6 +225,7 @@ jobs:
       needs.changes.outputs.ocr-service == 'true' ||
       needs.changes.outputs.ci == 'true'
     permissions:
+      actions: read
       contents: read
       packages: write
       security-events: write

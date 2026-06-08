@@ -19,7 +19,8 @@ use yew_router::Routable;
 /// Helper: returns all existing route paths paired with their expected variant.
 fn existing_routes() -> Vec<(&'static str, Route)> {
     vec![
-        ("/", Route::Login),
+        ("/", Route::Landing),
+        ("/login", Route::Login),
         ("/dashboard", Route::Dashboard),
         ("/propiedades", Route::Propiedades),
         ("/inquilinos", Route::Inquilinos),

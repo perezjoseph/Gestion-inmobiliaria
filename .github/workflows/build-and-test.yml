@@ -23,6 +23,7 @@ jobs:
     timeout-minutes: 60
     if: ${{ !inputs.is-fork-pr }}
     permissions:
+      actions: read
       contents: read
       id-token: write
       attestations: write
@@ -112,7 +113,11 @@ jobs:
             fi
             sleep 1
           done
-          echo "::error::Postgres port not reachable"
+          echo "::error::Postgres port not reachable after 15 seconds"
+          echo "Postgres port not reachable after 15 attempts (15s)" > "${RUNNER_TEMP}/wait-postgres-output.txt"
+          docker ps -a >> "${RUNNER_TEMP}/wait-postgres-output.txt" 2>&1 || true
+          echo "---" >> "${RUNNER_TEMP}/wait-postgres-output.txt"
+          docker logs $(docker ps -aq --filter "ancestor=postgres:16" | head -1) >> "${RUNNER_TEMP}/wait-postgres-output.txt" 2>&1 || true
           exit 1
 
       - name: Verify cargo-llvm-cov available
@@ -233,6 +238,7 @@ jobs:
             ${{ runner.temp }}/clippy-backend-stderr.txt
             ${{ runner.temp }}/test-backend-output.txt
             ${{ runner.temp }}/build-backend-output.txt
+            ${{ runner.temp }}/wait-postgres-output.txt
 
       - name: Write backend summary
         if: "!cancelled()"
@@ -254,6 +260,7 @@ jobs:
     timeout-minutes: 45
     if: ${{ !inputs.is-fork-pr }}
     permissions:
+      actions: read
       contents: read
       id-token: write
       attestations: write

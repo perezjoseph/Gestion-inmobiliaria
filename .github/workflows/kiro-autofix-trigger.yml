@@ -324,6 +324,7 @@ jobs:
           ARTIFACTS_JSON: ${{ steps.list.outputs.artifacts }}
           GIT_HISTORY_FILE: ${{ steps.history.outputs.history_log }}
           QUEUE_RUNS: ${{ steps.attempts.outputs.queue_runs }}
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
         run: |
           umask 077
           ATTEMPT_DISPLAY=$((QUEUE_RUNS + 1))
@@ -345,23 +346,75 @@ jobs:
                 CONTEXT_PATH="$ALT_FILE"
                 echo "::notice::Using alternative file from ${artifact}: $(basename "$ALT_FILE")"
               else
-                # Generate minimal context from what we know
+                # Fetch job logs directly from the GitHub API as last resort.
+                # Extract the job name from the artifact name (diag-{suffix} -> suffix).
                 CONTEXT_PATH="${RUNNER_TEMP}/all-diag/${artifact}/context-generated.txt"
                 mkdir -p "${RUNNER_TEMP}/all-diag/${artifact}"
-                {
-                  echo "=== JOB: ${artifact} ==="
-                  echo "The diagnostic artifact was uploaded but context.txt was empty."
-                  echo "This typically means a Docker build/push step failed before any"
-                  echo "output files could be captured."
-                  echo ""
-                  echo "Artifact name: ${artifact}"
-                  echo "CI run: ${CI_RUN_ID}"
-                  echo "Branch: ${BRANCH}"
-                  echo ""
-                  echo "Check the GitHub Actions UI for the full build log."
-                  echo "Look for Dockerfile issues, base image availability, or registry auth errors."
-                } > "$CONTEXT_PATH"
-                echo "::warning::Generated fallback context for ${artifact} (original context.txt was empty)"
+
+                # Attempt to find the failed job and get its logs
+                JOB_LOG_FETCHED=false
+                JOBS_JSON=$(curl -sf -H "Authorization: Bearer ${GH_TOKEN}" \
+                  -H "Accept: application/vnd.github+json" \
+                  "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${CI_RUN_ID}/attempts/1/jobs?per_page=100" \
+                  2>/dev/null || echo "")
+
+                if [ -n "$JOBS_JSON" ]; then
+                  # Find failed jobs and extract their logs
+                  FAILED_JOB_IDS=$(echo "$JOBS_JSON" | jq -r '.jobs[] | select(.conclusion == "failure") | .id' 2>/dev/null || true)
+
+                  {
+                    echo "=== JOB: ${artifact} ==="
+                    echo "The diagnostic artifact was uploaded but context.txt was empty."
+                    echo "Fetching job logs directly from GitHub API..."
+                    echo ""
+                    echo "=== FAILED JOBS IN THIS RUN ==="
+                    echo "$JOBS_JSON" | jq -r '.jobs[] | select(.conclusion == "failure") | "Job: \(.name) (id: \(.id))\n  Steps failed: \([.steps[] | select(.conclusion == "failure") | .name] | join(", "))\n"' 2>/dev/null || true
+                    echo ""
+                  } > "$CONTEXT_PATH"
+
+                  # Fetch logs from first failed job
+                  FIRST_FAILED=$(echo "$FAILED_JOB_IDS" | head -1)
+                  if [ -n "$FIRST_FAILED" ]; then
+                    LOG_TMP="${RUNNER_TEMP}/all-diag/${artifact}/job-log-tmp.txt"
+                    HTTP_CODE=$(curl -sf -o "$LOG_TMP" -w "%{http_code}" \
+                      -H "Authorization: Bearer ${GH_TOKEN}" \
+                      -H "Accept: application/vnd.github+json" \
+                      "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/${FIRST_FAILED}/logs" \
+                      2>/dev/null || echo "000")
+
+                    if [ "$HTTP_CODE" = "200" ] && [ -s "$LOG_TMP" ]; then
+                      {
+                        echo "=== JOB LOG (last 200 lines) ==="
+                        tail -200 "$LOG_TMP"
+                      } >> "$CONTEXT_PATH"
+                      JOB_LOG_FETCHED=true
+                      rm -f "$LOG_TMP"
+                      echo "::notice::Fetched job logs from API for ${artifact}"
+                    else
+                      rm -f "$LOG_TMP"
+                    fi
+                  fi
+                fi
+
+                if [ "$JOB_LOG_FETCHED" = false ]; then
+                  {
+                    echo "=== JOB: ${artifact} ==="
+                    echo "The diagnostic artifact was uploaded but context.txt was empty."
+                    echo "Could not fetch job logs from API either."
+                    echo ""
+                    echo "Artifact name: ${artifact}"
+                    echo "CI run: ${CI_RUN_ID}"
+                    echo "Branch: ${BRANCH}"
+                    echo ""
+                    echo "Check the GitHub Actions UI for the full build log:"
+                    echo "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${CI_RUN_ID}"
+                    echo ""
+                    echo "Look for Dockerfile issues, base image availability, service container"
+                    echo "startup failures, or registry auth errors."
+                  } > "$CONTEXT_PATH"
+                fi
+
+                echo "::warning::Generated context for ${artifact} (original context.txt was empty)"
               fi
             fi
 
