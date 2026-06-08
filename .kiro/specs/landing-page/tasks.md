@@ -44,7 +44,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 10.1, 12.1_
 
 - [ ] 3. Implement landing section components (part 2: Features, Preview, Transparency, Footer)
-  - [-] 3.1 Create `frontend/src/components/landing/features.rs` — Features grid component
+  - [x] 3.1 Create `frontend/src/components/landing/features.rs` — Features grid component
     - Implement `LandingFeatures` functional component with a static `FEATURES` array of exactly 6 items
     - Define internal `FeatureItem` struct with `icon`, `title`, `description` fields
     - 6 grouped capabilities: Propiedades y Unidades, Inquilinos y Contratos, Pagos y Cobros, Gastos y Reportes, Mantenimiento, Dashboard en tiempo real
