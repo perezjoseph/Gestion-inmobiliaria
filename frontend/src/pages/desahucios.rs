@@ -64,7 +64,6 @@ pub fn Desahucios() -> Html {
     let on_per_page_change = {
         let per_page = per_page.clone();
         let page = page.clone();
-        let reload = reload.clone();
         Callback::from(move |pp: u64| {
             per_page.set(pp);
             page.set(1);

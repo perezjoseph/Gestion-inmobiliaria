@@ -89,7 +89,6 @@ pub fn ServiciosPublicos() -> Html {
             if let (Some(prop_id), Some(unit_id)) = (selected_prop_val, closure_unit) {
                 let items = items.clone();
                 let error = error.clone();
-                let loading = loading.clone();
                 spawn_local(async move {
                     loading.set(true);
                     let url = format!("/propiedades/{prop_id}/unidades/{unit_id}/servicios");

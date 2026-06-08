@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::deserialize_f64_from_any;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SecuenciaNcf {
     pub id: String,
@@ -15,7 +15,7 @@ pub struct SecuenciaNcf {
     pub is_ecf: bool,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfigurarRango {
     pub tipo_ncf: String,

@@ -1,4 +1,3 @@
-#[allow(clippy::option_if_let_else)]
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
@@ -67,7 +66,12 @@ pub fn OrganizacionPage() -> Html {
                 })} />
             }
 
-            if let Some(data) = (*org).as_ref() {
+            {(*org).as_ref().map_or_else(|| html! {
+                <div class="gi-empty-state">
+                    <div class="gi-empty-state-title">{"Sin datos de organización"}</div>
+                    <p class="gi-empty-state-text">{"La información de la organización aparecerá aquí."}</p>
+                </div>
+            }, |data| html! {
                 <div class="gi-card" style="padding: var(--space-6);">
                     <OrgField label="Nombre" value={data.nombre.clone()} />
                     <OrgField label="Tipo" value={data.tipo.clone()} />
@@ -77,17 +81,12 @@ pub fn OrganizacionPage() -> Html {
                     <OrgField label="Razón Social" value={data.razon_social.clone().unwrap_or_default()} />
                     <OrgField label="Nombre Comercial" value={data.nombre_comercial.clone().unwrap_or_default()} />
                     <OrgField label="Teléfono" value={data.telefono.clone().unwrap_or_default()} />
-                    <OrgField label="Email" value={data.email_organizacion.clone().unwrap_or_default()} />
+                    <OrgField label="Email" value={data.email.clone().unwrap_or_default()} />
                     <OrgField label="Dirección Fiscal" value={data.direccion_fiscal.clone().unwrap_or_default()} />
                     <OrgField label="Representante Legal" value={data.representante_legal.clone().unwrap_or_default()} />
                     <OrgField label="Creado" value={format_date_display(&data.created_at)} />
                 </div>
-            } else {
-                <div class="gi-empty-state">
-                    <div class="gi-empty-state-title">{"Sin datos de organización"}</div>
-                    <p class="gi-empty-state-text">{"La información de la organización aparecerá aquí."}</p>
-                </div>
-            }
+            })}
         </div>
     }
 }
