@@ -1,4 +1,4 @@
-FROM python:3.14-slim AS builder
+FROM python:3.13-slim AS builder
 
 WORKDIR /app
 
@@ -36,7 +36,7 @@ RUN for i in 1 2 3; do \
 
 COPY main.py ocr_engine.py ./
 
-FROM python:3.14-slim
+FROM python:3.13-slim
 
 WORKDIR /app
 
@@ -72,7 +72,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     && usermod -aG video ocruser \
     && usermod -aG render ocruser
 
-COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /app/main.py /app/ocr_engine.py ./
 COPY --from=builder /app/.paddleocr /app/.paddleocr
