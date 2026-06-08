@@ -19,6 +19,7 @@ pub mod indexacion;
 pub mod inquilinos;
 pub mod invitaciones;
 pub mod ipi;
+pub mod landing;
 pub mod login;
 pub mod mantenimiento;
 pub mod ncf;
