@@ -173,8 +173,8 @@ jobs:
             # Test frontend is serving (Caddy returns 200 on /)
             echo "Testing frontend..."
             FRONTEND_STATUS=$(kubectl exec "$BACKEND_POD" -n ${NS} -- \
-              wget --spider -qS --timeout=10 http://frontend:80/ 2>&1 | grep "HTTP/" | tail -1) || {
-              echo "::error::Frontend not responding on port 80"
+              wget --spider -qS --no-check-certificate --timeout=10 https://frontend:8443/ 2>&1 | grep "HTTP/" | tail -1) || {
+              echo "::error::Frontend not responding on port 8443"
               exit 1
             }
             echo "Frontend status: $FRONTEND_STATUS"
