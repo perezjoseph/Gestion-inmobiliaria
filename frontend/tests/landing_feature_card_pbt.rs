@@ -57,9 +57,8 @@ fn known_features() -> Vec<FeatureItem> {
         FeatureItem {
             icon: "📊".to_string(),
             title: "Gastos y Reportes".to_string(),
-            description:
-                "Controla gastos por categoría y genera informes de ingresos y ocupación."
-                    .to_string(),
+            description: "Controla gastos por categoría y genera informes de ingresos y ocupación."
+                .to_string(),
         },
         FeatureItem {
             icon: "🔧".to_string(),

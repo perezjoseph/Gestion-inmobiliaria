@@ -37,8 +37,8 @@ impl StepData {
 /// Strategy to generate valid step data (non-empty fields).
 fn valid_step_strategy() -> impl Strategy<Value = StepData> {
     (
-        "[1-9][0-9]{0,2}",           // number: 1-999 as string
-        "[A-Za-záéíóúñÁÉÍÓÚÑ ]{3,50}", // title: non-empty Spanish-compatible text
+        "[1-9][0-9]{0,2}",                 // number: 1-999 as string
+        "[A-Za-záéíóúñÁÉÍÓÚÑ ]{3,50}",     // title: non-empty Spanish-compatible text
         "[A-Za-záéíóúñÁÉÍÓÚÑ .,]{10,200}", // description: non-empty Spanish-compatible text
     )
         .prop_map(|(number, title, description)| StepData {
@@ -110,14 +110,8 @@ fn test_steps_count_is_exactly_three() {
 #[test]
 fn test_actual_steps_satisfy_rendering_contract() {
     for (i, (number, title, description)) in EXPECTED_STEPS.iter().enumerate() {
-        assert!(
-            !number.is_empty(),
-            "Step {i} must have a non-empty number"
-        );
-        assert!(
-            !title.is_empty(),
-            "Step {i} must have a non-empty title"
-        );
+        assert!(!number.is_empty(), "Step {i} must have a non-empty number");
+        assert!(!title.is_empty(), "Step {i} must have a non-empty title");
         assert!(
             !description.is_empty(),
             "Step {i} must have a non-empty description"
@@ -133,9 +127,11 @@ fn test_steps_have_sequential_numbers() {
     for (i, (number, _, _)) in EXPECTED_STEPS.iter().enumerate() {
         let expected_number = (i + 1).to_string();
         assert_eq!(
-            *number, expected_number.as_str(),
+            *number,
+            expected_number.as_str(),
             "Step {i} should have number '{}' but has '{}'",
-            expected_number, number
+            expected_number,
+            number
         );
     }
 }
