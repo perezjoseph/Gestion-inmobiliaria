@@ -106,6 +106,7 @@ jobs:
       needs.changes.outputs.frontend == 'true' ||
       needs.changes.outputs.ci == 'true'
     permissions:
+      actions: read
       contents: read
       id-token: write
       attestations: write
@@ -380,6 +381,7 @@ jobs:
       needs.build-and-test.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped')
     permissions:
+      actions: read
       contents: read
       packages: write
       security-events: write
