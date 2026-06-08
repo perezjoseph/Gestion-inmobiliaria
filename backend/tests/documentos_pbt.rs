@@ -103,6 +103,42 @@ mod pbt_async {
         let _ = plantilla_documento::Entity::delete_by_id(id).exec(db).await;
     }
 
+    async fn cleanup_organizacion(db: &DatabaseConnection, id: uuid::Uuid) {
+        use realestate_backend::entities::organizacion;
+        use sea_orm::EntityTrait;
+        let _ = organizacion::Entity::delete_by_id(id).exec(db).await;
+    }
+
+    async fn create_test_org(db: &DatabaseConnection, org_id: uuid::Uuid) {
+        use realestate_backend::entities::organizacion;
+        use sea_orm::{ActiveModelTrait, Set};
+        let now = chrono::Utc::now().fixed_offset();
+        organizacion::ActiveModel {
+            id: Set(org_id),
+            tipo: Set("persona_fisica".to_string()),
+            nombre: Set(format!("PBT Org {org_id}")),
+            estado: Set("activo".to_string()),
+            cedula: Set(None),
+            telefono: Set(None),
+            email_organizacion: Set(None),
+            rnc: Set(None),
+            razon_social: Set(None),
+            nombre_comercial: Set(None),
+            direccion_fiscal: Set(None),
+            representante_legal: Set(None),
+            dgii_data: Set(None),
+            tipo_fiscal: Set("informal".to_string()),
+            regimen_pagos: Set(None),
+            fecha_inicio_operaciones: Set(None),
+            is_ecf_certificado: Set(false),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .expect("create org for PBT");
+    }
+
     /// Property 3: Template CRUD round-trip
     /// Create template with arbitrary valid inputs, read by ID, verify all fields match.
     pub fn p3_template_crud_round_trip(
@@ -113,6 +149,8 @@ mod pbt_async {
     ) {
         with_db(|db| async move {
             let org_id = uuid::Uuid::new_v4();
+            create_test_org(&db, org_id).await;
+
             let input = CrearPlantillaRequest {
                 nombre: nombre.clone(),
                 tipo_documento: tipo_documento.clone(),
@@ -140,8 +178,9 @@ mod pbt_async {
             assert_eq!(fetched.contenido, contenido, "contenido mismatch");
             assert_eq!(fetched.id, created.id, "id mismatch");
 
-            // Cleanup
+            // Cleanup (plantilla first due to FK)
             cleanup_plantilla(&db, created.id).await;
+            cleanup_organizacion(&db, org_id).await;
         });
     }
 }
