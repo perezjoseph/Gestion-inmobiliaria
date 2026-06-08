@@ -77,6 +77,15 @@ runs:
           fi
         } > "$OUT"
 
+        # Guarantee non-empty artifact: if context.txt ended up with only
+        # whitespace (no output files existed, no extra context), write a
+        # minimal diagnostic so downstream consumers always get something.
+        if ! grep -q '[^[:space:]]' "$OUT" 2>/dev/null; then
+          echo "=== JOB: ${JOB_NAME} ===" > "$OUT"
+          echo "No output files were found. The failure likely occurred in a step whose logs are only available in the GitHub Actions UI." >> "$OUT"
+          echo "Step outcomes: ${STEP_OUTCOMES:-unknown}" >> "$OUT"
+        fi
+
         echo "Wrote $(wc -l < "$OUT") lines to $OUT"
 
     - name: Upload diagnostics artifact

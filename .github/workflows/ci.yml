@@ -275,6 +275,21 @@ jobs:
           cache-to: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && format('type=registry,ref=ghcr.io/{0}/realestate-ocr-service:buildcache,mode=max', github.repository_owner) || '' }}
           outputs: type=registry,compression=zstd,compression-level=3,force-compression=true
 
+      - name: Capture Docker build logs on failure
+        if: failure() && steps.push.outcome == 'failure'
+        run: |
+          umask 077
+          {
+            echo "=== DOCKER BUILD FAILED: OCR SERVICE ==="
+            echo "Build step outcome: ${{ steps.push.outcome }}"
+            echo ""
+            echo "=== DOCKERFILE CONTENT ==="
+            cat ./ocr-service/Dockerfile 2>/dev/null || echo "Dockerfile not found"
+            echo ""
+            echo "=== DOCKER BUILDX INSPECT ==="
+            docker buildx inspect --bootstrap 2>&1 | tail -30 || true
+          } > "${RUNNER_TEMP}/docker-build-ocr-service.txt" 2>&1 || true
+
       - name: Install Trivy
         uses: ./.github/actions/install-security-tools
         with:
@@ -338,7 +353,13 @@ jobs:
           step-outcomes: |
             push=${{ steps.push.outcome }}
           output-files: |
+            ${{ runner.temp }}/docker-build-ocr-service.txt
             ${{ runner.temp }}/trivy-ocr-service-image.txt
+          extra-context: |
+            Image: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-ocr-service:${{ env.IMAGE_TAG }}
+            Dockerfile: ocr-service/Dockerfile
+            Context dir: ./ocr-service
+            If push failed, check Dockerfile syntax, base image availability, and registry auth.
 
       - name: Credential cleanup (ocr)
         if: always()
