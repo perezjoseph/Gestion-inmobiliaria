@@ -347,6 +347,7 @@ jobs:
               else
                 # Generate minimal context from what we know
                 CONTEXT_PATH="${RUNNER_TEMP}/all-diag/${artifact}/context-generated.txt"
+                mkdir -p "${RUNNER_TEMP}/all-diag/${artifact}"
                 {
                   echo "=== JOB: ${artifact} ==="
                   echo "The diagnostic artifact was uploaded but context.txt was empty."
