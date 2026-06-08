@@ -79,7 +79,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - _Requirements: 8.1, 8.2, 8.3, 10.1_
 
 - [ ] 4. Implement landing page and route integration
-  - [~] 4.1 Create `frontend/src/pages/landing.rs` — Page-level component with auth redirect
+  - [x] 4.1 Create `frontend/src/pages/landing.rs` — Page-level component with auth redirect
     - Implement `Landing` functional component
     - Use `is_authenticated()` to check JWT in localStorage on mount
     - Redirect authenticated users to `Route::Dashboard` via `use_navigator()` + `use_effect_with((), ...)`
