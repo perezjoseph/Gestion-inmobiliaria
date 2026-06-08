@@ -198,6 +198,60 @@ jobs:
             fi
           done
 
+      - name: Collect dev deployment diagnostics
+        if: failure()
+        env:
+          NS: realestate-dev
+        run: |
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/diag"
+          OUT="${RUNNER_TEMP}/diag/context.txt"
+
+          {
+            echo "=== DEV DEPLOYMENT FAILURE ==="
+            echo "Step outcomes:"
+            echo "  deploy=${{ steps.deploy.outcome }}"
+            echo "  rollout=${{ steps.rollout.outcome }}"
+            echo "  health-check=${{ steps.health-check.outcome }}"
+            echo "  smoke-tests=${{ steps.smoke-tests.outcome }}"
+            echo ""
+
+            echo "=== DEPLOYMENT STATUS ==="
+            kubectl get deployments,pods,services -n ${NS} -o wide 2>&1 || true
+            echo ""
+
+            echo "=== RECENT EVENTS (last 30) ==="
+            kubectl get events -n ${NS} \
+              --sort-by='.lastTimestamp' \
+              -o custom-columns=TIME:.lastTimestamp,TYPE:.type,REASON:.reason,OBJECT:.involvedObject.name,MESSAGE:.message \
+              2>&1 | tail -30 || true
+            echo ""
+
+            for DEPLOY in backend frontend baileys; do
+              echo "=== PODS FOR ${DEPLOY} ==="
+              for POD in $(kubectl get pods -n ${NS} \
+                  -l "app.kubernetes.io/name=${DEPLOY}" \
+                  -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+                echo "--- logs pod/${POD} (last 100 lines) ---"
+                kubectl logs "$POD" -n ${NS} --tail=100 2>&1 || true
+                echo ""
+                echo "--- logs pod/${POD} (previous, last 50 lines) ---"
+                kubectl logs "$POD" -n ${NS} --previous --tail=50 2>&1 || true
+                echo ""
+              done
+            done
+          } > "$OUT"
+
+          echo "Wrote $(wc -l < "$OUT") lines to $OUT"
+
+      - name: Upload dev deployment diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: diag-deploy-dev
+          path: ${{ runner.temp }}/diag/context.txt
+          retention-days: 1
+
       - name: Credential cleanup
         if: always()
         run: rm -f "${HOME}/.kube/config"
