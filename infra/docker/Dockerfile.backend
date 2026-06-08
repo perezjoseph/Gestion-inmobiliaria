@@ -10,7 +10,7 @@ COPY frontend/ frontend/
 RUN cargo build --locked -p realestate-backend --release
 RUN cp target/release/realestate-backend /app/realestate-backend
 
-FROM alpine:3.22 AS prebuilt
+FROM alpine:3.23 AS prebuilt
 ARG GH_REPO
 ARG GH_RUN_ID
 RUN apk add --no-cache github-cli
@@ -43,7 +43,7 @@ RUN --mount=type=secret,id=gh_token \
 
 FROM ${MODE} AS source
 
-FROM alpine:3.22
+FROM alpine:3.23
 
 RUN apk add --no-cache \
     ca-certificates libssl3 libpq curl \
