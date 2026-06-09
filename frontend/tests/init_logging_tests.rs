@@ -106,7 +106,11 @@ mod structural_checks {
 // These tests verify baseline behavior on UNFIXED code. They must PASS,
 // confirming the behavior that the bugfix must preserve.
 
-const INDEX_HTML_SOURCE: &str = include_str!("../index.html");
+const INDEX_HTML_SOURCE: &str = concat!(
+    include_str!("../index.html"),
+    include_str!("../js/error-handler.js"),
+    include_str!("../js/app-loaded.js"),
+);
 
 fn extract_protected_route_fn(source: &str) -> &str {
     let fn_start = source.find("fn ProtectedRoute(");

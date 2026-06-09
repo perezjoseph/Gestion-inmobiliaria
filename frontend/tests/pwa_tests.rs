@@ -16,7 +16,10 @@
 
 const MANIFEST_SOURCE: &str = include_str!("../manifest.webmanifest");
 const SERVICE_WORKER_SOURCE: &str = include_str!("../service-worker.js");
-const INDEX_HTML_SOURCE: &str = include_str!("../index.html");
+const INDEX_HTML_SOURCE: &str = concat!(
+    include_str!("../index.html"),
+    include_str!("../js/service-worker-register.js"),
+);
 const USE_ONLINE_SOURCE: &str = include_str!("../src/hooks/use_online.rs");
 const ONLINE_SERVICE_SOURCE: &str = include_str!("../src/services/online.rs");
 const OFFLINE_GUARD_SOURCE: &str = include_str!("../src/components/common/offline_guard.rs");

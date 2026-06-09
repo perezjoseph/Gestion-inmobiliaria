@@ -4,7 +4,7 @@ use yew::prelude::*;
 /// Shows domain-specific summary info that differentiates each section.
 ///
 /// Example usage:
-/// ```
+/// ```text
 /// <DomainHeader>
 ///     <DomainStat label="Atrasados" value="3" variant={DomainStatVariant::Error} />
 ///     <DomainStat label="Pendiente este mes" value="RD$45,000" />
