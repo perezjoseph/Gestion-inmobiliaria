@@ -455,6 +455,14 @@ jobs:
               EFFECTIVE_CTX="$CONTEXT_PATH"
             fi
 
+            # Skip deploy artifacts where the cluster is unreachable — no code change can fix this.
+            if [[ "$artifact" == diag-deploy-* ]] && grep -qF "=== CLUSTER UNREACHABLE ===" "$EFFECTIVE_CTX"; then
+              echo "::notice::Skipping ${artifact}: cluster unreachable (infrastructure issue, not actionable by code fix)"
+              printf '[%s] SKIPPED: cluster unreachable — infrastructure issue\n' "$artifact" >> "$LEARNINGS_FILE"
+              echo "::endgroup::"
+              continue
+            fi
+
             # Skip artifacts whose errors reference only files already fixed by prior queue items.
             if [ -n "$FIXED_FILES" ]; then
               DIAG_FILES=$(grep -oP '(?:^|\s)(\S+\.(?:rs|ts|tsx|kt|kts))' "$EFFECTIVE_CTX" | sort -u || true)
