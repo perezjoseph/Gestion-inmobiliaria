@@ -100,7 +100,7 @@ runs:
       with:
         context: ${{ inputs.context }}
         file: ${{ inputs.dockerfile }}
-        push: true
+        push: ${{ inputs.outputs-compression == '' }}
         tags: |
           ghcr.io/${{ inputs.image-owner }}/${{ inputs.image-name }}:${{ steps.meta.outputs.image-tag }}
           ${{ steps.meta.outputs.latest-tag }}
