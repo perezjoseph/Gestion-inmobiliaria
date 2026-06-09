@@ -338,129 +338,17 @@ jobs:
             [ -z "$artifact" ] && continue
             POS=$((POS + 1))
             CONTEXT_PATH="${RUNNER_TEMP}/all-diag/${artifact}/context.txt"
+
+            # collect-diagnostics guarantees non-empty context.txt.
+            # If somehow empty, try any file in the artifact dir, then skip.
             if [ ! -s "$CONTEXT_PATH" ]; then
-              # Artifact directory exists but context.txt is empty or missing.
-              # Try to find any file in the artifact directory as fallback.
               ALT_FILE=$(find "${RUNNER_TEMP}/all-diag/${artifact}/" -type f -size +0 2>/dev/null | head -1)
               if [ -n "$ALT_FILE" ]; then
                 CONTEXT_PATH="$ALT_FILE"
                 echo "::notice::Using alternative file from ${artifact}: $(basename "$ALT_FILE")"
               else
-                # Fetch job logs directly from the GitHub API as last resort.
-                CONTEXT_PATH="${RUNNER_TEMP}/all-diag/${artifact}/context-generated.txt"
-                mkdir -p "${RUNNER_TEMP}/all-diag/${artifact}"
-
-                # Attempt to find the failed job and get its logs.
-                # The CI_RUN_ID may have multiple attempts; fetch all jobs across all pages.
-                JOB_LOG_FETCHED=false
-                ALL_JOBS=""
-                PAGE=1
-                while true; do
-                  PAGE_JSON=$(curl -sL -H "Authorization: Bearer ${GH_TOKEN}" \
-                    -H "Accept: application/vnd.github+json" \
-                    "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${CI_RUN_ID}/jobs?per_page=100&page=${PAGE}" \
-                    2>/dev/null || echo "")
-                  if [ -z "$PAGE_JSON" ]; then break; fi
-                  PAGE_COUNT=$(echo "$PAGE_JSON" | jq '.jobs | length' 2>/dev/null || echo 0)
-                  if [ "$PAGE_COUNT" -eq 0 ]; then break; fi
-                  if [ -z "$ALL_JOBS" ]; then
-                    ALL_JOBS="$PAGE_JSON"
-                  else
-                    # Merge jobs arrays
-                    ALL_JOBS=$(echo "$ALL_JOBS" | jq --argjson new "$(echo "$PAGE_JSON" | jq '.jobs')" '.jobs += $new')
-                  fi
-                  if [ "$PAGE_COUNT" -lt 100 ]; then break; fi
-                  PAGE=$((PAGE + 1))
-                done
-
-                if [ -n "$ALL_JOBS" ]; then
-                  # Derive a search hint from the artifact name: diag-deploy-dev -> "deploy-dev"
-                  ARTIFACT_HINT="${artifact#diag-}"
-
-                  # Find the best matching failed job:
-                  # 1. Exact match on artifact suffix in job name (case-insensitive)
-                  # 2. Any failed job whose name contains the hint
-                  # 3. Fall back to any failed job
-                  MATCHED_JOB_ID=$(echo "$ALL_JOBS" | jq -r \
-                    --arg hint "$ARTIFACT_HINT" \
-                    '[.jobs[] | select(.conclusion == "failure")] |
-                     (map(select(.name | ascii_downcase | gsub("[^a-z0-9]"; "-") | contains($hint))) | .[0].id // null) //
-                     (map(select(.name | ascii_downcase | contains($hint))) | .[0].id // null) //
-                     (.[0].id // null) | . // empty' 2>/dev/null || true)
-
-                  FAILED_JOB_IDS=$(echo "$ALL_JOBS" | jq -r '.jobs[] | select(.conclusion == "failure") | .id' 2>/dev/null || true)
-
-                  {
-                    echo "=== JOB: ${artifact} ==="
-                    echo "The diagnostic artifact was uploaded but context.txt was empty."
-                    echo "Fetching job logs directly from GitHub API..."
-                    echo "Artifact hint: ${ARTIFACT_HINT}"
-                    echo "Matched job ID: ${MATCHED_JOB_ID:-none}"
-                    echo ""
-                    echo "=== FAILED JOBS IN THIS RUN ==="
-                    echo "$ALL_JOBS" | jq -r '.jobs[] | select(.conclusion == "failure") | "Job: \(.name) (id: \(.id))\n  Steps failed: \([.steps[]? | select(.conclusion == "failure") | .name] | join(", "))\n"' 2>/dev/null || true
-                    echo ""
-                  } > "$CONTEXT_PATH"
-
-                  # Use matched job, or first failed job
-                  TARGET_JOB="${MATCHED_JOB_ID:-$(echo "$FAILED_JOB_IDS" | head -1)}"
-                  if [ -n "$TARGET_JOB" ]; then
-                    # First, extract step details (always available without redirect issues)
-                    {
-                      echo "=== FAILED STEPS DETAIL ==="
-                      echo "$ALL_JOBS" | jq -r \
-                        --argjson id "$TARGET_JOB" \
-                        '.jobs[] | select(.id == $id) | .steps[] | select(.conclusion == "failure") | "FAILED STEP: \(.name)\n  Number: \(.number)\n  Started: \(.started_at // "unknown")\n  Completed: \(.completed_at // "unknown")\n"' \
-                        2>/dev/null || echo "Could not extract step details"
-                      echo ""
-                    } >> "$CONTEXT_PATH"
-
-                    # Fetch the full job log (follows 302 redirect to blob storage)
-                    LOG_TMP="${RUNNER_TEMP}/all-diag/${artifact}/job-log-tmp.txt"
-                    HTTP_CODE=$(curl -sL -o "$LOG_TMP" -w "%{http_code}" \
-                      -H "Authorization: Bearer ${GH_TOKEN}" \
-                      -H "Accept: application/vnd.github+json" \
-                      "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/${TARGET_JOB}/logs" \
-                      2>/dev/null || echo "000")
-
-                    if [ "$HTTP_CODE" = "200" ] && [ -s "$LOG_TMP" ]; then
-                      {
-                        echo "=== JOB LOG (last 300 lines) ==="
-                        tail -300 "$LOG_TMP"
-                      } >> "$CONTEXT_PATH"
-                      JOB_LOG_FETCHED=true
-                      rm -f "$LOG_TMP"
-                      echo "::notice::Fetched job logs from API for ${artifact} (job ${TARGET_JOB})"
-                    else
-                      echo "::warning::Job log fetch returned HTTP ${HTTP_CODE} for job ${TARGET_JOB}"
-                      rm -f "$LOG_TMP"
-                    fi
-                  fi
-                fi
-
-                if [ "$JOB_LOG_FETCHED" = false ]; then
-                  # Ensure we have at least something useful even when API fails
-                  if [ ! -s "$CONTEXT_PATH" ]; then
-                    {
-                      echo "=== JOB: ${artifact} ==="
-                      echo "The diagnostic artifact was uploaded but context.txt was empty."
-                      echo "Could not fetch job logs from API either."
-                      echo ""
-                      echo "Artifact name: ${artifact}"
-                      echo "CI run: ${CI_RUN_ID}"
-                      echo "Branch: ${BRANCH}"
-                      echo ""
-                      echo "Check the GitHub Actions UI for the full build log:"
-                      echo "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${CI_RUN_ID}"
-                      echo ""
-                      echo "Common causes: Dockerfile issues, base image availability, service container"
-                      echo "startup failures, registry auth errors, K8s cluster unreachable, or kubectl"
-                      echo "commands failing in the diagnostics collection step itself."
-                    } > "$CONTEXT_PATH"
-                  fi
-                fi
-
-                echo "::warning::Generated context for ${artifact} (original context.txt was empty)"
+                echo "::warning::${artifact} has no usable diagnostics content — skipping"
+                continue
               fi
             fi
 

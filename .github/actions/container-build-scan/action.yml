@@ -1,0 +1,215 @@
+name: Build, Scan & Attest Container
+description: >
+  Builds a container image, pushes to GHCR, scans with Trivy,
+  generates SARIF + SBOM, attests provenance, and cleans up credentials.
+  Consolidates the repeated container pipeline pattern into one reusable action.
+
+inputs:
+  image-name:
+    description: "Image name without registry prefix (e.g. realestate-backend)"
+    required: true
+  context:
+    description: "Docker build context path"
+    required: true
+  dockerfile:
+    description: "Path to Dockerfile relative to repo root"
+    required: true
+  build-args:
+    description: "Docker build-args (multi-line, one per line)"
+    required: false
+    default: ""
+  build-secrets:
+    description: "Docker build secrets (multi-line, one per line)"
+    required: false
+    default: ""
+  is-production:
+    description: "Whether to push :latest tag, generate SBOM, and write cache"
+    required: true
+  github-token:
+    description: "GITHUB_TOKEN for registry auth and attestation"
+    required: true
+  image-owner:
+    description: "GHCR namespace (typically github.repository_owner)"
+    required: true
+  cache-suffix:
+    description: "Cache tag suffix for BuildKit layer reuse"
+    required: false
+    default: "buildcache"
+  sarif-category:
+    description: "Category name for SARIF upload (e.g. trivy-backend-image)"
+    required: true
+  artifact-suffix:
+    description: "Suffix for diagnostics artifact name (e.g. container-backend)"
+    required: true
+  job-name:
+    description: "Human-readable job name for diagnostics"
+    required: true
+  outputs-compression:
+    description: "Docker build output compression (e.g. type=registry,compression=zstd,compression-level=3,force-compression=true)"
+    required: false
+    default: ""
+
+outputs:
+  digest:
+    description: "Pushed image digest (sha256:...)"
+    value: ${{ steps.push.outputs.digest }}
+
+runs:
+  using: composite
+  steps:
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v3.4.0
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.github-token }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+      with:
+        buildkitd-config-inline: |
+          [registry."ghcr.io"]
+            mirrors = ["ghcr.io"]
+          [registry."ghcr.io".tls]
+            insecureSkipVerify = false
+
+    - name: Compute image tag
+      id: meta
+      shell: bash
+      env:
+        IS_PRODUCTION: ${{ inputs.is-production }}
+        IMAGE_OWNER: ${{ inputs.image-owner }}
+        IMAGE_NAME: ${{ inputs.image-name }}
+      run: |
+        if [ "$IS_PRODUCTION" = "true" ]; then
+          IMAGE_TAG="${GITHUB_SHA}"
+          LATEST_TAG="ghcr.io/${IMAGE_OWNER}/${IMAGE_NAME}:latest"
+        else
+          IMAGE_TAG="preprod-${GITHUB_SHA}"
+          LATEST_TAG=""
+        fi
+        echo "image-tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+        echo "latest-tag=${LATEST_TAG}" >> "$GITHUB_OUTPUT"
+        echo "full-image=ghcr.io/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+    - name: Build and push container image
+      id: push
+      uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v6.18.0
+      env:
+        BUILDKIT_STEP_LOG_MAX_SIZE: 10485760
+      with:
+        context: ${{ inputs.context }}
+        file: ${{ inputs.dockerfile }}
+        push: true
+        tags: |
+          ghcr.io/${{ inputs.image-owner }}/${{ inputs.image-name }}:${{ steps.meta.outputs.image-tag }}
+          ${{ steps.meta.outputs.latest-tag }}
+        build-args: ${{ inputs.build-args }}
+        secrets: ${{ inputs.build-secrets }}
+        cache-from: type=registry,ref=ghcr.io/${{ inputs.image-owner }}/${{ inputs.image-name }}:${{ inputs.cache-suffix }}
+        cache-to: ${{ inputs.is-production == 'true' && format('type=registry,ref=ghcr.io/{0}/{1}:{2},mode=max', inputs.image-owner, inputs.image-name, inputs.cache-suffix) || '' }}
+        outputs: ${{ inputs.outputs-compression }}
+
+    - name: Capture Docker build logs on failure
+      if: failure() && steps.push.outcome == 'failure'
+      shell: bash
+      env:
+        IMAGE_NAME: ${{ inputs.image-name }}
+        DOCKERFILE: ${{ inputs.dockerfile }}
+      run: |
+        umask 077
+        {
+          echo "=== DOCKER BUILD FAILED: ${IMAGE_NAME} ==="
+          echo "Build step outcome: failure"
+          echo ""
+          echo "=== DOCKERFILE CONTENT ==="
+          cat "${DOCKERFILE}" 2>/dev/null || echo "Dockerfile not found at ${DOCKERFILE}"
+          echo ""
+          echo "=== DOCKER BUILDX INSPECT ==="
+          docker buildx inspect --bootstrap 2>&1 | tail -30 || true
+        } > "${RUNNER_TEMP}/docker-build-${IMAGE_NAME}.txt" 2>&1 || true
+
+    - name: Install Trivy
+      uses: ./.github/actions/install-security-tools
+      with:
+        trivy: "true"
+
+    - name: Scan container image for vulnerabilities
+      id: trivy-scan
+      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+      with:
+        timeout_minutes: 20
+        max_attempts: 2
+        command: |
+          trivy image --exit-code 1 --severity CRITICAL \
+            --no-progress --format table \
+            "ghcr.io/${{ inputs.image-owner }}/${{ inputs.image-name }}@${{ steps.push.outputs.digest }}" \
+            2>&1 | tee "${RUNNER_TEMP}/trivy-${{ inputs.image-name }}.txt"
+
+    - name: Generate SARIF report
+      if: "!cancelled()"
+      shell: bash
+      env:
+        IMAGE_REF: "ghcr.io/${{ inputs.image-owner }}/${{ inputs.image-name }}@${{ steps.push.outputs.digest }}"
+        IMAGE_NAME: ${{ inputs.image-name }}
+      run: |
+        umask 077
+        trivy image --severity CRITICAL,HIGH,MEDIUM \
+          --no-progress --format sarif --output "${IMAGE_NAME}-image.sarif" \
+          "$IMAGE_REF" || true
+
+    - name: Generate container SBOM
+      if: inputs.is-production == 'true'
+      shell: bash
+      env:
+        IMAGE_REF: "ghcr.io/${{ inputs.image-owner }}/${{ inputs.image-name }}@${{ steps.push.outputs.digest }}"
+        IMAGE_NAME: ${{ inputs.image-name }}
+      run: |
+        umask 077
+        trivy image --format cyclonedx --output "${IMAGE_NAME}-container-sbom.cdx.json" "$IMAGE_REF"
+
+    - name: Upload container SBOM
+      if: inputs.is-production == 'true'
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+      with:
+        name: ${{ inputs.image-name }}-container-sbom
+        path: ${{ inputs.image-name }}-container-sbom.cdx.json
+        retention-days: 30
+
+    - name: Upload SARIF to GitHub Security
+      if: "!cancelled() && hashFiles(format('{0}-image.sarif', inputs.image-name)) != ''"
+      uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+      with:
+        sarif_file: ${{ inputs.image-name }}-image.sarif
+        category: ${{ inputs.sarif-category }}
+      continue-on-error: true
+
+    - name: Attest build provenance
+      uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+      with:
+        subject-name: ghcr.io/${{ inputs.image-owner }}/${{ inputs.image-name }}
+        subject-digest: ${{ steps.push.outputs.digest }}
+        push-to-registry: true
+
+    - name: Collect diagnostics
+      if: failure()
+      uses: ./.github/actions/collect-diagnostics
+      with:
+        job-name: ${{ inputs.job-name }}
+        artifact-suffix: ${{ inputs.artifact-suffix }}
+        step-outcomes: |
+          push=${{ steps.push.outcome }}
+          trivy-scan=${{ steps.trivy-scan.outcome }}
+        output-files: |
+          ${{ runner.temp }}/docker-build-${{ inputs.image-name }}.txt
+          ${{ runner.temp }}/trivy-${{ inputs.image-name }}.txt
+
+    - name: Credential cleanup
+      if: always()
+      shell: bash
+      env:
+        IMAGE_NAME: ${{ inputs.image-name }}
+      run: |
+        docker logout ghcr.io 2>/dev/null || true
+        rm -f "${HOME}/.docker/config.json" 2>/dev/null || true
+        rm -f "${IMAGE_NAME}-image.sarif" "${IMAGE_NAME}-container-sbom.cdx.json" 2>/dev/null || true

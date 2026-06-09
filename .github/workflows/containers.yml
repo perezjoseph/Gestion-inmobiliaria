@@ -28,127 +28,35 @@ jobs:
       id-token: write
       attestations: write
     outputs:
-      digest: ${{ steps.push.outputs.digest }}
+      digest: ${{ steps.build.outputs.digest }}
     env:
       DOCKER_CONTENT_TRUST: "1"
-      IMAGE_OWNER: ${{ github.repository_owner }}
-      IMAGE_TAG: ${{ inputs.is-production && github.sha || format('preprod-{0}', github.sha) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v3.4.0
+      - name: Build, scan & attest backend container
+        id: build
+        uses: ./.github/actions/container-build-scan
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
-        with:
-          buildkitd-config-inline: |
-            [registry."ghcr.io"]
-              mirrors = ["ghcr.io"]
-            [registry."ghcr.io".tls]
-              insecureSkipVerify = false
-
-      - name: Build and push backend container image
-        id: push
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v6.18.0
-        env:
-          BUILDKIT_STEP_LOG_MAX_SIZE: 10485760
-        with:
+          image-name: realestate-backend
           context: .
-          file: infra/docker/Dockerfile.backend
-          push: true
-          tags: |
-            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend:${{ env.IMAGE_TAG }}
-            ${{ inputs.is-production && format('ghcr.io/{0}/realestate-backend:latest', github.repository_owner) || '' }}
+          dockerfile: infra/docker/Dockerfile.backend
           build-args: |
             MODE=prebuilt
             GH_REPO=${{ github.repository }}
             GH_RUN_ID=${{ github.run_id }}
-          secrets: |
+          build-secrets: |
             gh_token=${{ secrets.GITHUB_TOKEN }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-backend:buildcache
-          cache-to: ${{ inputs.is-production && format('type=registry,ref=ghcr.io/{0}/realestate-backend:buildcache,mode=max', github.repository_owner) || '' }}
-
-      - name: Install Trivy
-        uses: ./.github/actions/install-security-tools
-        with:
-          trivy: "true"
-
-      - name: Scan container image for vulnerabilities
-        id: trivy-scan
-        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
-        with:
-          timeout_minutes: 20
-          max_attempts: 2
-          command: |
-            trivy image --exit-code 1 --severity CRITICAL \
-              --no-progress --format table \
-              ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend@${{ steps.push.outputs.digest }} \
-              2>&1 | tee "${RUNNER_TEMP}/trivy-backend-image.txt"
-
-      - name: Generate SARIF report
-        if: "!cancelled()"
-        run: |
-          umask 077
-          trivy image --severity CRITICAL,HIGH,MEDIUM \
-            --no-progress --format sarif --output backend-image.sarif \
-            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend@${{ steps.push.outputs.digest }} || true
-
-      - name: Generate container SBOM
-        if: inputs.is-production
-        run: |
-          umask 077
-          trivy image --format cyclonedx --output backend-container-sbom.cdx.json \
-            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend@${{ steps.push.outputs.digest }}
-
-      - name: Upload backend container SBOM
-        if: inputs.is-production
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
-        with:
-          name: backend-container-sbom
-          path: backend-container-sbom.cdx.json
-          retention-days: 30
-
-      - name: Upload SARIF to GitHub Security
-        if: "!cancelled() && hashFiles('backend-image.sarif') != ''"
-        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
-        with:
-          sarif_file: backend-image.sarif
-          category: trivy-backend-image
-        continue-on-error: true
-
-      - name: Attest build provenance
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
-        with:
-          subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-backend
-          subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
-
-      - name: Collect diagnostics
-        if: failure()
-        uses: ./.github/actions/collect-diagnostics
-        with:
-          job-name: "containers / container-image-backend"
+          is-production: ${{ inputs.is-production }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          image-owner: ${{ github.repository_owner }}
+          cache-suffix: buildcache
+          sarif-category: trivy-backend-image
           artifact-suffix: container-backend
-          step-outcomes: |
-            push=${{ steps.push.outcome }}
-            trivy-scan=${{ steps.trivy-scan.outcome }}
-          output-files: |
-            ${{ runner.temp }}/trivy-backend-image.txt
-
-      - name: Credential cleanup
-        if: always()
-        run: |
-          docker logout ghcr.io 2>/dev/null || true
-          rm -f "${HOME}/.docker/config.json" 2>/dev/null || true
-          rm -f backend-image.sarif backend-container-sbom.cdx.json realestate-backend 2>/dev/null || true
+          job-name: "containers / container-image-backend"
 
   container-image-frontend:
     name: Container Image (Frontend)
@@ -162,32 +70,14 @@ jobs:
       id-token: write
       attestations: write
     outputs:
-      digest: ${{ steps.push.outputs.digest }}
+      digest: ${{ steps.build.outputs.digest }}
     env:
       DOCKER_CONTENT_TRUST: "1"
-      IMAGE_OWNER: ${{ github.repository_owner }}
-      IMAGE_TAG: ${{ inputs.is-production && github.sha || format('preprod-{0}', github.sha) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v3.4.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
-        with:
-          buildkitd-config-inline: |
-            [registry."ghcr.io"]
-              mirrors = ["ghcr.io"]
-            [registry."ghcr.io".tls]
-              insecureSkipVerify = false
 
       - name: Download frontend dist artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -196,96 +86,20 @@ jobs:
           path: ${{ runner.temp }}/frontend-artifact
 
       - name: Prepare frontend build context
-        run: |
-          cp -r "${{ runner.temp }}/frontend-artifact" dist
+        run: cp -r "${{ runner.temp }}/frontend-artifact" dist
 
-      - name: Build and push frontend container image
-        id: push
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v6.18.0
-        env:
-          BUILDKIT_STEP_LOG_MAX_SIZE: 10485760
+      - name: Build, scan & attest frontend container
+        id: build
+        uses: ./.github/actions/container-build-scan
         with:
+          image-name: realestate-frontend
           context: .
-          file: infra/docker/Dockerfile.frontend
-          push: true
-          tags: |
-            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend:${{ env.IMAGE_TAG }}
-            ${{ inputs.is-production && format('ghcr.io/{0}/realestate-frontend:latest', github.repository_owner) || '' }}
+          dockerfile: infra/docker/Dockerfile.frontend
           build-args: MODE=prebuilt
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/realestate-frontend:buildcache
-          cache-to: ${{ inputs.is-production && format('type=registry,ref=ghcr.io/{0}/realestate-frontend:buildcache,mode=max', github.repository_owner) || '' }}
-
-      - name: Install Trivy
-        uses: ./.github/actions/install-security-tools
-        with:
-          trivy: "true"
-
-      - name: Scan container image for vulnerabilities
-        id: trivy-scan
-        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
-        with:
-          timeout_minutes: 20
-          max_attempts: 2
-          command: |
-            trivy image --exit-code 1 --severity CRITICAL \
-              --no-progress --format table \
-              ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend@${{ steps.push.outputs.digest }} \
-              2>&1 | tee "${RUNNER_TEMP}/trivy-frontend-image.txt"
-
-      - name: Generate SARIF report
-        if: "!cancelled()"
-        run: |
-          umask 077
-          trivy image --severity CRITICAL,HIGH,MEDIUM \
-            --no-progress --format sarif --output frontend-image.sarif \
-            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend@${{ steps.push.outputs.digest }} || true
-
-      - name: Generate container SBOM
-        if: inputs.is-production
-        run: |
-          umask 077
-          trivy image --format cyclonedx --output frontend-container-sbom.cdx.json \
-            ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend@${{ steps.push.outputs.digest }}
-
-      - name: Upload frontend container SBOM
-        if: inputs.is-production
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
-        with:
-          name: frontend-container-sbom
-          path: frontend-container-sbom.cdx.json
-          retention-days: 30
-
-      - name: Upload SARIF to GitHub Security
-        if: "!cancelled() && hashFiles('frontend-image.sarif') != ''"
-        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
-        with:
-          sarif_file: frontend-image.sarif
-          category: trivy-frontend-image
-        continue-on-error: true
-
-      - name: Attest build provenance
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
-        with:
-          subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/realestate-frontend
-          subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
-
-      - name: Collect diagnostics
-        if: failure()
-        uses: ./.github/actions/collect-diagnostics
-        with:
-          job-name: "containers / container-image-frontend"
+          is-production: ${{ inputs.is-production }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          image-owner: ${{ github.repository_owner }}
+          cache-suffix: buildcache
+          sarif-category: trivy-frontend-image
           artifact-suffix: container-frontend
-          step-outcomes: |
-            push=${{ steps.push.outcome }}
-            trivy-scan=${{ steps.trivy-scan.outcome }}
-          output-files: |
-            ${{ runner.temp }}/trivy-frontend-image.txt
-
-      - name: Credential cleanup
-        if: always()
-        run: |
-          docker logout ghcr.io 2>/dev/null || true
-          rm -f "${HOME}/.docker/config.json" 2>/dev/null || true
-          rm -f frontend-image.sarif frontend-container-sbom.cdx.json 2>/dev/null || true
-          rm -rf dist 2>/dev/null || true
+          job-name: "containers / container-image-frontend"

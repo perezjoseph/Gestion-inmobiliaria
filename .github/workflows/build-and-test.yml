@@ -38,6 +38,14 @@ env:
   # Match parallelism to ARC runner pod CPU allocation.
   # Prevents over-subscription when cargo detects the node's full CPU count.
   CARGO_BUILD_JOBS: "4"
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+  CARGO_HTTP_CHECK_REVOKE: "true"
+  CARGO_HTTP_TIMEOUT: "30"
+  CARGO_NET_RETRY: "3"
+  RUSTFLAGS: "-D warnings"
 
 jobs:
   # ── Backend Clippy (compiles with musl target to warm sccache for release build) ──

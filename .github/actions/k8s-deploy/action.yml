@@ -1,0 +1,380 @@
+name: Kubernetes Deploy
+description: >
+  Deploys application to a k3s namespace: configures kubeconfig, updates secrets,
+  applies kustomize manifests, sets image digests, waits for rollout, runs health
+  checks, and rolls back on failure. Consolidates dev/prod deploy logic.
+
+inputs:
+  namespace:
+    description: "Target Kubernetes namespace"
+    required: true
+  kubeconfig-data:
+    description: "Base64-encoded kubeconfig"
+    required: true
+  db-username:
+    description: "Database username"
+    required: true
+  db-password:
+    description: "Database password"
+    required: true
+  db-host:
+    description: "Database host (e.g. db:5432 or db.realestate.svc.cluster.local:5432)"
+    required: true
+  db-name:
+    description: "Database name"
+    required: true
+  jwt-secret:
+    description: "JWT secret for app auth"
+    required: true
+  kustomize-path:
+    description: "Path to kustomize overlay (e.g. infra/k8s/app/overlays/dev/)"
+    required: true
+  caddyfile-path:
+    description: "Path to Caddyfile for ConfigMap"
+    required: true
+  shared-manifests-path:
+    description: "Path to shared kustomize base (applied before overlay, e.g. infra/k8s/app/shared/). Empty to skip."
+    required: false
+    default: ""
+  backend-digest:
+    description: "Backend image digest"
+    required: true
+  frontend-digest:
+    description: "Frontend image digest"
+    required: true
+  baileys-digest:
+    description: "Baileys image digest"
+    required: true
+  ocr-service-digest:
+    description: "OCR service image digest (empty to skip)"
+    required: false
+    default: ""
+  image-owner:
+    description: "GHCR namespace for images"
+    required: true
+  verify-attestations:
+    description: "Whether to verify image attestations before deploy (true for prod)"
+    required: false
+    default: "false"
+  github-token:
+    description: "GitHub token for attestation verification"
+    required: false
+    default: ""
+
+outputs:
+  deploy-outcome:
+    description: "Outcome of the deploy step"
+    value: ${{ steps.deploy.outcome }}
+
+runs:
+  using: composite
+  steps:
+    - name: Configure kubeconfig
+      shell: bash
+      env:
+        KUBECONFIG_DATA: ${{ inputs.kubeconfig-data }}
+      run: |
+        umask 077
+        mkdir -p "${HOME}/.kube"
+        echo "${KUBECONFIG_DATA}" | base64 -d > "${HOME}/.kube/config"
+        kubectl cluster-info
+
+    - name: Mask secrets
+      shell: bash
+      env:
+        DB_PASSWORD: ${{ inputs.db-password }}
+        JWT_SECRET: ${{ inputs.jwt-secret }}
+      run: |
+        echo "::add-mask::${DB_PASSWORD}"
+        echo "::add-mask::${JWT_SECRET}"
+
+    - name: Verify backend attestation
+      if: inputs.verify-attestations == 'true'
+      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        IMAGE_OWNER: ${{ inputs.image-owner }}
+        BACKEND_DIGEST: ${{ inputs.backend-digest }}
+      with:
+        timeout_minutes: 3
+        max_attempts: 3
+        retry_wait_seconds: 10
+        command: |
+          gh attestation verify \
+            "oci://ghcr.io/${IMAGE_OWNER}/realestate-backend@${BACKEND_DIGEST}" \
+            --owner "${IMAGE_OWNER}"
+
+    - name: Verify frontend attestation
+      if: inputs.verify-attestations == 'true'
+      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        IMAGE_OWNER: ${{ inputs.image-owner }}
+        FRONTEND_DIGEST: ${{ inputs.frontend-digest }}
+      with:
+        timeout_minutes: 3
+        max_attempts: 3
+        retry_wait_seconds: 10
+        command: |
+          gh attestation verify \
+            "oci://ghcr.io/${IMAGE_OWNER}/realestate-frontend@${FRONTEND_DIGEST}" \
+            --owner "${IMAGE_OWNER}"
+
+    - name: Verify OCR service attestation
+      if: inputs.verify-attestations == 'true' && inputs.ocr-service-digest != ''
+      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        IMAGE_OWNER: ${{ inputs.image-owner }}
+        OCR_DIGEST: ${{ inputs.ocr-service-digest }}
+      with:
+        timeout_minutes: 3
+        max_attempts: 3
+        retry_wait_seconds: 10
+        command: |
+          gh attestation verify \
+            "oci://ghcr.io/${IMAGE_OWNER}/realestate-ocr-service@${OCR_DIGEST}" \
+            --owner "${IMAGE_OWNER}"
+
+    - name: Verify Baileys attestation
+      if: inputs.verify-attestations == 'true'
+      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        IMAGE_OWNER: ${{ inputs.image-owner }}
+        BAILEYS_DIGEST: ${{ inputs.baileys-digest }}
+      with:
+        timeout_minutes: 3
+        max_attempts: 3
+        retry_wait_seconds: 10
+        command: |
+          gh attestation verify \
+            "oci://ghcr.io/${IMAGE_OWNER}/realestate-baileys@${BAILEYS_DIGEST}" \
+            --owner "${IMAGE_OWNER}"
+
+    - name: Ensure namespace exists
+      shell: bash
+      env:
+        NS: ${{ inputs.namespace }}
+      run: kubectl get namespace "${NS}" || kubectl create namespace "${NS}"
+
+    - name: Update secrets
+      shell: bash
+      env:
+        NS: ${{ inputs.namespace }}
+        DB_USERNAME: ${{ inputs.db-username }}
+        DB_PASSWORD: ${{ inputs.db-password }}
+        DB_HOST: ${{ inputs.db-host }}
+        DB_NAME: ${{ inputs.db-name }}
+        JWT_SECRET: ${{ inputs.jwt-secret }}
+      run: |
+        kubectl create secret generic realestate-db-secret \
+          --namespace "${NS}" \
+          --from-literal=username="${DB_USERNAME}" \
+          --from-literal=password="${DB_PASSWORD}" \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+        kubectl create secret generic realestate-db-url \
+          --namespace "${NS}" \
+          --from-literal=DATABASE_URL="postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}/${DB_NAME}" \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+        kubectl create secret generic realestate-app-secret \
+          --namespace "${NS}" \
+          --from-literal=jwt-secret="${JWT_SECRET}" \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Update Caddyfile ConfigMap
+      shell: bash
+      env:
+        NS: ${{ inputs.namespace }}
+        CADDYFILE_PATH: ${{ inputs.caddyfile-path }}
+      run: |
+        kubectl create configmap caddyfile \
+          --namespace "${NS}" \
+          --from-file=Caddyfile="${CADDYFILE_PATH}" \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Deploy shared resources
+      if: inputs.shared-manifests-path != ''
+      shell: bash
+      env:
+        SHARED_PATH: ${{ inputs.shared-manifests-path }}
+      run: kubectl apply -k "${SHARED_PATH}"
+
+    - name: Deploy application manifests
+      shell: bash
+      env:
+        KUSTOMIZE_PATH: ${{ inputs.kustomize-path }}
+      run: kubectl apply -k "${KUSTOMIZE_PATH}"
+
+    - name: Update container images by digest
+      id: deploy
+      shell: bash
+      env:
+        NS: ${{ inputs.namespace }}
+        IMAGE_OWNER: ${{ inputs.image-owner }}
+        BACKEND_DIGEST: ${{ inputs.backend-digest }}
+        FRONTEND_DIGEST: ${{ inputs.frontend-digest }}
+        BAILEYS_DIGEST: ${{ inputs.baileys-digest }}
+        OCR_DIGEST: ${{ inputs.ocr-service-digest }}
+      run: |
+        kubectl set image deployment/backend \
+          "backend=ghcr.io/${IMAGE_OWNER}/realestate-backend@${BACKEND_DIGEST}" \
+          --namespace "${NS}"
+
+        kubectl set image deployment/frontend \
+          "frontend=ghcr.io/${IMAGE_OWNER}/realestate-frontend@${FRONTEND_DIGEST}" \
+          --namespace "${NS}"
+
+        kubectl set image deployment/baileys \
+          "baileys=ghcr.io/${IMAGE_OWNER}/realestate-baileys@${BAILEYS_DIGEST}" \
+          --namespace "${NS}"
+
+        if [ -n "${OCR_DIGEST}" ]; then
+          kubectl set image deployment/ocr-service \
+            "ocr-service=ghcr.io/${IMAGE_OWNER}/realestate-ocr-service@${OCR_DIGEST}" \
+            --namespace "${NS}"
+        fi
+
+    - name: Wait for rollout
+      id: rollout
+      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+      env:
+        NS: ${{ inputs.namespace }}
+        OCR_DIGEST: ${{ inputs.ocr-service-digest }}
+      with:
+        timeout_minutes: 15
+        max_attempts: 2
+        command: |
+          kubectl rollout status deployment/backend --namespace "${NS}" --timeout=600s
+          kubectl rollout status deployment/frontend --namespace "${NS}" --timeout=600s
+          kubectl rollout status deployment/baileys --namespace "${NS}" --timeout=600s
+          if [ -n "${OCR_DIGEST}" ]; then
+            kubectl rollout status deployment/ocr-service --namespace "${NS}" --timeout=600s
+          fi
+
+    - name: Health check
+      id: health-check
+      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+      env:
+        NS: ${{ inputs.namespace }}
+        OCR_DIGEST: ${{ inputs.ocr-service-digest }}
+      with:
+        timeout_minutes: 10
+        max_attempts: 5
+        command: |
+          DEPLOYS="backend frontend baileys"
+          if [ -n "${OCR_DIGEST}" ]; then
+            DEPLOYS="$DEPLOYS ocr-service"
+          fi
+          for DEPLOY in $DEPLOYS; do
+            READY=$(kubectl get deployment "$DEPLOY" -n "${NS}" \
+              -o jsonpath='{.status.readyReplicas}')
+            DESIRED=$(kubectl get deployment "$DEPLOY" -n "${NS}" \
+              -o jsonpath='{.spec.replicas}')
+            if [ "${READY:-0}" -lt "${DESIRED:-1}" ]; then
+              echo "::error::${DEPLOY}: ${READY:-0}/${DESIRED:-1} replicas ready"
+              exit 1
+            fi
+            echo "${DEPLOY}: ${READY}/${DESIRED} replicas ready"
+          done
+          echo "All deployments healthy"
+
+    - name: Rollback on failure
+      if: failure() && steps.deploy.outcome == 'success'
+      shell: bash
+      env:
+        NS: ${{ inputs.namespace }}
+        OCR_DIGEST: ${{ inputs.ocr-service-digest }}
+      run: |
+        echo "::warning::Deployment health check failed -- rolling back only unhealthy deployments"
+        DEPLOYS="backend frontend baileys"
+        if [ -n "${OCR_DIGEST}" ]; then
+          DEPLOYS="$DEPLOYS ocr-service"
+        fi
+        for DEPLOY in $DEPLOYS; do
+          READY=$(kubectl get deployment "$DEPLOY" -n "${NS}" \
+            -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo 0)
+          DESIRED=$(kubectl get deployment "$DEPLOY" -n "${NS}" \
+            -o jsonpath='{.spec.replicas}' 2>/dev/null || echo 1)
+          if [ "${READY:-0}" -lt "${DESIRED:-1}" ]; then
+            echo "::warning::${DEPLOY} is unhealthy (${READY:-0}/${DESIRED:-1}) -- rolling back"
+            kubectl rollout undo "deployment/${DEPLOY}" --namespace "${NS}" || true
+          else
+            echo "${DEPLOY} is healthy (${READY}/${DESIRED}) -- leaving at new revision"
+          fi
+        done
+
+    - name: Collect deployment diagnostics
+      if: failure()
+      shell: bash
+      env:
+        NS: ${{ inputs.namespace }}
+        OCR_DIGEST: ${{ inputs.ocr-service-digest }}
+      run: |
+        umask 077
+        mkdir -p "${RUNNER_TEMP}/diag"
+        OUT="${RUNNER_TEMP}/diag/context.txt"
+
+        DEPLOYS="backend frontend baileys"
+        if [ -n "${OCR_DIGEST}" ]; then
+          DEPLOYS="$DEPLOYS ocr-service"
+        fi
+
+        {
+          echo "=== DEPLOYMENT FAILURE (${NS}) ==="
+          echo "Step outcomes:"
+          echo "  deploy=${{ steps.deploy.outcome }}"
+          echo "  rollout=${{ steps.rollout.outcome }}"
+          echo "  health-check=${{ steps.health-check.outcome }}"
+          echo ""
+
+          if ! kubectl cluster-info 2>&1; then
+            echo "=== CLUSTER UNREACHABLE ==="
+            echo "kubectl cluster-info failed. The K8s cluster may be down or kubeconfig invalid."
+          else
+            echo "=== DEPLOYMENT STATUS ==="
+            kubectl get deployments,pods,services -n "${NS}" -o wide 2>&1 || true
+            echo ""
+
+            echo "=== RECENT EVENTS (last 50) ==="
+            kubectl get events -n "${NS}" \
+              --sort-by='.lastTimestamp' \
+              -o custom-columns=TIME:.lastTimestamp,TYPE:.type,REASON:.reason,OBJECT:.involvedObject.name,MESSAGE:.message \
+              2>&1 | tail -50 || true
+            echo ""
+
+            for DEPLOY in $DEPLOYS; do
+              echo "=== PODS FOR ${DEPLOY} ==="
+              for POD in $(kubectl get pods -n "${NS}" \
+                  -l "app.kubernetes.io/name=${DEPLOY}" \
+                  -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+                echo "--- logs pod/${POD} (last 200 lines) ---"
+                kubectl logs "$POD" -n "${NS}" --tail=200 2>&1 || true
+                echo ""
+                echo "--- logs pod/${POD} (previous, last 100 lines) ---"
+                kubectl logs "$POD" -n "${NS}" --previous --tail=100 2>&1 || true
+                echo ""
+              done
+            done
+          fi
+        } > "$OUT"
+
+        if [ ! -s "$OUT" ]; then
+          echo "=== DEPLOYMENT FAILURE (${NS}) === Diagnostics collection produced no output." > "$OUT"
+        fi
+        echo "Wrote $(wc -l < "$OUT") lines to $OUT"
+
+    - name: Upload deployment diagnostics
+      if: failure()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+      with:
+        name: diag-deploy-${{ inputs.namespace }}
+        path: ${{ runner.temp }}/diag/context.txt
+        retention-days: 1
+
+    - name: Credential cleanup
+      if: always()
+      shell: bash
+      run: rm -f "${HOME}/.kube/config"
