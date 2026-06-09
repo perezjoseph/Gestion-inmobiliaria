@@ -1,0 +1,37 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-arc-runner-egress
+  namespace: arc-runners-v2
+spec:
+  podSelector:
+    matchLabels:
+      actions.github.com/scale-set-name: arc-runner-dind
+  policyTypes:
+    - Egress
+  egress:
+    # Allow HTTPS/HTTP to any external destination (GitHub APIs, container registries, crates.io)
+    - ports:
+        - port: 443
+          protocol: TCP
+        - port: 80
+          protocol: TCP
+    # Allow DNS resolution
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Allow NFS to NAS (registry, git, sccache, target caches)
+    - ports:
+        - port: 2049
+          protocol: TCP
+        - port: 2049
+          protocol: UDP
+      to:
+        - ipBlock:
+            cidr: 192.168.88.22/32
+    # Allow postgres service container (tests)
+    - ports:
+        - port: 5432
+          protocol: TCP
