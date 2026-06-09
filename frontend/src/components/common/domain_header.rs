@@ -35,7 +35,7 @@ pub enum DomainStatVariant {
     Error,
 }
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct DomainStatProps {
     /// Short label (e.g., "Atrasados", "Ocupación").
     pub label: AttrValue,

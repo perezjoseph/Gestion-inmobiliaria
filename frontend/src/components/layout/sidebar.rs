@@ -1,3 +1,4 @@
+use std::cmp::Reverse;
 use std::collections::HashMap;
 
 use wasm_bindgen_futures::spawn_local;
@@ -44,7 +45,7 @@ fn storage_set(key: &str, value: &str) {
 
 // ─── Route helpers ───────────────────────────────────────────────────────────
 
-fn is_trackable_route(route: &Route) -> bool {
+const fn is_trackable_route(route: &Route) -> bool {
     matches!(
         route,
         Route::Dashboard
@@ -59,7 +60,7 @@ fn is_trackable_route(route: &Route) -> bool {
     )
 }
 
-fn route_to_key(route: &Route) -> &'static str {
+const fn route_to_key(route: &Route) -> &'static str {
     match route {
         Route::Dashboard => "dashboard",
         Route::Propiedades => "propiedades",
@@ -89,7 +90,7 @@ fn key_to_route(key: &str) -> Option<Route> {
     }
 }
 
-fn route_label(route: &Route) -> &'static str {
+const fn route_label(route: &Route) -> &'static str {
     match route {
         Route::Dashboard => "Panel de Control",
         Route::Propiedades => "Propiedades",
@@ -149,7 +150,7 @@ fn increment_visit(route: &Route) {
 fn top_frecuentes() -> Vec<Route> {
     let counts = load_visit_counts();
     let mut sorted: Vec<_> = counts.into_iter().collect();
-    sorted.sort_by(|a, b| b.1.cmp(&a.1));
+    sorted.sort_by_key(|b| Reverse(b.1));
     sorted
         .into_iter()
         .take(MAX_FRECUENTES)
@@ -430,7 +431,6 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
     // Frecuentes tracking
     let frecuentes = use_state(top_frecuentes);
     {
-        let current_route = current_route.clone();
         let frecuentes = frecuentes.clone();
         use_effect_with(current_route.clone(), move |route| {
             if let Some(r) = route {
