@@ -308,10 +308,28 @@ jobs:
 
       - name: Verify downloaded artifacts
         if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
+        env:
+          ARTIFACTS_JSON: ${{ steps.list.outputs.artifacts }}
         run: |
           echo "=== Downloaded artifact structure ==="
           find "${RUNNER_TEMP}/all-diag" -type f -exec ls -la {} \; 2>/dev/null || echo "No files found"
           echo ""
+
+          # Fix flat downloads: when only 1 artifact matches the pattern,
+          # download-artifact may place files directly in the path dir
+          # instead of a subdirectory. Detect and reorganize.
+          if [ -f "${RUNNER_TEMP}/all-diag/context.txt" ] && [ ! -d "${RUNNER_TEMP}/all-diag/$(echo "$ARTIFACTS_JSON" | jq -r '.[0]')" ]; then
+            FIRST_ARTIFACT=$(echo "$ARTIFACTS_JSON" | jq -r '.[0]')
+            echo "::notice::Flat download detected — reorganizing into ${FIRST_ARTIFACT}/"
+            mkdir -p "${RUNNER_TEMP}/all-diag/${FIRST_ARTIFACT}"
+            mv "${RUNNER_TEMP}/all-diag/context.txt" "${RUNNER_TEMP}/all-diag/${FIRST_ARTIFACT}/context.txt"
+            # Move any other stray files too
+            for f in "${RUNNER_TEMP}/all-diag"/*; do
+              [ -d "$f" ] && continue
+              mv "$f" "${RUNNER_TEMP}/all-diag/${FIRST_ARTIFACT}/" 2>/dev/null || true
+            done
+          fi
+
           for dir in "${RUNNER_TEMP}/all-diag"/*/; do
             [ -d "$dir" ] || continue
             artifact_name=$(basename "$dir")
