@@ -743,6 +743,7 @@ jobs:
     needs: [kiro-autofix-deploy-precheck]
     if: needs.kiro-autofix-deploy-precheck.outputs.artifact-present == 'true'
     permissions:
+      actions: read
       contents: write
       pull-requests: write
     uses: ./.github/workflows/kiro-autofix.yml
