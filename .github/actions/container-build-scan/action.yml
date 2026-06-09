@@ -44,10 +44,6 @@ inputs:
   job-name:
     description: "Human-readable job name for diagnostics"
     required: true
-  outputs-compression:
-    description: "Docker build output compression (e.g. type=registry,compression=zstd,compression-level=3,force-compression=true)"
-    required: false
-    default: ""
 
 outputs:
   digest:
@@ -100,7 +96,7 @@ runs:
       with:
         context: ${{ inputs.context }}
         file: ${{ inputs.dockerfile }}
-        push: ${{ inputs.outputs-compression == '' }}
+        push: true
         tags: |
           ghcr.io/${{ inputs.image-owner }}/${{ inputs.image-name }}:${{ steps.meta.outputs.image-tag }}
           ${{ steps.meta.outputs.latest-tag }}
@@ -108,7 +104,6 @@ runs:
         secrets: ${{ inputs.build-secrets }}
         cache-from: type=registry,ref=ghcr.io/${{ inputs.image-owner }}/${{ inputs.image-name }}:${{ inputs.cache-suffix }}
         cache-to: ${{ inputs.is-production == 'true' && format('type=registry,ref=ghcr.io/{0}/{1}:{2},mode=max', inputs.image-owner, inputs.image-name, inputs.cache-suffix) || '' }}
-        outputs: ${{ inputs.outputs-compression }}
 
     - name: Capture Docker build logs on failure
       if: failure() && steps.push.outcome == 'failure'

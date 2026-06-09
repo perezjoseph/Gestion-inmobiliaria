@@ -190,7 +190,6 @@ jobs:
           sarif-category: trivy-ocr-service-image
           artifact-suffix: container-ocr
           job-name: "ocr-container"
-          outputs-compression: "type=registry,compression=zstd,compression-level=3,force-compression=true"
 
   # ── Stage 2: Container Images (after build-and-test + security pass) ──
   # On PRs, only run when both backend and frontend artifacts are available (neither skipped).
