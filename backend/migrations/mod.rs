@@ -50,6 +50,7 @@ pub mod m20260607_000001_add_guidance_rules_to_chatbot_config;
 pub mod m20260607_000002_seed_guidance_rule_templates;
 pub mod m20260608_000001_add_password_changed_at;
 pub mod m20260609_000001_add_organizacion_id_to_plantillas;
+pub mod m20260609_000002_add_performance_indexes;
 
 use sea_orm_migration::prelude::*;
 
@@ -110,6 +111,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260607_000002_seed_guidance_rule_templates::Migration),
             Box::new(m20260608_000001_add_password_changed_at::Migration),
             Box::new(m20260609_000001_add_organizacion_id_to_plantillas::Migration),
+            Box::new(m20260609_000002_add_performance_indexes::Migration),
         ]
     }
 }

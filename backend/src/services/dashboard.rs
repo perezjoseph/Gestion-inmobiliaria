@@ -20,7 +20,7 @@ use crate::services::documentos::{
     REQUERIDOS_CONTRATO, REQUERIDOS_INQUILINO, REQUERIDOS_PROPIEDAD,
 };
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DashboardStats {
     pub total_propiedades: u64,

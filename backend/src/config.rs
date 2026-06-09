@@ -121,8 +121,8 @@ pub struct PoolConfig {
 impl Default for PoolConfig {
     fn default() -> Self {
         Self {
-            max_connections: 10,
-            min_connections: 2,
+            max_connections: 25,
+            min_connections: 5,
             connect_timeout_secs: 5,
             idle_timeout_secs: 300,
             max_lifetime_secs: 1800,
@@ -374,8 +374,8 @@ mod tests {
         }
 
         let config = AppConfig::from_env().unwrap();
-        assert_eq!(config.pool.max_connections, 10);
-        assert_eq!(config.pool.min_connections, 2);
+        assert_eq!(config.pool.max_connections, 25);
+        assert_eq!(config.pool.min_connections, 5);
         assert_eq!(config.pool.connect_timeout_secs, 5);
         assert_eq!(config.pool.idle_timeout_secs, 300);
         assert_eq!(config.pool.max_lifetime_secs, 1800);

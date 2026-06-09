@@ -40,7 +40,15 @@ pub const TAREAS_VALIDAS: &[&str] = &[
     "generar_mantenimiento_programado",
 ];
 
-const INTERVALO_POR_DEFECTO_SECS: u64 = 86_400;
+/// Per-task interval in seconds. Tasks that need more frequent execution get shorter intervals.
+fn intervalo_para_tarea(nombre: &str) -> u64 {
+    match nombre {
+        "marcar_pagos_atrasados" => 3_600,  // Every hour
+        "generar_notificaciones" => 14_400, // Every 4 hours
+        "marcar_contratos_vencidos" | "marcar_documentos_vencidos" => 21_600, // Every 6 hours
+        _ => 86_400,                        // Daily (default for all others)
+    }
+}
 
 pub fn iniciar_scheduler(
     db: DatabaseConnection,
@@ -52,10 +60,10 @@ pub fn iniciar_scheduler(
         let db = db.clone();
         let nombre = tarea.to_string();
         let token = token.clone();
+        let intervalo = intervalo_para_tarea(tarea);
 
         let handle = tokio::spawn(async move {
-            let mut interval =
-                tokio::time::interval(Duration::from_secs(INTERVALO_POR_DEFECTO_SECS));
+            let mut interval = tokio::time::interval(Duration::from_secs(intervalo));
             // The first tick completes immediately — skip it so the first
             // execution happens after one full interval.
             interval.tick().await;
@@ -285,7 +293,12 @@ mod tests {
     }
 
     #[test]
-    fn intervalo_por_defecto_is_24_hours() {
-        assert_eq!(INTERVALO_POR_DEFECTO_SECS, 86_400);
+    fn intervalo_marcar_pagos_is_hourly() {
+        assert_eq!(intervalo_para_tarea("marcar_pagos_atrasados"), 3_600);
+    }
+
+    #[test]
+    fn intervalo_default_is_daily() {
+        assert_eq!(intervalo_para_tarea("unknown_task"), 86_400);
     }
 }

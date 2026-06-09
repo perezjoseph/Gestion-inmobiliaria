@@ -17,6 +17,7 @@ pub mod configuracion;
 pub mod contratos;
 pub mod crypto;
 pub mod dashboard;
+pub mod dashboard_cache;
 #[cfg(test)]
 mod dashboard_comparativo_pbt;
 pub mod desahucios;

@@ -5,12 +5,16 @@ use crate::errors::AppError;
 use crate::models::dashboard::{OcupacionTendenciaQuery, PagosProximosQuery};
 use crate::services::auth::Claims;
 use crate::services::dashboard;
+use crate::services::dashboard_cache::DashboardCache;
 
 pub async fn stats(
     db: web::Data<DatabaseConnection>,
     claims: Claims,
+    cache: web::Data<DashboardCache>,
 ) -> Result<HttpResponse, AppError> {
-    let result = dashboard::get_stats(db.get_ref(), claims.organizacion_id).await?;
+    let result = cache
+        .get_stats(db.get_ref(), claims.organizacion_id)
+        .await?;
     Ok(HttpResponse::Ok().json(result))
 }
 

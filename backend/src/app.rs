@@ -4,6 +4,7 @@ use actix_cors::Cors;
 use actix_web::HttpResponse;
 use actix_web::error::ResponseError;
 use actix_web::http::header;
+use actix_web::middleware::Compress;
 use actix_web::web;
 use actix_web::web::JsonConfig;
 use actix_web_prom::PrometheusMetricsBuilder;
@@ -14,6 +15,7 @@ use crate::config::{AppConfig, SmtpConfig};
 use crate::errors::AppError;
 use crate::routes;
 use crate::services::baileys_client::BaileysClient;
+use crate::services::dashboard_cache::DashboardCache;
 use crate::services::login_lockout::LoginLockout;
 use crate::services::mail::{MailClient, OutgoingMail, SmtpMailClient};
 use crate::services::ocr_preview::PreviewStore;
@@ -218,6 +220,7 @@ pub fn create_app(
     };
 
     let mut app = actix_web::App::new()
+        .wrap(Compress::default())
         .wrap(prometheus)
         .wrap(crate::middleware::security_headers::SecurityHeaders)
         .wrap(TracingLogger::default())
@@ -227,6 +230,7 @@ pub fn create_app(
         .app_data(preview_store)
         .app_data(lockout)
         .app_data(web::Data::new(UserSecurityCache::new()))
+        .app_data(web::Data::new(DashboardCache::new()))
         .app_data(web::Data::new(mail_client))
         .app_data(json_cfg)
         .app_data(multipart_cfg)
