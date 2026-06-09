@@ -66,7 +66,9 @@ runs:
 
           # Include each output file
           while IFS= read -r filepath; do
-            filepath=$(echo "$filepath" | xargs)  # trim whitespace
+            # Trim leading/trailing whitespace without xargs (avoids quote parsing)
+            filepath="${filepath#"${filepath%%[![:space:]]*}"}"
+            filepath="${filepath%"${filepath##*[![:space:]]}"}"
             [ -z "$filepath" ] && continue
             if [ -s "$filepath" ]; then
               FILES_FOUND=$((FILES_FOUND + 1))

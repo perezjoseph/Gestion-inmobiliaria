@@ -372,7 +372,9 @@ jobs:
               ALL_COVERED=true
               while IFS= read -r dfile; do
                 [ -z "$dfile" ] && continue
-                dfile_trimmed=$(echo "$dfile" | xargs)
+                # Trim leading/trailing whitespace without xargs (avoids quote parsing issues)
+                dfile_trimmed="${dfile#"${dfile%%[![:space:]]*}"}"
+                dfile_trimmed="${dfile_trimmed%"${dfile_trimmed##*[![:space:]]}"}"
                 if ! echo "$FIXED_FILES" | grep -qF "$dfile_trimmed"; then
                   ALL_COVERED=false
                   break
