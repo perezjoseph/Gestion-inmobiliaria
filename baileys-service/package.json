@@ -11,13 +11,13 @@
   },
   "dependencies": {
     "@whiskeysockets/baileys": "7.0.0-rc13",
-    "express": "4.22.1",
+    "express": "5.2.1",
     "pg": "^8.21.0",
     "pino": "9.6.0",
     "qrcode": "1.5.4"
   },
   "devDependencies": {
-    "@types/express": "5.0.1",
+    "@types/express": "5.0.6",
     "@types/node": "25.9.2",
     "@types/pg": "^8.11.11",
     "@types/qrcode": "1.5.6",
