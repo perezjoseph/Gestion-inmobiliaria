@@ -35,3 +35,10 @@ spec:
     - ports:
         - port: 5432
           protocol: TCP
+    # Allow access to K8s API server (kubectl in deploy jobs)
+    - ports:
+        - port: 6443
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: 192.168.88.112/32
