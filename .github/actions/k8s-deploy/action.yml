@@ -77,7 +77,14 @@ runs:
         umask 077
         mkdir -p "${HOME}/.kube"
         echo "${KUBECONFIG_DATA}" | base64 -d > "${HOME}/.kube/config"
-        kubectl cluster-info
+
+    - name: Verify cluster connectivity
+      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+      with:
+        timeout_minutes: 3
+        max_attempts: 5
+        retry_wait_seconds: 15
+        command: kubectl cluster-info
 
     - name: Mask secrets
       shell: bash
