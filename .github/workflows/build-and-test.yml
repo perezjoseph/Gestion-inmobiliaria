@@ -114,7 +114,7 @@ jobs:
 
   # ── Backend Tests (parallel with clippy and build) ──
   # On PRs: runs tests with cargo-nextest (parallel processes, sccache enabled, fast).
-  # On main: runs tests with llvm-cov coverage (sccache disabled, slower but only on merge).
+  # On main: runs tests with llvm-cov coverage (cargo test, sccache disabled, slower but only on merge).
   backend-test:
     name: Backend Test
     runs-on: arc-runner-dind
@@ -196,16 +196,6 @@ jobs:
             exit 1
           fi
 
-      - name: Verify cargo-nextest available (coverage path)
-        if: inputs.is-production
-        run: |
-          if command -v cargo-nextest &>/dev/null; then
-            echo "cargo-nextest already available: $(cargo-nextest --version)"
-          else
-            echo "cargo-nextest not found — installing"
-            curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
-          fi
-
       - name: Clean stale llvm-cov target artifacts
         if: inputs.is-production
         run: |
@@ -227,7 +217,7 @@ jobs:
           max_attempts: 2
           command: |
             mkdir -p coverage
-            cargo llvm-cov nextest --locked -p realestate-backend \
+            cargo llvm-cov test --locked -p realestate-backend \
               --lcov --output-path coverage/lcov.info 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
             exit ${PIPESTATUS[0]}
 
