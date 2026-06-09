@@ -52,7 +52,7 @@ pub fn MobileCard(props: &MobileCardProps) -> Html {
 }
 
 /// Container for a list of mobile cards. Only visible at ≤768px (via CSS).
-/// Pair with DataTable which is hidden on mobile via `.gi-mobile-hidden`.
+/// Pair with `DataTable` which is hidden on mobile via `.gi-mobile-hidden`.
 #[derive(Properties, PartialEq)]
 pub struct MobileCardListProps {
     #[prop_or_default]

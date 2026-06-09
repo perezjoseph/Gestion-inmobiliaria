@@ -59,7 +59,6 @@ pub fn Drawer(props: &DrawerProps) -> Html {
 
     // Close button
     let on_close_btn = {
-        let on_close = on_close.clone();
         Callback::from(move |_: MouseEvent| {
             on_close.emit(());
         })

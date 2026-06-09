@@ -1105,7 +1105,7 @@ fn render_propiedades_view(
                             let (badge_cls, badge_label) = estado_badge(&p.estado);
                             let badge_html = html! { <span class={badge_cls}>{badge_label}</span> };
                             let subtitle = format!("{}, {}", p.ciudad, p.provincia);
-                            let detail = format!("{} {}", p.moneda, format!("{:.2}", p.precio));
+                            let detail = format!("{} {:.2}", p.moneda, p.precio);
                             let pc = p.clone();
                             let on_edit_card = on_edit.clone();
                             let onclick = Callback::from(move |_: MouseEvent| {

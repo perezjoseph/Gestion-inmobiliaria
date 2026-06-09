@@ -114,7 +114,7 @@ jobs:
 
   # ── Backend Tests (parallel with clippy and build) ──
   # On PRs: runs tests with cargo-nextest (parallel processes, sccache enabled, fast).
-  # On main: runs tests with llvm-cov coverage (sccache disabled, slower but only on merge).
+  # On main: runs tests with llvm-cov coverage (cargo test, sccache disabled, slower but only on merge).
   backend-test:
     name: Backend Test
     runs-on: arc-runner-dind
@@ -217,7 +217,7 @@ jobs:
           max_attempts: 2
           command: |
             mkdir -p coverage
-            cargo llvm-cov nextest --locked -p realestate-backend \
+            cargo llvm-cov test --locked -p realestate-backend \
               --lcov --output-path coverage/lcov.info 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
             exit ${PIPESTATUS[0]}
 
@@ -230,15 +230,21 @@ jobs:
           retention-days: 7
 
       # ── Fast path (PRs — no coverage, sccache enabled, cargo-nextest for parallel execution) ──
-      - name: Verify cargo-nextest available
+      - name: Install cargo-nextest
         if: ${{ !inputs.is-production }}
-        run: |
-          if command -v cargo-nextest &>/dev/null; then
-            echo "cargo-nextest already available: $(cargo-nextest --version)"
-          else
-            echo "::error::cargo-nextest not found — expected prebaked in runner image"
-            exit 1
-          fi
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            if command -v cargo-nextest &>/dev/null; then
+              echo "cargo-nextest already available: $(cargo-nextest --version)"
+              exit 0
+            fi
+            echo "cargo-nextest not found — installing"
+            curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+            cargo nextest --version
 
       - name: Run tests (nextest)
         if: ${{ !inputs.is-production }}
@@ -250,6 +256,7 @@ jobs:
           timeout_minutes: 30
           max_attempts: 2
           command: |
+            export PATH="${CARGO_HOME:-~/.cargo}/bin:$PATH"
             cargo nextest run --locked -p realestate-backend 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
             exit ${PIPESTATUS[0]}
 
@@ -438,6 +445,21 @@ jobs:
           retention-days: 1
 
       # ── Phase 2: Tests ──
+      - name: Install cargo-nextest
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            if command -v cargo-nextest &>/dev/null; then
+              echo "cargo-nextest already available: $(cargo-nextest --version)"
+              exit 0
+            fi
+            echo "cargo-nextest not found — installing"
+            curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+            cargo nextest --version
+
       - name: Run frontend tests
         id: tests
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
@@ -445,6 +467,7 @@ jobs:
           timeout_minutes: 30
           max_attempts: 2
           command: |
+            export PATH="${CARGO_HOME:-~/.cargo}/bin:$PATH"
             cargo nextest run --locked -p realestate-frontend --all-targets 2>&1 | tee "${RUNNER_TEMP}/test-frontend-output.txt"
             exit ${PIPESTATUS[0]}
 

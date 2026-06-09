@@ -55,6 +55,7 @@ jobs:
     runs-on: arc-runner-dind
     timeout-minutes: 30
     permissions:
+      actions: read
       contents: write
       pull-requests: write
     env:

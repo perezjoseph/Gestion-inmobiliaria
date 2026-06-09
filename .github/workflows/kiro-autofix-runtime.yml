@@ -86,12 +86,12 @@ jobs:
           targets: x86_64-unknown-linux-musl,wasm32-unknown-unknown
 
       - name: Write diagnostics file
+        env:
+          ERROR_CONTEXT: ${{ inputs.error-context }}
         run: |
           umask 077
           mkdir -p "${RUNNER_TEMP}/runtime-diag"
-          cat > "${RUNNER_TEMP}/runtime-diag/context.txt" << 'DIAG_EOF'
-          ${{ inputs.error-context }}
-          DIAG_EOF
+          printf '%s\n' "$ERROR_CONTEXT" > "${RUNNER_TEMP}/runtime-diag/context.txt"
           echo "KIRO_DIAGNOSTICS_FILE=${RUNNER_TEMP}/runtime-diag/context.txt" >> "$GITHUB_ENV"
 
       - name: Count prior autofix attempts

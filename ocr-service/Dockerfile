@@ -2,7 +2,7 @@ FROM python:3.12-slim AS builder
 
 # Force rebuild to pick up latest Debian security patches.
 # Bump this date when OS-level CVEs have no pinnable fix version.
-ARG SECURITY_PATCH_DATE=2026-06-08
+ARG SECURITY_PATCH_DATE=2026-06-09
 
 WORKDIR /app
 
@@ -21,7 +21,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
 
 COPY requirements.txt .
 # Upgrade pip before installing to pick up CVE fixes (CVE-2025-8869, CVE-2026-6357, CVE-2026-3219)
-RUN pip install --no-cache-dir --upgrade pip \
+RUN pip install --no-cache-dir --upgrade "pip>=26.1" \
     && pip install --no-cache-dir -r requirements.txt
 
 # Download PaddleOCR models and convert to OpenVINO IR format
@@ -43,7 +43,7 @@ COPY main.py ocr_engine.py ./
 FROM python:3.12-slim
 
 # Force rebuild to pick up latest Debian security patches.
-ARG SECURITY_PATCH_DATE=2026-06-08
+ARG SECURITY_PATCH_DATE=2026-06-09
 
 WORKDIR /app
 

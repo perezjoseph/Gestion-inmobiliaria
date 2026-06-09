@@ -1,8 +1,6 @@
 # Stage 1: Install dependencies
-# node:24-alpine ships npm 11 which patches the bundled-npm CVEs
-# (tar, minimatch, glob, cross-spawn, brace-expansion, ip-address)
-# that ship inside node:20-alpine's older npm 10.x.
-# We also upgrade npm to latest to pick up patched bundled deps.
+# node:26-alpine ships npm 11+ which patches the bundled-npm CVEs.
+# Global npm/npx/corepack are removed from the runtime stage below.
 FROM node:26-alpine AS deps
 WORKDIR /app
 RUN npm install -g npm@latest
@@ -21,7 +19,8 @@ RUN npm run build
 FROM node:26-alpine AS runtime
 WORKDIR /app
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
+ && rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist

@@ -1433,9 +1433,13 @@ fn render_pagos_view(
                 contratos={(**contratos).clone()} contrato_label={contrato_label.clone()}
                 on_apply={on_filter_apply} on_clear={on_filter_clear}
             />
-            <Drawer open={**show_form} on_close={on_cancel.clone().reform(|()| {
-                // Create a synthetic MouseEvent-like close
-                web_sys::MouseEvent::new("click").unwrap()
+            <Drawer open={**show_form} on_close={Callback::from({
+                let on_cancel = on_cancel.clone();
+                move |()| {
+                    if let Ok(ev) = web_sys::MouseEvent::new("click") {
+                        on_cancel.emit(ev);
+                    }
+                }
             })} title={if editing.is_some() { "Editar Pago" } else { "Nuevo Pago" }}>
                 {form_html}
             </Drawer>

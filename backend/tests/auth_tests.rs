@@ -6,7 +6,7 @@ mod db_async {
     use serde_json::Value;
     use uuid::Uuid;
 
-    use crate::common::{self, JWT_SECRET};
+    use crate::common;
 
     fn make_config() -> realestate_backend::config::AppConfig {
         common::test_app_config(common::db_url())

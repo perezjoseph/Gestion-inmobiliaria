@@ -4,7 +4,7 @@ use yew_router::prelude::*;
 use crate::app::Route;
 
 /// A breadcrumb segment.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Crumb {
     pub label: AttrValue,
     pub route: Option<Route>,

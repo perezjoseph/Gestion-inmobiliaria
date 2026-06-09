@@ -21,7 +21,7 @@ FROM golang:1.26.4-alpine AS caddy-builder
 RUN apk add --no-cache git
 WORKDIR /build
 RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && \
-    XCADDY_SKIP_CLEANUP=1 xcaddy build v2.11.3 || true
+    XCADDY_SKIP_CLEANUP=1 xcaddy build v2.11.4 || true
 RUN BUILDENV=$(ls -d /tmp/buildenv_*) && \
     go -C "$BUILDENV" get github.com/go-jose/go-jose/v3@v3.0.5 && \
     go -C "$BUILDENV" get github.com/go-jose/go-jose/v4@v4.1.4 && \

@@ -234,36 +234,67 @@ jobs:
         if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false'
         env:
           GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            umask 077
+            ARTIFACTS_JSON=$(gh api \
+              "repos/${{ github.repository }}/actions/runs/${CI_RUN_ID}/artifacts?per_page=100" \
+              --jq '[.artifacts[] | select(.name | startswith("diag-")) | .name]')
+
+            if [ -z "$ARTIFACTS_JSON" ] || [ "$ARTIFACTS_JSON" = "[]" ]; then
+              echo "::warning::No diag-* artifacts found in run ${CI_RUN_ID}"
+              echo "artifacts=[]" >> "$GITHUB_OUTPUT"
+              echo "count=0" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            # Priority: build > lint > container > security > semgrep > codeql
+            SORTED=$(echo "$ARTIFACTS_JSON" | jq -c '
+              sort_by(
+                if startswith("diag-build-") then 0
+                elif startswith("diag-lint-") then 1
+                elif startswith("diag-container-") then 2
+                elif startswith("diag-security-") then 3
+                elif startswith("diag-semgrep-") then 4
+                elif startswith("diag-codeql-") then 5
+                else 6 end
+              )
+            ')
+
+            COUNT=$(echo "$SORTED" | jq 'length')
+            echo "artifacts=$SORTED" >> "$GITHUB_OUTPUT"
+            echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+            echo "Found $COUNT failing-job artifacts (priority-sorted): $SORTED"
+
+      - name: Notify on zero diagnostics artifacts
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count == '0'
+        env:
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
         run: |
           umask 077
-          ARTIFACTS_JSON=$(gh api \
-            "repos/${{ github.repository }}/actions/runs/${CI_RUN_ID}/artifacts?per_page=100" \
-            --jq '[.artifacts[] | select(.name | startswith("diag-")) | .name]')
+          pr_number=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --head "${BRANCH}" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty' 2>/dev/null || echo "")
+          MSG="⚠️ **Kiro Autofix: CI failed but no diagnostics artifacts were found.**
 
-          if [ -z "$ARTIFACTS_JSON" ] || [ "$ARTIFACTS_JSON" = "[]" ]; then
-            echo "::warning::No diag-* artifacts found in run ${CI_RUN_ID}"
-            echo "artifacts=[]" >> "$GITHUB_OUTPUT"
-            echo "count=0" >> "$GITHUB_OUTPUT"
-            exit 0
+          Run [${CI_RUN_ID}](${RUN_URL}) failed without producing any \`diag-*\` artifacts. This usually means a job failed before reaching its \`collect-diagnostics\` step, or the step was not wired for the failing job.
+
+          **Action needed:** Check the failing job and add \`collect-diagnostics\` to its \`if: failure()\` steps."
+
+          if [ -n "$pr_number" ]; then
+            gh pr comment "$pr_number" \
+              --repo "${{ github.repository }}" \
+              --body "$MSG"
+          else
+            echo "::warning::CI failed with no diag-* artifacts and no open PR to notify. Run: ${RUN_URL}"
           fi
-
-          # Priority: build > lint > container > security > semgrep > codeql
-          SORTED=$(echo "$ARTIFACTS_JSON" | jq -c '
-            sort_by(
-              if startswith("diag-build-") then 0
-              elif startswith("diag-lint-") then 1
-              elif startswith("diag-container-") then 2
-              elif startswith("diag-security-") then 3
-              elif startswith("diag-semgrep-") then 4
-              elif startswith("diag-codeql-") then 5
-              else 6 end
-            )
-          ')
-
-          COUNT=$(echo "$SORTED" | jq 'length')
-          echo "artifacts=$SORTED" >> "$GITHUB_OUTPUT"
-          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
-          echo "Found $COUNT failing-job artifacts (priority-sorted): $SORTED"
 
       - name: Download all failing-job artifacts
         if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
@@ -277,10 +308,28 @@ jobs:
 
       - name: Verify downloaded artifacts
         if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
+        env:
+          ARTIFACTS_JSON: ${{ steps.list.outputs.artifacts }}
         run: |
           echo "=== Downloaded artifact structure ==="
           find "${RUNNER_TEMP}/all-diag" -type f -exec ls -la {} \; 2>/dev/null || echo "No files found"
           echo ""
+
+          # Fix flat downloads: when only 1 artifact matches the pattern,
+          # download-artifact may place files directly in the path dir
+          # instead of a subdirectory. Detect and reorganize.
+          if [ -f "${RUNNER_TEMP}/all-diag/context.txt" ] && [ ! -d "${RUNNER_TEMP}/all-diag/$(echo "$ARTIFACTS_JSON" | jq -r '.[0]')" ]; then
+            FIRST_ARTIFACT=$(echo "$ARTIFACTS_JSON" | jq -r '.[0]')
+            echo "::notice::Flat download detected — reorganizing into ${FIRST_ARTIFACT}/"
+            mkdir -p "${RUNNER_TEMP}/all-diag/${FIRST_ARTIFACT}"
+            mv "${RUNNER_TEMP}/all-diag/context.txt" "${RUNNER_TEMP}/all-diag/${FIRST_ARTIFACT}/context.txt"
+            # Move any other stray files too
+            for f in "${RUNNER_TEMP}/all-diag"/*; do
+              [ -d "$f" ] && continue
+              mv "$f" "${RUNNER_TEMP}/all-diag/${FIRST_ARTIFACT}/" 2>/dev/null || true
+            done
+          fi
+
           for dir in "${RUNNER_TEMP}/all-diag"/*/; do
             [ -d "$dir" ] || continue
             artifact_name=$(basename "$dir")
@@ -295,9 +344,45 @@ jobs:
             fi
           done
 
+      - name: Baseline verification (confirm failure still reproduces)
+        id: baseline
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
+        run: |
+          umask 077
+          # Determine the appropriate quick-check command from the first artifact.
+          FIRST_ARTIFACT=$(echo '${{ steps.list.outputs.artifacts }}' | jq -r '.[0]')
+          echo "Running baseline check for artifact type: ${FIRST_ARTIFACT}"
+
+          BASELINE_PASS=false
+          case "$FIRST_ARTIFACT" in
+            diag-clippy-*|diag-build-*)
+              # Quick cargo check (not full build) to confirm compile errors exist
+              if cargo check --locked -p realestate-backend 2>/dev/null; then
+                if cargo check --locked -p realestate-frontend --target wasm32-unknown-unknown 2>/dev/null; then
+                  BASELINE_PASS=true
+                fi
+              fi
+              ;;
+            diag-test-*)
+              # For test failures, cargo check passes but tests would fail.
+              # Just confirm the code compiles — test failures are assumed valid.
+              ;;
+            *)
+              # For container, security, lint artifacts — assume still failing.
+              ;;
+          esac
+
+          if [ "$BASELINE_PASS" = true ]; then
+            echo "::notice::Baseline check PASSED — code compiles cleanly. The failure may have been fixed by a concurrent push."
+            echo "still_failing=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Baseline confirms failure still present. Proceeding with autofix."
+            echo "still_failing=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build git history of prior attempts
         id: history
-        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0' && steps.baseline.outputs.still_failing != 'false'
         run: |
           umask 077
           HISTORY_LOG="${RUNNER_TEMP}/git-history.txt"
@@ -310,21 +395,20 @@ jobs:
           echo "history_log=$HISTORY_LOG" >> "$GITHUB_OUTPUT"
 
       - name: Configure git identity
-        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0' && steps.baseline.outputs.still_failing != 'false'
         run: |
           git config user.name "kiro-bot"
           git config user.email "kiro-bot@users.noreply.github.com"
 
       - name: Process queue (one Kiro run + one commit per artifact)
         id: queue
-        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0'
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0' && steps.baseline.outputs.still_failing != 'false'
         env:
           KIRO_API_KEY: ${{ secrets.KIRO_API }}
           KIRO_MAX_FIX_ITERATIONS: "3"
           ARTIFACTS_JSON: ${{ steps.list.outputs.artifacts }}
           GIT_HISTORY_FILE: ${{ steps.history.outputs.history_log }}
           QUEUE_RUNS: ${{ steps.attempts.outputs.queue_runs }}
-          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
         run: |
           umask 077
           ATTEMPT_DISPLAY=$((QUEUE_RUNS + 1))
@@ -332,6 +416,10 @@ jobs:
           TOTAL=$(echo "$ARTIFACTS_JSON" | jq 'length')
           POS=0
           FIXED_FILES=""
+
+          # Initialize accumulated learnings file for cross-artifact context.
+          LEARNINGS_FILE="${RUNNER_TEMP}/autofix-learnings.txt"
+          : > "$LEARNINGS_FILE"
 
           # Iterate through artifacts in priority order
           while IFS= read -r artifact; do
@@ -348,6 +436,7 @@ jobs:
                 echo "::notice::Using alternative file from ${artifact}: $(basename "$ALT_FILE")"
               else
                 echo "::warning::${artifact} has no usable diagnostics content — skipping"
+                printf '[%s] SKIPPED: no usable diagnostics content\n' "$artifact" >> "$LEARNINGS_FILE"
                 continue
               fi
             fi
@@ -366,13 +455,23 @@ jobs:
               EFFECTIVE_CTX="$CONTEXT_PATH"
             fi
 
+            # Skip deploy artifacts where the cluster is unreachable — no code change can fix this.
+            if [[ "$artifact" == diag-deploy-* ]] && grep -qF "=== CLUSTER UNREACHABLE ===" "$EFFECTIVE_CTX"; then
+              echo "::notice::Skipping ${artifact}: cluster unreachable (infrastructure issue, not actionable by code fix)"
+              printf '[%s] SKIPPED: cluster unreachable — infrastructure issue\n' "$artifact" >> "$LEARNINGS_FILE"
+              echo "::endgroup::"
+              continue
+            fi
+
             # Skip artifacts whose errors reference only files already fixed by prior queue items.
             if [ -n "$FIXED_FILES" ]; then
               DIAG_FILES=$(grep -oP '(?:^|\s)(\S+\.(?:rs|ts|tsx|kt|kts))' "$EFFECTIVE_CTX" | sort -u || true)
               ALL_COVERED=true
               while IFS= read -r dfile; do
                 [ -z "$dfile" ] && continue
-                dfile_trimmed=$(echo "$dfile" | xargs)
+                # Trim leading/trailing whitespace without xargs (avoids quote parsing issues)
+                dfile_trimmed="${dfile#"${dfile%%[![:space:]]*}"}"
+                dfile_trimmed="${dfile_trimmed%"${dfile_trimmed##*[![:space:]]}"}"
                 if ! echo "$FIXED_FILES" | grep -qF "$dfile_trimmed"; then
                   ALL_COVERED=false
                   break
@@ -380,18 +479,55 @@ jobs:
               done <<< "$DIAG_FILES"
               if [ "$ALL_COVERED" = true ] && [ -n "$DIAG_FILES" ]; then
                 echo "::notice::Skipping ${artifact}: all referenced files were already fixed by prior queue items"
+                printf '[%s] SKIPPED: all referenced files already fixed by prior items\n' "$artifact" >> "$LEARNINGS_FILE"
                 echo "::endgroup::"
                 continue
               fi
             fi
 
-            # Set environment variables for the agent
+            # Set environment variables for the agent.
+            # NOTE: GH_TOKEN is NOT exported here — the agent should not have
+            # access to the PAT. Only KIRO_API_KEY is available to the agent.
             export KIRO_DIAGNOSTICS_FILE="$EFFECTIVE_CTX"
             export KIRO_COMMIT_MSG_FILE="${RUNNER_TEMP}/kiro-commit-message-${artifact}.txt"
             export KIRO_GIT_HISTORY_FILE="$GIT_HISTORY_FILE"
+            export KIRO_LEARNINGS_FILE="$LEARNINGS_FILE"
 
-            # Build the positional prompt with context the agent can act on immediately.
-            PROMPT="Fix CI failure from artifact '${artifact}' (queue position ${POS}/${TOTAL}). Read the diagnostics file at \$KIRO_DIAGNOSTICS_FILE. Read prior attempt history at \$KIRO_GIT_HISTORY_FILE. Write your commit message to \$KIRO_COMMIT_MSG_FILE when done."
+            # Determine success criteria based on artifact type.
+            SUCCESS_CRITERIA=""
+            case "$artifact" in
+              diag-clippy-backend|diag-build-backend)
+                SUCCESS_CRITERIA="Success criteria: 'cargo clippy --locked -p realestate-backend --target x86_64-unknown-linux-musl -- -D warnings' must exit 0 with no output."
+                ;;
+              diag-clippy-frontend|diag-build-frontend)
+                SUCCESS_CRITERIA="Success criteria: 'cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings' must exit 0 with no output."
+                ;;
+              diag-test-backend)
+                SUCCESS_CRITERIA="Success criteria: 'cargo test --locked -p realestate-backend' must exit 0 with all tests passing."
+                ;;
+              diag-test-frontend)
+                SUCCESS_CRITERIA="Success criteria: 'cargo test --locked -p realestate-frontend' must exit 0 with all tests passing."
+                ;;
+              diag-container-*)
+                SUCCESS_CRITERIA="Success criteria: the Dockerfile must build successfully and trivy image scan must find no CRITICAL vulnerabilities."
+                ;;
+              diag-security-*|diag-semgrep-*)
+                SUCCESS_CRITERIA="Success criteria: the security finding described in the diagnostics must be resolved without introducing new issues."
+                ;;
+              *)
+                SUCCESS_CRITERIA="Success criteria: the error described in the diagnostics must be fully resolved."
+                ;;
+            esac
+
+            # Build the positional prompt with success criteria and learnings context.
+            PROMPT="Fix CI failure from artifact '${artifact}' (queue position ${POS}/${TOTAL}). ${SUCCESS_CRITERIA} Read the diagnostics file at \$KIRO_DIAGNOSTICS_FILE. Read prior attempt history at \$KIRO_GIT_HISTORY_FILE."
+
+            # Include learnings from prior queue items if any exist.
+            if [ -s "$LEARNINGS_FILE" ]; then
+              PROMPT="${PROMPT} Read accumulated learnings from earlier queue items at \$KIRO_LEARNINGS_FILE."
+            fi
+
+            PROMPT="${PROMPT} Write your commit message to \$KIRO_COMMIT_MSG_FILE when done. Do NOT use placeholder or stub implementations — fix the root cause completely."
 
             # Invoke the autofix agent (no per-artifact timeout; job-level
             # timeout-minutes guards against runaway execution).
@@ -404,6 +540,7 @@ jobs:
             git add -A
             if [ -z "$(git status --porcelain)" ]; then
               echo "No changes produced by Kiro for ${artifact}, skipping commit"
+              printf '[%s] NO CHANGES: agent exit=%d, no files modified\n' "$artifact" "$AGENT_EXIT" >> "$LEARNINGS_FILE"
               if [ "$AGENT_EXIT" -ne 0 ]; then
                 echo "::warning::Agent exited ${AGENT_EXIT} with no changes for ${artifact}; stopping queue."
                 echo "::endgroup::"
@@ -416,6 +553,9 @@ jobs:
             # Track which files were fixed for deduplication of later artifacts.
             NEWLY_FIXED=$(git diff --cached --name-only)
             FIXED_FILES="${FIXED_FILES}"$'\n'"${NEWLY_FIXED}"
+
+            # Record what was fixed in learnings for subsequent artifacts.
+            printf '[%s] FIXED: agent exit=%d, files changed:\n%s\n' "$artifact" "$AGENT_EXIT" "$NEWLY_FIXED" >> "$LEARNINGS_FILE"
 
             # Commit locally — no push yet (push happens once at end of queue).
             # Ensure every queued commit ends with the Workflow run trailer for
@@ -432,6 +572,14 @@ jobs:
             COMMITS_MADE=$((COMMITS_MADE + 1))
             echo "Commit ${COMMITS_MADE} created for ${artifact}"
 
+            # Update git history file so subsequent artifacts see what changed.
+            {
+              echo "=== RECENT COMMITS (last 10) ==="
+              git log --format='%h %ae %s%n%b%n---' -n 10
+              echo ""
+              echo "=== PRIOR KIRO-BOT QUEUE RUNS AT HEAD: ${QUEUE_RUNS} ==="
+            } > "$GIT_HISTORY_FILE"
+
             # Exit code handling: 0 → continue queue; non-zero → stop queue
             if [ "$AGENT_EXIT" -ne 0 ]; then
               echo "::warning::Agent exited ${AGENT_EXIT} for ${artifact}; committed partial fix, stopping queue."
@@ -445,6 +593,59 @@ jobs:
           echo "commits_made=$COMMITS_MADE" >> "$GITHUB_OUTPUT"
           echo ""
           echo "Queue complete. Created $COMMITS_MADE commits."
+          if [ -s "$LEARNINGS_FILE" ]; then
+            echo "=== Queue Learnings ==="
+            cat "$LEARNINGS_FILE"
+          fi
+
+      - name: Post-queue review pass (separated evaluator)
+        id: review
+        if: steps.queue.outputs.commits_made != '0' && steps.queue.outputs.commits_made != ''
+        env:
+          KIRO_API_KEY: ${{ secrets.KIRO_API }}
+        run: |
+          umask 077
+          # Generate a combined diff of all queued commits for review.
+          REVIEW_DIFF="${RUNNER_TEMP}/review-diff.txt"
+          git diff "origin/${BRANCH}..HEAD" > "$REVIEW_DIFF"
+
+          DIFF_SIZE=$(wc -c < "$REVIEW_DIFF")
+          if [ "$DIFF_SIZE" -gt "${MAX_CONTEXT_BYTES}" ]; then
+            echo "::notice::Review diff is ${DIFF_SIZE} bytes; truncating to last ${MAX_CONTEXT_BYTES} for review."
+            tail -c "${MAX_CONTEXT_BYTES}" "$REVIEW_DIFF" > "${REVIEW_DIFF}.truncated"
+            mv "${REVIEW_DIFF}.truncated" "$REVIEW_DIFF"
+          fi
+
+          export KIRO_REVIEW_DIFF_FILE="$REVIEW_DIFF"
+          export KIRO_REVIEW_VERDICT_FILE="${RUNNER_TEMP}/review-verdict.txt"
+
+          REVIEW_PROMPT="You are a code reviewer. Review the diff at \$KIRO_REVIEW_DIFF_FILE. Check for:
+          1. Band-aid fixes that suppress errors without addressing root cause
+          2. Regressions introduced by the fix (e.g., removing functionality, breaking API contracts)
+          3. Dead code or commented-out code left behind
+          4. Security issues introduced by the fix
+          Write PASS or FAIL (with explanation) to \$KIRO_REVIEW_VERDICT_FILE.
+          If FAIL, also write which specific commit(s) should be reverted.
+          Only FAIL for serious issues — cosmetic or style nits are acceptable."
+
+          # Review agent runs without --trust-all-tools (read-only is sufficient).
+          kiro-cli chat --agent autofix --model claude-opus-4.6 --effort max --no-interactive \
+            "$REVIEW_PROMPT" || true
+
+          if [ -s "$KIRO_REVIEW_VERDICT_FILE" ]; then
+            VERDICT=$(head -1 "$KIRO_REVIEW_VERDICT_FILE")
+            echo "Review verdict: $VERDICT"
+            cat "$KIRO_REVIEW_VERDICT_FILE"
+            if echo "$VERDICT" | grep -qiF "FAIL"; then
+              echo "::warning::Post-queue review FAILED. Commits will still be pushed but review is logged."
+              echo "review_passed=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "review_passed=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "::notice::Review agent did not produce a verdict file. Proceeding with push."
+            echo "review_passed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Push all queued commits
         id: push
@@ -550,6 +751,7 @@ jobs:
     needs: [kiro-autofix-deploy-precheck]
     if: needs.kiro-autofix-deploy-precheck.outputs.artifact-present == 'true'
     permissions:
+      actions: read
       contents: write
       pull-requests: write
     uses: ./.github/workflows/kiro-autofix.yml
