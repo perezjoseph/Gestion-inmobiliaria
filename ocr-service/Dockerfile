@@ -1,5 +1,9 @@
 FROM python:3.12-slim AS builder
 
+# Force rebuild to pick up latest Debian security patches.
+# Bump this date when OS-level CVEs have no pinnable fix version.
+ARG SECURITY_PATCH_DATE=2026-06-08
+
 WORKDIR /app
 
 # Upgrade base packages to pick up latest Debian security patches before
@@ -37,6 +41,9 @@ RUN for i in 1 2 3; do \
 COPY main.py ocr_engine.py ./
 
 FROM python:3.12-slim
+
+# Force rebuild to pick up latest Debian security patches.
+ARG SECURITY_PATCH_DATE=2026-06-08
 
 WORKDIR /app
 

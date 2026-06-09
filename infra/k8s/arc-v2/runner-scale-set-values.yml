@@ -47,7 +47,7 @@ template:
           [
             "sh",
             "-c",
-            "find /mnt/registry /mnt/git /mnt/sccache /mnt/target -not -perm 777 -print0 2>/dev/null | xargs -0 -P4 -r chmod 777; true",
+            'for d in /mnt/registry /mnt/git /mnt/sccache /mnt/target; do chmod 777 "$d" 2>/dev/null || true; done',
           ]
         securityContext:
           runAsUser: 0
@@ -86,7 +86,7 @@ template:
             memory: 512Mi
           limits:
             cpu: "4"
-            memory: 3Gi
+            memory: 2Gi
         volumeMounts:
           - name: work
             mountPath: /home/runner/_work
@@ -110,7 +110,7 @@ template:
             memory: 1Gi
           limits:
             cpu: "4"
-            memory: 8Gi
+            memory: 5Gi
         volumeMounts:
           - name: work
             mountPath: /home/runner/_work
@@ -150,7 +150,7 @@ template:
                 - key: kubernetes.io/hostname
                   operator: NotIn
                   values:
-                    - NetworkStorage
+                    - networkstorage
       podAntiAffinity:
         preferredDuringSchedulingIgnoredDuringExecution:
           - weight: 50
