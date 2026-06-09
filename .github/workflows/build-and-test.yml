@@ -230,15 +230,21 @@ jobs:
           retention-days: 7
 
       # ── Fast path (PRs — no coverage, sccache enabled, cargo-nextest for parallel execution) ──
-      - name: Verify cargo-nextest available
+      - name: Install cargo-nextest
         if: ${{ !inputs.is-production }}
-        run: |
-          if command -v cargo-nextest &>/dev/null; then
-            echo "cargo-nextest already available: $(cargo-nextest --version)"
-          else
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            if command -v cargo-nextest &>/dev/null; then
+              echo "cargo-nextest already available: $(cargo-nextest --version)"
+              exit 0
+            fi
             echo "cargo-nextest not found — installing"
             curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
-          fi
+            cargo nextest --version
 
       - name: Run tests (nextest)
         if: ${{ !inputs.is-production }}
@@ -250,6 +256,7 @@ jobs:
           timeout_minutes: 30
           max_attempts: 2
           command: |
+            export PATH="${CARGO_HOME:-~/.cargo}/bin:$PATH"
             cargo nextest run --locked -p realestate-backend 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
             exit ${PIPESTATUS[0]}
 
@@ -438,6 +445,21 @@ jobs:
           retention-days: 1
 
       # ── Phase 2: Tests ──
+      - name: Install cargo-nextest
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            if command -v cargo-nextest &>/dev/null; then
+              echo "cargo-nextest already available: $(cargo-nextest --version)"
+              exit 0
+            fi
+            echo "cargo-nextest not found — installing"
+            curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+            cargo nextest --version
+
       - name: Run frontend tests
         id: tests
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
@@ -445,6 +467,7 @@ jobs:
           timeout_minutes: 30
           max_attempts: 2
           command: |
+            export PATH="${CARGO_HOME:-~/.cargo}/bin:$PATH"
             cargo nextest run --locked -p realestate-frontend --all-targets 2>&1 | tee "${RUNNER_TEMP}/test-frontend-output.txt"
             exit ${PIPESTATUS[0]}
 
