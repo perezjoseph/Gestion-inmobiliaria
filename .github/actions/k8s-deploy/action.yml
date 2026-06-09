@@ -314,6 +314,7 @@ runs:
         done
 
     - name: Collect deployment diagnostics
+      id: diagnostics
       if: failure()
       shell: bash
       env:
@@ -329,6 +330,7 @@ runs:
           DEPLOYS="$DEPLOYS ocr-service"
         fi
 
+        CLUSTER_REACHABLE=true
         {
           echo "=== DEPLOYMENT FAILURE (${NS}) ==="
           echo "Step outcomes:"
@@ -338,6 +340,7 @@ runs:
           echo ""
 
           if ! kubectl cluster-info 2>&1; then
+            CLUSTER_REACHABLE=false
             echo "=== CLUSTER UNREACHABLE ==="
             echo "kubectl cluster-info failed. The K8s cluster may be down or kubeconfig invalid."
           else
@@ -373,8 +376,17 @@ runs:
         fi
         echo "Wrote $(wc -l < "$OUT") lines to $OUT"
 
+        # If the cluster is unreachable, skip artifact upload to avoid
+        # triggering autofix for infrastructure issues no code change can fix.
+        if [ "$CLUSTER_REACHABLE" = false ]; then
+          echo "::warning::Cluster unreachable — skipping diagnostics artifact upload (not actionable by autofix)"
+          echo "actionable=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "actionable=true" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Upload deployment diagnostics
-      if: failure()
+      if: failure() && steps.diagnostics.outputs.actionable == 'true'
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
       with:
         name: diag-deploy-${{ inputs.namespace }}
