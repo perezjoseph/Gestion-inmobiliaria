@@ -238,7 +238,7 @@ runs:
           "baileys=ghcr.io/${IMAGE_OWNER}/realestate-baileys@${BAILEYS_DIGEST}" \
           --namespace "${NS}"
 
-        if [ -n "${OCR_DIGEST}" ]; then
+        if [ -n "${OCR_DIGEST}" ] && kubectl get deployment/ocr-service --namespace "${NS}" >/dev/null 2>&1; then
           kubectl set image deployment/ocr-service \
             "ocr-service=ghcr.io/${IMAGE_OWNER}/realestate-ocr-service@${OCR_DIGEST}" \
             --namespace "${NS}"
@@ -257,7 +257,7 @@ runs:
           kubectl rollout status deployment/backend --namespace "${NS}" --timeout=600s
           kubectl rollout status deployment/frontend --namespace "${NS}" --timeout=600s
           kubectl rollout status deployment/baileys --namespace "${NS}" --timeout=600s
-          if [ -n "${OCR_DIGEST}" ]; then
+          if [ -n "${OCR_DIGEST}" ] && kubectl get deployment/ocr-service --namespace "${NS}" >/dev/null 2>&1; then
             kubectl rollout status deployment/ocr-service --namespace "${NS}" --timeout=600s
           fi
 
@@ -272,7 +272,7 @@ runs:
         max_attempts: 5
         command: |
           DEPLOYS="backend frontend baileys"
-          if [ -n "${OCR_DIGEST}" ]; then
+          if [ -n "${OCR_DIGEST}" ] && kubectl get deployment/ocr-service -n "${NS}" >/dev/null 2>&1; then
             DEPLOYS="$DEPLOYS ocr-service"
           fi
           for DEPLOY in $DEPLOYS; do
@@ -297,7 +297,7 @@ runs:
       run: |
         echo "::warning::Deployment health check failed -- rolling back only unhealthy deployments"
         DEPLOYS="backend frontend baileys"
-        if [ -n "${OCR_DIGEST}" ]; then
+        if [ -n "${OCR_DIGEST}" ] && kubectl get deployment/ocr-service -n "${NS}" >/dev/null 2>&1; then
           DEPLOYS="$DEPLOYS ocr-service"
         fi
         for DEPLOY in $DEPLOYS; do
@@ -326,7 +326,7 @@ runs:
         OUT="${RUNNER_TEMP}/diag/context.txt"
 
         DEPLOYS="backend frontend baileys"
-        if [ -n "${OCR_DIGEST}" ]; then
+        if [ -n "${OCR_DIGEST}" ] && kubectl get deployment/ocr-service -n "${NS}" >/dev/null 2>&1; then
           DEPLOYS="$DEPLOYS ocr-service"
         fi
 
