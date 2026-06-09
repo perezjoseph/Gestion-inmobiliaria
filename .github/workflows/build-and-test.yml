@@ -196,6 +196,16 @@ jobs:
             exit 1
           fi
 
+      - name: Verify cargo-nextest available (coverage path)
+        if: inputs.is-production
+        run: |
+          if command -v cargo-nextest &>/dev/null; then
+            echo "cargo-nextest already available: $(cargo-nextest --version)"
+          else
+            echo "cargo-nextest not found — installing"
+            curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+          fi
+
       - name: Clean stale llvm-cov target artifacts
         if: inputs.is-production
         run: |
@@ -236,8 +246,8 @@ jobs:
           if command -v cargo-nextest &>/dev/null; then
             echo "cargo-nextest already available: $(cargo-nextest --version)"
           else
-            echo "::error::cargo-nextest not found — expected prebaked in runner image"
-            exit 1
+            echo "cargo-nextest not found — installing"
+            curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
           fi
 
       - name: Run tests (nextest)
