@@ -31,8 +31,15 @@ Before making changes:
 
 1. Read `$KIRO_DIAGNOSTICS_FILE` — identify the failing job, error output, file paths, and line numbers.
 2. Read `$KIRO_GIT_HISTORY_FILE` — check prior attempts. If a prior attempt modified the same files with a similar diff and the error persists, try a fundamentally different approach.
-3. Consult `lessons-learned.md` — apply known fixes directly to save iterations.
+3. Read `$KIRO_LEARNINGS_FILE` (if it exists and is non-empty) — apply learnings from earlier queue items to avoid repeating failed approaches.
 4. Consult `code-style.md` and `testing.md` when modifying code.
+
+### 1.5. Research (if needed)
+
+If the error involves an unfamiliar API, a version-specific breaking change, or a library whose correct usage you're uncertain about:
+- Use the **Context7** tool to look up current documentation for the relevant library/crate BEFORE attempting a fix.
+- Do this before wasting iterations on guesses from training data.
+- Common triggers: "method not found", "no such field", deprecated API warnings, trait bound mismatches on library types, unknown derive macro attributes.
 
 ### 2. Fix
 
