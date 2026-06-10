@@ -95,6 +95,17 @@ runs:
         echo "::add-mask::${DB_PASSWORD}"
         echo "::add-mask::${JWT_SECRET}"
 
+    - name: Validate secrets
+      shell: bash
+      env:
+        JWT_SECRET: ${{ inputs.jwt-secret }}
+      run: |
+        if [ "${#JWT_SECRET}" -lt 32 ]; then
+          echo "::error::JWT secret is ${#JWT_SECRET} characters but backend requires at least 32. Update the repository secret (DEV_JWT_SECRET or JWT_SECRET)."
+          echo "=== SECRET MISCONFIGURATION ===" > "${RUNNER_TEMP}/secret_validation_failed"
+          exit 1
+        fi
+
     - name: Verify backend attestation
       if: inputs.verify-attestations == 'true'
       uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
@@ -380,6 +391,9 @@ runs:
         # triggering autofix for infrastructure issues no code change can fix.
         if [ "$CLUSTER_REACHABLE" = false ]; then
           echo "::warning::Cluster unreachable — skipping diagnostics artifact upload (not actionable by autofix)"
+          echo "actionable=false" >> "$GITHUB_OUTPUT"
+        elif [ -f "${RUNNER_TEMP}/secret_validation_failed" ]; then
+          echo "::warning::Secret misconfiguration — skipping diagnostics artifact upload (not actionable by autofix)"
           echo "actionable=false" >> "$GITHUB_OUTPUT"
         else
           echo "actionable=true" >> "$GITHUB_OUTPUT"

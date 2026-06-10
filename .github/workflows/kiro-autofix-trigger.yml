@@ -463,6 +463,15 @@ jobs:
               continue
             fi
 
+            # Skip deploy artifacts where pods crash due to a secret length/value misconfiguration.
+            # These require updating GitHub Actions secrets, not code changes.
+            if [[ "$artifact" == diag-deploy-* ]] && grep -qF "JWT_SECRET debe tener al menos 32 caracteres" "$EFFECTIVE_CTX"; then
+              echo "::notice::Skipping ${artifact}: secret misconfiguration (JWT_SECRET too short — update the DEV_JWT_SECRET or JWT_SECRET GitHub Actions secret)"
+              printf '[%s] SKIPPED: secret misconfiguration — update DEV_JWT_SECRET repository secret to >=32 chars\n' "$artifact" >> "$LEARNINGS_FILE"
+              echo "::endgroup::"
+              continue
+            fi
+
             # Skip artifacts whose errors reference only files already fixed by prior queue items.
             if [ -n "$FIXED_FILES" ]; then
               DIAG_FILES=$(grep -oP '(?:^|\s)(\S+\.(?:rs|ts|tsx|kt|kts))' "$EFFECTIVE_CTX" | sort -u || true)
