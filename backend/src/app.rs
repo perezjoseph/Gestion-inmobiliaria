@@ -125,10 +125,10 @@ fn build_cors(config: &AppConfig) -> Cors {
     config.cors_origin.as_deref().map_or_else(
         || {
             tracing::warn!(
-                "CORS_ORIGIN no configurado — rechazando solicitudes cross-origin. \
-                 Configure CORS_ORIGIN para habilitar acceso desde el frontend."
+                "CORS_ORIGIN no configurado — usando CORS permisivo (solo desarrollo). \
+                 Configure CORS_ORIGIN para restringir orígenes en producción."
             );
-            Cors::default()
+            Cors::permissive()
         },
         |origin| {
             Cors::default()
