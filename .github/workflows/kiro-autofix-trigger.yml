@@ -472,6 +472,15 @@ jobs:
               continue
             fi
 
+            # Skip deploy artifacts where pods crash due to database unreachable (PoolTimedOut).
+            # This is an infrastructure issue (db pod not running), not a code issue.
+            if [[ "$artifact" == diag-deploy-* ]] && grep -qF "SqlxError(PoolTimedOut)" "$EFFECTIVE_CTX"; then
+              echo "::notice::Skipping ${artifact}: database unreachable (PoolTimedOut — ensure the db deployment is running in the namespace)"
+              printf '[%s] SKIPPED: database unreachable (PoolTimedOut) — ensure db pod is running in namespace\n' "$artifact" >> "$LEARNINGS_FILE"
+              echo "::endgroup::"
+              continue
+            fi
+
             # Skip artifacts whose errors reference only files already fixed by prior queue items.
             if [ -n "$FIXED_FILES" ]; then
               DIAG_FILES=$(grep -oP '(?:^|\s)(\S+\.(?:rs|ts|tsx|kt|kts))' "$EFFECTIVE_CTX" | sort -u || true)

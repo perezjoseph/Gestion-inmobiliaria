@@ -395,6 +395,9 @@ runs:
         elif [ -f "${RUNNER_TEMP}/secret_validation_failed" ]; then
           echo "::warning::Secret misconfiguration — skipping diagnostics artifact upload (not actionable by autofix)"
           echo "actionable=false" >> "$GITHUB_OUTPUT"
+        elif grep -qF "SqlxError(PoolTimedOut)" "$OUT"; then
+          echo "::warning::Database unreachable (PoolTimedOut) — skipping diagnostics artifact upload (not actionable by autofix)"
+          echo "actionable=false" >> "$GITHUB_OUTPUT"
         else
           echo "actionable=true" >> "$GITHUB_OUTPUT"
         fi
