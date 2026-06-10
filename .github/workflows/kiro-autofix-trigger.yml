@@ -481,6 +481,15 @@ jobs:
               continue
             fi
 
+            # Skip deploy artifacts where pods crash due to database credential mismatch (28P01).
+            # This requires updating the DEV_POSTGRES_PASSWORD GitHub Actions secret.
+            if [[ "$artifact" == diag-deploy-* ]] && grep -qF "password authentication failed" "$EFFECTIVE_CTX"; then
+              echo "::notice::Skipping ${artifact}: database credential mismatch (28P01 — update DEV_POSTGRES_PASSWORD secret to match the Postgres user password)"
+              printf '[%s] SKIPPED: database credential mismatch (28P01) — update DEV_POSTGRES_PASSWORD repository secret\n' "$artifact" >> "$LEARNINGS_FILE"
+              echo "::endgroup::"
+              continue
+            fi
+
             # Skip artifacts whose errors reference only files already fixed by prior queue items.
             if [ -n "$FIXED_FILES" ]; then
               DIAG_FILES=$(grep -oP '(?:^|\s)(\S+\.(?:rs|ts|tsx|kt|kts))' "$EFFECTIVE_CTX" | sort -u || true)
