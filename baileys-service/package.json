@@ -27,7 +27,6 @@
   },
   "overrides": {
     "qs": "6.15.2",
-    "path-to-regexp": "0.1.13",
     "music-metadata": "11.12.3",
     "file-type": "22.0.1",
     "protobufjs": "7.5.8"
