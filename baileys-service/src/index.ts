@@ -1,11 +1,17 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import pino from 'pino';
 import QRCode, { QRCodeToDataURLOptions } from 'qrcode';
 import { getConnectionCounts, startSession, stopSession, getStatus, sendMessage, restoreSessions } from './session-manager';
+import crypto from 'node:crypto';
 
 const logger = pino({ name: 'baileys-service' });
 
 const PORT = Number.parseInt(process.env.PORT || '3100', 10);
+const INTERNAL_TOKEN = process.env.BAILEYS_INTERNAL_TOKEN || '';
+
+if (!INTERNAL_TOKEN || INTERNAL_TOKEN.length < 32) {
+  logger.warn('BAILEYS_INTERNAL_TOKEN not set or too short (<32 chars) — requests will be rejected');
+}
 
 // Render QR at 2x the displayed 256px size for crisp scanning on high-DPI screens,
 // with a proper quiet zone margin and medium error correction (WhatsApp's QR payload
@@ -18,9 +24,28 @@ const QR_OPTIONS: QRCodeToDataURLOptions = {
 };
 
 const app = express();
-app.use(express.json());
+app.disable('x-powered-by');
+app.use(express.json({ limit: '100kb' }));
 
-// --- Health endpoint ---
+// --- Authentication middleware ---
+
+function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const token = req.headers['x-internal-token'] as string | undefined;
+  if (!INTERNAL_TOKEN || !token) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  // Constant-time comparison to prevent timing attacks
+  const tokenBuf = Buffer.from(token);
+  const expectedBuf = Buffer.from(INTERNAL_TOKEN);
+  if (tokenBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(tokenBuf, expectedBuf)) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  next();
+}
+
+// --- Health endpoint (unauthenticated — used by K8s probes) ---
 
 app.get('/health', (_req: Request, res: Response) => {
   const counts = getConnectionCounts();
@@ -31,7 +56,8 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// --- Session API endpoints ---
+// --- Session API endpoints (authenticated) ---
+app.use('/sessions', authMiddleware);
 
 /**
  * POST /sessions/:realmId/start
