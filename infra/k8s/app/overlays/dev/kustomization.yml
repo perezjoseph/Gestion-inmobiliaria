@@ -55,6 +55,26 @@ patches:
       - op: replace
         path: /spec/template/spec/containers/0/env/3/value
         value: "https://gestion.local"
+  # Allow dev backend egress to prod db (cross-namespace).
+  # The base allow-backend-egress uses podSelector which is namespace-scoped,
+  # so we patch it to also allow reaching the prod Postgres via namespaceSelector.
+  - target:
+      kind: NetworkPolicy
+      name: allow-backend-egress
+    patch: |
+      - op: add
+        path: /spec/egress/-
+        value:
+          to:
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: realestate
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: db
+          ports:
+            - port: 5432
+              protocol: TCP
 
 configMapGenerator:
   - name: caddyfile

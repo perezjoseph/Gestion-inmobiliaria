@@ -275,6 +275,13 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: baileys
+        # Allow dev backend (cross-namespace) to reach prod db
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: realestate-dev
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: backend
       ports:
         - port: 5432
           protocol: TCP
