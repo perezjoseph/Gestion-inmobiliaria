@@ -571,9 +571,10 @@ fn test_marcar_contratos_vencidos_updates_contracts() {
         assert_eq!(resp.status(), 200);
 
         let body: Value = actix_web::test::read_body_json(resp).await;
-        assert!(body["ejecucion"]["registrosAfectados"].as_i64().unwrap() >= 1);
+        assert_eq!(body["ejecucion"]["exitosa"], true);
 
-        // Verify the contract was updated
+        // Verify the contract was updated (may have been processed by a
+        // parallel nextest process running the same background job).
         use realestate_backend::entities::contrato;
         let updated = contrato::Entity::find_by_id(contrato_id)
             .one(&db)
@@ -646,7 +647,8 @@ fn test_idempotencia_segunda_ejecucion_cero_afectados() {
 
         let app = actix_web::test::init_service(make_app(db.clone())).await;
 
-        // First execution Ã¢â‚¬â€ should affect at least 1 record
+        // First execution -- should mark the payment as atrasado (or a parallel
+        // nextest process may have already done so).
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/tareas/marcar_pagos_atrasados/ejecutar")
             .insert_header(("Authorization", format!("Bearer {token}")))
@@ -654,9 +656,19 @@ fn test_idempotencia_segunda_ejecucion_cero_afectados() {
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
         let body: Value = actix_web::test::read_body_json(resp).await;
-        assert!(body["ejecucion"]["registrosAfectados"].as_i64().unwrap() >= 1);
+        assert_eq!(body["ejecucion"]["exitosa"], true);
 
-        // Second execution Ã¢â‚¬â€ should affect 0 records (idempotent)
+        // Verify DB state: the payment must be atrasado regardless of which
+        // process did the update.
+        use realestate_backend::entities::pago;
+        let updated = pago::Entity::find_by_id(_pago_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated.estado, "atrasado");
+
+        // Second execution -- should affect 0 records (idempotent)
         let req = actix_web::test::TestRequest::post()
             .uri("/api/v1/tareas/marcar_pagos_atrasados/ejecutar")
             .insert_header(("Authorization", format!("Bearer {token}")))
