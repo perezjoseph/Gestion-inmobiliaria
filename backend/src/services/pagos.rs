@@ -589,8 +589,16 @@ pub async fn mark_overdue(db: &DatabaseConnection) -> Result<u64, AppError> {
                 recargos::aplicar_recargo(db, *pago_id, contrato_model)
             })
             .collect();
-        let results = futures_util::future::try_join_all(futures).await?;
-        recargos_calculated += results.iter().filter(|r| r.is_some()).count() as u64;
+        let results = futures_util::future::join_all(futures).await;
+        for result in &results {
+            match result {
+                Ok(Some(_)) => recargos_calculated += 1,
+                Ok(None) => {}
+                Err(e) => {
+                    warn!("Error aplicando recargo durante mark_overdue: {e}");
+                }
+            }
+        }
     }
 
     if affected_count > 0 {
