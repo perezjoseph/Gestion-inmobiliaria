@@ -269,7 +269,9 @@ runs:
           kubectl rollout status deployment/frontend --namespace "${NS}" --timeout=600s
           kubectl rollout status deployment/baileys --namespace "${NS}" --timeout=600s
           if [ -n "${OCR_DIGEST}" ] && kubectl get deployment/ocr-service --namespace "${NS}" >/dev/null 2>&1; then
-            kubectl rollout status deployment/ocr-service --namespace "${NS}" --timeout=600s
+            if ! kubectl rollout status deployment/ocr-service --namespace "${NS}" --timeout=600s; then
+              echo "::warning::ocr-service rollout did not complete (optional service) — continuing"
+            fi
           fi
 
     - name: Health check
@@ -283,9 +285,6 @@ runs:
         max_attempts: 5
         command: |
           DEPLOYS="backend frontend baileys"
-          if [ -n "${OCR_DIGEST}" ] && kubectl get deployment/ocr-service -n "${NS}" >/dev/null 2>&1; then
-            DEPLOYS="$DEPLOYS ocr-service"
-          fi
           for DEPLOY in $DEPLOYS; do
             READY=$(kubectl get deployment "$DEPLOY" -n "${NS}" \
               -o jsonpath='{.status.readyReplicas}')
@@ -297,7 +296,18 @@ runs:
             fi
             echo "${DEPLOY}: ${READY}/${DESIRED} replicas ready"
           done
-          echo "All deployments healthy"
+          if [ -n "${OCR_DIGEST}" ] && kubectl get deployment/ocr-service -n "${NS}" >/dev/null 2>&1; then
+            READY=$(kubectl get deployment ocr-service -n "${NS}" \
+              -o jsonpath='{.status.readyReplicas}')
+            DESIRED=$(kubectl get deployment ocr-service -n "${NS}" \
+              -o jsonpath='{.spec.replicas}')
+            if [ "${READY:-0}" -lt "${DESIRED:-1}" ]; then
+              echo "::warning::ocr-service: ${READY:-0}/${DESIRED:-1} replicas ready (optional service)"
+            else
+              echo "ocr-service: ${READY}/${DESIRED} replicas ready"
+            fi
+          fi
+          echo "All core deployments healthy"
 
     - name: Rollback on failure
       if: failure() && steps.deploy.outcome == 'success'
