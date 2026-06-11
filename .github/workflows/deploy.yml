@@ -82,7 +82,11 @@ jobs:
             echo "${KUBECONFIG_DATA}" | base64 -d > "${HOME}/.kube/config"
 
             BACKEND_POD=$(kubectl get pods -n ${NS} -l app.kubernetes.io/name=backend \
+              --field-selector=status.phase=Running \
               -o jsonpath='{.items[0].metadata.name}')
+
+            echo "Waiting for backend rollout..."
+            kubectl rollout status deployment/backend -n ${NS} --timeout=120s
 
             echo "Testing backend /health..."
             HEALTH_RESPONSE=$(kubectl exec "$BACKEND_POD" -n ${NS} -- \

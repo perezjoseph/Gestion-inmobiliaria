@@ -21,6 +21,12 @@ use crate::services::mail::{MailClient, OutgoingMail, SmtpMailClient};
 use crate::services::ocr_preview::PreviewStore;
 use crate::services::user_security_cache::UserSecurityCache;
 
+/// Liveness probe — confirms the process is running. No dependencies checked.
+async fn livez() -> HttpResponse {
+    HttpResponse::Ok().json(serde_json::json!({"status": "alive"}))
+}
+
+/// Readiness probe — confirms the service can handle traffic (DB reachable).
 async fn health(db: web::Data<DatabaseConnection>) -> HttpResponse {
     use sea_orm::ConnectionTrait;
     let db_ok = db.execute_unprepared("SELECT 1").await.is_ok();
@@ -235,6 +241,7 @@ pub fn create_app(
         .app_data(web::Data::new(mail_client))
         .app_data(json_cfg)
         .app_data(multipart_cfg)
+        .route("/livez", web::get().to(livez))
         .route("/health", web::get().to(health))
         .route("/metrics", web::get().to(metrics_handler))
         .route("/internal/metrics", web::get().to(internal_metrics))

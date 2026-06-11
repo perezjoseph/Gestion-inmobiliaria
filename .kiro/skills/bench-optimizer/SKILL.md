@@ -11,7 +11,7 @@ description: >
 license: MIT
 allowed-tools: Read Write Grep Glob Shell
 metadata:
-  author: project
+  author: Joseph Perez
   version: "1.0.0"
   domain: performance
   triggers: benchmark, criterion, flamegraph, perf, hot path, which is faster, compare approaches, measure performance, throughput, latency, profile
@@ -286,3 +286,231 @@ fn generate_realistic_pagos(n: usize) -> Vec<Pago> {
 - Use `#[bench]` (unstable) — always use criterion
 - Benchmark in debug mode
 - Optimize for n=10 when production n=10,000 (or vice versa)
+
+
+---
+
+## Memory Efficiency Profiling
+
+Performance isn't only speed. A function that runs in 50µs but allocates 2MB per call
+will destroy throughput under concurrency (GC pressure in other runtimes, allocator
+contention in Rust, cache thrashing, OOM on constrained k8s pods).
+
+This section covers measuring and optimizing memory usage with the same discipline
+as latency: **measure first, decide after**.
+
+### When to Profile Memory
+
+- **High-concurrency endpoints**: Each concurrent request multiplies per-call allocation.
+  50 concurrent requests × 2MB/call = 100MB transient heap pressure.
+- **Streaming/batch operations**: Processing 10,000 records shouldn't require 10,000× object allocation.
+- **Constrained environments**: K8s pods with memory limits (e.g., 384Mi for backend).
+  If peak RSS approaches the limit, the OOM killer strikes.
+- **Long-lived processes**: Small leaks compound. A 1KB leak per request = 86MB/day at 1 req/s.
+- **Report generation**: Building PDF/XLSX for large datasets can spike memory.
+
+### When NOT to Profile Memory
+
+- **One-shot CLI tools**: They exit immediately. OS reclaims everything.
+- **Allocations < 1KB on cold paths**: Not worth the complexity.
+- **Already below 50% of pod memory limit with headroom**: Focus elsewhere.
+
+### Strategy 1: Counting Allocator (Per-Function Measurement)
+
+Use `dhat` in testing mode to assert allocation counts and bytes for specific code paths.
+This catches regressions where a refactor accidentally adds allocations to a hot path.
+
+#### Setup
+
+```toml
+# Cargo.toml
+[dev-dependencies]
+dhat = "0.3"
+
+[features]
+dhat-heap = []
+
+[profile.release]
+debug = 1  # needed for dhat backtraces
+```
+
+#### Writing a Memory Test
+
+```rust
+// tests/memory_budget.rs
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
+#[test]
+fn dashboard_stats_allocation_budget() {
+    let _profiler = dhat::Profiler::builder().testing().build();
+
+    // Exercise the pure-computation portion (post-DB-fetch aggregation)
+    let pagos = generate_realistic_pagos(2000);
+    let _result = aggregate_dashboard_metrics(&pagos);
+
+    let stats = dhat::HeapStats::get();
+
+    // Assert: peak heap usage should stay under 512KB for 2000 pagos
+    assert!(
+        stats.max_bytes < 512 * 1024,
+        "Peak heap {:.1}KB exceeds 512KB budget",
+        stats.max_bytes as f64 / 1024.0
+    );
+
+    // Assert: total allocations should be reasonable (not N+1 patterns)
+    assert!(
+        stats.total_blocks < 100,
+        "Too many allocations ({}): possible N+1 allocation pattern",
+        stats.total_blocks
+    );
+}
+```
+
+**Key rules:**
+- Put each memory test in its **own integration test file** (dhat uses global state).
+- Always test in **release mode**: `cargo test --release -p realestate-backend --test memory_budget`
+- Set budgets based on measured baselines, not guesses. Run once to get the current
+  numbers, then set the assertion 20% above as a regression ceiling.
+
+### Strategy 2: Comparing Allocation Pressure Between Approaches
+
+When choosing between implementations, measure both time AND allocations:
+
+```rust
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
+#[test]
+fn compare_grouping_strategies_memory() {
+    let pagos = generate_realistic_pagos(2000);
+
+    // Approach A: HashMap grouping (current)
+    {
+        let _profiler = dhat::Profiler::builder().testing().build();
+        let _result = group_by_hashmap(&pagos);
+        let stats = dhat::HeapStats::get();
+        eprintln!("HashMap: {} bytes in {} blocks (peak: {} bytes)",
+            stats.total_bytes, stats.total_blocks, stats.max_bytes);
+    }
+
+    // Note: dhat panics if two Profilers exist simultaneously.
+    // Each block must fully drop the Profiler before the next starts.
+    // In practice, put each approach in a separate test function.
+}
+```
+
+**Important**: `dhat` panics if multiple Profilers coexist. For comparing approaches,
+use **separate test functions** (one per approach) and compare the printed stats manually,
+or use `dhat::assert_eq!` with known baselines.
+
+### Strategy 3: Allocation-Aware Criterion Benchmarks
+
+For approaches where you want both speed AND allocation data in one run, use a
+counting allocator alongside criterion:
+
+```rust
+use std::alloc::{GlobalAlloc, Layout, System};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+struct CountingAlloc;
+static ALLOCATED: AtomicUsize = AtomicUsize::new(0);
+static ALLOC_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+unsafe impl GlobalAlloc for CountingAlloc {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        ALLOCATED.fetch_add(layout.size(), Ordering::Relaxed);
+        ALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
+        unsafe { System.alloc(layout) }
+    }
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        ALLOCATED.fetch_sub(layout.size(), Ordering::Relaxed);
+        unsafe { System.dealloc(ptr, layout) }
+    }
+}
+
+#[global_allocator]
+static A: CountingAlloc = CountingAlloc;
+
+fn bench_with_alloc_tracking(c: &mut Criterion) {
+    let data = generate_realistic_data(2000);
+    let mut group = c.benchmark_group("memory_comparison");
+
+    group.bench_function("current", |b| {
+        b.iter(|| {
+            ALLOC_COUNT.store(0, Ordering::Relaxed);
+            let result = current_approach(&data);
+            let allocs = ALLOC_COUNT.load(Ordering::Relaxed);
+            // Print once per benchmark (criterion runs many iterations)
+            std::hint::black_box((result, allocs))
+        })
+    });
+
+    group.finish();
+}
+```
+
+**Warning**: This adds overhead to every allocation. Only use in dedicated memory
+benchmarks, never in production code.
+
+### Strategy 4: Peak RSS Measurement (System-Level)
+
+For end-to-end memory usage of the entire process under load, measure RSS externally:
+
+```bash
+# Linux: run the binary and check peak memory
+/usr/bin/time -v ./target/release/realestate-backend 2>&1 | grep "Maximum resident"
+
+# During load test: track RSS over time
+while true; do ps -o rss= -p $(pgrep realestate-backend); sleep 1; done
+```
+
+For K8s: check pod metrics via `kubectl top pod` during realistic load.
+
+### Common Memory Optimization Patterns
+
+Once you've measured and confirmed a memory problem, these are the common fixes:
+
+| Pattern | Problem | Fix |
+|---------|---------|-----|
+| `Vec` growing | Multiple reallocations | `Vec::with_capacity(known_size)` |
+| String formatting | Temporary `String` per iteration | `write!` to a reusable buffer |
+| Cloning owned data | Unnecessary heap copies | `&str` / `&[T]` / `Cow<'_, T>` |
+| N+1 allocations | One `Vec` per item in a loop | Single pre-sized collection |
+| Large return types | Stack copies on return | Return `Box<T>` or pass `&mut T` |
+| Temporary collections | Build a Vec just to iterate it | Iterator chains (lazy) |
+| String keys in HashMap | Each key is a heap allocation | Intern strings, use `&str`, or indices |
+| Redundant serialization | Serialize to String then to bytes | Serialize directly to writer |
+
+### Decision Framework
+
+After measuring memory, use this to decide what to do:
+
+| Situation | Action |
+|-----------|--------|
+| Peak heap < 10% of pod limit, few allocations | Don't optimize. Document baseline. |
+| Peak heap > 50% of pod limit | Optimize. Risk of OOM under load. |
+| Allocation count scales linearly with N | Check for N+1 patterns. May need batching. |
+| Single function dominates allocation | Target that function specifically. |
+| Memory grows over time (leak) | Use dhat profiling to find unfreed blocks. |
+| Competing approaches differ by < 20% memory | Keep the faster/simpler one. |
+| Competing approaches differ by > 50% memory | Adopt the leaner one if speed is comparable. |
+
+### Constraints (Memory)
+
+#### MUST DO
+- Measure allocation count AND bytes before optimizing memory
+- Use `dhat` in testing mode or a counting allocator — never guess
+- Run memory tests in **release mode** (debug builds have different allocation behavior)
+- Set regression budgets based on measured baselines (not theory)
+- Consider peak vs total: a function might allocate 1MB total but only 10KB peak
+- Factor in concurrency: per-request cost × expected concurrent requests = real pressure
+- Put each `dhat` test in its own integration test file (global state conflicts)
+
+#### MUST NOT DO
+- Guess memory usage without measuring
+- Optimize allocations on cold paths (once-per-startup code doesn't matter)
+- Use `dhat` in production builds (it adds significant overhead)
+- Mix dhat profiling with criterion in the same binary (use separate test targets)
+- Assume "fewer allocations = faster" without benchmarking both (allocator fast paths exist)
+- Optimize memory at the cost of > 2x slowdown without confirming memory is the actual constraint

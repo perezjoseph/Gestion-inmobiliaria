@@ -102,6 +102,13 @@ spec:
               cpu: 500m
               memory: 384Mi
               ephemeral-storage: 256Mi
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 12
           readinessProbe:
             httpGet:
               path: /health
@@ -110,9 +117,9 @@ spec:
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /health
+              path: /livez
               port: 8080
-            initialDelaySeconds: 10
+            initialDelaySeconds: 5
             periodSeconds: 15
           securityContext:
             runAsNonRoot: true
