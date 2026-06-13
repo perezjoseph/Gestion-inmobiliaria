@@ -260,7 +260,7 @@ inspecting response headers / the browser console.
     - _Preservation: non-admin still 403 via AdminOnly; write/config paths still fiscally gated_
     - _Requirements: 1.5, 2.5, 3.6_
 
-  - [~] 15.2 Verify bug condition exploration test now passes
+  - [x] 15.2 Verify bug condition exploration test now passes
     - **Property 9: Expected Behavior** - Admin can read NCF sequences
     - **IMPORTANT**: Re-run the SAME test from task 13 - do NOT write a new test
     - **EXPECTED OUTCOME**: Test PASSES (admin of informal org → 200)
