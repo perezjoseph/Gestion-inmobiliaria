@@ -73,7 +73,7 @@ Restore chatbot agent inference by fixing the two independent infrastructure fai
   - Mark task complete when test is written, run, and failure is documented
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [-] 2. Write preservation property tests (BEFORE implementing fix)
+- [x] 2. Write preservation property tests (BEFORE implementing fix)
   - **Property 2: Preservation** — Non-Inference Behavior Unchanged
   - **IMPORTANT**: Follow observation-first methodology
   - Observe behavior on UNFIXED infrastructure for non-buggy inputs (inputs that do NOT depend on vLLM availability):
