@@ -42,6 +42,7 @@ jobs:
       ocr-service: ${{ steps.filter.outputs.ocr-service }}
       baileys-service: ${{ steps.filter.outputs.baileys-service }}
       ci: ${{ steps.filter.outputs.ci }}
+      infra: ${{ steps.filter.outputs.infra }}
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -68,7 +69,14 @@ jobs:
             baileys-service:
               - 'baileys-service/**'
             ci:
-              - '.github/**'
+              - '.github/actions/**'
+              - '.github/workflows/build-and-test.yml'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/containers.yml'
+              - '.github/workflows/deploy.yml'
+              - '.github/workflows/security.yml'
+            infra:
+              - 'infra/**'
 
   # ── Stage 1: All quality checks in parallel ──
 
