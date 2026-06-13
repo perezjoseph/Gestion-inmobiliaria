@@ -81,14 +81,13 @@ jobs:
             mkdir -p "${HOME}/.kube"
             echo "${KUBECONFIG_DATA}" | base64 -d > "${HOME}/.kube/config"
 
-            BACKEND_POD=$(kubectl get pods -n ${NS} -l app.kubernetes.io/name=backend \
-              --field-selector=status.phase=Running \
-              -o jsonpath='{.items[0].metadata.name}')
-
             echo "Waiting for backend rollout..."
             kubectl rollout status deployment/backend -n ${NS} --timeout=120s
 
             echo "Testing backend /health..."
+            BACKEND_POD=$(kubectl get pods -n ${NS} -l app.kubernetes.io/name=backend \
+              --field-selector=status.phase=Running \
+              -o jsonpath='{.items[0].metadata.name}')
             HEALTH_RESPONSE=$(kubectl exec "$BACKEND_POD" -n ${NS} -- \
               curl -sf --max-time 10 http://localhost:8080/health 2>&1) || {
               echo "::error::Backend /health endpoint unreachable"
@@ -97,7 +96,9 @@ jobs:
             echo "Backend /health: $HEALTH_RESPONSE"
 
             echo "Testing frontend..."
+            kubectl rollout status deployment/frontend -n ${NS} --timeout=120s
             FRONTEND_POD=$(kubectl get pods -n ${NS} -l app.kubernetes.io/name=frontend \
+              --field-selector=status.phase=Running \
               -o jsonpath='{.items[0].metadata.name}')
             FRONTEND_STATUS=$(kubectl exec "$FRONTEND_POD" -n ${NS} -- \
               wget --spider -qS --no-check-certificate --timeout=10 https://localhost:8443/ 2>&1 | grep "HTTP/" | tail -1) || {

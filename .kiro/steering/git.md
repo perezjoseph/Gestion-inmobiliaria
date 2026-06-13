@@ -1,3 +1,7 @@
+---
+inclusion: always
+---
+
 # Git Workflow
 
 - Push directly to `main`. Do not create feature branches unless explicitly asked.
