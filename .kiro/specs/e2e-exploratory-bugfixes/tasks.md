@@ -480,7 +480,7 @@ inspecting response headers / the browser console.
 
 - [ ] 27. Fix the deployed CSP for Cloudflare Insights
 
-  - [ ] 27.1 Align deployed CSP and handle the inline beacon without weakening protection
+  - [x] 27.1 Align deployed CSP and handle the inline beacon without weakening protection
     - Ensure the deployed `caddyfile` ConfigMap matches the repo CSP in `infra/caddy/Caddyfile` and
       `infra/k8s/app/overlays/prod/Caddyfile` (allows `https://static.cloudflareinsights.com` in
       `script-src` and `https://cloudflareinsights.com` in `connect-src`), then roll the frontend pods
