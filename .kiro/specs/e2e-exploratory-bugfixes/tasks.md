@@ -135,7 +135,7 @@ inspecting response headers / the browser console.
   - Document counterexample (both bars show "Mostrando 1–6 de 6")
   - _Requirements: 1.3_
 
-- [~] 8. Write preservation property test for pagination range and navigation
+- [x] 8. Write preservation property test for pagination range and navigation
   - **Property 6: Preservation** - Pagination range and navigation unchanged
   - **IMPORTANT**: Follow observation-first methodology
   - Observe on UNFIXED code: the retained (page-level) bar's range text, page nav, and per-page
