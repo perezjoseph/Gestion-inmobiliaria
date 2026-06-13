@@ -381,13 +381,13 @@ inspecting response headers / the browser console.
     - _Preservation: units/servicios calls unchanged_
     - _Requirements: 1.7, 2.7, 3.9_
 
-  - [-] 21.2 Verify the regression-guard test passes
+  - [x] 21.2 Verify the regression-guard test passes
     - **Property 13: Expected Behavior** - Servicios Públicos calls an existing property endpoint
     - **IMPORTANT**: Re-run the SAME test from task 19 - do NOT write a new test
     - **EXPECTED OUTCOME**: Test PASSES (dropdown calls `/propiedades?perPage=200`)
     - _Requirements: 2.7_
 
-  - [~] 21.3 Verify preservation test still passes
+  - [-] 21.3 Verify preservation test still passes
     - **Property 14: Preservation** - Other Servicios Públicos calls unchanged
     - **IMPORTANT**: Re-run the SAME test from task 20 - do NOT write a new test
     - **EXPECTED OUTCOME**: Tests PASS (units/servicios calls unchanged)
