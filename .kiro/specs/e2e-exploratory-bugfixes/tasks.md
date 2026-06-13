@@ -302,7 +302,7 @@ inspecting response headers / the browser console.
   - **EXPECTED OUTCOME**: Other-paginated-endpoint assertions PASS (baseline captured)
   - _Requirements: 3.7, 3.8_
 
-- [ ] 18. Fix Invitaciones to return a PaginatedResponse
+- [x] 18. Fix Invitaciones to return a PaginatedResponse
 
   - [x] 18.1 Add a list query DTO
     - In `backend/src/models/invitacion.rs`, add `InvitacionListQuery { page: Option<u64>,
@@ -325,7 +325,7 @@ inspecting response headers / the browser console.
     - _Preservation: populated lists round-trip correctly; other paginated endpoints untouched_
     - _Requirements: 1.6, 2.6, 3.7, 3.8_
 
-  - [-] 18.4 Verify bug condition exploration test now passes
+  - [x] 18.4 Verify bug condition exploration test now passes
     - **Property 11: Expected Behavior** - Empty Invitaciones returns a well-formed PaginatedResponse
     - **IMPORTANT**: Re-run the SAME test from task 16 - do NOT write a new test
     - **EXPECTED OUTCOME**: Test PASSES (empty list → `{ data: [], total: 0, ... }`)
@@ -346,7 +346,7 @@ inspecting response headers / the browser console.
 > regression guard); if it FAILS, a stray caller of `/propiedades/todas` was found and must be
 > repointed.
 
-- [~] 19. Write bug condition / regression-guard test for the property-list endpoint
+- [-] 19. Write bug condition / regression-guard test for the property-list endpoint
   - **Property 13: Bug Condition** - Servicios Públicos calls an existing property endpoint
   - **GOAL**: Guard that no caller of the non-existent `/propiedades/todas` route exists
   - **Scoped PBT Approach**: Scope to the property-list request from `/servicios-publicos`
