@@ -304,7 +304,7 @@ inspecting response headers / the browser console.
 
 - [ ] 18. Fix Invitaciones to return a PaginatedResponse
 
-  - [~] 18.1 Add a list query DTO
+  - [x] 18.1 Add a list query DTO
     - In `backend/src/models/invitacion.rs`, add `InvitacionListQuery { page: Option<u64>,
       per_page: Option<u64> }` with `#[serde(rename_all = "camelCase")]`
     - _Requirements: 1.6, 2.6_

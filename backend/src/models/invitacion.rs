@@ -21,6 +21,13 @@ pub struct InvitacionResponse {
     pub created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InvitacionListQuery {
+    pub page: Option<u64>,
+    pub per_page: Option<u64>,
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
