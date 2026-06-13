@@ -422,7 +422,7 @@ inspecting response headers / the browser console.
 
 - [ ] 24. Fix the document thumbnail URL and authenticated loading
 
-  - [ ] 24.1 Build the correct route and load via authenticated blob fetch
+  - [x] 24.1 Build the correct route and load via authenticated blob fetch
     - In `frontend/src/components/common/document_gallery.rs`: build
       `let file_path = format!("/uploads/{}", doc.file_path);`
     - Load the protected file via an authenticated blob fetch (mirror `services::api::api_download`):

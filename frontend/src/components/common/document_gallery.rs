@@ -580,12 +580,13 @@ struct DocumentCardProps {
     on_delete: Callback<String>,
 }
 
+#[allow(clippy::option_if_let_else)]
 #[component]
 fn DocumentCard(props: &DocumentCardProps) -> Html {
     let doc = &props.doc;
     let is_image = doc.mime_type.starts_with("image/");
     let is_pdf = doc.mime_type == "application/pdf";
-    let file_url = format!("{}/{}", BASE_URL.trim_end_matches("/api"), doc.file_path);
+    let file_path = format!("/uploads/{}", doc.file_path);
     let size_label = format_file_size(doc.file_size);
     let estado = doc.estado_verificacion.as_deref().unwrap_or("pendiente");
     let tipo = doc.tipo_documento.as_deref().unwrap_or("otro");
@@ -594,6 +595,25 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
         "/documentos/editor/{}/{}/{}",
         props.entity_type, props.entity_id, doc.id
     );
+
+    // Authenticated blob fetch: load the protected file and create an object URL
+    let blob_url = use_state(|| Option::<String>::None);
+    {
+        let blob_url = blob_url.clone();
+        let file_path = file_path.clone();
+        let token = props.token.to_string();
+        let needs_preview = is_image || is_pdf;
+        use_effect_with((file_path.clone(), token.clone()), move |_| {
+            if needs_preview {
+                let blob_url_inner = blob_url.clone();
+                spawn_local(async move {
+                    if let Ok(url) = fetch_blob_url(&file_path, &token).await {
+                        blob_url_inner.set(Some(url));
+                    }
+                });
+            }
+        });
+    }
 
     let deleting = use_state(|| false);
     let confirm_delete = use_state(|| false);
@@ -634,27 +654,42 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
         })
     };
 
+    // For downloads/links, use the authenticated file_path (will open via blob or direct)
+    let download_url = file_path;
+
     html! {
         <div class="gi-doc-card">
             <div class="gi-doc-card-preview">
                 if is_image {
-                    <a href={file_url.clone()} target="_blank" rel="noopener noreferrer">
-                        <img
-                            src={file_url}
-                            alt={doc.filename.clone()}
-                            loading="lazy"
-                        />
-                    </a>
+                    if let Some(src) = (*blob_url).as_ref() {
+                        <a href={src.clone()} target="_blank" rel="noopener noreferrer">
+                            <img
+                                src={src.clone()}
+                                alt={doc.filename.clone()}
+                                loading="lazy"
+                            />
+                        </a>
+                    } else {
+                        <div class="flex items-center justify-center h-full" style="color: var(--text-tertiary); font-size: var(--text-xs);">
+                            {"Cargando..."}
+                        </div>
+                    }
                 } else if is_pdf {
-                    <a href={file_url.clone()} target="_blank" rel="noopener noreferrer">
-                        <embed
-                            src={file_url}
-                            type="application/pdf"
-                            style="width: 100%; height: 120px; pointer-events: none;"
-                        />
-                    </a>
+                    if let Some(src) = (*blob_url).as_ref() {
+                        <a href={src.clone()} target="_blank" rel="noopener noreferrer">
+                            <embed
+                                src={src.clone()}
+                                type="application/pdf"
+                                style="width: 100%; height: 120px; pointer-events: none;"
+                            />
+                        </a>
+                    } else {
+                        <div class="flex items-center justify-center h-full" style="color: var(--text-tertiary); font-size: var(--text-xs);">
+                            {"Cargando..."}
+                        </div>
+                    }
                 } else {
-                    <a href={file_url} target="_blank" rel="noopener noreferrer"
+                    <a href={download_url} target="_blank" rel="noopener noreferrer"
                        class="flex items-center justify-center h-full">
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -725,6 +760,36 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
 }
 
 // ── API functions ──────────────────────────────────────────────────────
+
+/// Fetches a protected file with an Authorization header, builds a Blob, and
+/// returns an object URL suitable for use as an `<img>`/`<embed>` `src`.
+#[allow(clippy::future_not_send)]
+async fn fetch_blob_url(path: &str, token: &str) -> Result<String, String> {
+    let response = Request::get(path)
+        .header("Authorization", &format!("Bearer {token}"))
+        .send()
+        .await
+        .map_err(|e| format!("Error de red: {e}"))?;
+
+    if !response.ok() {
+        return Err(format!("HTTP {}", response.status()));
+    }
+
+    let bytes = response
+        .binary()
+        .await
+        .map_err(|e| format!("Error al leer respuesta: {e}"))?;
+
+    let uint8 = js_sys::Uint8Array::from(bytes.as_slice());
+    let array = js_sys::Array::new();
+    array.push(&uint8.buffer());
+
+    let blob = web_sys::Blob::new_with_u8_array_sequence(&array)
+        .map_err(|_| "Error al crear blob".to_string())?;
+
+    web_sys::Url::create_object_url_with_blob(&blob)
+        .map_err(|_| "Error al crear URL de blob".to_string())
+}
 
 #[allow(clippy::future_not_send)]
 async fn fetch_documents(
