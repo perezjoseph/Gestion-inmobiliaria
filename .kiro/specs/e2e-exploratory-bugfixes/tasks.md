@@ -467,7 +467,7 @@ inspecting response headers / the browser console.
   - Document the observed violation
   - _Requirements: 1.9_
 
-- [ ] 26. Write preservation check for first-party allowed / third-party blocked
+- [x] 26. Write preservation check for first-party allowed / third-party blocked
   - **Property 18: Preservation** - First-party allowed, third-party still blocked
   - **IMPORTANT**: Follow observation-first methodology
   - Observe: first-party assets are allowed (`default-src 'self'`, `script-src 'self'
