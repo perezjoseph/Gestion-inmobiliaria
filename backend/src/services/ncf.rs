@@ -240,15 +240,16 @@ pub async fn verificar_consumo_rango(
     Ok(alertas)
 }
 
-/// List all NCF sequences for an organization (with fiscal access check).
+/// List all NCF sequences for an organization.
+///
+/// The fiscal-access gate is intentionally removed from this read path so that any
+/// admin (even of an informal org with no DGII registration) can view the sequence
+/// list (which will simply be empty). RBAC (`AdminOnly`) and the multi-tenant
+/// `organizacion_id` filter remain enforced at the handler layer.
 pub async fn listar_secuencias(
     db: &DatabaseConnection,
     org_id: Uuid,
 ) -> Result<Vec<SecuenciaNcfResponse>, AppError> {
-    use crate::services::fiscal::obtener_org_con_acceso_fiscal;
-
-    obtener_org_con_acceso_fiscal(db, org_id).await?;
-
     let secuencias = secuencia_ncf::Entity::find()
         .filter(secuencia_ncf::Column::OrganizacionId.eq(org_id))
         .all(db)

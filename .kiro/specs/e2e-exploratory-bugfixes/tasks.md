@@ -250,7 +250,7 @@ inspecting response headers / the browser console.
 
 - [ ] 15. Fix NCF read access for admin
 
-  - [~] 15.1 Remove the fiscal-access gate from the read path
+  - [x] 15.1 Remove the fiscal-access gate from the read path
     - In `backend/src/services/ncf.rs::listar_secuencias`, remove the
       `obtener_org_con_acceso_fiscal(db, org_id)` call; retain the `AdminOnly` RBAC and the
       `organizacion_id` multi-tenant filter
