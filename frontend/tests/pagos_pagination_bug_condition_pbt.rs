@@ -66,8 +66,6 @@ struct PaginationBar {
 
 #[derive(Debug, Clone, PartialEq)]
 enum PaginationLocation {
-    /// Inside PagoList component, after the table
-    InsidePagoList,
     /// Page-level, after MobileCardList
     PageLevel,
 }
@@ -80,13 +78,12 @@ enum Viewport {
     Mobile,
 }
 
-/// Model of the CURRENT (unfixed) pagos page component tree.
+/// Model of the FIXED pagos page component tree.
 ///
 /// Returns the pagination bars that are visible on the given viewport.
-/// On desktop, BOTH bars are visible because:
-/// - PagoList's Pagination is inside gi-mobile-hidden (visible on desktop)
-/// - Page-level Pagination has no responsive wrapper (always visible)
-fn count_pagination_bars_current(viewport: &Viewport, has_items: bool) -> Vec<PaginationBar> {
+/// After the fix (Task 9.1): the `<Pagination>` inside `PagoList` was removed.
+/// Only the single page-level `<Pagination>` remains, visible on all viewports.
+fn count_pagination_bars_current(viewport: &Viewport, _has_items: bool) -> Vec<PaginationBar> {
     let total = 6; // example dataset
     let page = 1;
     let per_page = 6;
@@ -95,19 +92,7 @@ fn count_pagination_bars_current(viewport: &Viewport, has_items: bool) -> Vec<Pa
 
     match viewport {
         Viewport::Desktop => {
-            // PagoList is inside gi-mobile-hidden → visible on desktop
-            // PagoList only renders Pagination when items is non-empty
-            if has_items {
-                bars.push(PaginationBar {
-                    location: PaginationLocation::InsidePagoList,
-                    visible_on_desktop: true,
-                    total,
-                    page,
-                    per_page,
-                });
-            }
-
-            // Page-level Pagination (no responsive class → always visible)
+            // After fix: only the page-level Pagination remains (no wrapper → always visible)
             bars.push(PaginationBar {
                 location: PaginationLocation::PageLevel,
                 visible_on_desktop: true,
@@ -118,7 +103,6 @@ fn count_pagination_bars_current(viewport: &Viewport, has_items: bool) -> Vec<Pa
         }
         Viewport::Mobile => {
             // On mobile:
-            // - gi-mobile-hidden is hidden → PagoList not visible
             // - Page-level Pagination is visible (no wrapper)
             bars.push(PaginationBar {
                 location: PaginationLocation::PageLevel,
@@ -151,7 +135,7 @@ fn pagos_desktop_render_strategy() -> impl Strategy<Value = (u64, u64, u64)> {
         .prop_filter(
             "page must be valid for total/per_page",
             |(total, page, per_page)| {
-                let max_page = (*total + *per_page - 1) / *per_page;
+                let max_page = (*total).div_ceil(*per_page);
                 *page <= max_page
             },
         )

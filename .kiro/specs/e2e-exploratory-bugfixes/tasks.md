@@ -158,7 +158,7 @@ inspecting response headers / the browser console.
     - _Preservation: retained bar uses the same state/callbacks → range and navigation unchanged_
     - _Requirements: 1.3, 2.3, 3.4_
 
-  - [~] 9.2 Verify bug condition exploration test now passes
+  - [x] 9.2 Verify bug condition exploration test now passes
     - **Property 5: Expected Behavior** - Pagos shows exactly one pagination bar
     - **IMPORTANT**: Re-run the SAME test from task 7 - do NOT write a new test
     - **EXPECTED OUTCOME**: Test PASSES (exactly one bar on desktop)
