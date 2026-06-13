@@ -186,7 +186,7 @@ inspecting response headers / the browser console.
   - Document counterexample
   - _Requirements: 1.4_
 
-- [~] 11. Write preservation property test for the desktop navbar
+- [x] 11. Write preservation property test for the desktop navbar
   - **Property 8: Preservation** - Desktop navbar unchanged
   - **IMPORTANT**: Follow observation-first methodology
   - Observe on UNFIXED code: desktop/wider viewport navbar and `.gi-navbar-right` layout/behavior
