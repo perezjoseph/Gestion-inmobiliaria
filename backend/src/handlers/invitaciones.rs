@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::middleware::rbac::AdminOnly;
-use crate::models::invitacion::CrearInvitacionRequest;
+use crate::models::invitacion::{CrearInvitacionRequest, InvitacionListQuery};
 use crate::services::invitaciones;
 
 pub async fn crear(
@@ -20,8 +20,12 @@ pub async fn crear(
 pub async fn listar(
     db: web::Data<DatabaseConnection>,
     admin: AdminOnly,
+    query: web::Query<InvitacionListQuery>,
 ) -> Result<HttpResponse, AppError> {
-    let result = invitaciones::listar(db.get_ref(), admin.0.organizacion_id).await?;
+    let page = query.page.unwrap_or(1);
+    let per_page = query.per_page.unwrap_or(20);
+    let result =
+        invitaciones::listar(db.get_ref(), admin.0.organizacion_id, page, per_page).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 

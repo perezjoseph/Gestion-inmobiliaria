@@ -1,9 +1,13 @@
 use chrono::{Duration, Utc};
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    Set,
+};
 use uuid::Uuid;
 
 use crate::entities::invitacion;
 use crate::errors::AppError;
+use crate::models::PaginatedResponse;
 use crate::models::invitacion::{CrearInvitacionRequest, InvitacionResponse};
 
 impl From<invitacion::Model> for InvitacionResponse {
@@ -54,16 +58,28 @@ pub async fn crear(
 pub async fn listar(
     db: &DatabaseConnection,
     org_id: Uuid,
-) -> Result<Vec<InvitacionResponse>, AppError> {
+    page: u64,
+    per_page: u64,
+) -> Result<PaginatedResponse<InvitacionResponse>, AppError> {
+    let page = page.max(1);
+    let per_page = per_page.clamp(1, 100);
+
     let now: chrono::DateTime<chrono::FixedOffset> = Utc::now().into();
-    let records = invitacion::Entity::find()
+    let paginator = invitacion::Entity::find()
         .filter(invitacion::Column::OrganizacionId.eq(org_id))
         .filter(invitacion::Column::Usado.eq(false))
         .filter(invitacion::Column::ExpiresAt.gt(now))
-        .all(db)
-        .await?;
+        .paginate(db, per_page);
 
-    Ok(records.into_iter().map(InvitacionResponse::from).collect())
+    let total = paginator.num_items().await?;
+    let records = paginator.fetch_page(page - 1).await?;
+
+    Ok(PaginatedResponse {
+        data: records.into_iter().map(InvitacionResponse::from).collect(),
+        total,
+        page,
+        per_page,
+    })
 }
 
 pub async fn revocar(db: &DatabaseConnection, org_id: Uuid, id: Uuid) -> Result<(), AppError> {

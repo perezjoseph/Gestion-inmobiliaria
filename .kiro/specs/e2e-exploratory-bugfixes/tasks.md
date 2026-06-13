@@ -309,14 +309,14 @@ inspecting response headers / the browser console.
       per_page: Option<u64> }` with `#[serde(rename_all = "camelCase")]`
     - _Requirements: 1.6, 2.6_
 
-  - [~] 18.2 Return PaginatedResponse from the service
+  - [x] 18.2 Return PaginatedResponse from the service
     - In `backend/src/services/invitaciones.rs`, change `listar` to return
       `PaginatedResponse<InvitacionResponse>`, paginating the existing filtered query
       (`OrganizacionId == org_id`, not used, not expired) with `.paginate(db, per_page)` /
       `num_items()` / `fetch_page(page-1)` — mirroring `services::inquilinos::list`
     - _Requirements: 1.6, 2.6_
 
-  - [~] 18.3 Wire the handler to the envelope
+  - [x] 18.3 Wire the handler to the envelope
     - In `backend/src/handlers/invitaciones.rs`, accept `query: web::Query<InvitacionListQuery>`,
       pass `page`/`per_page` through, and return the envelope; empty case returns
       `{ "data": [], "total": 0, "page": 1, "perPage": 20 }`
