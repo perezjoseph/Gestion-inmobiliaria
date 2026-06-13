@@ -197,7 +197,7 @@ inspecting response headers / the browser console.
   - **EXPECTED OUTCOME**: Tests PASS (baseline desktop layout captured)
   - _Requirements: 3.5_
 
-- [ ] 12. Fix mobile hamburger interception
+- [x] 12. Fix mobile hamburger interception
 
   - [x] 12.1 Raise hamburger stacking and prevent right-group overlap on mobile
     - In `frontend/styles/tailwind.css`: add `.gi-hamburger { position: relative; z-index: 50; }`
@@ -214,7 +214,7 @@ inspecting response headers / the browser console.
     - **EXPECTED OUTCOME**: Test PASSES (hamburger receives the click; menu opens at 375px)
     - _Requirements: 2.4_
 
-  - [~] 12.3 Verify preservation test still passes
+  - [x] 12.3 Verify preservation test still passes
     - **Property 8: Preservation** - Desktop navbar unchanged
     - **IMPORTANT**: Re-run the SAME test from task 11 - do NOT write a new test
     - **EXPECTED OUTCOME**: Tests PASS (desktop navbar and `.gi-navbar-right` unchanged)
