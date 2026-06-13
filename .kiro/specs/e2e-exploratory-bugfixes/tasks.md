@@ -276,7 +276,7 @@ inspecting response headers / the browser console.
 
 ### Bug 6 — Invitaciones empty list fails to deserialize
 
-- [~] 16. Write bug condition exploration test for empty Invitaciones response shape
+- [x] 16. Write bug condition exploration test for empty Invitaciones response shape
   - **Property 11: Bug Condition** - Empty Invitaciones returns a well-formed PaginatedResponse
   - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
   - **GOAL**: Show the empty list serializes as a bare array, not a `PaginatedResponse`

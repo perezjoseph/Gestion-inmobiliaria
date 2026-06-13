@@ -92,6 +92,7 @@ mod unidades_tests;
 mod usuarios_tests;
 
 mod dr_compliance_integration_tests;
+mod invitaciones_bug_condition_pbt;
 mod ncf_bug_condition_pbt;
 mod ncf_preservation_pbt;
 mod security_audit_pbt;

@@ -9,13 +9,41 @@ Restore chatbot agent inference by fixing the two independent infrastructure fai
 ```json
 {
   "waves": [
-    ["1", "2"],
-    ["3.1"],
-    ["3.2", "3.3"],
-    ["3.4"],
-    ["3.5"],
-    ["3.6"],
-    ["4"]
+    {
+      "wave": 1,
+      "description": "Write bug condition exploration test and preservation tests on unfixed infrastructure",
+      "tasks": ["1", "2"]
+    },
+    {
+      "wave": 2,
+      "description": "Add offline environment variables to vLLM Deployment manifest",
+      "tasks": ["3.1"]
+    },
+    {
+      "wave": 3,
+      "description": "Create model-download Job and restart GPU device plugin (parallelizable)",
+      "tasks": ["3.2", "3.3"]
+    },
+    {
+      "wave": 4,
+      "description": "Rollout restart vLLM deployment after model provisioned and GPU healthy",
+      "tasks": ["3.4"]
+    },
+    {
+      "wave": 5,
+      "description": "Verify bug condition exploration test now passes",
+      "tasks": ["3.5"]
+    },
+    {
+      "wave": 6,
+      "description": "Verify preservation tests still pass",
+      "tasks": ["3.6"]
+    },
+    {
+      "wave": 7,
+      "description": "Final validation checkpoint",
+      "tasks": ["4"]
+    }
   ]
 }
 ```
@@ -144,11 +172,3 @@ Restore chatbot agent inference by fixing the two independent infrastructure fai
   - Cluster health: `kubectl get pods -n realestate` shows all pods healthy
   - GPU allocation: `kubectl describe node inference` shows `gpu.intel.com/xe` with expected allocatable count
   - Ensure all tests pass, ask the user if questions arise.
-
-
-## Notes
-
-- This is an infrastructure-only bugfix — no backend or frontend application code changes are required.
-- The model download Job (task 3.2) may take significant time depending on network speed (~30B parameter model).
-- If the GPU device plugin restart (task 3.3) does not resolve unhealthy devices, escalate to checking kernel drivers and `/dev/dri` device nodes on the inference node.
-- The temporary egress NetworkPolicy created for the download Job must be deleted after the Job completes successfully.
