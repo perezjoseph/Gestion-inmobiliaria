@@ -1,0 +1,89 @@
+# Temporary egress policy — DELETE after Job completes:
+#   kubectl delete networkpolicy allow-model-download-egress -n realestate
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-model-download-egress
+  namespace: realestate
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: model-download
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+    # Allow DNS resolution within the cluster
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: download-model
+  namespace: realestate
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: model-download
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/hostname: inference
+      containers:
+        - name: download
+          image: python:3.12-slim
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              echo "=== Installing huggingface-cli ==="
+              pip install --no-cache-dir "huggingface_hub[cli]"
+
+              echo "=== Downloading Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound ==="
+              huggingface-cli download Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound
+
+              echo "=== Download complete ==="
+              echo "=== Verifying HuggingFace cache layout ==="
+              ls -la /models/hub/models--Intel--Qwen3-30B-A3B-Instruct-2507-int4-AutoRound/ || true
+              du -sh /models/hub/models--Intel--Qwen3-30B-A3B-Instruct-2507-int4-AutoRound/ || true
+              df -h /models
+              echo "=== Done ==="
+          env:
+            - name: HF_HOME
+              value: /models
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+              ephemeral-storage: 2Gi
+            limits:
+              cpu: "4"
+              memory: 4Gi
+              ephemeral-storage: 4Gi
+          volumeMounts:
+            - name: models
+              mountPath: /models
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: vllm-models-pvc

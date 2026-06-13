@@ -104,7 +104,7 @@ Restore chatbot agent inference by fixing the two independent infrastructure fai
     - _Preservation: No changes to ports, volumes, resource requests, or network policies for other pods_
     - _Requirements: 2.3_
 
-  - [~] 3.2 Create model-download Kubernetes Job
+  - [-] 3.2 Create model-download Kubernetes Job
     - Create `infra/k8s/jobs/download-model.yml`
     - Job uses `python:3.12-slim` image with `huggingface_hub` pip-installed
     - Mounts `vllm-models-pvc` at `/models`
@@ -120,7 +120,7 @@ Restore chatbot agent inference by fixing the two independent infrastructure fai
     - _Preservation: Temporary egress policy scoped only to download Job; removed after completion_
     - _Requirements: 2.3_
 
-  - [~] 3.3 Restart Intel GPU device plugin on inference node
+  - [-] 3.3 Restart Intel GPU device plugin on inference node
     - Delete the `intel-gpu-plugin` pod on the `inference` node to force re-detection of `/dev/dri` devices:
       ```
       kubectl delete pod -n kube-system -l app.kubernetes.io/name=intel-gpu-plugin --field-selector spec.nodeName=inference

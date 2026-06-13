@@ -435,7 +435,7 @@ inspecting response headers / the browser console.
     - _Preservation: missing files still 404; traversal still rejected_
     - _Requirements: 1.8, 2.8, 3.10_
 
-  - [-] 24.2 Verify bug condition exploration test now passes
+  - [x] 24.2 Verify bug condition exploration test now passes
     - **Property 15: Expected Behavior** - Stored document image is served
     - **IMPORTANT**: Re-run the SAME test from task 22 - do NOT write a new test
     - **EXPECTED OUTCOME**: Test PASSES (URL resolves to `/uploads/{file_path}`; image served 200)
