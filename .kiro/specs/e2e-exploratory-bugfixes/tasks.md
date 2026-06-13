@@ -370,7 +370,7 @@ inspecting response headers / the browser console.
   - **EXPECTED OUTCOME**: Tests PASS (other page calls unchanged)
   - _Requirements: 3.9_
 
-- [ ] 21. Confirm source correctness and ensure deployment
+- [x] 21. Confirm source correctness and ensure deployment
 
   - [x] 21.1 Verify the corrected endpoint and deploy the fixed frontend build
     - Confirm no remaining caller of `/propiedades/todas`; the dropdown loads via
@@ -387,7 +387,7 @@ inspecting response headers / the browser console.
     - **EXPECTED OUTCOME**: Test PASSES (dropdown calls `/propiedades?perPage=200`)
     - _Requirements: 2.7_
 
-  - [-] 21.3 Verify preservation test still passes
+  - [x] 21.3 Verify preservation test still passes
     - **Property 14: Preservation** - Other Servicios Públicos calls unchanged
     - **IMPORTANT**: Re-run the SAME test from task 20 - do NOT write a new test
     - **EXPECTED OUTCOME**: Tests PASS (units/servicios calls unchanged)
