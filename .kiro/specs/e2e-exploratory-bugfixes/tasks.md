@@ -397,7 +397,7 @@ inspecting response headers / the browser console.
 
 ### Bug 8 — Property document thumbnail 404
 
-- [-] 22. Write bug condition exploration test for the document URL builder
+- [x] 22. Write bug condition exploration test for the document URL builder
   - **Property 15: Bug Condition** - Stored document image is served
   - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
   - **GOAL**: Show the gallery builds an unroutable `/api/v1/{file_path}` URL (no-op `trim_end_matches`)
@@ -410,7 +410,7 @@ inspecting response headers / the browser console.
   - Document counterexample (e.g., `…/Eg3tKKlWsAA0v_w (1).jpg` → 404)
   - _Requirements: 1.8_
 
-- [~] 23. Write preservation property test for missing files and traversal
+- [ ] 23. Write preservation property test for missing files and traversal
   - **Property 16: Preservation** - Missing files and traversal unchanged
   - **IMPORTANT**: Follow observation-first methodology
   - Observe on UNFIXED code: `serve_upload` returns 404 for missing files and rejects `..` traversal
@@ -422,7 +422,7 @@ inspecting response headers / the browser console.
 
 - [ ] 24. Fix the document thumbnail URL and authenticated loading
 
-  - [~] 24.1 Build the correct route and load via authenticated blob fetch
+  - [ ] 24.1 Build the correct route and load via authenticated blob fetch
     - In `frontend/src/components/common/document_gallery.rs`: build
       `let file_path = format!("/uploads/{}", doc.file_path);`
     - Load the protected file via an authenticated blob fetch (mirror `services::api::api_download`):
@@ -435,13 +435,13 @@ inspecting response headers / the browser console.
     - _Preservation: missing files still 404; traversal still rejected_
     - _Requirements: 1.8, 2.8, 3.10_
 
-  - [~] 24.2 Verify bug condition exploration test now passes
+  - [ ] 24.2 Verify bug condition exploration test now passes
     - **Property 15: Expected Behavior** - Stored document image is served
     - **IMPORTANT**: Re-run the SAME test from task 22 - do NOT write a new test
     - **EXPECTED OUTCOME**: Test PASSES (URL resolves to `/uploads/{file_path}`; image served 200)
     - _Requirements: 2.8_
 
-  - [~] 24.3 Verify preservation test still passes
+  - [ ] 24.3 Verify preservation test still passes
     - **Property 16: Preservation** - Missing files and traversal unchanged
     - **IMPORTANT**: Re-run the SAME test from task 23 - do NOT write a new test
     - **EXPECTED OUTCOME**: Tests PASS (missing files still 404; traversal still rejected)
@@ -451,7 +451,7 @@ inspecting response headers / the browser console.
 
 ### Bug 9 — CSP blocks Cloudflare Insights site-wide
 
-- [~] 25. Write bug condition verification for the CSP and Cloudflare Insights beacon
+- [ ] 25. Write bug condition verification for the CSP and Cloudflare Insights beacon
   - **Property 17: Bug Condition** - CSP no longer blocks Cloudflare Insights
   - **CRITICAL**: This check MUST FAIL against the deployed (stale) CSP - failure confirms the bug
   - **GOAL**: Demonstrate the deployed `script-src 'self' 'wasm-unsafe-eval'` blocks
@@ -467,7 +467,7 @@ inspecting response headers / the browser console.
   - Document the observed violation
   - _Requirements: 1.9_
 
-- [~] 26. Write preservation check for first-party allowed / third-party blocked
+- [ ] 26. Write preservation check for first-party allowed / third-party blocked
   - **Property 18: Preservation** - First-party allowed, third-party still blocked
   - **IMPORTANT**: Follow observation-first methodology
   - Observe: first-party assets are allowed (`default-src 'self'`, `script-src 'self'
@@ -480,7 +480,7 @@ inspecting response headers / the browser console.
 
 - [ ] 27. Fix the deployed CSP for Cloudflare Insights
 
-  - [~] 27.1 Align deployed CSP and handle the inline beacon without weakening protection
+  - [ ] 27.1 Align deployed CSP and handle the inline beacon without weakening protection
     - Ensure the deployed `caddyfile` ConfigMap matches the repo CSP in `infra/caddy/Caddyfile` and
       `infra/k8s/app/overlays/prod/Caddyfile` (allows `https://static.cloudflareinsights.com` in
       `script-src` and `https://cloudflareinsights.com` in `connect-src`), then roll the frontend pods
@@ -492,13 +492,13 @@ inspecting response headers / the browser console.
     - _Preservation: first-party assets allowed; third-party origins still blocked; no `'unsafe-inline'`/wildcards_
     - _Requirements: 1.9, 2.9, 3.11_
 
-  - [~] 27.2 Verify bug condition check now passes
+  - [ ] 27.2 Verify bug condition check now passes
     - **Property 17: Expected Behavior** - CSP no longer blocks Cloudflare Insights
     - **IMPORTANT**: Re-run the SAME check from task 25 - do NOT write a new check
     - **EXPECTED OUTCOME**: Check PASSES (no CSP violation for Cloudflare Insights on page load)
     - _Requirements: 2.9_
 
-  - [~] 27.3 Verify preservation check still passes
+  - [ ] 27.3 Verify preservation check still passes
     - **Property 18: Preservation** - First-party allowed, third-party still blocked
     - **IMPORTANT**: Re-run the SAME check from task 26 - do NOT write a new check
     - **EXPECTED OUTCOME**: Check PASSES (first-party allowed; third-party blocked; no weakening)
@@ -508,7 +508,7 @@ inspecting response headers / the browser console.
 
 ### Final Validation
 
-- [~] 28. Checkpoint - Ensure all tests pass
+- [ ] 28. Checkpoint - Ensure all tests pass
   - Run the full backend test suite (`cargo test`) and frontend tests; run the Playwright E2E pass
   - Confirm every Bug Condition exploration test/check now PASSES (Properties 1, 3, 5, 7, 9, 11, 13,
     15, 17) and every Preservation test/check still PASSES (Properties 2, 4, 6, 8, 10, 12, 14, 16, 18)

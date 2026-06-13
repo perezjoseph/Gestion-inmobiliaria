@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 1b277baab4a96b459c91e82f12201639dd736a6fcbcec7b54c582c5853d93529 # shrinks to file_path = "propiedad/aaa00000-0a0a-a00a-71f9-8b8fbb29b419/xly.docx"
+cc ebb417d394f0b756c861d1c556467a02ada9cf7a84fb32073eccd9fdbdb252f5 # shrinks to file_path = "propiedad/aa0a0aa0-000a-a0a0-aaa1-113a3fdc620c/contrato firmado (2).pdf"

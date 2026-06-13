@@ -73,7 +73,7 @@ Restore chatbot agent inference by fixing the two independent infrastructure fai
   - Mark task complete when test is written, run, and failure is documented
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 2. Write preservation property tests (BEFORE implementing fix)
+- [-] 2. Write preservation property tests (BEFORE implementing fix)
   - **Property 2: Preservation** — Non-Inference Behavior Unchanged
   - **IMPORTANT**: Follow observation-first methodology
   - Observe behavior on UNFIXED infrastructure for non-buggy inputs (inputs that do NOT depend on vLLM availability):
@@ -95,7 +95,7 @@ Restore chatbot agent inference by fixing the two independent infrastructure fai
 
 - [ ] 3. Fix for vLLM inference outage — restore chatbot agent reply generation
 
-  - [ ] 3.1 Add offline environment variables to vLLM Deployment manifest
+  - [~] 3.1 Add offline environment variables to vLLM Deployment manifest
     - Edit `infra/k8s/app/shared/vllm.yml`
     - Add `HF_HUB_OFFLINE=1` env var to the vLLM container spec to prevent HuggingFace Hub from attempting online downloads
     - Add `TRANSFORMERS_OFFLINE=1` env var as belt-and-suspenders to ensure transformers library also stays offline
@@ -104,7 +104,7 @@ Restore chatbot agent inference by fixing the two independent infrastructure fai
     - _Preservation: No changes to ports, volumes, resource requests, or network policies for other pods_
     - _Requirements: 2.3_
 
-  - [ ] 3.2 Create model-download Kubernetes Job
+  - [~] 3.2 Create model-download Kubernetes Job
     - Create `infra/k8s/jobs/download-model.yml`
     - Job uses `python:3.12-slim` image with `huggingface_hub` pip-installed
     - Mounts `vllm-models-pvc` at `/models`
@@ -120,7 +120,7 @@ Restore chatbot agent inference by fixing the two independent infrastructure fai
     - _Preservation: Temporary egress policy scoped only to download Job; removed after completion_
     - _Requirements: 2.3_
 
-  - [ ] 3.3 Restart Intel GPU device plugin on inference node
+  - [~] 3.3 Restart Intel GPU device plugin on inference node
     - Delete the `intel-gpu-plugin` pod on the `inference` node to force re-detection of `/dev/dri` devices:
       ```
       kubectl delete pod -n kube-system -l app.kubernetes.io/name=intel-gpu-plugin --field-selector spec.nodeName=inference
@@ -133,7 +133,7 @@ Restore chatbot agent inference by fixing the two independent infrastructure fai
     - _Preservation: Only restarts the specific plugin pod on inference node; no changes to other nodes or DaemonSet spec_
     - _Requirements: 2.4_
 
-  - [ ] 3.4 Rollout restart vLLM deployment
+  - [~] 3.4 Rollout restart vLLM deployment
     - After model is provisioned (3.2) and GPU is healthy (3.3), apply the updated manifest and restart:
       ```
       kubectl apply -f infra/k8s/app/shared/vllm.yml
@@ -147,7 +147,7 @@ Restore chatbot agent inference by fixing the two independent infrastructure fai
     - _Preservation: No changes to other deployments in the namespace_
     - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-  - [ ] 3.5 Verify bug condition exploration test now passes
+  - [~] 3.5 Verify bug condition exploration test now passes
     - **Property 1: Expected Behavior** — vLLM Inference Restored
     - **IMPORTANT**: Re-run the SAME test from task 1 — do NOT write a new test
     - The test from task 1 encodes the expected behavior: healthy pod, healthy GPU, model loaded offline, inference returns HTTP 200
@@ -156,7 +156,7 @@ Restore chatbot agent inference by fixing the two independent infrastructure fai
     - **EXPECTED OUTCOME**: Test PASSES (confirms bug is fixed)
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-  - [ ] 3.6 Verify preservation tests still pass
+  - [~] 3.6 Verify preservation tests still pass
     - **Property 2: Preservation** — Non-Inference Behavior Unchanged
     - **IMPORTANT**: Re-run the SAME tests from task 2 — do NOT write new tests
     - Run preservation property tests from step 2
@@ -164,7 +164,7 @@ Restore chatbot agent inference by fixing the two independent infrastructure fai
     - Confirm config page, health endpoint, chatbot CRUD, error-handling path, and other AI features still work
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 4. Checkpoint — Ensure all tests pass
+- [~] 4. Checkpoint — Ensure all tests pass
   - Run full bug condition test (Property 1) — must PASS
   - Run full preservation test suite (Property 2) — must PASS
   - End-to-end validation: send message via "Probar conversación" panel and verify streamed agent reply is received (HTTP 200)
