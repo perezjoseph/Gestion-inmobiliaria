@@ -1,6 +1,6 @@
 ---
 name: rust-coder
-description: "Implements Rust code changes following a plan. Writes idiomatic Rust 2024 for backend (Actix-web, SeaORM) and frontend (Leptos). Runs fmt, clippy, and tests after changes. Triggers: implement, code, write, build, rust, backend, frontend."
+description: "Implements Rust code. Delegate here for any Rust implementation work — backend (Actix-web, SeaORM), frontend (Leptos), or both. Follows plans precisely, writes idiomatic Rust 2024, and self-verifies with fmt + clippy + tests before returning. Use when the user asks to implement, code, write, build, fix, or refactor Rust/backend/frontend code."
 tools: ["read", "write", "shell"]
 ---
 

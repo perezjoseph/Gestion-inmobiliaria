@@ -1,6 +1,6 @@
 ---
 name: code-planner
-description: "Plans code changes before implementation. Analyzes requirements, reads existing code, designs approach, identifies affected files, and produces step-by-step plans. Writes plans to .kiro/plans/. Triggers: plan, design, approach, architecture, how should we, what files, scope."
+description: "Use proactively before any non-trivial code change. Plans implementation by reading existing code, designing the approach, identifying affected files, and producing step-by-step plans to .kiro/plans/. Delegate here when the user asks to plan, design, scope, architect, or asks 'how should we' or 'what files would change'. Also use when a task spans 3+ files or involves new domain workflows."
 tools: ["read", "write", "web", "@mcp"]
 ---
 

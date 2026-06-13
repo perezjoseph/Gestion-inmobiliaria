@@ -1,0 +1,52 @@
+{
+  "skill_name": "security-and-hardening",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add a POST endpoint at /api/v1/usuarios/{id}/cambiar-password that lets an authenticated user change their own password. They provide current_password and new_password in the body. The endpoint should verify the current password matches before updating. Use the existing auth service patterns in backend/src/services/auth.rs and the argon2 hashing already in the project. Add it to the usuarios handler file and register the route.",
+      "expected_output": "A handler that validates input, verifies current password, hashes new password, updates DB. Should have proper auth extractor, input validation (min length, not empty), timing-safe password verification, no password logging, and appropriate error responses that don't leak whether the old password was wrong vs other failures.",
+      "files": [],
+      "expectations": [
+        "Handler uses Claims or WriteAccess extractor for authentication",
+        "Validates that new_password meets minimum length requirement",
+        "Validates that current_password is not empty",
+        "Uses argon2 verify_password (constant-time) to check current password",
+        "Uses argon2 hash_password to hash the new password before storing",
+        "Does NOT log the password or hash in any tracing call",
+        "Returns generic error message that doesn't reveal whether current_password was wrong vs user not found",
+        "Verifies the user is changing their own password (path id matches claims.sub)"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I need a new endpoint GET /api/v1/reportes/pagos-export that exports all payments for the authenticated user's organization as a CSV file. It should accept optional query params fecha_inicio and fecha_fin to filter by date range. Return the CSV with proper content-disposition header. Add it to the reportes handler.",
+      "expected_output": "A handler that exports payments as CSV with proper security controls: auth extractor, tenant-scoping by organizacion_id, date range validation/defaults, rate limiting consideration, audit logging, Content-Disposition header, and bounded query results.",
+      "files": [],
+      "expectations": [
+        "Handler uses Claims or WriteAccess extractor for authentication",
+        "Queries filter by organizacion_id from claims (tenant scoping)",
+        "Applies a default date range or maximum date range limit to prevent unbounded exports",
+        "Sets Content-Disposition: attachment header on the response",
+        "Logs the export event with structured tracing fields",
+        "Does not expose internal error details in the response body",
+        "Caps row count or enforces date boundaries to prevent memory exhaustion"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Create a new endpoint POST /api/v1/documentos/upload that accepts a multipart file upload and associates it with an entity (entity_type and entity_id provided as form fields). Store the file on disk under ./uploads/{uuid}.{ext} and create a Documento record in the database. Only allow PDF, JPG, PNG, and DOCX files up to 10MB.",
+      "expected_output": "A handler that safely handles file uploads with: auth extractor, file size validation, extension allowlist, magic byte validation, path traversal prevention, UUID-based storage names, tenant scoping, and proper error handling.",
+      "files": [],
+      "expectations": [
+        "Handler uses WriteAccess or AdminOnly extractor for authentication",
+        "Validates file size does not exceed 10MB limit before fully reading the file or after reading",
+        "Validates file extension against an explicit allowlist (pdf, jpg, png, docx)",
+        "Uses UUID-based filename for storage (not user-provided filename)",
+        "Prevents path traversal by not using user-provided filename in the storage path",
+        "Filters by organizacion_id or validates entity ownership (tenant scoping)",
+        "Does not serve the file back without authentication consideration",
+        "Rejects files with no extension or unrecognized extensions"
+      ]
+    }
+  ]
+}

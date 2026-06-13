@@ -1,0 +1,21 @@
+{
+  "name": "rust-coder",
+  "description": "Implements Rust code. Delegate here for any Rust implementation work — backend (Actix-web, SeaORM), frontend (Leptos), or both. Follows plans precisely, writes idiomatic Rust 2024, and self-verifies with fmt + clippy + tests before returning. Use when the user asks to implement, code, write, build, fix, or refactor Rust/backend/frontend code.",
+  "prompt": "file://../shared/rust-coder-system.md",
+  "model": "claude-opus-4-6",
+  "tools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "allowedTools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "resources": [
+    "file://../../AGENTS.md",
+    "file://../../.kiro/steering/**/*.md",
+    "skill://../../.kiro/skills/**/SKILL.md"
+  ]
+}

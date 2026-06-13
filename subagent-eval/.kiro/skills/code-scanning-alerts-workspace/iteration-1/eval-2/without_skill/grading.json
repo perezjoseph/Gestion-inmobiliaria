@@ -1,0 +1,33 @@
+{
+    "eval_id": 2,
+    "run_type": "without_skill",
+    "expectations": [
+        {
+            "text": "classifies_by_path_pattern",
+            "passed": true,
+            "evidence": "03-classify-alerts.sh uses jq select with path pattern matching on most_recent_instance.location.path."
+        },
+        {
+            "text": "identifies_base_image_patterns",
+            "passed": true,
+            "evidence": "02-triage-heuristics.md documents bare image refs and system library paths as base image. Decision tree correctly identifies /usr/lib and /lib as base image."
+        },
+        {
+            "text": "identifies_our_code_patterns",
+            "passed": true,
+            "evidence": "Identifies /usr/local/bin/realestate-backend, /usr/bin/caddy, /srv/, /app/ as our code. Includes lang-go and lang-rust tags."
+        },
+        {
+            "text": "provides_remediation_guidance",
+            "passed": true,
+            "evidence": "05-workflow-runbook.md provides fix guidance: cargo update for Rust crates, Go dep bumps for Caddy, Dockerfile edits for IaC."
+        },
+        {
+            "text": "uses_correct_dismissed_reason",
+            "passed": false,
+            "evidence": "04-dismiss-base-image-alerts.sh uses dismissed_reason=\"won't fix\" (with space). The valid API value is 'won't_fix' (with underscore). This would fail at runtime."
+        }
+    ],
+    "pass_rate": 0.8,
+    "summary": "4/5 assertions passed. Without the skill, the agent produced comprehensive triage logic but used an invalid dismissed_reason value ('won't fix' instead of 'won't_fix') and produced bash scripts instead of PowerShell."
+}

@@ -33,6 +33,7 @@ impl From<gasto::Model> for GastoResponse {
             id: m.id,
             propiedad_id: m.propiedad_id,
             unidad_id: m.unidad_id,
+            numero_unidad: None,
             categoria: m.categoria,
             descripcion: m.descripcion,
             monto: m.monto,
@@ -54,6 +55,15 @@ impl From<gasto::Model> for GastoResponse {
             periodo_inicio: m.periodo_inicio,
             periodo_fin: m.periodo_fin,
         }
+    }
+}
+
+impl GastoResponse {
+    fn from_with_unidad(m: gasto::Model, unidad: Option<unidad::Model>) -> Self {
+        let numero_unidad = unidad.map(|u| u.numero_unidad);
+        let mut resp = Self::from(m);
+        resp.numero_unidad = numero_unidad;
+        resp
     }
 }
 
@@ -236,15 +246,20 @@ pub async fn list(
         select = select.filter(gasto::Column::PeriodoHasta.lte(periodo_hasta));
     }
 
-    let paginator = select
-        .order_by_desc(gasto::Column::FechaGasto)
-        .paginate(db, per_page);
+    let select = select
+        .find_also_related(unidad::Entity)
+        .order_by_desc(gasto::Column::FechaGasto);
+
+    let paginator = select.paginate(db, per_page);
 
     let total = paginator.num_items().await?;
     let records = paginator.fetch_page(page - 1).await?;
 
     Ok(PaginatedResponse {
-        data: records.into_iter().map(GastoResponse::from).collect(),
+        data: records
+            .into_iter()
+            .map(|(g, u)| GastoResponse::from_with_unidad(g, u))
+            .collect(),
         total,
         page,
         per_page,

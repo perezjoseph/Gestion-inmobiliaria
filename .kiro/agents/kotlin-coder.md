@@ -1,6 +1,6 @@
 ---
 name: kotlin-coder
-description: "Implements Kotlin/Android code changes following a plan. Writes idiomatic Kotlin with Jetpack Compose, MVVM, Hilt, Room 3, Retrofit. Runs gradle build and tests after changes. Triggers: implement, code, write, android, kotlin, compose, mobile."
+description: "Implements Android/Kotlin code. Delegate here for any Android implementation — Jetpack Compose UI, MVVM architecture, Hilt DI, Room 3 persistence, Retrofit networking. Self-verifies with gradle build + tests. Use when the user asks to implement, code, write, build, or fix anything in the android/ directory or mentions Kotlin, Compose, or mobile."
 tools: ["read", "write", "shell"]
 ---
 

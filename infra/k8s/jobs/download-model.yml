@@ -1,14 +1,14 @@
 # Temporary egress policy — DELETE after Job completes:
-#   kubectl delete networkpolicy allow-model-download-egress -n realestate
+#   kubectl delete networkpolicy download-model-egress -n realestate
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-model-download-egress
+  name: download-model-egress
   namespace: realestate
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: model-download
+      job-name: download-model
   policyTypes:
     - Egress
   egress:
@@ -42,7 +42,7 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: model-download
+        job-name: download-model
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false
@@ -56,16 +56,16 @@ spec:
             - -c
             - |
               set -e
-              echo "=== Installing huggingface_hub[cli] ==="
+              echo "=== Installing huggingface_hub ==="
               pip install --no-cache-dir "huggingface_hub[cli]"
 
-              echo "=== Downloading Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound ==="
-              hf download Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound
+              echo "=== Downloading Qwen/Qwen3-Coder-30B-A3B-Instruct ==="
+              hf download Qwen/Qwen3-Coder-30B-A3B-Instruct
 
               echo "=== Download complete ==="
               echo "=== Verifying HuggingFace cache layout ==="
-              ls -la /models/hub/models--Intel--Qwen3-30B-A3B-Instruct-2507-int4-AutoRound/ || true
-              du -sh /models/hub/models--Intel--Qwen3-30B-A3B-Instruct-2507-int4-AutoRound/ || true
+              ls -la /models/hub/models--Qwen--Qwen3-Coder-30B-A3B-Instruct/ || true
+              du -sh /models/hub/models--Qwen--Qwen3-Coder-30B-A3B-Instruct/ || true
               df -h /models
               echo "=== Done ==="
           env:

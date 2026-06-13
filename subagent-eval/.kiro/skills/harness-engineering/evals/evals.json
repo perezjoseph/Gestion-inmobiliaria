@@ -1,0 +1,54 @@
+{
+    "skill_name": "harness-engineering",
+    "evals": [
+        {
+            "id": 1,
+            "prompt": "Create a kiro-cli custom agent JSON config at .kiro/agents/autofix.json for a CI autofix agent. It should use a file-based system prompt at .kiro/prompts/autofix-system.md, include resources for AGENTS.md and all steering files, have a postToolUse hook that runs cargo fmt after file writes, and use claude-sonnet-4 as the model. The agent needs access to read, write, and shell tools.",
+            "expected_output": "A valid .kiro/agents/autofix.json file that passes the validate-kiro-agent.js validator, with correct file:// and skill:// URIs, proper hook structure using internal tool names (fs_write not write), and no schema violations.",
+            "files": [],
+            "expectations": [
+                "The output is a valid JSON file at .kiro/agents/autofix.json",
+                "The prompt field uses a file:// URI with a path that correctly resolves relative to the config file location (.kiro/agents/), not relative to workspace root",
+                "The resources array uses glob patterns (e.g. **/*.md) for steering files rather than listing each file individually",
+                "The hooks object uses 'postToolUse' as the trigger key (not 'postToolWrite' or similar)",
+                "The hook uses the field name 'matcher' (not 'match' or 'on') with the internal tool name 'fs_write' (not 'write')",
+                "The allowedTools field is present and does NOT use '*' wildcard (lists specific patterns instead)",
+                "The config passes validation when run through scripts/validate-kiro-agent.js",
+                "A companion system prompt file is produced alongside the config (complete package, not isolated artifact)"
+            ]
+        },
+        {
+            "id": 2,
+            "prompt": "Design a verify-fix loop for a CI autofix agent that handles a Rust workspace (backend + WASM frontend) and a TypeScript sidecar (baileys-service). The loop should: detect which file types were modified, run only relevant sensors, iterate up to a configurable max (default 3, controlled by KIRO_MAX_FIX_ITERATIONS env var), and exit with appropriate codes (0=clean, 1=partial, 2=no progress). Order sensors cheapest-first. Include eslint as a separate TypeScript lint sensor between build and test. Write this as a system prompt section.",
+            "expected_output": "A markdown file describing the verify-fix loop with selective sensor activation based on file types, ordered cheapest-first (format -> lint -> compile -> test), configurable iteration cap via env var, eslint as a distinct sensor, and three exit codes.",
+            "files": [],
+            "expectations": [
+                "The output defines sensors ordered by cost: format first, then lint, then compile/typecheck, then tests",
+                "The output includes selective activation: Rust sensors only for .rs files, TypeScript sensors only for baileys-service files",
+                "The output specifies the correct Rust sensor commands: cargo fmt --all -- --check, cargo clippy --locked -p realestate-backend -- -D warnings, cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings",
+                "The output includes eslint as a separate TypeScript sensor: npx eslint . --max-warnings 0 (or equivalent) in baileys-service/",
+                "The output specifies npm run build and npm test as separate TypeScript sensors in baileys-service/",
+                "The output defines three distinct exit codes (0=clean, 1=partial progress, 2=no progress)",
+                "The output instructs the agent to try a fundamentally different approach after 2 consecutive identical failures (not incremental patching)",
+                "The iteration cap is configurable via KIRO_MAX_FIX_ITERATIONS environment variable with a default of 3"
+            ]
+        },
+        {
+            "id": 3,
+            "prompt": "The current kiro-autofix-trigger.yml workflow uses an inline prompt built with printf statements in a shell script. Refactor the 'Process queue' step to instead invoke a custom agent config using 'kiro-cli --agent autofix chat --no-interactive --trust-all-tools' with a minimal positional prompt. The diagnostics context should be passed via the KIRO_DIAGNOSTICS_FILE environment variable instead of being cat'd into the prompt. Keep the queue loop structure, commit logic, and all safety checks intact. Produce the complete package: refactored workflow step, agent config, and system prompt.",
+            "expected_output": "A complete 3-file package: refactored workflow step (YAML), agent config (JSON), and system prompt (markdown). The workflow step invokes the agent via --agent flag, the config references the prompt via file:// URI, and the system prompt documents all env vars the workflow passes.",
+            "files": [],
+            "expectations": [
+                "The refactored step uses 'kiro-cli --agent autofix chat --no-interactive --trust-all-tools' command syntax",
+                "The diagnostics context is passed via KIRO_DIAGNOSTICS_FILE environment variable (not inlined in the prompt)",
+                "The positional prompt is minimal: references artifact name and queue position only",
+                "The commit logic (git add -A, status check, commit with message file or fallback) is preserved",
+                "The KIRO_COMMIT_MSG_FILE environment variable is still set for each artifact",
+                "The queue loop structure (while read artifact) is preserved",
+                "The truncation logic for oversized diagnostics is preserved",
+                "A companion agent config JSON file is produced with correct matcher: fs_write hook",
+                "A companion system prompt markdown file is produced that documents all env vars (KIRO_DIAGNOSTICS_FILE, KIRO_COMMIT_MSG_FILE, etc.)"
+            ]
+        }
+    ]
+}

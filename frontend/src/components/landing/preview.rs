@@ -20,34 +20,34 @@ pub fn LandingPreview() -> Html {
                     <div class="gi-l-preview-body">
                         <div class="gi-l-preview-tiles">
                             <div class="gi-l-preview-tile">
-                                <span class="gi-l-preview-tile-value">{"24"}</span>
+                                <span class="gi-l-preview-tile-placeholder"></span>
                                 <span class="gi-l-preview-tile-label">{"Propiedades"}</span>
                             </div>
                             <div class="gi-l-preview-tile">
-                                <span class="gi-l-preview-tile-value">{"18"}</span>
-                                <span class="gi-l-preview-tile-label">{"Contratos activos"}</span>
+                                <span class="gi-l-preview-tile-placeholder"></span>
+                                <span class="gi-l-preview-tile-label">{"Contratos"}</span>
                             </div>
                             <div class="gi-l-preview-tile">
-                                <span class="gi-l-preview-tile-value gi-l-preview-tile-value--accent">{"RD$ 410K"}</span>
-                                <span class="gi-l-preview-tile-label">{"Cobrado este mes"}</span>
+                                <span class="gi-l-preview-tile-placeholder gi-l-preview-tile-placeholder--accent"></span>
+                                <span class="gi-l-preview-tile-label">{"Ingresos"}</span>
                             </div>
                             <div class="gi-l-preview-tile">
-                                <span class="gi-l-preview-tile-value gi-l-preview-tile-value--warn">{"3"}</span>
-                                <span class="gi-l-preview-tile-label">{"Pagos atrasados"}</span>
+                                <span class="gi-l-preview-tile-placeholder gi-l-preview-tile-placeholder--warn"></span>
+                                <span class="gi-l-preview-tile-label">{"Alertas"}</span>
                             </div>
                         </div>
                         <div class="gi-l-preview-rows">
                             <div class="gi-l-preview-row">
-                                <span>{"Apartamento Naco 2B"}</span>
-                                <span class="gi-l-preview-badge gi-l-preview-badge--ok">{"Pagado"}</span>
+                                <span class="gi-l-preview-row-placeholder"></span>
+                                <span class="gi-l-preview-badge gi-l-preview-badge--ok"></span>
                             </div>
                             <div class="gi-l-preview-row">
-                                <span>{"Local Piantini 04"}</span>
-                                <span class="gi-l-preview-badge gi-l-preview-badge--warn">{"Pendiente"}</span>
+                                <span class="gi-l-preview-row-placeholder gi-l-preview-row-placeholder--short"></span>
+                                <span class="gi-l-preview-badge gi-l-preview-badge--warn"></span>
                             </div>
                             <div class="gi-l-preview-row">
-                                <span>{"Casa Los Prados"}</span>
-                                <span class="gi-l-preview-badge gi-l-preview-badge--ok">{"Pagado"}</span>
+                                <span class="gi-l-preview-row-placeholder"></span>
+                                <span class="gi-l-preview-badge gi-l-preview-badge--ok"></span>
                             </div>
                         </div>
                     </div>

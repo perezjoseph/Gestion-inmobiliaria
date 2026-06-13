@@ -1,0 +1,45 @@
+{
+  "expectations": [
+    {
+      "text": "Handler uses Claims or WriteAccess extractor for authentication",
+      "passed": true,
+      "evidence": "handler.rs uses `claims: Claims` extractor"
+    },
+    {
+      "text": "Queries filter by organizacion_id from claims (tenant scoping)",
+      "passed": true,
+      "evidence": "service.rs filters with `pago::Column::OrganizacionId.eq(org_id)` where org_id comes from claims.organizacion_id"
+    },
+    {
+      "text": "Applies a default date range or maximum date range limit to prevent unbounded exports",
+      "passed": false,
+      "evidence": "service.rs does NOT apply any default date range when no dates are provided. If both fecha_inicio and fecha_fin are None, the query returns ALL pagos for the org with no date boundary."
+    },
+    {
+      "text": "Sets Content-Disposition: attachment header on the response",
+      "passed": true,
+      "evidence": "handler.rs sets `.insert_header((\"Content-Disposition\", \"attachment; filename=\\\"pagos-export.csv\\\"\"))`"
+    },
+    {
+      "text": "Logs the export event with structured tracing fields",
+      "passed": false,
+      "evidence": "Neither handler.rs nor service.rs contain any tracing::info!, tracing::warn!, or logging calls for the export event"
+    },
+    {
+      "text": "Does not expose internal error details in the response body",
+      "passed": true,
+      "evidence": "Uses AppError types throughout which map to safe responses"
+    },
+    {
+      "text": "Caps row count or enforces date boundaries to prevent memory exhaustion",
+      "passed": false,
+      "evidence": "No row count cap and no date boundary default. The query can return unlimited rows if no date filters are provided."
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 3,
+    "total": 7,
+    "pass_rate": 0.57
+  }
+}

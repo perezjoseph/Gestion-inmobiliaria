@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "deployment-patterns",
+  "owner": "affaan-m",
+  "repo": "everything-claude-code",
+  "path": ".kiro/skills/deployment-patterns",
+  "branch": "main",
+  "sha": "52ad41eaf72c25dcd20b8d4d491a02acc76f9bf3",
+  "source": "manual"
+}

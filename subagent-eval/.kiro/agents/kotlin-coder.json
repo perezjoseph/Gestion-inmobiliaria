@@ -1,0 +1,21 @@
+{
+  "name": "kotlin-coder",
+  "description": "Implements Android/Kotlin code. Delegate here for any Android implementation — Jetpack Compose UI, MVVM architecture, Hilt DI, Room 3 persistence, Retrofit networking. Self-verifies with gradle build + tests. Use when the user asks to implement, code, write, build, or fix anything in the android/ directory or mentions Kotlin, Compose, or mobile.",
+  "prompt": "file://../shared/kotlin-coder-system.md",
+  "model": "claude-opus-4-6",
+  "tools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "allowedTools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "resources": [
+    "file://../../AGENTS.md",
+    "file://../../.kiro/steering/**/*.md",
+    "skill://../../.kiro/skills/**/SKILL.md"
+  ]
+}

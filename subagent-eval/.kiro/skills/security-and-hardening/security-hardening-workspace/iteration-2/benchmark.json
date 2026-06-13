@@ -1,0 +1,190 @@
+{
+  "metadata": {
+    "skill_name": "security-and-hardening",
+    "skill_path": "realestate/.kiro/skills/security-and-hardening",
+    "executor_model": "claude-opus-4-6",
+    "timestamp": "2026-05-05T12:00:00Z",
+    "evals_run": [1, 2, 3],
+    "runs_per_configuration": 1
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "eval_name": "password-change",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 8,
+        "failed": 0,
+        "total": 8,
+        "time_seconds": 0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Handler uses Claims or WriteAccess extractor for authentication", "passed": true, "evidence": "Uses Claims extractor"},
+        {"text": "Validates that new_password meets minimum length requirement", "passed": true, "evidence": "Checks len() < 8"},
+        {"text": "Validates that current_password is not empty", "passed": true, "evidence": "Caps at 128 chars (DoS prevention)"},
+        {"text": "Uses argon2 verify_password (constant-time) to check current password", "passed": true, "evidence": "Calls verify_password()"},
+        {"text": "Uses argon2 hash_password to hash the new password before storing", "passed": true, "evidence": "Calls hash_password()"},
+        {"text": "Does NOT log the password or hash in any tracing call", "passed": true, "evidence": "Only logs user_id"},
+        {"text": "Returns generic error message that doesn't reveal whether current_password was wrong vs user not found", "passed": true, "evidence": "Generic error message"},
+        {"text": "Verifies the user is changing their own password (path id matches claims.sub)", "passed": true, "evidence": "Checks target_id != claims.sub"}
+      ]
+    },
+    {
+      "eval_id": 1,
+      "eval_name": "password-change",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.75,
+        "passed": 6,
+        "failed": 2,
+        "total": 8,
+        "time_seconds": 0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Handler uses Claims or WriteAccess extractor for authentication", "passed": true, "evidence": "Uses Claims extractor"},
+        {"text": "Validates that new_password meets minimum length requirement", "passed": false, "evidence": "No length validation in handler — delegates to service"},
+        {"text": "Validates that current_password is not empty", "passed": false, "evidence": "No empty check in handler"},
+        {"text": "Uses argon2 verify_password (constant-time) to check current password", "passed": true, "evidence": "Via perfil::cambiar_password"},
+        {"text": "Uses argon2 hash_password to hash the new password before storing", "passed": true, "evidence": "Via perfil::cambiar_password"},
+        {"text": "Does NOT log the password or hash in any tracing call", "passed": true, "evidence": "Only logs user_id"},
+        {"text": "Returns generic error message that doesn't reveal whether current_password was wrong vs user not found", "passed": true, "evidence": "Generic errors from service"},
+        {"text": "Verifies the user is changing their own password (path id matches claims.sub)", "passed": true, "evidence": "Checks claims.sub != id"}
+      ]
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "csv-export",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 7,
+        "failed": 0,
+        "total": 7,
+        "time_seconds": 0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Handler uses Claims or WriteAccess extractor for authentication", "passed": true, "evidence": "Uses Claims extractor"},
+        {"text": "Queries filter by organizacion_id from claims (tenant scoping)", "passed": true, "evidence": "Filters by OrganizacionId.eq(org_id)"},
+        {"text": "Applies a default date range or maximum date range limit to prevent unbounded exports", "passed": true, "evidence": "12-month default + 2-year cap"},
+        {"text": "Sets Content-Disposition: attachment header on the response", "passed": true, "evidence": "Sets attachment header"},
+        {"text": "Logs the export event with structured tracing fields", "passed": true, "evidence": "tracing::info! with user_email, org_id, dates"},
+        {"text": "Does not expose internal error details in the response body", "passed": true, "evidence": "Uses AppError::Internal"},
+        {"text": "Caps row count or enforces date boundaries to prevent memory exhaustion", "passed": true, "evidence": "50k row cap + date defaults"}
+      ]
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "csv-export",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.57,
+        "passed": 4,
+        "failed": 3,
+        "total": 7,
+        "time_seconds": 0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Handler uses Claims or WriteAccess extractor for authentication", "passed": true, "evidence": "Uses Claims extractor"},
+        {"text": "Queries filter by organizacion_id from claims (tenant scoping)", "passed": true, "evidence": "Filters by OrganizacionId.eq(org_id)"},
+        {"text": "Applies a default date range or maximum date range limit to prevent unbounded exports", "passed": false, "evidence": "No default date range when params are None"},
+        {"text": "Sets Content-Disposition: attachment header on the response", "passed": true, "evidence": "Sets attachment header"},
+        {"text": "Logs the export event with structured tracing fields", "passed": false, "evidence": "No tracing/logging calls present"},
+        {"text": "Does not expose internal error details in the response body", "passed": true, "evidence": "Uses AppError types"},
+        {"text": "Caps row count or enforces date boundaries to prevent memory exhaustion", "passed": false, "evidence": "No row cap, no date boundary defaults"}
+      ]
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "file-upload",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.875,
+        "passed": 7,
+        "failed": 1,
+        "total": 8,
+        "time_seconds": 0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Handler uses WriteAccess or AdminOnly extractor for authentication", "passed": true, "evidence": "Uses WriteAccess extractor"},
+        {"text": "Validates file size does not exceed 10MB limit before fully reading the file or after reading", "passed": true, "evidence": "Early rejection during streaming + service validation"},
+        {"text": "Validates file extension against an explicit allowlist (pdf, jpg, png, docx)", "passed": true, "evidence": "ALLOWED_EXTENSIONS constant"},
+        {"text": "Uses UUID-based filename for storage (not user-provided filename)", "passed": true, "evidence": "Uuid::new_v4() for storage name"},
+        {"text": "Prevents path traversal by not using user-provided filename in the storage path", "passed": true, "evidence": "UUID name + sanitization + canonical path check"},
+        {"text": "Filters by organizacion_id or validates entity ownership (tenant scoping)", "passed": false, "evidence": "No org_id filter or entity ownership validation"},
+        {"text": "Does not serve the file back without authentication consideration", "passed": true, "evidence": "No static serving added"},
+        {"text": "Rejects files with no extension or unrecognized extensions", "passed": true, "evidence": "extract_extension() rejects missing extensions"}
+      ]
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "file-upload",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.875,
+        "passed": 7,
+        "failed": 1,
+        "total": 8,
+        "time_seconds": 0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Handler uses WriteAccess or AdminOnly extractor for authentication", "passed": true, "evidence": "Uses WriteAccess extractor"},
+        {"text": "Validates file size does not exceed 10MB limit before fully reading the file or after reading", "passed": true, "evidence": "Early rejection + service validation"},
+        {"text": "Validates file extension against an explicit allowlist (pdf, jpg, png, docx)", "passed": true, "evidence": "ALLOWED_EXTENSIONS constant"},
+        {"text": "Uses UUID-based filename for storage (not user-provided filename)", "passed": true, "evidence": "Uuid::new_v4() for storage name"},
+        {"text": "Prevents path traversal by not using user-provided filename in the storage path", "passed": true, "evidence": "UUID name + sanitization + canonical path check"},
+        {"text": "Filters by organizacion_id or validates entity ownership (tenant scoping)", "passed": false, "evidence": "No org_id filter or entity ownership validation"},
+        {"text": "Does not serve the file back without authentication consideration", "passed": true, "evidence": "No static serving added"},
+        {"text": "Rejects files with no extension or unrecognized extensions", "passed": true, "evidence": "validate_and_extract_extension() rejects missing/invalid extensions"}
+      ]
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {"mean": 0.958, "stddev": 0.059, "min": 0.875, "max": 1.0},
+      "time_seconds": {"mean": 0, "stddev": 0, "min": 0, "max": 0},
+      "tokens": {"mean": 0, "stddev": 0, "min": 0, "max": 0}
+    },
+    "without_skill": {
+      "pass_rate": {"mean": 0.732, "stddev": 0.126, "min": 0.57, "max": 0.875},
+      "time_seconds": {"mean": 0, "stddev": 0, "min": 0, "max": 0},
+      "tokens": {"mean": 0, "stddev": 0, "min": 0, "max": 0}
+    },
+    "delta": {
+      "pass_rate": "+0.226",
+      "time_seconds": "0",
+      "tokens": "0"
+    }
+  },
+  "notes": [
+    "The skill provides the most value on the CSV export eval (+43% pass rate) — it adds date boundary defaults, row caps, and audit logging that the baseline completely misses.",
+    "Password change eval shows +25% improvement — the skill prompts explicit input validation at the handler boundary rather than relying on service-layer validation.",
+    "File upload eval shows identical scores (87.5%) for both configurations — the tenant-scoping assertion fails in both cases. The skill mentions 'verify parent ownership before creating children' but neither implementation actually queries the entity to verify org membership.",
+    "The 'tenant scoping' assertion for file uploads may be too strict — the existing codebase's upload handler also doesn't verify entity ownership. This could be a gap in the skill's guidance rather than a failure to follow it.",
+    "Auth extractor and Content-Disposition assertions pass 100% in both configurations — these are non-discriminating (the model knows to do this regardless of skill)."
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "expectations": [
+    {
+      "text": "Handler uses Claims or WriteAccess extractor for authentication",
+      "passed": true,
+      "evidence": "handler.rs uses `claims: Claims` extractor"
+    },
+    {
+      "text": "Queries filter by organizacion_id from claims (tenant scoping)",
+      "passed": true,
+      "evidence": "service.rs filters with `pago::Column::OrganizacionId.eq(org_id)` where org_id comes from claims.organizacion_id"
+    },
+    {
+      "text": "Applies a default date range or maximum date range limit to prevent unbounded exports",
+      "passed": true,
+      "evidence": "service.rs defaults to last 12 months when no dates provided (`checked_sub_months(12)`), and handler.rs caps range at 2 years (`diff > 365 * 2`)"
+    },
+    {
+      "text": "Sets Content-Disposition: attachment header on the response",
+      "passed": true,
+      "evidence": "handler.rs sets `.insert_header((\"Content-Disposition\", \"attachment; filename=\\\"pagos-export.csv\\\"\"))`"
+    },
+    {
+      "text": "Logs the export event with structured tracing fields",
+      "passed": true,
+      "evidence": "handler.rs has `tracing::info!(user_email = %claims.email, organizacion_id = %claims.organizacion_id, fecha_inicio = ?params.fecha_inicio, fecha_fin = ?params.fecha_fin, \"Exportación CSV de pagos solicitada\")`"
+    },
+    {
+      "text": "Does not expose internal error details in the response body",
+      "passed": true,
+      "evidence": "service.rs uses `AppError::Internal(anyhow::anyhow!(...))` for CSV writer errors which returns generic message to client"
+    },
+    {
+      "text": "Caps row count or enforces date boundaries to prevent memory exhaustion",
+      "passed": true,
+      "evidence": "service.rs has `const MAX_EXPORT_ROWS: usize = 50_000` and rejects if `pagos.len() > MAX_EXPORT_ROWS`"
+    }
+  ],
+  "summary": {
+    "passed": 7,
+    "failed": 0,
+    "total": 7,
+    "pass_rate": 1.0
+  }
+}
