@@ -224,7 +224,7 @@ inspecting response headers / the browser console.
 
 ### Bug 5 — NCF `GET /ncf/secuencias` returns 403 for admin
 
-- [~] 13. Write bug condition exploration test for admin NCF read
+- [x] 13. Write bug condition exploration test for admin NCF read
   - **Property 9: Bug Condition** - Admin can read NCF sequences
   - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
   - **GOAL**: Show an admin of an `informal` org is blocked from reading NCF sequences
