@@ -478,7 +478,7 @@ inspecting response headers / the browser console.
   - **EXPECTED OUTCOME**: Check PASSES (baseline first-party/third-party policy captured)
   - _Requirements: 3.11_
 
-- [ ] 27. Fix the deployed CSP for Cloudflare Insights
+- [x] 27. Fix the deployed CSP for Cloudflare Insights
 
   - [x] 27.1 Align deployed CSP and handle the inline beacon without weakening protection
     - Ensure the deployed `caddyfile` ConfigMap matches the repo CSP in `infra/caddy/Caddyfile` and
@@ -498,7 +498,7 @@ inspecting response headers / the browser console.
     - **EXPECTED OUTCOME**: Check PASSES (no CSP violation for Cloudflare Insights on page load)
     - _Requirements: 2.9_
 
-  - [ ] 27.3 Verify preservation check still passes
+  - [x] 27.3 Verify preservation check still passes
     - **Property 18: Preservation** - First-party allowed, third-party still blocked
     - **IMPORTANT**: Re-run the SAME check from task 26 - do NOT write a new check
     - **EXPECTED OUTCOME**: Check PASSES (first-party allowed; third-party blocked; no weakening)
