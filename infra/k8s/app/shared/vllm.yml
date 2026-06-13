@@ -80,12 +80,12 @@ spec:
           resources:
             requests:
               cpu: 500m
-              memory: 16Gi
+              memory: 24Gi
               ephemeral-storage: 128Mi
               gpu.intel.com/xe: "1"
             limits:
               cpu: 4000m
-              memory: 24Gi
+              memory: 32Gi
               ephemeral-storage: 512Mi
               gpu.intel.com/xe: "1"
           volumeMounts:

@@ -359,7 +359,7 @@ inspecting response headers / the browser console.
     preventing reintroduction and ensuring the corrected build is deployed
   - _Requirements: 1.7_
 
-- [-] 20. Write preservation property test for other Servicios Públicos calls
+- [x] 20. Write preservation property test for other Servicios Públicos calls
   - **Property 14: Preservation** - Other Servicios Públicos calls unchanged
   - **IMPORTANT**: Follow observation-first methodology
   - Observe on current source: units (`/propiedades/{id}/unidades`) and servicios
@@ -372,7 +372,7 @@ inspecting response headers / the browser console.
 
 - [ ] 21. Confirm source correctness and ensure deployment
 
-  - [~] 21.1 Verify the corrected endpoint and deploy the fixed frontend build
+  - [x] 21.1 Verify the corrected endpoint and deploy the fixed frontend build
     - Confirm no remaining caller of `/propiedades/todas`; the dropdown loads via
       `/propiedades?perPage=200`. Ensure the corrected frontend build is deployed (the defect was in
       the stale deployed build, not current source). No code change required unless a stray caller is found
@@ -381,7 +381,7 @@ inspecting response headers / the browser console.
     - _Preservation: units/servicios calls unchanged_
     - _Requirements: 1.7, 2.7, 3.9_
 
-  - [~] 21.2 Verify the regression-guard test passes
+  - [-] 21.2 Verify the regression-guard test passes
     - **Property 13: Expected Behavior** - Servicios Públicos calls an existing property endpoint
     - **IMPORTANT**: Re-run the SAME test from task 19 - do NOT write a new test
     - **EXPECTED OUTCOME**: Test PASSES (dropdown calls `/propiedades?perPage=200`)
