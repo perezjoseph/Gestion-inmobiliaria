@@ -236,7 +236,7 @@ inspecting response headers / the browser console.
   - Document counterexample (admin of informal org → 403 "Funciones fiscales requieren registro en DGII")
   - _Requirements: 1.5_
 
-- [~] 14. Write preservation property test for non-admin NCF restrictions
+- [x] 14. Write preservation property test for non-admin NCF restrictions
   - **Property 10: Preservation** - Non-admin NCF restrictions unchanged
   - **IMPORTANT**: Follow observation-first methodology
   - Observe on UNFIXED code: `gerente`/`visualizador` receive 403 (from `AdminOnly`) on NCF endpoints;

@@ -93,6 +93,7 @@ mod usuarios_tests;
 
 mod dr_compliance_integration_tests;
 mod ncf_bug_condition_pbt;
+mod ncf_preservation_pbt;
 mod security_audit_pbt;
 mod security_preservation_pbt;
 
