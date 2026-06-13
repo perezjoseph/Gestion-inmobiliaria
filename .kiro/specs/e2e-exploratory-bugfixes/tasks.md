@@ -397,7 +397,7 @@ inspecting response headers / the browser console.
 
 ### Bug 8 — Property document thumbnail 404
 
-- [~] 22. Write bug condition exploration test for the document URL builder
+- [-] 22. Write bug condition exploration test for the document URL builder
   - **Property 15: Bug Condition** - Stored document image is served
   - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
   - **GOAL**: Show the gallery builds an unroutable `/api/v1/{file_path}` URL (no-op `trim_end_matches`)
