@@ -693,6 +693,8 @@ h6,
   color: var(--text-primary);
   cursor: pointer;
   padding: var(--space-2);
+  position: relative;
+  z-index: 50;
 }
 
 /* Mobile sidebar overlay */
@@ -800,6 +802,16 @@ h6,
     min-height: 44px;
     align-items: center;
     justify-content: center;
+  }
+
+  /* Prevent right-group overlap on mobile */
+  .gi-navbar-right {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .gi-kbd {
+    display: none;
   }
 
   .gi-sidebar {

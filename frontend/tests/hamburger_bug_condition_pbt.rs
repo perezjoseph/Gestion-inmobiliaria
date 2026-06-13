@@ -140,9 +140,9 @@ fn compute_navbar_layout(viewport_width: u32, authenticated: bool) -> NavbarFlex
         44.0 + 12.0 + 44.0 // ~100px (just theme toggle + login)
     };
 
-    // UNFIXED STATE: hamburger has NO z-index, NO position: relative
-    let hamburger_has_z_index = false;
-    let hamburger_has_position = false;
+    // FIXED STATE: hamburger has position: relative and z-index: 50
+    let hamburger_has_z_index = true;
+    let hamburger_has_position = true;
 
     NavbarFlexLayout {
         viewport_width,

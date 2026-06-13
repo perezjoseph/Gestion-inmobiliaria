@@ -199,7 +199,7 @@ inspecting response headers / the browser console.
 
 - [ ] 12. Fix mobile hamburger interception
 
-  - [~] 12.1 Raise hamburger stacking and prevent right-group overlap on mobile
+  - [x] 12.1 Raise hamburger stacking and prevent right-group overlap on mobile
     - In `frontend/styles/tailwind.css`: add `.gi-hamburger { position: relative; z-index: 50; }`
     - Within `@media (max-width: 768px)`: allow `.gi-navbar-right { min-width: 0; flex-wrap: wrap; }`
       and hide low-priority controls (`.gi-kbd { display: none; }`)
@@ -208,7 +208,7 @@ inspecting response headers / the browser console.
     - _Preservation: desktop hamburger is display:none; right-group changes scoped to mobile media query_
     - _Requirements: 1.4, 2.4, 3.5_
 
-  - [~] 12.2 Verify bug condition exploration test now passes
+  - [x] 12.2 Verify bug condition exploration test now passes
     - **Property 7: Expected Behavior** - Mobile hamburger receives the click
     - **IMPORTANT**: Re-run the SAME test from task 10 - do NOT write a new test
     - **EXPECTED OUTCOME**: Test PASSES (hamburger receives the click; menu opens at 375px)
