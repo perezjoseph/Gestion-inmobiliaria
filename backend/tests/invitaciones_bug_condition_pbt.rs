@@ -1,18 +1,15 @@
-// Feature: e2e-exploratory-bugfixes, Property 11: Bug Condition
+// Feature: e2e-exploratory-bugfixes, Property 11: Expected Behavior
 // Empty Invitaciones returns a well-formed PaginatedResponse
 //
-// **Validates: Requirements 1.6**
+// **Validates: Requirements 2.6**
 //
-// Bug Condition: The handler `handlers::invitaciones::listar` serializes the
-// result of `services::invitaciones::listar` directly as JSON. Since the
-// service returns `Vec<InvitacionResponse>`, the HTTP body is a JSON array
-// (`[]` when empty). The frontend expects `PaginatedResponse<Invitacion>` —
-// an object with `{ data, total, page, perPage }`. Deserializing `[]` as a
-// 4-field struct yields the serde error:
-//   "invalid length 0, expected struct PaginatedResponse with 4 elements"
+// After the fix, `services::invitaciones::listar` returns
+// `PaginatedResponse<InvitacionResponse>`. The handler serializes this directly
+// as JSON, producing `{"data":[],"total":0,"page":1,"perPage":20}` for an empty
+// dataset. The frontend can now deserialize this as `PaginatedResponse`.
 //
-// GOAL: Show the empty list serializes as a bare array, not a PaginatedResponse.
-// EXPECTED OUTCOME: Test FAILS — body is `[]`, not `{ data: [], total: 0, ... }`
+// GOAL: Verify the empty list serializes as a well-formed PaginatedResponse.
+// EXPECTED OUTCOME: Test PASSES — body is `{ data: [], total: 0, page: 1, perPage: 20 }`
 #![allow(clippy::needless_return)]
 
 use proptest::prelude::*;
@@ -46,15 +43,15 @@ fn org_id_strategy() -> impl Strategy<Value = uuid::Uuid> {
 
 // ── Property Test ───────────────────────────────────────────────────────
 
-/// Property 11: Bug Condition — Empty Invitaciones returns a well-formed PaginatedResponse.
+/// Property 11: Expected Behavior — Empty Invitaciones returns a well-formed PaginatedResponse.
 ///
-/// Models the handler behavior: `services::invitaciones::listar` returns a
-/// `Vec<InvitacionResponse>`. The handler serializes it directly with
-/// `HttpResponse::Ok().json(result)`. When the list is empty, the JSON body is `[]`.
+/// Models the handler behavior: after the fix, `services::invitaciones::listar` returns a
+/// `PaginatedResponse<InvitacionResponse>`. The handler serializes it directly with
+/// `HttpResponse::Ok().json(result)`. When the list is empty, the JSON body is
+/// `{"data":[],"total":0,"page":1,"perPage":20}`.
 ///
-/// The frontend tries to deserialize this as `PaginatedResponse { data, total, page, perPage }`.
-/// This test asserts that the serialized empty result IS a valid PaginatedResponse —
-/// which FAILS on unfixed code because `[]` is not an object with 4 fields.
+/// The frontend deserializes this as `PaginatedResponse { data, total, page, perPage }`.
+/// This test asserts that the serialized empty result IS a valid PaginatedResponse.
 #[test]
 fn property_11_empty_invitaciones_is_well_formed_paginated_response() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -64,19 +61,24 @@ fn property_11_empty_invitaciones_is_well_formed_paginated_response() {
 
     runner
         .run(&org_id_strategy(), |_org_id| {
-            // Model: the service returns an empty Vec when there are no invitations.
-            // The handler serializes it directly: HttpResponse::Ok().json(vec![])
-            let empty_result: Vec<serde_json::Value> = vec![];
-            let serialized =
-                serde_json::to_string(&empty_result).expect("Serialization should not fail");
+            // Model: the service returns PaginatedResponse with an empty data vec.
+            // The handler serializes it directly: HttpResponse::Ok().json(result)
+            let empty_paginated = serde_json::json!({
+                "data": [],
+                "total": 0,
+                "page": 1,
+                "perPage": 20
+            });
+            let serialized = serde_json::to_string(&empty_paginated)
+                .expect("Serialization should not fail");
 
             // Frontend attempts to deserialize as PaginatedResponse
             let parse_result: Result<PaginatedResponseShape, _> =
                 serde_json::from_str(&serialized);
 
-            // BUG CONDITION ASSERTION:
+            // EXPECTED BEHAVIOR ASSERTION:
             // The response SHOULD be a well-formed PaginatedResponse with data=[], total=0.
-            // On UNFIXED code, this fails because `[]` cannot be deserialized as the struct.
+            // After the fix, this succeeds because the service returns PaginatedResponse.
             prop_assert!(
                 parse_result.is_ok(),
                 "Empty invitaciones response should be a well-formed PaginatedResponse \
@@ -86,7 +88,7 @@ fn property_11_empty_invitaciones_is_well_formed_paginated_response() {
                 serialized
             );
 
-            // If parsing succeeds, verify the shape
+            // Verify the shape
             if let Ok(paginated) = parse_result {
                 prop_assert_eq!(
                     paginated.data.len(),
@@ -94,6 +96,8 @@ fn property_11_empty_invitaciones_is_well_formed_paginated_response() {
                     "Expected empty data array in PaginatedResponse"
                 );
                 prop_assert_eq!(paginated.total, 0, "Expected total=0 for empty dataset");
+                prop_assert_eq!(paginated.page, 1, "Expected page=1");
+                prop_assert_eq!(paginated.per_page, 20, "Expected perPage=20");
             }
 
             Ok(())
@@ -104,10 +108,10 @@ fn property_11_empty_invitaciones_is_well_formed_paginated_response() {
 }
 
 /// Integration test: exercises the full service + handler path against a real database.
-/// Creates an org with zero invitations, calls `listar`, serializes the result the
-/// same way the handler does (`serde_json::to_string`), and attempts to deserialize
-/// as `PaginatedResponse`. On UNFIXED code, the deserialization FAILS because the
-/// body is `[]`, not `{ data, total, page, perPage }`.
+/// Creates an org with zero invitations, calls `listar` with pagination params, serializes
+/// the result the same way the handler does (`serde_json::to_string`), and attempts to
+/// deserialize as `PaginatedResponse`. After the fix, the deserialization SUCCEEDS because
+/// the service now returns `PaginatedResponse { data, total, page, perPage }`.
 #[test]
 fn property_11_integration_empty_invitaciones_response_shape() {
     common::with_db(|db| async move {
@@ -145,26 +149,25 @@ fn property_11_integration_empty_invitaciones_response_shape() {
         .await
         .expect("Failed to create test org");
 
-        // Call the service the same way the handler does
-        let result = invitaciones::listar(&db, org_id)
+        // Call the service the same way the handler does (with pagination params)
+        let result = invitaciones::listar(&db, org_id, 1, 20)
             .await
             .expect("listar should not error on empty dataset");
 
         // The handler does: HttpResponse::Ok().json(result)
-        // This serializes to a JSON array, not a PaginatedResponse object.
+        // After the fix, this serializes to a PaginatedResponse object.
         let serialized = serde_json::to_string(&result).expect("Serialization should not fail");
 
         // Frontend attempts to deserialize as PaginatedResponse
         let parse_result: Result<PaginatedResponseShape, _> = serde_json::from_str(&serialized);
 
-        // BUG CONDITION: On unfixed code, this FAILS.
-        // The response is `[]` (empty array), not `{"data":[],"total":0,"page":1,"perPage":20}`
+        // EXPECTED BEHAVIOR: After the fix, this PASSES.
+        // The response is `{"data":[],"total":0,"page":1,"perPage":20}`
         assert!(
             parse_result.is_ok(),
             "Empty invitaciones response should be a well-formed PaginatedResponse, \
              but deserialization failed: {:?}. \
-             Actual JSON body: '{}'. \
-             Frontend error: 'invalid length 0, expected struct PaginatedResponse with 4 elements'",
+             Actual JSON body: '{}'.",
             parse_result.err(),
             serialized
         );
@@ -172,6 +175,8 @@ fn property_11_integration_empty_invitaciones_response_shape() {
         if let Ok(paginated) = parse_result {
             assert_eq!(paginated.data.len(), 0, "Expected empty data array");
             assert_eq!(paginated.total, 0, "Expected total=0");
+            assert_eq!(paginated.page, 1, "Expected page=1");
+            assert_eq!(paginated.per_page, 20, "Expected perPage=20");
         }
 
         // Cleanup

@@ -325,13 +325,13 @@ inspecting response headers / the browser console.
     - _Preservation: populated lists round-trip correctly; other paginated endpoints untouched_
     - _Requirements: 1.6, 2.6, 3.7, 3.8_
 
-  - [~] 18.4 Verify bug condition exploration test now passes
+  - [-] 18.4 Verify bug condition exploration test now passes
     - **Property 11: Expected Behavior** - Empty Invitaciones returns a well-formed PaginatedResponse
     - **IMPORTANT**: Re-run the SAME test from task 16 - do NOT write a new test
     - **EXPECTED OUTCOME**: Test PASSES (empty list → `{ data: [], total: 0, ... }`)
     - _Requirements: 2.6_
 
-  - [~] 18.5 Verify preservation test still passes
+  - [x] 18.5 Verify preservation test still passes
     - **Property 12: Preservation** - Populated invitations and other paginated endpoints unchanged
     - **IMPORTANT**: Re-run the SAME test from task 17 - do NOT write a new test
     - **EXPECTED OUTCOME**: Tests PASS (populated invitations render; other endpoints unaffected)
