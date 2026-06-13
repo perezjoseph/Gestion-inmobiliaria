@@ -174,7 +174,7 @@ inspecting response headers / the browser console.
 
 ### Bug 4 — Mobile hamburger intercepted by an SVG in `.gi-navbar-right`
 
-- [~] 10. Write bug condition exploration test for the mobile hamburger
+- [x] 10. Write bug condition exploration test for the mobile hamburger
   - **Property 7: Bug Condition** - Mobile hamburger receives the click
   - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
   - **GOAL**: Demonstrate the pointer event is intercepted by an element other than the hamburger

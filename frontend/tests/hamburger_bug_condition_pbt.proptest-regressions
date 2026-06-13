@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc a308adccccef6827b7613d04cc7139f29beb842ce5b536c0218561c26631d75a # shrinks to (viewport_width, authenticated) = (320, true)
