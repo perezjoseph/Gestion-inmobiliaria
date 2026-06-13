@@ -89,9 +89,8 @@ jobs:
               -l app.kubernetes.io/name=backend -n ${NS} --timeout=60s
 
             BACKEND_POD=$(kubectl get pods -n ${NS} -l app.kubernetes.io/name=backend \
-              --field-selector=status.phase=Running \
-              -o jsonpath='{.items[?(@.status.conditions[?(@.type=="Ready")].status=="True")].metadata.name}' \
-              | awk '{print $1}')
+              -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\n"}{end}' \
+              | grep Running | head -1 | cut -f1)
 
             if [ -z "$BACKEND_POD" ]; then
               echo "::error::No Ready backend pod found"
@@ -118,9 +117,8 @@ jobs:
               -l app.kubernetes.io/name=frontend -n ${NS} --timeout=60s
 
             FRONTEND_POD=$(kubectl get pods -n ${NS} -l app.kubernetes.io/name=frontend \
-              --field-selector=status.phase=Running \
-              -o jsonpath='{.items[?(@.status.conditions[?(@.type=="Ready")].status=="True")].metadata.name}' \
-              | awk '{print $1}')
+              -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\n"}{end}' \
+              | grep Running | head -1 | cut -f1)
 
             if [ -z "$FRONTEND_POD" ]; then
               echo "::error::No Ready frontend pod found"
