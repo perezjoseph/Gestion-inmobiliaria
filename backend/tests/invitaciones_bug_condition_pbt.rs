@@ -126,7 +126,7 @@ fn property_11_integration_empty_invitaciones_response_shape() {
         let now = Utc::now().into();
         organizacion::ActiveModel {
             id: Set(org_id),
-            tipo: Set("propietario".to_string()),
+            tipo: Set("persona_fisica".to_string()),
             nombre: Set(format!("Invitaciones PBT Org {org_id}")),
             estado: Set("activo".to_string()),
             cedula: Set(None),

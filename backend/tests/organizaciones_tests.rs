@@ -806,7 +806,9 @@ mod db_async {
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 200);
             let body: Value = test::read_body_json(resp).await;
-            let invitations = body.as_array().expect("response should be an array");
+            let invitations = body["data"]
+                .as_array()
+                .expect("response should be an array");
             assert!(
                 invitations.len() >= 2,
                 "should have at least 2 pending invitations"
@@ -829,7 +831,7 @@ mod db_async {
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 200);
             let body: Value = test::read_body_json(resp).await;
-            let invitations_after = body.as_array().unwrap();
+            let invitations_after = body["data"].as_array().unwrap();
             assert_eq!(
                 invitations_after.len(),
                 invitations.len() - 1,

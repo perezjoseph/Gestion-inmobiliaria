@@ -173,7 +173,7 @@ fn property_9_integration_admin_informal_org_listar_secuencias() {
         let now = Utc::now().into();
         organizacion::ActiveModel {
             id: Set(org_id),
-            tipo: Set("propietario".to_string()),
+            tipo: Set("persona_fisica".to_string()),
             nombre: Set(format!("NCF Integration PBT Org {org_id}")),
             estado: Set("activo".to_string()),
             cedula: Set(None),

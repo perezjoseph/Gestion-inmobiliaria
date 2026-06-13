@@ -248,7 +248,7 @@ fn property_12_other_paginated_endpoints_are_well_formed() {
         let now = Utc::now().into();
         organizacion::ActiveModel {
             id: Set(org_id),
-            tipo: Set("propietario".to_string()),
+            tipo: Set("persona_fisica".to_string()),
             nombre: Set(format!("Preservation PBT Org {org_id}")),
             estado: Set("activo".to_string()),
             cedula: Set(None),
