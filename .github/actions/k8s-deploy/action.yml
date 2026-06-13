@@ -237,22 +237,71 @@ runs:
         BAILEYS_DIGEST: ${{ inputs.baileys-digest }}
         OCR_DIGEST: ${{ inputs.ocr-service-digest }}
       run: |
-        kubectl set image deployment/backend \
-          "backend=ghcr.io/${IMAGE_OWNER}/realestate-backend@${BACKEND_DIGEST}" \
-          --namespace "${NS}"
+        # Helper: get the current image digest running in a deployment's container
+        current_digest() {
+          local deploy="$1" container="$2"
+          kubectl get deployment "$deploy" -n "${NS}" \
+            -o jsonpath="{.spec.template.spec.containers[?(@.name==\"${container}\")].image}" 2>/dev/null \
+            | grep -oP '@\K.*' || true
+        }
 
-        kubectl set image deployment/frontend \
-          "frontend=ghcr.io/${IMAGE_OWNER}/realestate-frontend@${FRONTEND_DIGEST}" \
-          --namespace "${NS}"
+        UPDATED=""
 
-        kubectl set image deployment/baileys \
-          "baileys=ghcr.io/${IMAGE_OWNER}/realestate-baileys@${BAILEYS_DIGEST}" \
-          --namespace "${NS}"
-
-        if [ -n "${OCR_DIGEST}" ] && kubectl get deployment/ocr-service --namespace "${NS}" >/dev/null 2>&1; then
-          kubectl set image deployment/ocr-service \
-            "ocr-service=ghcr.io/${IMAGE_OWNER}/realestate-ocr-service@${OCR_DIGEST}" \
+        # Backend
+        CURRENT=$(current_digest "backend" "backend")
+        if [ "$CURRENT" != "$BACKEND_DIGEST" ]; then
+          echo "Updating backend: ${CURRENT:-<none>} → ${BACKEND_DIGEST}"
+          kubectl set image deployment/backend \
+            "backend=ghcr.io/${IMAGE_OWNER}/realestate-backend@${BACKEND_DIGEST}" \
             --namespace "${NS}"
+          UPDATED="${UPDATED} backend"
+        else
+          echo "Backend already at ${BACKEND_DIGEST} — skipping"
+        fi
+
+        # Frontend
+        CURRENT=$(current_digest "frontend" "frontend")
+        if [ "$CURRENT" != "$FRONTEND_DIGEST" ]; then
+          echo "Updating frontend: ${CURRENT:-<none>} → ${FRONTEND_DIGEST}"
+          kubectl set image deployment/frontend \
+            "frontend=ghcr.io/${IMAGE_OWNER}/realestate-frontend@${FRONTEND_DIGEST}" \
+            --namespace "${NS}"
+          UPDATED="${UPDATED} frontend"
+        else
+          echo "Frontend already at ${FRONTEND_DIGEST} — skipping"
+        fi
+
+        # Baileys
+        CURRENT=$(current_digest "baileys" "baileys")
+        if [ "$CURRENT" != "$BAILEYS_DIGEST" ]; then
+          echo "Updating baileys: ${CURRENT:-<none>} → ${BAILEYS_DIGEST}"
+          kubectl set image deployment/baileys \
+            "baileys=ghcr.io/${IMAGE_OWNER}/realestate-baileys@${BAILEYS_DIGEST}" \
+            --namespace "${NS}"
+          UPDATED="${UPDATED} baileys"
+        else
+          echo "Baileys already at ${BAILEYS_DIGEST} — skipping"
+        fi
+
+        # OCR (optional)
+        if [ -n "${OCR_DIGEST}" ] && kubectl get deployment/ocr-service --namespace "${NS}" >/dev/null 2>&1; then
+          CURRENT=$(current_digest "ocr-service" "ocr-service")
+          if [ "$CURRENT" != "$OCR_DIGEST" ]; then
+            echo "Updating ocr-service: ${CURRENT:-<none>} → ${OCR_DIGEST}"
+            kubectl set image deployment/ocr-service \
+              "ocr-service=ghcr.io/${IMAGE_OWNER}/realestate-ocr-service@${OCR_DIGEST}" \
+              --namespace "${NS}"
+            UPDATED="${UPDATED} ocr-service"
+          else
+            echo "OCR service already at ${OCR_DIGEST} — skipping"
+          fi
+        fi
+
+        echo "updated=${UPDATED}" >> "$GITHUB_OUTPUT"
+        if [ -z "$UPDATED" ]; then
+          echo "::notice::All deployments already at target digests — no rollout triggered"
+        else
+          echo "Updated deployments:${UPDATED}"
         fi
 
     - name: Wait for rollout
