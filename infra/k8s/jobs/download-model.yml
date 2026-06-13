@@ -56,11 +56,11 @@ spec:
             - -c
             - |
               set -e
-              echo "=== Installing huggingface-cli ==="
+              echo "=== Installing huggingface_hub[cli] ==="
               pip install --no-cache-dir "huggingface_hub[cli]"
 
               echo "=== Downloading Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound ==="
-              huggingface-cli download Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound
+              hf download Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound
 
               echo "=== Download complete ==="
               echo "=== Verifying HuggingFace cache layout ==="

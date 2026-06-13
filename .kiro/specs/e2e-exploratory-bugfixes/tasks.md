@@ -508,7 +508,7 @@ inspecting response headers / the browser console.
 
 ### Final Validation
 
-- [ ] 28. Checkpoint - Ensure all tests pass
+- [-] 28. Checkpoint - Ensure all tests pass
   - Run the full backend test suite (`cargo test`) and frontend tests; run the Playwright E2E pass
   - Confirm every Bug Condition exploration test/check now PASSES (Properties 1, 3, 5, 7, 9, 11, 13,
     15, 17) and every Preservation test/check still PASSES (Properties 2, 4, 6, 8, 10, 12, 14, 16, 18)

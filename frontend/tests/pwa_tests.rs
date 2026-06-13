@@ -171,13 +171,11 @@ mod service_worker_registration {
             SERVICE_WORKER_SOURCE.contains("/index.html"),
             "service-worker.js must precache /index.html"
         );
+        // Trunk emits .wasm and .js with content hashes, so they are cached
+        // on demand by the fetch handler rather than precached at install time.
         assert!(
-            SERVICE_WORKER_SOURCE.contains("/main.wasm"),
-            "service-worker.js must precache /main.wasm"
-        );
-        assert!(
-            SERVICE_WORKER_SOURCE.contains("/main.js"),
-            "service-worker.js must precache /main.js"
+            SERVICE_WORKER_SOURCE.contains(".wasm") && SERVICE_WORKER_SOURCE.contains(".js"),
+            "service-worker.js must handle .wasm and .js as static assets for on-demand caching"
         );
     }
 
