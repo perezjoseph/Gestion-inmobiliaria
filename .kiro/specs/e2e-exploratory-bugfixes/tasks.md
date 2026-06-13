@@ -99,7 +99,7 @@ inspecting response headers / the browser console.
 
 - [ ] 6. Fix sticky Nombre validation
 
-  - [~] 6.1 Add live revalidation for the Nombre field
+  - [x] 6.1 Add live revalidation for the Nombre field
     - In `frontend/src/components/auth/register_form.rs`, replace the generic `nombre` handler with
       one that calls `nombre_error.set(validate_nombre(&value))` on input (clears once non-empty),
       keeping the submit-time `validate_nombre` call intact

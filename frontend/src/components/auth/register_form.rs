@@ -166,7 +166,16 @@ pub fn RegisterForm(props: &RegisterFormProps) -> Html {
         })
     };
 
-    let on_nombre_change = make_handler(nombre.clone());
+    let on_nombre_change = {
+        let nombre = nombre.clone();
+        let nombre_error = nombre_error.clone();
+        Callback::from(move |e: InputEvent| {
+            let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+            let value = input.value();
+            nombre_error.set(validate_nombre(&value)); // clears once non-empty
+            nombre.set(value);
+        })
+    };
     let on_email_change = make_handler(email.clone());
     let on_password_change = make_handler(password.clone());
     let on_confirm_change = make_handler(confirm_password.clone());
