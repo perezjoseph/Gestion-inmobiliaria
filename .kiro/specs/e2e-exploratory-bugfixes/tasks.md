@@ -420,7 +420,7 @@ inspecting response headers / the browser console.
   - **EXPECTED OUTCOME**: Tests PASS (baseline 404/traversal behavior captured)
   - _Requirements: 3.10_
 
-- [ ] 24. Fix the document thumbnail URL and authenticated loading
+- [x] 24. Fix the document thumbnail URL and authenticated loading
 
   - [x] 24.1 Build the correct route and load via authenticated blob fetch
     - In `frontend/src/components/common/document_gallery.rs`: build
@@ -441,7 +441,7 @@ inspecting response headers / the browser console.
     - **EXPECTED OUTCOME**: Test PASSES (URL resolves to `/uploads/{file_path}`; image served 200)
     - _Requirements: 2.8_
 
-  - [ ] 24.3 Verify preservation test still passes
+  - [x] 24.3 Verify preservation test still passes
     - **Property 16: Preservation** - Missing files and traversal unchanged
     - **IMPORTANT**: Re-run the SAME test from task 23 - do NOT write a new test
     - **EXPECTED OUTCOME**: Tests PASS (missing files still 404; traversal still rejected)
