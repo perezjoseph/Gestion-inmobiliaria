@@ -1,0 +1,315 @@
+{
+    "schemaVersion": 2,
+    "generatedAt": "2026-06-13T03:00:00.000Z",
+    "title": "Design System: Gestión Inmobiliaria RD",
+    "extensions": {
+        "colorMeta": {
+            "primary-500": {
+                "role": "primary",
+                "displayName": "Deep Coastal Teal",
+                "canonical": "oklch(48% 0.10 185)",
+                "tonalRamp": [
+                    "oklch(22% 0.05 185)",
+                    "oklch(27% 0.06 185)",
+                    "oklch(33% 0.08 185)",
+                    "oklch(40% 0.09 185)",
+                    "oklch(48% 0.10 185)",
+                    "oklch(58% 0.11 185)",
+                    "oklch(70% 0.10 185)",
+                    "oklch(80% 0.08 185)",
+                    "oklch(90% 0.05 185)",
+                    "oklch(95% 0.03 185)"
+                ]
+            },
+            "accent-500": {
+                "role": "secondary",
+                "displayName": "Warm Terracotta",
+                "canonical": "oklch(55% 0.13 30)",
+                "tonalRamp": [
+                    "oklch(20% 0.04 30)",
+                    "oklch(30% 0.07 30)",
+                    "oklch(40% 0.09 30)",
+                    "oklch(48% 0.11 30)",
+                    "oklch(55% 0.13 30)",
+                    "oklch(62% 0.14 30)",
+                    "oklch(70% 0.13 30)",
+                    "oklch(80% 0.10 30)",
+                    "oklch(90% 0.06 30)",
+                    "oklch(95% 0.03 30)"
+                ]
+            },
+            "sand-50": {
+                "role": "neutral",
+                "displayName": "Sand Paper",
+                "canonical": "oklch(98% 0.008 80)",
+                "tonalRamp": [
+                    "oklch(14% 0.005 80)",
+                    "oklch(20% 0.006 80)",
+                    "oklch(28% 0.008 80)",
+                    "oklch(38% 0.008 80)",
+                    "oklch(48% 0.008 80)",
+                    "oklch(58% 0.008 80)",
+                    "oklch(70% 0.008 80)",
+                    "oklch(82% 0.010 80)",
+                    "oklch(90% 0.012 80)",
+                    "oklch(98% 0.008 80)"
+                ]
+            },
+            "success": {
+                "role": "semantic",
+                "displayName": "Verdant Paid",
+                "canonical": "oklch(55% 0.12 155)",
+                "tonalRamp": [
+                    "oklch(20% 0.04 155)",
+                    "oklch(30% 0.06 155)",
+                    "oklch(40% 0.09 155)",
+                    "oklch(55% 0.12 155)",
+                    "oklch(65% 0.10 155)",
+                    "oklch(75% 0.08 155)",
+                    "oklch(85% 0.06 155)",
+                    "oklch(92% 0.05 155)"
+                ]
+            },
+            "warning": {
+                "role": "semantic",
+                "displayName": "Amber Due",
+                "canonical": "oklch(65% 0.14 85)",
+                "tonalRamp": [
+                    "oklch(25% 0.04 85)",
+                    "oklch(35% 0.07 85)",
+                    "oklch(48% 0.10 85)",
+                    "oklch(65% 0.14 85)",
+                    "oklch(75% 0.11 85)",
+                    "oklch(82% 0.08 85)",
+                    "oklch(88% 0.06 85)",
+                    "oklch(92% 0.06 85)"
+                ]
+            },
+            "error": {
+                "role": "semantic",
+                "displayName": "Overdue Red",
+                "canonical": "oklch(55% 0.14 25)",
+                "tonalRamp": [
+                    "oklch(20% 0.04 25)",
+                    "oklch(30% 0.07 25)",
+                    "oklch(42% 0.10 25)",
+                    "oklch(55% 0.14 25)",
+                    "oklch(65% 0.12 25)",
+                    "oklch(75% 0.09 25)",
+                    "oklch(85% 0.06 25)",
+                    "oklch(92% 0.04 25)"
+                ]
+            },
+            "info": {
+                "role": "semantic",
+                "displayName": "Informational Blue",
+                "canonical": "oklch(55% 0.10 230)",
+                "tonalRamp": [
+                    "oklch(20% 0.04 230)",
+                    "oklch(30% 0.06 230)",
+                    "oklch(42% 0.08 230)",
+                    "oklch(55% 0.10 230)",
+                    "oklch(65% 0.08 230)",
+                    "oklch(75% 0.06 230)",
+                    "oklch(85% 0.04 230)",
+                    "oklch(92% 0.04 230)"
+                ]
+            }
+        },
+        "typographyMeta": {
+            "display": {
+                "displayName": "Display",
+                "purpose": "Page titles. Appears once per screen, establishing the context."
+            },
+            "title": {
+                "displayName": "Title",
+                "purpose": "Section headings and card titles. The workhorse heading level."
+            },
+            "body": {
+                "displayName": "Body",
+                "purpose": "Running text, form content, table cells. The default reading size."
+            },
+            "label": {
+                "displayName": "Label",
+                "purpose": "Table headers, sidebar group labels, field labels. Smallest legible text."
+            }
+        },
+        "shadows": [
+            {
+                "name": "shadow-sm",
+                "value": "0 1px 2px oklch(20% 0.01 80 / 0.08)",
+                "purpose": "Resting navbar separation. Barely perceptible."
+            },
+            {
+                "name": "shadow-md",
+                "value": "0 2px 8px oklch(20% 0.01 80 / 0.10)",
+                "purpose": "Hover state for cards and buttons. The 'just picked up' elevation."
+            },
+            {
+                "name": "shadow-lg",
+                "value": "0 8px 24px oklch(20% 0.01 80 / 0.12)",
+                "purpose": "Modals, toasts, floating overlays."
+            }
+        ],
+        "motion": [
+            {
+                "name": "ease-out",
+                "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+                "purpose": "Default easing for all state transitions. Exponential ease-out."
+            },
+            {
+                "name": "duration-fast",
+                "value": "150ms",
+                "purpose": "Hover states, color shifts, micro-interactions."
+            },
+            {
+                "name": "duration-normal",
+                "value": "250ms",
+                "purpose": "Layout transitions, sidebar slides, theme changes."
+            }
+        ],
+        "breakpoints": [
+            {
+                "name": "sm",
+                "value": "480px"
+            },
+            {
+                "name": "md",
+                "value": "768px"
+            },
+            {
+                "name": "lg",
+                "value": "1024px"
+            }
+        ]
+    },
+    "components": [
+        {
+            "name": "Primary Button",
+            "kind": "button",
+            "refersTo": "button-primary",
+            "description": "Main action button. Deep teal, white text, tactile press on active.",
+            "html": "<button class=\"ds-btn-primary\">Agregar Propiedad</button>",
+            "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 16px; border-radius: 8px; font-family: 'Source Sans 3', system-ui, sans-serif; font-size: 0.875rem; font-weight: 600; border: none; cursor: pointer; background-color: oklch(48% 0.10 185); color: oklch(98% 0.005 80); transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 150ms cubic-bezier(0.16, 1, 0.3, 1), transform 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-primary:hover { background-color: oklch(40% 0.09 185); box-shadow: 0 2px 8px oklch(20% 0.01 80 / 0.10); } .ds-btn-primary:active { transform: scale(0.98); } .ds-btn-primary:focus-visible { outline: 2px solid oklch(58% 0.11 185); outline-offset: 2px; }"
+        },
+        {
+            "name": "Ghost Button",
+            "kind": "button",
+            "refersTo": "button-ghost",
+            "description": "Secondary action. Transparent with border, fills on hover.",
+            "html": "<button class=\"ds-btn-ghost\">Cancelar</button>",
+            "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 16px; border-radius: 8px; font-family: 'Source Sans 3', system-ui, sans-serif; font-size: 0.875rem; font-weight: 600; cursor: pointer; background-color: transparent; color: oklch(48% 0.008 80); border: 1px solid oklch(90% 0.012 80); transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), border-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-ghost:hover { background-color: oklch(95% 0.010 80); border-color: oklch(82% 0.010 80); } .ds-btn-ghost:active { transform: scale(0.98); } .ds-btn-ghost:focus-visible { outline: 2px solid oklch(58% 0.11 185); outline-offset: 2px; }"
+        },
+        {
+            "name": "Danger Button",
+            "kind": "button",
+            "refersTo": "button-danger",
+            "description": "Destructive action confirmation. Terracotta-adjacent red.",
+            "html": "<button class=\"ds-btn-danger\">Eliminar</button>",
+            "css": ".ds-btn-danger { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 16px; border-radius: 8px; font-family: 'Source Sans 3', system-ui, sans-serif; font-size: 0.875rem; font-weight: 600; border: none; cursor: pointer; background-color: oklch(55% 0.14 25); color: oklch(98% 0.005 80); transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-danger:hover { background-color: oklch(42% 0.10 25); } .ds-btn-danger:active { transform: scale(0.98); } .ds-btn-danger:focus-visible { outline: 2px solid oklch(55% 0.14 25); outline-offset: 2px; }"
+        },
+        {
+            "name": "Text Input",
+            "kind": "input",
+            "refersTo": "input-default",
+            "description": "Standard form field with teal focus ring.",
+            "html": "<div class=\"ds-field\"><label class=\"ds-label\">Dirección</label><input class=\"ds-input\" placeholder=\"Calle ejemplo #123\" /></div>",
+            "css": ".ds-field { display: flex; flex-direction: column; } .ds-label { font-family: 'Source Sans 3', system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; color: oklch(48% 0.008 80); margin-bottom: 4px; } .ds-input { width: 100%; padding: 8px 12px; border: 1px solid oklch(90% 0.012 80); border-radius: 8px; font-family: 'Source Sans 3', system-ui, sans-serif; font-size: 0.875rem; background-color: oklch(99% 0.005 80); color: oklch(20% 0.006 80); transition: border-color 150ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-input::placeholder { color: oklch(70% 0.008 80); } .ds-input:focus { outline: none; border-color: oklch(58% 0.11 185); box-shadow: 0 0 0 3px oklch(48% 0.10 185 / 0.15); } .ds-input:focus-visible { outline: none; }"
+        },
+        {
+            "name": "Status Badge (Success)",
+            "kind": "chip",
+            "refersTo": "badge-success",
+            "description": "Pill badge for positive states: paid, active, available.",
+            "html": "<span class=\"ds-badge ds-badge-success\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" fill=\"none\"><path d=\"M2.5 6L5 8.5L9.5 4\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg> Pagado</span>",
+            "css": ".ds-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 12px; border-radius: 9999px; font-family: 'Source Sans 3', system-ui, sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em; } .ds-badge-success { background-color: oklch(92% 0.05 155); color: oklch(40% 0.09 155); } .ds-badge svg { width: 12px; height: 12px; }"
+        },
+        {
+            "name": "Status Badge (Error)",
+            "kind": "chip",
+            "refersTo": "badge-error",
+            "description": "Pill badge for negative states: overdue, rejected, cancelled.",
+            "html": "<span class=\"ds-badge ds-badge-error\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" fill=\"none\"><path d=\"M3 3L9 9M9 3L3 9\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg> Atrasado</span>",
+            "css": ".ds-badge-error { background-color: oklch(92% 0.04 25); color: oklch(42% 0.10 25); }"
+        },
+        {
+            "name": "Sidebar Navigation",
+            "kind": "nav",
+            "refersTo": null,
+            "description": "Deep teal sidebar with active/hover states. The anchoring element of the layout.",
+            "html": "<nav class=\"ds-sidebar\"><div class=\"ds-sidebar-group\"><span class=\"ds-sidebar-label\">Principal</span><a class=\"ds-sidebar-link ds-sidebar-link-active\" href=\"#\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3m10-11v10a1 1 0 01-1 1h-3\"/></svg>Dashboard</a><a class=\"ds-sidebar-link\" href=\"#\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M3 9h18M9 21V9\"/></svg>Propiedades</a></div></nav>",
+            "css": ".ds-sidebar { background-color: oklch(27% 0.06 185); padding: 16px; min-height: 200px; width: 240px; } .ds-sidebar-group { margin-bottom: 12px; } .ds-sidebar-label { display: block; padding: 8px 16px; font-family: 'Source Sans 3', system-ui, sans-serif; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: oklch(55% 0.01 185); } .ds-sidebar-link { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 8px; font-family: 'Source Sans 3', system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; color: oklch(80% 0.01 185); text-decoration: none; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-sidebar-link:hover { background-color: oklch(33% 0.08 185); color: oklch(95% 0.005 80); } .ds-sidebar-link-active { background-color: oklch(40% 0.09 185); color: oklch(98% 0.005 80); font-weight: 600; }"
+        },
+        {
+            "name": "Toast Notification",
+            "kind": "custom",
+            "refersTo": null,
+            "description": "Success toast with icon circle and slide-in animation.",
+            "html": "<div class=\"ds-toast ds-toast-success\"><div class=\"ds-toast-icon\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" fill=\"none\"><path d=\"M2.5 6L5 8.5L9.5 4\" stroke=\"white\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></div><span class=\"ds-toast-text\">Propiedad creada exitosamente</span><button class=\"ds-toast-close\">&times;</button></div>",
+            "css": ".ds-toast { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 10px; box-shadow: 0 8px 24px oklch(20% 0.01 80 / 0.12); font-family: 'Source Sans 3', system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; animation: ds-toast-in 0.3s cubic-bezier(0.16, 1, 0.3, 1); } .ds-toast-success { background-color: oklch(92% 0.05 155); color: oklch(40% 0.09 155); border: 1px solid oklch(55% 0.12 155); } .ds-toast-icon { flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background-color: oklch(55% 0.12 155); } .ds-toast-text { flex: 1; } .ds-toast-close { background: none; border: none; cursor: pointer; font-size: 1.25rem; line-height: 1; opacity: 0.6; padding: 4px; color: inherit; } .ds-toast-close:hover { opacity: 1; } @keyframes ds-toast-in { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }"
+        }
+    ],
+    "narrative": {
+        "northStar": "La Oficina Costera",
+        "overview": "The grounded efficiency of a well-run office where you can hear the sea through open louvers. Business first, warmth always. This system serves property managers who spend hours in data-heavy screens; it must be dense without being cramped, warm without being decorative, and local without being kitsch.\n\nThe visual language draws from Caribbean professional spaces: sandy warm surfaces instead of cold grays, deep teal as the working accent (ocean depth, not tourism blue), and terracotta reserved for moments that demand attention. Every surface is tinted toward warmth. Every interaction is deliberate.\n\nThis is free, open-source software built for independent Dominican landlords. It rejects the aesthetic baggage of enterprise platforms and Silicon Valley SaaS alike.",
+        "keyCharacteristics": [
+            "Warm-tinted neutrals everywhere (sand, stone, never steel)",
+            "Deep teal as the single working primary; terracotta reserved for emphasis and alerts",
+            "Serif headings (Bitter) for Caribbean confidence; clean sans body (Source Sans 3) for data density",
+            "Flat by default; shadows appear only as state feedback",
+            "Status communicated through color AND icon/text, never color alone",
+            "Generous touch targets for accessibility across all ages"
+        ],
+        "rules": [
+            {
+                "name": "The Sand Foundation Rule",
+                "body": "Every neutral in the system carries hue 80 with chroma 0.005 to 0.012. Cold gray (chroma 0, hue 0) is prohibited. If a surface doesn't feel like sandstone, it's wrong.",
+                "section": "colors"
+            },
+            {
+                "name": "The Teal Budget Rule",
+                "body": "Primary teal occupies no more than 10% of any given screen's surface area. Its scarcity is its authority. When everything is teal, nothing is.",
+                "section": "colors"
+            },
+            {
+                "name": "The Bitter Reserve Rule",
+                "body": "Bitter appears only on h1 through h6 and elements with .font-display. It never appears in buttons, labels, badges, or body copy. Its exclusivity gives headings weight.",
+                "section": "typography"
+            },
+            {
+                "name": "The Tabular Data Rule",
+                "body": "All numeric data in tables uses font-variant-numeric: tabular-nums so columns align. Numbers are never proportional in data contexts.",
+                "section": "typography"
+            },
+            {
+                "name": "The Flat-By-Default Rule",
+                "body": "Surfaces are flat at rest. Shadows appear only as a response to state (hover, focus, elevation). If a card has a shadow before interaction, the shadow is wrong.",
+                "section": "elevation"
+            }
+        ],
+        "dos": [
+            "Do tint every neutral toward hue 80 (sand/warm). Even borders, even shadows.",
+            "Do use tabular-nums in any column showing currency amounts or dates.",
+            "Do pair every status color with a text label or icon. A green badge alone is not accessible.",
+            "Do use Bitter exclusively for headings. Its weight comes from scarcity.",
+            "Do test all interactive elements at 44px minimum touch target on mobile.",
+            "Do use the 4px spacing scale consistently. Gaps should be multiples of 4.",
+            "Do keep button text at weight 600 and size text-sm. Consistency builds trust.",
+            "Do respect prefers-reduced-motion by disabling transform/animation transitions."
+        ],
+        "donts": [
+            "Don't use cold gray (oklch with hue 0 or chroma 0). Sand Foundation Rule: every neutral has warmth.",
+            "Don't use border-left or border-right greater than 1px as a colored accent stripe on any element.",
+            "Don't apply gradient backgrounds to text (background-clip: text).",
+            "Don't use glassmorphism (backdrop-filter blur + translucent backgrounds) decoratively.",
+            "Don't create identical card grids with icon + heading + text repeated in a row.",
+            "Don't use purple gradients, neon accents, or any SaaS-default aesthetic.",
+            "Don't use navy-and-gold combinations. This is Caribbean professional, not banking.",
+            "Don't add sunset gradients or palm tree illustrations. Business, not tourism.",
+            "Don't make it look like enterprise software that costs $50k/year.",
+            "Don't nest cards inside cards.",
+            "Don't use shadows at rest. Flat surfaces only; elevation is a state response.",
+            "Don't use modals as a first resort. Exhaust inline alternatives first."
+        ]
+    }
+}

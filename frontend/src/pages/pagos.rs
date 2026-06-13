@@ -1431,7 +1431,7 @@ fn render_pagos_view(
             })} title={if editing.is_some() { "Editar Pago" } else { "Nuevo Pago" }}>
                 {form_html}
             </Drawer>
-            <div class="gi-mobile-hidden">
+            <div class="gi-mobile-hidden" aria-live="polite" aria-atomic="true">
                 <PagoList
                     items={(**items).clone()} user_rol={user_rol.to_string()} headers={headers}
                     contrato_label={contrato_label.clone()} on_edit={on_edit.clone()}

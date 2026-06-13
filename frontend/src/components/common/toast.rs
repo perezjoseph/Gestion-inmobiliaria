@@ -196,7 +196,7 @@ pub fn ToastContainer(_props: &ToastContainerProps) -> Html {
     };
 
     html! {
-        <div class="gi-toast-container" aria-live="polite">
+        <div class="gi-toast-container" aria-live="assertive" role="alert" aria-atomic="true">
             { for toasts.messages.iter().map(|msg| {
                 html! { <ToastItem msg={msg.clone()} on_dismiss={on_dismiss.clone()} /> }
             })}

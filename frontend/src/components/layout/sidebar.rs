@@ -608,7 +608,7 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                                     {icon_maintenance()}{"Mantenimiento"}
                                 </Link<Route>>
                             </li>
-                            <li onclick={make_click(on_nav_click.clone())}>
+                            <li onclick={make_click(on_nav_click.clone())} title="Proceso legal de desalojo — Seguimiento de procedimientos de desahucio">
                                 <Link<Route> to={Route::Desahucios} classes={classes!(link_class(&Route::Desahucios))}>
                                     {icon_desahucios()}{"Desahucios"}
                                 </Link<Route>>
@@ -646,12 +646,12 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                                         {icon_plantillas()}{"Plantillas"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())}>
+                                <li onclick={make_click(on_nav_click.clone())} title="Dirección General de Impuestos Internos — Reportes fiscales y formularios">
                                     <Link<Route> to={Route::Dgii} classes={classes!(link_class(&Route::Dgii))}>
                                         {icon_dgii()}{"DGII"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())}>
+                                <li onclick={make_click(on_nav_click.clone())} title="Agua, luz, gas — Control de responsabilidades de servicios por unidad">
                                     <Link<Route> to={Route::ServiciosPublicos} classes={classes!(link_class(&Route::ServiciosPublicos))}>
                                         {icon_servicios_publicos()}{"Servicios Públicos"}
                                     </Link<Route>>
@@ -680,27 +680,27 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                                         {icon_users()}{"Usuarios"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())}>
+                                <li onclick={make_click(on_nav_click.clone())} title="Registro de cambios — Historial de todas las modificaciones del sistema">
                                     <Link<Route> to={Route::AuditoriaPage} classes={classes!(link_class(&Route::AuditoriaPage))}>
                                         {icon_audit()}{"Auditoría"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())}>
+                                <li onclick={make_click(on_nav_click.clone())} title="Números de Comprobantes Fiscales — Secuencias de facturación requeridas por la DGII">
                                     <Link<Route> to={Route::Ncf} classes={classes!(link_class(&Route::Ncf))}>
                                         {icon_ncf()}{"NCF"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())}>
+                                <li onclick={make_click(on_nav_click.clone())} title="Tareas programadas del sistema — Historial de ejecuciones automáticas">
                                     <Link<Route> to={Route::Tareas} classes={classes!(link_class(&Route::Tareas))}>
                                         {icon_tareas()}{"Tareas"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())}>
+                                <li onclick={make_click(on_nav_click.clone())} title="Invitar usuarios — Enviar accesos a nuevos miembros del equipo">
                                     <Link<Route> to={Route::Invitaciones} classes={classes!(link_class(&Route::Invitaciones))}>
                                         {icon_invitaciones()}{"Invitaciones"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())}>
+                                <li onclick={make_click(on_nav_click.clone())} title="Datos de la empresa — Información fiscal y de contacto de su organización">
                                     <Link<Route> to={Route::Organizacion} classes={classes!(link_class(&Route::Organizacion))}>
                                         {icon_organizacion()}{"Organización"}
                                     </Link<Route>>

@@ -123,7 +123,7 @@ fn PropiedadFilterBar(props: &PropiedadFilterBarProps) -> Html {
                 </div>
             </div>
             if props.total > 0 || active_count > 0 {
-                <div class="gi-filter-count">
+                <div class="gi-filter-count" aria-live="polite" aria-atomic="true">
                     if active_count > 0 {
                         {format!("Mostrando {} de {} propiedades", props.showing, props.total)}
                     } else {
@@ -1081,7 +1081,7 @@ fn render_propiedades_view(
                         }
                     }
 
-                    <div class="gi-mobile-hidden">
+                    <div class="gi-mobile-hidden" aria-live="polite" aria-atomic="true">
                     <PropiedadList
                         items={(*(*items)).clone()}
                         user_rol={user_rol.to_string()}

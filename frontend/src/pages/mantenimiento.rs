@@ -1117,12 +1117,14 @@ fn render_mantenimiento_list_view(
             {error_html}
             {delete_html}
             <MantFilterBar filter_estado={filter_estado.clone()} filter_prioridad={filter_prioridad.clone()} {on_filter_apply} {on_filter_clear} />
+            <div aria-live="polite" aria-atomic="true">
             <MantenimientoList
                 items={(**items).clone()} user_rol={user_rol.to_string()} headers={headers}
                 total={total} page={page} per_page={per_page} prop_label={prop_label_cb}
                 on_edit={on_edit} on_delete={on_delete_click} on_view_detail={on_view_detail}
                 on_new={on_new} on_page_change={on_page_change} on_per_page_change={on_per_page_change}
             />
+            </div>
         </div>
     }
 }

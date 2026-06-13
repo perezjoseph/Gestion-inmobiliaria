@@ -1529,6 +1529,7 @@ fn render_contratos_view(
                     />
                 })}
             {form_html}
+            <div aria-live="polite" aria-atomic="true">
             <ContratoList
                 items={(**view.items).clone()} user_rol={view.user_rol.to_string()} headers={headers}
                 total={view.total} page={view.page} per_page={view.per_page}
@@ -1538,6 +1539,7 @@ fn render_contratos_view(
                 on_generar_pagos={callbacks.on_generar_pagos_click}
                 on_page_change={callbacks.on_page_change} on_per_page_change={callbacks.on_per_page_change}
             />
+            </div>
         </div>
     }
 }

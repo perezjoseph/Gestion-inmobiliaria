@@ -9,7 +9,7 @@ pub fn LandingHero() -> Html {
         <section class="gi-l-hero">
             <div class="gi-l-container gi-l-hero-grid">
                 <div class="gi-l-hero-content">
-                    <p class="gi-l-eyebrow">{"Simple y gratis"}</p>
+                    <p class="gi-l-eyebrow"><span class="gi-l-dot gi-l-dot--accent"></span>{"Simple y gratis"}</p>
                     <h1 class="gi-l-hero-title">
                         {"Gestiona tus propiedades en "}
                         <span class="gi-l-hero-title-accent">{"República Dominicana"}</span>

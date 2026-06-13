@@ -15,6 +15,8 @@ use crate::types::pago::Pago;
 use crate::types::{DashboardStats, PaginatedResponse};
 use crate::utils::format_date_display;
 
+const DETAILS_OPEN_KEY: &str = "gi_dashboard_details_open";
+
 #[component]
 pub fn Dashboard() -> Html {
     let stats = use_state(|| Option::<DashboardStats>::None);
@@ -92,8 +94,27 @@ pub fn Dashboard() -> Html {
 
     let has_data = stats.is_some();
 
+    // Collapsible state: read initial value from localStorage (default open)
+    let details_open = use_state(|| {
+        web_sys::window()
+            .and_then(|w| w.local_storage().ok().flatten())
+            .and_then(|ls| ls.get_item(DETAILS_OPEN_KEY).ok().flatten())
+            .is_none_or(|v| v != "false")
+    });
+
+    let on_toggle_details = {
+        let details_open = details_open.clone();
+        Callback::from(move |_: MouseEvent| {
+            let new_val = !*details_open;
+            details_open.set(new_val);
+            if let Some(ls) = web_sys::window().and_then(|w| w.local_storage().ok().flatten()) {
+                let _ = ls.set_item(DETAILS_OPEN_KEY, if new_val { "true" } else { "false" });
+            }
+        })
+    };
+
     html! {
-        <div>
+        <div aria-live="polite" aria-atomic="true" aria-busy={(*loading).to_string()}>
             <div class="gi-page-header">
                 <h1 class="gi-page-title">{"Panel de Control"}</h1>
             </div>
@@ -108,10 +129,28 @@ pub fn Dashboard() -> Html {
                     overdue_pagos={(*overdue_pagos).clone()}
                     stats={(*stats).clone()}
                 />
-                <OccupancyChart data={(*ocupacion_tendencia).clone()} />
-                <ContratosPorVencerWidget />
-                <UpcomingPaymentsWidget />
-                <ExpenseCard data={(*gastos_comp).clone()} />
+                // Visual separator between attention and details
+                <div style="border-top: 1px solid var(--border-subtle); margin-top: var(--space-5); padding-top: var(--space-5);">
+                    <div class="gi-collapsible-trigger" onclick={on_toggle_details.clone()}
+                        role="button" tabindex="0"
+                        aria-expanded={if *details_open { "true" } else { "false" }}
+                        aria-controls="dashboard-details-panel">
+                        <h2 class="gi-section-header-title">{"Detalles del Portafolio"}</h2>
+                        <span style={format!(
+                            "display: inline-block; transition: transform var(--duration-normal) var(--ease-out); transform: rotate({}deg);",
+                            if *details_open { 180 } else { 0 }
+                        )}>
+                            {"▾"}
+                        </span>
+                    </div>
+                    <div class="gi-collapsible-content" id="dashboard-details-panel"
+                        style={if *details_open { "" } else { "display: none;" }}>
+                        <OccupancyChart data={(*ocupacion_tendencia).clone()} />
+                        <ContratosPorVencerWidget />
+                        <UpcomingPaymentsWidget />
+                        <ExpenseCard data={(*gastos_comp).clone()} />
+                    </div>
+                </div>
             } else {
                 <WelcomeCard />
             }

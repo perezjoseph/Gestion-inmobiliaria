@@ -734,7 +734,7 @@ fn render_inquilinos_view(
                 }
             </DomainHeader>
 
-            <div class="gi-mobile-hidden">
+            <div class="gi-mobile-hidden" aria-live="polite" aria-atomic="true">
             <InquilinoList
                 items={(**items).clone()}
                 user_rol={user_rol.to_string()}

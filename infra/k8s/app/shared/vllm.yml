@@ -35,19 +35,19 @@ spec:
         kubernetes.io/hostname: inference
       containers:
         - name: vllm
-          image: intel/vllm:0.14.1-xpu
+          image: localhost/vllm-custom:latest
+          imagePullPolicy: Never
           command: ["bash", "-c"]
           args:
             - |
-              VLLM_WORKER_MULTIPROC_METHOD=spawn python3 -m vllm.entrypoints.openai.api_server \
-                --model Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound \
+              VLLM_WORKER_MULTIPROC_METHOD=spawn vllm serve Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound \
                 --dtype=float16 \
                 --enforce-eager \
                 --port 8000 \
                 --host 0.0.0.0 \
                 --block-size 64 \
                 --gpu-memory-util 0.9 \
-                --disable-async-output-proc \
+                --no-enable-prefix-caching \
                 --trust-remote-code \
                 --max-num-batched-tokens 4096 \
                 --max-model-len 4096 \

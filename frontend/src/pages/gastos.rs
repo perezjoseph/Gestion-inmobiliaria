@@ -1345,6 +1345,7 @@ fn render_gastos_view(
                 on_apply={on_filter_apply} on_clear={on_filter_clear}
             />
             {form_html}
+            <div aria-live="polite" aria-atomic="true">
             <GastoList
                 items={(**items).clone()} user_rol={user_rol.to_string()} headers={headers}
                 total={**total} page={**page} per_page={**per_page}
@@ -1352,6 +1353,7 @@ fn render_gastos_view(
                 on_delete={on_delete_click} on_new={on_new}
                 on_page_change={on_page_change} on_per_page_change={on_per_page_change}
             />
+            </div>
         </div>
     }
 }

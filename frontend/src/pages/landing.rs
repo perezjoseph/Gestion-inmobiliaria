@@ -30,9 +30,9 @@ pub fn Landing() -> Html {
         <div class="gi-l-page">
             <LandingHero />
             <LandingStats />
-            <LandingHowItWorks />
-            <LandingFeatures />
             <LandingPreview />
+            <LandingFeatures />
+            <LandingHowItWorks />
             <LandingTransparency />
             <LandingFooter />
         </div>
