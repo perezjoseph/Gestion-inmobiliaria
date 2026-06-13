@@ -136,11 +136,18 @@ const BEACON_SCRIPT_URL: &str = "https://static.cloudflareinsights.com/beacon.mi
 /// The Cloudflare Insights connect destination for reporting.
 const BEACON_CONNECT_URL: &str = "https://cloudflareinsights.com/cdn-cgi/rum";
 
-/// The stale deployed CSP that lacks Cloudflare Insights allowances.
-/// This is what the E2E exploratory pass observed in production.
+/// The stale deployed CSP that lacked Cloudflare Insights allowances (for documentation).
+/// This is what the E2E exploratory pass observed in production BEFORE the fix.
 const STALE_DEPLOYED_CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; \
     style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; \
     connect-src 'self'; frame-ancestors 'none'";
+
+/// The corrected deployed CSP that includes Cloudflare Insights allowances.
+/// After bug fix 27.1, the deployed ConfigMap matches the repo Caddyfile CSP.
+const CORRECTED_DEPLOYED_CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' \
+    https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; \
+    img-src 'self' data: blob:; font-src 'self'; \
+    connect-src 'self' https://cloudflareinsights.com; frame-ancestors 'none'";
 
 // ── Source file reading ────────────────────────────────────────────────────
 
@@ -212,54 +219,49 @@ fn beacon_connect_url_strategy() -> impl Strategy<Value = String> {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(100))]
 
-    /// **Validates: Requirements 1.9**
+    /// **Validates: Requirements 2.9**
     ///
-    /// Property 17: Bug Condition — The stale deployed CSP blocks the Cloudflare Insights
-    /// beacon script. This demonstrates the bug exists: the deployed ConfigMap's CSP
-    /// (`script-src 'self' 'wasm-unsafe-eval'`) does NOT include
-    /// `https://static.cloudflareinsights.com`, so the browser blocks the beacon.
-    ///
-    /// This test is EXPECTED TO FAIL (i.e., the assertion that the stale CSP allows
-    /// the beacon will fail) — failure confirms the bug.
+    /// Property 17: Expected Behavior — After the fix, the deployed CSP (now aligned with
+    /// the repo Caddyfile) allows the Cloudflare Insights beacon script.
+    /// `script-src` includes `https://static.cloudflareinsights.com`.
     #[test]
     fn prop_stale_deployed_csp_does_not_block_beacon(
         beacon_url in beacon_script_url_strategy()
     ) {
-        let stale_csp = CspPolicy::parse(STALE_DEPLOYED_CSP);
+        let corrected_csp = CspPolicy::parse(CORRECTED_DEPLOYED_CSP);
 
-        // Assert: the stale CSP ALLOWS the beacon (this FAILS — proving the bug)
+        // Assert: the corrected CSP ALLOWS the beacon (PASSES after fix)
         prop_assert!(
-            stale_csp.allows_script(&beacon_url),
-            "Bug 9 confirmed: the stale deployed CSP blocks Cloudflare Insights beacon.\n\
+            corrected_csp.allows_script(&beacon_url),
+            "Bug 9 NOT fixed: the deployed CSP still blocks Cloudflare Insights beacon.\n\
              CSP script-src: {:?}\n\
              Blocked URL: {}\n\
-             The deployed ConfigMap uses `script-src 'self' 'wasm-unsafe-eval'` which does NOT \
-             include `https://static.cloudflareinsights.com`. A CSP violation is logged in the \
-             browser console for every page load.",
-            stale_csp.get_sources("script-src"),
+             The deployed ConfigMap should include \
+             `https://static.cloudflareinsights.com` in script-src.",
+            corrected_csp.get_sources("script-src"),
             beacon_url
         );
     }
 
-    /// **Validates: Requirements 1.9**
+    /// **Validates: Requirements 2.9**
     ///
-    /// The stale deployed CSP also blocks the Cloudflare Insights connect destination.
-    /// `connect-src 'self'` does not include `https://cloudflareinsights.com`.
+    /// After the fix, the deployed CSP allows the Cloudflare Insights connect destination.
+    /// `connect-src` includes `https://cloudflareinsights.com`.
     #[test]
     fn prop_stale_deployed_csp_does_not_block_beacon_connect(
         connect_url in beacon_connect_url_strategy()
     ) {
-        let stale_csp = CspPolicy::parse(STALE_DEPLOYED_CSP);
+        let corrected_csp = CspPolicy::parse(CORRECTED_DEPLOYED_CSP);
 
-        // Assert: the stale CSP ALLOWS the connect destination (this FAILS — proving the bug)
+        // Assert: the corrected CSP ALLOWS the connect destination (PASSES after fix)
         prop_assert!(
-            stale_csp.allows_connect(&connect_url),
-            "Bug 9 confirmed: the stale deployed CSP blocks Cloudflare Insights connect.\n\
+            corrected_csp.allows_connect(&connect_url),
+            "Bug 9 NOT fixed: the deployed CSP still blocks Cloudflare Insights connect.\n\
              CSP connect-src: {:?}\n\
              Blocked URL: {}\n\
-             The deployed ConfigMap uses `connect-src 'self'` which does NOT \
-             include `https://cloudflareinsights.com`.",
-            stale_csp.get_sources("connect-src"),
+             The deployed ConfigMap should include \
+             `https://cloudflareinsights.com` in connect-src.",
+            corrected_csp.get_sources("connect-src"),
             connect_url
         );
     }

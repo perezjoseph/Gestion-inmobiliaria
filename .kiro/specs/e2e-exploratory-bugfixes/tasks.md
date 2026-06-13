@@ -492,7 +492,7 @@ inspecting response headers / the browser console.
     - _Preservation: first-party assets allowed; third-party origins still blocked; no `'unsafe-inline'`/wildcards_
     - _Requirements: 1.9, 2.9, 3.11_
 
-  - [ ] 27.2 Verify bug condition check now passes
+  - [x] 27.2 Verify bug condition check now passes
     - **Property 17: Expected Behavior** - CSP no longer blocks Cloudflare Insights
     - **IMPORTANT**: Re-run the SAME check from task 25 - do NOT write a new check
     - **EXPECTED OUTCOME**: Check PASSES (no CSP violation for Cloudflare Insights on page load)
