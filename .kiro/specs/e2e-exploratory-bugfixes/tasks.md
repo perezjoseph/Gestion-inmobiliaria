@@ -248,7 +248,7 @@ inspecting response headers / the browser console.
   - **EXPECTED OUTCOME**: Tests PASS (baseline RBAC + write-path fiscal gating captured)
   - _Requirements: 3.6_
 
-- [ ] 15. Fix NCF read access for admin
+- [x] 15. Fix NCF read access for admin
 
   - [x] 15.1 Remove the fiscal-access gate from the read path
     - In `backend/src/services/ncf.rs::listar_secuencias`, remove the
@@ -266,7 +266,7 @@ inspecting response headers / the browser console.
     - **EXPECTED OUTCOME**: Test PASSES (admin of informal org → 200)
     - _Requirements: 2.5_
 
-  - [~] 15.3 Verify preservation test still passes
+  - [x] 15.3 Verify preservation test still passes
     - **Property 10: Preservation** - Non-admin NCF restrictions unchanged
     - **IMPORTANT**: Re-run the SAME test from task 14 - do NOT write a new test
     - **EXPECTED OUTCOME**: Tests PASS (non-admin still 403; write paths still gated)
