@@ -91,7 +91,6 @@ jobs:
     name: Build & Test
     needs: [changes]
     if: >-
-      github.event_name != 'pull_request' ||
       needs.changes.outputs.backend == 'true' ||
       needs.changes.outputs.frontend == 'true' ||
       needs.changes.outputs.ci == 'true'
@@ -104,8 +103,8 @@ jobs:
     with:
       is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
       is-production: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-      skip-backend: ${{ github.event_name == 'pull_request' && needs.changes.outputs.backend != 'true' && needs.changes.outputs.ci != 'true' }}
-      skip-frontend: ${{ github.event_name == 'pull_request' && needs.changes.outputs.frontend != 'true' && needs.changes.outputs.ci != 'true' }}
+      skip-backend: ${{ needs.changes.outputs.backend != 'true' && needs.changes.outputs.ci != 'true' }}
+      skip-frontend: ${{ needs.changes.outputs.frontend != 'true' && needs.changes.outputs.ci != 'true' }}
 
   # ── Stage 1.5: Sidecar Containers (no Rust dependency, run parallel with build-and-test) ──
 
@@ -113,7 +112,6 @@ jobs:
     name: Baileys Container
     needs: [changes]
     if: >-
-      github.event_name != 'pull_request' ||
       needs.changes.outputs.baileys-service == 'true' ||
       needs.changes.outputs.ci == 'true'
     permissions:
@@ -154,7 +152,6 @@ jobs:
     name: OCR Container
     needs: [changes]
     if: >-
-      github.event_name != 'pull_request' ||
       needs.changes.outputs.ocr-service == 'true' ||
       needs.changes.outputs.ci == 'true'
     permissions:
@@ -192,8 +189,6 @@ jobs:
           job-name: "ocr-container"
 
   # ── Stage 2: Container Images (after build-and-test + security pass) ──
-  # On PRs, only run when both backend and frontend artifacts are available (neither skipped).
-  # On main pushes, always run (skip inputs are always false).
 
   containers:
     name: Containers
@@ -202,7 +197,7 @@ jobs:
       !cancelled() &&
       needs.build-and-test.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
-      (github.event_name != 'pull_request' || (needs.changes.outputs.backend == 'true' || needs.changes.outputs.ci == 'true'))
+      (needs.changes.outputs.backend == 'true' || needs.changes.outputs.ci == 'true')
     permissions:
       actions: read
       contents: read
@@ -214,26 +209,140 @@ jobs:
     with:
       is-production: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
 
-  # ── Stage 3: Deploy (after all containers are pushed) ──
+  # ── Stage 2.5: Resolve digests for all components ──
+  # For components that were rebuilt, use the fresh digest.
+  # For components that were skipped, fetch the current 'latest' digest from GHCR.
+
+  resolve-digests:
+    name: Resolve Image Digests
+    needs: [changes, containers, ocr-container, baileys-container]
+    if: |
+      !cancelled() &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') &&
+      github.event_name == 'push'
+    runs-on: arc-runner-dind
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      backend-digest: ${{ steps.resolve.outputs.backend-digest }}
+      frontend-digest: ${{ steps.resolve.outputs.frontend-digest }}
+      ocr-service-digest: ${{ steps.resolve.outputs.ocr-service-digest }}
+      baileys-digest: ${{ steps.resolve.outputs.baileys-digest }}
+      should-deploy: ${{ steps.resolve.outputs.should-deploy }}
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve digests
+        id: resolve
+        env:
+          IMAGE_OWNER: ${{ github.repository_owner }}
+          CONTAINERS_RESULT: ${{ needs.containers.result }}
+          BACKEND_DIGEST_NEW: ${{ needs.containers.outputs.backend-digest }}
+          FRONTEND_DIGEST_NEW: ${{ needs.containers.outputs.frontend-digest }}
+          OCR_RESULT: ${{ needs.ocr-container.result }}
+          OCR_DIGEST_NEW: ${{ needs.ocr-container.outputs.digest }}
+          BAILEYS_RESULT: ${{ needs.baileys-container.result }}
+          BAILEYS_DIGEST_NEW: ${{ needs.baileys-container.outputs.digest }}
+        run: |
+          FAILED=false
+
+          # Helper: fetch latest digest from GHCR for a given image
+          fetch_latest_digest() {
+            local image="$1"
+            docker manifest inspect "ghcr.io/${IMAGE_OWNER}/${image}:latest" 2>/dev/null \
+              | jq -r '.manifests[0].digest // .config.digest // empty' \
+              || true
+          }
+
+          # Backend
+          if [ "$CONTAINERS_RESULT" = "success" ] && [ -n "$BACKEND_DIGEST_NEW" ]; then
+            echo "backend-digest=${BACKEND_DIGEST_NEW}" >> "$GITHUB_OUTPUT"
+          else
+            DIGEST=$(fetch_latest_digest "realestate-backend")
+            if [ -z "$DIGEST" ]; then
+              echo "::error::No backend digest available (build skipped and no latest tag in GHCR)"
+              FAILED=true
+            else
+              echo "backend-digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+              echo "::notice::Using existing backend digest: ${DIGEST}"
+            fi
+          fi
+
+          # Frontend
+          if [ "$CONTAINERS_RESULT" = "success" ] && [ -n "$FRONTEND_DIGEST_NEW" ]; then
+            echo "frontend-digest=${FRONTEND_DIGEST_NEW}" >> "$GITHUB_OUTPUT"
+          else
+            DIGEST=$(fetch_latest_digest "realestate-frontend")
+            if [ -z "$DIGEST" ]; then
+              echo "::error::No frontend digest available (build skipped and no latest tag in GHCR)"
+              FAILED=true
+            else
+              echo "frontend-digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+              echo "::notice::Using existing frontend digest: ${DIGEST}"
+            fi
+          fi
+
+          # Baileys
+          if [ "$BAILEYS_RESULT" = "success" ] && [ -n "$BAILEYS_DIGEST_NEW" ]; then
+            echo "baileys-digest=${BAILEYS_DIGEST_NEW}" >> "$GITHUB_OUTPUT"
+          else
+            DIGEST=$(fetch_latest_digest "realestate-baileys")
+            if [ -z "$DIGEST" ]; then
+              echo "::error::No baileys digest available (build skipped and no latest tag in GHCR)"
+              FAILED=true
+            else
+              echo "baileys-digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+              echo "::notice::Using existing baileys digest: ${DIGEST}"
+            fi
+          fi
+
+          # OCR (optional — empty string is acceptable)
+          if [ "$OCR_RESULT" = "success" ] && [ -n "$OCR_DIGEST_NEW" ]; then
+            echo "ocr-service-digest=${OCR_DIGEST_NEW}" >> "$GITHUB_OUTPUT"
+          else
+            DIGEST=$(fetch_latest_digest "realestate-ocr-service")
+            echo "ocr-service-digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+            if [ -n "$DIGEST" ]; then
+              echo "::notice::Using existing OCR service digest: ${DIGEST}"
+            fi
+          fi
+
+          # At least one component must have been rebuilt to justify a deploy
+          if [ "$CONTAINERS_RESULT" = "success" ] || [ "$BAILEYS_RESULT" = "success" ] || [ "$OCR_RESULT" = "success" ]; then
+            if [ "$FAILED" = "true" ]; then
+              echo "should-deploy=false" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+            echo "should-deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::No components were rebuilt — skipping deploy"
+            echo "should-deploy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ── Stage 3: Deploy (after digests are resolved) ──
 
   deploy:
     name: Deploy
-    needs: [containers, ocr-container, baileys-container]
+    needs: [resolve-digests]
     if: >-
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') &&
-      github.event_name == 'push' &&
-      needs.containers.result == 'success' &&
-      (needs.ocr-container.result == 'success' || needs.ocr-container.result == 'skipped') &&
-      (needs.baileys-container.result == 'success' || needs.baileys-container.result == 'skipped')
+      needs.resolve-digests.result == 'success' &&
+      needs.resolve-digests.outputs.should-deploy == 'true'
     permissions:
       contents: read
       packages: read
     uses: ./.github/workflows/deploy.yml
     with:
-      backend-digest: ${{ needs.containers.outputs.backend-digest }}
-      frontend-digest: ${{ needs.containers.outputs.frontend-digest }}
-      ocr-service-digest: ${{ needs.ocr-container.outputs.digest || '' }}
-      baileys-digest: ${{ needs.baileys-container.outputs.digest }}
+      backend-digest: ${{ needs.resolve-digests.outputs.backend-digest }}
+      frontend-digest: ${{ needs.resolve-digests.outputs.frontend-digest }}
+      ocr-service-digest: ${{ needs.resolve-digests.outputs.ocr-service-digest }}
+      baileys-digest: ${{ needs.resolve-digests.outputs.baileys-digest }}
     secrets:
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
