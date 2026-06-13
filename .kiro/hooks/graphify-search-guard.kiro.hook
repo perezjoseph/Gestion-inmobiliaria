@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "name": "Graphify Search Guard",
+  "description": "Before any file search (Glob/Grep), reminds the agent to read GRAPH_REPORT.md first if a knowledge graph exists.",
+  "version": "1",
+  "when": {
+    "type": "preToolUse",
+    "toolTypes": [
+      ".*[Gg]rep.*",
+      ".*[Ss]earch.*",
+      ".*[Gg]lob.*",
+      ".*file_search.*"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "graphify: Knowledge graph exists. Read GRAPH_REPORT.md for god nodes and community structure before searching raw files."
+  }
+}

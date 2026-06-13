@@ -6,6 +6,7 @@ use crate::components::common::data_table::DataTable;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::skeleton::TableSkeleton;
 use crate::services::api::api_get;
+use crate::types::PaginatedResponse;
 use crate::types::propiedad::Propiedad;
 use crate::types::servicio_publico::ResponsabilidadEfectiva;
 use crate::types::unidad::Unidad;
@@ -43,8 +44,10 @@ pub fn ServiciosPublicos() -> Html {
         let loading_props = loading_props.clone();
         use_effect_with((), move |()| {
             spawn_local(async move {
-                if let Ok(resp) = api_get::<Vec<Propiedad>>("/propiedades/todas").await {
-                    propiedades.set(resp);
+                if let Ok(resp) =
+                    api_get::<PaginatedResponse<Propiedad>>("/propiedades?perPage=200").await
+                {
+                    propiedades.set(resp.data);
                 }
                 loading_props.set(false);
             });

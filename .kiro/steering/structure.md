@@ -24,7 +24,7 @@ New feature: types -> api calls -> components -> page -> route. Re-export in eac
 
 `app/` | `core/{common,data,database,model,network,ui}` | `feature/{domain}/`
 
-Naming: Rust `snake_case`, Kotlin `PascalCase`. Migrations: `m{YYYYMMDD}_{SEQ}_{name}.rs`. Tests: `{domain}_tests.rs`, `{domain}_pbt.rs`.
+Naming: Rust `snake_case`, Kotlin `PascalCase`. Migration and test-file naming: see `backend.md` and `testing.md`.
 
 ## Infrastructure (`infra/`)
 

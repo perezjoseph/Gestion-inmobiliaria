@@ -49,6 +49,9 @@ __pycache__/
 .hypothesis/
 .pytest_cache/
 
+# Graphify knowledge graph
+graphify-out/
+
 # Android build artifacts
 android/.gradle/
 android/.jdk/

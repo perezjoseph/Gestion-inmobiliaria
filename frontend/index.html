@@ -15,8 +15,12 @@
   <link data-trunk rel="css" href="styles/fonts.css" />
   <link data-trunk rel="css" href="styles/tailwind.css" />
   <link data-trunk rel="rust" data-wasm-opt="0" />
-  <script data-trunk src="js/theme-init.js"></script>
-  <script data-trunk src="js/error-handler.js"></script>
+  <link data-trunk rel="copy-file" href="js/theme-init.js" />
+  <link data-trunk rel="copy-file" href="js/error-handler.js" />
+  <link data-trunk rel="copy-file" href="js/app-loaded.js" />
+  <link data-trunk rel="copy-dir" href="icons" />
+  <script src="/theme-init.js"></script>
+  <script src="/error-handler.js"></script>
 </head>
 
 <body>
@@ -37,8 +41,9 @@
       }
     }
   </style>
-  <script data-trunk src="js/app-loaded.js"></script>
-  <script data-trunk type="module" src="js/service-worker-register.js"></script>
+  <script src="/app-loaded.js"></script>
+  <link data-trunk rel="copy-file" href="js/service-worker-register.js" />
+  <script type="module" src="/service-worker-register.js"></script>
 </body>
 
 </html>

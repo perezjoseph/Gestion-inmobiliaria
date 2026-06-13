@@ -18,4 +18,4 @@ fileMatchPattern: ["**/*.rs", "**/Cargo.toml"]
 `spawn_blocking` for blocking. `try_join!()` for concurrent. Never hold `Mutex` across `.await`.
 
 ## Format
-Rust 2024. `cargo fmt` + `cargo clippy` before done. `mod.rs` for re-exports. Remove dead code. Check Cargo.toml before adding deps.
+Rust 2024. `cargo fmt` + `cargo clippy` before done. `mod.rs` for re-exports. Remove dead code.

@@ -95,23 +95,53 @@ pub async fn disconnect(
 /// GET `/api/v1/chatbot/status` — get current `WhatsApp` connection status.
 ///
 /// Calls `GET /sessions/{realmId}/status` on the `Baileys` sidecar.
+///
+/// The frontend polls this endpoint on an interval. When the `Baileys` sidecar
+/// is unconfigured or unreachable, we degrade gracefully to a `disconnected`
+/// status (HTTP 200) instead of returning 500, so the client can keep polling
+/// for recovery without surfacing an error on every tick. Explicit user actions
+/// (`connect`/`disconnect`) still return errors so the user gets feedback.
 pub async fn status(
     baileys: Option<web::Data<BaileysClient>>,
     claims: WriteAccess,
 ) -> Result<HttpResponse, AppError> {
-    let client = baileys.ok_or_else(|| {
-        AppError::Internal(anyhow::anyhow!(
-            "BaileysClient no configurado — servicio WhatsApp no disponible"
-        ))
-    })?;
-
     let realm_id = claims.0.organizacion_id;
-    let response = client.get_status(realm_id).await?;
 
-    let body = serde_json::to_value(&response)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Error serializando respuesta: {e}")))?;
+    let Some(client) = baileys else {
+        tracing::warn!(
+            organizacion_id = %realm_id,
+            "BaileysClient no configurado — reportando estado desconectado"
+        );
+        return Ok(HttpResponse::Ok().json(disconnected_status()));
+    };
 
-    Ok(HttpResponse::Ok().json(normalize_baileys_response(&body)))
+    match client.get_status(realm_id).await {
+        Ok(response) => {
+            let body = serde_json::to_value(&response).map_err(|e| {
+                AppError::Internal(anyhow::anyhow!("Error serializando respuesta: {e}"))
+            })?;
+            Ok(HttpResponse::Ok().json(normalize_baileys_response(&body)))
+        }
+        Err(e) => {
+            tracing::warn!(
+                organizacion_id = %realm_id,
+                error = %e,
+                "Servicio Baileys no disponible — reportando estado desconectado"
+            );
+            Ok(HttpResponse::Ok().json(disconnected_status()))
+        }
+    }
+}
+
+/// Builds a degraded `disconnected` status payload matching the normalized shape
+/// returned by [`normalize_baileys_response`].
+fn disconnected_status() -> serde_json::Value {
+    serde_json::json!({
+        "status": "disconnected",
+        "qrCode": serde_json::Value::Null,
+        "connectedPhone": serde_json::Value::Null,
+        "connectedAt": serde_json::Value::Null,
+    })
 }
 
 // --- Conversation Query Params ---
