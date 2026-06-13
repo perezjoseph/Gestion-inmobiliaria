@@ -410,7 +410,7 @@ inspecting response headers / the browser console.
   - Document counterexample (e.g., `…/Eg3tKKlWsAA0v_w (1).jpg` → 404)
   - _Requirements: 1.8_
 
-- [ ] 23. Write preservation property test for missing files and traversal
+- [x] 23. Write preservation property test for missing files and traversal
   - **Property 16: Preservation** - Missing files and traversal unchanged
   - **IMPORTANT**: Follow observation-first methodology
   - Observe on UNFIXED code: `serve_upload` returns 404 for missing files and rejects `..` traversal

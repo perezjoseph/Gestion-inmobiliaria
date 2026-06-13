@@ -91,6 +91,7 @@ mod unidades_pbt;
 mod unidades_tests;
 mod usuarios_tests;
 
+mod document_preservation_pbt;
 mod dr_compliance_integration_tests;
 mod invitaciones_bug_condition_pbt;
 mod invitaciones_preservation_pbt;
