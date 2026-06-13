@@ -45,7 +45,7 @@ inspecting response headers / the browser console.
   - Mark task complete when test is written, run, and passing on unfixed code
   - _Requirements: 3.1_
 
-- [ ] 3. Fix login 401 handling so errors surface on /login
+- [x] 3. Fix login 401 handling so errors surface on /login
 
   - [x] 3.1 Guard the 401 clear-and-redirect on token presence
     - In `frontend/src/services/api.rs::handle_response`, only `clear_token_and_redirect()` when
@@ -62,7 +62,7 @@ inspecting response headers / the browser console.
     - **EXPECTED OUTCOME**: Test PASSES (confirms 401 without token surfaces an error, no redirect)
     - _Requirements: 2.1_
 
-  - [~] 3.3 Verify preservation test still passes
+  - [x] 3.3 Verify preservation test still passes
     - **Property 2: Preservation** - Authenticated flows and session expiry unchanged
     - **IMPORTANT**: Re-run the SAME test from task 2 - do NOT write a new test
     - **EXPECTED OUTCOME**: Test PASSES (no regression to session-expiry redirect or valid login)
