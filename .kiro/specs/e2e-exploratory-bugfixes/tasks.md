@@ -72,7 +72,7 @@ inspecting response headers / the browser console.
 
 ### Bug 2 — Registration "El nombre es obligatorio" is sticky
 
-- [~] 4. Write bug condition exploration test for sticky Nombre validation
+- [x] 4. Write bug condition exploration test for sticky Nombre validation
   - **Property 3: Bug Condition** - Filled Nombre clears the validation error
   - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
   - **GOAL**: Reproduce the sticky `nombre_error` after a prior empty submission
