@@ -148,7 +148,7 @@ inspecting response headers / the browser console.
 
 - [ ] 9. Fix duplicate pagination on /pagos
 
-  - [~] 9.1 Remove the redundant pagination bar
+  - [x] 9.1 Remove the redundant pagination bar
     - In `frontend/src/pages/pagos.rs`, remove the `<Pagination>` rendered inside `PagoList`; keep
       the single page-level `<Pagination>`
     - Drop now-unused `total`, `page`, `per_page`, `on_page_change`, `on_per_page_change` from

@@ -314,15 +314,10 @@ struct PagoListProps {
     items: Vec<Pago>,
     user_rol: String,
     headers: Vec<String>,
-    total: u64,
-    page: u64,
-    per_page: u64,
     contrato_label: Callback<String, String>,
     on_edit: Callback<Pago>,
     on_delete: Callback<Pago>,
     on_new: Callback<MouseEvent>,
-    on_page_change: Callback<u64>,
-    on_per_page_change: Callback<u64>,
     #[prop_or_default]
     selected_ids: Vec<String>,
     #[prop_or_default]
@@ -548,13 +543,6 @@ fn PagoList(props: &PagoListProps) -> Html {
                     </tbody>
                 </table>
             </div>
-            <Pagination
-                total={props.total}
-                page={props.page}
-                per_page={props.per_page}
-                on_page_change={props.on_page_change.clone()}
-                on_per_page_change={props.on_per_page_change.clone()}
-            />
         </>
     }
 }
@@ -1446,10 +1434,8 @@ fn render_pagos_view(
             <div class="gi-mobile-hidden">
                 <PagoList
                     items={(**items).clone()} user_rol={user_rol.to_string()} headers={headers}
-                    total={**total} page={**page} per_page={**per_page}
                     contrato_label={contrato_label.clone()} on_edit={on_edit.clone()}
                     on_delete={on_delete_click.clone()} on_new={on_new.clone()}
-                    on_page_change={on_page_change.clone()} on_per_page_change={on_per_page_change.clone()}
                     selected_ids={(**selected_ids).clone()}
                     on_toggle_select={Some(on_toggle_select)}
                     on_select_all={Some(on_select_all)}
