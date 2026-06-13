@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 016c75d0e078850581ef6ed8b0f99d54ecb49f4dce7c10b5973289376e7c7122 # shrinks to beacon_url = "https://static.cloudflareinsights.com/beacon.min.js"
+cc 9973fd32dd52aa254242b75a3eda23df853b2a737ff8efc4581cc240623c830e # shrinks to connect_url = "https://cloudflareinsights.com/cdn-cgi/rum"

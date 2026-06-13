@@ -451,7 +451,7 @@ inspecting response headers / the browser console.
 
 ### Bug 9 — CSP blocks Cloudflare Insights site-wide
 
-- [ ] 25. Write bug condition verification for the CSP and Cloudflare Insights beacon
+- [x] 25. Write bug condition verification for the CSP and Cloudflare Insights beacon
   - **Property 17: Bug Condition** - CSP no longer blocks Cloudflare Insights
   - **CRITICAL**: This check MUST FAIL against the deployed (stale) CSP - failure confirms the bug
   - **GOAL**: Demonstrate the deployed `script-src 'self' 'wasm-unsafe-eval'` blocks
