@@ -346,7 +346,7 @@ inspecting response headers / the browser console.
 > regression guard); if it FAILS, a stray caller of `/propiedades/todas` was found and must be
 > repointed.
 
-- [-] 19. Write bug condition / regression-guard test for the property-list endpoint
+- [x] 19. Write bug condition / regression-guard test for the property-list endpoint
   - **Property 13: Bug Condition** - Servicios Públicos calls an existing property endpoint
   - **GOAL**: Guard that no caller of the non-existent `/propiedades/todas` route exists
   - **Scoped PBT Approach**: Scope to the property-list request from `/servicios-publicos`
