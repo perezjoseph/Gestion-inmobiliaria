@@ -95,7 +95,7 @@ Restore chatbot agent inference by fixing the two independent infrastructure fai
 
 - [ ] 3. Fix for vLLM inference outage — restore chatbot agent reply generation
 
-  - [~] 3.1 Add offline environment variables to vLLM Deployment manifest
+  - [x] 3.1 Add offline environment variables to vLLM Deployment manifest
     - Edit `infra/k8s/app/shared/vllm.yml`
     - Add `HF_HUB_OFFLINE=1` env var to the vLLM container spec to prevent HuggingFace Hub from attempting online downloads
     - Add `TRANSFORMERS_OFFLINE=1` env var as belt-and-suspenders to ensure transformers library also stays offline

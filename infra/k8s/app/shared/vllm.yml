@@ -63,6 +63,10 @@ spec:
               value: /home/vllm
             - name: HF_HOME
               value: /models
+            - name: HF_HUB_OFFLINE
+              value: "1"
+            - name: TRANSFORMERS_OFFLINE
+              value: "1"
             - name: SYCL_UR_USE_LEVEL_ZERO_V2
               value: "0"
             - name: PYTORCH_ALLOC_CONF

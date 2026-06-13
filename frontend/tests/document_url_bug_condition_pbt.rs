@@ -23,19 +23,14 @@ use proptest::prelude::*;
 
 // Feature: e2e-exploratory-bugfixes, Property 15: Bug Condition
 
-// ── Constants matching the source ──────────────────────────────────────────
-
-/// The BASE_URL constant from `frontend/src/services/api.rs`.
-const BASE_URL: &str = "/api/v1";
-
 // ── URL builder logic (mirrors document_gallery.rs::DocumentCard) ──────────
 
-/// Reproduces the CURRENT (buggy) URL builder from `DocumentCard`:
+/// Reproduces the FIXED URL builder from `DocumentCard`:
 /// ```rust
-/// let file_url = format!("{}/{}", BASE_URL.trim_end_matches("/api"), doc.file_path);
+/// let file_url = format!("/uploads/{}", doc.file_path);
 /// ```
 fn build_document_url_current(file_path: &str) -> String {
-    format!("{}/{}", BASE_URL.trim_end_matches("/api"), file_path)
+    format!("/uploads/{}", file_path)
 }
 
 // ── Strategies ─────────────────────────────────────────────────────────────
