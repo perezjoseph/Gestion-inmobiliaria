@@ -345,7 +345,7 @@ jobs:
     needs: [resolve-digests]
     if: >-
       needs.resolve-digests.result == 'success' &&
-      needs.resolve-digests.outputs.should-deploy == 'true'
+      fromJSON(needs.resolve-digests.outputs.should-deploy)
     permissions:
       contents: read
       packages: read
