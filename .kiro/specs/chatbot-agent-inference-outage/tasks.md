@@ -133,7 +133,7 @@ Restore chatbot agent inference by fixing the two independent infrastructure fai
     - _Preservation: Only restarts the specific plugin pod on inference node; no changes to other nodes or DaemonSet spec_
     - _Requirements: 2.4_
 
-  - [~] 3.4 Rollout restart vLLM deployment
+  - [-] 3.4 Rollout restart vLLM deployment
     - After model is provisioned (3.2) and GPU is healthy (3.3), apply the updated manifest and restart:
       ```
       kubectl apply -f infra/k8s/app/shared/vllm.yml
