@@ -161,14 +161,10 @@ jobs:
       - name: Set up Android SDK
         uses: ./.github/actions/android-setup
 
-      - name: Cache Gradle dependencies
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-codeql-${{ hashFiles('android/**/*.gradle.kts', 'android/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: gradle-codeql-
+          gradle-version: "8.11.1"
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
@@ -181,12 +177,15 @@ jobs:
               - android
 
       - name: Build Android project
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         env:
           JAVA_HOME: /usr/lib/jvm/java-21-amazon-corretto
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew --no-daemon compileDebugKotlin compileDebugJavaWithJavac
+        with:
+          timeout_minutes: 30
+          max_attempts: 2
+          command: |
+            cd android
+            gradle --no-daemon compileDebugKotlin compileDebugJavaWithJavac
 
       - name: Perform CodeQL Analysis
         id: analyze
