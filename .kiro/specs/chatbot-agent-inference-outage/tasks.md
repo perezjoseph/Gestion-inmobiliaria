@@ -50,7 +50,7 @@ Restore chatbot agent inference by fixing the two independent infrastructure fai
 
 ## Tasks
 
-- [ ] 1. Write bug condition exploration test
+- [x] 1. Write bug condition exploration test
   - **Property 1: Bug Condition** — vLLM Inference Unavailability
   - **CRITICAL**: This test MUST FAIL on unfixed infrastructure — failure confirms the bug exists
   - **DO NOT attempt to fix the test or the infrastructure when it fails**
