@@ -146,7 +146,7 @@ inspecting response headers / the browser console.
   - **EXPECTED OUTCOME**: Tests PASS (baseline pagination behavior captured)
   - _Requirements: 3.4_
 
-- [ ] 9. Fix duplicate pagination on /pagos
+- [x] 9. Fix duplicate pagination on /pagos
 
   - [x] 9.1 Remove the redundant pagination bar
     - In `frontend/src/pages/pagos.rs`, remove the `<Pagination>` rendered inside `PagoList`; keep
@@ -164,7 +164,7 @@ inspecting response headers / the browser console.
     - **EXPECTED OUTCOME**: Test PASSES (exactly one bar on desktop)
     - _Requirements: 2.3_
 
-  - [~] 9.3 Verify preservation test still passes
+  - [x] 9.3 Verify preservation test still passes
     - **Property 6: Preservation** - Pagination range and navigation unchanged
     - **IMPORTANT**: Re-run the SAME test from task 8 - do NOT write a new test
     - **EXPECTED OUTCOME**: Tests PASS (range text, page nav, per-page selection unchanged)
