@@ -97,7 +97,7 @@ inspecting response headers / the browser console.
   - **EXPECTED OUTCOME**: Tests PASS (baseline `validate_nombre` behavior captured)
   - _Requirements: 3.2, 3.3_
 
-- [ ] 6. Fix sticky Nombre validation
+- [x] 6. Fix sticky Nombre validation
 
   - [x] 6.1 Add live revalidation for the Nombre field
     - In `frontend/src/components/auth/register_form.rs`, replace the generic `nombre` handler with
@@ -114,7 +114,7 @@ inspecting response headers / the browser console.
     - **EXPECTED OUTCOME**: Test PASSES (non-empty Nombre after empty submit ⇒ no error)
     - _Requirements: 2.2_
 
-  - [~] 6.3 Verify preservation tests still pass
+  - [x] 6.3 Verify preservation tests still pass
     - **Property 4: Preservation** - Empty-name error and valid submissions unchanged
     - **IMPORTANT**: Re-run the SAME tests from task 5 - do NOT write new tests
     - **EXPECTED OUTCOME**: Tests PASS (empty Nombre still errors; valid form still submits)
