@@ -1,0 +1,141 @@
+{
+    "skill_name": "bench-optimizer",
+    "evals": [
+        {
+            "id": 1,
+            "prompt": "I have a function that groups 2000 payments by property_id using a HashMap. Is there a faster way? Maybe sorting first then scanning?",
+            "expected_output": "Should write a criterion benchmark with both approaches, run it, and report actual measured results. Should NOT predict which is faster.",
+            "difficulty": "easy",
+            "assertions": [
+                {
+                    "text": "Contains a criterion benchmark with at least 2 approaches",
+                    "type": "content"
+                },
+                {
+                    "text": "Does NOT contain predicted speedup or expected results before running",
+                    "type": "absence"
+                },
+                {
+                    "text": "Includes cargo bench command or states it must be run",
+                    "type": "content"
+                },
+                {
+                    "text": "Uses realistic data size (1000+ items)",
+                    "type": "content"
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "prompt": "Our dashboard endpoint takes 200ms. The DB queries take 180ms and the in-memory aggregation takes 2ms. Should I optimize the aggregation code with SIMD or parallel iterators?",
+            "expected_output": "Should recommend NOT optimizing. Should identify this as IO-bound and say optimization of the CPU portion is pointless.",
+            "difficulty": "medium",
+            "assertions": [
+                {
+                    "text": "Identifies the function as IO-bound or DB as bottleneck",
+                    "type": "content"
+                },
+                {
+                    "text": "Recommends NOT optimizing the aggregation",
+                    "type": "content"
+                },
+                {
+                    "text": "Does NOT write a benchmark for the 2ms aggregation",
+                    "type": "absence"
+                },
+                {
+                    "text": "Mentions absolute time vs system latency tradeoff",
+                    "type": "content"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "prompt": "My PDF export function handles 500 rows and the pod has a 384Mi memory limit. I'm worried it might OOM under concurrent requests. How do I measure its memory usage?",
+            "expected_output": "Should use dhat or counting allocator. Should consider concurrency multiplier. Should NOT guess memory.",
+            "difficulty": "medium",
+            "assertions": [
+                {
+                    "text": "Mentions dhat crate or counting allocator",
+                    "type": "content"
+                },
+                {
+                    "text": "Shows how to set up a memory measurement test",
+                    "type": "content"
+                },
+                {
+                    "text": "Considers concurrency multiplier (N requests × per-call)",
+                    "type": "content"
+                },
+                {
+                    "text": "References the pod memory limit in decision framework",
+                    "type": "content"
+                },
+                {
+                    "text": "Does NOT guess or predict memory usage",
+                    "type": "absence"
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "prompt": "I benchmarked two approaches: HashMap grouping takes 45µs and sort+scan takes 38µs for 2000 items. The sort approach is 15% faster but requires cloning the input Vec. Which should I pick? The endpoint has 50ms DB latency.",
+            "expected_output": "Should recommend keeping HashMap despite sort being faster. 15% of 45µs = 7µs savings — negligible vs 50ms DB latency. Cloning adds complexity. The 'don't optimize' escape hatch should fire.",
+            "difficulty": "hard",
+            "assertions": [
+                {
+                    "text": "Recommends keeping HashMap (simpler) or says don't optimize",
+                    "type": "content"
+                },
+                {
+                    "text": "Calculates or acknowledges the absolute savings are negligible (microseconds vs milliseconds)",
+                    "type": "content"
+                },
+                {
+                    "text": "Mentions that 15% of 45µs is irrelevant vs 50ms total",
+                    "type": "content"
+                },
+                {
+                    "text": "Does NOT recommend adopting sort+scan despite it being faster",
+                    "type": "absence"
+                },
+                {
+                    "text": "Considers the clone overhead as a negative tradeoff",
+                    "type": "content"
+                }
+            ]
+        },
+        {
+            "id": 5,
+            "prompt": "We have a report generation endpoint that builds XLSX files. For 100 rows it takes 8ms and allocates 2MB. For 5000 rows it takes 400ms and allocates 180MB. Under 10 concurrent requests with 5000 rows each, pods OOM (384Mi limit). How do I fix this? Should I optimize the XLSX generation speed, reduce memory, or limit concurrency?",
+            "expected_output": "Should identify memory as the primary constraint (180MB × 10 = 1.8GB vs 384Mi limit). Speed optimization alone won't help. Should recommend concurrency limiting (semaphore) as immediate fix AND memory reduction as longer-term fix. Should propose measuring with dhat to find where the 180MB goes. Should NOT just write a speed benchmark.",
+            "difficulty": "expert",
+            "assertions": [
+                {
+                    "text": "Identifies memory (not speed) as the primary constraint",
+                    "type": "content"
+                },
+                {
+                    "text": "Calculates or states that 180MB × 10 exceeds 384Mi",
+                    "type": "content"
+                },
+                {
+                    "text": "Recommends concurrency limiting (semaphore/queue) as immediate mitigation",
+                    "type": "content"
+                },
+                {
+                    "text": "Recommends memory profiling (dhat or similar) to find allocation sources",
+                    "type": "content"
+                },
+                {
+                    "text": "Does NOT focus primarily on speed optimization",
+                    "type": "absence"
+                },
+                {
+                    "text": "Suggests streaming or chunked approach as memory reduction strategy",
+                    "type": "content"
+                }
+            ]
+        }
+    ]
+}

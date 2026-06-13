@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "grafana-dashboards",
+  "owner": "sickn33",
+  "repo": "antigravity-awesome-skills",
+  "path": "plugins/antigravity-awesome-skills-claude/skills/grafana-dashboards",
+  "branch": "main",
+  "sha": "81c45c5fbca262bd2113ecec1170e1784fa65641",
+  "source": "manual"
+}

@@ -1,0 +1,23 @@
+{
+    "skill_name": "code-scanning-alerts",
+    "evals": [
+        {
+            "id": 1,
+            "prompt": "Check what code scanning alerts are open in our repo and group them by severity",
+            "expected_output": "Uses gh api to fetch alerts, parses with PowerShell, groups by security_severity_level",
+            "files": []
+        },
+        {
+            "id": 2,
+            "prompt": "Triage the Trivy alerts — which ones are from base images vs our code?",
+            "expected_output": "Fetches alerts filtered by tool=Trivy, applies triage heuristics to classify base-image vs source alerts",
+            "files": []
+        },
+        {
+            "id": 3,
+            "prompt": "Dismiss alert #42 as a false positive because it's in a test file",
+            "expected_output": "Uses gh api PATCH to dismiss the alert with reason=used_in_tests and appropriate comment",
+            "files": []
+        }
+    ]
+}

@@ -80,3 +80,6 @@ k3s/
 
 # State store (redb)
 data/state_store.db
+
+# Large binary (OpenTelemetry collector)
+subagent-eval/.evalkit/tracing/otelcol-contrib

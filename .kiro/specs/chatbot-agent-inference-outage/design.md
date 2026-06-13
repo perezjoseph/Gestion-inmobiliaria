@@ -4,7 +4,7 @@
 
 The agentic WhatsApp chatbot cannot generate replies in production because the vLLM inference service (`vllm-inference.realestate.svc.cluster.local:8000`) is completely unavailable. Two independent infrastructure failures prevent any vLLM pod from reaching a healthy `Running` state:
 
-1. **Model download failure** — The vLLM container command passes the HuggingFace model ID `Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound` directly to `vllm serve`, which attempts an online download at startup. Production network policies (`default-deny-egress`) block all internet egress from the vLLM pod, causing `ConnectionError: [Errno 101] Network is unreachable` and `CrashLoopBackOff`.
+1. **Model download failure** — The vLLM container command passes the HuggingFace model ID `Qwen/Qwen3-Coder-30B-A3B-Instruct` directly to `vllm serve`, which attempts an online download at startup. Production network policies (`default-deny-egress`) block all internet egress from the vLLM pod, causing `ConnectionError: [Errno 101] Network is unreachable` and `CrashLoopBackOff`.
 2. **GPU device unhealthy** — The Intel GPU device plugin (`intel/intel-gpu-plugin:0.35.0`) reports `gpu.intel.com/xe` devices as unhealthy, causing Kubernetes to reject pod admission with `UnexpectedAdmissionError`.
 
 The fix restores inference availability by pre-provisioning the model into the existing PVC (`vllm-models-pvc`) and setting `HF_HUB_OFFLINE=1` so vLLM loads from the local cache without egress. The GPU health issue is resolved by restarting the device plugin after verifying `/dev/dri` device accessibility on the `inference` node.
@@ -25,7 +25,7 @@ The fix restores inference availability by pre-provisioning the model into the e
 
 The bug manifests whenever a chatbot reply is requested while the vLLM inference service is unavailable. Two independent failure modes make the service unavailable:
 
-1. The vLLM pod starts and runs `vllm serve Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound` which triggers a model download from `huggingface.co`. The `default-deny-egress` network policy blocks all internet traffic from the vLLM pod (no egress rule exists for it), so the download fails and the pod crash-loops.
+1. The vLLM pod starts and runs `vllm serve Qwen/Qwen3-Coder-30B-A3B-Instruct` which triggers a model download from `huggingface.co`. The `default-deny-egress` network policy blocks all internet traffic from the vLLM pod (no egress rule exists for it), so the download fails and the pod crash-loops.
 2. The Intel GPU device plugin reports `gpu.intel.com/xe` devices as unhealthy, so the kubelet cannot allocate the GPU resource requested by the vLLM deployment, and Kubernetes rejects pod admission entirely.
 
 **Formal Specification:**
@@ -72,7 +72,7 @@ All inputs that do NOT involve the vLLM inference availability should be complet
 
 Based on the bug description and infrastructure analysis, two independent root causes:
 
-1. **Missing offline model provisioning**: The `vllm serve` command references the model by HuggingFace ID (`Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound`). When `HF_HOME=/models` is set and the PVC is empty, vLLM's model loader falls back to downloading from `huggingface.co`. The network policy `default-deny-egress` blocks all egress from the vLLM pod (there is no egress rule for it unlike backend which has explicit SMTP egress). The `--download-dir /models` flag only controls where to cache, not whether to skip download.
+1. **Missing offline model provisioning**: The `vllm serve` command references the model by HuggingFace ID (`Qwen/Qwen3-Coder-30B-A3B-Instruct`). When `HF_HOME=/models` is set and the PVC is empty, vLLM's model loader falls back to downloading from `huggingface.co`. The network policy `default-deny-egress` blocks all egress from the vLLM pod (there is no egress rule for it unlike backend which has explicit SMTP egress). The `--download-dir /models` flag only controls where to cache, not whether to skip download.
    - **Fix**: Pre-populate the model files into `vllm-models-pvc` via a one-time Job with internet access (or a local copy), then set `HF_HUB_OFFLINE=1` environment variable in the Deployment so vLLM never attempts an online download.
 
 2. **Intel GPU device plugin health reporting**: The device plugin version `0.35.0` with args `-shared-dev-num=2 -bypath=none` is reporting all `gpu.intel.com/xe` devices as unhealthy. This could be caused by:
@@ -123,7 +123,7 @@ Assuming our root cause analysis is correct:
    - Runs a `huggingface/downloader` or `python:3.12-slim` image with `huggingface_hub` installed
    - Has an egress network policy allowing HTTPS to the internet
    - Mounts `vllm-models-pvc` at `/models`
-   - Downloads `Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound` into the HuggingFace cache layout under `/models`
+   - Downloads `Qwen/Qwen3-Coder-30B-A3B-Instruct` into the HuggingFace cache layout under `/models`
    - Runs once to completion, then the PVC contains the model for all subsequent vLLM starts
    - After successful completion, the Job and its temporary egress policy can be deleted
 

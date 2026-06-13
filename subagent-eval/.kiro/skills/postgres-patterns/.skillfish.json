@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "postgres-patterns",
+  "owner": "affaan-m",
+  "repo": "everything-claude-code",
+  "path": ".kiro/skills/postgres-patterns",
+  "branch": "main",
+  "sha": "7ecd3fefc556d40ad2283aaa890dd9afb120089a",
+  "source": "manual"
+}

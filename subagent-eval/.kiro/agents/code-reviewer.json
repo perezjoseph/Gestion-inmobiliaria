@@ -1,0 +1,21 @@
+{
+  "name": "code-reviewer",
+  "description": "Quality gate after implementation. Reviews code for correctness, security, performance, and project conventions. Returns PASS or FAIL with specific issues to .kiro/plans/. Delegate here after code changes are complete and need verification, or when the user asks to review, verify, check quality, or approve changes. Runs tests and linters as part of review.",
+  "prompt": "file://../shared/code-reviewer-system.md",
+  "model": "claude-opus-4-6",
+  "tools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "allowedTools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "resources": [
+    "file://../../AGENTS.md",
+    "file://../../.kiro/steering/**/*.md",
+    "skill://../../.kiro/skills/**/SKILL.md"
+  ]
+}

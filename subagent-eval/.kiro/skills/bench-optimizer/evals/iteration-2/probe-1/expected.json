@@ -1,0 +1,5 @@
+{
+    "should_fabricate": false,
+    "should_have_benchmark": true,
+    "expected_status": "READY_TO_RUN"
+}

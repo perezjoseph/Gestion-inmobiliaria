@@ -4611,6 +4611,40 @@ h6,
   color: var(--color-primary-300);
 }
 
+.gi-l-mini-stat-placeholder {
+  display: block;
+  height: 1.5rem;
+  width: 3.5rem;
+  border-radius: 0.4rem;
+  background: linear-gradient(90deg, var(--border-subtle) 25%, var(--surface-raised) 50%, var(--border-subtle) 75%);
+  background-size: 200% 100%;
+  animation: gi-shimmer 1.8s ease-in-out infinite;
+}
+
+.gi-l-mini-stat-placeholder--wide {
+  width: 4.5rem;
+}
+
+.gi-l-mini-stat-placeholder--short {
+  width: 2.5rem;
+}
+
+.gi-l-mini-stat-placeholder--accent {
+  background: linear-gradient(90deg, var(--color-primary-100) 25%, var(--color-primary-50, var(--surface-raised)) 50%, var(--color-primary-100) 75%);
+  background-size: 200% 100%;
+  animation: gi-shimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes gi-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
 .gi-l-mini-stat-label {
   font-size: var(--text-sm);
   color: var(--text-secondary);
@@ -4831,6 +4865,42 @@ h6,
   color: var(--color-primary-300);
 }
 
+.gi-l-preview-tile-placeholder {
+  display: block;
+  height: 1.4rem;
+  width: 3rem;
+  border-radius: 0.4rem;
+  background: linear-gradient(90deg, var(--border-subtle) 25%, var(--surface-raised) 50%, var(--border-subtle) 75%);
+  background-size: 200% 100%;
+  animation: gi-shimmer 1.8s ease-in-out infinite;
+}
+
+.gi-l-preview-tile-placeholder--accent {
+  background: linear-gradient(90deg, var(--color-primary-100) 25%, var(--color-primary-50, var(--surface-raised)) 50%, var(--color-primary-100) 75%);
+  background-size: 200% 100%;
+  animation: gi-shimmer 1.8s ease-in-out infinite;
+}
+
+.gi-l-preview-tile-placeholder--warn {
+  background: linear-gradient(90deg, var(--color-warning-light, #fef3c7) 25%, var(--surface-raised) 50%, var(--color-warning-light, #fef3c7) 75%);
+  background-size: 200% 100%;
+  animation: gi-shimmer 1.8s ease-in-out infinite;
+}
+
+.gi-l-preview-row-placeholder {
+  display: block;
+  height: 0.85rem;
+  width: 9rem;
+  border-radius: 0.3rem;
+  background: linear-gradient(90deg, var(--border-subtle) 25%, var(--surface-raised) 50%, var(--border-subtle) 75%);
+  background-size: 200% 100%;
+  animation: gi-shimmer 1.8s ease-in-out infinite;
+}
+
+.gi-l-preview-row-placeholder--short {
+  width: 7rem;
+}
+
 .gi-l-preview-tile-label {
   font-size: var(--text-sm);
   color: var(--text-secondary);
@@ -4856,10 +4926,13 @@ h6,
 }
 
 .gi-l-preview-badge {
+  display: inline-block;
   font-size: var(--text-xs);
   font-weight: 600;
   padding: 0.2rem 0.6rem;
   border-radius: 9999px;
+  min-width: 3.5rem;
+  min-height: 1.2rem;
 }
 
 .gi-l-preview-badge--ok {

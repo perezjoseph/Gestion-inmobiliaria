@@ -1,0 +1,33 @@
+{
+    "eval_id": 1,
+    "run_type": "with_skill",
+    "expectations": [
+        {
+            "text": "uses_gh_api_not_gh_code_scanning",
+            "passed": true,
+            "evidence": "commands.md uses 'gh api /repos/<OWNER>/<REPO>/code-scanning/alerts' throughout. No reference to 'gh code-scanning' subcommand."
+        },
+        {
+            "text": "uses_pagination",
+            "passed": true,
+            "evidence": "check-alerts.ps1 line: gh api \"/repos/$repoSlug/code-scanning/alerts?state=open&per_page=100\" --paginate > $alertsFile"
+        },
+        {
+            "text": "groups_by_security_severity_level",
+            "passed": true,
+            "evidence": "check-alerts.ps1: $alerts | Group-Object {$_.rule.security_severity_level} — uses the correct field."
+        },
+        {
+            "text": "windows_compatible",
+            "passed": true,
+            "evidence": "Produces PowerShell script (check-alerts.ps1) with Get-Content, ConvertFrom-Json, Group-Object — fully Windows-native parsing."
+        },
+        {
+            "text": "dumps_to_file_first",
+            "passed": true,
+            "evidence": "check-alerts.ps1: gh api ... > $alertsFile then $alerts = Get-Content $alertsFile | ConvertFrom-Json. Explicitly dumps to file before parsing."
+        }
+    ],
+    "pass_rate": 1.0,
+    "summary": "All 5 assertions passed. The skill correctly guided the agent to use gh api (not gh code-scanning), paginate, dump to file, parse with PowerShell, and group by the correct severity field."
+}

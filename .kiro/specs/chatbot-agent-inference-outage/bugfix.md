@@ -25,7 +25,7 @@ Two distinct contributing failures cause the inference dependency to be
 unavailable, and both must be addressed:
 
 1. **Model unavailability at runtime** — vLLM attempts to download the model
-   `Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound` from `huggingface.co` at
+   `Qwen/Qwen3-Coder-30B-A3B-Instruct` from `huggingface.co` at
    startup. Production has no egress to `huggingface.co`, so the pod fails with
    `requests.exceptions.ConnectionError: ... [Errno 101] Network is unreachable`
    and enters `CrashLoopBackOff`.
@@ -56,7 +56,7 @@ unreachable and the request fails.
 
 1.2 WHEN the backend `test_chat_stream` handler calls `OvmsCompletionModel` at `http://vllm-inference.realestate.svc.cluster.local:8000/v1/chat/completions` THEN the request fails with `ProviderError: Error conectando a OVMS stream: error sending request` because no healthy vLLM pod is serving the endpoint
 
-1.3 WHEN a vLLM pod starts in the `realestate` namespace THEN it attempts to download `Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound` from `huggingface.co`, fails with `ConnectionError: ... [Errno 101] Network is unreachable`, and enters `CrashLoopBackOff` because production has no egress to `huggingface.co`
+1.3 WHEN a vLLM pod starts in the `realestate` namespace THEN it attempts to download `Qwen/Qwen3-Coder-30B-A3B-Instruct` from `huggingface.co`, fails with `ConnectionError: ... [Errno 101] Network is unreachable`, and enters `CrashLoopBackOff` because production has no egress to `huggingface.co`
 
 1.4 WHEN the Kubernetes scheduler attempts to admit a vLLM pod requesting `gpu.intel.com/xe` THEN admission is rejected with `UnexpectedAdmissionError: Allocate failed due to no healthy devices present` because the Intel GPU device plugin reports the devices as unhealthy
 
@@ -71,7 +71,7 @@ agent generates replies.
 
 2.2 WHEN the backend `test_chat_stream` handler calls `OvmsCompletionModel` at the in-cluster vLLM URL THEN the request SHALL succeed and receive a streamed completion from a healthy vLLM pod
 
-2.3 WHEN a vLLM pod starts in the `realestate` namespace THEN it SHALL obtain the model `Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound` from a pre-provisioned local source (baked into the image, mounted from a PVC/local model cache, or loaded with HuggingFace offline / `local-files-only` mode) WITHOUT requiring egress to `huggingface.co`, and SHALL reach a `Running`/`Ready` state
+2.3 WHEN a vLLM pod starts in the `realestate` namespace THEN it SHALL obtain the model `Qwen/Qwen3-Coder-30B-A3B-Instruct` from a pre-provisioned local source (baked into the image, mounted from a PVC/local model cache, or loaded with HuggingFace offline / `local-files-only` mode) WITHOUT requiring egress to `huggingface.co`, and SHALL reach a `Running`/`Ready` state
 
 2.4 WHEN the Kubernetes scheduler attempts to admit a vLLM pod requesting `gpu.intel.com/xe` THEN the Intel GPU device plugin SHALL report healthy devices and the pod SHALL be admitted and scheduled
 

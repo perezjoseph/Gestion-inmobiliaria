@@ -1,0 +1,32 @@
+{
+    "eval_id": 3,
+    "eval_name": "memory-profiling-pdf-oom-risk",
+    "expectations": [
+        {
+            "text": "Mentions dhat crate or counting allocator for measurement",
+            "passed": true,
+            "evidence": "Output uses dhat exclusively. Sets up #[global_allocator] static ALLOC: dhat::Alloc = dhat::Alloc; and dhat::Profiler::builder().testing().build(). Also adds dhat = '0.3' to Cargo.toml dev-dependencies."
+        },
+        {
+            "text": "Shows how to set up a memory test or profiling",
+            "passed": true,
+            "evidence": "Provides complete integration test file (pdf_memory_budget.rs) with realistic data generation, HeapStats assertions, and exact run command (cargo test --release --test pdf_memory_budget -- --nocapture)."
+        },
+        {
+            "text": "Considers concurrency multiplier (concurrent requests × per-call memory)",
+            "passed": true,
+            "evidence": "Includes a dedicated 'pdf_export_concurrent_simulation' test that runs 5 sequential calls and states: 'In production each request would hold its own buffer simultaneously. This test shows per-call allocation; multiply by expected concurrency.' Decision table shows per-call × 10 concurrent."
+        },
+        {
+            "text": "References the pod memory limit in the decision",
+            "passed": true,
+            "evidence": "Decision framework table explicitly compares against '384Mi budget'. Also mentions 'Baseline RSS of your backend process. Subtract this from 384Mi to get your actual headroom.'"
+        },
+        {
+            "text": "Does NOT guess the memory usage without measuring",
+            "passed": true,
+            "evidence": "Final section states: 'I am not going to predict what the numbers will be. The skill's entire purpose is to replace guessing with measurement.' No memory estimates appear anywhere."
+        }
+    ],
+    "pass_rate": 1.0
+}

@@ -1,0 +1,21 @@
+{
+  "name": "frontend-designer",
+  "description": "Frontend UI/UX specialist for Leptos + Tailwind. Delegate here for design critique, visual polish, responsive layout, accessibility compliance, component architecture, and redesigns. Use proactively when the user mentions UI, UX, design, layout, responsive, accessibility, a11y, Tailwind, CSS, components, 'looks off', 'polish', or visual style. Implements changes in Leptos/Tailwind and self-verifies with clippy.",
+  "prompt": "file://../shared/frontend-designer-system.md",
+  "model": "claude-opus-4-6",
+  "tools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "allowedTools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "resources": [
+    "file://../../AGENTS.md",
+    "file://../../.kiro/steering/**/*.md",
+    "skill://../../.kiro/skills/**/SKILL.md"
+  ]
+}

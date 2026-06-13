@@ -36,20 +36,20 @@ pub fn LandingHero() -> Html {
                 <div class="gi-l-hero-visual" aria-hidden="true">
                     <div class="gi-l-hero-panel">
                         <div class="gi-l-mini-stat">
-                            <span class="gi-l-mini-stat-value">{"24"}</span>
+                            <span class="gi-l-mini-stat-placeholder gi-l-mini-stat-placeholder--wide"></span>
                             <span class="gi-l-mini-stat-label">{"Propiedades"}</span>
                         </div>
                         <div class="gi-l-mini-stat">
-                            <span class="gi-l-mini-stat-value">{"92%"}</span>
+                            <span class="gi-l-mini-stat-placeholder"></span>
                             <span class="gi-l-mini-stat-label">{"Ocupación"}</span>
                         </div>
                         <div class="gi-l-mini-stat">
-                            <span class="gi-l-mini-stat-value gi-l-mini-stat-value--accent">{"RD$ 410K"}</span>
-                            <span class="gi-l-mini-stat-label">{"Cobrado este mes"}</span>
+                            <span class="gi-l-mini-stat-placeholder gi-l-mini-stat-placeholder--accent"></span>
+                            <span class="gi-l-mini-stat-label">{"Ingresos"}</span>
                         </div>
                         <div class="gi-l-mini-stat">
-                            <span class="gi-l-dot gi-l-dot--warn"></span>
-                            <span class="gi-l-mini-stat-label">{"3 pagos por vencer"}</span>
+                            <span class="gi-l-mini-stat-placeholder gi-l-mini-stat-placeholder--short"></span>
+                            <span class="gi-l-mini-stat-label">{"Alertas"}</span>
                         </div>
                     </div>
                 </div>
