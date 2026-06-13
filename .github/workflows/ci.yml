@@ -207,7 +207,7 @@ jobs:
       !cancelled() &&
       needs.build-and-test.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
-      (needs.changes.outputs.backend == 'true' || needs.changes.outputs.ci == 'true')
+      (needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.ci == 'true')
     permissions:
       actions: read
       contents: read
@@ -218,6 +218,8 @@ jobs:
     uses: ./.github/workflows/containers.yml
     with:
       is-production: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+      build-backend: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.ci == 'true' }}
+      build-frontend: ${{ needs.changes.outputs.frontend == 'true' || needs.changes.outputs.ci == 'true' }}
 
   # ── Stage 2.5: Resolve digests for all components ──
   # For components that were rebuilt, use the fresh digest.

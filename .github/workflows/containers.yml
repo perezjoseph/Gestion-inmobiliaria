@@ -7,6 +7,14 @@ on:
         description: "Whether this is a production build (main push). Controls tagging and latest."
         type: boolean
         required: true
+      build-backend:
+        description: "Whether to build the backend container image (backend or ci changed)."
+        type: boolean
+        required: true
+      build-frontend:
+        description: "Whether to build the frontend container image (frontend or ci changed). Must match when frontend-dist was produced."
+        type: boolean
+        required: true
     outputs:
       backend-digest:
         value: ${{ jobs.container-image-backend.outputs.digest }}
@@ -20,6 +28,7 @@ jobs:
     name: Container Image (Backend)
     runs-on: arc-runner-dind
     timeout-minutes: 30
+    if: ${{ inputs.build-backend }}
     permissions:
       actions: read
       contents: read
@@ -62,6 +71,7 @@ jobs:
     name: Container Image (Frontend)
     runs-on: arc-runner-dind
     timeout-minutes: 30
+    if: ${{ inputs.build-frontend }}
     permissions:
       actions: read
       contents: read
