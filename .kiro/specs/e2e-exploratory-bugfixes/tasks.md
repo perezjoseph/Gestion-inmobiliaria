@@ -289,7 +289,7 @@ inspecting response headers / the browser console.
   - Document counterexample
   - _Requirements: 1.6_
 
-- [~] 17. Write preservation property test for populated invitations and other paginated endpoints
+- [-] 17. Write preservation property test for populated invitations and other paginated endpoints
   - **Property 12: Preservation** - Populated invitations and other paginated endpoints unchanged
   - **IMPORTANT**: Follow observation-first methodology
   - Observe on UNFIXED code: other `PaginatedResponse`-backed endpoints (e.g. `inquilinos::list`)
