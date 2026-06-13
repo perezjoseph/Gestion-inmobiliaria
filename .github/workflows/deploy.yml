@@ -140,6 +140,20 @@ jobs:
 
             rm -f "${HOME}/.kube/config"
 
+      - name: Collect smoke test diagnostics
+        if: failure() && steps.smoke-tests.outcome == 'failure'
+        uses: ./.github/actions/collect-diagnostics
+        with:
+          job-name: "deploy / deploy-dev / smoke-tests"
+          artifact-suffix: deploy-dev-smoke
+          step-outcomes: |
+            smoke-tests=${{ steps.smoke-tests.outcome }}
+          extra-context: |
+            Smoke tests failed after successful k8s-deploy action.
+            The deployment rolled out but the in-pod health check could not reach the backend /health endpoint
+            or the frontend. This is likely a timing issue in the smoke test script, a pod crash after readiness,
+            or a networking/configuration problem in the realestate-dev namespace.
+
   # ── Deploy to Production (main branch only) ──
   deploy-prod:
     name: Deploy to Production (k3s)
