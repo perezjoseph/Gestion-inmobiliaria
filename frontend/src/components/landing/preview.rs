@@ -1,36 +1,65 @@
 use yew::prelude::*;
+use yew_router::prelude::*;
+
+use crate::app::Route;
 
 #[component]
 pub fn LandingPreview() -> Html {
     html! {
-        <section class="px-4 py-12 max-w-5xl mx-auto">
-            <h2
-                class="text-2xl md:text-3xl font-bold text-center mb-6"
-                style="font-family: var(--font-display); color: var(--text-primary);"
-            >
-                {"Así se ve por dentro"}
-            </h2>
-            <div
-                class="rounded-xl overflow-hidden mb-6"
-                style="box-shadow: var(--shadow-lg); border: 1px solid var(--border-subtle);"
-            >
-                <img
-                    src="/assets/dashboard-preview.gif"
-                    alt="Demo animada del dashboard de Gestión Inmobiliaria"
-                    class="w-full h-auto"
-                    loading="lazy"
-                />
-            </div>
-            <div class="text-center">
-                <a
-                    href="https://demo.gestion-inmobiliaria.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold"
-                    style="border: 1px solid var(--border-default); color: var(--text-primary);"
-                >
-                    {"Ver demo en vivo"}
-                </a>
+        <section class="gi-l-preview">
+            <div class="gi-l-container">
+                <div class="gi-l-section-head">
+                    <h2 class="gi-l-section-title">{"Así se ve por dentro"}</h2>
+                </div>
+                <div class="gi-l-preview-frame" aria-hidden="true">
+                    <div class="gi-l-preview-bar">
+                        <span class="gi-l-preview-dot"></span>
+                        <span class="gi-l-preview-dot"></span>
+                        <span class="gi-l-preview-dot"></span>
+                    </div>
+                    <div class="gi-l-preview-body">
+                        <div class="gi-l-preview-tiles">
+                            <div class="gi-l-preview-tile">
+                                <span class="gi-l-preview-tile-value">{"24"}</span>
+                                <span class="gi-l-preview-tile-label">{"Propiedades"}</span>
+                            </div>
+                            <div class="gi-l-preview-tile">
+                                <span class="gi-l-preview-tile-value">{"18"}</span>
+                                <span class="gi-l-preview-tile-label">{"Contratos activos"}</span>
+                            </div>
+                            <div class="gi-l-preview-tile">
+                                <span class="gi-l-preview-tile-value gi-l-preview-tile-value--accent">{"RD$ 410K"}</span>
+                                <span class="gi-l-preview-tile-label">{"Cobrado este mes"}</span>
+                            </div>
+                            <div class="gi-l-preview-tile">
+                                <span class="gi-l-preview-tile-value gi-l-preview-tile-value--warn">{"3"}</span>
+                                <span class="gi-l-preview-tile-label">{"Pagos atrasados"}</span>
+                            </div>
+                        </div>
+                        <div class="gi-l-preview-rows">
+                            <div class="gi-l-preview-row">
+                                <span>{"Apartamento Naco 2B"}</span>
+                                <span class="gi-l-preview-badge gi-l-preview-badge--ok">{"Pagado"}</span>
+                            </div>
+                            <div class="gi-l-preview-row">
+                                <span>{"Local Piantini 04"}</span>
+                                <span class="gi-l-preview-badge gi-l-preview-badge--warn">{"Pendiente"}</span>
+                            </div>
+                            <div class="gi-l-preview-row">
+                                <span>{"Casa Los Prados"}</span>
+                                <span class="gi-l-preview-badge gi-l-preview-badge--ok">{"Pagado"}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="gi-l-preview-cta">
+                    <Link<Route>
+                        to={Route::Registro}
+                        classes="gi-l-btn gi-l-btn-primary"
+                    >
+                        {"Crear cuenta gratis"}
+                    </Link<Route>>
+                </div>
             </div>
         </section>
     }

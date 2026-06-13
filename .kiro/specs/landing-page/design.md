@@ -464,7 +464,7 @@ pub fn LandingTransparency() -> Html {
                     {"Este proyecto es de código abierto — lo construimos porque nos pareció útil y divertido. No hay letra pequeña, ni planes de pago escondidos. Si te sirve, úsalo."}
                 </p>
                 <a
-                    href="https://github.com/jpilier/Gestion-inmobiliaria"
+                    href="https://github.com/perezjoseph/Gestion-inmobiliaria"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold"

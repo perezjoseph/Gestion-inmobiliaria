@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-find-config
+  namespace: realestate
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    kubernetes.io/hostname: inference
+  containers:
+    - name: debug
+      image: busybox
+      command:
+        [
+          "sh",
+          "-c",
+          "MODEL_DIR=/models/hub/models--Intel--Qwen3-30B-A3B-Instruct-2507-int4-AutoRound/snapshots/57260401ae48d607dbeb2cd3eee17d61c1087ceb; sed -i 's|intel/auto-round|auto-round|g' $MODEL_DIR/config.json $MODEL_DIR/quantization_config.json && echo 'Patched successfully' && grep quant_method $MODEL_DIR/config.json $MODEL_DIR/quantization_config.json",
+        ]
+      volumeMounts:
+        - name: models
+          mountPath: /models
+  volumes:
+    - name: models
+      persistentVolumeClaim:
+        claimName: vllm-models-pvc

@@ -67,7 +67,7 @@ Add a public landing page at route `/` that introduces the Gestión Inmobiliaria
     - Implement `LandingTransparency` functional component with heading, paragraph, and GitHub link
     - Heading: "Código abierto, hecho con cariño"
     - Friendly tone emphasizing community and fun, not commercial
-    - Link to `https://github.com/jpilier/Gestion-inmobiliaria` with `target="_blank"` and `rel="noopener noreferrer"`
+    - Link to `https://github.com/perezjoseph/Gestion-inmobiliaria` with `target="_blank"` and `rel="noopener noreferrer"`
     - Link styled as Secondary CTA: outline border, `px-5 py-2.5 font-semibold`
     - Section uses `var(--surface-raised)` background for visual distinction
     - _Requirements: 7.1, 7.2, 7.3, 9.3, 10.1_

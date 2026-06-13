@@ -35,24 +35,26 @@ spec:
         kubernetes.io/hostname: inference
       containers:
         - name: vllm
-          image: intel/vllm:0.17.0-xpu
+          image: intel/vllm:0.14.1-xpu
           command: ["bash", "-c"]
           args:
             - |
-              VLLM_WORKER_MULTIPROC_METHOD=spawn vllm serve Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound \
+              VLLM_WORKER_MULTIPROC_METHOD=spawn python3 -m vllm.entrypoints.openai.api_server \
+                --model Intel/Qwen3-30B-A3B-Instruct-2507-int4-AutoRound \
                 --dtype=float16 \
                 --enforce-eager \
                 --port 8000 \
                 --host 0.0.0.0 \
                 --block-size 64 \
                 --gpu-memory-util 0.9 \
-                --no-enable-prefix-caching \
+                --disable-async-output-proc \
                 --trust-remote-code \
                 --max-num-batched-tokens 4096 \
                 --max-model-len 4096 \
                 --max-num-seqs 8 \
-                --quantization gptq \
                 --download-dir /models \
+                --quantization auto-round \
+                --allow-deprecated-quantization \
                 --enable-auto-tool-choice \
                 --tool-call-parser hermes \
                 ${VLLM_API_KEY:+--api-key $VLLM_API_KEY}
@@ -67,6 +69,10 @@ spec:
               value: "1"
             - name: TRANSFORMERS_OFFLINE
               value: "1"
+            - name: VLLM_USE_V1
+              value: "0"
+            - name: VLLM_ENABLE_V1_MULTIPROCESSING
+              value: "0"
             - name: SYCL_UR_USE_LEVEL_ZERO_V2
               value: "0"
             - name: PYTORCH_ALLOC_CONF
@@ -75,6 +81,8 @@ spec:
               value: "expandable_segments:True"
             - name: ZE_FLAT_DEVICE_HIERARCHY
               value: "FLAT"
+            - name: ZE_COMMAND_QUEUE_SYNCHRONIZE_TIMEOUT
+              value: "4294967295"
             - name: VLLM_API_KEY
               valueFrom:
                 secretKeyRef:

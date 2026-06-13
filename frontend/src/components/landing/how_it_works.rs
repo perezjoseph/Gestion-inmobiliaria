@@ -27,33 +27,20 @@ const STEPS: &[Step] = &[
 #[component]
 pub fn LandingHowItWorks() -> Html {
     html! {
-        <section class="px-4 py-12 max-w-5xl mx-auto">
-            <h2
-                class="text-2xl md:text-3xl font-bold text-center mb-10"
-                style="font-family: var(--font-display); color: var(--text-primary);"
-            >
-                {"Cómo funciona"}
-            </h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                { for STEPS.iter().map(|step| html! {
-                    <div class="text-center">
-                        <div
-                            class="w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold mx-auto mb-4 text-white"
-                            style="background-color: #3d8b8b;"
-                        >
-                            { step.number }
+        <section class="gi-l-how">
+            <div class="gi-l-container">
+                <div class="gi-l-section-head">
+                    <h2 class="gi-l-section-title">{"Cómo funciona"}</h2>
+                </div>
+                <div class="gi-l-steps">
+                    { for STEPS.iter().map(|step| html! {
+                        <div class="gi-l-step">
+                            <span class="gi-l-step-num">{ step.number }</span>
+                            <h3 class="gi-l-step-title">{ step.title }</h3>
+                            <p class="gi-l-step-desc">{ step.description }</p>
                         </div>
-                        <h3
-                            class="text-lg font-semibold mb-2"
-                            style="color: var(--text-primary);"
-                        >
-                            { step.title }
-                        </h3>
-                        <p class="text-sm" style="color: var(--text-secondary);">
-                            { step.description }
-                        </p>
-                    </div>
-                })}
+                    })}
+                </div>
             </div>
         </section>
     }

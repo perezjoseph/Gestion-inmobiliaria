@@ -3,26 +3,19 @@ use yew::prelude::*;
 #[component]
 pub fn LandingStats() -> Html {
     html! {
-        <section
-            class="px-4 py-4 border-y"
-            style="border-color: var(--border-subtle); background-color: var(--surface-raised);"
-        >
-            <div class="max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-6 text-sm"
-                 style="color: var(--text-tertiary);">
-                <div class="flex items-center gap-2">
-                    <span>{"⭐"}</span>
-                    <span>{"GitHub Stars"}</span>
+        <section class="gi-l-trust">
+            <div class="gi-l-container gi-l-trust-row">
+                <div class="gi-l-trust-item">
+                    <span class="gi-l-dot gi-l-dot--ok"></span>
+                    <span>{"En desarrollo activo"}</span>
                 </div>
-                <div class="flex items-center gap-2">
-                    <span
-                        class="w-2 h-2 rounded-full inline-block"
-                        style="background-color: #22c55e;"
-                    ></span>
-                    <span>{"Proyecto en desarrollo activo"}</span>
-                </div>
-                <div class="flex items-center gap-2">
+                <div class="gi-l-trust-item">
                     <span>{"🆓"}</span>
-                    <span>{"100% gratis y código abierto"}</span>
+                    <span>{"Gratis y sin límites"}</span>
+                </div>
+                <div class="gi-l-trust-item">
+                    <span>{"🇩🇴"}</span>
+                    <span>{"Hecho para República Dominicana"}</span>
                 </div>
             </div>
         </section>

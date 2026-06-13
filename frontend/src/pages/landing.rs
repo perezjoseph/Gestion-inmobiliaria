@@ -27,7 +27,7 @@ pub fn Landing() -> Html {
     }
 
     html! {
-        <div class="min-h-screen" style="background-color: var(--surface-base); color: var(--text-primary);">
+        <div class="gi-l-page">
             <LandingHero />
             <LandingStats />
             <LandingHowItWorks />
