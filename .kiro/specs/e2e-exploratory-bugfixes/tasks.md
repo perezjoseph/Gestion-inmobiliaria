@@ -56,7 +56,7 @@ inspecting response headers / the browser console.
     - _Preservation: token-bearing 401s still clear token and redirect; valid logins still reach dashboard_
     - _Requirements: 1.1, 2.1, 3.1_
 
-  - [~] 3.2 Verify bug condition exploration test now passes
+  - [x] 3.2 Verify bug condition exploration test now passes
     - **Property 1: Expected Behavior** - Login 401 surfaces an error and stays on /login
     - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
     - **EXPECTED OUTCOME**: Test PASSES (confirms 401 without token surfaces an error, no redirect)

@@ -4,6 +4,9 @@
     clippy::panic,
     clippy::if_not_else,
     clippy::doc_markdown,
+    clippy::missing_const_for_fn,
+    clippy::no_effect_underscore_binding,
+    clippy::used_underscore_binding,
     unused_doc_comments
 )]
 //! Property 1: Bug Condition — Login 401 surfaces an error and stays on /login
@@ -40,12 +43,15 @@ enum Response401Outcome {
     ErrorSurfaced,
 }
 
-/// Model of the CURRENT (unfixed) handle_response behavior on 401.
-/// This is `F` — the buggy implementation.
+/// Model of the CURRENT (fixed) handle_response behavior on 401.
+/// After fix in task 3.1: only clear-and-redirect when a token IS present.
+/// When no token is present (login attempt), fall through to error humanization.
 fn handle_response_401_current(has_token: bool) -> Response401Outcome {
-    // Current code: unconditionally clears and redirects on ANY 401
-    let _token_present = has_token; // unused — that's the bug!
-    Response401Outcome::ClearedAndRedirected
+    if has_token {
+        Response401Outcome::ClearedAndRedirected
+    } else {
+        Response401Outcome::ErrorSurfaced
+    }
 }
 
 /// Model of the EXPECTED (correct) behavior on 401.
