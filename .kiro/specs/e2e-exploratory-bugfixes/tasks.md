@@ -359,7 +359,7 @@ inspecting response headers / the browser console.
     preventing reintroduction and ensuring the corrected build is deployed
   - _Requirements: 1.7_
 
-- [~] 20. Write preservation property test for other Servicios Públicos calls
+- [-] 20. Write preservation property test for other Servicios Públicos calls
   - **Property 14: Preservation** - Other Servicios Públicos calls unchanged
   - **IMPORTANT**: Follow observation-first methodology
   - Observe on current source: units (`/propiedades/{id}/unidades`) and servicios
