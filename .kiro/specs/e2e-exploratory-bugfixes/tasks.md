@@ -86,7 +86,7 @@ inspecting response headers / the browser console.
   - Document counterexample found
   - _Requirements: 1.2_
 
-- [~] 5. Write preservation property test for empty-name error and valid submissions
+- [x] 5. Write preservation property test for empty-name error and valid submissions
   - **Property 4: Preservation** - Empty-name error and valid submissions unchanged
   - **IMPORTANT**: Follow observation-first methodology
   - Observe on UNFIXED code: empty/whitespace Nombre on submit shows "El nombre es obligatorio";
