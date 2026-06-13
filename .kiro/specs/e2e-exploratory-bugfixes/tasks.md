@@ -47,7 +47,7 @@ inspecting response headers / the browser console.
 
 - [ ] 3. Fix login 401 handling so errors surface on /login
 
-  - [~] 3.1 Guard the 401 clear-and-redirect on token presence
+  - [x] 3.1 Guard the 401 clear-and-redirect on token presence
     - In `frontend/src/services/api.rs::handle_response`, only `clear_token_and_redirect()` when
       `get_token().is_some()`; otherwise fall through to error humanization
     - (Optional) add an explicit `401 =>` arm in `humanize_error` returning "Credenciales inválidas."

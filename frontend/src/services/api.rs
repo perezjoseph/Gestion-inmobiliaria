@@ -84,6 +84,7 @@ fn humanize_error(status: u16, raw: &str) -> String {
 
     match status {
         400 => "Solicitud inválida. Verifique los datos enviados.".into(),
+        401 => "Credenciales inválidas.".into(),
         403 => "No tiene permisos para realizar esta acción.".into(),
         404 => "El registro solicitado no fue encontrado.".into(),
         409 => "Este registro ya existe. Verifique los datos e intente de nuevo.".into(),
@@ -97,7 +98,7 @@ fn humanize_error(status: u16, raw: &str) -> String {
 async fn handle_response(
     response: gloo_net::http::Response,
 ) -> Result<gloo_net::http::Response, String> {
-    if response.status() == 401 {
+    if response.status() == 401 && get_token().is_some() {
         clear_token_and_redirect();
         return Err("Sesión expirada. Redirigiendo al inicio de sesión.".into());
     }
