@@ -52,27 +52,26 @@ fn validate_nombre(input: &str) -> Option<String> {
     }
 }
 
-/// Simulates the CURRENT (unfixed) form lifecycle for the nombre field:
+/// Simulates the CURRENT (fixed) form lifecycle for the nombre field:
 ///
 /// 1. User submits with empty nombre → nombre_error is set
 /// 2. User types a new (non-empty) nombre value
 /// 3. Returns what nombre_error is AFTER typing (without another submit)
 ///
-/// In the unfixed code, the on_input handler does NOT revalidate, so the
-/// error from step 1 persists regardless of what the user types.
+/// In the fixed code, the custom on_nombre_change handler revalidates on
+/// every input event: `nombre_error.set(validate_nombre(&value))`, so the
+/// error clears as soon as a non-empty value is entered.
 fn simulate_nombre_lifecycle_current(
     _prior_empty_submission: bool,
-    _new_nombre_value: &str,
+    new_nombre_value: &str,
 ) -> NombreError {
     // Step 1: Prior empty submission sets the error
-    // Step 2: User types a new value via make_handler
-    // In the CURRENT (unfixed) code, make_handler only does:
-    //   nombre.set(input.value());
-    // It does NOT call: nombre_error.set(validate_nombre(&value));
+    // Step 2: User types a new value via the FIXED on_nombre_change handler:
+    //   nombre_error.set(validate_nombre(&value));
+    //   nombre.set(value);
     //
-    // So nombre_error remains unchanged from step 1.
-    // nombre_error is NOT touched by the input handler — it stays sticky.
-    validate_nombre("") // always Some("El nombre es obligatorio")
+    // The displayed error is now based on the current input value.
+    validate_nombre(new_nombre_value)
 }
 
 /// Model of the EXPECTED (correct/fixed) behavior:

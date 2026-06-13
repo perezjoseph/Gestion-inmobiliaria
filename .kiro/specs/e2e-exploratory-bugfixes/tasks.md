@@ -108,7 +108,7 @@ inspecting response headers / the browser console.
     - _Preservation: empty Nombre still errors on submit; valid submissions still create the account_
     - _Requirements: 1.2, 2.2, 3.2, 3.3_
 
-  - [~] 6.2 Verify bug condition exploration test now passes
+  - [x] 6.2 Verify bug condition exploration test now passes
     - **Property 3: Expected Behavior** - Filled Nombre clears the validation error
     - **IMPORTANT**: Re-run the SAME test from task 4 - do NOT write a new test
     - **EXPECTED OUTCOME**: Test PASSES (non-empty Nombre after empty submit ⇒ no error)
