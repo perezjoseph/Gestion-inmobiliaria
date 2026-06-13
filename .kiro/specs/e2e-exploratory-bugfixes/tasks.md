@@ -33,7 +33,7 @@ inspecting response headers / the browser console.
   - Mark task complete when test is written, run, and failure is documented
   - _Requirements: 1.1_
 
-- [~] 2. Write preservation property test for authenticated flows and session expiry
+- [x] 2. Write preservation property test for authenticated flows and session expiry
   - **Property 2: Preservation** - Authenticated flows and session expiry unchanged
   - **IMPORTANT**: Follow observation-first methodology
   - Observe on UNFIXED code: a 401 WITH a token present clears the token and redirects to `/`;
