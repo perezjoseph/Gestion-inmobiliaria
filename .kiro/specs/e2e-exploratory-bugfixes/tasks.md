@@ -124,7 +124,7 @@ inspecting response headers / the browser console.
 
 ### Bug 3 — Pagos renders two pagination bars
 
-- [~] 7. Write bug condition exploration test for duplicate pagination
+- [x] 7. Write bug condition exploration test for duplicate pagination
   - **Property 5: Bug Condition** - Pagos shows exactly one pagination bar
   - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
   - **GOAL**: Demonstrate two pagination bars on a desktop `/pagos` render
