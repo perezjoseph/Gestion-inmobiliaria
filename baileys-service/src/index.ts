@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import pino from 'pino';
 import QRCode, { QRCodeToDataURLOptions } from 'qrcode';
 import { getConnectionCounts, startSession, stopSession, getStatus, sendMessage, restoreSessions } from './session-manager';
+import { registry } from './metrics';
 import crypto from 'node:crypto';
 
 const logger = pino({ name: 'baileys-service' });
@@ -46,6 +47,11 @@ app.get('/health', (_req: Request, res: Response) => {
     uptime: process.uptime(),
     connections: counts,
   });
+});
+
+app.get('/metrics', async (_req: Request, res: Response) => {
+  res.set('Content-Type', registry.contentType);
+  res.end(await registry.metrics());
 });
 
 app.use('/sessions', authMiddleware);

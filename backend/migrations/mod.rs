@@ -52,6 +52,7 @@ pub mod m20260608_000001_add_password_changed_at;
 pub mod m20260609_000001_add_organizacion_id_to_plantillas;
 pub mod m20260609_000002_add_performance_indexes;
 pub mod m20260613_000001_add_overdue_payments_indexes;
+pub mod m20260614_000001_create_metrics_exporter_role;
 
 use sea_orm_migration::prelude::*;
 
@@ -114,6 +115,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260609_000001_add_organizacion_id_to_plantillas::Migration),
             Box::new(m20260609_000002_add_performance_indexes::Migration),
             Box::new(m20260613_000001_add_overdue_payments_indexes::Migration),
+            Box::new(m20260614_000001_create_metrics_exporter_role::Migration),
         ]
     }
 }

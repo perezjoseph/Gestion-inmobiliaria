@@ -18,3 +18,16 @@ spec:
       - key: node-role.kubernetes.io/control-plane
         operator: Exists
         effect: NoSchedule
+    metrics:
+      prometheus:
+        entryPoint: metrics
+        addEntryPointsLabels: true
+        addServicesLabels: true
+        addRoutersLabels: true
+    ports:
+      metrics:
+        port: 9100
+        expose:
+          default: true
+        exposedPort: 9100
+        protocol: TCP

@@ -289,6 +289,26 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
+  name: allow-db-metrics-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: db
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow Prometheus to scrape postgres-exporter sidecar
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 9187
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
   name: allow-frontend-ingress
 spec:
   podSelector:
@@ -332,6 +352,14 @@ spec:
       ports:
         - port: 3100
           protocol: TCP
+    # Allow Prometheus to scrape /metrics
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 3100
+          protocol: TCP
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -364,6 +392,34 @@ spec:
     - from:
         - ipBlock:
             cidr: 192.168.88.0/24
+      ports:
+        - port: 8000
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ocr-service-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ocr-service
+  policyTypes:
+    - Ingress
+  ingress:
+    # Backend calls OCR for document extraction
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: backend
+      ports:
+        - port: 8000
+          protocol: TCP
+    # Allow Prometheus to scrape /metrics
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
       ports:
         - port: 8000
           protocol: TCP

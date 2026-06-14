@@ -10,10 +10,14 @@ from fastapi.responses import JSONResponse
 from PIL import Image
 
 from ocr_engine import OpenVINOOCREngine
+from prometheus_fastapi_instrumentator import Instrumentator
+from metrics import ocr_documents_total, ocr_duration_seconds
 
 app = FastAPI(title="OCR Service")
 
 ocr_engine = OpenVINOOCREngine()
+
+Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 
 @app.get("/health")
@@ -272,19 +276,22 @@ async def ocr_extract(
             content={"detail": "El archivo excede el tamaño máximo de 10 MB"},
         )
 
-    if image.content_type == "application/pdf":
-        img_array = _pdf_first_page_to_array(file_bytes)
-    else:
-        img_array = _image_bytes_to_array(file_bytes)
+    with ocr_duration_seconds.time():
+        if image.content_type == "application/pdf":
+            img_array = _pdf_first_page_to_array(file_bytes)
+        else:
+            img_array = _image_bytes_to_array(file_bytes)
 
-    lines = _run_ocr(img_array)
+        lines = _run_ocr(img_array)
 
-    if document_type:
-        doc_type = document_type
-    else:
-        doc_type = _classify_document(lines)
+        if document_type:
+            doc_type = document_type
+        else:
+            doc_type = _classify_document(lines)
 
-    structured_fields = _extract_structured_fields(lines, doc_type)
+        structured_fields = _extract_structured_fields(lines, doc_type)
+
+    ocr_documents_total.labels(doc_type=doc_type).inc()
 
     return JSONResponse(content={
         "document_type": doc_type,

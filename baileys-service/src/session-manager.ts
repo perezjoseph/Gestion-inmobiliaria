@@ -10,6 +10,7 @@ import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import { usePostgresAuthState, deleteAuthState, listStoredRealms } from './pg-auth-state';
 import { calculateBackoffDelay, isRecoverableDisconnect } from './reconnect';
+import { setConnectionUp, incMessages, incReconnect, incSessionRestore } from './metrics';
 
 const RECONNECT_INITIAL_DELAY_MS = Number.parseInt(
   process.env.RECONNECT_INITIAL_DELAY_MS || '2000',
@@ -89,6 +90,8 @@ function scheduleReconnect(sessionInfo: SessionInfo, statusCode: number): void {
   );
   sessionInfo.reconnectAttempts += 1;
 
+  incReconnect(realmId);
+
   logger.info(
     {
       realmId,
@@ -110,6 +113,8 @@ function scheduleReconnect(sessionInfo: SessionInfo, statusCode: number): void {
 
 function handleConnectionClose(sessionInfo: SessionInfo, statusCode: number | undefined): void {
   const { realmId } = sessionInfo;
+
+  setConnectionUp(realmId, false);
 
   if (statusCode === DisconnectReason.loggedOut) {
     sessionInfo.status = 'logged_out';
@@ -158,6 +163,7 @@ function handleConnectionUpdate(
     sessionInfo.status = 'connected';
     sessionInfo.qrCode = null;
     sessionInfo.reconnectAttempts = 0;
+    setConnectionUp(realmId, true);
     if (sessionInfo.reconnectTimer) {
       clearTimeout(sessionInfo.reconnectTimer);
       sessionInfo.reconnectTimer = null;
@@ -275,9 +281,13 @@ async function forwardToBackend(realmId: string, message: any): Promise<void> {
         { realmId, status: response.status, senderPhone },
         'Backend webhook returned non-OK status'
       );
+      incMessages(realmId, 'inbound', 'error');
+    } else {
+      incMessages(realmId, 'inbound', 'ok');
     }
   } catch (err: any) {
     logger.error({ realmId, err: err.message, senderPhone }, 'Failed to forward message to backend');
+    incMessages(realmId, 'inbound', 'error');
   }
 }
 
@@ -433,7 +443,14 @@ export async function sendMessage(
   }
 
   const jid = `${recipientPhone.replace('+', '')}@s.whatsapp.net`;
-  const sent = await session.socket.sendMessage(jid, { text: content });
+  let sent;
+  try {
+    sent = await session.socket.sendMessage(jid, { text: content });
+  } catch (err) {
+    incMessages(realmId, 'outbound', 'error');
+    throw err;
+  }
+  incMessages(realmId, 'outbound', 'ok');
 
   if (sent?.key?.id) {
     sentMessageIds.add(sent.key.id);
@@ -451,8 +468,10 @@ export async function restoreSessions(): Promise<void> {
   for (const realmId of realms) {
     try {
       await startSession(realmId);
+      incSessionRestore('success');
       logger.info({ realmId }, 'Session restored');
     } catch (err: any) {
+      incSessionRestore('failure');
       logger.error({ realmId, err: err.message }, 'Failed to restore session');
     }
   }

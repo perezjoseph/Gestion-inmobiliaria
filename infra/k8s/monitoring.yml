@@ -71,6 +71,31 @@ data:
       - job_name: "kube-state-metrics"
         static_configs:
           - targets: ["kube-state-metrics.monitoring.svc.cluster.local:8080"]
+
+      - job_name: "traefik"
+        metrics_path: "/metrics"
+        static_configs:
+          - targets: ["traefik.kube-system.svc.cluster.local:9100"]
+
+      - job_name: "postgres-exporter"
+        static_configs:
+          - targets: ["db-metrics.realestate.svc.cluster.local:9187"]
+            labels:
+              environment: "production"
+
+      - job_name: "baileys"
+        metrics_path: "/metrics"
+        static_configs:
+          - targets: ["baileys.realestate.svc.cluster.local:3100"]
+            labels:
+              environment: "production"
+
+      - job_name: "ocr-service"
+        metrics_path: "/metrics"
+        static_configs:
+          - targets: ["ocr-service.realestate.svc.cluster.local:8000"]
+            labels:
+              environment: "production"
 ---
 # Prometheus deployment
 apiVersion: apps/v1
@@ -95,6 +120,8 @@ spec:
             - "--config.file=/etc/prometheus/prometheus.yml"
             - "--storage.tsdb.path=/prometheus"
             - "--storage.tsdb.retention.time=30d"
+            - "--web.enable-remote-write-receiver"
+            - "--enable-feature=exemplar-storage"
           ports:
             - containerPort: 9090
           volumeMounts:
@@ -293,10 +320,22 @@ spec:
             - name: dashboard-business-kpi
               mountPath: /var/lib/grafana/dashboards/application/business-kpi-dashboard.json
               subPath: business-kpi-dashboard.json
+            - name: dashboard-tracing-service-red
+              mountPath: /var/lib/grafana/dashboards/application/tracing-service-red-dashboard.json
+              subPath: tracing-service-red-dashboard.json
             # Kubernetes cluster dashboard
             - name: dashboard-kubernetes
               mountPath: /var/lib/grafana/dashboards/infrastructure/kubernetes-dashboard.json
               subPath: kubernetes-dashboard.json
+            - name: dashboard-traefik-edge
+              mountPath: /var/lib/grafana/dashboards/infrastructure/traefik-edge-dashboard.json
+              subPath: traefik-edge-dashboard.json
+            - name: dashboard-whatsapp
+              mountPath: /var/lib/grafana/dashboards/application/whatsapp-dashboard.json
+              subPath: whatsapp-dashboard.json
+            - name: dashboard-ocr
+              mountPath: /var/lib/grafana/dashboards/application/ocr-dashboard.json
+              subPath: ocr-dashboard.json
             - name: grafana-data
               mountPath: /var/lib/grafana/data
           resources:
@@ -340,9 +379,21 @@ spec:
         - name: dashboard-business-kpi
           configMap:
             name: grafana-dashboard-business-kpi
+        - name: dashboard-tracing-service-red
+          configMap:
+            name: grafana-dashboard-tracing-service-red
         - name: dashboard-kubernetes
           configMap:
             name: grafana-dashboard-kubernetes
+        - name: dashboard-traefik-edge
+          configMap:
+            name: grafana-dashboard-traefik-edge
+        - name: dashboard-whatsapp
+          configMap:
+            name: grafana-dashboard-whatsapp
+        - name: dashboard-ocr
+          configMap:
+            name: grafana-dashboard-ocr
         - name: grafana-data
           persistentVolumeClaim:
             claimName: grafana-pvc

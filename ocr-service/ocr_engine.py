@@ -18,6 +18,8 @@ import numpy as np
 import openvino as ov
 import yaml
 
+from metrics import ocr_inference_seconds
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -491,7 +493,8 @@ class OpenVINOOCREngine:
 
         input_tensor = self._det_request.get_input_tensor(0)
         input_tensor.data[:] = blob
-        self._det_request.infer()
+        with ocr_inference_seconds.labels(stage="detection").time():
+            self._det_request.infer()
         output = self._det_request.get_output_tensor(0).data
 
         pred = output[0, 0, :bh, :bw]
@@ -512,7 +515,8 @@ class OpenVINOOCREngine:
             start = b * batch_size
             batch_blob = _rec_preprocess_batch(crops[start:start + batch_size])
             input_tensor.data[:] = batch_blob
-            self._rec_request.infer()
+            with ocr_inference_seconds.labels(stage="recognition").time():
+                self._rec_request.infer()
             output = self._rec_request.get_output_tensor(0).data
             for i in range(batch_size):
                 results.append(_rec_postprocess(output[i:i+1], self.char_dict))
@@ -526,7 +530,8 @@ class OpenVINOOCREngine:
             ]
             batch_blob = _rec_preprocess_batch(padded_crops)
             input_tensor.data[:] = batch_blob
-            self._rec_request.infer()
+            with ocr_inference_seconds.labels(stage="recognition").time():
+                self._rec_request.infer()
             output = self._rec_request.get_output_tensor(0).data
             for i in range(remainder):
                 results.append(_rec_postprocess(output[i:i+1], self.char_dict))
