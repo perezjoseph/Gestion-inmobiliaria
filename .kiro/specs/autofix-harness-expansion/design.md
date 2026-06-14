@@ -42,7 +42,7 @@ Scored with the rubric in `measuring-harness-quality.md` (0 absent / 1 partial /
 - Instructions 8/8, State 2/4, Verification 4/6, Scope 6/8, Lifecycle 2/4.
 - Total **22/30 ≈ 73%** → Level 3 (scoped + verified), upper edge.
 
-The expansion targets the four lost points (State, Verification, Lifecycle) and the two soft Scope points, aiming for ~90% (Level 4). The **State subsystem is the biggest mover**: F4 (cross-run learnings) plus F10 (git-backed persistent memory that survives ephemeral sessions, hydrated on spawn, with workflow-only write integrity) take State from partial (2/4) to solid (4/4), since continuity now spans both *within* a queue run and *across* CI invocations.
+The expansion targets the four lost points (State, Verification, Lifecycle) and the two soft Scope points, aiming for ~90% (Level 4). The **State subsystem is the biggest mover**: F10 (a persistent native knowledge base stored on an NFS-mounted volume that survives ephemeral runner pods, present at session start with no rebuild) takes State from partial (2/4) to solid (4/4), since continuity now spans both *within* a queue run (F4's ephemeral learnings file) and *across* CI invocations (the NFS-persisted knowledge base). **Memory does not live in git** — see F10 for the storage architecture.
 
 ---
 
@@ -59,7 +59,7 @@ Each gap is a place where a real failure can land today.
 | GAP-5 | Scope | No diff-size budget | No control on number/spread of files written | Agent sprawls a "minimal" fix across many files; scope discipline relies on the prompt alone |
 | GAP-6 | Scope | Lockfiles and Python deps not write-protected | `deniedPaths` covers Cargo manifests + `Cargo.lock` but not `package-lock.json`, `android` lockfiles, or `ocr-service/requirements.txt` | Agent silently bumps a dependency version, violating the dependencies steering rule |
 | GAP-7 | Lifecycle | No persisted trace / metrics | Covered in detail by `.kiro/plans/harness-observability.md` (G1–G6) | Cannot compute VCR, verification_gap, escape rate |
-| GAP-8 | State | Agent sessions are ephemeral; kiro-cli's native knowledge base is stored machine-locally and does not survive across CI invocations on a fresh runner | Each `kiro-cli chat --agent autofix` call in `kiro-autofix-trigger.yml` is a fresh, isolated process; the native KB lives in the runner's local data dir ([machine-local storage](https://kiro.dev/docs/cli/experimental/knowledge-management/)), which is empty each job, and `agentSpawn` currently only clears state | Agent re-derives the same root cause every run and re-attempts an approach that already failed for the same artifact/diagnostic — no durable, human-readable memory |
+| GAP-8 | State | Agent sessions are ephemeral; kiro-cli's native knowledge base is stored machine-locally and does not survive across CI invocations because each autofix job runs in a fresh, destroyed-after-use ARC runner pod | The autofix workflows invoke `kiro-cli chat --agent autofix --model claude-opus-4.6 --effort max --no-interactive --trust-all-tools "$PROMPT"` (`kiro-autofix-runtime.yml`) on `arc-runner-dind` pods (`runs-on: arc-runner-dind` in `kiro-autofix.yml`, `kiro-autofix-trigger.yml`, `kiro-autofix-runtime.yml`). The native KB is stored only on the local filesystem at `~/.local/share/kiro-cli/knowledge_bases/` ([machine-local storage, no remote backend](https://kiro.dev/docs/cli/experimental/knowledge-management/), [kiro#4823](https://github.com/kirodotdev/Kiro/issues/4823)); the pod template (`infra/k8s/arc-v2/runner-scale-set-values.yml`, `minRunners: 1`, `maxRunners: 10`) destroys that dir after each job, so it is empty on the next run unless backed by an external volume, and `agentSpawn` currently only clears state. Compounding this, the `knowledge` built-in tool is **not** in the autofix agent's `tools`/`allowedTools` (current list: `read, write, shell, code, grep, glob, introspect, thinking, @context7`), so even a persisted store is unreachable by the headless agent until the tool is granted ([built-in tools doc](https://kiro.dev/docs/cli/reference/built-in-tools/)). Enabling cross-run memory therefore requires BOTH `chat.enableKnowledge true` AND granting the `knowledge` tool in `autofix.json`. | Agent re-derives the same root cause every run and re-attempts an approach that already failed for the same artifact/diagnostic — no durable memory |
 
 ---
 
@@ -76,10 +76,9 @@ graph TD
         VFL[verify-fix-loop SKILL<br/>+ Python row]
     end
     subgraph State
-        LRN[machine tier git source-of-truth<br/>evals/autofix-learnings.jsonl]
-        MEM[human tier digest git source-of-truth<br/>.kiro/memory/autofix/MEMORY.md]
-        KB[native KB index<br/>rebuilt from git on spawn]
-        SPAWN[agentSpawn hydration<br/>native KB + resources digest]
+        NFS["NFS-mounted native KB<br/>(persists across pods)<br/>192.168.88.22:/...kiro-memory"]
+        SCRATCH["within-run scratch<br/>KIRO_LEARNINGS_FILE in RUNNER_TEMP"]
+        SPAWN["agentSpawn<br/>KB already present + indexed<br/>(no rebuild)"]
         HANDOFF[structured compaction<br/>handoff block]
     end
     subgraph Verification
@@ -102,13 +101,10 @@ graph TD
     NONCODE --> STOP
     SUP --> STOP
     BUDGET --> STOP
-    LRN --> SP
-    LRN --> MEM
-    MEM --> KB
-    LRN --> KB
-    KB --> SPAWN
-    MEM --> SPAWN
+    NFS --> SPAWN
     SPAWN --> SP
+    SCRATCH --> SP
+    STOP --> NFS
     STOP --> OBS
     HANDOFF --> OBS
 ```
@@ -122,10 +118,10 @@ sequenceDiagram
     participant Guards as preToolUse / postToolUse hooks
     participant Sensors as Sensor suites
     participant Stop as stop gate
-    participant State as Cross-run state
+    participant State as NFS-mounted KB
 
-    WF->>State: load evals/autofix-learnings.jsonl (prior runs)
-    WF->>Agent: KIRO_DIAGNOSTICS_FILE + KIRO_LEARNINGS_FILE
+    Agent->>State: search KB for (artifact, diag_sig) before fixing
+    WF->>Agent: KIRO_DIAGNOSTICS_FILE + KIRO_LEARNINGS_FILE (within-run scratch)
     Agent->>Guards: fs_write(file)
     Guards->>Guards: deny lockfile? suppression token? over budget?
     alt blocked
@@ -138,14 +134,15 @@ sequenceDiagram
     Agent->>Stop: attempt stop
     Stop->>Stop: modified files all have a matching sensor-ran? else block
     Stop-->>WF: clean exit + commit message
-    WF->>State: append run record to evals/autofix-learnings.jsonl
+    Agent->>State: knowledge tool stores lesson keyed (artifact, diag_sig) → persists on NFS
 ```
 
 ### Design decisions and rationale
 
 - **Mechanical over advisory.** GAP-4, GAP-5, GAP-6 are promoted from prompt text to hooks/`deniedPaths` because a control that depends on the agent choosing to comply is a suggestion, not a control (harness quality gate #2).
 - **Per-stack sensor tracking, not a single boolean.** The current `stop` gate uses one `autofix-sensors-ran.txt` flag for all stacks. After adding Python and non-code validators, a single flag would let an agent satisfy the gate by running a Rust sensor after editing a Python file. The expansion tracks sensor-ran **per stack** so the gate verifies the right sensor ran for the files actually modified (closes GAP-1 properly).
-- **State persistence rides the existing commit, not a new branch.** Cross-run learnings append to a git-tracked `evals/autofix-learnings.jsonl` committed alongside the fix — consistent with the harness-observability plan's Phase 5/7 decision to avoid a separate metrics branch where possible.
+- **Cross-run memory lives on an NFS-mounted volume, not in git.** The native KB directory is mounted from the existing NFS server (`192.168.88.22`) into the runner pod, exactly mirroring the `cargo-registry`/`sccache` cache pattern already in `infra/k8s/arc-v2/runner-scale-set-values.yml`. The memory *is* the native KB itself, living on the NAS; it survives ephemeral pods because the volume is external to the pod. Nothing memory-related is committed to the repository. Because the index persists on NFS, there is **no rebuild-from-source step on spawn** — the KB is already present and indexed when the agent starts.
+- **Within-run scratch stays ephemeral.** The `KIRO_LEARNINGS_FILE` in `$RUNNER_TEMP` remains a within-run scratch pad for the current queue; cross-run continuity is now provided by the NFS-persisted KB, not by a git-tracked store.
 - **Reuse the existing observability plan for Lifecycle.** No new trace design here; this spec's Lifecycle work is "consume the learnings the observability pipeline persists," keeping the two efforts non-overlapping.
 
 ---
@@ -173,27 +170,27 @@ sensor_pattern <stack>       # echoes the regex of sensor commands that count fo
 **Purpose**: Mechanically enforce the three currently-advisory scope rules.
 
 **Responsibilities**:
-- **Suppression guard**: reject any write whose new content introduces a suppression token (`#[allow(`, `@ts-ignore`, `@ts-nocheck`, `eslint-disable`, `@Suppress`, `# type: ignore`, `# noqa`).
-- **Diff-budget guard**: track the cumulative count of distinct files modified in one agent invocation; warn at a soft threshold and block further writes past a hard threshold, telling the agent to narrow scope.
+- **Suppression guard**: reject any write that *increases* the count of suppression tokens (`#[allow(`, `@ts-ignore`, `@ts-nocheck`, `eslint-disable`, `@Suppress`, `# type: ignore`, `# noqa`) for a file — i.e. block only a net-new suppression, never a pre-existing one that is left in place or relocated unchanged.
+- **Diff-budget guard**: track the cumulative count of distinct files modified in one agent invocation; warn at a soft threshold and emit a stronger `::warning::` past a hard threshold, telling the agent to narrow scope. This guard is **advisory only** — it prints CI annotations the agent may act on; it does not block writes and nothing in the harness mechanically enforces the file-count budget.
 - **Lockfile/dep guard**: handled declaratively via `deniedPaths` (no hook needed).
 
-### Component 3: Cross-run State Store
+### Component 3: Within-run Scratch State
 
-**Purpose**: Carry failed-approach learnings across queue runs so the agent does not repeat them.
+**Purpose**: Carry failed-approach notes *within a single queue run* so the agent does not repeat them while processing the artifacts of that one run. Cross-run continuity is now provided by the NFS-persisted native KB (Component 5), not by this scratch file.
 
 **Interface**:
 
 ```bash
-# read at queue start, before the per-artifact loop
-load_prior_learnings <history_file>   # tail of evals/autofix-learnings.jsonl → KIRO_LEARNINGS_FILE seed
-# append at queue end, in the existing commit step
-record_run <run_id> <artifact> <verdict> <approach_summary>
+# reset at queue start (within-run only — NOT seeded from git)
+init_scratch <learnings_file>        # truncate KIRO_LEARNINGS_FILE in $RUNNER_TEMP
+# appended by the agent/workflow during the run
+note_attempt <artifact> <approach>   # one line appended to the scratch file
 ```
 
 **Responsibilities**:
-- Seed `KIRO_LEARNINGS_FILE` with the last K records instead of an empty file.
-- Append one JSONL record per processed artifact to the git-tracked store.
-- Bound the file (keep last N records) so it does not grow unbounded.
+- Provide an ephemeral, within-run notepad (`KIRO_LEARNINGS_FILE` in `$RUNNER_TEMP`) that lives and dies with the queue run.
+- Hold no durable, cross-run state — that role moves entirely to the NFS-mounted KB (Component 5).
+- Stay out of git: the scratch file is never committed.
 
 ### Component 4: Structured Compaction Handoff
 
@@ -205,53 +202,54 @@ record_run <run_id> <artifact> <verdict> <approach_summary>
 
 ### Component 5: Persistent Memory Subsystem (F10)
 
-**Purpose**: Give the ephemeral agent durable memory across CI invocations. Git-tracked files are the durable source of truth; kiro-cli's native knowledge base ([`/knowledge`](https://kiro.dev/docs/cli/experimental/knowledge-management/)) is a searchable index rebuilt from those files on every session init. The agent reads memory (native KB search + an always-in-context prose digest); only the workflow writes it. Full design in the Low-Level Design (F10).
+**Purpose**: Give the ephemeral agent durable memory across CI invocations **without using git**. The memory is kiro-cli's own native knowledge base, reached by the headless agent through the built-in [`knowledge` tool](https://kiro.dev/docs/cli/reference/built-in-tools/) (the `/knowledge` REPL slash-command is the interactive surface for the same feature; the `--no-interactive` autofix agent uses the tool). Its store directory is mounted from an NFS-backed volume into the runner pod. Because the volume is external to the pod, the KB — and its index — survive the destruction of each ephemeral runner pod. No memory is committed to the repository. Full design in the Low-Level Design (F10).
 
-**Interface**:
+**Interface** (the built-in `knowledge` tool — search / store; no custom store):
 
-```bash
-# read-on-spawn (native KB sync on session init + resources digest): index prior learnings, load digest
-hydrate_memory                       # native KB re-indexes .kiro/memory/autofix on init; digest loaded via resources
-# write-on-commit (workflow): append a keyed record, then rebuild the digest
-record_run <artifact> <diag_sig> <result> <approach>   # appends to evals/autofix-learnings.jsonl
-distill_digest                       # rebuild .kiro/memory/autofix/MEMORY.md, bounded + deduped
+```text
+# The headless autofix agent invokes the built-in `knowledge` tool, NOT the
+# `/knowledge` REPL slash-command. `/knowledge` is the interactive surface for the
+# SAME feature; the --no-interactive agent reaches the feature through the tool.
+# The `knowledge` tool has no configuration options (per the built-in tools doc) —
+# storage location is governed by settings + the filesystem (the NFS mount), not a tool flag.
+
+knowledge: search "<artifact> <diag_sig>"   # read-on-spawn anti-repeat lookup before a fix
+knowledge: store  "<lesson keyed (artifact, diag_sig)>"   # native-curation write after a verified outcome
 ```
 
 **Responsibilities**:
-- Persist memory in two git-tracked tiers as the durable source of truth: machine (`evals/autofix-learnings.jsonl`, = F4) and human (`.kiro/memory/autofix/MEMORY.md`).
-- Index the git-tracked memory into a native kiro-cli knowledge base that re-syncs on every session init, giving the agent lexical search over prior lessons without depending on cross-session persistence of the index itself.
-- Hydrate the persisted memory into every fresh session via the native KB (re-indexed on spawn) plus the prose digest in `resources` (guaranteed-in-context fallback).
-- Key each record by `(artifact, diag_sig)` so anti-repeat lookup is meaningful.
-- Keep the agent out of the writer role (`.kiro/memory/**` in `deniedPaths`) so memory integrity holds; the native KB is read-only for the agent.
-- Bound both tiers (record cap + entry cap) so memory — and the KB index rebuilt from it — does not grow unbounded or rot.
+- Persist memory as the native KB on an NFS-mounted volume at the kiro-cli data dir (`~/.local/share/kiro-cli`), so the `knowledge_bases/` subdir and its index persist across pods.
+- Present the KB already-indexed at session start — **no read-on-spawn rebuild**, unlike a git-seeded approach.
+- Key/tag each entry by `(artifact, diag_sig)` so anti-repeat lookup is meaningful (a naming/tagging convention, since the native KB has no schema).
+- Bound growth via an out-of-band GC mechanism (the native KB has no auto-cleanup); see F10.
+- Default to the **native-curation** write model (the agent maintains its own KB); offer a stronger read-only-mount variant if write integrity proves necessary (see F10).
 
 ---
 
 ## Data Models
 
-### Cross-run learnings record (`evals/autofix-learnings.jsonl`)
+### Persisted memory entry (native KB on NFS)
 
-One JSON object per line.
+Memory is not a git file; it is the native KB persisted on the NFS-mounted volume, reached through the built-in `knowledge` tool. There is no enforced schema, so entries follow a **naming/tagging convention** keyed by `(artifact, diag_sig)` to make anti-repeat lookup meaningful. A typical curated entry (written by the agent via the `knowledge` tool's store operation) records, in prose:
 
-```json
-{
-  "run_id": "1234567890",
-  "ts": "2026-06-13T02:00:00Z",
-  "branch": "main",
-  "artifact": "diag-clippy-backend",
-  "verdict": "CLEAN",
-  "iterations": 2,
-  "files": ["backend/src/handlers/payments.rs"],
-  "approach": "Removed unused import flagged by clippy::unused_imports",
-  "outcome": "fixed"
-}
+```text
+[artifact: diag-clippy-backend] [diag_sig: clippy::needless_return]
+Failure: clippy denies needless_return in payment handlers.
+Root cause: trailing `return` added by an earlier mechanical edit.
+Fix that worked: drop the `return` keyword, keep the tail expression.
+Avoid: do NOT add #[allow(clippy::needless_return)] (blocked by suppression guard).
+Files: backend/src/handlers/payments.rs
 ```
 
-**Validation rules**:
-- `verdict` ∈ {`CLEAN`, `PARTIAL`, `NO_FIX`, `SKIPPED`}.
-- `outcome` ∈ {`fixed`, `no_change`, `skipped`, `held`, `escaped`} (`held`/`escaped` set later by the observability correlation step).
-- `files` is a possibly-empty array of repo-relative paths.
-- File is truncated to the most recent `KIRO_LEARNINGS_KEEP` records (default 200) on append.
+**Convention rules**:
+- The first line carries the `(artifact, diag_sig)` tag so a `knowledge` tool search for `"<artifact> <diag_sig>"` retrieves the right lesson.
+- `diag_sig` is a normalized signature of the diagnostic: clippy lint name, Rust error code (`E0277`), failing test name, ruff rule code, hadolint rule, etc.
+- Each entry records whether the approach *worked* or *failed*, so the agent can avoid re-attempting a failed approach.
+- Growth is bounded out-of-band (GC CronJob / periodic removal via the `knowledge` tool), since the native KB has no auto-cleanup — see F10.
+
+### Within-run scratch (`$RUNNER_TEMP/autofix-learnings.txt`)
+
+A plain-text notepad, one line per attempt, that lives and dies with a single queue run. It is reset at queue start and is **never** committed to git. Cross-run continuity comes from the NFS KB above, not from this file.
 
 ### Per-stack sensor-ran state (`$RUNNER_TEMP/autofix-sensors-ran.d/`)
 
@@ -278,13 +276,13 @@ Each feature names the subsystem it strengthens, the behavior it adds, and wheth
 | F1 | Python (ocr-service) sensor suite | Verification | GAP-1 | Mechanical + prompt |
 | F2 | Non-code validators (Dockerfile, K8s, shell) | Verification | GAP-2 | Mechanical + prompt |
 | F3 | Per-stack sensor-ran tracking in the stop gate | Verification | GAP-1, GAP-2 | Mechanical |
-| F4 | Cross-run learnings store | State | GAP-3 | Mechanical + prompt |
+| F4 | Within-run scratch learnings (ephemeral; cross-run role folded into F10) | State | GAP-3 (within-run) | Ephemeral (within-run only) |
 | F5 | Structured compaction handoff | State / Lifecycle | GAP-3 | Advisory (prompt) |
 | F6 | Suppression guard | Scope | GAP-4 | Mechanical |
-| F7 | Diff-budget guard | Scope | GAP-5 | Mechanical |
+| F7 | Diff-budget guard | Scope | GAP-5 | Advisory (prompt/CI-annotation) |
 | F8 | Expanded deniedPaths (lockfiles + Python deps) | Scope | GAP-6 | Mechanical |
 | F9 | Trace + metrics integration | Lifecycle | GAP-7 | See existing plan |
-| F10 | Persistent memory subsystem (git source-of-truth, two-tier, native KB re-indexed on spawn, read-on-spawn / write-on-commit) | State (+ Lifecycle) | GAP-8 | Mechanical + prompt |
+| F10 | Persistent memory subsystem (native KB on an NFS-mounted volume, persists across ephemeral pods, present + indexed at session start with no rebuild; subsumes the cross-run role of F4) | State (+ Lifecycle) | GAP-3 (cross-run), GAP-8 | Mechanical (infra) + prompt |
 
 ---
 
@@ -312,15 +310,16 @@ The expanded `toolsSettings.write.deniedPaths` (F8). Additions are the last four
         "baileys-service/package-lock.json",
         "ocr-service/requirements.txt",
         "android/gradle/libs.versions.toml",
-        "android/**/*.lockfile",
-        ".kiro/memory/**"
+        "android/**/*.lockfile"
       ]
     }
   }
 }
 ```
 
-Rationale: the dependencies steering rule requires research-and-pin before any version change. Dependency edits are out of scope for a surgical CI fix, so they are denied outright. If a fix genuinely requires a dependency change, the agent exits with `Status: PARTIAL` and reports it for human action (consistent with how it already handles unfixable secret/infra diagnostics in the trigger workflow). The final entry, `.kiro/memory/**` (F10), is denied so the agent can read but never author its own memory — see the F10 memory subsystem for the write-integrity rationale.
+Rationale: the dependencies steering rule requires research-and-pin before any version change. Dependency edits are out of scope for a surgical CI fix, so they are denied outright. If a fix genuinely requires a dependency change, the agent exits with `Status: PARTIAL` and reports it for human action (consistent with how it already handles unfixable secret/infra diagnostics in the trigger workflow). No memory path appears in `deniedPaths`: memory is the NFS-mounted native KB, not a file in the repository (F10), so there is nothing repo-side to deny — see the F10 write-integrity discussion for how memory integrity is handled instead.
+
+Note on `android/**/*.lockfile`: this pattern matches no file in the repo today because Gradle dependency-locking is not currently enabled. It is a harmless forward-looking guard — a pattern with no current target rather than an active rule — kept so that if dependency-locking is later turned on, the lockfiles it produces are denied from the start. The entry is intentionally retained.
 
 ### F1: Python sensor suite (system prompt + verify-fix-loop SKILL row)
 
@@ -431,25 +430,58 @@ fi'
 */ocr-service/*.py) cd ocr-service && ruff format "$FILE" 2>/dev/null || true ;;
 ```
 
+Implementation note: the bash snippets above show the hook command bodies only. When wired into `autofix.json`, each hook MUST retain its `matcher` field or it will not bind to any tool — `execute_bash` for the sensor-ran tracker (it inspects `tool_input.command`), and `fs_write`/`str_replace` for the formatter (it acts on written files). The existing hooks in `autofix.json` already use exactly these matchers; mirror them when adding the per-stack versions.
+
 ### F6: Suppression guard (`preToolUse`)
 
-New `preToolUse` entries matching `fs_write` and `str_replace`. Reads the content being written; blocks if it introduces a suppression token.
+New `preToolUse` entries matching `fs_write` and `str_replace`. The guard must block only a **net-new** suppression, never a suppression that already exists in the file. A naive presence-check is unshippable on this repo: `#[allow(...)]` is pervasive across the backend (`app.rs`, `auth.rs`, `documentos.rs`, `firmas.rs`, `config.rs`, `main.rs`, and dozens of services/models/tests). Because `fs_write` carries the *full* new file content, a presence-check would hard-deny any full-file write to a file that already contains a suppression — locking the agent out of large parts of the backend. The guard therefore compares suppression-token counts and blocks only when the write increases the count.
+
+- **`str_replace`**: compare the suppression-token count in `tool_input.newStr` against `tool_input.oldStr`; block only if `count(newStr) > count(oldStr)`.
+- **`fs_write`**: read the current on-disk file at `tool_input.path` and compare the suppression-token count in `tool_input.text` (new) against the current file (old; treat a non-existent file as count 0); block only if `new > old`.
+
+**`str_replace` matcher:**
 
 ```bash
 bash -c '
 INPUT=$(cat)
-CONTENT=$(echo "$INPUT" | jq -r ".tool_input.text // .tool_input.newStr // empty" 2>/dev/null)
-if echo "$CONTENT" | grep -qE "#\[allow\(|@ts-ignore|@ts-nocheck|eslint-disable|@Suppress|# type: ignore|# noqa"; then
-  echo "BLOCKED: suppression directive detected. Fix the root cause instead of silencing the warning (see autofix-system.md: No suppressed warnings)." >&2
+RE="#\[allow\(|@ts-ignore|@ts-nocheck|eslint-disable|@Suppress|# type: ignore|# noqa"
+NEW=$(echo "$INPUT" | jq -r ".tool_input.newStr // empty" 2>/dev/null)
+OLD=$(echo "$INPUT" | jq -r ".tool_input.oldStr // empty" 2>/dev/null)
+NEW_N=$(printf "%s" "$NEW" | grep -oE "$RE" | wc -l | tr -d " ")
+OLD_N=$(printf "%s" "$OLD" | grep -oE "$RE" | wc -l | tr -d " ")
+if [ "$NEW_N" -gt "$OLD_N" ]; then
+  echo "BLOCKED: this edit adds a NET-NEW suppression directive ($OLD_N -> $NEW_N). Fix the root cause instead of silencing the warning (see autofix-system.md: No suppressed warnings)." >&2
   exit 2
 fi'
 ```
 
-Edge case: a legitimate pre-existing suppression being moved verbatim would also trip this. Accepted tradeoff — the harness forbids suppressions outright, and a surgical fix should not be relocating them. The max-2-block stop escape does not apply to `preToolUse` (this is a hard deny), so the agent must choose a non-suppressing fix.
+**`fs_write` matcher:**
+
+```bash
+bash -c '
+INPUT=$(cat)
+RE="#\[allow\(|@ts-ignore|@ts-nocheck|eslint-disable|@Suppress|# type: ignore|# noqa"
+PATH_=$(echo "$INPUT" | jq -r ".tool_input.path // empty" 2>/dev/null)
+NEW=$(echo "$INPUT" | jq -r ".tool_input.text // empty" 2>/dev/null)
+NEW_N=$(printf "%s" "$NEW" | grep -oE "$RE" | wc -l | tr -d " ")
+if [ -f "$PATH_" ]; then
+  OLD_N=$(grep -oE "$RE" "$PATH_" | wc -l | tr -d " ")
+else
+  OLD_N=0
+fi
+if [ "$NEW_N" -gt "$OLD_N" ]; then
+  echo "BLOCKED: this write adds a NET-NEW suppression directive ($OLD_N -> $NEW_N) to $PATH_. Fix the root cause instead of silencing the warning (see autofix-system.md: No suppressed warnings)." >&2
+  exit 2
+fi'
+```
+
+Edge case: `#[allow(...)]` is **pervasive** in this repo, so a naive presence-check is unshippable — it would block routine edits to any file that already carries a suppression and effectively lock the agent out of the backend. The count-delta check above is required: it permits leaving or relocating an existing suppression while still blocking the introduction of a new one. Residual limitation: a single write that *removes* one suppression and *adds* a different one (equal count) slips through, since the total count is unchanged. That is an accepted tradeoff — the goal is preventing net-new suppressions, not perfectly tracking individual tokens. The max-2-block stop escape does not apply to `preToolUse` (this is a hard deny), so the agent must choose a fix that does not increase the suppression count.
 
 ### F7: Diff-budget guard (`postToolUse`)
 
-Tracks distinct modified files; soft-warns past `KIRO_DIFF_SOFT` (default 8), and emits a strong advisory past `KIRO_DIFF_HARD` (default 15). Because `postToolUse` cannot retroactively undo a write, the hard limit surfaces as a loud warning the agent sees on its next turn rather than a silent block; the stop gate remains the enforcement point.
+Tracks distinct modified files; soft-warns past `KIRO_DIFF_SOFT` (default 8), and emits a strong advisory past `KIRO_DIFF_HARD` (default 15). **F7 is a purely advisory nudge — it enforces nothing.** Because `postToolUse` cannot retroactively undo a write, the hard limit only prints a `::warning::`/`::notice::` annotation the agent sees on its next turn. Nothing in the harness mechanically enforces the file-count budget: the F3 stop gate checks sensors-ran per stack only and has no file-count check, so no component blocks a fix for exceeding the budget. The budget influences behavior solely by surfacing a message the agent may act on.
+
+If a hard, mechanical budget is ever wanted, it would require adding an explicit file-count check to the stop gate — count distinct entries in `autofix-modified-files.txt` and block exit past the cap — but that is not part of this design as written.
 
 ```bash
 bash -c '
@@ -464,46 +496,20 @@ elif [ "$N" -ge "$SOFT" ]; then
 fi'
 ```
 
-### F4: Cross-run learnings store (workflow-side)
+### F4: Within-run scratch learnings (workflow-side)
 
-In `kiro-autofix-trigger.yml`, replace the queue-start wipe with a seed-from-history, and add an append step in the existing commit path.
+F4 is now **within-run only**. The previous design wrote a git-tracked `evals/autofix-learnings.jsonl` and seeded the next run from it; that git store is **removed** (memory must not live in git) and its cross-run role is folded into F10's NFS-mounted native KB. What remains of F4 is the ephemeral scratch pad inside a single queue run.
 
-Before (current):
-
-```bash
-LEARNINGS_FILE="${RUNNER_TEMP}/autofix-learnings.txt"
-: > "$LEARNINGS_FILE"
-```
-
-After (seed from the git-tracked store):
+In `kiro-autofix-trigger.yml`, the queue-start reset is kept as-is — the scratch file starts empty each run and is never committed:
 
 ```bash
 LEARNINGS_FILE="${RUNNER_TEMP}/autofix-learnings.txt"
 : > "$LEARNINGS_FILE"
-STORE="evals/autofix-learnings.jsonl"
-if [ -s "$STORE" ]; then
-  echo "=== PRIOR RUN LEARNINGS (last ${KIRO_LEARNINGS_SEED:-20}) ===" >> "$LEARNINGS_FILE"
-  tail -n "${KIRO_LEARNINGS_SEED:-20}" "$STORE" \
-    | jq -r "\"[\(.artifact)] \(.verdict): \(.approach)\"" >> "$LEARNINGS_FILE" 2>/dev/null || true
-fi
 ```
 
-Append one record per processed artifact (after the existing per-artifact commit), then commit `evals/autofix-learnings.jsonl` alongside the fix:
+There is **no seed-from-git** step and **no commit-of-memory** step. Within a queue run, the agent (and the workflow) may append short notes to `$LEARNINGS_FILE` so later artifacts in the *same* run benefit from earlier attempts; the file is discarded when the runner pod is destroyed.
 
-```bash
-jq -c -n \
-  --arg run_id "$CI_RUN_ID" --arg ts "$(date -u +%FT%TZ)" \
-  --arg branch "$BRANCH" --arg artifact "$artifact" \
-  --arg verdict "$VERDICT" --arg approach "$APPROACH_SUMMARY" \
-  --argjson files "$(printf '%s' "$NEWLY_FIXED" | jq -R . | jq -s .)" \
-  '{run_id:$run_id, ts:$ts, branch:$branch, artifact:$artifact,
-    verdict:$verdict, files:$files, approach:$approach, outcome:"fixed"}' \
-  >> evals/autofix-learnings.jsonl
-# bound the file
-tail -n "${KIRO_LEARNINGS_KEEP:-200}" evals/autofix-learnings.jsonl > evals/.tmp && mv evals/.tmp evals/autofix-learnings.jsonl
-```
-
-`VERDICT` and `APPROACH_SUMMARY` are parsed from the agent's commit message (`Status:` line and subject), data the harness already produces. `evals/autofix-learnings.jsonl` is **not** in `deniedPaths` (the agent does not write it — the workflow does), and it rides the existing commit/push, so no new push or branch is introduced.
+Cross-run continuity — remembering a `(artifact, diag_sig)` lesson from a *previous* CI invocation — is provided entirely by the NFS-persisted native KB described in F10. The agent searches that KB at the start of a fix; it does not read any git-tracked learnings file.
 
 ### F5: Structured compaction handoff (system prompt)
 
@@ -529,137 +535,194 @@ In addition to the prose handoff block, F5 can tune kiro-cli's native compaction
 
 ### F10: Persistent memory subsystem
 
-#### Problem and workaround
+> **F10 is the highest-infra-cost, lowest-verification feature in this design.** Everything else (F1–F8) is editable config or hooks verified by the repo's own sensors. The official [built-in tools doc](https://kiro.dev/docs/cli/reference/built-in-tools/) now **retires the tool-existence risk**: `knowledge` is a real, grantable built-in tool (listed under experimental tools alongside `thinking` and `todo`), so the earlier worry that "there is no knowledge tool / it is only a slash-command" is settled. What remains are two smaller, still-unproven assumptions: (a) that the granted `knowledge` tool actually *functions* in headless `--no-interactive` mode, and (b) the real on-disk store path on the runner image. The spike below is a **hard gate** narrowed to those two: it must pass before any work touches `infra/` or helm.
 
-kiro-cli exposes a native, experimental knowledge base ([`/knowledge`](https://kiro.dev/docs/cli/experimental/knowledge-management/)) that is designed to persist "across chat sessions and CLI restarts." That is the intended persistence and hydration mechanism, and the autofix harness should use it. There is one decisive caveat: the native knowledge base is stored in the **machine-local** system data directory, not in the repository (Linux: `~/.local/share/kiro-cli/knowledge_bases/`, macOS: `~/Library/Application Support/kiro-cli/knowledge_bases/`, Windows: `%LOCALAPPDATA%\kiro-cli\knowledge_bases\`). The autofix harness runs each agent turn as a fresh `kiro-cli chat --agent autofix` process on an **ephemeral CI runner** in `kiro-autofix-trigger.yml`. On such a runner that local data directory is empty at the start of every job, so the native "persists across sessions" guarantee does not survive across CI invocations on its own — the index is rebuilt from nothing each run.
+#### Validation spike (prerequisite gate)
 
-This is precisely why **git must remain the source of truth**. The architecture combines both layers:
+Before any infra/helm/NFS work, a spike MUST confirm the two remaining unproven assumptions below. The tool-existence question is already **RESOLVED** by the official [built-in tools doc](https://kiro.dev/docs/cli/reference/built-in-tools/): `knowledge` is a real built-in tool ("Store and retrieve information in a knowledge base across chat sessions. Provides semantic search capabilities for files, directories, and text content. This tool has no configuration options."), listed under the experimental tools, and the doc's `allowedTools` example explicitly includes `"knowledge"`. So the earlier worry — "there is no `knowledge` tool / it is only a REPL slash-command" — is settled, provided the tool is granted (see the tool-grant delta below). The spike no longer has to discover whether a knowledge mechanism exists; it only has to confirm the two narrower points.
 
-- **Durability comes from git.** Memory lives in git-tracked files committed by the *workflow*. They are present in the checkout at the start of every run regardless of the runner's local state.
-- **Ergonomic search comes from the native knowledge base.** On session init the native KB indexes those git-tracked files, giving the agent fast lexical lookup keyed on diagnostic signatures and lint codes. Because the index is rebuilt from the durable git files each run, its machine-local ephemerality no longer matters.
+**(a) Does the granted `knowledge` tool actually function headless?** The tool exists and is grantable, but its runtime behavior under `kiro-cli chat --agent autofix --no-interactive --trust-all-tools "$PROMPT"` is unverified. After adding `"knowledge"` to both `tools` and `allowedTools` in `autofix.json` (the tool-grant delta below), smoke-test that in non-interactive mode the agent can (1) run a knowledge **search** and get results back, and (2) **store** an entry that actually persists to the store directory. The tool being present and granted does not by itself prove the search/store round-trip works in headless mode — that is what this step verifies before any infra spend.
 
-The native knowledge base's supported file types include `.md`, `.txt`, `.json`, `.yaml/.yml`, and code files, so both tiers of our store are natively indexable — though the agent searches the human-readable `.md` digest, since `.jsonl` is not in the documented supported-extensions list. This reuses three mechanics the harness already has — the `resources` list, the structured commit message, and (optionally) an agent-config knowledge-base resource — rather than introducing a new runtime, and it directly answers the original question: *sessions are temporal and in-session memory does not persist, so persist in git and re-index into the native KB on every spawn.*
+**(b) What is the real KB store path on the runner image?** The store path `~/.local/share/kiro-cli/knowledge_bases/` is an **external claim** (kiro.dev docs + [kiro#4823](https://github.com/kirodotdev/Kiro/issues/4823)). If the real path on the runner image differs, the NFS mount targets the wrong directory and the KB is always empty. Because the `knowledge` tool "has no configuration options" (built-in tools doc), there is **no per-tool path setting** to point it elsewhere — the store location is governed by the feature/settings and the filesystem, which is exactly why the NFS-mount-at-the-data-dir approach is the persistence mechanism. The spike must determine the actual path by running kiro-cli on the runner image `ghcr.io/perezjoseph/realestate-runner` and inspecting the filesystem — do not trust the documented path blindly.
 
-Four principles:
+**Gate decision.** If the spike shows the granted `knowledge` tool **does not function** headless (search returns nothing usable, or stores do not persist), F10 must be **redesigned** (e.g. a different memory mechanism the headless agent can actually drive) or **dropped**. Do not proceed to the NFS mount, the `runner-scale-set-values.yml` delta, or any helm change until both (a) and (b) are confirmed. This makes the "external claims — re-verify at implementation time" callout (see Dependencies) concrete and blocking for F10.
 
-1. **Persist outside the session, in git.** Memory lives in git-tracked files committed by the *workflow*, not written by the agent. Git is the durable source of truth; the native KB is a rebuildable index over it.
-2. **Read-on-spawn via the native knowledge base + resources.** The native KB re-indexes the git-tracked memory on session init; the prose digest is also loaded via `resources` as a guaranteed-in-context fallback.
-3. **Write-on-commit.** The workflow extracts the session's learnings from the structured commit message and appends a record to the store, committed alongside the fix.
-4. **Bounded + garbage-collected.** Both tiers are capped so memory does not grow unbounded or rot. The native KB has **no automatic cleanup of old contexts** ([docs](https://kiro.dev/docs/cli/experimental/knowledge-management/)), which is an additional reason our git-side distillation/GC is required: re-indexing a bounded git directory keeps the rebuilt KB bounded too.
+#### Problem and decision
 
-#### Two-tier model
+kiro-cli exposes a native, experimental knowledge base — reached by the headless agent through the built-in [`knowledge` tool](https://kiro.dev/docs/cli/reference/built-in-tools/) (the [`/knowledge`](https://kiro.dev/docs/cli/experimental/knowledge-management/) slash-command is the interactive surface for the same feature) — designed to persist "across chat sessions and CLI restarts." Critically, **kiro-cli has no remote or cloud memory backend**: the knowledge base is stored *only* on the local filesystem at `~/.local/share/kiro-cli/knowledge_bases/` ([knowledge management docs](https://kiro.dev/docs/cli/experimental/knowledge-management/), [kiro#4823](https://github.com/kirodotdev/Kiro/issues/4823)), and the `knowledge` tool itself "has no configuration options" ([built-in tools doc](https://kiro.dev/docs/cli/reference/built-in-tools/)) — so there is no setting on the tool to point it at S3, a database, or any external service. So the **only** way to persist it is to make that local directory itself durable.
 
-| Tier | File | Format | Audience | Source |
-|------|------|--------|----------|--------|
-| Machine tier | `evals/autofix-learnings.jsonl` (this is the **F4** store) | JSONL, one record per artifact | Workflow: seeding, dedup, distillation | Appended by the workflow on commit |
-| Human/agent tier | `.kiro/memory/autofix/MEMORY.md` | Bounded Markdown prose digest | The agent: searched via the native KB and loaded via `resources` every spawn | Distilled from the JSONL by a workflow step |
+The autofix workflows run on self-hosted Actions Runner Controller (ARC) runners (`runs-on: arc-runner-dind` in `kiro-autofix.yml`, `kiro-autofix-trigger.yml`, `kiro-autofix-runtime.yml`), invoking `kiro-cli chat --agent autofix --model claude-opus-4.6 --effort max --no-interactive --trust-all-tools "$PROMPT"` (`kiro-autofix-runtime.yml`). Each job runs in a fresh `arc-runner-dind` pod that is destroyed afterward, so the local data dir is empty on the next run.
 
-F4 is **not duplicated** by F10 — F4 *is* the machine tier of this subsystem. F10 adds the human-readable digest on top of it, the native-KB index over the git-tracked memory, and the read-on-spawn hydration. The digest is small enough to load into context on every spawn and to index quickly; the JSONL is the structured substrate it is distilled from. The native KB indexes the `.md` digest (a supported file type); `.jsonl` is not a documented supported extension, so the digest is the artifact the agent searches.
+**Core decision: persist kiro-cli's native knowledge base directory on an NFS-backed volume mounted into the ARC runner pod at the kiro-cli data dir**, mirroring the existing cargo-cache NFS pattern in `infra/k8s/arc-v2/runner-scale-set-values.yml`. The memory *is* the native KB itself, living on the NAS — it survives ephemeral runner pods because the volume is external to the pod. It is durable, **not in git**, and **not in the container image**.
 
-#### File layout
+A key simplification versus a git-seeded approach: because the index itself persists on NFS, there is **no rebuild-from-source step on spawn** — the KB is already present and indexed when the agent starts.
 
-```
-.kiro/memory/autofix/
-  MEMORY.md                  # bounded prose digest, loaded via resources every spawn
-evals/
-  autofix-learnings.jsonl    # machine tier (F4): structured records, seed + dedup substrate
-```
+Four principles (adapted to NFS storage):
 
-#### Memory record key (dedup / anti-repeat)
+1. **Persist outside the session, on NFS — never in git.** Memory is the native KB on a volume external to the pod. Nothing memory-related is committed to the repository, baked into the image, or distilled to a tracked file.
+2. **Read-on-spawn with no rebuild.** The KB is already mounted, present, and indexed at session start; the agent searches it immediately. There is no seed step and no re-index-from-git step.
+3. **Bounded + garbage-collected out-of-band.** The native KB has **no automatic cleanup of old contexts** ([docs](https://kiro.dev/docs/cli/experimental/knowledge-management/)) and NFS persists indefinitely, so a separate GC mechanism trims the store (see below).
+4. **Degrade gracefully.** If the NFS server is unavailable, the agent runs with no memory rather than failing hard.
 
-For lookup to be meaningful, each record is keyed so the agent can recognize a previously-failed approach for the *same problem*. The key is `artifact + diagnostic signature`:
+#### Tool-grant delta to `autofix.json` (prerequisite for the headless agent)
 
-- `artifact` — the diagnostics artifact name (e.g. `diag-clippy-backend`).
-- `diag_sig` — a normalized signature of the diagnostic itself: the clippy lint name, Rust error code (`E0277`), failing test name, ruff rule code, hadolint rule, etc. Extracted from the diagnostics file by a fixed regex; falls back to a hash of the first error line when no code is present.
-
-The F4 record (defined above) gains two fields to support this:
+Per the [built-in tools doc](https://kiro.dev/docs/cli/reference/built-in-tools/), "if a tool is not in the `allowedTools` list, the user will be prompted for permission when the tool is used." In headless `--no-interactive` mode **there is no user to prompt**, so an ungranted tool effectively cannot be used. The autofix agent's current `tools`/`allowedTools` are `read, write, shell, code, grep, glob, introspect, thinking, @context7` — `knowledge` is **absent from both**. F10 therefore requires adding `"knowledge"` to BOTH arrays. This mirrors the pattern the same doc states for `subagent`: a custom agent must explicitly add the tool to its `tools` array (or pull it in via `@builtin`).
 
 ```json
 {
-  "run_id": "1234567890",
-  "ts": "2026-06-13T02:00:00Z",
-  "branch": "main",
-  "artifact": "diag-clippy-backend",
-  "diag_sig": "clippy::needless_return",
-  "verdict": "CLEAN",
-  "iterations": 2,
-  "files": ["backend/src/handlers/payments.rs"],
-  "approach": "Removed needless return flagged by clippy",
-  "result": "worked",
-  "outcome": "fixed"
+  "tools": [
+    "read", "write", "shell", "code", "grep", "glob",
+    "introspect", "thinking", "knowledge", "@context7"
+  ],
+  "allowedTools": [
+    "read", "write", "shell", "code", "grep", "glob",
+    "introspect", "thinking", "knowledge", "@context7"
+  ]
 }
 ```
 
-- `diag_sig` is the memory key component alongside `artifact`.
-- `result` ∈ {`worked`, `failed`} records whether the approach actually cleared the diagnostic, so the digest can carry both *fix-that-worked* and *fix-that-failed* lessons. (`outcome` keeps its existing F4 vocabulary for the observability correlation step.)
+`--trust-all-tools` (already passed on the runtime invocation) may in practice cover an ungranted tool, but relying on it is non-deterministic — explicitly listing `knowledge` in both `tools` and `allowedTools` is the correct, deterministic grant and the approach this design adopts. The `knowledge` tool "has no configuration options," so there is nothing further to configure on the tool itself; storage location is handled by the NFS mount, not a tool flag.
 
-Before attempting a fix, the seeded memory lets the agent match the current `(artifact, diag_sig)` against prior records and avoid re-running a `result: failed` approach.
+This is a `.kiro/agents/autofix.json` change. Per the Security section's two-mechanism distinction, that file is protected **only** by the agent's own `write.deniedPaths` (`.kiro/agents/**`, which stops the agent self-editing it) — it is **not** in `.github/CODEOWNERS`, so a human PR editing it triggers no required-review gate. Apply this grant as part of the same human-applied change set as the F10 infra delta.
 
-#### Digest schema (`.kiro/memory/autofix/MEMORY.md`)
+#### Proposed infra delta to `runner-scale-set-values.yml`
 
-Prose, one entry per distinct `(artifact, diag_sig)`, newest first, capped at `KIRO_MEMORY_ENTRIES` (default 40 entries) so the whole file stays small enough for `resources`:
+> **This is a PROPOSED, human-applied change.** `infra/**` is in the agent's `write.deniedPaths` and is CODEOWNERS-protected; the autofix agent cannot apply it. A human applies these YAML additions and re-runs `helm upgrade`.
 
-```markdown
-# Autofix Memory
+Add a new `kiro-memory` NFS volume, mount it in the `runner` container at the kiro-cli data dir, and extend the `init-nfs-permissions` initContainer to `chmod 777` the new mount — consistent with the file's existing style.
 
-Durable lessons distilled from prior runs. Read before attempting a fix.
-Match the current artifact + diagnostic signature against the entries below.
+**1. New volume (add under `volumes:`):**
 
-## diag-clippy-backend · clippy::needless_return
-- Failure: clippy denies `needless_return` in payment handlers.
-- Root cause: trailing `return` added by an earlier mechanical edit.
-- Fix that worked: drop the `return` keyword, leave the tail expression.
-- Avoid: do NOT add `#[allow(clippy::needless_return)]` (blocked by suppression guard).
-
-## diag-test-backend · contracts::overlap_rejected
-- Failure: contract overlap test fails after date-range change.
-- Root cause: inclusive vs exclusive end date off-by-one.
-- Fix that failed: widening the range — broke an adjacent test.
-- Fix that worked: use a half-open interval in the overlap check.
+```yaml
+      - name: kiro-memory
+        nfs:
+          server: 192.168.88.22
+          path: /volume1/docker/k3s-cache/kiro-memory
 ```
 
-#### Native knowledge base wiring (read-on-spawn search)
+**2. Mount in the `runner` container (add under that container's `volumeMounts:`):**
 
-The native knowledge base must be enabled and pointed at the git-tracked memory directory so it re-indexes on every session init. There are two ways to wire it; the harness should prefer the agent-config form and fall back to the CLI-command form.
+```yaml
+          - name: kiro-memory
+            mountPath: /home/runner/.local/share/kiro-cli
+```
 
-**Option A — declare a knowledge base in the agent config (preferred).** Per the docs, "Knowledge base resources defined in an agent's configuration sync automatically on session init and agent swap, so agent-defined knowledge bases are indexed without manual intervention" ([knowledge management](https://kiro.dev/docs/cli/experimental/knowledge-management/)). This is the native read-on-spawn hydration mechanism: declare a knowledge base over `.kiro/memory/autofix/` in `autofix.json` and kiro-cli re-indexes it on every spawn, with no manual `/knowledge add` step.
+The native KB lives in the `knowledge_bases/` subdir of that path; mounting the parent kiro-cli data dir persists the KB and its index together.
 
-> Schema note: the **exact JSON field** for an agent-config knowledge-base resource is not specified in the two referenced docs. Do not fabricate it. Verify the precise key against the custom-agents configuration reference before implementing Option A. If the field cannot be confirmed, ship Option B (below), which uses only documented CLI commands and settings, and promote to Option A once the schema is verified.
+**3. Extend the `init-nfs-permissions` initContainer.** Add the new mount and include `/mnt/kiro-memory` in the existing `chmod` loop:
 
-**Option B — workflow runs documented CLI commands (grounded fallback).** Before the agent turn in `kiro-autofix-trigger.yml`, enable the feature and add (or re-index) the memory directory using only commands the docs define:
+```yaml
+      - name: init-nfs-permissions
+        image: ghcr.io/perezjoseph/realestate-runner:latest
+        imagePullPolicy: Always
+        command:
+          [
+            "sh",
+            "-c",
+            'for d in /mnt/registry /mnt/git /mnt/sccache /mnt/target /mnt/kiro-memory; do chmod 777 "$d" 2>/dev/null || true; done',
+          ]
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+          - name: cargo-registry
+            mountPath: /mnt/registry
+          - name: cargo-git
+            mountPath: /mnt/git
+          - name: sccache
+            mountPath: /mnt/sccache
+          - name: cargo-target
+            mountPath: /mnt/target
+          - name: kiro-memory
+            mountPath: /mnt/kiro-memory
+```
+
+This reuses the exact NFS server (`192.168.88.22`) and path convention (`/volume1/docker/k3s-cache/...`) already established for the cargo caches.
+
+
+
+#### Anti-repeat keying convention
+
+The native KB has no enforced schema, so entries follow a tagging convention keyed by `(artifact, diag_sig)` so the agent can recognize a previously-seen problem:
+
+- `artifact` — the diagnostics artifact name (e.g. `diag-clippy-backend`).
+- `diag_sig` — a normalized signature of the diagnostic itself: the clippy lint name, Rust error code (`E0277`), failing test name, ruff rule code, hadolint rule, etc. Falls back to a hash of the first error line when no code is present.
+
+Before attempting a fix, the agent invokes the `knowledge` tool to search for `"<artifact> <diag_sig>"` against the persisted KB, reads any matching lesson, and avoids re-attempting an approach recorded as failed. Each curated entry records whether the approach worked or failed (see the entry convention in Data Models). This `(artifact, diag_sig)` keying is the read-on-spawn / anti-repeat mechanism; because the KB is already on the mounted volume, the lookup needs no rebuild.
+
+#### Concurrency: reuse the existing per-branch group, partition the KB per branch
+
+`maxRunners: 10` means up to ten runner pods could mount the **same** NFS KB at once. The instinct to add a `concurrency: group: autofix-memory` block is **wrong** here, for two concrete reasons:
+
+1. **A GitHub workflow can declare only one `concurrency:` block, and `kiro-autofix-trigger.yml` already has one** (marked mandatory by its own comment):
+
+   ```yaml
+   # IMPORTANT: cancel-in-progress MUST be false ...
+   concurrency:
+     group: kiro-autofix-${{ github.event.workflow_run.head_branch }}
+     cancel-in-progress: false
+   ```
+
+2. **Replacing the per-branch group with a global `autofix-memory` group would serialize all branches** and destroy the per-branch queue semantics the file comment says are mandatory (the queue processes one artifact at a time *per branch*). A global group is therefore not an option, and a second block cannot be added.
+
+**Resolution: do not add any concurrency group. Reuse the existing per-branch group as-is and partition the KB per branch.** Each branch writes its own KB subdirectory under the NFS mount:
+
+```text
+/home/runner/.local/share/kiro-cli/knowledge_bases/<branch>/
+```
+
+The per-branch path is derived from the branch name that already drives the existing concurrency group — `github.event.workflow_run.head_branch` — sanitized for filesystem safety (replace `/` and any non-`[A-Za-z0-9._-]` character with `_`), e.g. `feature/x` → `feature_x`. The workflow exports it (for example `KIRO_KB_BRANCH`) and the agent/settings point the KB at the corresponding subdir.
+
+This fits the existing concurrency model perfectly: the `kiro-autofix-${{ head_branch }}` group already guarantees **at most one autofix job per branch runs at a time**, so within a branch there is a single writer to that branch's subdir, and different branches write different subdirs — no cross-branch contention and no new group needed.
+
+Tradeoff: per-branch partitioning means a lesson learned on branch A is **not** visible on branch B. This is acceptable — `main` is the dominant autofix target, so the bulk of accumulated memory lives and is reused under the `main` subdir.
+
+Residual risk: even with a single writer per branch, NFS file-locking on a bm25 index can still be flaky across pod churn (a pod dying mid-write, or NFS lock state lingering after a pod is destroyed). Graceful degradation (the `agentSpawn` missing-KB check) softens this but does **not** fully eliminate the chance of a corrupted index; the GC/rebuild path (below) is the recovery for a corrupted base.
+
+
+
+#### Write integrity: who curates the memory
+
+With `--trust-all-tools`, the `knowledge` tool granted, and a writable NFS mount, the agent **can** invoke the `knowledge` tool's store operation and curate its own memory. Be honest about the consequence: there is **no hard mechanical barrier** here like the old git `deniedPaths` entry gave — the previous design could deny `.kiro/memory/**` because memory was a repo path, but the NFS-mounted KB is not a repo path and the agent owns the `knowledge` tool. Two options:
+
+**(a) Native-curation model — DEFAULT, recommended for the first iteration.** The agent maintains its own KB: after a verified outcome it records a lesson via the `knowledge` tool's store operation, keyed `(artifact, diag_sig)`. This matches how kiro-cli's knowledge feature is intended to work and is the simplest. Integrity relies on the bounded, reviewable nature of the store and on the fact that lessons derive from *verified* sensor outcomes (a lesson is written only after the stop gate confirms the result). **Residual risk:** because the agent is the writer, it could in principle record a self-serving or inaccurate lesson; nothing mechanically prevents it. The GC policy and the small bounded size keep the store auditable.
+
+**(b) Stronger-integrity variant — adopt only if write-integrity proves necessary.** Mount the NFS KB **read-only** into the runner during the agent turn, and have a separate writer — a small post-job step or a k8s `Job` using `kubectl`, or the workflow itself — write curated entries out-of-band so the agent cannot author its own memory. This is more complex and may fight kiro-cli's native KB, which expects to write its own store (a read-only store dir can break the `knowledge` tool's store operation and index updates). Treat it as a hardening step, not the starting point.
+
+**Recommendation:** ship (a) first; move to (b) only if observed behavior shows the agent recording untrustworthy lessons.
+
+
+#### Knowledge base enablement and index type
+
+Enabling cross-run memory has **two** prerequisites that must both hold: (1) the `knowledge` built-in tool is granted in `autofix.json` (the tool-grant delta above), and (2) the experimental knowledge feature is turned on via settings. Missing either one leaves the headless agent unable to use memory.
+
+The native knowledge base must be enabled (it is experimental and off by default) and configured to use the Fast index. Both settings live in `~/.kiro/settings/cli.json` and are set with `kiro-cli settings <key> <value>` ([settings reference](https://kiro.dev/docs/cli/reference/settings/)):
 
 ```bash
 kiro-cli settings chat.enableKnowledge true
 kiro-cli settings knowledge.indexType Fast
-
-# First run: register the memory dir; subsequent runs: re-index it.
-if kiro-cli /knowledge show 2>/dev/null | grep -q 'autofix-memory'; then
-  kiro-cli /knowledge update .kiro/memory/autofix
-else
-  kiro-cli /knowledge add --name autofix-memory --path .kiro/memory/autofix \
-    --include '**/*.md' --index-type Fast
-fi
 ```
+
+Because the KB store persists on the NFS mount, there is no per-run re-add of the memory dir — the base is already present and indexed at session start. The agent simply invokes the `knowledge` tool to search it for `"<artifact> <diag_sig>"` and, under the native-curation model, stores lessons after verified fixes.
+
+> Schema note: if a future kiro-cli release lets an agent config declare a knowledge-base resource that "syncs automatically on session init," that could replace the manual settings step. The **exact JSON field** for an agent-config knowledge-base resource is not specified in the referenced docs. Do not fabricate it — verify the precise key against the custom-agents configuration reference before relying on it.
 
 **Index type — Fast (bm25), not Best.** The docs offer two index types: **Fast** (lexical bm25 — near-instant indexing, instant keyword search, low CPU/memory, "perfect for logs, configs, and large codebases") and **Best** (semantic `all-minilm-l6-v2` — natural-language meaning, but slower and more resource-hungry). Autofix memory lookup is keyed on diagnostic signatures and lint codes (`clippy::needless_return`, `E0277`, ruff rule codes) — exact-token matches — so **Fast (bm25) is the right default**. It also keeps per-run indexing cost negligible on the ephemeral runner.
 
-#### Settings (runner image or workflow)
+#### Settings persistence on ephemeral pods
 
-Set via `kiro-cli settings <key> <value>`; settings live in `~/.kiro/settings/cli.json` ([settings reference](https://kiro.dev/docs/cli/reference/settings/)). Keep the memory-dir index tiny.
+`chat.enableKnowledge true` and `knowledge.indexType Fast` live in `~/.kiro/settings/cli.json`, which resets on each ephemeral pod unless persisted. Three options, in order of preference:
 
-| Setting | Value | Why |
-|---------|-------|-----|
-| `chat.enableKnowledge` | `true` | Knowledge is experimental and off by default; required to use `/knowledge`. |
-| `knowledge.indexType` | `Fast` | bm25 lexical match on diagnostic signatures; fast, low-resource. |
-| `knowledge.defaultIncludePatterns` | `["**/*.md"]` | Scope indexing to the prose digest (the supported, agent-searched tier). |
-| `knowledge.maxFiles` | small (e.g. `16`) | The memory dir is tiny; cap defensively. |
-| `knowledge.chunkSize` / `knowledge.chunkOverlap` | small defaults | Digest entries are short; no need for large chunks. |
+1. **Bake the settings into the runner image** (`ghcr.io/perezjoseph/realestate-runner`) so every pod starts with knowledge enabled — simplest and most reliable.
+2. **Run `kiro-cli settings ...` idempotently at job start** in the workflow before the agent turn (the two commands above) — no image change, but adds a step to each run.
+3. **Persist `~/.kiro` on NFS** as a second mounted volume — heavier, and overlaps with the KB-data mount; only worthwhile if many other settings must also persist.
 
-Per-add `--include '**/*.md'` (Option B) achieves the same scoping as `knowledge.defaultIncludePatterns` for the single `autofix-memory` base.
+Option 1 is recommended; option 2 is the zero-infra-change fallback.
 
-#### Extended `agentSpawn` hook (read-on-spawn hydration)
 
-The current `agentSpawn` hook only clears stale verification state. It is extended to also hydrate memory: announce the digest's presence and, as a fallback for environments where the workflow did not pre-seed (e.g. local runs), seed the JSONL tail into the session-visible learnings file. The native knowledge base (wired via Option A or B above) is the primary search path and re-indexes the digest on session init; the digest itself also reaches context through the `resources` entry below, not through copying. The `agentSpawn` seed is a belt-and-suspenders fallback for the case where knowledge is disabled or the index is still empty on the very first run.
+
+#### `agentSpawn` hook (no rebuild, degrade gracefully)
+
+The KB is already present on the NFS mount, so `agentSpawn` does **not** seed or rebuild memory. It keeps its existing job — clearing stale verification state (now the F3 per-stack dir) — and adds a graceful-degradation check: if the NFS-mounted KB dir is missing (server down or volume unmounted), it announces that the agent will run without memory rather than failing.
 
 ```bash
 bash -c '
@@ -668,109 +731,38 @@ T="${RUNNER_TEMP:-/tmp}"
 rm -f "$T/autofix-modified-files.txt" "$T/autofix-stop-blocks.txt" 2>/dev/null
 rm -rf "$T/autofix-sensors-ran.d" 2>/dev/null
 
-MEM=".kiro/memory/autofix/MEMORY.md"
-STORE="evals/autofix-learnings.jsonl"
-SEED="$T/autofix-learnings.txt"
+# Within-run scratch starts empty (F4); cross-run memory is the NFS-mounted KB.
+: > "$T/autofix-learnings.txt"
 
-if [ -s "$MEM" ]; then
-  echo "Memory digest present ($(wc -l < "$MEM") lines) — loaded via resources."
+KB="${HOME}/.local/share/kiro-cli/knowledge_bases"
+if [ -d "$KB" ]; then
+  echo "Persistent KB present on NFS mount — memory available, already indexed."
 else
-  echo "No memory digest yet (first run or empty store)."
+  echo "WARNING: KB dir absent (NFS unavailable?) — proceeding WITHOUT memory."
 fi
 
-# Fallback seed only if the workflow did not already populate the learnings file.
-if [ ! -s "$SEED" ] && [ -s "$STORE" ]; then
-  echo "=== PRIOR RUN LEARNINGS (last ${KIRO_LEARNINGS_SEED:-20}) ===" > "$SEED"
-  tail -n "${KIRO_LEARNINGS_SEED:-20}" "$STORE" \
-    | jq -r "\"[\(.artifact) \(.diag_sig)] \(.result // .verdict): \(.approach)\"" >> "$SEED" 2>/dev/null || true
-fi
-
-echo "Autofix session initialized — stale verification state cleared, memory hydrated."'
+echo "Autofix session initialized — stale verification state cleared."'
 ```
 
-#### `resources` entry (always-in-context digest)
+There is no `resources` digest entry and no `.kiro/memory/**` path: memory does not live in the repository, so nothing memory-related is loaded through `resources` or denied through `deniedPaths`. The agent reaches memory only through the `knowledge` tool's search operation against the mounted KB.
 
-Add the digest to the agent's `resources` list so it loads on every spawn alongside the existing AGENTS.md, steering, and skill resources:
+#### Garbage collection (bounded growth)
 
-```json
-{
-  "resources": [
-    "file://../../AGENTS.md",
-    "file://../../.kiro/steering/**/*.md",
-    "skill://../../.kiro/skills/verify-fix-loop/SKILL.md",
-    "file://../../.kiro/memory/autofix/MEMORY.md"
-  ]
-}
-```
+The native KB has **no automatic cleanup of old contexts** ([docs](https://kiro.dev/docs/cli/experimental/knowledge-management/)) and NFS persists indefinitely, so without GC the memory grows forever. Add a bounded-retention GC, for example a small k8s `CronJob` that mounts the same `kiro-memory` NFS path and trims the store on a fixed policy:
 
-A `file://` resource that does not yet exist is tolerated (empty on first run); the workflow creates it on the first distillation.
+- **Age cap:** remove entries (or context files) older than `N` days (e.g. 90).
+- **Size cap:** if the store exceeds a byte/entry ceiling, evict oldest-first until under the cap.
+- Implement either by pruning files under the mounted `knowledge_bases/` path directly, or by periodic removal of stale contexts via the `knowledge` tool.
 
-This is the second layer of a deliberate two-layer hydration: the native knowledge base provides ergonomic search over the memory, while the small prose digest in `resources` is **always in context** regardless of the KB. Both layers are kept because (a) the native knowledge feature is experimental, and (b) the KB index may be empty on the very first run before any `/knowledge add`/sync completes. If knowledge is disabled or the index is empty, the agent still sees the digest verbatim through `resources`.
+The CronJob reuses the NFS volume definition from the runner pod (same server `192.168.88.22`, same `kiro-memory` path). This is the GC arm of the harness "bounded" principle, now enforced out-of-band instead of by a git distillation step.
 
-#### `deniedPaths` entry (write integrity)
+#### Backup and single-point-of-failure
 
-The agent must not be able to write, tamper with, or fabricate its own memory — otherwise memory is just the agent talking to itself and loses its value as an independent record. The memory directory is added to `write.deniedPaths` (extending the F8 list):
+The NFS server `192.168.88.22` is a single point of failure: if it is down, memory is unavailable. The design **degrades gracefully** — the `agentSpawn` check above lets the agent run with no memory (a soft, not hard, failure), so a NAS outage slows learning but does not break autofix. Snapshot/back up the `kiro-memory` path alongside the other `k3s-cache` volumes so a NAS loss does not permanently erase accumulated lessons.
 
-```json
-".kiro/memory/**"
-```
+#### Prompt advisory
 
-The agent reads memory (via the native KB search and the `resources` digest) but can never write it. The workflow is the sole writer — the same trust boundary already used for `evals/autofix-learnings.jsonl`, which is likewise absent from `deniedPaths` only because the agent never targets it and the workflow owns it. For the prose digest the protection is made explicit because the path is human-readable and an attractive target for an agent tempted to "remember" a convenient falsehood. The native knowledge base does **not** change this writer/integrity model: the KB is a read-only search index for the agent, the workflow writes the git files, and the KB is re-indexed *from* those git files on the next spawn. The agent cannot influence memory by writing to the KB; there is no agent-facing KB write path in this design.
-
-#### Workflow steps (seed / append / distill)
-
-These extend the F4 workflow edits in `kiro-autofix-trigger.yml`; F10 adds the `diag_sig`/`result` fields and the distillation step.
-
-**Seed (queue start)** — unchanged from F4: tail of the JSONL store is loaded into `KIRO_LEARNINGS_FILE`. The digest reaches the agent through `resources`, so no extra seed step is needed for the human tier.
-
-**Append (on commit)** — extends the F4 append to compute the diagnostic signature and the worked/failed result:
-
-```bash
-# DIAG_SIG: extract a stable signature from the diagnostics file.
-DIAG_SIG=$(grep -oiE 'clippy::[a-z_]+|error\[E[0-9]+\]|[A-Z][0-9]{3,4}|test [^ ]+ \.\.\. FAILED' \
-  "$EFFECTIVE_CTX" | head -1 | tr -d '[]' || true)
-[ -z "$DIAG_SIG" ] && DIAG_SIG=$(head -1 "$EFFECTIVE_CTX" | sha1sum | cut -c1-12)
-
-# RESULT: did the post-fix sensor re-run clear the diagnostic for this artifact?
-RESULT="failed"; [ "$VERDICT" = "CLEAN" ] && RESULT="worked"
-
-jq -c -n \
-  --arg run_id "$CI_RUN_ID" --arg ts "$(date -u +%FT%TZ)" \
-  --arg branch "$BRANCH" --arg artifact "$artifact" \
-  --arg diag_sig "$DIAG_SIG" --arg verdict "$VERDICT" \
-  --arg approach "$APPROACH_SUMMARY" --arg result "$RESULT" \
-  --argjson files "$(printf '%s' "$NEWLY_FIXED" | jq -R . | jq -s .)" \
-  '{run_id:$run_id, ts:$ts, branch:$branch, artifact:$artifact, diag_sig:$diag_sig,
-    verdict:$verdict, files:$files, approach:$approach, result:$result, outcome:"fixed"}' \
-  >> evals/autofix-learnings.jsonl
-tail -n "${KIRO_LEARNINGS_KEEP:-200}" evals/autofix-learnings.jsonl > evals/.tmp \
-  && mv evals/.tmp evals/autofix-learnings.jsonl
-```
-
-**Distill (end of queue, before the final push)** — rebuild the bounded prose digest from the JSONL, keeping the newest record per `(artifact, diag_sig)` and capping the entry count. Committed alongside the fix on the existing push (no new branch):
-
-```bash
-DIGEST=".kiro/memory/autofix/MEMORY.md"
-mkdir -p "$(dirname "$DIGEST")"
-{
-  echo "# Autofix Memory"
-  echo
-  echo "Durable lessons distilled from prior runs. Read before attempting a fix."
-  echo "Match the current artifact + diagnostic signature against the entries below."
-  echo
-  # newest record per (artifact, diag_sig), most recent first, capped.
-  tac evals/autofix-learnings.jsonl \
-    | jq -c -s 'unique_by(.artifact + "::" + .diag_sig)
-                | sort_by(.ts) | reverse
-                | .[0:('"${KIRO_MEMORY_ENTRIES:-40}"')] | .[]' \
-    | jq -r '"## \(.artifact) · \(.diag_sig)\n- Fix that \(.result): \(.approach)\n- Files: \(.files | join(", "))\n"'
-} > "$DIGEST"
-git add "$DIGEST" evals/autofix-learnings.jsonl
-```
-
-Distillation runs once per queue (not per artifact) to keep the digest churn-free and the commit minimal. The agent's own root-cause prose can later enrich each entry; the workflow seeds the mechanical skeleton from data it already has. Because distillation rebuilds a *bounded* digest each queue, the native KB rebuilt from it on the next spawn is bounded too — which matters specifically because the native knowledge base performs **no automatic cleanup of old contexts** ([docs](https://kiro.dev/docs/cli/experimental/knowledge-management/)); our git-side GC is what keeps the indexed surface small.
-
-This is advisory at the prompt layer too: `autofix-system.md` gains one line instructing the agent to read `.kiro/memory/autofix/MEMORY.md` (or search the `autofix-memory` knowledge base), match the current `(artifact, diagnostic)` against it, and not repeat any approach recorded as `failed`.
+`autofix-system.md` gains one line instructing the agent to use the `knowledge` tool to search the persisted knowledge base for the current `(artifact, diagnostic signature)` *before* attempting a fix, and to not repeat any approach the KB records as `failed`. Under the native-curation model it also stores a short lesson (via the `knowledge` tool), keyed `(artifact, diag_sig)`, after the stop gate confirms a verified outcome.
 
 ---
 
@@ -780,16 +772,15 @@ This is advisory at the prompt layer too: `autofix-system.md` gains one line ins
 |----------|-----------|----------|----------|
 | Sensor tool missing | `ruff`/`hadolint`/`kubeconform`/`shellcheck` not on PATH | Install step (retry-wrapped per steering) runs in the job before the agent; if still missing, the sensor command fails loudly and the stack is treated as un-verified → stop gate blocks | Add the tool to the runner image |
 | Suppression false-positive | Legitimate content trips the regex | Agent receives the block reason and must choose a non-suppressing fix | Refine the regex if a real false-positive recurs (review-feedback promotion) |
-| Learnings store corrupt | `evals/autofix-learnings.jsonl` has a malformed line | `jq` per-line parse with `|| true`; bad lines are skipped, not fatal | Truncation on append self-heals over time |
+| Within-run scratch corrupt | `$RUNNER_TEMP/autofix-learnings.txt` has a malformed line | Plain-text notepad; bad lines are harmless and discarded with the pod | Ephemeral — gone after the run, no recovery needed |
 | Diff budget exceeded legitimately | A cross-cutting fix genuinely needs many files | Hard-limit warning instructs the agent to exit `Status: PARTIAL` and explain rather than silently sprawl | Human reviews the PARTIAL report |
 | Per-stack gate deadlock | Modified stack has no installed sensor | Max-2-block escape hatch (preserved from current design) lets the agent exit after two blocks to avoid an infinite stop loop | Trace shows the un-verified stack for follow-up |
-| Memory digest missing | `.kiro/memory/autofix/MEMORY.md` absent on first run | `resources` tolerates a missing `file://`; `agentSpawn` announces "no digest yet"; distillation creates it at end of the first queue | Self-heals after the first committed fix |
-| Memory digest / JSONL corrupt | A malformed JSONL line or unparseable digest | Distillation uses per-record `jq` with `-c -s` over the array and `|| true` seeding; bad lines are skipped, the digest is rebuilt from scratch each queue (idempotent) | Truncation + full rebuild self-heals over time |
-| Agent attempts to write memory | Agent issues `fs_write`/`str_replace` under `.kiro/memory/**` | Denied by `deniedPaths` (F10) before the write lands; agent receives the denial and must proceed without editing memory | None needed — write integrity preserved by design |
-| Native KB empty on first run | No `/knowledge add`/sync has completed yet (fresh runner, first ever run) | The `resources` digest is always in context, so the agent still sees prior lessons even before the index exists | Self-heals once the first sync/`/knowledge add` completes |
-| Knowledge feature disabled | `chat.enableKnowledge` is `false` or `/knowledge` unavailable | Falls back entirely to the `resources` digest (always in context) and the `agentSpawn` seeded learnings; no behavior depends on the KB being present | Enable `chat.enableKnowledge true` on the runner image to restore search |
-| Native KB index stale vs git | Memory committed in a prior run, runner-local index rebuilt from current checkout | Index re-syncs on session init (Option A) or via `/knowledge update` (Option B) from the git files, which are the source of truth | Re-index from git on next spawn; git checkout is authoritative |
-| Stale / wrong lesson in digest | A recorded approach no longer applies after code drift | Entry is keyed by `(artifact, diag_sig)` and overwritten by the newest record on each distillation; recency cap evicts old entries | Next successful fix for that key replaces the lesson |
+| NFS unavailable | `kiro-memory` volume not mounted (server `192.168.88.22` down) | `agentSpawn` detects the missing KB dir and announces "proceeding WITHOUT memory"; the agent runs normally minus the anti-repeat lookup — a soft, not hard, failure | Restore NFS; memory resumes on the next run from the persisted store |
+| Concurrent-write corruption | Multiple runner pods (`maxRunners: 10`) could mount the same NFS KB at once | Prevented by the **existing per-branch** `concurrency: group: kiro-autofix-${{ head_branch }}` (one autofix job per branch at a time) combined with **per-branch KB partitioning** (`knowledge_bases/<branch>/`), so each branch's subdir has a single writer. No new concurrency group is added. | If an index still corrupts (NFS lock flakiness across pod churn), GC/rebuild the affected branch subdir |
+| Settings not persisted | `chat.enableKnowledge`/`indexType` reset on a fresh pod | Settings baked into the runner image (preferred) or set idempotently at job start, so knowledge is always enabled before the agent turn | Bake into image, or add the `kiro-cli settings` step to the workflow |
+| KB grows unbounded | Native KB has no auto-cleanup; NFS persists indefinitely | GC CronJob trims by age/size cap (or periodic removal via the `knowledge` tool), keeping the store bounded and auditable | Tune the GC policy; run an out-of-band prune |
+| Self-serving lesson (native-curation) | Agent records an inaccurate/self-serving lesson via the `knowledge` tool | Lessons are written only after a verified sensor outcome; store is small and auditable; residual risk accepted for iteration 1 | Adopt the read-only-mount + out-of-band writer variant (option b) if it recurs |
+| Stale / wrong lesson | A recorded approach no longer applies after code drift | Newest entry per `(artifact, diag_sig)` supersedes older ones; GC age cap evicts stale entries | Next verified fix for that key replaces the lesson |
 
 ---
 
@@ -838,11 +829,11 @@ For F3, F6, F7: disable the hook, re-run the seeded set, measure the metric delt
 - **No weakening of existing protections.** All current `deniedPaths` and the git-block `preToolUse` are retained verbatim; the expansion only adds denials and guards.
 - **Suppression guard is a security control, not just style.** Forbidding `# noqa`/`@ts-ignore`/`#[allow]` mechanically prevents the agent from silencing a security lint (Semgrep/clippy) to make CI green — directly supporting AGENTS.md rule 1 (never weaken protections to unblock progress).
 - **Hook input is untrusted.** Hook scripts parse tool input with `jq -r ... // empty` and quote all expansions; no `eval` of agent-provided strings. Content is grepped, never executed.
-- **No secret exposure.** The learnings store records artifact names, verdicts, and file paths — never diagnostic file contents, tokens, or environment values. The append `jq` filter has a fixed schema, so it cannot accidentally serialize secrets.
-- **Workflow secrets unchanged.** F4 rides the existing commit/push with the already-scoped `KIRO_GITHUB_TOKEN`; no new permission or secret is required. `GH_TOKEN` is still not exported to the agent.
-- **CODEOWNERS.** Changes to `.github/workflows/kiro-autofix-trigger.yml` (F4, F10) and `.kiro/agents/autofix.json` (F1, F3, F6, F7, F8, F10) are CODEOWNERS-protected and require human review — show diffs, do not self-merge.
-- **Memory write integrity (F10).** `.kiro/memory/**` is in `deniedPaths`, so the agent can read but never write its own memory. This prevents an agent from fabricating a convenient "lesson" to justify a future action — memory stays an independent record authored only by the workflow from committed outcomes.
-- **No secrets in memory (F10).** Both tiers record only artifact names, normalized diagnostic signatures, file paths, and short approach summaries — never diagnostic file contents, tokens, or environment values. The append `jq` filter has a fixed schema and the `diag_sig` extractor matches only lint/error codes or a hash, so neither tier can serialize a secret. The digest is git-tracked and human-reviewable, making any accidental leak visible in the diff.
+- **No secret exposure.** The within-run scratch and curated KB entries record artifact names, verdicts, and file paths — never diagnostic file contents, tokens, or environment values. Curated entries follow a fixed `(artifact, diag_sig)` convention, so they cannot accidentally serialize secrets.
+- **Workflow secrets unchanged.** No memory is committed or pushed, so the autofix commit/push is unchanged and uses the already-scoped `KIRO_GITHUB_TOKEN`; no new permission or secret is required. `GH_TOKEN` is still not exported to the agent. The NFS mount carries no credentials.
+- **Two distinct protection mechanisms — do not conflate them.** (a) `deniedPaths` blocks the *agent* from self-editing `.kiro/**` config: `.kiro/agents/**` is in the agent's own `write.deniedPaths`, so the autofix agent cannot modify `.kiro/agents/autofix.json` (the file that defines F1, F3, F6, F7, F8, F10). This is an agent self-edit barrier, *not* a review gate — `.kiro/` is **not** listed in `.github/CODEOWNERS`, so a human PR that edits `.kiro/agents/autofix.json` triggers no required-review gate. (b) CODEOWNERS requires human review only for the three paths it actually lists (`.github/workflows/`, `.github/actions/`, `infra/`, all owned by `@perezjoseph`). The F10 infra delta to `infra/k8s/arc-v2/runner-scale-set-values.yml` (covered by `infra/`) and the small per-branch-KB workflow step added to the autofix workflows under `.github/workflows/` (which exports the sanitized branch name — no new `concurrency:` block, since the existing per-branch group is reused) therefore **are** CODEOWNERS-protected and human-applied; the agent's `deniedPaths` also block `infra/**` and `.github/workflows/**`, so the agent cannot apply either change itself. In all cases: show diffs, do not self-merge.
+- **Memory write integrity (F10).** Memory is the native KB on an NFS-mounted volume, not a repo path, so there is no `deniedPaths` barrier. The default native-curation model lets the agent write lessons only after a verified sensor outcome; the store is bounded and auditable. The honest residual risk — an agent recording a self-serving lesson — is accepted for the first iteration; the stronger read-only-mount + out-of-band-writer variant (F10 option b) is available if it proves necessary.
+- **No secrets in memory (F10).** Curated entries record only artifact names, normalized diagnostic signatures, file paths, and short approach summaries — never diagnostic file contents, tokens, or environment values. The `(artifact, diag_sig)` keying matches only lint/error codes or a hash, so an entry cannot serialize a secret. The KB lives on the NAS (not in git and not in the image), and the GC policy keeps it small and reviewable.
 
 ---
 
@@ -860,23 +851,28 @@ New CLI tools required by F1/F2 sensors. Per the dependencies steering rule, pin
 
 No new Rust crate, npm package, or Gradle dependency is introduced. All tools are validators, not runtime dependencies.
 
-### F10 native knowledge base settings
+### F10 native knowledge base — infra and settings
 
-F10 introduces no package dependency, only kiro-cli settings ([settings reference](https://kiro.dev/docs/cli/reference/settings/)), set on the runner image or in the workflow via `kiro-cli settings <key> <value>`:
+F10 introduces no package dependency. It requires (1) the NFS-volume infra delta to `infra/k8s/arc-v2/runner-scale-set-values.yml` (proposed above, human-applied), (2) **no new concurrency group** — write safety comes from the existing per-branch `concurrency: group: kiro-autofix-${{ head_branch }}` plus per-branch KB partitioning; the only workflow change is a small step that exports the sanitized branch name so the KB points at `knowledge_bases/<branch>/`, (3) a GC CronJob, (4) the **tool-grant delta** adding `"knowledge"` to both `tools` and `allowedTools` in `autofix.json` (see the tool-grant subsection above; without it the headless agent cannot use the tool), and (5) two kiro-cli settings ([settings reference](https://kiro.dev/docs/cli/reference/settings/)), baked into the runner image or set idempotently at job start via `kiro-cli settings <key> <value>`. Enabling memory therefore has **two** independent prerequisites — granting the `knowledge` tool AND `chat.enableKnowledge true` — and both must hold:
 
-| Setting | Value | Purpose |
-|---------|-------|---------|
-| `chat.enableKnowledge` | `true` | Enable the experimental native knowledge base (off by default). |
-| `knowledge.indexType` | `Fast` | bm25 lexical index — exact-token match on diagnostic signatures, low resource. |
-| `knowledge.defaultIncludePatterns` | `["**/*.md"]` | Scope the index to the prose digest tier. |
-| `knowledge.maxFiles` | small (e.g. `16`) | Defensive cap; the memory dir is tiny. |
+| Prerequisite | Value / location | Purpose |
+|--------------|------------------|---------|
+| `knowledge` tool grant | `tools` + `allowedTools` in `.kiro/agents/autofix.json` | Make the built-in `knowledge` tool usable by the headless `--no-interactive` agent (ungranted tools cannot be used with no user to prompt). |
+| `chat.enableKnowledge` | `true` (`~/.kiro/settings/cli.json`) | Enable the experimental native knowledge base (off by default; required for the knowledge feature). |
+| `knowledge.indexType` | `Fast` (`~/.kiro/settings/cli.json`) | bm25 lexical index — exact-token match on diagnostic signatures, low resource. |
 
-The native knowledge base is **experimental**; `/knowledge clear` is irreversible and there is no automatic cleanup of old contexts — both reasons the design keeps git as the source of truth and bounds the digest on the git side.
+The native knowledge base is **experimental**, is stored only on the local filesystem (no remote backend), `/knowledge clear` is irreversible, and there is **no automatic cleanup of old contexts** — which is why the design (a) persists the store on a durable NFS volume rather than relying on the local pod disk, and (b) bounds growth with an out-of-band GC CronJob. Nothing about memory is stored in git.
+
+> **External claims — re-verify at implementation time.** The kiro-cli native-KB properties this design relies on (local-only storage with no remote backend, no automatic cleanup of old contexts, and experimental/off-by-default status) are **external claims** sourced from the kiro.dev docs and kiro issue #4823 (see References). Per the dependencies steering rule, they must be re-verified against the live kiro-cli docs at implementation time and not treated as repo-verified facts — the experimental feature's behavior, settings keys, and storage location may change between now and implementation.
 
 ### References
 
-- kiro-cli knowledge management (native `/knowledge`, index types, storage location, agent-config sync, limitations): <https://kiro.dev/docs/cli/experimental/knowledge-management/>
+- kiro-cli knowledge management (native `/knowledge`, index types, local-only storage location, limitations): <https://kiro.dev/docs/cli/experimental/knowledge-management/>
+- kiro-cli built-in tools (the `knowledge` tool — "Store and retrieve information in a knowledge base across chat sessions"; experimental tools; `allowedTools` grant requirement and headless-permission behavior): <https://kiro.dev/docs/cli/reference/built-in-tools/>
 - kiro-cli settings reference (`chat.enableKnowledge`, `knowledge.*`, compaction settings): <https://kiro.dev/docs/cli/reference/settings/>
+- Kiro issue confirming no remote/cloud knowledge-base backend (local filesystem only): <https://github.com/kirodotdev/Kiro/issues/4823>
+- ARC runner pod template (NFS volume pattern, `init-nfs-permissions`, `minRunners`/`maxRunners`): `infra/k8s/arc-v2/runner-scale-set-values.yml`
+- Autofix workflows (`runs-on: arc-runner-dind`, `kiro-cli chat --agent autofix ...` invocation): `.github/workflows/kiro-autofix.yml`, `.github/workflows/kiro-autofix-trigger.yml`, `.github/workflows/kiro-autofix-runtime.yml`
 
 ---
 
@@ -894,50 +890,54 @@ The `stop` gate's per-stack check considers every modified file, not a single gl
 
 ### Property 3: Suppression impossibility (F6)
 
-For all writes `w`: if `w` introduces a suppression token, then `w` is blocked with exit code 2.
+For all writes `w`: if `w` increases the suppression-token count for the target file (`count(new) > count(old)`), then `w` is blocked with exit code 2. A write that leaves the count unchanged — including one that relocates a pre-existing suppression — is allowed.
 
 ### Property 4: Dependency immutability (F8)
 
 For all writes `w` targeting a lockfile or pinned-dependency manifest: `w` is denied.
 
-### Property 5: Cross-run memory (F4)
+### Property 5: Within-run memory (F4)
 
-For all queue runs `n > 1` with a non-empty store: the agent's `KIRO_LEARNINGS_FILE` contains records from run `n−1`.
+For all queue runs and all artifacts `a_i` (`i > 1`) processed in one run: notes appended to `KIRO_LEARNINGS_FILE` while processing `a_1..a_{i-1}` are visible when the agent processes `a_i`. This scratch is ephemeral and is not expected to survive the run; cross-run continuity is Property 8.
 
 ### Property 6: No regression of existing controls
 
 Every current `deniedPaths` entry, the git-block guard, the auto-format behavior, and the max-2-block escape hatch are preserved unchanged.
 
-### Property 7: Bounded state (F4)
+### Property 7: Bounded memory store (F10)
 
-For all appends: `evals/autofix-learnings.jsonl` line count is at most `KIRO_LEARNINGS_KEEP`.
+For all GC runs: the persisted KB on NFS is trimmed to the configured age and/or size cap, so the store does not grow without bound despite the native KB having no auto-cleanup.
 
-### Property 8: Memory persistence across ephemeral sessions (F10)
+### Property 8: Memory persistence across ephemeral pods (F10)
 
-For any two successive agent invocations `s` and `s+1`, where `s` produced a committed fix recorded with key `(artifact, diag_sig)`: when `s+1` spawns, that lesson is reachable in `s+1`'s context (the `resources` digest, the native KB re-indexed from git, and/or the seeded learnings).
+For any two successive agent invocations `s` and `s+1`, where `s` recorded a verified lesson keyed `(artifact, diag_sig)` into the KB: when `s+1` spawns on a fresh runner pod, that lesson is reachable via the `knowledge` tool's search operation.
 
-This property holds **via the git source of truth plus re-indexing on spawn, not via the native knowledge base's own cross-session persistence.** On an ephemeral CI runner the native KB's machine-local store ([Linux `~/.local/share/kiro-cli/knowledge_bases/`, etc.](https://kiro.dev/docs/cli/experimental/knowledge-management/)) is empty at job start, so the native "persists across sessions" guarantee cannot be relied on here. Because the lesson is committed to git in `s` and re-loaded (digest in `resources`) and re-indexed (native KB) from that git checkout at the spawn of `s+1`, the property is true even when no in-process memory and no machine-local index survive between invocations. Formally: a fix recorded in session `s` implies its lesson is present at the spawn of session `s+1`, on a fresh runner with an empty local data directory.
+This property holds **via the NFS-mounted data directory surviving pod churn — NOT via git, and NOT via kiro-cli's local-disk cross-session guarantee.** On an ephemeral runner the native KB's local store ([`~/.local/share/kiro-cli/knowledge_bases/`](https://kiro.dev/docs/cli/experimental/knowledge-management/), [kiro#4823](https://github.com/kirodotdev/Kiro/issues/4823)) would be empty at job start on a fresh pod, so the native "persists across sessions" guarantee cannot be relied on here. The design makes that local directory durable by mounting it from an external NFS volume; because the volume is external to the pod, the store and its index persist when the pod is destroyed. Formally: a lesson recorded in pod `s` is present, already indexed, at the spawn of pod `s+1`, even though `s+1` runs in a brand-new pod with no inherited local disk. (Subject to Property 12: the NFS volume is mounted; if it is not, the agent degrades to no memory.)
 
-### Property 9: Memory write integrity — agent cannot author its own memory (F10)
+### Property 9: Memory write model (F10)
 
-For all writes `w` issued by the agent targeting `.kiro/memory/**`: `w` is denied. The only writer of `.kiro/memory/autofix/MEMORY.md` and `evals/autofix-learnings.jsonl` is the workflow. The agent can read memory but can never create, edit, or delete it.
+Under the default native-curation model there is **no mechanical guarantee** that the agent cannot write memory — with `--trust-all-tools`, the `knowledge` tool granted, and a writable NFS mount, the agent owns the `knowledge` tool. The honest invariant is narrower: a lesson is recorded only after the stop gate confirms a verified outcome, and the store is bounded and auditable. The stronger invariant "only a non-agent writer authors memory" holds **only** if the read-only-mount + out-of-band-writer variant (option b) is adopted.
 
-### Property 10: Bounded memory (F10)
+### Property 10: Single-writer-per-branch (F10)
 
-For all distillations: `.kiro/memory/autofix/MEMORY.md` contains at most `KIRO_MEMORY_ENTRIES` entries, and holds at most one entry per distinct `(artifact, diag_sig)` (the most recent). The digest does not grow unbounded and does not accumulate duplicate keys.
+For all autofix runs: the **existing** per-branch `concurrency: group: kiro-autofix-${{ head_branch }}` group guarantees at most one autofix job runs per branch at a time, and the KB is **partitioned per branch** (`knowledge_bases/<branch>/`). Therefore each branch's KB subdir has a single writer at any moment — no new concurrency group is introduced, and writes from up to `maxRunners` pods on *different* branches target *different* subdirs. (Residual: NFS lock flakiness across pod churn can still corrupt a branch index; recovery is GC/rebuild of that subdir — see Error Handling.)
 
 ### Property 11: Anti-repeat (F10)
 
-For any `(artifact, diag_sig)` with a prior record whose `result = failed`: that approach is present in the seeded memory at spawn, so the agent can recognize and avoid re-attempting it.
+For any `(artifact, diag_sig)` with a prior KB entry recorded as `failed`: that entry is retrievable by the `knowledge` tool's search operation at spawn (the KB is already mounted and indexed), so the agent can recognize and avoid re-attempting it.
+
+### Property 12: Graceful degradation (F10)
+
+For all runs where the NFS volume is unavailable: `agentSpawn` detects the missing KB directory and the agent proceeds without memory rather than failing the job. Absence of memory is a soft degradation, never a hard error.
 
 ---
 
 ## Relationship to the Existing Observability Plan
 
-`.kiro/plans/harness-observability.md` (Phases 0–7) owns the Lifecycle/trace/metrics track (GAP-7). This spec is complementary and deliberately non-overlapping:
+`.kiro/plans/harness-observability.md` (Phases 0–7) owns the Lifecycle/trace/metrics track (GAP-7). This spec is complementary, but one prior assumption now **conflicts** and must be reconciled:
 
-- This spec's **F4 learnings store** aligns with that plan's **Phase 7** (persist learnings across queue runs) — they describe the same artifact (`evals/autofix-learnings.jsonl`). Implement once; this design supplies the record schema and the seed/append mechanics, the observability plan supplies the trend/eval consumption.
-- **F10 builds directly on F4, it does not duplicate it.** F4 is the *machine tier* of the F10 memory subsystem (structured JSONL for seeding and dedup); F10 adds the *human tier* (the distilled `.kiro/memory/autofix/MEMORY.md` digest) plus read-on-spawn hydration and the `deniedPaths` write-integrity boundary. There is exactly one JSONL store, written by exactly one writer (the workflow), consumed by three readers: the F4 queue seed, the F9/observability trend step, and the F10 distillation step.
+- **CONFLICT — observability Phase 7 assumed a git-tracked JSONL.** That plan's Phase 7 persisted cross-run learnings to a git-tracked `evals/autofix-learnings.jsonl`. Under this revision **memory must not live in git**, so that git JSONL is removed and cross-run memory is the NFS-persisted native KB (F10). This must be reconciled, not silently duplicated: either (a) the observability metrics step reads from the NFS-mounted KB, or (b) observability keeps its own *separate, non-memory* metrics artifact (trend data, VCR, escape rate) that is explicitly not the agent's memory. Do not recreate a committed learnings JSONL to satisfy the old Phase 7.
+- **F10 subsumes the cross-run role of F4.** F4 is now within-run scratch only (`$RUNNER_TEMP`, never committed); the durable cross-run store is the NFS-mounted KB. There is no git memory file for either subsystem to read.
 - The **per-stack sensor-ran state (F3)** feeds the observability plan's `harness.sensors_ran` signal, making `verification_gap` accurate per stack.
 - No trace-emission, OTLP, or Tempo work is specified here — that remains entirely in the observability plan.
 
@@ -945,10 +945,11 @@ For any `(artifact, diag_sig)` with a prior record whose `result = failed`: that
 
 Ratchet order, cheapest-and-highest-value first:
 
+0. **F10 validation spike (HARD GATE — must pass before any `infra/` or helm work).** The built-in tools doc already settles that `knowledge` is a real, grantable tool, so the spike is now narrowed: before mounting NFS or editing `runner-scale-set-values.yml`, run the spike described in F10's "Validation spike (prerequisite gate)": after adding `"knowledge"` to `tools`/`allowedTools` in `autofix.json`, confirm (1) the granted `knowledge` tool actually functions in a headless `kiro-cli chat --agent autofix --no-interactive --trust-all-tools` invocation (search returns results, store persists), and (2) the real KB store path on the runner image `ghcr.io/perezjoseph/realestate-runner`. If the spike fails, F10 is redesigned or dropped — do **not** proceed to the infra steps below.
 1. **F1 + F3** (Python sensors + per-stack gate) — closes the largest verification hole; one `autofix.json` edit + prompt/SKILL rows.
 2. **F8** (deniedPaths) — one-line-per-entry config change, zero risk.
-3. **F6** (suppression guard) — small `preToolUse` hook, high security value.
-4. **F4** (cross-run learnings) — workflow edit (CODEOWNERS review). This lays the machine tier F10 builds on.
-5. **F10** (persistent memory) — extends F4 with `diag_sig`/`result` fields, the `agentSpawn` hydration, the `resources` digest entry, the `.kiro/memory/**` deniedPath, and the distillation step. Sequence right after F4 since it reuses the same JSONL store.
+3. **F6** (suppression guard) — small `preToolUse` hooks (count-delta, net-new only), high security value.
+4. **F4** (within-run scratch) — keep the queue-start reset; no git store, no commit step. Trivial.
+5. **F10** (persistent memory on NFS) — **gated on step 0 passing.** Then: grants the `knowledge` tool by adding `"knowledge"` to both `tools` and `allowedTools` in `autofix.json` (the tool-grant delta); human-applies the infra delta to `runner-scale-set-values.yml` (CODEOWNERS); adds **no new concurrency group** (reuses the existing per-branch group) plus per-branch KB partitioning and the small workflow step that exports the sanitized branch name; adds the GC CronJob; bakes `chat.enableKnowledge`/`indexType` into the runner image; and adds the prompt advisory + `agentSpawn` degrade check. Ship the native-curation write model first; move to the read-only-mount variant only if write integrity proves necessary.
 6. **F2** (non-code validators) — needs runner-image tool installs.
 7. **F7 + F5** (diff budget + handoff) — softest controls; add last, measure whether they move the number before keeping.
