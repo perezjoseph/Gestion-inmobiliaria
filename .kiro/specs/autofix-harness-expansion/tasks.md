@@ -110,7 +110,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - _Requirements: 6.1, 6.2, 6.3_
 
 - [ ] 10. Non-code validators (F2)
-  - [-] 10.1 Add the non-code validator tier to `autofix-system.md`
+  - [x] 10.1 Add the non-code validator tier to `autofix-system.md`
     - Document `hadolint` (docker), `kubeconform -strict -ignore-missing-schemas` (k8s), `shellcheck` (shell) as validation-only sensors
     - State they do not authorize writes to `infra/**`, which remains write-denied; if a required tool is absent from PATH after the retry-wrapped install, the stack is treated as un-verified so the stop gate blocks
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
