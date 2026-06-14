@@ -1,16 +1,16 @@
 {
   "enabled": true,
   "name": "SkillSpector Security Scan",
-  "description": "Automatically runs SkillSpector security scan (static analysis, no LLM) on any skill when a SKILL.md file is created, and reports findings to the agent for review.",
-  "version": "1",
+  "description": "Scans new skill files for security vulnerabilities using SkillSpector static analysis (no LLM).",
+  "version": "1.0.0",
   "when": {
     "type": "fileCreated",
     "patterns": [
-      "**/SKILL.md"
+      ".kiro/skills/**"
     ]
   },
   "then": {
     "type": "askAgent",
-    "prompt": "A new skill file was just created. Run SkillSpector to scan it for security vulnerabilities using: d:\\realestate\\.venv\\Scripts\\skillspector.exe scan {parentDirectory} --no-llm. Report the risk score and any findings. If HIGH or CRITICAL severity, warn the user not to use the skill."
+    "prompt": "A new file was just created in .kiro/skills/. Run SkillSpector to scan the skill's directory for security vulnerabilities. Run: d:\\realestate\\.venv\\Scripts\\skillspector.exe scan <skill_directory> --no-llm --format terminal. Report risk score and findings. If HIGH or CRITICAL, warn user to NOT use the skill and suggest removal."
   }
 }

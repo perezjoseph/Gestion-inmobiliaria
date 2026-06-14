@@ -360,3 +360,10 @@ spec:
       ports:
         - port: 8000
           protocol: TCP
+    # Allow LAN access via NodePort (dev workstation, SkillSpector)
+    - from:
+        - ipBlock:
+            cidr: 192.168.88.0/24
+      ports:
+        - port: 8000
+          protocol: TCP

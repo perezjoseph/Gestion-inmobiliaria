@@ -161,10 +161,11 @@ metadata:
   name: vllm-inference
   namespace: realestate
 spec:
-  type: LoadBalancer
+  type: NodePort
   selector:
     app.kubernetes.io/name: vllm
   ports:
     - port: 8000
       targetPort: 8000
+      nodePort: 30800
       protocol: TCP
