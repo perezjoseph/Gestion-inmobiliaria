@@ -111,8 +111,15 @@ Evaluation metrics must be:
 
 - **Tracing instrumentation**: Traceloop library
 - **Evaluation frameworks**: DeepEval library
-- **LLM calling service**: LiteLLM library
-- **LLM provider**: Amazon Bedrock
+- **LLM calling service**: LiteLLM library (for Bedrock/OpenAI) or kiro-cli (for kiro-based judging)
+- **LLM provider**: Amazon Bedrock (default) or kiro-cli (if user requests kiro)
 - **Data processing**: JSON or JSONL
 - **Agent integration**: Direct imports for Python agents
 - **Configuration**: YAML files
+
+**LLM Judge Options**:
+
+| Option | When to use | Config value |
+|--------|-------------|--------------|
+| Amazon Bedrock | Default. Uses LiteLLM + DeepEval's AmazonBedrockModel | `bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0` |
+| kiro-cli | When user says "use kiro" or "kiro-cli as judge". Uses a custom DeepEvalBaseLLM subclass that shells out to kiro-cli | `kiro-cli` |

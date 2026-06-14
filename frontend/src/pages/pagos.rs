@@ -33,8 +33,8 @@ use crate::types::ocr::OcrExtractField;
 use crate::types::pago::{CreatePago, Pago, UpdatePago};
 use crate::types::propiedad::Propiedad;
 use crate::utils::{
-    EscapeHandler, can_delete, can_write, field_error, format_currency, format_date_display,
-    input_class,
+    EscapeHandler, can_delete, can_write, display_to_iso, field_error, format_currency,
+    format_date_display, input_class, iso_to_display,
 };
 
 fn push_toast(toasts: Option<&ToastContext>, msg: &str, kind: ToastKind) {
@@ -158,15 +158,6 @@ struct PagoFormProps {
 fn PagoForm(props: &PagoFormProps) -> Html {
     let fe = props.form_errors.clone();
 
-    macro_rules! input_cb {
-        ($state:expr) => {{
-            let s = $state.clone();
-            Callback::from(move |e: InputEvent| {
-                let input: web_sys::HtmlInputElement = e.target_unchecked_into();
-                s.set(input.value());
-            })
-        }};
-    }
     macro_rules! select_cb {
         ($state:expr) => {{
             let s = $state.clone();
@@ -176,6 +167,38 @@ fn PagoForm(props: &PagoFormProps) -> Html {
             })
         }};
     }
+    macro_rules! select_cb_val {
+        ($state:expr, $val:expr) => {{
+            let s = $state.clone();
+            let v = $val.to_string();
+            Callback::from(move |_: MouseEvent| {
+                s.set(v.clone());
+            })
+        }};
+    }
+
+    // Date input callback: stores ISO internally but user types DD/MM/YYYY
+    let date_input_cb = |state: &UseStateHandle<String>| -> Callback<InputEvent> {
+        let s = state.clone();
+        Callback::from(move |e: InputEvent| {
+            let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+            let raw = input.value();
+            s.set(display_to_iso(&raw));
+        })
+    };
+
+    let date_input_cb_conf =
+        |state: &UseStateHandle<String>, field_name: &str| -> Callback<InputEvent> {
+            let s = state.clone();
+            let clear = props.on_confidence_clear.clone();
+            let name = field_name.to_string();
+            Callback::from(move |e: InputEvent| {
+                let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+                let raw = input.value();
+                s.set(display_to_iso(&raw));
+                clear.emit(name.clone());
+            })
+        };
 
     let confidence_for = |name: &str| -> Option<f64> { props.confidences.get(name).copied() };
 
@@ -210,6 +233,22 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                     {if props.is_editing { "Editar Pago" } else { "Nuevo Pago" }}</h2>
                 {scan_button}
             </div>
+            // Prominent currency toggle at the top
+            <div style="margin-bottom: var(--space-4);">
+                <label class="gi-label" style="margin-bottom: var(--space-2);">{"Moneda"}</label>
+                <div class="gi-currency-toggle gi-currency-toggle--prominent">
+                    <button type="button"
+                        class={if *props.moneda == "DOP" { "gi-currency-toggle__btn gi-currency-toggle__btn--active" } else { "gi-currency-toggle__btn" }}
+                        onclick={select_cb_val!(props.moneda, "DOP")}>
+                        {"🇩🇴 Peso Dominicano (DOP)"}
+                    </button>
+                    <button type="button"
+                        class={if *props.moneda == "USD" { "gi-currency-toggle__btn gi-currency-toggle__btn--active" } else { "gi-currency-toggle__btn" }}
+                        onclick={select_cb_val!(props.moneda, "USD")}>
+                        {"🇺🇸 Dólar (USD)"}
+                    </button>
+                </div>
+            </div>
             <form onsubmit={props.on_submit.clone()} style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
                 <div>
                     <label class="gi-label">{"Contrato *"}</label>
@@ -236,28 +275,26 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                     {field_error(&fe.monto)}
                 </div>
                 <div>
-                    <label class="gi-label">{"Moneda"}</label>
-                    <select onchange={select_cb!(props.moneda)} class="gi-input">
-                        <option value="DOP" selected={*props.moneda == "DOP"}>{"DOP"}</option>
-                        <option value="USD" selected={*props.moneda == "USD"}>{"USD"}</option>
-                    </select>
-                </div>
-                <div>
                     <label class="gi-label">{"Fecha de Vencimiento *"}
                         <HelpTooltip text="Fecha límite para recibir el pago sin que se considere atrasado." id="help-fecha-venc" />
                     </label>
-                    <input type="date" value={(*props.fecha_vencimiento).clone()} oninput={input_cb!(props.fecha_vencimiento)} disabled={props.is_editing}
+                    <input type="text" placeholder="DD/MM/AAAA"
+                        value={iso_to_display(&props.fecha_vencimiento)}
+                        oninput={date_input_cb(&props.fecha_vencimiento)} disabled={props.is_editing}
                         class={input_class(fe.fecha_vencimiento.is_some())} />
+                    <span class="gi-hint">{"Formato: DD/MM/AAAA"}</span>
                     {field_error(&fe.fecha_vencimiento)}
                 </div>
                 <div>
                     <label class="gi-label">{"Fecha de Pago"}</label>
                     <ConfidenceInput
-                        value={AttrValue::from((*props.fecha_pago).clone())}
+                        value={AttrValue::from(iso_to_display(&props.fecha_pago))}
                         confidence={confidence_for("fecha_pago")}
-                        oninput={input_cb_conf(&props.fecha_pago, "fecha_pago")}
-                        input_type="date"
+                        oninput={date_input_cb_conf(&props.fecha_pago, "fecha_pago")}
+                        input_type="text"
+                        placeholder={AttrValue::from("DD/MM/AAAA")}
                     />
+                    <span class="gi-hint">{"Formato: DD/MM/AAAA"}</span>
                 </div>
                 <div>
                     <label class="gi-label">{"Método de Pago"}</label>

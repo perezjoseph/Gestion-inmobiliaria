@@ -77,7 +77,7 @@ def convert_to_onnx() -> None:
 
 
 def convert_to_ir() -> None:
-    """Convert ONNX models to OpenVINO IR (.xml + .bin) for optimized inference."""
+    """Convert ONNX models to OpenVINO IR (.xml + .bin) with FP16 quantization."""
     import openvino as ov
 
     models = discover_models()
@@ -95,9 +95,9 @@ def convert_to_ir() -> None:
             print(f"IR already exists for {model_path.name}, skipping.")
             continue
 
-        print(f"Converting {model_path.name} ONNX -> OpenVINO IR...")
+        print(f"Converting {model_path.name} ONNX -> OpenVINO IR (FP16)...")
         model = ov.Core().read_model(str(onnx_file))
-        ov.save_model(model, str(ir_xml))
+        ov.save_model(model, str(ir_xml), compress_to_fp16=True)
         print(f"  -> {ir_xml} ({ir_xml.stat().st_size} bytes)")
 
 

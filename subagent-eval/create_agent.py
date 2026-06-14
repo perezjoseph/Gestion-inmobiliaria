@@ -106,6 +106,12 @@ def convert_agents(model: str, names: list[str] | None = None):
     output.mkdir(parents=True, exist_ok=True)
     prompts_dir.mkdir(parents=True, exist_ok=True)
 
+    # Copy .json agents directly (like eval-judge.json)
+    for json_file in sorted(source.glob("*.json")):
+        shutil.copy2(json_file, output / json_file.name)
+        print(f"  ✓ {json_file.name} (copied)")
+
+    # Convert .md agents to .json
     agents = []
     for md_file in sorted(source.glob("*.md")):
         agent = parse_md_agent(md_file)

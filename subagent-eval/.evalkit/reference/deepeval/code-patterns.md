@@ -23,7 +23,14 @@ This section summarizes the key code patterns that can be adapted for other trac
 ```yaml
 # In eval/config.yaml
 model:
-  name: "bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0"
+  # Option A: Amazon Bedrock (default)
+  provider: "bedrock"
+  name: "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+  region: "us-east-1"
+  
+  # Option B: kiro-cli (use when user requests kiro)
+  # provider: "kiro-cli"
+  # name: "claude-sonnet-4-6"  # optional, omit for Auto
 
 evaluation:
   metrics:
@@ -101,21 +108,33 @@ def load_trace_to_test_case(file_path: str) -> LLMTestCase:
     )
 ```
 
-### Metrics Definition Pattern
+### Metrics Definition Pattern (Bedrock)
 
 ```python
-# In eval/metrics.py
+# In eval/metrics.py — when using Bedrock as judge
 from deepeval.test_case import LLMTestCase, LLMTestCaseParams
 from deepeval.metrics import GEval, BaseMetric
-from deepeval.models import LiteLLMModel
-import os
-import litellm
+from deepeval.models.llms.amazon_bedrock_model import AmazonBedrockModel
 
-# Configure LiteLLM to drop unsupported parameters for Bedrock
-litellm.drop_params = True
+# Configure default model (use inference profile ID, not base model ID)
+DEFAULT_MODEL = AmazonBedrockModel(
+    model_id="us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    region_name="us-east-1",
+)
+```
 
-# Configure default model
-DEFAULT_MODEL = LiteLLMModel(model="bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0")
+> **Note**: If `temperature` + `topP` conflict occurs, subclass AmazonBedrockModel and override `get_converse_request_body` to omit `topP`.
+
+### Metrics Definition Pattern (kiro-cli)
+
+```python
+# In eval/metrics.py — when using kiro-cli as judge
+# See "Using kiro-cli as LLM Judge" section below for the full KiroModel class
+from metrics import KiroModel
+
+DEFAULT_MODEL = KiroModel()  # uses Auto model
+# Or pin: DEFAULT_MODEL = KiroModel(model="claude-sonnet-4-6")
+```
 
 class CustomMetric(BaseMetric):
     """Pattern: Custom metric implementation."""
@@ -149,17 +168,18 @@ class CustomMetric(BaseMetric):
 
 def get_metrics(config: dict = None):
     """Pattern: Metric factory function with config-based model setup."""
-    # Pattern: Configure model from config.yaml
+    provider = "bedrock"
     if config and "model" in config:
-        model_config = config["model"]
-        
-        # Create model from config
-        model = LiteLLMModel(
-            model=model_config.get("name", "bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0")
-        )
+        provider = config["model"].get("provider", "bedrock")
+
+    if provider == "kiro-cli":
+        model = KiroModel(model=config["model"].get("name"))
     else:
-        # Fallback to default model
-        model = DEFAULT_MODEL
+        from deepeval.models.llms.amazon_bedrock_model import AmazonBedrockModel
+        model = AmazonBedrockModel(
+            model_id=config["model"].get("name", "us.anthropic.claude-haiku-4-5-20251001-v1:0"),
+            region_name=config["model"].get("region", "us-east-1"),
+        )
     
     return [
         CustomMetric1(model=model),
@@ -278,3 +298,141 @@ if __name__ == "__main__":
 3. **Model Configuration**: Adjust model settings in config.yaml and metrics.py
 4. **Input/Output Paths**: Configure trace directories and output locations
 5. **Evaluation Parameters**: Choose appropriate `LLMTestCaseParams` for the proposed metrics
+
+---
+
+## Using kiro-cli as LLM Judge
+
+When the user requests kiro-cli as the evaluation judge (e.g., "use kiro", "kiro-cli as judge"), use this pattern instead of Bedrock/LiteLLM.
+
+### KiroModel Implementation
+
+```python
+# In eval/metrics.py
+import json
+import re
+import subprocess
+from typing import Optional
+
+from deepeval.metrics import GEval
+from deepeval.models import DeepEvalBaseLLM
+from deepeval.test_case import LLMTestCase, LLMTestCaseParams
+from pydantic import BaseModel
+
+
+class KiroModel(DeepEvalBaseLLM):
+    """Uses kiro-cli as the LLM judge for DeepEval metrics."""
+
+    def __init__(self, model: str = None):
+        """
+        Args:
+            model: Optional model name to pass to kiro-cli (e.g., "claude-sonnet-4-6").
+                   If None, uses kiro-cli's default (Auto).
+        """
+        self._model = model
+
+    def _call_kiro(self, prompt: str) -> str:
+        cmd = ["kiro-cli", "chat", "--no-interactive", "--trust-all-tools"]
+        if self._model:
+            cmd.extend(["--model", self._model])
+        cmd.append(prompt)
+
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        text = result.stdout.strip()
+        # Strip ANSI escape codes from kiro-cli output
+        return re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', text)
+
+    def _extract_json(self, text: str):
+        """Extract JSON object from kiro-cli output (may have tool chatter before it)."""
+        matches = re.findall(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text)
+        for m in reversed(matches):
+            try:
+                return json.loads(m)
+            except json.JSONDecodeError:
+                continue
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return None
+
+    def generate(self, prompt: str, schema: Optional[BaseModel] = None) -> str:
+        text = self._call_kiro(prompt)
+        if schema is None:
+            return text
+        data = self._extract_json(text)
+        if data:
+            try:
+                return schema.model_validate(data)
+            except Exception:
+                pass
+        return text
+
+    async def a_generate(self, prompt: str, schema: Optional[BaseModel] = None) -> str:
+        return self.generate(prompt, schema)
+
+    def get_model_name(self) -> str:
+        return f"kiro-cli" + (f"/{self._model}" if self._model else "")
+
+    def load_model(self):
+        return "kiro-cli"
+```
+
+### Configuration for kiro-cli Judge
+
+```yaml
+# In eval/config.yaml
+model:
+  provider: "kiro-cli"
+  # Optional: pin a specific model (omit for Auto)
+  # name: "claude-sonnet-4-6"
+
+evaluation:
+  metrics:
+    - "metric_name_1"
+    - "metric_name_2"
+  thresholds:
+    metric_name_1: 0.7
+    metric_name_2: 0.7
+```
+
+### Metric Factory with kiro-cli Support
+
+```python
+def get_metrics(config: dict = None) -> list[GEval]:
+    """Create metrics with the configured judge model."""
+    provider = "kiro-cli"
+    model_name = None
+
+    if config and "model" in config:
+        provider = config["model"].get("provider", "kiro-cli")
+        model_name = config["model"].get("name")
+
+    if provider == "kiro-cli":
+        model = KiroModel(model=model_name)
+    else:
+        # Bedrock fallback
+        from deepeval.models.llms.amazon_bedrock_model import AmazonBedrockModel
+        model = AmazonBedrockModel(
+            model_id=model_name or "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+            region_name=config["model"].get("region", "us-east-1"),
+        )
+
+    return [
+        GEval(name="My Metric", criteria="...", evaluation_params=[...], model=model, threshold=0.7),
+    ]
+```
+
+### Dependencies for kiro-cli Judge
+
+When using kiro-cli as judge, the only Python dependencies needed are:
+- `deepeval` (for GEval framework)
+- `pyyaml` (for config)
+
+No `litellm`, `boto3`, `aiobotocore`, or `botocore` required. `kiro-cli` must be installed and on PATH.
+
+### Key Notes
+
+- kiro-cli output includes tool-use chatter (file reads, globs) before the actual response. The `_extract_json` method handles this by searching for valid JSON in the output.
+- ANSI escape codes must be stripped from stdout.
+- Each GEval metric call invokes kiro-cli twice (once for evaluation steps generation, once for scoring), so expect ~10-15s per metric per test case.
+- To pin a model: `KiroModel(model="claude-sonnet-4-6")`. To use Auto: `KiroModel()`.

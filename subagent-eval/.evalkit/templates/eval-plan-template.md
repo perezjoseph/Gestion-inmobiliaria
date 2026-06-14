@@ -116,9 +116,9 @@ ACTION REQUIRED: The code structure below will be adjusted based on your evaluat
 | **Tracing Libraries**    | [e.g., Traceloop (default), Strands Telemetry (for Strands-based agents)]             |
 | **OTEL Infrastructure**  | [Local collector with file export (default)]           |
 | **Evaluation Libraries** | [e.g., DeepEval (default), RAGAS, Custom]              |
-| **LLM Service**          | [LiteLLM (default)]                                    |
-| **LLM Provider**         | [Bedrock (default)]                                    |
-| **LLM Model**            | [us.anthropic.claude-sonnet-4-20250514-v1:0 (default)] |
+| **LLM Service**          | [LiteLLM (default), or kiro-cli]                       |
+| **LLM Provider**         | [Bedrock (default), or kiro-cli]                       |
+| **LLM Model**            | [us.anthropic.claude-haiku-4-5-20251001-v1:0 (default), or kiro-cli (Auto)] |
 | **Agent Integration**    | [e.g., Direct import, API]                             |
 | **Results Storage**      | [e.g., JSON files (default)]                           |
 

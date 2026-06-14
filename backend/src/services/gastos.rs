@@ -192,12 +192,13 @@ pub async fn get_by_id(
     org_id: Uuid,
     id: Uuid,
 ) -> Result<GastoResponse, AppError> {
-    let record = gasto::Entity::find_by_id(id)
+    let (record, unidad) = gasto::Entity::find_by_id(id)
         .filter(gasto::Column::OrganizacionId.eq(org_id))
+        .find_also_related(unidad::Entity)
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Gasto no encontrado".to_string()))?;
-    Ok(GastoResponse::from(record))
+    Ok(GastoResponse::from_with_unidad(record, unidad))
 }
 
 pub async fn list(

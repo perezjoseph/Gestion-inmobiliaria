@@ -350,3 +350,87 @@ pub async fn delete<C: ConnectionTrait>(
 
     Ok(())
 }
+
+pub async fn resumen(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+    id: Uuid,
+) -> Result<crate::models::propiedad::PropiedadResumen, AppError> {
+    use crate::entities::{contrato, pago, solicitud_mantenimiento};
+    use crate::models::propiedad::{MantenimientoPorEstado, PropiedadResumen};
+    use sea_orm::sea_query::Expr;
+
+    // Verify property exists and belongs to org
+    propiedad::Entity::find_by_id(id)
+        .filter(propiedad::Column::OrganizacionId.eq(org_id))
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Propiedad no encontrada".to_string()))?;
+
+    // Count active contracts
+    let contratos_activos = contrato::Entity::find()
+        .filter(contrato::Column::PropiedadId.eq(id))
+        .filter(contrato::Column::OrganizacionId.eq(org_id))
+        .filter(contrato::Column::Estado.eq("activo"))
+        .count(db)
+        .await?;
+
+    // Sum pending payments in DOP for contracts of this property
+    #[derive(Debug, FromQueryResult)]
+    struct SumRow {
+        total: Option<rust_decimal::Decimal>,
+    }
+
+    let pending_dop = pago::Entity::find()
+        .select_only()
+        .column_as(Expr::col(pago::Column::Monto).sum(), "total")
+        .filter(pago::Column::OrganizacionId.eq(org_id))
+        .filter(pago::Column::Estado.is_in(["pendiente", "atrasado"]))
+        .filter(pago::Column::Moneda.eq("DOP"))
+        .filter(
+            pago::Column::ContratoId.in_subquery(
+                sea_orm::sea_query::Query::select()
+                    .column(contrato::Column::Id)
+                    .from(contrato::Entity)
+                    .and_where(Expr::col(contrato::Column::PropiedadId).eq(id))
+                    .and_where(Expr::col(contrato::Column::OrganizacionId).eq(org_id))
+                    .to_owned(),
+            ),
+        )
+        .into_model::<SumRow>()
+        .one(db)
+        .await?;
+
+    let pagos_pendientes_dop = pending_dop
+        .and_then(|r| r.total)
+        .unwrap_or(rust_decimal::Decimal::ZERO);
+
+    // Maintenance requests by status
+    let maint_records = solicitud_mantenimiento::Entity::find()
+        .filter(solicitud_mantenimiento::Column::PropiedadId.eq(id))
+        .filter(solicitud_mantenimiento::Column::OrganizacionId.eq(org_id))
+        .all(db)
+        .await?;
+
+    let mut pendiente = 0u64;
+    let mut en_progreso = 0u64;
+    let mut completado = 0u64;
+    for r in &maint_records {
+        match r.estado.as_str() {
+            "pendiente" => pendiente += 1,
+            "en_progreso" => en_progreso += 1,
+            "completado" => completado += 1,
+            _ => {}
+        }
+    }
+
+    Ok(PropiedadResumen {
+        contratos_activos,
+        pagos_pendientes_dop,
+        mantenimiento_por_estado: MantenimientoPorEstado {
+            pendiente,
+            en_progreso,
+            completado,
+        },
+    })
+}

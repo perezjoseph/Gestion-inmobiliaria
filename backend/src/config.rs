@@ -121,8 +121,8 @@ pub struct PoolConfig {
 impl Default for PoolConfig {
     fn default() -> Self {
         Self {
-            max_connections: 25,
-            min_connections: 5,
+            max_connections: 10,
+            min_connections: 2,
             connect_timeout_secs: 5,
             idle_timeout_secs: 300,
             max_lifetime_secs: 1800,

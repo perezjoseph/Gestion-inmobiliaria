@@ -75,3 +75,19 @@ pub struct PropiedadListQuery {
     pub precio_min: Option<Decimal>,
     pub precio_max: Option<Decimal>,
 }
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PropiedadResumen {
+    pub contratos_activos: u64,
+    pub pagos_pendientes_dop: Decimal,
+    pub mantenimiento_por_estado: MantenimientoPorEstado,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MantenimientoPorEstado {
+    pub pendiente: u64,
+    pub en_progreso: u64,
+    pub completado: u64,
+}

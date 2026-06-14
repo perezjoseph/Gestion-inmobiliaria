@@ -53,6 +53,7 @@ mod background_jobs_pbt;
 mod background_jobs_tests;
 mod chatbot_pbt;
 mod chatbot_self_message_pbt;
+mod contratos_overlap_cascade_tests;
 mod contratos_tests;
 mod deposit_tracking_pbt;
 mod deposit_tracking_tests;
