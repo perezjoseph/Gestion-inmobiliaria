@@ -43,6 +43,8 @@ spec:
               value: "0"
             - name: OCR_REC_BATCH_SIZE
               value: "16"
+            - name: OCR_DET_INPUT_SIZE
+              value: "640"
           resources:
             requests:
               cpu: 50m

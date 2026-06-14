@@ -103,7 +103,6 @@ pub async fn create<C: ConnectionTrait>(
         }
     }
 
-    // Utility field validation when categoria == "servicios"
     if input.categoria == "servicios" {
         if input.proveedor_servicio.is_none() {
             return Err(AppError::Validation(
@@ -175,7 +174,6 @@ pub async fn create<C: ConnectionTrait>(
     )
     .await;
 
-    // Best-effort anomaly detection for utility gastos
     if record.categoria == "servicios" {
         if let Err(e) =
             super::servicios_publicos::verificar_consumo_anormal(db, &record, organizacion_id).await

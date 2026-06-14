@@ -1,5 +1,3 @@
-/// Constant-time comparison of two byte slices.
-/// Always compares all bytes regardless of mismatch position.
 pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;

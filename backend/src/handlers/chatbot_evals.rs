@@ -1,7 +1,3 @@
-//! Eval API endpoints for the chatbot subsystem.
-//!
-//! All handlers are gated behind the `evals` feature flag.
-
 use actix_web::{HttpResponse, web};
 use sea_orm::DatabaseConnection;
 use serde::Deserialize;
@@ -14,10 +10,6 @@ use crate::models::chatbot::AgentConfig;
 use crate::services::ai_module::AiModule;
 use crate::services::ai_module::evals::{EvalRunConfig, EvalRunner, EvalSuite};
 use crate::services::chatbot_evals;
-
-// =============================================================================
-// Request / Response DTOs
-// =============================================================================
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -36,11 +28,6 @@ pub struct RunEvalRequest {
     pub concurrency: Option<usize>,
 }
 
-// =============================================================================
-// Handlers
-// =============================================================================
-
-/// GET `/api/v1/chatbot/evals/suites` — list eval suites for the requesting user's org.
 pub async fn list_suites(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,
@@ -49,7 +36,6 @@ pub async fn list_suites(
     Ok(HttpResponse::Ok().json(suites))
 }
 
-/// POST `/api/v1/chatbot/evals/suites` — create a new eval suite.
 pub async fn create_suite(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,
@@ -76,9 +62,6 @@ pub async fn create_suite(
     Ok(HttpResponse::Created().json(inserted))
 }
 
-/// POST `/api/v1/chatbot/evals/run` — run an eval suite.
-///
-/// Validates that the suite_id belongs to the requesting org before executing.
 pub async fn run_eval(
     db: web::Data<DatabaseConnection>,
     app_config: web::Data<AppConfig>,
@@ -88,10 +71,8 @@ pub async fn run_eval(
     let org_id = claims.0.organizacion_id;
     let request = body.into_inner();
 
-    // Validate suite exists and belongs to org
     let suite_model = chatbot_evals::find_suite(db.get_ref(), request.suite_id, org_id).await?;
 
-    // Parse cases from JSONB
     let cases: Vec<crate::services::ai_module::evals::EvalCase> =
         serde_json::from_value(suite_model.cases.clone()).map_err(|e| {
             AppError::Internal(anyhow::anyhow!("Error parseando casos del suite: {e}"))
@@ -116,12 +97,10 @@ pub async fn run_eval(
         agent_config_override: request.agent_config_override,
     };
 
-    // Build AI module
     let chatbot_env = &app_config.chatbot;
     let ai_module = AiModule::new(chatbot_env)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error inicializando AI module: {e}")))?;
 
-    // Create the run record with status "running"
     let run_id = Uuid::new_v4();
     let agent_config_snapshot = serde_json::to_value(
         eval_config
@@ -140,11 +119,9 @@ pub async fn run_eval(
     )
     .await?;
 
-    // Execute the eval suite
     let runner = EvalRunner::new(&ai_module, db.get_ref());
     let result = runner.run_suite(&suite, &eval_config).await;
 
-    // Update the run record with results
     let results_json = serde_json::to_value(&result.results).ok();
     let summary_json = serde_json::to_value(&result.summary).ok();
 
@@ -153,7 +130,6 @@ pub async fn run_eval(
     Ok(HttpResponse::Ok().json(result))
 }
 
-/// GET `/api/v1/chatbot/evals/runs` — list eval runs for the org.
 pub async fn list_runs(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,
@@ -162,7 +138,6 @@ pub async fn list_runs(
     Ok(HttpResponse::Ok().json(runs))
 }
 
-/// GET `/api/v1/chatbot/evals/runs/{id}` — get specific run results.
 pub async fn get_run(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,

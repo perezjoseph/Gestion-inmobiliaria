@@ -24,15 +24,12 @@ pub fn NotificationBell() -> Html {
     {
         let count = count.clone();
         use_effect_with((), move |()| {
-            // Initial fetch on mount
             fetch_count(count.clone());
 
-            // Poll every 60 seconds
             let interval = Interval::new(POLL_INTERVAL_MS, move || {
                 fetch_count(count.clone());
             });
 
-            // Cleanup: drop the interval when the component unmounts
             move || drop(interval)
         });
     }

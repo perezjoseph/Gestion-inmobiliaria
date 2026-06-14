@@ -48,7 +48,7 @@ pub fn Registro() -> Html {
                             </svg>
                         </div>
                         <h1 class="text-display" style="font-size: var(--text-xl); font-weight: 700; color: var(--color-primary-500);">
-                            {"Gestión Inmobiliaria"}
+                            {"GestiÃ³n Inmobiliaria"}
                         </h1>
                         <p style="font-size: var(--text-sm); color: var(--text-tertiary); margin-top: var(--space-1);">
                             {"Cree su cuenta para comenzar"}

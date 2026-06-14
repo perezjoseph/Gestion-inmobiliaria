@@ -15,10 +15,8 @@ const ALLOWED_TYPES: &[&str] = &[
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ];
 
-// ── Document type catalog per entity_type ──────────────────────────────
-
 pub const TIPOS_INQUILINO: &[(&str, &str)] = &[
-    ("cedula", "Cédula"),
+    ("cedula", "CÃ©dula"),
     ("comprobante_ingresos", "Comprobante de ingresos"),
     ("carta_referencia", "Carta de referencia"),
     ("contrato_trabajo", "Contrato de trabajo"),
@@ -26,11 +24,11 @@ pub const TIPOS_INQUILINO: &[(&str, &str)] = &[
 ];
 
 pub const TIPOS_PROPIEDAD: &[(&str, &str)] = &[
-    ("titulo_propiedad", "Título de propiedad"),
-    ("certificacion_no_gravamen", "Certificación de no gravamen"),
+    ("titulo_propiedad", "TÃ­tulo de propiedad"),
+    ("certificacion_no_gravamen", "CertificaciÃ³n de no gravamen"),
     ("plano_catastral", "Plano catastral"),
-    ("certificacion_uso_suelo", "Certificación de uso de suelo"),
-    ("poliza_seguro", "Póliza de seguro"),
+    ("certificacion_uso_suelo", "CertificaciÃ³n de uso de suelo"),
+    ("poliza_seguro", "PÃ³liza de seguro"),
 ];
 
 pub const TIPOS_CONTRATO: &[(&str, &str)] = &[
@@ -102,16 +100,12 @@ fn tipo_doc_label(tipo: &str, entity_type: &str) -> String {
         .map_or_else(|| tipo.replace('_', " "), |(_, label)| (*label).to_string())
 }
 
-// ── Props ──────────────────────────────────────────────────────────────
-
 #[derive(Properties, PartialEq, Eq)]
 pub struct DocumentGalleryProps {
     pub entity_type: String,
     pub entity_id: String,
     pub token: String,
 }
-
-// ── Main component ─────────────────────────────────────────────────────
 
 #[component]
 pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
@@ -125,7 +119,6 @@ pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
     let numero_documento = use_state(String::new);
     let digitalizing = use_state(|| false);
 
-    // Fetch documents on mount / entity change
     {
         let documents = documents.clone();
         let loading = loading.clone();
@@ -146,7 +139,6 @@ pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
         });
     }
 
-    // Filter documents client-side
     let filtered_docs: Vec<DocumentoResponse> = documents
         .iter()
         .filter(|d| {
@@ -165,7 +157,6 @@ pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
 
     let filtered_docs = Rc::new(filtered_docs);
 
-    // Upload handler
     let on_upload = {
         let documents = documents.clone();
         let error = error.clone();
@@ -183,7 +174,7 @@ pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
             let size = file.size() as u64;
             if size > MAX_FILE_SIZE {
                 error.set(Some(format!(
-                    "El archivo excede el tamaño máximo de {} MB.",
+                    "El archivo excede el tamaÃ±o mÃ¡ximo de {} MB.",
                     MAX_FILE_SIZE / (1024 * 1024)
                 )));
                 input.set_value("");
@@ -237,7 +228,6 @@ pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
         })
     };
 
-    // Digitalizar handler
     let on_digitalizar = {
         let error = error.clone();
         let digitalizing = digitalizing.clone();
@@ -261,7 +251,6 @@ pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
             spawn_local(async move {
                 match digitalizar_document(&entity_type, &entity_id, &token, file).await {
                     Ok(resp) => {
-                        // Navigate to editor with the digitalized content
                         if let Some(win) = web_sys::window() {
                             let url = format!(
                                 "/documentos/editor/{}/{}/{}",
@@ -360,8 +349,6 @@ pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
     }
 }
 
-// ── Sub-component: GalleryHeader ───────────────────────────────────────
-
 #[derive(Properties, PartialEq)]
 struct GalleryHeaderProps {
     uploading: bool,
@@ -419,8 +406,6 @@ fn GalleryHeader(props: &GalleryHeaderProps) -> Html {
     }
 }
 
-// ── Sub-component: UploadForm ──────────────────────────────────────────
-
 #[derive(Properties, PartialEq)]
 struct UploadFormProps {
     entity_type: AttrValue,
@@ -456,7 +441,7 @@ fn UploadForm(props: &UploadFormProps) -> Html {
             <div>
                 <label class="gi-label" style="font-size: var(--text-xs);">{"Tipo de documento"}</label>
                 <select onchange={on_tipo_select} class="gi-input" style="font-size: var(--text-xs); padding: var(--space-1) var(--space-2);">
-                    <option value="" selected={props.selected_tipo_doc.is_empty()}>{"— Seleccionar —"}</option>
+                    <option value="" selected={props.selected_tipo_doc.is_empty()}>{"â€” Seleccionar â€”"}</option>
                     { for tipos.iter().map(|(val, label)| {
                         html! {
                             <option value={*val} selected={props.selected_tipo_doc == *val}>{label}</option>
@@ -466,7 +451,7 @@ fn UploadForm(props: &UploadFormProps) -> Html {
             </div>
             if show_numero {
                 <div>
-                    <label class="gi-label" style="font-size: var(--text-xs);">{"Número NCF"}</label>
+                    <label class="gi-label" style="font-size: var(--text-xs);">{"NÃºmero NCF"}</label>
                     <input
                         type="text"
                         class="gi-input"
@@ -480,8 +465,6 @@ fn UploadForm(props: &UploadFormProps) -> Html {
         </div>
     }
 }
-
-// ── Sub-component: FilterBar ───────────────────────────────────────────
 
 #[derive(Properties, PartialEq)]
 struct FilterBarProps {
@@ -539,8 +522,6 @@ fn FilterBar(props: &FilterBarProps) -> Html {
     }
 }
 
-// ── Sub-component: DocumentGrid ────────────────────────────────────────
-
 #[derive(Properties, PartialEq)]
 struct DocumentGridProps {
     documents: Rc<Vec<DocumentoResponse>>,
@@ -569,8 +550,6 @@ fn DocumentGrid(props: &DocumentGridProps) -> Html {
     }
 }
 
-// ── Sub-component: DocumentCard ────────────────────────────────────────
-
 #[derive(Properties, PartialEq)]
 struct DocumentCardProps {
     doc: DocumentoResponse,
@@ -596,7 +575,6 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
         props.entity_type, props.entity_id, doc.id
     );
 
-    // Authenticated blob fetch: load the protected file and create an object URL
     let blob_url = use_state(|| Option::<String>::None);
     {
         let blob_url = blob_url.clone();
@@ -654,7 +632,6 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
         })
     };
 
-    // For downloads/links, use the authenticated file_path (will open via blob or direct)
     let download_url = file_path;
 
     html! {
@@ -714,13 +691,13 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
             </div>
             <div class="gi-doc-card-actions">
                 if *confirm_delete {
-                    <span class="text-xs text-[var(--text-secondary)]">{"¿Eliminar?"}</span>
+                    <span class="text-xs text-[var(--text-secondary)]">{"Â¿Eliminar?"}</span>
                     <button
                         class="gi-btn gi-btn-sm gi-btn-danger"
                         style="font-size: var(--text-xs);"
                         onclick={on_confirm_delete}
                     >
-                        {"Sí"}
+                        {"SÃ­"}
                     </button>
                     <button
                         class="gi-btn gi-btn-sm gi-btn-secondary"
@@ -759,10 +736,6 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
     }
 }
 
-// ── API functions ──────────────────────────────────────────────────────
-
-/// Fetches a protected file with an Authorization header, builds a Blob, and
-/// returns an object URL suitable for use as an `<img>`/`<embed>` `src`.
 #[allow(clippy::future_not_send)]
 async fn fetch_blob_url(path: &str, token: &str) -> Result<String, String> {
     let response = Request::get(path)
@@ -838,7 +811,7 @@ async fn upload_document(
     if !numero_documento.is_empty() {
         form_data
             .append_with_str("numero_documento", numero_documento)
-            .map_err(|_| "Error al agregar número de documento".to_string())?;
+            .map_err(|_| "Error al agregar nÃºmero de documento".to_string())?;
     }
 
     let url = format!("{BASE_URL}/documentos/{entity_type}/{entity_id}");

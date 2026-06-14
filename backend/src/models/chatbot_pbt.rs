@@ -1,16 +1,8 @@
-//! Property-based tests for `AgentConfig::resolve()`.
-//!
-//! Feature: native-rig-agent-guardrails, Property 7: AgentConfig Resolution Validity
-//! **Validates: Requirements 6.2, 6.3, 6.4, 6.5, 6.6, 6.7**
-
 use proptest::prelude::*;
 use proptest::test_runner::{Config as ProptestConfig, TestRunner};
 
 use super::chatbot::{AgentConfig, GuardrailOverrides, ToolRegistrationStrategy};
 
-// ── Custom Strategies ──────────────────────────────────────────────────
-
-/// Generate an arbitrary `ToolRegistrationStrategy`.
 fn arb_tool_registration_strategy() -> impl Strategy<Value = ToolRegistrationStrategy> {
     prop_oneof![
         Just(ToolRegistrationStrategy::Selective),
@@ -18,7 +10,6 @@ fn arb_tool_registration_strategy() -> impl Strategy<Value = ToolRegistrationStr
     ]
 }
 
-/// Generate arbitrary `GuardrailOverrides`.
 fn arb_guardrail_overrides() -> impl Strategy<Value = GuardrailOverrides> {
     (
         prop::option::of(any::<f64>()),
@@ -36,7 +27,6 @@ fn arb_guardrail_overrides() -> impl Strategy<Value = GuardrailOverrides> {
         )
 }
 
-/// Generate an arbitrary `AgentConfig` with full range of possible values.
 fn arb_agent_config() -> impl Strategy<Value = AgentConfig> {
     (
         prop::option::of(any::<u8>()),
@@ -56,13 +46,6 @@ fn arb_agent_config() -> impl Strategy<Value = AgentConfig> {
         )
 }
 
-// ── Property Tests ─────────────────────────────────────────────────────
-
-// Feature: native-rig-agent-guardrails, Property 7: AgentConfig Resolution Validity
-// **Validates: Requirements 6.2, 6.3, 6.4, 6.5, 6.6, 6.7**
-
-/// Property 7.1: resolved.max_turns is always in range 1–15.
-/// **Validates: Requirements 6.2, 6.3**
 #[test]
 fn agent_config_resolve_max_turns_always_in_range() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -84,8 +67,6 @@ fn agent_config_resolve_max_turns_always_in_range() {
         .unwrap();
 }
 
-/// Property 7.2: If config.max_turns is None, resolved is 5.
-/// **Validates: Requirements 6.3**
 #[test]
 fn agent_config_resolve_max_turns_defaults_to_5() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -93,7 +74,6 @@ fn agent_config_resolve_max_turns_defaults_to_5() {
         ..Default::default()
     });
 
-    // Generate configs where max_turns is always None
     let strategy = arb_agent_config().prop_map(|mut config| {
         config.max_turns = None;
         config
@@ -112,8 +92,6 @@ fn agent_config_resolve_max_turns_defaults_to_5() {
         .unwrap();
 }
 
-/// Property 7.3: resolved.temperature is always None or within 0.0–2.0.
-/// **Validates: Requirements 6.4, 6.5**
 #[test]
 fn agent_config_resolve_temperature_always_valid_or_none() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -130,15 +108,13 @@ fn agent_config_resolve_temperature_always_valid_or_none() {
                     "temperature {} is outside range 0.0–2.0",
                     t
                 ),
-                None => {} // None is always valid
+                None => {}
             }
             Ok(())
         })
         .unwrap();
 }
 
-/// Property 7.4: If config.temperature is Some but outside 0.0–2.0, resolved is None.
-/// **Validates: Requirements 6.5**
 #[test]
 fn agent_config_resolve_temperature_outside_range_becomes_none() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -146,13 +122,9 @@ fn agent_config_resolve_temperature_outside_range_becomes_none() {
         ..Default::default()
     });
 
-    // Generate configs with temperature outside valid range
     let strategy = arb_agent_config().prop_flat_map(|config| {
-        // Generate f64 values that are outside 0.0..=2.0
         prop_oneof![
-            // Negative values
             (-1000.0f64..0.0f64).prop_map(|t| t - f64::EPSILON),
-            // Values above 2.0
             (2.0f64..1000.0f64).prop_map(|t| t + f64::EPSILON),
         ]
         .prop_map(move |temp| {
@@ -176,8 +148,6 @@ fn agent_config_resolve_temperature_outside_range_becomes_none() {
         .unwrap();
 }
 
-/// Property 7.5: resolved.max_tokens is always None or within 1–4096.
-/// **Validates: Requirements 6.6, 6.7**
 #[test]
 fn agent_config_resolve_max_tokens_always_valid_or_none() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -194,15 +164,13 @@ fn agent_config_resolve_max_tokens_always_valid_or_none() {
                     "max_tokens {} is outside range 1–4096",
                     t
                 ),
-                None => {} // None is always valid
+                None => {}
             }
             Ok(())
         })
         .unwrap();
 }
 
-/// Property 7.6: If config.max_tokens is Some but outside 1–4096, resolved is None.
-/// **Validates: Requirements 6.7**
 #[test]
 fn agent_config_resolve_max_tokens_outside_range_becomes_none() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -210,15 +178,8 @@ fn agent_config_resolve_max_tokens_outside_range_becomes_none() {
         ..Default::default()
     });
 
-    // Generate configs with max_tokens outside valid range
     let strategy = arb_agent_config().prop_flat_map(|config| {
-        prop_oneof![
-            // Zero (below minimum)
-            Just(0u64),
-            // Above maximum
-            (4097u64..=u64::MAX),
-        ]
-        .prop_map(move |tokens| {
+        prop_oneof![Just(0u64), (4097u64..=u64::MAX),].prop_map(move |tokens| {
             let mut c = config.clone();
             c.max_tokens = Some(tokens);
             c
@@ -239,8 +200,6 @@ fn agent_config_resolve_max_tokens_outside_range_becomes_none() {
         .unwrap();
 }
 
-/// Property 7.7: resolved.tool_registration defaults to Selective when None.
-/// **Validates: Requirements 6.2**
 #[test]
 fn agent_config_resolve_tool_registration_defaults_to_selective() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -248,7 +207,6 @@ fn agent_config_resolve_tool_registration_defaults_to_selective() {
         ..Default::default()
     });
 
-    // Generate configs where tool_registration is always None
     let strategy = arb_agent_config().prop_map(|mut config| {
         config.tool_registration = None;
         config

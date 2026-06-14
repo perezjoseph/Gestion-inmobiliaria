@@ -1,0 +1,408 @@
+{
+    "annotations": {
+        "list": [
+            {
+                "builtIn": 1,
+                "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+                "enable": true,
+                "hide": true,
+                "iconColor": "rgba(0, 211, 255, 1)",
+                "name": "Annotations & Alerts",
+                "type": "dashboard"
+            }
+        ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "id": null,
+    "links": [],
+    "panels": [
+        {
+            "collapsed": false,
+            "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+            "id": 1,
+            "title": "Resumen",
+            "type": "row"
+        },
+        {
+            "datasource": { "type": "prometheus", "uid": "${datasource}" },
+            "fieldConfig": {
+                "defaults": {
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            { "color": "green", "value": null },
+                            { "color": "yellow", "value": 0.5 },
+                            { "color": "red", "value": 2 }
+                        ]
+                    },
+                    "unit": "s"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+            "id": 2,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+                "textMode": "auto"
+            },
+            "title": "P95 Latency",
+            "type": "stat",
+            "targets": [
+                {
+                    "datasource": { "type": "prometheus", "uid": "${datasource}" },
+                    "expr": "histogram_quantile(0.95, sum(rate(api_http_requests_duration_seconds_bucket{job=\"backend\", environment=\"$environment\"}[5m])) by (le))",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "datasource": { "type": "prometheus", "uid": "${datasource}" },
+            "fieldConfig": {
+                "defaults": {
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            { "color": "green", "value": null },
+                            { "color": "yellow", "value": 1 },
+                            { "color": "red", "value": 5 }
+                        ]
+                    },
+                    "unit": "percent"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+            "id": 3,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+                "textMode": "auto"
+            },
+            "title": "Error Rate %",
+            "type": "stat",
+            "targets": [
+                {
+                    "datasource": { "type": "prometheus", "uid": "${datasource}" },
+                    "expr": "sum(rate(api_http_requests_total{job=\"backend\", environment=\"$environment\", status=~\"5..\"}[5m])) / sum(rate(api_http_requests_total{job=\"backend\", environment=\"$environment\"}[5m])) * 100",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "datasource": { "type": "prometheus", "uid": "${datasource}" },
+            "fieldConfig": {
+                "defaults": {
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            { "color": "green", "value": null },
+                            { "color": "yellow", "value": 3 },
+                            { "color": "red", "value": 10 }
+                        ]
+                    },
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+            "id": 4,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+                "textMode": "auto"
+            },
+            "title": "Pod Restarts (24h)",
+            "type": "stat",
+            "targets": [
+                {
+                    "datasource": { "type": "prometheus", "uid": "${datasource}" },
+                    "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=~\"realestate|realestate-dev\", container=\"backend\"}[24h]))",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "datasource": { "type": "prometheus", "uid": "${datasource}" },
+            "fieldConfig": {
+                "defaults": {
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            { "color": "green", "value": null }
+                        ]
+                    },
+                    "unit": "reqps"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+            "id": 5,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+                "textMode": "auto"
+            },
+            "title": "Request Rate",
+            "type": "stat",
+            "targets": [
+                {
+                    "datasource": { "type": "prometheus", "uid": "${datasource}" },
+                    "expr": "sum(rate(api_http_requests_total{job=\"backend\", environment=\"$environment\"}[5m]))",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "collapsed": false,
+            "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+            "id": 10,
+            "title": "Latencia",
+            "type": "row"
+        },
+        {
+            "datasource": { "type": "prometheus", "uid": "${datasource}" },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
+                    "unit": "s"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+            "id": 11,
+            "options": {
+                "legend": { "displayMode": "list", "placement": "bottom" },
+                "tooltip": { "mode": "multi", "sort": "desc" }
+            },
+            "title": "Latency Percentiles (P50 / P95 / P99)",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "datasource": { "type": "prometheus", "uid": "${datasource}" },
+                    "expr": "histogram_quantile(0.5, sum(rate(api_http_requests_duration_seconds_bucket{job=\"backend\", environment=\"$environment\"}[5m])) by (le))",
+                    "legendFormat": "P50",
+                    "refId": "A"
+                },
+                {
+                    "datasource": { "type": "prometheus", "uid": "${datasource}" },
+                    "expr": "histogram_quantile(0.95, sum(rate(api_http_requests_duration_seconds_bucket{job=\"backend\", environment=\"$environment\"}[5m])) by (le))",
+                    "legendFormat": "P95",
+                    "refId": "B"
+                },
+                {
+                    "datasource": { "type": "prometheus", "uid": "${datasource}" },
+                    "expr": "histogram_quantile(0.99, sum(rate(api_http_requests_duration_seconds_bucket{job=\"backend\", environment=\"$environment\"}[5m])) by (le))",
+                    "legendFormat": "P99",
+                    "refId": "C"
+                }
+            ]
+        },
+        {
+            "datasource": { "type": "prometheus", "uid": "${datasource}" },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
+                    "unit": "s"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+            "id": 12,
+            "options": {
+                "legend": { "displayMode": "list", "placement": "bottom" },
+                "tooltip": { "mode": "multi", "sort": "desc" }
+            },
+            "title": "P95 Latency by Endpoint (Top 5)",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "datasource": { "type": "prometheus", "uid": "${datasource}" },
+                    "expr": "topk(5, histogram_quantile(0.95, sum(rate(api_http_requests_duration_seconds_bucket{job=\"backend\", environment=\"$environment\"}[5m])) by (le, endpoint)))",
+                    "legendFormat": "{{endpoint}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "collapsed": false,
+            "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+            "id": 20,
+            "title": "Tasa de Errores",
+            "type": "row"
+        },
+        {
+            "datasource": { "type": "prometheus", "uid": "${datasource}" },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2, "showPoints": "never" },
+                    "unit": "percent"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+            "id": 21,
+            "options": {
+                "legend": { "displayMode": "list", "placement": "bottom" },
+                "tooltip": { "mode": "multi", "sort": "desc" }
+            },
+            "title": "Error Rate % Over Time",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "datasource": { "type": "prometheus", "uid": "${datasource}" },
+                    "expr": "sum(rate(api_http_requests_total{job=\"backend\", environment=\"$environment\", status=~\"5..\"}[5m])) / sum(rate(api_http_requests_total{job=\"backend\", environment=\"$environment\"}[5m])) * 100",
+                    "legendFormat": "5xx Error Rate",
+                    "refId": "A"
+                },
+                {
+                    "datasource": { "type": "prometheus", "uid": "${datasource}" },
+                    "expr": "sum(rate(api_http_requests_total{job=\"backend\", environment=\"$environment\", status=~\"4..\"}[5m])) / sum(rate(api_http_requests_total{job=\"backend\", environment=\"$environment\"}[5m])) * 100",
+                    "legendFormat": "4xx Client Error Rate",
+                    "refId": "B"
+                }
+            ]
+        },
+        {
+            "datasource": { "type": "prometheus", "uid": "${datasource}" },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 1, "showPoints": "never", "stacking": { "mode": "normal" } },
+                    "unit": "reqps"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+            "id": 22,
+            "options": {
+                "legend": { "displayMode": "list", "placement": "bottom" },
+                "tooltip": { "mode": "multi", "sort": "desc" }
+            },
+            "title": "5xx Errors by Endpoint",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "datasource": { "type": "prometheus", "uid": "${datasource}" },
+                    "expr": "sum(rate(api_http_requests_total{job=\"backend\", environment=\"$environment\", status=~\"5..\"}[5m])) by (endpoint) > 0",
+                    "legendFormat": "{{endpoint}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "collapsed": false,
+            "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+            "id": 30,
+            "title": "Pod Restarts",
+            "type": "row"
+        },
+        {
+            "datasource": { "type": "prometheus", "uid": "${datasource}" },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "auto" },
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+            "id": 31,
+            "options": {
+                "legend": { "displayMode": "list", "placement": "bottom" },
+                "tooltip": { "mode": "multi", "sort": "desc" }
+            },
+            "title": "Container Restarts Over Time",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "datasource": { "type": "prometheus", "uid": "${datasource}" },
+                    "expr": "increase(kube_pod_container_status_restarts_total{namespace=~\"realestate|realestate-dev\", container=\"backend\"}[1h])",
+                    "legendFormat": "{{pod}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "datasource": { "type": "prometheus", "uid": "${datasource}" },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": { "filterable": true },
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+            "id": 32,
+            "options": {
+                "showHeader": true,
+                "sortBy": [{ "desc": true, "displayName": "Restarts" }]
+            },
+            "title": "Pod Restart Count (Last 24h)",
+            "type": "table",
+            "targets": [
+                {
+                    "datasource": { "type": "prometheus", "uid": "${datasource}" },
+                    "expr": "increase(kube_pod_container_status_restarts_total{namespace=~\"realestate|realestate-dev\", container=\"backend\"}[24h]) > 0",
+                    "format": "table",
+                    "instant": true,
+                    "refId": "A"
+                }
+            ],
+            "transformations": [
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": { "Time": true, "__name__": true, "uid": true, "job": true, "instance": true },
+                        "renameByName": { "pod": "Pod", "namespace": "Namespace", "container": "Container", "Value": "Restarts" }
+                    }
+                }
+            ]
+        }
+    ],
+    "refresh": "30s",
+    "schemaVersion": 39,
+    "tags": ["backend", "health", "application"],
+    "templating": {
+        "list": [
+            {
+                "current": {},
+                "hide": 0,
+                "includeAll": false,
+                "label": "Datasource",
+                "multi": false,
+                "name": "datasource",
+                "options": [],
+                "query": "prometheus",
+                "refresh": 1,
+                "type": "datasource"
+            },
+            {
+                "current": { "selected": true, "text": "production", "value": "production" },
+                "hide": 0,
+                "includeAll": false,
+                "label": "Environment",
+                "multi": false,
+                "name": "environment",
+                "options": [
+                    { "selected": true, "text": "production", "value": "production" },
+                    { "selected": false, "text": "development", "value": "development" }
+                ],
+                "query": "production,development",
+                "type": "custom"
+            }
+        ]
+    },
+    "time": { "from": "now-1h", "to": "now" },
+    "timepicker": {},
+    "timezone": "",
+    "title": "Backend Service Health",
+    "uid": "backend-health",
+    "version": 1,
+    "weekStart": ""
+}

@@ -12,7 +12,6 @@ pub struct ResponsabilidadEfectivaResponse {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateResponsabilidadRequest {
     pub responsabilidades: Vec<ResponsabilidadItem>,
-    /// Required for contract-level updates to identify the unit.
     pub unidad_id: Option<uuid::Uuid>,
 }
 

@@ -8,14 +8,12 @@ use crate::models::dgii::{
     DgiiConsultaResponse, DgiiNombreItem, DgiiNombreResponse, MegaplusApiResponse,
 };
 
-/// Normalize an RNC/cédula: strip dashes, spaces, and trim.
 fn normalize_rnc(rnc: &str) -> String {
     rnc.chars()
         .filter(|c| !c.is_whitespace() && *c != '-')
         .collect::<String>()
 }
 
-/// Validate that a normalized RNC is 9 digits (RNC) or 11 digits (cédula).
 fn validate_rnc(normalized: &str) -> Result<(), AppError> {
     let len = normalized.len();
     if len != 9 && len != 11 {
@@ -26,12 +24,10 @@ fn validate_rnc(normalized: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Get the base URL for the DGII/megaplus API.
 fn get_base_url() -> String {
     std::env::var("DGII_API_BASE_URL").unwrap_or_else(|_| "https://rnc.megaplus.com.do".to_string())
 }
 
-/// Build a reqwest client with 10s timeout.
 fn build_client() -> Result<reqwest::Client, AppError> {
     reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
@@ -39,7 +35,6 @@ fn build_client() -> Result<reqwest::Client, AppError> {
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error creando HTTP client: {e}")))
 }
 
-/// Lookup RNC/cédula with cache-first strategy (24h TTL).
 pub async fn consultar_rnc(
     db: &DatabaseConnection,
     organizacion_id: Uuid,
@@ -50,7 +45,6 @@ pub async fn consultar_rnc(
 
     let now = Utc::now().fixed_offset();
 
-    // Check cache for non-expired entry
     let cached = cache_dgii::Entity::find()
         .filter(cache_dgii::Column::CedulaRnc.eq(&normalized))
         .filter(cache_dgii::Column::OrganizacionId.eq(organizacion_id))
@@ -70,7 +64,6 @@ pub async fn consultar_rnc(
         });
     }
 
-    // Cache miss — call megaplus API
     let base_url = get_base_url();
     let client = build_client()?;
     let url = format!("{base_url}/api/rnc?rnc={normalized}");
@@ -80,7 +73,6 @@ pub async fn consultar_rnc(
     match api_result {
         Ok(response) => {
             if !response.status().is_success() {
-                // API returned an error status — try stale cache
                 return try_stale_cache_or_error(db, organizacion_id, &normalized).await;
             }
 
@@ -88,7 +80,6 @@ pub async fn consultar_rnc(
                 AppError::Internal(anyhow::anyhow!("Error parseando respuesta DGII: {e}"))
             })?;
 
-            // Extract fields from data
             let data = api_response.data.ok_or_else(|| {
                 AppError::NotFound("RNC/cédula no encontrado en DGII".to_string())
             })?;
@@ -121,11 +112,9 @@ pub async fn consultar_rnc(
                 .and_then(|v| v.as_str())
                 .map(std::string::ToString::to_string);
 
-            // Upsert cache
             let cached_at = Utc::now().fixed_offset();
             let expires_at = cached_at + chrono::Duration::hours(24);
 
-            // Check if entry already exists (expired)
             let existing = cache_dgii::Entity::find()
                 .filter(cache_dgii::Column::CedulaRnc.eq(&normalized))
                 .filter(cache_dgii::Column::OrganizacionId.eq(organizacion_id))
@@ -180,7 +169,6 @@ pub async fn consultar_rnc(
     }
 }
 
-/// Graceful degradation: return stale cache if available, otherwise error.
 async fn try_stale_cache_or_error(
     db: &DatabaseConnection,
     organizacion_id: Uuid,
@@ -214,7 +202,6 @@ async fn try_stale_cache_or_error(
     }
 }
 
-/// Lookup by name — proxy to megaplus name search API (no caching).
 pub async fn consultar_nombre(buscar: &str) -> Result<DgiiNombreResponse, AppError> {
     let base_url = get_base_url();
     let client = build_client()?;
@@ -237,7 +224,6 @@ pub async fn consultar_nombre(buscar: &str) -> Result<DgiiNombreResponse, AppErr
         .await
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error parseando respuesta DGII: {e}")))?;
 
-    // Parse the response into Vec<DgiiNombreItem>
     let items = body
         .get("data")
         .and_then(|d| d.as_array())
@@ -266,7 +252,6 @@ pub async fn consultar_nombre(buscar: &str) -> Result<DgiiNombreResponse, AppErr
     Ok(DgiiNombreResponse { resultados: items })
 }
 
-/// Invalidate a specific cache entry by `cedula_rnc` + `organizacion_id`.
 pub async fn invalidar_cache(
     db: &DatabaseConnection,
     organizacion_id: Uuid,
@@ -283,8 +268,6 @@ pub async fn invalidar_cache(
     Ok(())
 }
 
-/// Best-effort validation of inquilino cédula against DGII.
-/// Returns Some on success, None on any error. Never errors.
 pub async fn validar_cedula_inquilino<C: sea_orm::ConnectionTrait>(
     db: &C,
     organizacion_id: Uuid,
@@ -297,7 +280,6 @@ pub async fn validar_cedula_inquilino<C: sea_orm::ConnectionTrait>(
 
     let now = Utc::now().fixed_offset();
 
-    // Check cache for non-expired entry
     let cached = cache_dgii::Entity::find()
         .filter(cache_dgii::Column::CedulaRnc.eq(&normalized))
         .filter(cache_dgii::Column::OrganizacionId.eq(organizacion_id))

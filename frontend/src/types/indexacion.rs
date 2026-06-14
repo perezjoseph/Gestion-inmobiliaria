@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::deserialize_f64_from_any;
 
-/// Contrato próximo a vencer, recibido de GET /api/v1/indexacion/proximos-vencer.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ContratoProximoVencer {
@@ -16,7 +15,6 @@ pub struct ContratoProximoVencer {
     pub dias_restantes: i32,
 }
 
-/// Propuesta de renovación, recibida de GET /`api/v1/indexacion/propuesta/{contrato_id`}.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PropuestaRenovacion {
@@ -31,7 +29,6 @@ pub struct PropuestaRenovacion {
     pub datos_stale: bool,
 }
 
-/// Request body para POST /`api/v1/indexacion/aprobar/{contrato_id`}.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AprobarRenovacionRequest {

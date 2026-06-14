@@ -9,7 +9,6 @@ use crate::middleware::rbac::WriteAccess;
 use crate::models::ipi::ConfiguracionIpiRequest;
 use crate::services::ipi;
 
-/// Request body for creating a co-owner record.
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CrearCopropietarioRequest {
@@ -19,7 +18,6 @@ pub struct CrearCopropietarioRequest {
     pub porcentaje_propiedad: Decimal,
 }
 
-/// GET /api/v1/ipi/calculo — compute IPI liability for the organization.
 pub async fn calcular_ipi_handler(
     db: web::Data<DatabaseConnection>,
     user: WriteAccess,
@@ -29,7 +27,6 @@ pub async fn calcular_ipi_handler(
     Ok(HttpResponse::Ok().json(result))
 }
 
-/// PUT /api/v1/ipi/umbral — update the IPI threshold configuration for the org.
 pub async fn actualizar_umbral(
     db: web::Data<DatabaseConnection>,
     user: WriteAccess,
@@ -40,7 +37,6 @@ pub async fn actualizar_umbral(
     Ok(HttpResponse::Ok().json(result))
 }
 
-/// List co-owners for a property.
 pub async fn listar_copropietarios(
     db: web::Data<DatabaseConnection>,
     _user: WriteAccess,
@@ -51,7 +47,6 @@ pub async fn listar_copropietarios(
     Ok(HttpResponse::Ok().json(result))
 }
 
-/// POST /api/v1/ipi/copropietarios — add a co-owner to a property.
 pub async fn crear_copropietario(
     db: web::Data<DatabaseConnection>,
     user: WriteAccess,

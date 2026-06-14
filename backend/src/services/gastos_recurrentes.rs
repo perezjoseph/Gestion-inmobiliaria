@@ -292,9 +292,6 @@ pub async fn delete<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Generates gastos from active recurring templates whose `proxima_fecha` <= today.
-/// Advances `proxima_fecha` after generating each gasto.
-/// Called by the background scheduler.
 pub async fn generar_gastos_pendientes(db: &DatabaseConnection) -> Result<i64, AppError> {
     let today = Utc::now().date_naive();
 
@@ -341,7 +338,6 @@ pub async fn generar_gastos_pendientes(db: &DatabaseConnection) -> Result<i64, A
 
         nuevo_gasto.insert(db).await?;
 
-        // Advance proxima_fecha
         let next = calcular_proxima_fecha(template.proxima_fecha, &template.frecuencia);
         let mut active: gasto_recurrente::ActiveModel = template.into();
         active.proxima_fecha = Set(next);
@@ -354,7 +350,6 @@ pub async fn generar_gastos_pendientes(db: &DatabaseConnection) -> Result<i64, A
     Ok(count)
 }
 
-/// Calculates the next date based on frequency.
 fn calcular_proxima_fecha(current: NaiveDate, frecuencia: &str) -> NaiveDate {
     match frecuencia {
         "mensual" => advance_months(current, 1),

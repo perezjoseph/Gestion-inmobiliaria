@@ -55,7 +55,7 @@ pub fn Invitaciones() -> Html {
     if !is_admin {
         return html! {
             <div class="gi-empty-state">
-                <div class="gi-empty-state-title">{"No tiene permisos para acceder a esta sección"}</div>
+                <div class="gi-empty-state-title">{"No tiene permisos para acceder a esta secciÃ³n"}</div>
             </div>
         };
     }
@@ -95,7 +95,7 @@ pub fn Invitaciones() -> Html {
         <div>
             <div class="gi-page-header">
                 <h1 class="gi-page-title">{"Invitaciones"}</h1>
-                <button class="gi-btn gi-btn-primary">{"Crear Invitación"}</button>
+                <button class="gi-btn gi-btn-primary">{"Crear InvitaciÃ³n"}</button>
             </div>
 
             if let Some(err) = (*error).as_ref() {
@@ -107,7 +107,7 @@ pub fn Invitaciones() -> Html {
             if (*items).is_empty() {
                 <div class="gi-empty-state">
                     <div class="gi-empty-state-title">{"Sin invitaciones"}</div>
-                    <p class="gi-empty-state-text">{"Las invitaciones enviadas aparecerán aquí."}</p>
+                    <p class="gi-empty-state-text">{"Las invitaciones enviadas aparecerÃ¡n aquÃ­."}</p>
                 </div>
             } else {
                 <DataTable headers={headers}>

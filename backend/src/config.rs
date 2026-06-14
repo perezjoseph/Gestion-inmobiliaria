@@ -90,11 +90,6 @@ impl ChatbotEnvConfig {
         })
     }
 
-    /// Returns a `ChatbotEnvConfig` populated with deterministic defaults for tests.
-    ///
-    /// Matches the production defaults so unit and integration tests behave the
-    /// same as a fresh deployment without any custom env vars. Use this anywhere
-    /// you previously wrote out the struct literal by hand.
     #[doc(hidden)]
     pub fn for_testing() -> Self {
         Self {
@@ -290,7 +285,6 @@ mod tests {
         }
     }
 
-    /// Sets the minimum env vars needed for chatbot config to pass validation.
     #[allow(unsafe_code)]
     unsafe fn set_chatbot_env_vars() {
         unsafe {
@@ -336,7 +330,6 @@ mod tests {
             set_chatbot_env_vars();
         }
 
-        // dotenvy may load SERVER_PORT from .env; just verify it parses successfully
         let config = AppConfig::from_env().unwrap();
         assert!(config.server_port > 0);
 
@@ -457,8 +450,6 @@ mod tests {
 
     #[test]
     fn for_testing_matches_production_defaults() {
-        // The test helper exists to deduplicate fixtures, but it must keep behaving
-        // like a fresh deployment so unit tests don't drift from real defaults.
         let cfg = ChatbotEnvConfig::for_testing();
 
         assert_eq!(cfg.baileys_service_url, "http://baileys:3100");

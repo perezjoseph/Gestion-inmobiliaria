@@ -2,9 +2,6 @@ import pino from 'pino';
 
 const logger = pino({ name: 'baileys-reconnect' });
 
-/**
- * Connection states matching the design document state machine.
- */
 export type ConnectionStatus =
   | 'disconnected'
   | 'qr_pending'
@@ -12,10 +9,6 @@ export type ConnectionStatus =
   | 'reconnecting'
   | 'logged_out';
 
-/**
- * Baileys DisconnectReason codes.
- * Reference: @whiskeysockets/baileys DisconnectReason enum.
- */
 export const DisconnectReason = {
   connectionClosed: 428,
   connectionLost: 408,
@@ -27,21 +20,12 @@ export const DisconnectReason = {
   badSession: 500,
 } as const;
 
-/**
- * Configuration for the reconnect strategy.
- */
 export interface ReconnectConfig {
-  /** Initial backoff delay in milliseconds. Default: 2000 */
   initialDelayMs: number;
-  /** Maximum backoff delay in milliseconds. Default: 60000 */
   maxDelayMs: number;
-  /** Maximum number of reconnection attempts. Default: 5 */
   maxAttempts: number;
-  /** Maximum QR regeneration attempts before giving up. Default: 3 */
   maxQrRetries: number;
-  /** Backend webhook URL for status notifications */
   backendWebhookUrl: string;
-  /** Internal token for authenticating with the backend */
   internalToken: string;
 }
 
@@ -52,40 +36,21 @@ const DEFAULT_CONFIG: Omit<ReconnectConfig, 'backendWebhookUrl' | 'internalToken
   maxQrRetries: 3,
 };
 
-/**
- * Tracks reconnection state for a single session.
- */
 export interface ReconnectState {
-  /** Current number of reconnection attempts */
   attempts: number;
-  /** Current number of QR regeneration attempts */
   qrRetries: number;
-  /** Whether a reconnection is currently in progress */
   isReconnecting: boolean;
-  /** Current connection status */
   status: ConnectionStatus;
-  /** Timer handle for pending reconnect delay */
   reconnectTimer: ReturnType<typeof setTimeout> | null;
 }
 
-/**
- * Callback interface for the session manager to implement.
- * The reconnect handler calls these to trigger actual Baileys operations.
- */
 export interface SessionCallbacks {
-  /** Attempt to reconnect the WASocket (without new QR) */
   reconnect(realmId: string): Promise<void>;
-  /** Regenerate QR code for the session */
   regenerateQr(realmId: string): Promise<void>;
-  /** Update the session's connection status */
   setStatus(realmId: string, status: ConnectionStatus): void;
-  /** Clean up session resources after permanent failure */
   cleanup(realmId: string): void;
 }
 
-/**
- * Determines if a disconnect reason is recoverable (should trigger auto-reconnect).
- */
 export function isRecoverableDisconnect(statusCode: number): boolean {
   const recoverableCodes: number[] = [
     DisconnectReason.connectionClosed,
@@ -96,17 +61,10 @@ export function isRecoverableDisconnect(statusCode: number): boolean {
   return recoverableCodes.includes(statusCode);
 }
 
-/**
- * Determines if the disconnect was a remote logout.
- */
 export function isRemoteLogout(statusCode: number): boolean {
   return statusCode === DisconnectReason.loggedOut;
 }
 
-/**
- * Calculates exponential backoff delay with jitter.
- * Formula: min(initialDelay * 2^attempt, maxDelay) + random jitter (0-500ms)
- */
 export function calculateBackoffDelay(
   attempt: number,
   initialDelayMs: number,
@@ -118,9 +76,6 @@ export function calculateBackoffDelay(
   return clampedDelay + jitter;
 }
 
-/**
- * Notifies the backend about a session status change.
- */
 export async function notifyBackend(
   realmId: string,
   status: ConnectionStatus,
@@ -154,9 +109,6 @@ export async function notifyBackend(
   }
 }
 
-/**
- * Creates a new reconnect state for a session.
- */
 export function createReconnectState(): ReconnectState {
   return {
     attempts: 0,
@@ -167,9 +119,6 @@ export function createReconnectState(): ReconnectState {
   };
 }
 
-/**
- * Loads reconnect configuration from environment variables with defaults.
- */
 export function loadReconnectConfig(): ReconnectConfig {
   const backendWebhookUrl = process.env.BACKEND_WEBHOOK_URL || 'http://backend:8080';
   const internalToken = process.env.BAILEYS_INTERNAL_TOKEN || '';
@@ -189,14 +138,6 @@ export function loadReconnectConfig(): ReconnectConfig {
   };
 }
 
-/**
- * Manages auto-reconnect logic for Baileys sessions.
- *
- * Handles three disconnect scenarios:
- * 1. Recoverable disconnect → exponential backoff reconnection (up to 5 attempts)
- * 2. Remote logout → transition to logged_out, notify backend
- * 3. QR expiry → regenerate QR up to 3 times, then disconnect
- */
 export class ReconnectHandler {
   private readonly states: Map<string, ReconnectState> = new Map();
   private readonly config: ReconnectConfig;
@@ -207,10 +148,6 @@ export class ReconnectHandler {
     this.callbacks = callbacks;
   }
 
-  /**
-   * Handles a disconnect event for a session.
-   * Determines the appropriate action based on the disconnect reason.
-   */
   async handleDisconnect(realmId: string, statusCode: number): Promise<void> {
     const state = this.getOrCreateState(realmId);
 
@@ -219,7 +156,6 @@ export class ReconnectHandler {
     } else if (isRecoverableDisconnect(statusCode)) {
       await this.handleRecoverableDisconnect(realmId, state);
     } else {
-      // Non-recoverable, non-logout disconnect — give up
       logger.info(
         { realmId, statusCode },
         'Non-recoverable disconnect, transitioning to disconnected',
@@ -228,10 +164,6 @@ export class ReconnectHandler {
     }
   }
 
-  /**
-   * Handles QR code expiry for a session.
-   * Regenerates QR up to maxQrRetries times, then transitions to disconnected.
-   */
   async handleQrExpiry(realmId: string): Promise<void> {
     const state = this.getOrCreateState(realmId);
     state.qrRetries += 1;
@@ -259,9 +191,6 @@ export class ReconnectHandler {
     }
   }
 
-  /**
-   * Resets reconnect state for a session (e.g., on successful connection).
-   */
   resetState(realmId: string): void {
     const state = this.states.get(realmId);
     if (state) {
@@ -273,9 +202,6 @@ export class ReconnectHandler {
     }
   }
 
-  /**
-   * Removes all state for a session (e.g., on manual disconnect).
-   */
   removeState(realmId: string): void {
     const state = this.states.get(realmId);
     if (state) {
@@ -284,9 +210,6 @@ export class ReconnectHandler {
     this.states.delete(realmId);
   }
 
-  /**
-   * Returns the current reconnect state for a session, if any.
-   */
   getState(realmId: string): ReconnectState | undefined {
     return this.states.get(realmId);
   }
@@ -339,14 +262,11 @@ export class ReconnectHandler {
     state.reconnectTimer = setTimeout(async () => {
       try {
         await this.callbacks.reconnect(realmId);
-        // If reconnect succeeds, resetState will be called by the session manager
-        // on the 'connection.update' event with status 'open'
       } catch (error) {
         logger.error(
           { realmId, attempt: state.attempts, error: (error as Error).message },
           'Reconnection attempt failed',
         );
-        // Recursively try again (will check maxAttempts at the top)
         await this.handleRecoverableDisconnect(realmId, state);
       }
     }, delay);

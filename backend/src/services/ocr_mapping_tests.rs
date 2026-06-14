@@ -23,8 +23,6 @@ mod tests {
         }
     }
 
-    // ── normalize_cedula ──
-
     #[test]
     fn normalize_cedula_empty_string() {
         assert_eq!(normalize_cedula(""), "");
@@ -54,8 +52,6 @@ mod tests {
     fn normalize_cedula_eleven_digits_with_dots() {
         assert_eq!(normalize_cedula("001.1234567.8"), "001-1234567-8");
     }
-
-    // ── map_cedula ──
 
     #[test]
     fn map_cedula_full_fields() {
@@ -119,8 +115,6 @@ mod tests {
         let cedula_field = extracted.iter().find(|f| f.name == "cedula").unwrap();
         assert_eq!(cedula_field.value, "12345");
     }
-
-    // ── map_contrato ──
 
     #[test]
     fn map_contrato_full_fields() {
@@ -202,8 +196,6 @@ mod tests {
         }
     }
 
-    // ── map_deposito_extract ──
-
     #[test]
     fn map_deposito_extract_full_fields() {
         let fields = HashMap::from([
@@ -231,8 +223,6 @@ mod tests {
         assert_eq!(get("moneda").value, "DOP");
         assert_eq!(get("fecha_pago").value, "2025-03-15");
     }
-
-    // ── map_gasto_extract ──
 
     #[test]
     fn map_gasto_extract_full_fields() {

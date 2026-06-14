@@ -37,7 +37,6 @@ pub struct ConsultaNombreQuery {
     pub buscar: String,
 }
 
-/// Internal struct for deserializing the Megaplus API response.
 #[derive(Debug, Deserialize)]
 pub struct MegaplusApiResponse {
     pub data: Option<serde_json::Value>,

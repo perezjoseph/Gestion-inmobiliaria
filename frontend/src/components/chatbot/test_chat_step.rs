@@ -22,7 +22,6 @@ pub fn TestChatStep() -> Html {
     let error = use_state(|| Option::<String>::None);
     let chat_ref = use_node_ref();
 
-    // Scroll to bottom when messages change
     {
         let chat_ref = chat_ref.clone();
         let msg_len = messages.len();
@@ -69,12 +68,10 @@ pub fn TestChatStep() -> Html {
             let loading = loading.clone();
             let error = error.clone();
 
-            // Build history from existing completed messages BEFORE adding the new ones
             let history: Vec<TestChatHistoryEntry> = (*messages)
                 .iter()
                 .filter(|m| !m.content.is_empty())
                 .map(|m| {
-                    // Strip <think> blocks from assistant messages — only send visible content
                     let content = if m.role == "assistant" && m.content.contains("<think>") {
                         let (_, visible) = split_think_content(&m.content);
                         visible
@@ -130,10 +127,10 @@ pub fn TestChatStep() -> Html {
             <header class="flex items-center justify-between mb-3">
                 <div>
                     <h3 class="text-sm font-semibold text-[var(--text-primary)]">
-                        {"Probar conversación"}
+                        {"Probar conversaciÃ³n"}
                     </h3>
                     <p class="text-xs text-[var(--text-tertiary)] mt-0.5">
-                        {"Simule un mensaje de inquilino con la configuración actual."}
+                        {"Simule un mensaje de inquilino con la configuraciÃ³n actual."}
                     </p>
                 </div>
                 if has_messages {
@@ -141,7 +138,7 @@ pub fn TestChatStep() -> Html {
                         type="button"
                         class="gi-btn gi-btn-secondary text-xs"
                         onclick={on_reset}
-                        aria-label="Reiniciar conversación"
+                        aria-label="Reiniciar conversaciÃ³n"
                     >
                         {"Reiniciar"}
                     </button>
@@ -168,7 +165,7 @@ pub fn TestChatStep() -> Html {
                             {"Escriba un mensaje de ejemplo"}
                         </p>
                         <p class="text-xs text-[var(--text-tertiary)]">
-                            {"Ej: ¿Cuánto debo este mes? o ¿Cuándo vence mi pago?"}
+                            {"Ej: Â¿CuÃ¡nto debo este mes? o Â¿CuÃ¡ndo vence mi pago?"}
                         </p>
                     </div>
                 }
@@ -211,10 +208,6 @@ pub fn TestChatStep() -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Typing indicator dot
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct TypingDotProps {
     delay: u32,
@@ -233,10 +226,6 @@ fn TypingDot(props: &TypingDotProps) -> Html {
         />
     }
 }
-
-// ---------------------------------------------------------------------------
-// ChatBubble — renders thinking blocks as collapsible "Pensando" sections
-// ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct ChatBubbleProps {
@@ -258,7 +247,6 @@ fn ChatBubble(props: &ChatBubbleProps) -> Html {
         )
     };
 
-    // For user messages or messages without <think>, render plain
     if props.is_user || !props.content.contains("<think>") {
         return html! {
             <div class={classes!(align, "rounded-lg", "text-sm", "leading-relaxed")} style={style}>
@@ -267,7 +255,6 @@ fn ChatBubble(props: &ChatBubbleProps) -> Html {
         };
     }
 
-    // Parse thinking and visible content
     let (thinking, visible) = split_think_content(&props.content);
 
     html! {
@@ -281,10 +268,6 @@ fn ChatBubble(props: &ChatBubbleProps) -> Html {
         </div>
     }
 }
-
-// ---------------------------------------------------------------------------
-// ThinkingDisclosure — collapsible "Pensando" section
-// ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct ThinkingDisclosureProps {
@@ -332,8 +315,6 @@ fn ThinkingDisclosure(props: &ThinkingDisclosureProps) -> Html {
     }
 }
 
-/// Splits content into (`thinking_text`, `visible_text`).
-/// Handles both complete `<think>...</think>` and unclosed `<think>...` (still streaming).
 fn split_think_content(text: &str) -> (String, String) {
     let mut thinking = String::new();
     let mut visible = String::new();
@@ -348,7 +329,6 @@ fn split_think_content(text: &str) -> (String, String) {
                 thinking.push_str(&remaining[..end]);
                 remaining = &remaining[end + 8..];
             } else {
-                // Unclosed — still streaming thinking
                 thinking.push_str(remaining);
                 break;
             }
@@ -361,11 +341,6 @@ fn split_think_content(text: &str) -> (String, String) {
     (thinking.trim().to_string(), visible.trim().to_string())
 }
 
-// ---------------------------------------------------------------------------
-// Streaming plumbing
-// ---------------------------------------------------------------------------
-
-/// Initiates the streaming fetch request and returns the Response object.
 #[allow(clippy::future_not_send)]
 async fn stream_chat_response(
     message: &str,
@@ -407,20 +382,19 @@ async fn stream_chat_response(
 
     let response: Response = resp_value
         .dyn_into()
-        .map_err(|_| "Respuesta inválida".to_string())?;
+        .map_err(|_| "Respuesta invÃ¡lida".to_string())?;
 
     if !response.ok() {
         let status = response.status();
         if status == 401 {
-            return Err("Sesión expirada. Redirigiendo al inicio de sesión.".to_string());
+            return Err("SesiÃ³n expirada. Redirigiendo al inicio de sesiÃ³n.".to_string());
         }
-        return Err(format!("Error del servidor (código {status})"));
+        return Err(format!("Error del servidor (cÃ³digo {status})"));
     }
 
     Ok(response)
 }
 
-/// Consumes the SSE stream from the response.
 #[allow(clippy::future_not_send)]
 async fn consume_stream(
     response: Response,
@@ -497,7 +471,6 @@ async fn consume_stream(
     }
 }
 
-/// Parses a single SSE data payload and extracts the content delta token.
 fn parse_sse_token(data: &str) -> Option<String> {
     let parsed: serde_json::Value = serde_json::from_str(data).ok()?;
     parsed

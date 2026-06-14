@@ -11,7 +11,6 @@ use crate::services::baileys_client::BaileysClient;
 use crate::services::chatbot;
 use crate::services::crypto::constant_time_eq;
 
-/// Hash a phone number for safe logging (no PII in logs).
 fn hash_phone(phone: &str) -> String {
     use std::hash::{DefaultHasher, Hash, Hasher};
     let mut hasher = DefaultHasher::new();
@@ -19,20 +18,6 @@ fn hash_phone(phone: &str) -> String {
     format!("{:x}", hasher.finish())
 }
 
-/// POST `/internal/whatsapp/incoming`
-///
-/// Receives incoming messages from the Baileys sidecar.
-/// Validates the `X-Internal-Token` header using constant-time comparison.
-/// Then runs the full message processing pipeline:
-/// 1. Load `ChatbotConfig` for the org
-/// 2. Check `config.activo` — if false, return 200 silently
-/// 3. Apply sender policy — if denied, return 200 silently (log for monitoring)
-/// 4. Resolve tenant by phone + `org_id`
-/// 5. Load conversation history
-/// 6. Invoke AI module
-/// 7. Persist user message + assistant reply
-/// 8. Send reply via `Baileys` Service
-/// 9. If AI fails: persist user message, send error reply
 #[allow(clippy::future_not_send)]
 pub async fn incoming_webhook(
     req: HttpRequest,
@@ -43,7 +28,6 @@ pub async fn incoming_webhook(
 ) -> Result<HttpResponse, AppError> {
     let chatbot_env = &config.chatbot;
 
-    // --- Token validation ---
     let token = req
         .headers()
         .get("X-Internal-Token")
@@ -62,26 +46,21 @@ pub async fn incoming_webhook(
         return Err(AppError::Unauthorized(None));
     }
 
-    // Token valid — proceed with message processing pipeline
     let payload = payload.into_inner();
     let org_id = payload.realm_id;
 
-    // Step 1: Load ChatbotConfig for the org
     let cfg = chatbot::get_config_model(db.get_ref(), org_id).await?;
 
-    // Step 2: Check config.activo — if false, silently discard (Requirement 9.7)
     if !cfg.activo {
         tracing::debug!(organizacion_id = %org_id, "Chatbot inactivo, descartando mensaje");
         return Ok(HttpResponse::Ok().json(serde_json::json!({"status": "discarded"})));
     }
 
-    // Self-message bypass: skip sender policy for messages from the bot's own number
     let is_self_message = payload.session_phone.as_deref() == Some(&payload.sender_phone);
     if is_self_message {
         tracing::debug!("Self-message detected, bypassing sender policy");
     }
 
-    // Step 3: Apply sender policy (Requirement 2.4)
     if !is_self_message {
         let allowlist: Option<Vec<String>> = cfg
             .allowlist
@@ -109,7 +88,6 @@ pub async fn incoming_webhook(
         }
     }
 
-    // Step 4: Resolve tenant by phone + org_id
     let tenant = chatbot::find_tenant_by_phone(db.get_ref(), &payload.sender_phone, org_id).await?;
 
     let tenant_context = tenant.as_ref().map(|t| TenantContext {
@@ -117,12 +95,10 @@ pub async fn incoming_webhook(
     });
     let inquilino_id = tenant.as_ref().map(|t| t.id);
 
-    // Step 4.5: Check handoff status — if active, persist message but skip AI (Requirement 11.4)
     let handoff_active =
         chatbot::is_handoff_active(db.get_ref(), org_id, &payload.sender_phone).await?;
 
     if handoff_active {
-        // Persist the user message for human operator review, but do NOT invoke AI
         chatbot::persist_message(
             db.get_ref(),
             org_id,
@@ -144,21 +120,19 @@ pub async fn incoming_webhook(
         return Ok(HttpResponse::Ok().json(serde_json::json!({"status": "handoff_active"})));
     }
 
-    // Step 5: Load conversation history
     let history_limit = cfg.history_limit as u64;
     let history_records =
         chatbot::load_history(db.get_ref(), org_id, &payload.sender_phone, history_limit).await?;
 
     let history: Vec<ConversationEntry> = history_records
         .iter()
-        .rev() // load_history returns DESC, we need chronological order
+        .rev()
         .map(|m| ConversationEntry {
             role: m.role.clone(),
             content: m.content.clone(),
         })
         .collect();
 
-    // Step 6: Invoke AI module
     let ai_module = AiModule::new(chatbot_env)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error inicializando AI module: {e}")))?;
 
@@ -223,10 +197,8 @@ pub async fn incoming_webhook(
 
     let ai_result = ai_module.process_message(&ctx).await;
 
-    // Step 7 & 8 & 9: Handle AI result
     let reply_text = match ai_result {
         Ok(response) => {
-            // Persist user message
             chatbot::persist_message(
                 db.get_ref(),
                 org_id,
@@ -239,7 +211,6 @@ pub async fn incoming_webhook(
             )
             .await?;
 
-            // Persist assistant reply
             chatbot::persist_message(
                 db.get_ref(),
                 org_id,
@@ -252,8 +223,6 @@ pub async fn incoming_webhook(
             )
             .await?;
 
-            // Post-loop: if extract_receipt was invoked successfully, persist the extraction
-            // (Requirement 8.3)
             if response
                 .tools_invoked
                 .contains(&"extract_receipt".to_string())
@@ -285,7 +254,6 @@ pub async fn incoming_webhook(
                 "Error en AI module, persistiendo mensaje de usuario y enviando error"
             );
 
-            // Persist user message even on AI failure (Requirement 7.6)
             let _ = chatbot::persist_message(
                 db.get_ref(),
                 org_id,
@@ -298,14 +266,12 @@ pub async fn incoming_webhook(
             )
             .await;
 
-            // Error reply to sender
             "Lo siento, no pude procesar tu mensaje en este momento. \
              Por favor, intenta de nuevo más tarde."
                 .to_string()
         }
     };
 
-    // Send reply via Baileys Service
     if let Some(ref client) = baileys {
         if let Err(e) = client
             .send_message(org_id, &payload.sender_phone, &reply_text)

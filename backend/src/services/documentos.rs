@@ -29,8 +29,6 @@ const ALLOWED_ENTITY_TYPES: &[&str] = &[
     "mantenimiento",
 ];
 
-// ── Document type catalog per entity type ──────────────────────
-
 pub const TIPOS_INQUILINO: &[&str] = &[
     "cedula",
     "comprobante_ingresos",
@@ -58,14 +56,10 @@ pub const TIPOS_PAGO: &[&str] = &[
 ];
 pub const TIPOS_GASTO: &[&str] = &["factura_proveedor", "comprobante_fiscal_ncf", "recibo_pago"];
 
-// ── Required document types per entity type ────────────────────
-
 pub const REQUERIDOS_INQUILINO: &[&str] = &["cedula", "comprobante_ingresos"];
 pub const REQUERIDOS_PROPIEDAD: &[&str] = &["titulo_propiedad"];
 pub const REQUERIDOS_CONTRATO: &[&str] = &["contrato_arrendamiento"];
 
-/// Return the valid `tipo_documento` values for a given `entity_type`,
-/// or `None` if the entity type has no document catalog (e.g. `mantenimiento`).
 fn tipos_for_entity(entity_type: &str) -> Option<&'static [&'static str]> {
     match entity_type {
         "inquilino" => Some(TIPOS_INQUILINO),
@@ -77,13 +71,8 @@ fn tipos_for_entity(entity_type: &str) -> Option<&'static [&'static str]> {
     }
 }
 
-/// Validate that `tipo_documento` is valid for the given `entity_type`.
-///
-/// Returns `Ok(())` on success, or `AppError::Validation` (422) listing the
-/// valid types when the value is not in the catalog.
 pub fn validate_tipo_documento(entity_type: &str, tipo_documento: &str) -> Result<(), AppError> {
     let Some(valid) = tipos_for_entity(entity_type) else {
-        // Entity types without a catalog (e.g. mantenimiento) accept any tipo
         return Ok(());
     };
 
@@ -117,7 +106,6 @@ fn validate_mime_type(mime_type: &str) -> Result<(), AppError> {
 }
 
 fn validate_magic_bytes(data: &[u8], declared_mime: &str) -> Result<(), AppError> {
-    // For small files (< 4 bytes), skip magic byte check — infer needs minimum bytes
     if data.len() < 4 {
         return Ok(());
     }
@@ -126,7 +114,6 @@ fn validate_magic_bytes(data: &[u8], declared_mime: &str) -> Result<(), AppError
         "image/jpeg" => detected.is_some_and(|t| t.mime_type() == "image/jpeg"),
         "image/png" => detected.is_some_and(|t| t.mime_type() == "image/png"),
         "application/pdf" => detected.is_some_and(|t| t.mime_type() == "application/pdf"),
-        // DOCX is a ZIP archive — infer detects it as application/zip
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => {
             detected.is_some_and(|t| t.mime_type() == "application/zip")
         }
@@ -149,11 +136,9 @@ fn validate_entity_type(entity_type: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Sanitize a filename by stripping path separators and directory traversal sequences.
 fn sanitize_filename(name: &str) -> Result<String, AppError> {
     let sanitized: String = name.replace(['/', '\\'], "_").replace("..", "_");
 
-    // After sanitization the name must still be non-empty
     let trimmed = sanitized.trim();
     if trimmed.is_empty() {
         return Err(AppError::Validation(
@@ -167,7 +152,6 @@ fn get_upload_dir() -> String {
     std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string())
 }
 
-/// Convert a `documento::Model` into the public `DocumentoResponse` DTO.
 fn model_to_response(d: documento::Model) -> DocumentoResponse {
     DocumentoResponse {
         id: d.id,
@@ -214,7 +198,6 @@ pub async fn upload(
     validate_tipo_documento(entity_type, tipo_documento)?;
     let safe_filename = sanitize_filename(filename)?;
 
-    // Verify the target entity belongs to the caller's organization
     verificar_entidad_pertenece_a_org(db, entity_type, entity_id, organizacion_id).await?;
     if tipo_documento == "comprobante_fiscal_ncf" {
         let ncf = numero_documento.as_deref().ok_or_else(|| {
@@ -224,7 +207,6 @@ pub async fn upload(
         })?;
         validacion_fiscal::validar_ncf(ncf)?;
 
-        // Check NCF uniqueness within the organization
         let existing = documento::Entity::find()
             .filter(documento::Column::TipoDocumento.eq("comprobante_fiscal_ncf"))
             .filter(documento::Column::NumeroDocumento.eq(ncf))
@@ -237,7 +219,6 @@ pub async fn upload(
         }
     }
 
-    // ── Cedula cross-check for inquilino cedula docs ───────────
     if tipo_documento == "cedula" && entity_type == "inquilino" {
         if let Some(ref num_doc) = numero_documento {
             let inq = inquilino::Entity::find_by_id(entity_id)
@@ -257,14 +238,12 @@ pub async fn upload(
     }
 
     let upload_dir = get_upload_dir();
-    // entity_type is validated against an allowlist; entity_id is a Uuid (no traversal possible)
     let dir_path = format!("{upload_dir}/{entity_type}/{entity_id}");
 
     let file_uuid = Uuid::new_v4();
     let stored_filename = format!("{file_uuid}-{safe_filename}");
     let full_path = format!("{dir_path}/{stored_filename}");
 
-    // Perform filesystem operations on a blocking thread to avoid starving the async runtime
     let upload_dir_clone = upload_dir.clone();
     let dir_path_clone = dir_path.clone();
     let full_path_clone = full_path.clone();
@@ -325,7 +304,6 @@ pub async fn upload(
 
     let inserted = model.insert(db).await?;
 
-    // ── Audit trail (best-effort, non-blocking) ────────────────
     auditoria::registrar_best_effort(
         db,
         auditoria::CreateAuditoriaEntry {
@@ -353,7 +331,6 @@ pub async fn listar_documentos(
     filters: Option<DocumentoListQuery>,
     organizacion_id: Uuid,
 ) -> Result<Vec<DocumentoResponse>, AppError> {
-    // Verify entity belongs to caller's org
     verificar_entidad_pertenece_a_org(db, entity_type, entity_id, organizacion_id).await?;
 
     let mut query = documento::Entity::find()
@@ -383,8 +360,6 @@ pub async fn listar_documentos(
     Ok(docs.into_iter().map(model_to_response).collect())
 }
 
-// ── Verification workflow ──────────────────────────────────────
-
 const VALID_ESTADOS_VERIFICACION: &[&str] = &["verificado", "rechazado", "pendiente"];
 
 pub async fn verificar(
@@ -394,7 +369,6 @@ pub async fn verificar(
     usuario_id: Uuid,
     organizacion_id: Uuid,
 ) -> Result<DocumentoResponse, AppError> {
-    // Validate the new status
     if !VALID_ESTADOS_VERIFICACION.contains(&request.estado_verificacion.as_str()) {
         return Err(AppError::Validation(format!(
             "Estado de verificación '{}' no es válido. Valores permitidos: {}",
@@ -403,7 +377,6 @@ pub async fn verificar(
         )));
     }
 
-    // Require notas_verificacion for rejection
     if request.estado_verificacion == "rechazado"
         && request
             .notas_verificacion
@@ -415,13 +388,11 @@ pub async fn verificar(
         ));
     }
 
-    // Find the document
     let doc = documento::Entity::find_by_id(documento_id)
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
 
-    // Verify the document's parent entity belongs to the caller's org
     verificar_entidad_pertenece_a_org(db, &doc.entity_type, doc.entity_id, organizacion_id).await?;
 
     let old_status = doc.estado_verificacion.clone();
@@ -449,12 +420,11 @@ pub async fn verificar(
             active.fecha_verificacion = Set(None);
             active.notas_verificacion = Set(None);
         }
-        _ => unreachable!(), // Already validated above
+        _ => unreachable!(),
     }
 
     let updated = active.update(db).await?;
 
-    // Audit trail
     auditoria::registrar_best_effort(
         db,
         auditoria::CreateAuditoriaEntry {
@@ -473,8 +443,6 @@ pub async fn verificar(
     Ok(model_to_response(updated))
 }
 
-// ── Document deletion ──────────────────────────────────────────
-
 pub async fn eliminar(
     db: &DatabaseConnection,
     documento_id: Uuid,
@@ -486,17 +454,14 @@ pub async fn eliminar(
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
 
-    // Verify the document's parent entity belongs to the caller's org
     verificar_entidad_pertenece_a_org(db, &doc.entity_type, doc.entity_id, organizacion_id).await?;
 
-    // Reject deletion of sealed documents (signed contracts)
     if doc.sellado || doc.documento_origen_id.is_some() {
         return Err(AppError::Forbidden(
             "No se puede eliminar un documento sellado".into(),
         ));
     }
 
-    // Delete file from disk (best-effort — don't fail if file is already gone)
     let upload_dir = get_upload_dir();
     let full_path = format!("{upload_dir}/{}", doc.file_path);
     let full_path_clone = full_path.clone();
@@ -506,7 +471,6 @@ pub async fn eliminar(
     .await
     .ok();
 
-    // Capture metadata for audit before deleting the record
     let audit_cambios = serde_json::json!({
         "filename": doc.filename,
         "tipo_documento": doc.tipo_documento,
@@ -519,7 +483,6 @@ pub async fn eliminar(
         .exec(db)
         .await?;
 
-    // Audit trail
     auditoria::registrar_best_effort(
         db,
         auditoria::CreateAuditoriaEntry {
@@ -534,8 +497,6 @@ pub async fn eliminar(
 
     Ok(())
 }
-
-// ── Batch expiration ───────────────────────────────────────────
 
 pub async fn marcar_vencidos(db: &DatabaseConnection) -> Result<u64, AppError> {
     let today = Utc::now().date_naive();
@@ -553,10 +514,6 @@ pub async fn marcar_vencidos(db: &DatabaseConnection) -> Result<u64, AppError> {
     Ok(result.rows_affected)
 }
 
-// ── Helpers for compliance ─────────────────────────────────────
-
-/// Return the required document types for a given entity type, or `None`
-/// if the entity type has no required documents (e.g. pago, gasto).
 fn requeridos_for_entity(entity_type: &str) -> Option<&'static [&'static str]> {
     match entity_type {
         "inquilino" => Some(REQUERIDOS_INQUILINO),
@@ -566,7 +523,6 @@ fn requeridos_for_entity(entity_type: &str) -> Option<&'static [&'static str]> {
     }
 }
 
-/// Return a Spanish display name for a `tipo_documento` value.
 fn nombre_tipo_documento(tipo: &str) -> &'static str {
     match tipo {
         "cedula" => "Cédula de Identidad",
@@ -591,9 +547,7 @@ fn nombre_tipo_documento(tipo: &str) -> &'static str {
     }
 }
 
-/// Determine the compliance status for a document type based on existing documents.
 fn estado_for_tipo(docs: &[documento::Model], tipo: &str) -> &'static str {
-    // Find the most recent document of this type
     let matching: Vec<&documento::Model> =
         docs.iter().filter(|d| d.tipo_documento == tipo).collect();
 
@@ -601,8 +555,6 @@ fn estado_for_tipo(docs: &[documento::Model], tipo: &str) -> &'static str {
         return "faltante";
     }
 
-    // Priority: verificado > pendiente > vencido > rechazado
-    // If any doc of this type is verified, status is "presente"
     if matching
         .iter()
         .any(|d| d.estado_verificacion == "verificado")
@@ -628,8 +580,6 @@ fn estado_for_tipo(docs: &[documento::Model], tipo: &str) -> &'static str {
     "pendiente"
 }
 
-/// Verify that the entity referenced by a document belongs to the given organization.
-/// Returns `NotFound` (not `Forbidden`) to avoid revealing resource existence to other tenants.
 pub(crate) async fn verificar_entidad_pertenece_a_org(
     db: &DatabaseConnection,
     entity_type: &str,
@@ -691,8 +641,6 @@ pub(crate) async fn verificar_entidad_pertenece_a_org(
     Ok(())
 }
 
-// ── Compliance profile ─────────────────────────────────────────
-
 #[allow(clippy::cast_possible_truncation)]
 pub async fn cumplimiento(
     db: &DatabaseConnection,
@@ -700,7 +648,6 @@ pub async fn cumplimiento(
     entity_id: Uuid,
     organizacion_id: Uuid,
 ) -> Result<CumplimientoResponse, AppError> {
-    // Validate entity_type has a document catalog
     let all_tipos = tipos_for_entity(entity_type).ok_or_else(|| {
         AppError::Validation(format!(
             "Tipo de entidad '{entity_type}' no tiene catálogo de documentos. \
@@ -708,10 +655,8 @@ pub async fn cumplimiento(
         ))
     })?;
 
-    // Verify entity belongs to caller's org
     verificar_entidad_pertenece_a_org(db, entity_type, entity_id, organizacion_id).await?;
 
-    // Fetch all documents for this entity
     let docs = documento::Entity::find()
         .filter(documento::Column::EntityType.eq(entity_type))
         .filter(documento::Column::EntityId.eq(entity_id))
@@ -723,7 +668,6 @@ pub async fn cumplimiento(
     let mut items = Vec::with_capacity(all_tipos.len());
     let mut presente_count: u32 = 0;
 
-    // Process all document types for this entity
     for &tipo in all_tipos {
         let es_requerido = requeridos.contains(&tipo);
         let estado = estado_for_tipo(&docs, tipo);
@@ -753,8 +697,6 @@ pub async fn cumplimiento(
     })
 }
 
-// ── Documents expiring soon ────────────────────────────────────
-
 pub async fn por_vencer(
     db: &DatabaseConnection,
     dias: Option<i64>,
@@ -778,7 +720,6 @@ pub async fn por_vencer(
         .all(db)
         .await?;
 
-    // Batch-resolve org ownership instead of N+1 per-doc queries
     use std::collections::{HashMap, HashSet};
 
     let mut ids_by_type: HashMap<&str, Vec<Uuid>> = HashMap::new();
@@ -961,8 +902,6 @@ mod tests {
         unsafe { std::env::remove_var("UPLOAD_DIR") };
     }
 
-    // ── validate_tipo_documento tests ──────────────────────────
-
     #[test]
     fn validate_tipo_documento_accepts_valid_inquilino_types() {
         for tipo in TIPOS_INQUILINO {
@@ -1034,30 +973,23 @@ mod tests {
 
     #[test]
     fn validate_tipo_documento_accepts_any_for_mantenimiento() {
-        // mantenimiento has no catalog, so any tipo is accepted
         assert!(validate_tipo_documento("mantenimiento", "foto_antes").is_ok());
         assert!(validate_tipo_documento("mantenimiento", "anything").is_ok());
     }
 
     #[test]
     fn validate_tipo_documento_cross_entity_rejection() {
-        // contrato type should not be valid for pago
         assert!(validate_tipo_documento("pago", "contrato_arrendamiento").is_err());
-        // pago type should not be valid for inquilino
         assert!(validate_tipo_documento("inquilino", "recibo_pago").is_err());
     }
 
     #[test]
     fn validate_tipo_documento_shared_types_across_entities() {
-        // comprobante_fiscal_ncf is valid for both pago and gasto
         assert!(validate_tipo_documento("pago", "comprobante_fiscal_ncf").is_ok());
         assert!(validate_tipo_documento("gasto", "comprobante_fiscal_ncf").is_ok());
-        // recibo_pago is valid for both pago and gasto
         assert!(validate_tipo_documento("pago", "recibo_pago").is_ok());
         assert!(validate_tipo_documento("gasto", "recibo_pago").is_ok());
     }
-
-    // ── verificar validation tests ─────────────────────────────
 
     #[test]
     fn valid_estados_verificacion_contains_expected_values() {
@@ -1072,8 +1004,6 @@ mod tests {
         assert!(!VALID_ESTADOS_VERIFICACION.contains(&"aprobado"));
         assert!(!VALID_ESTADOS_VERIFICACION.contains(&""));
     }
-
-    // ── model_to_response tests ────────────────────────────────
 
     #[test]
     fn model_to_response_converts_all_fields() {
@@ -1153,8 +1083,6 @@ mod tests {
         assert!(resp.updated_at.is_some());
     }
 
-    // ── requeridos_for_entity tests ────────────────────────────
-
     #[test]
     fn requeridos_for_entity_returns_inquilino_required() {
         let req = requeridos_for_entity("inquilino");
@@ -1195,8 +1123,6 @@ mod tests {
         assert!(requeridos_for_entity("unknown").is_none());
     }
 
-    // ── nombre_tipo_documento tests ────────────────────────────
-
     #[test]
     fn nombre_tipo_documento_returns_spanish_names() {
         assert_eq!(nombre_tipo_documento("cedula"), "Cédula de Identidad");
@@ -1215,8 +1141,6 @@ mod tests {
     fn nombre_tipo_documento_returns_otro_for_unknown() {
         assert_eq!(nombre_tipo_documento("desconocido"), "Otro");
     }
-
-    // ── estado_for_tipo tests ──────────────────────────────────
 
     fn make_doc_model(tipo: &str, estado: &str) -> documento::Model {
         let now = Utc::now().fixed_offset();

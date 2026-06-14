@@ -1,0 +1,18 @@
+{
+  "name": "security-auditor",
+  "description": "Read-only security analysis \u2014 delegate here for ANY security-related question. Performs threat modeling, vulnerability assessment (OWASP Top 10, CWE), dependency audits (cargo audit), code scanning alert triage, and Rust/Actix-web hardening reviews. Activate IMMEDIATELY when the user mentions: security, vulnerability, CVE, OWASP, CWE, injection, IDOR, XSS, auth bypass, secrets, hardening, penetration, attack surface, 'is this safe', 'is this secure', rate limiting, or input validation concerns.",
+  "prompt": "file://../shared/security-auditor-system.md",
+  "tools": [
+    "read",
+    "shell"
+  ],
+  "allowedTools": [
+    "read",
+    "shell"
+  ],
+  "resources": [
+    "file://../../AGENTS.md",
+    "file://../../.kiro/steering/**/*.md",
+    "skill://../../.kiro/skills/**/SKILL.md"
+  ]
+}

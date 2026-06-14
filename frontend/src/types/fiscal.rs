@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-/// Tipo fiscal de la organización
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TipoFiscal {
@@ -12,8 +11,8 @@ pub enum TipoFiscal {
 impl TipoFiscal {
     pub const fn label(&self) -> &'static str {
         match self {
-            Self::PersonaJuridica => "Persona Jurídica",
-            Self::PersonaFisica => "Persona Física",
+            Self::PersonaJuridica => "Persona JurÃ­dica",
+            Self::PersonaFisica => "Persona FÃ­sica",
             Self::Informal => "Informal",
         }
     }
@@ -34,7 +33,6 @@ impl std::fmt::Display for TipoFiscal {
     }
 }
 
-/// Response from GET /organizacion/fiscal/estado
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct EstadoFiscalResponse {
@@ -45,7 +43,6 @@ pub struct EstadoFiscalResponse {
     pub is_ecf: bool,
 }
 
-/// Request for PUT /organizacion/fiscal/tipo-fiscal
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ActualizarTipoFiscalRequest {
@@ -53,7 +50,6 @@ pub struct ActualizarTipoFiscalRequest {
     pub identificador: Option<String>,
 }
 
-/// NCF sequence info
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SecuenciaNcfResponse {
@@ -82,7 +78,6 @@ impl SecuenciaNcfResponse {
     }
 }
 
-/// Request for POST /ncf/configurar-rango
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfigurarRangoRequest {
@@ -92,7 +87,6 @@ pub struct ConfigurarRangoRequest {
     pub rango_hasta: i32,
 }
 
-/// Alert when NCF range is nearing exhaustion
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AlertaRango {

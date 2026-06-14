@@ -8,8 +8,6 @@ use crate::models::documento::{
     PlantillaResponse,
 };
 
-// ── List templates ─────────────────────────────────────────────
-
 pub async fn listar(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -38,8 +36,6 @@ pub async fn listar(
 
     Ok(responses)
 }
-
-// ── Create template ────────────────────────────────────────────
 
 pub async fn crear(
     db: &DatabaseConnection,
@@ -83,8 +79,6 @@ pub async fn crear(
     })
 }
 
-// ── Get template by ID ─────────────────────────────────────────
-
 pub async fn obtener(
     db: &DatabaseConnection,
     id: Uuid,
@@ -104,8 +98,6 @@ pub async fn obtener(
         contenido: model.contenido,
     })
 }
-
-// ── Update template ────────────────────────────────────────────
 
 pub async fn actualizar(
     db: &DatabaseConnection,
@@ -160,8 +152,6 @@ pub async fn actualizar(
     })
 }
 
-// ── Soft-delete template ───────────────────────────────────────
-
 pub async fn eliminar(db: &DatabaseConnection, id: Uuid, org_id: Uuid) -> Result<(), AppError> {
     let existing = plantilla_documento::Entity::find_by_id(id)
         .filter(plantilla_documento::Column::OrganizacionId.eq(org_id))
@@ -177,8 +167,6 @@ pub async fn eliminar(db: &DatabaseConnection, id: Uuid, org_id: Uuid) -> Result
     Ok(())
 }
 
-// ── Fill template with entity data ─────────────────────────────
-
 pub async fn rellenar(
     db: &DatabaseConnection,
     plantilla_id: Uuid,
@@ -186,7 +174,6 @@ pub async fn rellenar(
     entity_id: Uuid,
     organizacion_id: Uuid,
 ) -> Result<PlantillaRellenadaResponse, AppError> {
-    // Verify the target entity belongs to the caller's organization
     crate::services::documentos::verificar_entidad_pertenece_a_org(
         db,
         entity_type,
@@ -195,16 +182,13 @@ pub async fn rellenar(
     )
     .await?;
 
-    // Load template
     let plantilla = plantilla_documento::Entity::find_by_id(plantilla_id)
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Plantilla no encontrada".into()))?;
 
-    // Build replacement map from entity data
     let replacements = load_entity_fields(db, entity_type, entity_id).await?;
 
-    // Walk JSON tree and replace placeholders
     let contenido_resuelto = resolve_placeholders(&plantilla.contenido, &replacements);
 
     Ok(PlantillaRellenadaResponse {
@@ -215,11 +199,6 @@ pub async fn rellenar(
     })
 }
 
-// ── Placeholder resolution ─────────────────────────────────────
-
-/// Recursively walk a JSON value, replacing `{{entity.field}}` patterns
-/// with actual values from the replacements map. Unresolved placeholders
-/// remain as-is.
 pub(crate) fn resolve_placeholders(
     value: &serde_json::Value,
     replacements: &std::collections::HashMap<String, String>,
@@ -243,13 +222,10 @@ pub(crate) fn resolve_placeholders(
                 .collect();
             serde_json::Value::Object(resolved)
         }
-        // Numbers, booleans, nulls pass through unchanged
         other => other.clone(),
     }
 }
 
-/// Replace all `{{key}}` patterns in a string with values from the map.
-/// Unresolved placeholders remain as-is.
 pub(crate) fn replace_in_string(
     input: &str,
     replacements: &std::collections::HashMap<String, String>,
@@ -261,8 +237,6 @@ pub(crate) fn replace_in_string(
     }
     result
 }
-
-// ── Entity field loading ───────────────────────────────────────
 
 async fn load_entity_fields(
     db: &DatabaseConnection,
@@ -293,7 +267,6 @@ async fn load_entity_fields(
                 .ok_or_else(|| AppError::NotFound("Contrato no encontrado".into()))?;
             insert_contrato_fields(&mut fields, &c);
 
-            // Also load related propiedad and inquilino
             if let Some(p) = propiedad::Entity::find_by_id(c.propiedad_id)
                 .one(db)
                 .await?
@@ -314,7 +287,6 @@ async fn load_entity_fields(
                 .ok_or_else(|| AppError::NotFound("Pago no encontrado".into()))?;
             insert_pago_fields(&mut fields, &pg);
 
-            // Also load related contrato, propiedad, and inquilino
             if let Some(c) = contrato::Entity::find_by_id(pg.contrato_id).one(db).await? {
                 insert_contrato_fields(&mut fields, &c);
                 if let Some(p) = propiedad::Entity::find_by_id(c.propiedad_id)
@@ -338,7 +310,6 @@ async fn load_entity_fields(
                 .ok_or_else(|| AppError::NotFound("Gasto no encontrado".into()))?;
             insert_gasto_fields(&mut fields, &g);
 
-            // Also load related propiedad
             if let Some(p) = propiedad::Entity::find_by_id(g.propiedad_id)
                 .one(db)
                 .await?

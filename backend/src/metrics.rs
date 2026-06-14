@@ -1,9 +1,3 @@
-//! Custom Prometheus metrics for business and operational observability.
-//!
-//! All metrics are registered lazily on first access via `std::sync::LazyLock`.
-//! They are automatically included in the `/internal/metrics` endpoint since
-//! they register against the global `prometheus::default_registry()`.
-
 use std::sync::LazyLock;
 
 use prometheus::{
@@ -12,9 +6,6 @@ use prometheus::{
     register_int_gauge,
 };
 
-/// Unwraps a metric registration result, aborting the process on failure.
-/// Metric registration only fails if a duplicate metric name is registered,
-/// which indicates a programming error that cannot be recovered at runtime.
 fn unwrap_metric<T, E: std::fmt::Display>(result: Result<T, E>, name: &str) -> T {
     match result {
         Ok(v) => v,
@@ -25,10 +16,6 @@ fn unwrap_metric<T, E: std::fmt::Display>(result: Result<T, E>, name: &str) -> T
     }
 }
 
-// ─── Authentication ──────────────────────────────────────────────────────────
-
-/// Total login attempts partitioned by outcome.
-/// Labels: `result` = "success" | "failed" | "locked"
 pub static AUTH_LOGIN_ATTEMPTS: LazyLock<IntCounterVec> = LazyLock::new(|| {
     unwrap_metric(
         register_int_counter_vec!(
@@ -39,11 +26,6 @@ pub static AUTH_LOGIN_ATTEMPTS: LazyLock<IntCounterVec> = LazyLock::new(|| {
     )
 });
 
-// ─── Payments ────────────────────────────────────────────────────────────────
-
-/// Total payments processed, partitioned by payment method and currency.
-/// Labels: `metodo` = "efectivo" | "transferencia" | "cheque" | "tarjeta"
-///         `moneda` = "DOP" | "USD"
 pub static PAGOS_PROCESADOS: LazyLock<IntCounterVec> = LazyLock::new(|| {
     unwrap_metric(
         register_int_counter_vec!(
@@ -54,7 +36,6 @@ pub static PAGOS_PROCESADOS: LazyLock<IntCounterVec> = LazyLock::new(|| {
     )
 });
 
-/// Current count of overdue payments (gauge, updated by background job).
 pub static PAGOS_ATRASADOS: LazyLock<IntGauge> = LazyLock::new(|| {
     unwrap_metric(
         register_int_gauge!(Opts::new("pagos_atrasados", "Pagos actualmente atrasados")),
@@ -62,9 +43,6 @@ pub static PAGOS_ATRASADOS: LazyLock<IntGauge> = LazyLock::new(|| {
     )
 });
 
-// ─── Contracts ───────────────────────────────────────────────────────────────
-
-/// Current count of active contracts (gauge, updated by background job).
 pub static CONTRATOS_ACTIVOS: LazyLock<IntGauge> = LazyLock::new(|| {
     unwrap_metric(
         register_int_gauge!(Opts::new(
@@ -75,8 +53,6 @@ pub static CONTRATOS_ACTIVOS: LazyLock<IntGauge> = LazyLock::new(|| {
     )
 });
 
-/// Total contract state transitions.
-/// Labels: `from` = previous state, `to` = new state
 pub static CONTRATOS_TRANSICIONES: LazyLock<IntCounterVec> = LazyLock::new(|| {
     unwrap_metric(
         register_int_counter_vec!(
@@ -90,9 +66,6 @@ pub static CONTRATOS_TRANSICIONES: LazyLock<IntCounterVec> = LazyLock::new(|| {
     )
 });
 
-// ─── Maintenance ─────────────────────────────────────────────────────────────
-
-/// Current count of pending maintenance requests (gauge).
 pub static MANTENIMIENTO_PENDIENTE: LazyLock<IntGauge> = LazyLock::new(|| {
     unwrap_metric(
         register_int_gauge!(Opts::new(
@@ -103,8 +76,6 @@ pub static MANTENIMIENTO_PENDIENTE: LazyLock<IntGauge> = LazyLock::new(|| {
     )
 });
 
-/// Total maintenance requests created, by priority.
-/// Labels: `prioridad` = "baja" | "media" | "alta" | "urgente"
 pub static MANTENIMIENTO_CREADAS: LazyLock<IntCounterVec> = LazyLock::new(|| {
     unwrap_metric(
         register_int_counter_vec!(
@@ -118,10 +89,6 @@ pub static MANTENIMIENTO_CREADAS: LazyLock<IntCounterVec> = LazyLock::new(|| {
     )
 });
 
-// ─── Database ────────────────────────────────────────────────────────────────
-
-/// Histogram of database query durations by service domain.
-/// Labels: `domain` = "pagos" | "contratos" | "propiedades" | etc.
 pub static DB_QUERY_DURATION: LazyLock<HistogramVec> = LazyLock::new(|| {
     unwrap_metric(
         register_histogram_vec!(
@@ -138,9 +105,6 @@ pub static DB_QUERY_DURATION: LazyLock<HistogramVec> = LazyLock::new(|| {
     )
 });
 
-// ─── AI / Chatbot ────────────────────────────────────────────────────────────
-
-/// Histogram of AI inference response times.
 pub static AI_INFERENCE_DURATION: LazyLock<Histogram> = LazyLock::new(|| {
     unwrap_metric(
         register_histogram!(
@@ -154,8 +118,6 @@ pub static AI_INFERENCE_DURATION: LazyLock<Histogram> = LazyLock::new(|| {
     )
 });
 
-/// Total AI requests by outcome.
-/// Labels: `result` = "success" | "error" | "timeout"
 pub static AI_REQUESTS: LazyLock<IntCounterVec> = LazyLock::new(|| {
     unwrap_metric(
         register_int_counter_vec!(
@@ -166,10 +128,6 @@ pub static AI_REQUESTS: LazyLock<IntCounterVec> = LazyLock::new(|| {
     )
 });
 
-// ─── Notifications ───────────────────────────────────────────────────────────
-
-/// Total notifications sent by channel.
-/// Labels: `channel` = "whatsapp" | "email"
 pub static NOTIFICACIONES_ENVIADAS: LazyLock<IntCounterVec> = LazyLock::new(|| {
     unwrap_metric(
         register_int_counter_vec!(
@@ -180,10 +138,6 @@ pub static NOTIFICACIONES_ENVIADAS: LazyLock<IntCounterVec> = LazyLock::new(|| {
     )
 });
 
-// ─── Expenses ────────────────────────────────────────────────────────────────
-
-/// Total expenses recorded by category.
-/// Labels: `categoria`, `moneda`
 pub static GASTOS_REGISTRADOS: LazyLock<IntCounterVec> = LazyLock::new(|| {
     unwrap_metric(
         register_int_counter_vec!(
@@ -194,9 +148,6 @@ pub static GASTOS_REGISTRADOS: LazyLock<IntCounterVec> = LazyLock::new(|| {
     )
 });
 
-// ─── Active Users ────────────────────────────────────────────────────────────
-
-/// Tracks the number of active API sessions (approximation via recent JWT validations).
 pub static USUARIOS_ACTIVOS: LazyLock<IntGauge> = LazyLock::new(|| {
     unwrap_metric(
         register_int_gauge!(Opts::new(
@@ -207,7 +158,6 @@ pub static USUARIOS_ACTIVOS: LazyLock<IntGauge> = LazyLock::new(|| {
     )
 });
 
-/// Total HTTP requests that resulted in 401/403, by endpoint.
 pub static AUTH_REJECTIONS: LazyLock<IntCounter> = LazyLock::new(|| {
     unwrap_metric(
         register_int_counter!(Opts::new(
@@ -218,10 +168,7 @@ pub static AUTH_REJECTIONS: LazyLock<IntCounter> = LazyLock::new(|| {
     )
 });
 
-/// Force-initialize all metrics so they appear in /metrics even before first use.
-/// Call this once at app startup.
 pub fn init() {
-    // Touch each LazyLock to trigger registration
     let _ = &*AUTH_LOGIN_ATTEMPTS;
     let _ = &*PAGOS_PROCESADOS;
     let _ = &*PAGOS_ATRASADOS;

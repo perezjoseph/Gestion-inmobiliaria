@@ -9,19 +9,11 @@ use crate::services::api::{api_get, api_put};
 use crate::types::configuracion::{RecargoDefectoConfig, UpdateRecargoDefectoRequest};
 use wasm_bindgen_futures::spawn_local;
 
-// ---------------------------------------------------------------------------
-// Tab definitions
-// ---------------------------------------------------------------------------
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ConfigTab {
     General,
     Chatbot,
 }
-
-// ---------------------------------------------------------------------------
-// ConfigTabNav — horizontal tab navigation
-// ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct ConfigTabNavProps {
@@ -73,7 +65,7 @@ fn ConfigTabNav(props: &ConfigTabNavProps) -> Html {
     };
 
     html! {
-        <div role="tablist" aria-label="Secciones de configuración" class="gi-config-tabs">
+        <div role="tablist" aria-label="Secciones de configuraciÃ³n" class="gi-config-tabs">
             {tab_btn(ConfigTab::General, "General", general_icon)}
             if props.can_write {
                 {tab_btn(ConfigTab::Chatbot, "Chatbot WhatsApp", chatbot_icon)}
@@ -81,10 +73,6 @@ fn ConfigTabNav(props: &ConfigTabNavProps) -> Html {
         </div>
     }
 }
-
-// ---------------------------------------------------------------------------
-// RecargoSection — late fee configuration
-// ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct RecargoSectionProps {
@@ -131,7 +119,7 @@ fn RecargoSection(props: &RecargoSectionProps) -> Html {
             e.prevent_default();
             let val = (*input_value).trim().to_string();
             let Ok(parsed) = val.parse::<f64>() else {
-                error.set(Some("Ingrese un número válido".into()));
+                error.set(Some("Ingrese un nÃºmero vÃ¡lido".into()));
                 return;
             };
             if !(0.0..=100.0).contains(&parsed) {
@@ -236,10 +224,6 @@ fn RecargoSection(props: &RecargoSectionProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// GeneralTab — general settings content
-// ---------------------------------------------------------------------------
-
 #[component]
 fn GeneralTab() -> Html {
     let auth = use_context::<AuthContext>();
@@ -255,10 +239,6 @@ fn GeneralTab() -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Configuracion — main page with tabs
-// ---------------------------------------------------------------------------
-
 #[component]
 pub fn Configuracion() -> Html {
     let route = use_route::<Route>();
@@ -270,7 +250,6 @@ pub fn Configuracion() -> Html {
         .and_then(|a| a.user.as_ref())
         .is_some_and(|u| u.rol == "admin" || u.rol == "gerente");
 
-    // Determine active tab from route
     let active_tab = if route.as_ref() == Some(&Route::ConfiguracionChatbot) {
         ConfigTab::Chatbot
     } else {
@@ -292,7 +271,7 @@ pub fn Configuracion() -> Html {
     html! {
         <div>
             <div class="gi-page-header">
-                <h1 class="gi-page-title">{"Configuración"}</h1>
+                <h1 class="gi-page-title">{"ConfiguraciÃ³n"}</h1>
             </div>
 
             <ConfigTabNav active={active_tab} on_tab={on_tab} can_write={can_write} />

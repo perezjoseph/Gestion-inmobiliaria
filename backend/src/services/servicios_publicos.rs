@@ -16,7 +16,6 @@ use crate::services::validation::validate_enum;
 pub const PROVEEDORES_SERVICIO: &[&str] = &["EDENORTE", "EDESUR", "EDEESTE", "CAASD"];
 pub const RESPONSABLES: &[&str] = &["propietario", "inquilino"];
 
-/// Resolves effective responsibility using contract override > unit default > fallback.
 pub fn resolve_responsabilidad<'a>(
     unit_default: Option<&'a str>,
     contract_override: Option<&'a str>,
@@ -27,8 +26,6 @@ pub fn resolve_responsabilidad<'a>(
     unit_default.unwrap_or("propietario")
 }
 
-/// Get effective responsibility for all providers on a unit.
-/// For each provider, resolves: contract override > unit default.
 pub async fn obtener_responsabilidades(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -68,7 +65,6 @@ pub async fn obtener_responsabilidades(
     Ok(results)
 }
 
-/// Update unit-level default responsibilities (`contrato_id` = NULL).
 pub async fn actualizar_responsabilidad_unidad(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -98,7 +94,6 @@ pub async fn actualizar_responsabilidad_unidad(
     obtener_responsabilidades(db, org_id, unidad_id).await
 }
 
-/// Update contract-level override responsibilities.
 pub async fn actualizar_responsabilidad_contrato(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -106,14 +101,12 @@ pub async fn actualizar_responsabilidad_contrato(
     input: UpdateResponsabilidadRequest,
     _usuario_id: Uuid,
 ) -> Result<Vec<ResponsabilidadEfectivaResponse>, AppError> {
-    // Get the contrato to verify it exists and belongs to the org
     let _contrato = contrato::Entity::find_by_id(contrato_id)
         .filter(contrato::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
 
-    // unidad_id must be provided in the request for contract-level overrides
     let unidad_id = input.unidad_id.ok_or_else(|| {
         AppError::Validation("unidad_id es requerido para overrides de contrato".to_string())
     })?;
@@ -140,14 +133,11 @@ pub async fn actualizar_responsabilidad_contrato(
     obtener_responsabilidades(db, org_id, unidad_id).await
 }
 
-/// Check for abnormal consumption after gasto creation.
-/// Never propagates errors — logs warnings and returns `Ok(())` always.
 pub async fn verificar_consumo_anormal<C: ConnectionTrait>(
     db: &C,
     gasto: &gasto::Model,
     organizacion_id: Uuid,
 ) -> Result<(), AppError> {
-    // Guard: skip if missing required fields
     let Some(consumo) = gasto.consumo else {
         return Ok(());
     };
@@ -194,7 +184,7 @@ async fn verificar_consumo_anormal_inner<C: ConnectionTrait>(
     let sum: Decimal = historico.iter().filter_map(|g| g.consumo).sum();
     let count = Decimal::from(historico.len() as u64);
     let promedio = sum / count;
-    let umbral = promedio * Decimal::new(15, 1); // avg * 1.5
+    let umbral = promedio * Decimal::new(15, 1);
 
     if consumo > umbral {
         let porcentaje_desviacion = if promedio > Decimal::ZERO {
@@ -229,23 +219,19 @@ async fn verificar_consumo_anormal_inner<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Determines if consumption is anomalous based on historical data.
-/// Pure function for testing — returns true if alert should trigger.
 pub fn es_consumo_anormal(historico: &[Decimal], consumo_nuevo: Decimal) -> Option<bool> {
     if historico.len() < 3 {
-        return None; // Skip check — insufficient data
+        return None;
     }
 
     let sum: Decimal = historico.iter().copied().sum();
     let count = Decimal::from(historico.len() as u64);
     let promedio = sum / count;
-    let umbral = promedio * Decimal::new(15, 1); // avg * 1.5
+    let umbral = promedio * Decimal::new(15, 1);
 
     Some(consumo_nuevo > umbral)
 }
 
-/// Upsert a `responsabilidad_servicios` record.
-/// Finds by (`unidad_id`, `proveedor_servicio`, `contrato_id`) — updates if found, inserts if not.
 async fn upsert_responsabilidad<C: ConnectionTrait>(
     db: &C,
     org_id: Uuid,

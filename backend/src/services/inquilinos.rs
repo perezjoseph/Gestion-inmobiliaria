@@ -78,7 +78,6 @@ pub async fn create<C: ConnectionTrait>(
     )
     .await?;
 
-    // Best-effort DGII cédula validation (never blocks creation)
     let cedula = record.cedula.clone();
     match super::dgii::validar_cedula_inquilino(db, org_id, &cedula).await {
         Some(resp) => {
@@ -209,7 +208,6 @@ pub async fn update<C: ConnectionTrait>(
     )
     .await?;
 
-    // Best-effort DGII cédula validation (never blocks update)
     let cedula = updated.cedula.clone();
     match super::dgii::validar_cedula_inquilino(db, org_id, &cedula).await {
         Some(resp) => {

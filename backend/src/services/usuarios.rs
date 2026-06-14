@@ -68,7 +68,6 @@ pub async fn cambiar_rol(
         .await?
         .ok_or_else(|| AppError::NotFound("Usuario no encontrado".to_string()))?;
 
-    // Last admin guard: prevent demoting the only active admin in the org
     if record.rol == "admin" && nuevo_rol != "admin" {
         let admin_count = usuario::Entity::find()
             .filter(usuario::Column::OrganizacionId.eq(org_id))

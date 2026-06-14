@@ -12,8 +12,6 @@ import pino from 'pino';
 
 const logger = pino({ name: 'pg-auth-state' });
 
-// --- Encryption (same AES-256-GCM as before) ---
-
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
@@ -50,8 +48,6 @@ export function decrypt(data: Buffer): Buffer {
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 }
 
-// --- PostgreSQL Auth State ---
-
 let pool: Pool | null = null;
 
 export function getPool(): Pool {
@@ -77,17 +73,12 @@ export async function closePool(): Promise<void> {
   }
 }
 
-/**
- * PostgreSQL-backed auth state for Baileys.
- * Stores encrypted credentials and Signal keys in whatsapp_auth_* tables.
- */
 export async function usePostgresAuthState(realmId: string): Promise<{
   state: AuthenticationState;
   saveCreds: () => Promise<void>;
 }> {
   const db = getPool();
 
-  // --- Load or initialize creds ---
   const credsRow = await db.query(
     'SELECT creds_data FROM whatsapp_auth_creds WHERE realm_id = $1',
     [realmId]
@@ -106,7 +97,6 @@ export async function usePostgresAuthState(realmId: string): Promise<{
     creds = initAuthCreds();
   }
 
-  // --- saveCreds: persist device identity ---
   const saveCreds = async (): Promise<void> => {
     const serialized = JSON.stringify(creds, BufferJSON.replacer);
     const encrypted = encrypt(Buffer.from(serialized, 'utf-8'));
@@ -119,7 +109,6 @@ export async function usePostgresAuthState(realmId: string): Promise<{
     );
   };
 
-  // --- keys: Signal Protocol key store ---
   const keys = {
     get: async <T extends keyof SignalDataTypeMap>(
       type: T,
@@ -195,9 +184,6 @@ export async function usePostgresAuthState(realmId: string): Promise<{
   return { state: { creds, keys }, saveCreds };
 }
 
-/**
- * Remove all auth data for a realm from the database.
- */
 export async function deleteAuthState(realmId: string): Promise<void> {
   const db = getPool();
   const client = await db.connect();
@@ -214,9 +200,6 @@ export async function deleteAuthState(realmId: string): Promise<void> {
   }
 }
 
-/**
- * List all realm IDs that have stored credentials (for session restoration on startup).
- */
 export async function listStoredRealms(): Promise<string[]> {
   const db = getPool();
   const result = await db.query('SELECT realm_id FROM whatsapp_auth_creds');

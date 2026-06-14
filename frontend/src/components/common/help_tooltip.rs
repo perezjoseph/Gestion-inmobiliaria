@@ -7,8 +7,6 @@ pub struct HelpTooltipProps {
     pub id: Option<AttrValue>,
 }
 
-/// A small "?" icon that reveals a tooltip on hover/focus.
-/// Use `id` prop to connect via `aria-describedby` on the associated input.
 #[component]
 pub fn HelpTooltip(props: &HelpTooltipProps) -> Html {
     let visible = use_state(|| false);

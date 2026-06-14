@@ -2,15 +2,6 @@ use yew::prelude::*;
 
 use crate::hooks::use_online;
 
-/// Wraps any submit button or action control and disables it when the browser
-/// is offline. Shows a "Sin conexión" tooltip on hover while disabled.
-///
-/// Usage:
-/// ```ignore
-/// <OfflineGuard>
-///     <button type="submit" class="gi-btn gi-btn-primary">{"Guardar"}</button>
-/// </OfflineGuard>
-/// ```
 #[derive(Properties, PartialEq)]
 pub struct OfflineGuardProps {
     pub children: Children,
@@ -26,7 +17,7 @@ pub fn OfflineGuard(props: &OfflineGuardProps) -> Html {
         html! {
             <span
                 style="position: relative; display: inline-block; cursor: not-allowed;"
-                title="Sin conexión"
+                title="Sin conexiÃ³n"
             >
                 <span style="pointer-events: none; opacity: 0.5;">
                     { for props.children.iter() }

@@ -2,7 +2,6 @@ use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
-/// A single record in the 607 (income/sales) report per Norma General 07-2018.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Registro607 {
@@ -18,7 +17,6 @@ pub struct Registro607 {
     pub forma_pago: String,
 }
 
-/// A single record in the 606 (purchases/expenses) report per Norma General 07-2018.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Registro606 {
@@ -35,8 +33,6 @@ pub struct Registro606 {
     pub forma_pago: String,
 }
 
-/// The generated report output containing the formatted content, preview rows,
-/// excluded records, and summary totals.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ReporteGenerado {
@@ -48,7 +44,6 @@ pub struct ReporteGenerado {
     pub itbis_total: Decimal,
 }
 
-/// A record excluded from report generation due to incomplete fiscal data.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RegistroExcluido {
@@ -56,14 +51,12 @@ pub struct RegistroExcluido {
     pub referencia: String,
 }
 
-/// A preview row where each field is rendered as a string for display purposes.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RegistroPreview {
     pub campos: Vec<String>,
 }
 
-/// The net ITBIS calculation result (607 collected minus 606 paid).
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ItbisNetoResult {

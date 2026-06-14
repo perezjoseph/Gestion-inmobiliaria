@@ -6,7 +6,6 @@ use yew::prelude::*;
 use crate::components::common::signature_canvas::SignatureCanvas;
 use crate::services::api::BASE_URL;
 
-/// Response from POST /firmas/{token}/verificar
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DocumentoFirmaResponse {
@@ -55,7 +54,6 @@ pub fn FirmaPublica(props: &FirmaPublicaProps) -> Html {
     let loading = use_state(|| false);
     let token = props.token.clone();
 
-    // Password form submit
     let on_verify = {
         let state = state.clone();
         let password = password.clone();
@@ -103,7 +101,7 @@ pub fn FirmaPublica(props: &FirmaPublicaProps) -> Html {
                             }
                         }
                         401 => {
-                            error_msg.set(Some("Contraseña incorrecta".into()));
+                            error_msg.set(Some("ContraseÃ±a incorrecta".into()));
                         }
                         410 => {
                             state.set(PageState::Expired);
@@ -113,14 +111,13 @@ pub fn FirmaPublica(props: &FirmaPublicaProps) -> Html {
                         }
                     },
                     Err(_) => {
-                        error_msg.set(Some("Error de red. Verifique su conexión.".into()));
+                        error_msg.set(Some("Error de red. Verifique su conexiÃ³n.".into()));
                     }
                 }
             });
         })
     };
 
-    // Signature submit
     let on_sign = {
         let state = state.clone();
         let password = password.clone();
@@ -160,7 +157,7 @@ pub fn FirmaPublica(props: &FirmaPublicaProps) -> Html {
                             state.set(PageState::Expired);
                         }
                         401 => {
-                            error_msg.set(Some("Contraseña incorrecta".into()));
+                            error_msg.set(Some("ContraseÃ±a incorrecta".into()));
                         }
                         409 => {
                             error_msg.set(Some("Esta firma ya fue procesada.".into()));
@@ -170,7 +167,7 @@ pub fn FirmaPublica(props: &FirmaPublicaProps) -> Html {
                         }
                     },
                     Err(_) => {
-                        error_msg.set(Some("Error de red. Verifique su conexión.".into()));
+                        error_msg.set(Some("Error de red. Verifique su conexiÃ³n.".into()));
                     }
                 }
             });
@@ -211,7 +208,7 @@ fn render_expired() -> Html {
         <div class="gi-login-page">
             <div class="gi-login-container">
                 <div class="gi-card gi-p-6" style="text-align: center;">
-                    <div style="font-size: 3rem; margin-bottom: var(--space-4);">{"⚠️"}</div>
+                    <div style="font-size: 3rem; margin-bottom: var(--space-4);">{"âš ï¸"}</div>
                     <h1 class="text-display" style="margin-bottom: var(--space-3);">
                         {"Enlace expirado"}
                     </h1>
@@ -229,7 +226,7 @@ fn render_confirmation() -> Html {
         <div class="gi-login-page">
             <div class="gi-login-container">
                 <div class="gi-card gi-p-6" style="text-align: center;">
-                    <div style="font-size: 3rem; margin-bottom: var(--space-4);">{"✅"}</div>
+                    <div style="font-size: 3rem; margin-bottom: var(--space-4);">{"âœ…"}</div>
                     <h1 class="text-display" style="margin-bottom: var(--space-3);">
                         {"Documento firmado exitosamente"}
                     </h1>
@@ -263,7 +260,7 @@ fn render_password_form(
                             {"Firma de Documento"}
                         </h1>
                         <p class="gi-login-subtitle">
-                            {"Ingrese la contraseña proporcionada para acceder al documento."}
+                            {"Ingrese la contraseÃ±a proporcionada para acceder al documento."}
                         </p>
                     </div>
                     if let Some(err) = error_msg {
@@ -273,12 +270,12 @@ fn render_password_form(
                     }
                     <form onsubmit={on_submit.clone()}>
                         <div class="gi-form-group">
-                            <label for="firma-password" class="gi-label">{"Contraseña"}</label>
+                            <label for="firma-password" class="gi-label">{"ContraseÃ±a"}</label>
                             <input
                                 id="firma-password"
                                 type="password"
                                 class="gi-input"
-                                placeholder="Ingrese la contraseña"
+                                placeholder="Ingrese la contraseÃ±a"
                                 oninput={on_input.clone()}
                                 disabled={loading}
                                 autocomplete="off"
@@ -319,7 +316,7 @@ fn render_document_review(
             <div style="max-width: 800px; margin: 0 auto;">
                 <div class="gi-card gi-p-6" style="margin-bottom: var(--space-4);">
                     <h1 class="text-display" style="margin-bottom: var(--space-2);">
-                        {"Revisión de Documento"}
+                        {"RevisiÃ³n de Documento"}
                     </h1>
                     <p style="color: var(--text-secondary); margin-bottom: var(--space-4);">
                         {format!("Firmante: {firmante_nombre}")}
@@ -331,7 +328,7 @@ fn render_document_review(
                 <div class="gi-card gi-p-6">
                     <h2 style="margin-bottom: var(--space-3);">{"Firmar Documento"}</h2>
                     <p style="color: var(--text-secondary); margin-bottom: var(--space-3);">
-                        {"Dibuje su firma en el recuadro a continuación."}
+                        {"Dibuje su firma en el recuadro a continuaciÃ³n."}
                     </p>
                     if let Some(err) = error_msg {
                         <div class="gi-error-banner gi-mb-3" role="alert">
@@ -352,7 +349,6 @@ fn render_document_review(
     }
 }
 
-/// Render `Block_JSON` content as readonly HTML
 fn render_blocks(contenido: &serde_json::Value) -> Html {
     let blocks = contenido
         .get("blocks")

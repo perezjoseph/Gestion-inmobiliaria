@@ -3,10 +3,6 @@ use yew::prelude::*;
 
 use crate::types::chatbot::FaqEntry;
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 pub struct KnowledgeStepProps {
     pub faqs: Vec<FaqEntry>,
@@ -15,17 +11,11 @@ pub struct KnowledgeStepProps {
     pub on_policies_change: Callback<String>,
 }
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
 #[component]
 pub fn KnowledgeStep(props: &KnowledgeStepProps) -> Html {
     let faqs = use_state(|| props.faqs.clone());
     let policies = use_state(|| props.policies.clone());
     let dirty = use_state(|| false);
-
-    // --- FAQ mutations (local only, mark dirty) ---
 
     let on_add_faq = {
         let faqs = faqs.clone();
@@ -94,8 +84,6 @@ pub fn KnowledgeStep(props: &KnowledgeStepProps) -> Html {
         }
     };
 
-    // --- Policies (local only, mark dirty) ---
-
     let on_policies_input = {
         let policies = policies.clone();
         let dirty = dirty.clone();
@@ -105,8 +93,6 @@ pub fn KnowledgeStep(props: &KnowledgeStepProps) -> Html {
             dirty.set(true);
         })
     };
-
-    // --- Save: emit to parent only on explicit click ---
 
     let on_save = {
         let faqs = faqs.clone();
@@ -133,7 +119,7 @@ pub fn KnowledgeStep(props: &KnowledgeStepProps) -> Html {
                             {"Preguntas frecuentes"}
                         </h4>
                         <p class="text-xs text-[var(--text-tertiary)] mt-0.5">
-                            {format!("{faq_count} de 50 entradas. El bot responderá con estas respuestas cuando detecte la pregunta.")}
+                            {format!("{faq_count} de 50 entradas. El bot responderÃ¡ con estas respuestas cuando detecte la pregunta.")}
                         </p>
                     </div>
                     if faq_count < 50 {
@@ -180,10 +166,10 @@ pub fn KnowledgeStep(props: &KnowledgeStepProps) -> Html {
 
             <div>
                 <label for="knowledge-policies" class="gi-label">
-                    {"Políticas y reglas"}
+                    {"PolÃ­ticas y reglas"}
                 </label>
                 <p class="text-xs text-[var(--text-tertiary)] mb-2">
-                    {"Instrucciones que el bot seguirá siempre (ej. no dar información financiera sin verificar)."}
+                    {"Instrucciones que el bot seguirÃ¡ siempre (ej. no dar informaciÃ³n financiera sin verificar)."}
                 </p>
                 <textarea
                     id="knowledge-policies"
@@ -214,10 +200,6 @@ pub fn KnowledgeStep(props: &KnowledgeStepProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// FaqItem sub-component (inline confirmation on delete)
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct FaqItemProps {
     idx: usize,
@@ -239,7 +221,6 @@ fn FaqItem(props: &FaqItemProps) -> Html {
         })
     };
 
-    // Auto-revert confirmation after 3 seconds
     {
         let confirming = confirming.clone();
         use_effect_with(*confirming, move |is_confirming| {
@@ -283,14 +264,14 @@ fn FaqItem(props: &FaqItemProps) -> Html {
                 </span>
                 if *confirming {
                     <span class="flex items-center gap-2 text-xs">
-                        <span class="text-[var(--text-secondary)]">{"¿Eliminar?"}</span>
+                        <span class="text-[var(--text-secondary)]">{"Â¿Eliminar?"}</span>
                         <button
                             type="button"
                             class="gi-btn gi-btn-danger text-xs"
                             style="padding: 2px 8px;"
                             onclick={on_confirm_remove}
                         >
-                            {"Sí"}
+                            {"SÃ­"}
                         </button>
                         <button
                             type="button"
@@ -322,7 +303,7 @@ fn FaqItem(props: &FaqItemProps) -> Html {
                 type="text"
                 class="gi-input mb-2"
                 maxlength="200"
-                placeholder="Ej: ¿Cuál es la fecha de corte?"
+                placeholder="Ej: Â¿CuÃ¡l es la fecha de corte?"
                 value={props.question.clone()}
                 oninput={props.on_question_change.clone()}
             />
@@ -330,7 +311,7 @@ fn FaqItem(props: &FaqItemProps) -> Html {
                 class="gi-input"
                 rows="2"
                 maxlength="1000"
-                placeholder="Respuesta que el bot dará (máx. 1000 caracteres)"
+                placeholder="Respuesta que el bot darÃ¡ (mÃ¡x. 1000 caracteres)"
                 value={props.answer.clone()}
                 oninput={props.on_answer_change.clone()}
             />

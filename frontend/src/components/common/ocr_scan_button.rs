@@ -54,7 +54,7 @@ async fn perform_ocr_extract(
             }
             let _ = win.location().set_href("/");
         }
-        return Err("Sesión expirada".into());
+        return Err("SesiÃ³n expirada".into());
     }
 
     if !resp.ok() {
@@ -69,8 +69,8 @@ async fn perform_ocr_extract(
         }
         return Err(match resp.status() {
             503 => "Servicio OCR no disponible".into(),
-            422 => "Datos inválidos. Revise el archivo e intente de nuevo.".into(),
-            _ => format!("Error inesperado (código {})", resp.status()),
+            422 => "Datos invÃ¡lidos. Revise el archivo e intente de nuevo.".into(),
+            _ => format!("Error inesperado (cÃ³digo {})", resp.status()),
         });
     }
 

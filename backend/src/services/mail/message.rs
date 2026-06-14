@@ -2,10 +2,6 @@ use uuid::Uuid;
 
 use super::client::OutgoingMail;
 
-/// Builds a Spanish-language signing-link email for a contract.
-///
-/// The email informs the tenant that a contract is ready for electronic
-/// signature and provides the link to complete the process.
 pub fn signature_link_mail(contrato_id: Uuid, link: &str) -> OutgoingMail {
     let subject = format!("Firma electrónica de su contrato #{contrato_id}");
 
@@ -29,7 +25,7 @@ pub fn signature_link_mail(contrato_id: Uuid, link: &str) -> OutgoingMail {
     );
 
     OutgoingMail {
-        to: String::new(), // Caller sets the recipient
+        to: String::new(),
         subject,
         body_html,
         body_text,

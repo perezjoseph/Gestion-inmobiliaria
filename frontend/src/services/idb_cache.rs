@@ -6,7 +6,6 @@ use wasm_bindgen::JsValue;
 const DB_NAME: &str = "realestate_cache";
 const DB_VERSION: u32 = 1;
 
-/// Opens (or creates) the `IndexedDB` database, ensuring the given object store exists.
 #[allow(clippy::future_not_send)]
 async fn open_db(store_name: &str) -> Result<idb::Database, JsValue> {
     let factory =
@@ -20,7 +19,6 @@ async fn open_db(store_name: &str) -> Result<idb::Database, JsValue> {
     open_request.on_upgrade_needed(move |event| {
         let db = event.database().unwrap_or_else(|e| {
             web_sys::console::error_1(&format!("IDB upgrade error: {e:?}").into());
-            // This callback cannot propagate errors; the browser will abort the transaction.
             unreachable!()
         });
 
@@ -35,9 +33,6 @@ async fn open_db(store_name: &str) -> Result<idb::Database, JsValue> {
         .map_err(|e| JsValue::from_str(&format!("IDB open await error: {e:?}")))
 }
 
-/// Reads a cached list from `IndexedDB`.
-///
-/// Returns `Some(vec)` if the key exists and deserializes successfully, `None` otherwise.
 #[allow(clippy::future_not_send)]
 pub async fn read_list<T: DeserializeOwned>(store: &str, key: &str) -> Option<Vec<T>> {
     let db = open_db(store).await.ok()?;
@@ -57,7 +52,6 @@ pub async fn read_list<T: DeserializeOwned>(store: &str, key: &str) -> Option<Ve
     Some(items)
 }
 
-/// Writes a list to `IndexedDB`, overwriting any previous value for the given key.
 #[allow(clippy::future_not_send)]
 pub async fn write_list<T: Serialize>(store: &str, key: &str, value: &[T]) {
     let Ok(db) = open_db(store).await else {
@@ -77,7 +71,6 @@ pub async fn write_list<T: Serialize>(store: &str, key: &str, value: &[T]) {
     };
 
     let js_key = JsValue::from_str(key);
-    // Use put with an explicit key to store the serialized list under the string key.
     if let Ok(put_request) = object_store.put(&js_value, Some(&js_key)) {
         let _ = put_request.await;
     }

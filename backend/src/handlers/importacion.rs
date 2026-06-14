@@ -204,7 +204,6 @@ pub async fn confirmar_preview(
 
     validate_preview_fields(&preview)?;
 
-    // Best-effort tenant match for deposito_bancario (Recibo branch)
     let inquilino_id = if preview.document_type == "deposito_bancario" {
         let depositante = preview
             .fields
@@ -233,8 +232,6 @@ pub async fn confirmar_preview(
     })))
 }
 
-/// Validates OCR extraction fields before persisting.
-/// Returns `AppError::Validation` (HTTP 422) when required fields are missing or invalid.
 fn validate_preview_fields(preview: &crate::models::ocr::ImportPreview) -> Result<(), AppError> {
     let get_field = |name: &str| -> Option<&str> {
         preview
@@ -244,7 +241,6 @@ fn validate_preview_fields(preview: &crate::models::ocr::ImportPreview) -> Resul
             .map(|f| f.value.as_str())
     };
 
-    // monto is required and must be a valid positive decimal
     let monto_str = get_field("monto").unwrap_or("");
     if monto_str.is_empty() {
         return Err(AppError::Validation("Datos de OCR inválidos".to_string()));
@@ -256,13 +252,11 @@ fn validate_preview_fields(preview: &crate::models::ocr::ImportPreview) -> Resul
         return Err(AppError::Validation("Datos de OCR inválidos".to_string()));
     }
 
-    // moneda must be DOP or USD
     let moneda = get_field("moneda").unwrap_or("");
     if moneda != "DOP" && moneda != "USD" {
         return Err(AppError::Validation("Datos de OCR inválidos".to_string()));
     }
 
-    // For deposito_bancario: validate fecha_pago if present
     if preview.document_type == "deposito_bancario" {
         if let Some(fecha) = get_field("fecha_pago") {
             if !fecha.is_empty() && chrono::NaiveDate::parse_from_str(fecha, "%Y-%m-%d").is_err() {
@@ -271,7 +265,6 @@ fn validate_preview_fields(preview: &crate::models::ocr::ImportPreview) -> Resul
         }
     }
 
-    // For recibo_gasto: validate fecha_gasto if present
     if preview.document_type == "recibo_gasto" {
         if let Some(fecha) = get_field("fecha_gasto") {
             if !fecha.is_empty() && chrono::NaiveDate::parse_from_str(fecha, "%Y-%m-%d").is_err() {

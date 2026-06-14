@@ -57,10 +57,6 @@ pub fn Reportes() -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Ingresos Tab (existing functionality)
-// ---------------------------------------------------------------------------
-
 #[component]
 fn IngresosTab() -> Html {
     let mes = use_state(|| {
@@ -185,10 +181,6 @@ fn IngresosTab() -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Rentabilidad Tab
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct IngresosFilterBarProps {
     mes: u32,
@@ -228,7 +220,7 @@ fn IngresosFilterBar(props: &IngresosFilterBarProps) -> Html {
                     </select>
                 </div>
                 <div>
-                    <label class="gi-label">{"Año"}</label>
+                    <label class="gi-label">{"AÃ±o"}</label>
                     <input
                         type="number"
                         class="gi-input"
@@ -293,7 +285,7 @@ fn IngresosResult(props: &IngresosResultProps) -> Html {
                     </p>
                 </div>
                 <div class="gi-card" style="padding: var(--space-4);">
-                    <p class="gi-label" style="margin-bottom: var(--space-1);">{"Tasa Ocupación"}</p>
+                    <p class="gi-label" style="margin-bottom: var(--space-1);">{"Tasa OcupaciÃ³n"}</p>
                     <p style="font-size: var(--text-xl); font-weight: 600;">
                         {format!("{:.1}%", r.tasa_ocupacion)}
                     </p>
@@ -328,10 +320,6 @@ fn IngresosResult(props: &IngresosResultProps) -> Html {
         </div>
     }
 }
-
-// ---------------------------------------------------------------------------
-// Rentabilidad Tab (Requirement 9.1, 9.8)
-// ---------------------------------------------------------------------------
 
 #[component]
 fn RentabilidadTab() -> Html {
@@ -496,7 +484,7 @@ fn RentabilidadFilterBar(props: &RentabilidadFilterBarProps) -> Html {
                     </select>
                 </div>
                 <div>
-                    <label class="gi-label">{"Año"}</label>
+                    <label class="gi-label">{"AÃ±o"}</label>
                     <input
                         type="number"
                         class="gi-input"
@@ -599,7 +587,7 @@ fn RentabilidadTable(props: &RentabilidadTableProps) -> Html {
     if props.rows.is_empty() {
         return html! {
             <div class="gi-card" style="padding: var(--space-6); text-align: center; color: var(--text-secondary);">
-                {"No se encontraron datos para el período seleccionado."}
+                {"No se encontraron datos para el perÃ­odo seleccionado."}
             </div>
         };
     }

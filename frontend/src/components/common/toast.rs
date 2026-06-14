@@ -137,9 +137,9 @@ fn ToastItem(props: &ToastItemProps) -> Html {
         ToastKind::Info => "gi-toast-info",
     };
     let icon = match props.msg.kind {
-        ToastKind::Success => "✓",
-        ToastKind::Error => "✕",
-        ToastKind::Info => "ℹ",
+        ToastKind::Success => "âœ“",
+        ToastKind::Error => "âœ•",
+        ToastKind::Info => "â„¹",
     };
     let dismiss = {
         let on_dismiss = props.on_dismiss.clone();
@@ -170,7 +170,7 @@ fn ToastItem(props: &ToastItemProps) -> Html {
             <span class="gi-toast-icon">{icon}</span>
             <span class="gi-toast-text">{&props.msg.text}</span>
             {action_html}
-            <button onclick={dismiss} class="gi-toast-close" aria-label="Cerrar">{"×"}</button>
+            <button onclick={dismiss} class="gi-toast-close" aria-label="Cerrar">{"Ã—"}</button>
         </div>
     }
 }

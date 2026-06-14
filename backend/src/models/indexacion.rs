@@ -3,7 +3,6 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// Propuesta de renovación generada por el sistema basada en IPC y Ley 85-25.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PropuestaRenovacion {
@@ -15,14 +14,12 @@ pub struct PropuestaRenovacion {
     pub datos_stale: bool,
 }
 
-/// Solicitud del admin para aprobar una renovación con un monto específico.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AprobarRenovacionRequest {
     pub monto_aprobado: Decimal,
 }
 
-/// Contrato próximo a vencer (dentro de 60 días) para revisión de indexación.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContratoProximoVencer {

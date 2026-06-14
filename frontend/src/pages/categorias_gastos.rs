@@ -37,7 +37,7 @@ fn categoria_label(cat: &str) -> &str {
         "servicios" => "Servicios",
         "impuestos" => "Impuestos",
         "seguro" => "Seguro",
-        "administracion" => "Administración",
+        "administracion" => "AdministraciÃ³n",
         "otros" => "Otros",
         other => other,
     }
@@ -110,9 +110,9 @@ pub fn CategoriasGastos() -> Html {
     let sort_indicator = |col: SortColumn| -> &'static str {
         if *sort_col == col {
             if *sort_dir == SortDir::Asc {
-                " ▲"
+                " â–²"
             } else {
-                " ▼"
+                " â–¼"
             }
         } else {
             ""
@@ -122,7 +122,7 @@ pub fn CategoriasGastos() -> Html {
     html! {
         <div>
             <div class="gi-page-header">
-                <h1 class="gi-page-title">{"Resumen por Categoría de Gastos"}</h1>
+                <h1 class="gi-page-title">{"Resumen por CategorÃ­a de Gastos"}</h1>
             </div>
 
             if let Some(err) = (*error).as_ref() {
@@ -145,7 +145,7 @@ pub fn CategoriasGastos() -> Html {
                                 <tr>
                                     <th style="padding: var(--space-3) var(--space-4); cursor: pointer;"
                                         onclick={make_sort_handler(SortColumn::Categoria)}>
-                                        {format!("Categoría{}", sort_indicator(SortColumn::Categoria))}
+                                        {format!("CategorÃ­a{}", sort_indicator(SortColumn::Categoria))}
                                     </th>
                                     <th style="padding: var(--space-3) var(--space-4); cursor: pointer; text-align: right;"
                                         onclick={make_sort_handler(SortColumn::Total)}>

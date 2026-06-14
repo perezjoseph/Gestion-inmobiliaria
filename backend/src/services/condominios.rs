@@ -11,7 +11,6 @@ use crate::models::condominios::{
 use crate::models::fiscal::TipoFiscal;
 use crate::services::itbis::calcular_itbis;
 
-/// Create a new condominium fee record for a property.
 pub async fn crear_cuota(
     db: &DatabaseConnection,
     input: CrearCuotaRequest,
@@ -39,7 +38,6 @@ pub async fn crear_cuota(
     Ok(to_response(&model))
 }
 
-/// Update an existing condominium fee record. Only provided fields are changed.
 pub async fn actualizar_cuota(
     db: &DatabaseConnection,
     id: Uuid,
@@ -79,7 +77,6 @@ pub async fn actualizar_cuota(
     Ok(to_response(&updated))
 }
 
-/// List all condominium fees for a given property within the organization.
 pub async fn listar_cuotas(
     db: &DatabaseConnection,
     propiedad_id: Uuid,
@@ -94,7 +91,6 @@ pub async fn listar_cuotas(
     Ok(cuotas.iter().map(to_response).collect())
 }
 
-/// Delete a condominium fee record by ID, scoped to the organization.
 pub async fn eliminar_cuota(
     db: &DatabaseConnection,
     id: Uuid,
@@ -115,35 +111,19 @@ pub async fn eliminar_cuota(
     Ok(())
 }
 
-/// Calculate billing breakdown with condominium fee as a separate line item.
-///
-/// This is a pure function that computes the billing desglose:
-/// - `monto_base`: base rent amount
-/// - `cuota_condominio`: condominium fee (zero if no cuota or not passthrough)
-/// - `itbis_base`: ITBIS on base rent (18% if commercial + registered)
-/// - `itbis_cuota`: ITBIS on cuota (18% if commercial + registered)
-/// - `total`: sum of all components
-///
-/// Key rules:
-/// - ITBIS applies to cuota ONLY if property is commercial AND org is registered
-/// - Cuota increases are NOT subject to 10% Ley 85-25 cap
-/// - Each component is shown as a separate line item
 pub fn calcular_billing_con_cuota(
     monto_base: Decimal,
     cuota: Option<&cuota_condominio::Model>,
     tipo_propiedad: &str,
     tipo_fiscal: &TipoFiscal,
 ) -> BillingDesglose {
-    // Calculate ITBIS on base rent
     let itbis_base_result = calcular_itbis(monto_base, tipo_propiedad, tipo_fiscal, None);
     let itbis_base = itbis_base_result.monto_itbis;
 
-    // Determine cuota amount (only if passthrough and present)
     let cuota_monto = cuota
         .filter(|c| c.es_passthrough)
         .map_or(Decimal::ZERO, |c| c.monto);
 
-    // Calculate ITBIS on cuota (same rules: commercial + registered)
     let itbis_cuota = if cuota_monto > Decimal::ZERO {
         let itbis_cuota_result = calcular_itbis(cuota_monto, tipo_propiedad, tipo_fiscal, None);
         itbis_cuota_result.monto_itbis
@@ -162,7 +142,6 @@ pub fn calcular_billing_con_cuota(
     }
 }
 
-/// Convert an entity model to a response DTO.
 fn to_response(model: &cuota_condominio::Model) -> CuotaResponse {
     CuotaResponse {
         id: model.id,
@@ -199,8 +178,6 @@ mod tests {
             updated_at: Utc::now().fixed_offset(),
         }
     }
-
-    // ── calcular_billing_con_cuota tests ──────────────────────
 
     #[test]
     fn billing_no_cuota_comercial_registered() {
@@ -274,7 +251,6 @@ mod tests {
             "comercial",
             &TipoFiscal::PersonaJuridica,
         );
-        // Non-passthrough cuota is NOT included in tenant billing
         assert_eq!(result.cuota_condominio, Decimal::ZERO);
         assert_eq!(result.itbis_cuota, Decimal::ZERO);
         assert_eq!(result.total, Decimal::new(29500_00, 2));

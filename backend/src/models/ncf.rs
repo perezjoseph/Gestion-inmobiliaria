@@ -2,12 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use uuid::Uuid;
 
-/// NCF types relevant to property management per DGII classification.
-///
-/// - `B01` (Crédito Fiscal): issued to persona jurídica/persona física registrada tenants
-/// - `B02` (Consumo Final): issued to unregistered individuals
-/// - `B14` (Régimen Especial): issued to entities in special tax regimes
-/// - `B15` (Gubernamental): issued to government entities
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TipoNCF {
     B01,
@@ -27,7 +21,6 @@ impl fmt::Display for TipoNCF {
     }
 }
 
-/// Request to configure an authorized NCF sequence range as allocated by DGII.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfigurarRangoRequest {
@@ -37,7 +30,6 @@ pub struct ConfigurarRangoRequest {
     pub rango_hasta: i32,
 }
 
-/// Alert indicating NCF range consumption level for a given type.
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AlertaRango {
@@ -46,7 +38,6 @@ pub struct AlertaRango {
     pub restantes: i32,
 }
 
-/// Response representing a configured NCF sequence for an organization.
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SecuenciaNcfResponse {

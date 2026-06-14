@@ -99,10 +99,8 @@ mod tests {
 
     #[test]
     fn update_request_does_not_include_immutable_fields() {
-        // tipo, cedula, rnc should NOT be in UpdateOrganizacionRequest
         let json = r#"{"tipo": "persona_juridica", "cedula": "12345678901", "rnc": "123456789"}"#;
         let req: UpdateOrganizacionRequest = serde_json::from_str(json).unwrap();
-        // These fields are silently ignored since they don't exist on the struct
         assert!(req.nombre.is_none());
     }
 }

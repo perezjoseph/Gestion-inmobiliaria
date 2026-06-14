@@ -6,10 +6,6 @@ use crate::middleware::rbac::AdminOnly;
 use crate::models::fiscal::ActualizarTipoFiscalRequest;
 use crate::services::fiscal;
 
-/// PUT /api/v1/organizacion/fiscal/tipo-fiscal
-///
-/// Updates the `tipo_fiscal` for the admin's organization.
-/// Validates the identifier (RNC or cédula) before persisting.
 pub async fn actualizar_tipo_fiscal(
     db: web::Data<DatabaseConnection>,
     admin: AdminOnly,
@@ -30,9 +26,6 @@ pub async fn actualizar_tipo_fiscal(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// GET /api/v1/organizacion/fiscal/estado
-///
-/// Returns the current fiscal state of the admin's organization.
 pub async fn obtener_estado_fiscal(
     db: web::Data<DatabaseConnection>,
     admin: AdminOnly,

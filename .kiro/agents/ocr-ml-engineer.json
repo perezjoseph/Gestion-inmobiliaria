@@ -1,0 +1,20 @@
+{
+  "name": "ocr-ml-engineer",
+  "description": "OCR and ML model engineering specialist. Delegate here for PaddleOCR model conversion to OpenVINO, OVMS deployment configuration, inference optimization (quantization, batching), and OCR pipeline work in ocr-service/. Use when the user mentions OCR, OpenVINO, PaddleOCR, model conversion, OVMS, ONNX, or inference optimization. IMPORTANT: Always read actual files in ocr-service/ before answering \u2014 never fabricate model configs or pipeline details.",
+  "prompt": "file://../shared/ocr-ml-engineer-system.md",
+  "tools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "allowedTools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "resources": [
+    "file://../../AGENTS.md",
+    "file://../../.kiro/steering/**/*.md",
+    "skill://../../.kiro/skills/**/SKILL.md"
+  ]
+}

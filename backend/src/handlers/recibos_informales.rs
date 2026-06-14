@@ -7,7 +7,6 @@ use crate::errors::AppError;
 use crate::middleware::rbac::WriteAccess;
 use crate::services::recibos_informales;
 
-/// Request body for `POST /api/v1/recibos-informales`.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CrearReciboInformalRequest {
@@ -15,7 +14,6 @@ pub struct CrearReciboInformalRequest {
     pub organizacion_id: Uuid,
 }
 
-/// POST `/api/v1/recibos-informales` — crear un recibo informal para un pago en efectivo.
 pub async fn crear(
     db: web::Data<DatabaseConnection>,
     _claims: WriteAccess,

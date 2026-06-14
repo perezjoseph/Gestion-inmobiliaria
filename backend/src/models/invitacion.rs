@@ -6,7 +6,7 @@ use uuid::Uuid;
 #[serde(rename_all = "camelCase")]
 pub struct CrearInvitacionRequest {
     pub email: String,
-    pub rol: String, // "gerente" | "visualizador"
+    pub rol: String,
 }
 
 #[derive(Debug, Serialize)]

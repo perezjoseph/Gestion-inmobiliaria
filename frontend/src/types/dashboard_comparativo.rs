@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use crate::types::deserialize_f64_from_any;
 use crate::types::deserialize_option_f64_from_any;
 
-/// Per-property comparison row in the comparative dashboard.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PropertyComparison {
@@ -31,7 +30,6 @@ pub struct PropertyComparison {
     pub rentabilidad_unreliable: bool,
 }
 
-/// Response for the comparative dashboard endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct DashboardComparativoResponse {

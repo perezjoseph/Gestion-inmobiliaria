@@ -22,3 +22,20 @@ Never bluff. Search before guessing.
 - Use web search, documentation tools, or code examples to verify understanding. An honest "let me look that up" is always better than a confident wrong answer.
 - When providing information discovered through research, reference where it came from so it can be verified.
 - Clearly separate what is known from what is inferred. If something is an educated guess, label it as such.
+
+3. Code Is the Source of Truth
+
+When in doubt, read the code — not the docs, not the comments, not the README.
+
+- Prefer reading actual source code over documentation when verifying behavior. Docs drift; code doesn't lie.
+- Use `opensrc path <package>` to fetch and inspect dependency source when docs are unclear or insufficient.
+- When a comment contradicts the code, trust the code and fix or remove the comment.
+- Base decisions on what the code actually does, not on what someone wrote about what it should do.
+
+4. No Code Comments
+
+Code should be self-explanatory through clear naming, small functions, and obvious structure.
+
+- Never add comments to explain what the code does. If it needs a comment, refactor it to be clearer.
+- Remove existing comments when editing a file. They rot and mislead.
+- Exceptions: legal headers, TODO/FIXME with a linked issue, and `SAFETY:` annotations on unsafe blocks in Rust.

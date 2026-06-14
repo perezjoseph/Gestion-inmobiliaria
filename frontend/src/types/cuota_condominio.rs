@@ -41,7 +41,6 @@ pub struct UpdateCuotaCondominio {
     pub es_passthrough: Option<bool>,
 }
 
-/// Billing preview response from the API
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct BillingPreview {

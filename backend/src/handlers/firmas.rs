@@ -13,7 +13,6 @@ use crate::services::auth::Claims;
 use crate::services::firmas;
 use crate::services::mail::MailClient;
 
-/// Extract client IP from X-Forwarded-For header, falling back to peer address.
 fn extract_ip(req: &HttpRequest) -> String {
     req.headers()
         .get("X-Forwarded-For")
@@ -28,7 +27,6 @@ fn extract_ip(req: &HttpRequest) -> String {
         )
 }
 
-/// Extract User-Agent from request headers.
 fn extract_user_agent(req: &HttpRequest) -> String {
     req.headers()
         .get("User-Agent")
@@ -37,7 +35,6 @@ fn extract_user_agent(req: &HttpRequest) -> String {
         .to_string()
 }
 
-/// POST `/documentos/{id}/firmar` — Authenticated manager signing.
 #[allow(clippy::future_not_send)]
 pub async fn firmar(
     db: web::Data<DatabaseConnection>,
@@ -66,7 +63,6 @@ pub async fn firmar(
     Ok(HttpResponse::Ok().json(result))
 }
 
-/// POST `/documentos/{id}/solicitar-firma` — Request tenant signature.
 pub async fn solicitar_firma(
     db: web::Data<DatabaseConnection>,
     access: WriteAccess,
@@ -88,7 +84,6 @@ pub async fn solicitar_firma(
     Ok(HttpResponse::Created().json(result))
 }
 
-/// GET `/documentos/{id}/firmas` — List all signatures for a document.
 pub async fn listar_firmas(
     db: web::Data<DatabaseConnection>,
     claims: Claims,
@@ -101,7 +96,6 @@ pub async fn listar_firmas(
     Ok(HttpResponse::Ok().json(result))
 }
 
-/// POST `/firmas/{token}/verificar` — Public token verification (no auth).
 pub async fn verificar_firma_publica(
     db: web::Data<DatabaseConnection>,
     path: web::Path<String>,
@@ -114,7 +108,6 @@ pub async fn verificar_firma_publica(
     Ok(HttpResponse::Ok().json(result))
 }
 
-/// POST `/firmas/{token}/firmar` — Public tenant signing (no auth).
 #[allow(clippy::future_not_send)]
 pub async fn firmar_publica(
     db: web::Data<DatabaseConnection>,

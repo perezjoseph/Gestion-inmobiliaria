@@ -4,9 +4,6 @@
     clippy::doc_markdown,
     clippy::empty_line_after_doc_comments
 )]
-//! Property-based tests for the chatbot service.
-//!
-//! **Validates: Requirements 2.1, 2.2, 2.3, 13.1, 13.3**
 
 use proptest::prelude::*;
 use proptest::test_runner::{Config as ProptestConfig, TestRunner};
@@ -14,9 +11,6 @@ use proptest::test_runner::{Config as ProptestConfig, TestRunner};
 use crate::models::chatbot::{Confidence, map_confidence};
 use crate::services::chatbot::{check_sender_policy_no_db, is_phone_in_allowlist};
 
-// â”€â”€ Custom Strategies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-/// Generate a valid E.164 phone number for testing.
 fn arb_e164_phone() -> impl Strategy<Value = String> {
     (1..=9u8, proptest::collection::vec(0..=9u8, 6..14)).prop_map(|(first, rest)| {
         let mut phone = format!("+{first}");
@@ -27,24 +21,16 @@ fn arb_e164_phone() -> impl Strategy<Value = String> {
     })
 }
 
-/// Generate a non-empty allowlist of E.164 phone numbers.
 fn arb_allowlist() -> impl Strategy<Value = Vec<String>> {
     proptest::collection::vec(arb_e164_phone(), 1..20)
 }
 
-/// Generate a policy string that is NOT one of the recognized values.
 fn arb_unrecognized_policy() -> impl Strategy<Value = String> {
     "[a-z_]{1,30}".prop_filter("must not be a recognized policy", |s| {
         s != "tenants_only" && s != "tenants_and_prospects" && s != "allowlist"
     })
 }
 
-// â”€â”€ Property 2: Sender Policy Correctness â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// Feature: whatsapp-ai-assistant, Property 2: Sender Policy Correctness
-// **Validates: Requirements 2.1, 2.2, 2.3**
-
-/// Property 2a: `tenants_and_prospects` always allows any sender.
 #[test]
 fn tenants_and_prospects_always_allows() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -67,7 +53,6 @@ fn tenants_and_prospects_always_allows() {
         .expect("tenants_and_prospects_always_allows failed");
 }
 
-/// Property 2b: `allowlist` policy allows iff phone is in the list.
 #[test]
 fn allowlist_allows_phone_in_list() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -88,7 +73,6 @@ fn allowlist_allows_phone_in_list() {
         .expect("allowlist_allows_phone_in_list failed");
 }
 
-/// Property 2b (converse): `allowlist` policy denies phone NOT in the list.
 #[test]
 fn allowlist_denies_phone_not_in_list() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -109,7 +93,6 @@ fn allowlist_denies_phone_not_in_list() {
         .expect("allowlist_denies_phone_not_in_list failed");
 }
 
-/// Property 2b (edge): `allowlist` policy denies when allowlist is None.
 #[test]
 fn allowlist_denies_when_none() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -130,7 +113,6 @@ fn allowlist_denies_when_none() {
         .expect("allowlist_denies_when_none failed");
 }
 
-/// Property 2c: Unrecognized policies always deny (fail-closed).
 #[test]
 fn unrecognized_policy_always_denies() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -157,7 +139,6 @@ fn unrecognized_policy_always_denies() {
         .expect("unrecognized_policy_always_denies failed");
 }
 
-/// Property 2 (structural): `tenants_only` requires DB lookup (returns None from pure check).
 #[test]
 fn tenants_only_requires_db_lookup() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -180,7 +161,6 @@ fn tenants_only_requires_db_lookup() {
         .expect("tenants_only_requires_db_lookup failed");
 }
 
-/// Property 2b (via check_sender_policy_no_db): allowlist through the unified check function.
 #[test]
 fn check_sender_policy_allowlist_correctness() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -208,9 +188,6 @@ fn check_sender_policy_allowlist_correctness() {
         .expect("check_sender_policy_allowlist_correctness failed");
 }
 
-// â”€â”€ Strategies for Phone Number E.164 Validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-/// Generate a valid E.164 phone number: '+' followed by 2â€“15 digits where the first digit is 1â€“9.
 fn valid_e164() -> impl Strategy<Value = String> {
     (1u8..=9, prop::collection::vec(0u8..=9, 1..=14)).prop_map(|(first, rest)| {
         let mut s = String::with_capacity(16);
@@ -223,10 +200,8 @@ fn valid_e164() -> impl Strategy<Value = String> {
     })
 }
 
-/// Generate strings that do NOT match E.164 format.
 fn invalid_e164() -> impl Strategy<Value = String> {
     prop_oneof![
-        // Missing '+' prefix
         (1u8..=9, prop::collection::vec(0u8..=9, 1..=14)).prop_map(|(first, rest)| {
             let mut s = String::new();
             s.push(char::from(b'0' + first));
@@ -235,7 +210,6 @@ fn invalid_e164() -> impl Strategy<Value = String> {
             }
             s
         }),
-        // Leading zero after '+'
         prop::collection::vec(0u8..=9, 1..=14).prop_map(|rest| {
             let mut s = String::from("+0");
             for d in rest {
@@ -243,7 +217,6 @@ fn invalid_e164() -> impl Strategy<Value = String> {
             }
             s
         }),
-        // Too many digits (16+ after '+')
         (1u8..=9, prop::collection::vec(0u8..=9, 15..=20)).prop_map(|(first, rest)| {
             let mut s = String::from("+");
             s.push(char::from(b'0' + first));
@@ -252,11 +225,8 @@ fn invalid_e164() -> impl Strategy<Value = String> {
             }
             s
         }),
-        // Empty string
         Just(String::new()),
-        // Only '+'
         Just("+".to_string()),
-        // Contains non-digit characters after '+'
         (1u8..=9, prop::collection::vec(0u8..=9, 3..=8)).prop_map(|(first, rest)| {
             let mut s = String::from("+");
             s.push(char::from(b'0' + first));
@@ -266,7 +236,6 @@ fn invalid_e164() -> impl Strategy<Value = String> {
             }
             s
         }),
-        // Contains spaces after '+'
         (1u8..=9, prop::collection::vec(0u8..=9, 3..=8)).prop_map(|(first, rest)| {
             let mut s = String::from("+");
             s.push(char::from(b'0' + first));
@@ -279,7 +248,6 @@ fn invalid_e164() -> impl Strategy<Value = String> {
     ]
 }
 
-/// Generate a normalizable phone number (local format with enough digits).
 fn normalizable_local_phone() -> impl Strategy<Value = String> {
     (1u8..=9, prop::collection::vec(0u8..=9, 6..=9)).prop_map(|(first, rest)| {
         let mut s = String::new();
@@ -291,7 +259,6 @@ fn normalizable_local_phone() -> impl Strategy<Value = String> {
     })
 }
 
-/// Generate a valid country code prefix (e.g., "+1", "+44", "+809").
 fn valid_country_code() -> impl Strategy<Value = String> {
     prop_oneof![
         Just("+1".to_string()),
@@ -301,14 +268,8 @@ fn valid_country_code() -> impl Strategy<Value = String> {
     ]
 }
 
-// â”€â”€ Property 21: Phone Number E.164 Validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
 use crate::services::chatbot::{enforce_config_role, normalize_phone, validate_e164};
 
-// Feature: whatsapp-ai-assistant, Property 21: Phone Number E.164 Validation
-
-/// Property 21a: Valid E.164 numbers are accepted by validate_e164.
-/// **Validates: Requirements 13.1, 13.3**
 #[test]
 fn valid_e164_numbers_are_accepted() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -330,8 +291,6 @@ fn valid_e164_numbers_are_accepted() {
         .expect("valid_e164_numbers_are_accepted failed");
 }
 
-/// Property 21b: Invalid E.164 numbers are rejected by validate_e164.
-/// **Validates: Requirements 13.1, 13.3**
 #[test]
 fn invalid_e164_numbers_are_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -352,8 +311,6 @@ fn invalid_e164_numbers_are_rejected() {
         .expect("invalid_e164_numbers_are_rejected failed");
 }
 
-/// Property 21c: normalize_phone output always passes validate_e164.
-/// **Validates: Requirements 13.1, 13.3**
 #[test]
 fn normalize_phone_output_always_valid_e164() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -376,14 +333,12 @@ fn normalize_phone_output_always_valid_e164() {
                         validation.err()
                     );
                 }
-                // If normalize_phone returns Err, that's also acceptable (rejection path)
                 Ok(())
             },
         )
         .expect("normalize_phone_output_always_valid_e164 failed");
 }
 
-/// Generate a valid E.164 number with at least 7 digits (normalize_phone's minimum).
 fn valid_e164_normalizable() -> impl Strategy<Value = String> {
     (1u8..=9, prop::collection::vec(0u8..=9, 6..=14)).prop_map(|(first, rest)| {
         let mut s = String::with_capacity(16);
@@ -396,8 +351,6 @@ fn valid_e164_normalizable() -> impl Strategy<Value = String> {
     })
 }
 
-/// Property 21d: normalize_phone is idempotent on valid E.164 numbers.
-/// **Validates: Requirements 13.1, 13.3**
 #[test]
 fn normalize_phone_is_idempotent() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -442,23 +395,16 @@ fn normalize_phone_is_idempotent() {
         .expect("normalize_phone_is_idempotent failed");
 }
 
-// â”€â”€ Property 14: Retention Cleanup Correctness â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
 use chrono::{Duration, Utc};
 use sea_orm::prelude::DateTimeWithTimeZone;
 use uuid::Uuid;
 
-/// A simplified conversation message for retention testing.
 #[derive(Debug, Clone)]
 struct TestMessage {
     id: Uuid,
     created_at: chrono::DateTime<Utc>,
 }
 
-/// Pure model of the retention cleanup logic.
-/// Mirrors `cleanup_expired` which deletes messages WHERE `created_at < (now - retention_days)`.
-///
-/// Returns (kept, deleted) partitions.
 fn retention_partition(
     messages: &[TestMessage],
     now: chrono::DateTime<Utc>,
@@ -479,22 +425,14 @@ fn retention_partition(
     (kept, deleted)
 }
 
-/// Generate a timestamp relative to `now` within a range of days offset.
-/// Negative offset = in the past, positive = in the future.
 fn arb_timestamp_offset_days() -> impl Strategy<Value = i64> {
-    -730i64..=730 // up to 2 years in either direction
+    -730i64..=730
 }
 
-/// Generate a valid retention_days value (1â€“365).
 fn arb_retention_days() -> impl Strategy<Value = i64> {
     1i64..=365
 }
 
-// Feature: whatsapp-ai-assistant, Property 14: Retention Cleanup Correctness
-/// **Validates: Requirement 7.4**
-
-/// Property 14a: Messages older than retention_days are deleted.
-/// For any message with (now - created_at) > retention_days, it SHALL be deleted.
 #[test]
 fn retention_cleanup_deletes_expired_messages() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -519,7 +457,6 @@ fn retention_cleanup_deletes_expired_messages() {
 
                 let (kept, deleted) = retention_partition(&messages, now, retention_days);
 
-                // Verify: every deleted message has created_at < cutoff
                 let cutoff = now - Duration::days(retention_days);
                 for msg in &messages {
                     if msg.created_at < cutoff {
@@ -532,7 +469,6 @@ fn retention_cleanup_deletes_expired_messages() {
                     }
                 }
 
-                // Verify: every kept message has created_at >= cutoff
                 for msg in &messages {
                     if msg.created_at >= cutoff {
                         prop_assert!(
@@ -550,8 +486,6 @@ fn retention_cleanup_deletes_expired_messages() {
         .expect("retention_cleanup_deletes_expired_messages failed");
 }
 
-/// Property 14b: Messages within retention period are preserved.
-/// For any message with (now - created_at) <= retention_days, it SHALL be preserved.
 #[test]
 fn retention_cleanup_preserves_recent_messages() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -565,7 +499,6 @@ fn retention_cleanup_preserves_recent_messages() {
         .run(
             &(arb_retention_days(), 0i64..=365),
             |(retention_days, age_days)| {
-                // Create a message that is exactly `age_days` old (within retention)
                 prop_assume!(age_days <= retention_days);
 
                 let msg = TestMessage {
@@ -595,7 +528,6 @@ fn retention_cleanup_preserves_recent_messages() {
         .expect("retention_cleanup_preserves_recent_messages failed");
 }
 
-/// Property 14c: Partition is exhaustive â€” every message is either kept or deleted, never both, never lost.
 #[test]
 fn retention_cleanup_partition_is_exhaustive() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -623,7 +555,6 @@ fn retention_cleanup_partition_is_exhaustive() {
 
                 let (kept, deleted) = retention_partition(&messages, now, retention_days);
 
-                // Every message appears in exactly one partition
                 prop_assert_eq!(
                     kept.len() + deleted.len(),
                     messages.len(),
@@ -633,7 +564,6 @@ fn retention_cleanup_partition_is_exhaustive() {
                     messages.len()
                 );
 
-                // No message appears in both
                 for id in &kept {
                     prop_assert!(
                         !deleted.contains(id),
@@ -648,9 +578,6 @@ fn retention_cleanup_partition_is_exhaustive() {
         .expect("retention_cleanup_partition_is_exhaustive failed");
 }
 
-/// Property 14d: The cutoff boundary is strict â€” a message exactly at the boundary is preserved.
-/// `cleanup_expired` uses `created_at < cutoff` (strict less-than), so messages at exactly
-/// `now - retention_days` are preserved (since `created_at < cutoff` is false when equal).
 #[test]
 fn retention_cleanup_boundary_message_is_preserved() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -663,7 +590,6 @@ fn retention_cleanup_boundary_message_is_preserved() {
             let now = Utc::now();
             let cutoff = now - Duration::days(retention_days);
 
-            // Message created exactly at the cutoff boundary
             let msg = TestMessage {
                 id: Uuid::from_u128(99),
                 created_at: cutoff,
@@ -672,7 +598,6 @@ fn retention_cleanup_boundary_message_is_preserved() {
             let (kept, deleted) =
                 retention_partition(std::slice::from_ref(&msg), now, retention_days);
 
-            // Since cleanup uses `created_at < cutoff`, a message AT the cutoff is NOT deleted
             prop_assert!(
                 kept.contains(&msg.id),
                 "Message at exact cutoff boundary (retention_days={}) should be preserved",
@@ -688,13 +613,10 @@ fn retention_cleanup_boundary_message_is_preserved() {
         .expect("retention_cleanup_boundary_message_is_preserved failed");
 }
 
-// â”€â”€ Strategies for Conversation History Windowing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
 use chrono::DateTime;
 
 use crate::services::chatbot::{TimestampedMessage, window_history};
 
-/// Generate a list of messages with distinct timestamps.
 fn arb_message_list(max_len: usize) -> impl Strategy<Value = Vec<TimestampedMessage>> {
     prop::collection::vec((any::<u32>(), "[a-z]{1,20}"), 0..=max_len).prop_map(|items| {
         let base: DateTime<Utc> =
@@ -711,17 +633,10 @@ fn arb_message_list(max_len: usize) -> impl Strategy<Value = Vec<TimestampedMess
     })
 }
 
-/// Generate a valid history_limit (1â€“50, matching config validation).
 fn arb_history_limit() -> impl Strategy<Value = usize> {
     1..=50usize
 }
 
-// â”€â”€ Property 6: Conversation History Windowing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// Feature: whatsapp-ai-assistant, Property 6: Conversation History Windowing
-// **Validates: Requirements 3.2, 7.2**
-
-/// Property 6a: window_history returns exactly min(M, N) messages.
 #[test]
 fn history_windowing_returns_min_m_n() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -750,7 +665,6 @@ fn history_windowing_returns_min_m_n() {
         .expect("history_windowing_returns_min_m_n failed");
 }
 
-/// Property 6b: window_history returns the N most recent messages (by created_at).
 #[test]
 fn history_windowing_returns_most_recent() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -764,7 +678,6 @@ fn history_windowing_returns_most_recent() {
             |(messages, limit)| {
                 let result = window_history(&messages, limit);
 
-                // The result should be ordered DESC by created_at
                 for pair in result.windows(2) {
                     prop_assert!(
                         pair[0].created_at >= pair[1].created_at,
@@ -774,7 +687,6 @@ fn history_windowing_returns_most_recent() {
                     );
                 }
 
-                // Every message in the result should be >= every message NOT in the result
                 if !result.is_empty() && result.len() < messages.len() {
                     let oldest_in_result = result.last().unwrap().created_at;
                     let result_set: std::collections::HashSet<_> =
@@ -797,39 +709,31 @@ fn history_windowing_returns_most_recent() {
         .expect("history_windowing_returns_most_recent failed");
 }
 
-// â”€â”€ Strategies for Configuration Round-Trip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
 use crate::entities::chatbot_config;
 use crate::models::chatbot::{Capabilities, ChatbotConfigUpdateRequest, FaqEntry};
 use crate::services::chatbot::{config_model_to_response, validate_config};
 
-/// Generate a valid display_name (1â€“100 bytes, ASCII to avoid multi-byte issues).
 fn valid_display_name() -> impl Strategy<Value = String> {
     "[A-Za-z0-9 ]{1,100}"
 }
 
-/// Generate a valid tone (1â€“50 bytes, ASCII to avoid multi-byte issues).
 fn valid_tone() -> impl Strategy<Value = String> {
     "[a-z]{1,50}"
 }
 
-/// Generate a valid FAQ entry (question 1â€“200 bytes, answer 1â€“200 bytes, ASCII).
 fn valid_faq_entry() -> impl Strategy<Value = FaqEntry> {
     ("[A-Za-z0-9 ?]{1,200}", "[A-Za-z0-9 .]{1,200}")
         .prop_map(|(question, answer)| FaqEntry { question, answer })
 }
 
-/// Generate a valid FAQ list (0â€“10 entries for test speed).
 fn valid_faqs() -> impl Strategy<Value = Vec<FaqEntry>> {
     prop::collection::vec(valid_faq_entry(), 0..=10)
 }
 
-/// Generate valid policies text (0â€“500 bytes, ASCII).
 fn valid_policies() -> impl Strategy<Value = String> {
     "[A-Za-z0-9 .\n]{0,500}"
 }
 
-/// Generate a valid sender_policy value.
 fn valid_sender_policy() -> impl Strategy<Value = String> {
     prop_oneof![
         Just("tenants_only".to_string()),
@@ -838,7 +742,6 @@ fn valid_sender_policy() -> impl Strategy<Value = String> {
     ]
 }
 
-/// Generate valid capabilities.
 fn valid_capabilities() -> impl Strategy<Value = Capabilities> {
     (
         any::<bool>(),
@@ -866,17 +769,14 @@ fn valid_capabilities() -> impl Strategy<Value = Capabilities> {
         )
 }
 
-/// Generate a valid history_limit (1â€“50).
 fn valid_history_limit() -> impl Strategy<Value = i32> {
     1..=50i32
 }
 
-/// Generate a valid retention_days (1â€“365).
 fn valid_retention_days() -> impl Strategy<Value = i32> {
     1..=365i32
 }
 
-/// Generate a complete valid ChatbotConfigUpdateRequest.
 fn valid_config_update() -> impl Strategy<Value = ChatbotConfigUpdateRequest> {
     (
         any::<bool>(),
@@ -920,8 +820,6 @@ fn valid_config_update() -> impl Strategy<Value = ChatbotConfigUpdateRequest> {
         )
 }
 
-/// Build a chatbot_config::Model from a ChatbotConfigUpdateRequest,
-/// simulating what upsert_config does when inserting a new record.
 fn build_model_from_input(input: &ChatbotConfigUpdateRequest) -> chatbot_config::Model {
     let now: DateTimeWithTimeZone = Utc::now().into();
     chatbot_config::Model {
@@ -968,10 +866,6 @@ fn build_model_from_input(input: &ChatbotConfigUpdateRequest) -> chatbot_config:
     }
 }
 
-// â”€â”€ Property 17: Configuration Round-Trip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// Feature: whatsapp-ai-assistant, Property 17: Configuration Round-Trip
-/// **Validates: Requirements 9.2, 9.3, 9.4, 9.5**
 #[test]
 fn config_round_trip_preserves_all_fields() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -981,21 +875,16 @@ fn config_round_trip_preserves_all_fields() {
 
     runner
         .run(&valid_config_update(), |input| {
-            // Step 1: validate_config accepts any valid input
             prop_assert!(
                 validate_config(&input).is_ok(),
                 "validate_config rejected a valid input: {:?}",
                 input
             );
 
-            // Step 2: Build a model (simulating DB insert) and convert back to response
             let model = build_model_from_input(&input);
             let response =
                 config_model_to_response(model).expect("config_model_to_response failed");
 
-            // Step 3: Verify all fields round-trip correctly
-
-            // Persona settings (Requirement 9.2)
             prop_assert_eq!(
                 response.display_name.as_deref(),
                 input.display_name.as_deref(),
@@ -1017,7 +906,6 @@ fn config_round_trip_preserves_all_fields() {
                 "greeting mismatch"
             );
 
-            // Capability toggles (Requirement 9.3)
             let input_caps = input.capabilities.as_ref().unwrap();
             prop_assert_eq!(
                 response.capabilities.receipt_ocr,
@@ -1045,7 +933,6 @@ fn config_round_trip_preserves_all_fields() {
                 "human_handoff mismatch"
             );
 
-            // FAQ entries (Requirement 9.4)
             let input_faqs = input.faqs.as_ref().unwrap();
             let response_faqs = response.faqs.as_ref().unwrap();
             prop_assert_eq!(response_faqs.len(), input_faqs.len(), "FAQ count mismatch");
@@ -1065,35 +952,30 @@ fn config_round_trip_preserves_all_fields() {
                 );
             }
 
-            // Policies text (Requirement 9.5)
             prop_assert_eq!(
                 response.policies.as_deref(),
                 input.policies.as_deref(),
                 "policies mismatch"
             );
 
-            // Sender policy
             prop_assert_eq!(
                 &response.sender_policy,
                 input.sender_policy.as_ref().unwrap(),
                 "sender_policy mismatch"
             );
 
-            // Allowlist
             prop_assert_eq!(
                 response.allowlist.as_ref(),
                 input.allowlist.as_ref(),
                 "allowlist mismatch"
             );
 
-            // Handoff keywords
             prop_assert_eq!(
                 response.handoff_keywords.as_ref(),
                 input.handoff_keywords.as_ref(),
                 "handoff_keywords mismatch"
             );
 
-            // Numeric settings
             prop_assert_eq!(
                 response.history_limit,
                 input.history_limit.unwrap(),
@@ -1105,7 +987,6 @@ fn config_round_trip_preserves_all_fields() {
                 "retention_days mismatch"
             );
 
-            // Activo flag
             prop_assert_eq!(response.activo, input.activo.unwrap(), "activo mismatch");
 
             Ok(())
@@ -1113,17 +994,10 @@ fn config_round_trip_preserves_all_fields() {
         .expect("config_round_trip_preserves_all_fields failed");
 }
 
-// â”€â”€ Property 8: Confidence Level Mapping â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// Feature: whatsapp-ai-assistant, Property 8: Confidence Level Mapping
-// **Validates: Requirement 4.2**
-
-/// Generate a valid OCR confidence score in [0.0, 1.0].
 fn arb_confidence_score() -> impl Strategy<Value = f64> {
     0.0..=1.0f64
 }
 
-/// Property 8a: Scores >= 0.85 always map to High.
 #[test]
 fn confidence_high_threshold() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1144,7 +1018,6 @@ fn confidence_high_threshold() {
         .expect("confidence_high_threshold failed");
 }
 
-/// Property 8b: Scores in [0.60, 0.85) always map to Medium.
 #[test]
 fn confidence_medium_threshold() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1165,7 +1038,6 @@ fn confidence_medium_threshold() {
         .expect("confidence_medium_threshold failed");
 }
 
-/// Property 8c: Scores < 0.60 always map to Low.
 #[test]
 fn confidence_low_threshold() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1186,7 +1058,6 @@ fn confidence_low_threshold() {
         .expect("confidence_low_threshold failed");
 }
 
-/// Property 8d: Mapping is exhaustive â€” every score in [0.0, 1.0] maps to exactly one level.
 #[test]
 fn confidence_mapping_exhaustive() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1211,8 +1082,6 @@ fn confidence_mapping_exhaustive() {
         .expect("confidence_mapping_exhaustive failed");
 }
 
-/// Property 8e: Mapping is monotonic â€” higher scores never map to lower confidence levels.
-/// Confidence ordering: High > Medium > Low.
 #[test]
 fn confidence_mapping_monotonic() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1261,12 +1130,6 @@ fn confidence_mapping_monotonic() {
         .expect("confidence_mapping_monotonic failed");
 }
 
-// â”€â”€ Property 9: Confidence-Based Receipt Routing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// Feature: whatsapp-ai-assistant, Property 9: Confidence-Based Receipt Routing
-// **Validates: Requirements 4.3, 4.4**
-
-/// Generate an arbitrary Confidence value.
 fn arb_confidence() -> impl Strategy<Value = Confidence> {
     prop_oneof![
         Just(Confidence::High),
@@ -1275,7 +1138,6 @@ fn arb_confidence() -> impl Strategy<Value = Confidence> {
     ]
 }
 
-/// Generate an arbitrary Option<Uuid> representing tenant resolution status.
 fn arb_inquilino_id() -> impl Strategy<Value = Option<Uuid>> {
     prop_oneof![
         Just(None),
@@ -1283,10 +1145,6 @@ fn arb_inquilino_id() -> impl Strategy<Value = Option<Uuid>> {
     ]
 }
 
-/// Pure model of the receipt routing logic.
-/// Mirrors `record_extraction` which always stores with status `pending_confirmation`
-/// regardless of confidence level or tenant resolution status.
-/// The routing difference (reply to tenant) is handled elsewhere.
 fn determine_extraction_status(
     _confidence: &Confidence,
     _inquilino_id: Option<Uuid>,
@@ -1294,7 +1152,6 @@ fn determine_extraction_status(
     "pending_confirmation"
 }
 
-/// Property 9a: High confidence with resolved tenant â†’ status is `pending_confirmation`.
 #[test]
 fn receipt_routing_high_confidence_resolved_tenant() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1317,7 +1174,6 @@ fn receipt_routing_high_confidence_resolved_tenant() {
         .expect("receipt_routing_high_confidence_resolved_tenant failed");
 }
 
-/// Property 9b: Medium or Low confidence â†’ status is `pending_confirmation` regardless of tenant resolution.
 #[test]
 fn receipt_routing_medium_low_always_pending_confirmation() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1346,9 +1202,6 @@ fn receipt_routing_medium_low_always_pending_confirmation() {
         .expect("receipt_routing_medium_low_always_pending_confirmation failed");
 }
 
-/// Property 9c: For ANY confidence level and ANY tenant resolution status,
-/// the extraction status is always `pending_confirmation`.
-/// This is the universal property: all extractions queue for landlord confirmation.
 #[test]
 fn receipt_routing_always_pending_confirmation() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1375,16 +1228,12 @@ fn receipt_routing_always_pending_confirmation() {
         .expect("receipt_routing_always_pending_confirmation failed");
 }
 
-// â”€â”€ Strategies for Balance and Currency Formatting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
 use rust_decimal::Decimal;
 
 use crate::models::chatbot::format_currency;
 
-/// Statuses that count toward outstanding balance.
 const OUTSTANDING_STATUSES: &[&str] = &["pendiente", "atrasado"];
 
-/// A simplified payment for balance calculation testing.
 #[derive(Debug, Clone)]
 struct TestPayment {
     amount: Decimal,
@@ -1392,20 +1241,14 @@ struct TestPayment {
     status: String,
 }
 
-/// Generate a valid payment amount (positive, reasonable range).
 fn arb_payment_amount() -> impl Strategy<Value = Decimal> {
-    (1i64..=999_999_999, 0u32..=2).prop_map(|(cents, scale)| {
-        // Generate amounts from 0.01 to 999,999,999.99
-        Decimal::new(cents, scale)
-    })
+    (1i64..=999_999_999, 0u32..=2).prop_map(|(cents, scale)| Decimal::new(cents, scale))
 }
 
-/// Generate a currency code (DOP or USD).
 fn arb_currency() -> impl Strategy<Value = String> {
     prop_oneof![Just("DOP".to_string()), Just("USD".to_string()),]
 }
 
-/// Generate a payment status.
 fn arb_payment_status() -> impl Strategy<Value = String> {
     prop_oneof![
         Just("pendiente".to_string()),
@@ -1414,7 +1257,6 @@ fn arb_payment_status() -> impl Strategy<Value = String> {
     ]
 }
 
-/// Generate a list of test payments.
 fn arb_payments(max_len: usize) -> impl Strategy<Value = Vec<TestPayment>> {
     prop::collection::vec(
         (arb_payment_amount(), arb_currency(), arb_payment_status()),
@@ -1432,8 +1274,6 @@ fn arb_payments(max_len: usize) -> impl Strategy<Value = Vec<TestPayment>> {
     })
 }
 
-/// Pure model of balance calculation: sum amounts where status is `pendiente` or `atrasado`,
-/// grouped by currency. Mirrors `query_tenant_balance` logic.
 fn calculate_balance(payments: &[TestPayment]) -> std::collections::HashMap<String, Decimal> {
     let mut totals: std::collections::HashMap<String, Decimal> = std::collections::HashMap::new();
     for p in payments {
@@ -1445,13 +1285,6 @@ fn calculate_balance(payments: &[TestPayment]) -> std::collections::HashMap<Stri
     totals
 }
 
-// â”€â”€ Property 10: Balance Calculation Correctness â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// Feature: whatsapp-ai-assistant, Property 10: Balance Calculation Correctness
-// **Validates: Requirements 5.1, 5.3**
-
-/// Property 10a: The outstanding balance equals the sum of amounts for payments
-/// with status `pendiente` or `atrasado`, grouped by currency.
 #[test]
 fn balance_calculation_sums_outstanding_only() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1463,7 +1296,6 @@ fn balance_calculation_sums_outstanding_only() {
         .run(&arb_payments(30), |payments| {
             let totals = calculate_balance(&payments);
 
-            // Manually compute expected totals
             let mut expected: std::collections::HashMap<String, Decimal> =
                 std::collections::HashMap::new();
             for p in &payments {
@@ -1498,7 +1330,6 @@ fn balance_calculation_sums_outstanding_only() {
         .expect("balance_calculation_sums_outstanding_only failed");
 }
 
-/// Property 10b: Payments with status `pagado` never contribute to the outstanding balance.
 #[test]
 fn balance_excludes_paid_payments() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1510,7 +1341,6 @@ fn balance_excludes_paid_payments() {
         .run(
             &prop::collection::vec((arb_payment_amount(), arb_currency()), 1..=20),
             |paid_payments| {
-                // All payments are "pagado"
                 let payments: Vec<TestPayment> = paid_payments
                     .into_iter()
                     .map(|(amount, currency)| TestPayment {
@@ -1534,7 +1364,6 @@ fn balance_excludes_paid_payments() {
         .expect("balance_excludes_paid_payments failed");
 }
 
-/// Property 10c: Balance never mixes currencies â€” each currency total is independent.
 #[test]
 fn balance_never_mixes_currencies() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1546,7 +1375,6 @@ fn balance_never_mixes_currencies() {
         .run(&arb_payments(30), |payments| {
             let totals = calculate_balance(&payments);
 
-            // For each currency in totals, verify it only sums amounts of that currency
             for (currency, total) in &totals {
                 let manual_sum: Decimal = payments
                     .iter()
@@ -1572,7 +1400,6 @@ fn balance_never_mixes_currencies() {
         .expect("balance_never_mixes_currencies failed");
 }
 
-/// Property 10d: Empty payment list produces empty balance.
 #[test]
 fn balance_empty_payments_produces_empty_totals() {
     let totals = calculate_balance(&[]);
@@ -1582,26 +1409,15 @@ fn balance_empty_payments_produces_empty_totals() {
     );
 }
 
-// â”€â”€ Property 11: Currency Formatting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// Feature: whatsapp-ai-assistant, Property 11: Currency Formatting
-// **Validates: Requirements 5.1, 5.3**
-
-/// Generate a Decimal amount suitable for formatting (positive and negative).
 fn arb_format_amount() -> impl Strategy<Value = Decimal> {
     prop_oneof![
-        // Positive amounts
         (0i64..=999_999_999, 0u32..=2).prop_map(|(v, s)| Decimal::new(v, s)),
-        // Negative amounts
         (-999_999_999i64..=-1, 0u32..=2).prop_map(|(v, s)| Decimal::new(v, s)),
-        // Zero
         Just(Decimal::ZERO),
-        // Small fractional amounts
         (1i64..=99, 2u32..=2).prop_map(|(v, s)| Decimal::new(v, s)),
     ]
 }
 
-/// Property 11a: DOP formatting always contains "RD$" symbol.
 #[test]
 fn currency_format_dop_contains_correct_symbol() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1618,7 +1434,6 @@ fn currency_format_dop_contains_correct_symbol() {
                 formatted,
                 amount
             );
-            // Must NOT contain USD symbol
             prop_assert!(
                 !formatted.contains("US$"),
                 "DOP formatted '{}' must NOT contain 'US$' (amount: {})",
@@ -1630,7 +1445,6 @@ fn currency_format_dop_contains_correct_symbol() {
         .expect("currency_format_dop_contains_correct_symbol failed");
 }
 
-/// Property 11b: USD formatting always contains "US$" symbol.
 #[test]
 fn currency_format_usd_contains_correct_symbol() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1647,7 +1461,6 @@ fn currency_format_usd_contains_correct_symbol() {
                 formatted,
                 amount
             );
-            // Must NOT contain DOP symbol
             prop_assert!(
                 !formatted.contains("RD$"),
                 "USD formatted '{}' must NOT contain 'RD$' (amount: {})",
@@ -1659,7 +1472,6 @@ fn currency_format_usd_contains_correct_symbol() {
         .expect("currency_format_usd_contains_correct_symbol failed");
 }
 
-/// Property 11c: Formatted output always ends with exactly two decimal places (.XX).
 #[test]
 fn currency_format_has_two_decimal_places() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1673,7 +1485,6 @@ fn currency_format_has_two_decimal_places() {
             |(amount, currency)| {
                 let formatted = format_currency(amount, &currency);
 
-                // Find the last '.' in the string â€” it should be followed by exactly 2 digits
                 let dot_pos = formatted.rfind('.');
                 prop_assert!(
                     dot_pos.is_some(),
@@ -1693,7 +1504,6 @@ fn currency_format_has_two_decimal_places() {
                     amount
                 );
 
-                // Both characters after the dot must be digits
                 prop_assert!(
                     after_dot.chars().all(|c| c.is_ascii_digit()),
                     "Decimal places must be digits, got '{}' in '{}' (amount: {})",
@@ -1708,7 +1518,6 @@ fn currency_format_has_two_decimal_places() {
         .expect("currency_format_has_two_decimal_places failed");
 }
 
-/// Property 11d: Currency symbols never mix â€” DOP symbol never appears with USD input and vice versa.
 #[test]
 fn currency_format_never_mixes_symbols() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1721,7 +1530,6 @@ fn currency_format_never_mixes_symbols() {
             let dop_formatted = format_currency(amount, "DOP");
             let usd_formatted = format_currency(amount, "USD");
 
-            // DOP output must not contain US$
             prop_assert!(
                 !dop_formatted.contains("US$"),
                 "DOP format '{}' contains US$ symbol (amount: {})",
@@ -1729,7 +1537,6 @@ fn currency_format_never_mixes_symbols() {
                 amount
             );
 
-            // USD output must not contain RD$
             prop_assert!(
                 !usd_formatted.contains("RD$"),
                 "USD format '{}' contains RD$ symbol (amount: {})",
@@ -1742,29 +1549,22 @@ fn currency_format_never_mixes_symbols() {
         .expect("currency_format_never_mixes_symbols failed");
 }
 
-// â”€â”€ Strategies for Maintenance Request Defaults â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
 use crate::services::chatbot::resolve_maintenance_defaults;
 
-/// Valid priorities for maintenance requests.
 const TEST_VALID_PRIORITIES: &[&str] = &["baja", "media", "alta", "urgente"];
 
-/// Generate a valid maintenance description (2â€“1000 chars).
 fn arb_valid_description() -> impl Strategy<Value = String> {
     "[A-Za-z0-9 .,!?]{2,200}"
 }
 
-/// Generate an invalid description (too short: 0â€“1 chars).
 fn arb_short_description() -> impl Strategy<Value = String> {
     prop_oneof![Just(String::new()), "[a-z]{1,1}",]
 }
 
-/// Generate an invalid description (too long: >1000 chars).
 fn arb_long_description() -> impl Strategy<Value = String> {
     "[a-z]{1001,1100}"
 }
 
-/// Generate a valid priority value.
 fn arb_valid_priority() -> impl Strategy<Value = String> {
     prop_oneof![
         Just("baja".to_string()),
@@ -1774,20 +1574,12 @@ fn arb_valid_priority() -> impl Strategy<Value = String> {
     ]
 }
 
-/// Generate an invalid priority value.
 fn arb_invalid_priority() -> impl Strategy<Value = String> {
     "[a-z]{1,20}".prop_filter("must not be a valid priority", |s| {
         !TEST_VALID_PRIORITIES.contains(&s.as_str())
     })
 }
 
-// â”€â”€ Property 12: Maintenance Request Defaults and Linking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// Feature: whatsapp-ai-assistant, Property 12: Maintenance Request Defaults and Linking
-// **Validates: Requirements 6.1, 6.2**
-
-/// Property 12a: With no explicit priority, the request defaults to status `pendiente`
-/// and priority `media`, linked to the given `propiedad_id`.
 #[test]
 fn maintenance_defaults_no_priority() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1833,8 +1625,6 @@ fn maintenance_defaults_no_priority() {
         .expect("maintenance_defaults_no_priority failed");
 }
 
-/// Property 12b: With an explicit valid priority, the request uses that priority,
-/// status is still `pendiente`, and it's linked to the given `propiedad_id`.
 #[test]
 fn maintenance_defaults_explicit_priority() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1883,8 +1673,6 @@ fn maintenance_defaults_explicit_priority() {
         .expect("maintenance_defaults_explicit_priority failed");
 }
 
-/// Property 12c: The request is always linked to a `propiedad_id` (from the contract).
-/// For any valid inputs, the resulting defaults always contain the provided `propiedad_id`.
 #[test]
 fn maintenance_always_linked_to_property() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1923,7 +1711,6 @@ fn maintenance_always_linked_to_property() {
         .expect("maintenance_always_linked_to_property failed");
 }
 
-/// Property 12d: Description validation â€” too short (< 2 chars) is rejected.
 #[test]
 fn maintenance_rejects_short_description() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1951,7 +1738,6 @@ fn maintenance_rejects_short_description() {
         .expect("maintenance_rejects_short_description failed");
 }
 
-/// Property 12e: Description validation â€” too long (> 1000 chars) is rejected.
 #[test]
 fn maintenance_rejects_long_description() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -1978,7 +1764,6 @@ fn maintenance_rejects_long_description() {
         .expect("maintenance_rejects_long_description failed");
 }
 
-/// Property 12f: Invalid priority values are rejected.
 #[test]
 fn maintenance_rejects_invalid_priority() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2010,14 +1795,10 @@ fn maintenance_rejects_invalid_priority() {
         .expect("maintenance_rejects_invalid_priority failed");
 }
 
-// â”€â”€ Pure Models for Receipt Status Transitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-/// Valid receipt extraction statuses.
 const RECEIPT_STATUS_PENDING: &str = "pending_confirmation";
 const RECEIPT_STATUS_CONFIRMED: &str = "confirmed";
 const RECEIPT_STATUS_REJECTED: &str = "rejected";
 
-/// A simplified receipt extraction for status transition testing.
 #[derive(Debug, Clone)]
 struct TestReceiptExtraction {
     id: Uuid,
@@ -2025,8 +1806,6 @@ struct TestReceiptExtraction {
     status: String,
 }
 
-/// Pure model of the pending receipts filter.
-/// Mirrors `list_pending_receipts` which filters by org_id AND status == "pending_confirmation".
 fn filter_pending_receipts(extractions: &[TestReceiptExtraction], org_id: Uuid) -> Vec<Uuid> {
     extractions
         .iter()
@@ -2035,20 +1814,15 @@ fn filter_pending_receipts(extractions: &[TestReceiptExtraction], org_id: Uuid) 
         .collect()
 }
 
-/// Result of a status transition attempt.
 #[derive(Debug, Clone, PartialEq)]
 enum TransitionResult {
-    /// Transition succeeded, new status and optional confirming user.
     Success {
         new_status: String,
         confirmed_by: Option<Uuid>,
     },
-    /// Transition rejected because extraction is not in `pending_confirmation`.
     Rejected,
 }
 
-/// Pure model of the confirm receipt status transition.
-/// Mirrors `confirm_receipt`: only transitions from `pending_confirmation` â†’ `confirmed`.
 fn try_confirm(extraction: &TestReceiptExtraction, user_id: Uuid) -> TransitionResult {
     if extraction.status != RECEIPT_STATUS_PENDING {
         return TransitionResult::Rejected;
@@ -2059,8 +1833,6 @@ fn try_confirm(extraction: &TestReceiptExtraction, user_id: Uuid) -> TransitionR
     }
 }
 
-/// Pure model of the reject receipt status transition.
-/// Mirrors `reject_receipt`: only transitions from `pending_confirmation` â†’ `rejected`.
 fn try_reject(extraction: &TestReceiptExtraction) -> TransitionResult {
     if extraction.status != RECEIPT_STATUS_PENDING {
         return TransitionResult::Rejected;
@@ -2071,9 +1843,6 @@ fn try_reject(extraction: &TestReceiptExtraction) -> TransitionResult {
     }
 }
 
-// â”€â”€ Strategies for Receipt Status Transitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-/// Generate a receipt extraction status.
 fn arb_receipt_status() -> impl Strategy<Value = String> {
     prop_oneof![
         Just(RECEIPT_STATUS_PENDING.to_string()),
@@ -2082,7 +1851,6 @@ fn arb_receipt_status() -> impl Strategy<Value = String> {
     ]
 }
 
-/// Generate a receipt extraction with a specific status.
 fn arb_extraction_with_status(
     status: &'static str,
 ) -> impl Strategy<Value = TestReceiptExtraction> {
@@ -2093,7 +1861,6 @@ fn arb_extraction_with_status(
     })
 }
 
-/// Generate a list of receipt extractions with mixed statuses and org IDs.
 fn arb_extraction_list(max_len: usize) -> impl Strategy<Value = Vec<TestReceiptExtraction>> {
     prop::collection::vec(
         (
@@ -2115,13 +1882,6 @@ fn arb_extraction_list(max_len: usize) -> impl Strategy<Value = Vec<TestReceiptE
     })
 }
 
-// â”€â”€ Property 15: Pending Receipts Visibility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// Feature: whatsapp-ai-assistant, Property 15: Pending Receipts Visibility
-// **Validates: Requirement 8.1**
-
-/// Property 15a: Any extraction with status `pending_confirmation` in org O
-/// appears in the pending receipts list for O.
 #[test]
 fn pending_receipts_includes_all_pending_in_org() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2136,7 +1896,6 @@ fn pending_receipts_includes_all_pending_in_org() {
                 let org_id = Uuid::from_u128(org_seed);
                 let pending_ids = filter_pending_receipts(&extractions, org_id);
 
-                // Every extraction with status pending_confirmation in this org must be in the result
                 for extraction in &extractions {
                     if extraction.organizacion_id == org_id
                         && extraction.status == RECEIPT_STATUS_PENDING
@@ -2157,8 +1916,6 @@ fn pending_receipts_includes_all_pending_in_org() {
         .expect("pending_receipts_includes_all_pending_in_org failed");
 }
 
-/// Property 15b: Extractions NOT in `pending_confirmation` status never appear
-/// in the pending receipts list, regardless of org.
 #[test]
 fn pending_receipts_excludes_non_pending() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2173,7 +1930,6 @@ fn pending_receipts_excludes_non_pending() {
                 let org_id = Uuid::from_u128(org_seed);
                 let pending_ids = filter_pending_receipts(&extractions, org_id);
 
-                // No extraction with status != pending_confirmation should be in the result
                 for extraction in &extractions {
                     if extraction.status != RECEIPT_STATUS_PENDING {
                         prop_assert!(
@@ -2191,7 +1947,6 @@ fn pending_receipts_excludes_non_pending() {
         .expect("pending_receipts_excludes_non_pending failed");
 }
 
-/// Property 15c: Extractions from a different org never appear in the pending list.
 #[test]
 fn pending_receipts_scoped_to_org() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2206,7 +1961,6 @@ fn pending_receipts_scoped_to_org() {
                 let org_id = Uuid::from_u128(org_seed);
                 let pending_ids = filter_pending_receipts(&extractions, org_id);
 
-                // No extraction from a different org should be in the result
                 for extraction in &extractions {
                     if extraction.organizacion_id != org_id {
                         prop_assert!(
@@ -2225,13 +1979,6 @@ fn pending_receipts_scoped_to_org() {
         .expect("pending_receipts_scoped_to_org failed");
 }
 
-// â”€â”€ Property 16: Receipt Status Transitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// Feature: whatsapp-ai-assistant, Property 16: Receipt Status Transitions
-// **Validates: Requirements 8.2, 8.3**
-
-/// Property 16a: Confirming a `pending_confirmation` extraction sets status to `confirmed`
-/// and records the confirming user's ID.
 #[test]
 fn confirm_pending_sets_confirmed_with_user() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2280,7 +2027,6 @@ fn confirm_pending_sets_confirmed_with_user() {
         .expect("confirm_pending_sets_confirmed_with_user failed");
 }
 
-/// Property 16b: Rejecting a `pending_confirmation` extraction sets status to `rejected`.
 #[test]
 fn reject_pending_sets_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2325,7 +2071,6 @@ fn reject_pending_sets_rejected() {
         .expect("reject_pending_sets_rejected failed");
 }
 
-/// Property 16c: Confirming an extraction NOT in `pending_confirmation` is rejected.
 #[test]
 fn confirm_non_pending_is_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2358,7 +2103,6 @@ fn confirm_non_pending_is_rejected() {
         .expect("confirm_non_pending_is_rejected failed");
 }
 
-/// Property 16d: Rejecting an extraction NOT in `pending_confirmation` is rejected.
 #[test]
 fn reject_non_pending_is_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2387,8 +2131,6 @@ fn reject_non_pending_is_rejected() {
         .expect("reject_non_pending_is_rejected failed");
 }
 
-/// Property 16e: The only valid transitions from `pending_confirmation` are to
-/// `confirmed` or `rejected`. No other target states are reachable.
 #[test]
 fn pending_only_transitions_to_confirmed_or_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2408,7 +2150,6 @@ fn pending_only_transitions_to_confirmed_or_rejected() {
                 let confirm_result = try_confirm(&extraction, user_id);
                 let reject_result = try_reject(&extraction);
 
-                // Confirm must produce "confirmed"
                 if let TransitionResult::Success { ref new_status, .. } = confirm_result {
                     prop_assert_eq!(
                         new_status,
@@ -2418,7 +2159,6 @@ fn pending_only_transitions_to_confirmed_or_rejected() {
                     );
                 }
 
-                // Reject must produce "rejected"
                 if let TransitionResult::Success { ref new_status, .. } = reject_result {
                     prop_assert_eq!(
                         new_status,
@@ -2428,7 +2168,6 @@ fn pending_only_transitions_to_confirmed_or_rejected() {
                     );
                 }
 
-                // Both must succeed (not be rejected)
                 prop_assert!(
                     matches!(confirm_result, TransitionResult::Success { .. }),
                     "Confirm from pending must succeed"
@@ -2444,19 +2183,12 @@ fn pending_only_transitions_to_confirmed_or_rejected() {
         .expect("pending_only_transitions_to_confirmed_or_rejected failed");
 }
 
-// â”€â”€ Property 5: System Prompt Composition Completeness â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// Feature: whatsapp-ai-assistant, Property 5: System Prompt Composition Completeness
-// **Validates: Requirement 3.1**
-
 use crate::services::ai_module::{ChatbotPersona, TenantContext, compose_system_prompt};
 
-/// Generate a non-empty arbitrary string for persona fields.
 fn arb_nonempty_string() -> impl Strategy<Value = String> {
     "[A-Za-z0-9 Ã¡Ã©Ã­Ã³ÃºÃ±]{1,80}"
 }
 
-/// Generate an arbitrary FAQ list (1â€“10 entries with non-empty Q&A).
 fn arb_faq_list() -> impl Strategy<Value = Vec<FaqEntry>> {
     prop::collection::vec(
         (arb_nonempty_string(), arb_nonempty_string()).prop_map(|(q, a)| FaqEntry {
@@ -2467,12 +2199,10 @@ fn arb_faq_list() -> impl Strategy<Value = Vec<FaqEntry>> {
     )
 }
 
-/// Generate an arbitrary list of handoff keywords.
 fn arb_handoff_keywords() -> impl Strategy<Value = Vec<String>> {
     prop::collection::vec(arb_nonempty_string(), 1..=5)
 }
 
-/// Property 5a: When tone is Some, the composed prompt contains the tone string.
 #[test]
 fn system_prompt_contains_tone_when_present() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2501,7 +2231,6 @@ fn system_prompt_contains_tone_when_present() {
         .expect("system_prompt_contains_tone_when_present failed");
 }
 
-/// Property 5b: When greeting is Some, the composed prompt contains the greeting string.
 #[test]
 fn system_prompt_contains_greeting_when_present() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2530,8 +2259,6 @@ fn system_prompt_contains_greeting_when_present() {
         .expect("system_prompt_contains_greeting_when_present failed");
 }
 
-/// Property 5c: The deprecated system_prompt field is no longer included in the composed prompt
-/// (replaced by guidance rules).
 #[test]
 fn system_prompt_ignores_deprecated_system_prompt_field() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2539,8 +2266,6 @@ fn system_prompt_ignores_deprecated_system_prompt_field() {
         ..Default::default()
     });
 
-    // Use a distinctive prefix so generated strings never accidentally match
-    // normal prompt output (e.g. single spaces, common words).
     runner
         .run(&"SYSPROMPT_[A-Za-z0-9]{5,40}", |sys_prompt| {
             let config = ChatbotPersona {
@@ -2562,7 +2287,6 @@ fn system_prompt_ignores_deprecated_system_prompt_field() {
         .expect("system_prompt_ignores_deprecated_system_prompt_field failed");
 }
 
-/// Property 5d: Every FAQ question and answer appears in the composed prompt.
 #[test]
 fn system_prompt_contains_all_faq_entries() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2602,7 +2326,6 @@ fn system_prompt_contains_all_faq_entries() {
         .expect("system_prompt_contains_all_faq_entries failed");
 }
 
-/// Property 5e: When policies is Some and non-empty, the composed prompt contains the policies text.
 #[test]
 fn system_prompt_contains_policies_when_present() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2631,7 +2354,6 @@ fn system_prompt_contains_policies_when_present() {
         .expect("system_prompt_contains_policies_when_present failed");
 }
 
-/// Property 5f: When tenant_context is Some, the composed prompt contains the tenant's name.
 #[test]
 fn system_prompt_contains_tenant_name_when_resolved() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2661,7 +2383,6 @@ fn system_prompt_contains_tenant_name_when_resolved() {
         .expect("system_prompt_contains_tenant_name_when_resolved failed");
 }
 
-/// Property 5g: Handoff keywords appear in the prompt when provided.
 #[test]
 fn system_prompt_contains_handoff_keywords_when_provided() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2694,8 +2415,6 @@ fn system_prompt_contains_handoff_keywords_when_provided() {
         .expect("system_prompt_contains_handoff_keywords_when_provided failed");
 }
 
-/// Property 5 (combined): For any full persona configuration with all fields populated,
-/// the composed system prompt contains ALL active elements simultaneously.
 #[test]
 fn system_prompt_composition_completeness_combined() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2704,12 +2423,12 @@ fn system_prompt_composition_completeness_combined() {
     });
 
     let strategy = (
-        arb_nonempty_string(),  // tone
-        arb_nonempty_string(),  // greeting
-        arb_nonempty_string(),  // tenant name
-        arb_faq_list(),         // faqs
-        arb_nonempty_string(),  // policies
-        arb_handoff_keywords(), // handoff keywords
+        arb_nonempty_string(),
+        arb_nonempty_string(),
+        arb_nonempty_string(),
+        arb_faq_list(),
+        arb_nonempty_string(),
+        arb_handoff_keywords(),
     );
 
     runner
@@ -2735,25 +2454,21 @@ fn system_prompt_composition_completeness_combined() {
                     &[],
                 );
 
-                // Tone
                 prop_assert!(
                     prompt.contains(&tone),
                     "Combined: prompt must contain tone '{}'",
                     tone
                 );
-                // Greeting
                 prop_assert!(
                     prompt.contains(&greeting),
                     "Combined: prompt must contain greeting '{}'",
                     greeting
                 );
-                // Tenant name
                 prop_assert!(
                     prompt.contains(&tenant_name),
                     "Combined: prompt must contain tenant name '{}'",
                     tenant_name
                 );
-                // All FAQ entries
                 for (i, faq) in faqs.iter().enumerate() {
                     prop_assert!(
                         prompt.contains(&faq.question),
@@ -2768,13 +2483,11 @@ fn system_prompt_composition_completeness_combined() {
                         faq.answer
                     );
                 }
-                // Policies
                 prop_assert!(
                     prompt.contains(&policies),
                     "Combined: prompt must contain policies '{}'",
                     policies
                 );
-                // Handoff keywords
                 for (i, kw) in keywords.iter().enumerate() {
                     prop_assert!(
                         prompt.contains(kw),
@@ -2790,15 +2503,9 @@ fn system_prompt_composition_completeness_combined() {
         .expect("system_prompt_composition_completeness_combined failed");
 }
 
-// â”€â”€ Property 7: Tool Registration Matches Capabilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// Feature: whatsapp-ai-assistant, Property 7: Tool Registration Matches Capabilities
-// **Validates: Requirements 3.5, 3.6**
-
 use crate::services::ai_module::get_enabled_tools;
 use std::collections::HashSet;
 
-/// Compute the expected tool set for a given capabilities configuration.
 fn expected_tools_for_capabilities(caps: &Capabilities) -> HashSet<&'static str> {
     let mut expected = HashSet::new();
 
@@ -2815,13 +2522,10 @@ fn expected_tools_for_capabilities(caps: &Capabilities) -> HashSet<&'static str>
     if caps.human_handoff {
         expected.insert("handoff_to_human");
     }
-    // payment_reminders has no tool mapping
 
     expected
 }
 
-/// Property 7a: For any combination of capability booleans, the returned tool set
-/// matches exactly the expected set â€” no more, no fewer.
 #[test]
 fn tool_registration_matches_capabilities_exactly() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2847,7 +2551,6 @@ fn tool_registration_matches_capabilities_exactly() {
         .expect("tool_registration_matches_capabilities_exactly failed");
 }
 
-/// Property 7b: Disabled capabilities never produce their corresponding tools.
 #[test]
 fn disabled_capabilities_never_produce_tools() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2893,7 +2596,6 @@ fn disabled_capabilities_never_produce_tools() {
         .expect("disabled_capabilities_never_produce_tools failed");
 }
 
-/// Property 7c: Enabled capabilities always produce their corresponding tools.
 #[test]
 fn enabled_capabilities_always_produce_tools() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -2939,25 +2641,14 @@ fn enabled_capabilities_always_produce_tools() {
         .expect("enabled_capabilities_always_produce_tools failed");
 }
 
-// â”€â”€ Property 19: Internal Webhook Authentication â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// Feature: whatsapp-ai-assistant, Property 19: Internal Webhook Authentication
-// **Validates: Requirements 10.1, 10.2**
-
 use crate::services::crypto::constant_time_eq;
 
-/// Authentication decision result.
 #[derive(Debug, Clone, PartialEq)]
 enum AuthResult {
     Accepted,
     Rejected,
 }
 
-/// Pure model of the internal webhook authentication logic.
-/// Given a configured secret and an optional provided token:
-/// - If token is None (missing header) â†’ reject
-/// - If token does not match secret â†’ reject
-/// - If token matches secret â†’ accept
 fn authenticate_webhook(configured_secret: &str, provided_token: Option<&str>) -> AuthResult {
     provided_token.map_or(AuthResult::Rejected, |token| {
         if constant_time_eq(token.as_bytes(), configured_secret.as_bytes()) {
@@ -2968,18 +2659,14 @@ fn authenticate_webhook(configured_secret: &str, provided_token: Option<&str>) -
     })
 }
 
-/// Generate a non-empty secret string (at least 32 chars as per Requirement 10.5).
 fn arb_secret() -> impl Strategy<Value = String> {
     "[A-Za-z0-9!@#$%^&*]{32,64}"
 }
 
-/// Generate an arbitrary non-empty token string.
 fn arb_token() -> impl Strategy<Value = String> {
     "[A-Za-z0-9!@#$%^&*]{1,64}"
 }
 
-/// Property 19a: Valid token always accepted.
-/// For any configured secret, providing that exact secret as the token results in acceptance.
 #[test]
 fn webhook_auth_valid_token_always_accepted() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -3001,8 +2688,6 @@ fn webhook_auth_valid_token_always_accepted() {
         .expect("webhook_auth_valid_token_always_accepted failed");
 }
 
-/// Property 19b: Invalid token always rejected.
-/// For any configured secret and any token that differs from the secret, the request is rejected.
 #[test]
 fn webhook_auth_invalid_token_always_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -3026,8 +2711,6 @@ fn webhook_auth_invalid_token_always_rejected() {
         .expect("webhook_auth_invalid_token_always_rejected failed");
 }
 
-/// Property 19c: Missing token always rejected.
-/// For any configured secret, if no token is provided (None), the request is rejected.
 #[test]
 fn webhook_auth_missing_token_always_rejected() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -3049,8 +2732,6 @@ fn webhook_auth_missing_token_always_rejected() {
         .expect("webhook_auth_missing_token_always_rejected failed");
 }
 
-/// Property 19d: Constant-time comparison â€” equal strings return true, different strings return false.
-/// This tests the actual `constant_time_eq` implementation directly.
 #[test]
 fn webhook_auth_constant_time_eq_correctness() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -3076,28 +2757,12 @@ fn webhook_auth_constant_time_eq_correctness() {
         .expect("webhook_auth_constant_time_eq_correctness failed");
 }
 
-// â”€â”€ Property 4: Unauthorized Senders Do Not Invoke AI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// Feature: whatsapp-ai-assistant, Property 4: Unauthorized Senders Do Not Invoke AI
-// **Validates: Requirements 2.4, 9.7**
-
-/// Result of the pipeline decision: whether AI should be invoked.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum AiInvocationDecision {
-    /// AI module is invoked (activo=true AND sender authorized).
     Invoke,
-    /// AI module is NOT invoked (activo=false OR sender not authorized).
     Skip,
 }
 
-/// Pure model of the pipeline decision logic.
-/// Given the `activo` flag and the sender authorization result,
-/// determines whether the AI_Module should be invoked.
-///
-/// This mirrors the logic in `chatbot_internal.rs`:
-/// - Step 2: if `!cfg.activo` â†’ discard (Skip)
-/// - Step 3: if `!is_allowed` â†’ discard (Skip)
-/// - Otherwise â†’ proceed to AI invocation (Invoke)
 fn pipeline_decision(activo: bool, sender_authorized: bool) -> AiInvocationDecision {
     if !activo {
         return AiInvocationDecision::Skip;
@@ -3108,7 +2773,6 @@ fn pipeline_decision(activo: bool, sender_authorized: bool) -> AiInvocationDecis
     AiInvocationDecision::Invoke
 }
 
-/// Property 4a: When `activo` is false, AI is never invoked regardless of sender authorization.
 #[test]
 fn inactive_org_never_invokes_ai() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -3130,7 +2794,6 @@ fn inactive_org_never_invokes_ai() {
         .expect("inactive_org_never_invokes_ai failed");
 }
 
-/// Property 4b: When sender is not authorized, AI is never invoked regardless of `activo`.
 #[test]
 fn unauthorized_sender_never_invokes_ai() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -3152,7 +2815,6 @@ fn unauthorized_sender_never_invokes_ai() {
         .expect("unauthorized_sender_never_invokes_ai failed");
 }
 
-/// Property 4c: AI is invoked ONLY when both `activo` is true AND sender is authorized.
 #[test]
 fn ai_invoked_only_when_active_and_authorized() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -3185,9 +2847,6 @@ fn ai_invoked_only_when_active_and_authorized() {
         .expect("ai_invoked_only_when_active_and_authorized failed");
 }
 
-/// Property 4d: Integration with sender policy â€” combining `activo` flag with
-/// `check_sender_policy_no_db` results. For policies that can be resolved without DB
-/// (tenants_and_prospects, allowlist, unrecognized), the pipeline decision is deterministic.
 #[test]
 fn pipeline_decision_with_sender_policy() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -3196,9 +2855,9 @@ fn pipeline_decision_with_sender_policy() {
     });
 
     let strategy = (
-        any::<bool>(),    // activo
-        arb_e164_phone(), // sender phone
-        arb_allowlist(),  // allowlist
+        any::<bool>(),
+        arb_e164_phone(),
+        arb_allowlist(),
         prop_oneof![
             Just("tenants_and_prospects".to_string()),
             Just("allowlist".to_string()),
@@ -3208,10 +2867,8 @@ fn pipeline_decision_with_sender_policy() {
 
     runner
         .run(&strategy, |(activo, phone, allowlist, policy)| {
-            // Resolve sender authorization using the pure policy check
             let policy_result = check_sender_policy_no_db(&policy, &phone, Some(&allowlist));
 
-            // For non-DB policies, we always get Some(bool)
             if let Some(sender_authorized) = policy_result {
                 let decision = pipeline_decision(activo, sender_authorized);
 
@@ -3241,31 +2898,21 @@ fn pipeline_decision_with_sender_policy() {
                     );
                 }
             }
-            // tenants_only returns None (needs DB) â€” skip those cases
 
             Ok(())
         })
         .expect("pipeline_decision_with_sender_policy failed");
 }
 
-// â”€â”€ Property 18: Role-Based Access Control for Configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// Feature: whatsapp-ai-assistant, Property 18: Role-Based Access Control for Configuration
-// **Validates: Requirement 9.6**
-
-/// Generate an arbitrary role string that is NOT `admin` or `gerente`.
 fn arb_non_admin_role() -> impl Strategy<Value = String> {
     prop_oneof![
-        // Known non-admin roles
         Just("visualizador".to_string()),
-        // Arbitrary strings that are not admin/gerente
         "[a-z_]{1,30}".prop_filter("must not be admin or gerente", |s| {
             s != "admin" && s != "gerente"
         }),
     ]
 }
 
-/// Property 18a: "admin" role is always allowed access to configuration endpoints.
 #[test]
 fn rbac_admin_always_allowed() {
     let result = enforce_config_role("admin");
@@ -3276,7 +2923,6 @@ fn rbac_admin_always_allowed() {
     );
 }
 
-/// Property 18b: "gerente" role is always allowed access to configuration endpoints.
 #[test]
 fn rbac_gerente_always_allowed() {
     let result = enforce_config_role("gerente");
@@ -3287,7 +2933,6 @@ fn rbac_gerente_always_allowed() {
     );
 }
 
-/// Property 18c: Any role other than "admin" or "gerente" is always forbidden.
 #[test]
 fn rbac_non_admin_roles_always_forbidden() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -3308,32 +2953,19 @@ fn rbac_non_admin_roles_always_forbidden() {
         .expect("rbac_non_admin_roles_always_forbidden failed");
 }
 
-// â”€â”€ Property 20: Handoff Ceases AI Responses â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// Feature: whatsapp-ai-assistant, Property 20: Handoff Ceases AI Responses
-// **Validates: Requirement 11.3**
-
-/// Handoff state machine states.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HandoffState {
-    /// No handoff active â€” AI processes messages normally.
     None,
-    /// Awaiting human operator â€” AI is NOT invoked.
     AwaitingHuman,
 }
 
-/// Handoff state machine transitions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HandoffAction {
-    /// An incoming message arrives from the sender.
     IncomingMessage,
-    /// The handoff is set (e.g., LLM invokes `handoff_to_human` tool).
     SetHandoff,
-    /// An admin/gerente clears the handoff.
     ClearHandoff,
 }
 
-/// Whether the AI module should be invoked for the current state.
 fn should_invoke_ai(state: HandoffState) -> bool {
     match state {
         HandoffState::None => true,
@@ -3341,23 +2973,18 @@ fn should_invoke_ai(state: HandoffState) -> bool {
     }
 }
 
-/// Transition the handoff state machine given an action.
 fn handoff_transition(state: HandoffState, action: HandoffAction) -> HandoffState {
     match (state, action) {
-        // Setting handoff transitions to AwaitingHuman (idempotent)
         (HandoffState::None | HandoffState::AwaitingHuman, HandoffAction::SetHandoff) => {
             HandoffState::AwaitingHuman
         }
-        // Clearing handoff transitions to None (idempotent)
         (HandoffState::AwaitingHuman | HandoffState::None, HandoffAction::ClearHandoff) => {
             HandoffState::None
         }
-        // Incoming messages don't change the state
         (s, HandoffAction::IncomingMessage) => s,
     }
 }
 
-/// Generate an arbitrary handoff action.
 fn arb_handoff_action() -> impl Strategy<Value = HandoffAction> {
     prop_oneof![
         Just(HandoffAction::IncomingMessage),
@@ -3366,18 +2993,14 @@ fn arb_handoff_action() -> impl Strategy<Value = HandoffAction> {
     ]
 }
 
-/// Generate a sequence of handoff actions.
 fn arb_handoff_action_sequence(max_len: usize) -> impl Strategy<Value = Vec<HandoffAction>> {
     prop::collection::vec(arb_handoff_action(), 1..=max_len)
 }
 
-/// Generate an arbitrary handoff state.
 fn arb_handoff_state() -> impl Strategy<Value = HandoffState> {
     prop_oneof![Just(HandoffState::None), Just(HandoffState::AwaitingHuman),]
 }
 
-/// Property 20a: When handoff is active (AwaitingHuman), AI is NEVER invoked
-/// for any number of subsequent incoming messages.
 #[test]
 fn handoff_active_ai_never_invoked() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -3389,11 +3012,9 @@ fn handoff_active_ai_never_invoked() {
         .run(
             &prop::collection::vec(Just(HandoffAction::IncomingMessage), 1..=20),
             |messages| {
-                // Start in AwaitingHuman state
                 let mut state = HandoffState::AwaitingHuman;
 
                 for (i, action) in messages.iter().enumerate() {
-                    // AI must NOT be invoked while in AwaitingHuman
                     prop_assert!(
                         !should_invoke_ai(state),
                         "Message #{}: AI should NOT be invoked when handoff is active (state={:?})",
@@ -3403,7 +3024,6 @@ fn handoff_active_ai_never_invoked() {
                     state = handoff_transition(state, *action);
                 }
 
-                // After all messages, state should still be AwaitingHuman
                 prop_assert_eq!(
                     state,
                     HandoffState::AwaitingHuman,
@@ -3416,7 +3036,6 @@ fn handoff_active_ai_never_invoked() {
         .expect("handoff_active_ai_never_invoked failed");
 }
 
-/// Property 20b: When handoff is cleared, AI resumes processing for subsequent messages.
 #[test]
 fn handoff_cleared_ai_resumes() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -3428,18 +3047,15 @@ fn handoff_cleared_ai_resumes() {
         .run(
             &prop::collection::vec(Just(HandoffAction::IncomingMessage), 1..=20),
             |messages| {
-                // Start in AwaitingHuman, then clear
                 let state = HandoffState::AwaitingHuman;
                 let state = handoff_transition(state, HandoffAction::ClearHandoff);
 
-                // After clearing, state should be None
                 prop_assert_eq!(
                     state,
                     HandoffState::None,
                     "State must be None after clearing handoff"
                 );
 
-                // AI should be invoked for all subsequent messages
                 let mut current = state;
                 for (i, action) in messages.iter().enumerate() {
                     prop_assert!(
@@ -3457,8 +3073,6 @@ fn handoff_cleared_ai_resumes() {
         .expect("handoff_cleared_ai_resumes failed");
 }
 
-/// Property 20c: Setting handoff then clearing it returns to normal operation.
-/// For any sequence of messages after setâ†’clear, AI is always invoked.
 #[test]
 fn handoff_set_then_clear_returns_to_normal() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -3470,11 +3084,9 @@ fn handoff_set_then_clear_returns_to_normal() {
         .run(
             &prop::collection::vec(Just(HandoffAction::IncomingMessage), 1..=20),
             |messages| {
-                // Start from None, set handoff, then clear it
                 let state = HandoffState::None;
                 let state = handoff_transition(state, HandoffAction::SetHandoff);
 
-                // While in AwaitingHuman, AI must not be invoked
                 prop_assert!(
                     !should_invoke_ai(state),
                     "AI must NOT be invoked after SetHandoff"
@@ -3482,14 +3094,12 @@ fn handoff_set_then_clear_returns_to_normal() {
 
                 let state = handoff_transition(state, HandoffAction::ClearHandoff);
 
-                // After clearing, we're back to normal
                 prop_assert_eq!(
                     state,
                     HandoffState::None,
                     "State must be None after setâ†’clear cycle"
                 );
 
-                // All subsequent messages should invoke AI
                 let mut current = state;
                 for (i, action) in messages.iter().enumerate() {
                     prop_assert!(
@@ -3507,9 +3117,6 @@ fn handoff_set_then_clear_returns_to_normal() {
         .expect("handoff_set_then_clear_returns_to_normal failed");
 }
 
-/// Property 20d: For any arbitrary sequence of actions, the AI invocation decision
-/// is always consistent with the current handoff state.
-/// AI is invoked iff state is None; AI is NOT invoked iff state is AwaitingHuman.
 #[test]
 fn handoff_ai_invocation_consistent_with_state() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -3524,7 +3131,6 @@ fn handoff_ai_invocation_consistent_with_state() {
                 let mut state = initial_state;
 
                 for (i, action) in actions.iter().enumerate() {
-                    // Before processing the action, check AI invocation consistency
                     let ai_invoked = should_invoke_ai(state);
                     match state {
                         HandoffState::None => {
@@ -3551,8 +3157,6 @@ fn handoff_ai_invocation_consistent_with_state() {
         .expect("handoff_ai_invocation_consistent_with_state failed");
 }
 
-/// Property 20e: SetHandoff is idempotent â€” setting handoff when already awaiting
-/// keeps the state as AwaitingHuman.
 #[test]
 fn handoff_set_is_idempotent() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -3565,7 +3169,6 @@ fn handoff_set_is_idempotent() {
             let mut state = HandoffState::None;
             state = handoff_transition(state, HandoffAction::SetHandoff);
 
-            // Repeatedly setting handoff should keep state as AwaitingHuman
             for _ in 0..repeat_count {
                 state = handoff_transition(state, HandoffAction::SetHandoff);
                 prop_assert_eq!(
@@ -3584,14 +3187,6 @@ fn handoff_set_is_idempotent() {
         .expect("handoff_set_is_idempotent failed");
 }
 
-// â”€â”€ Property 13: Conversation Persistence Completeness â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// Feature: whatsapp-ai-assistant, Property 13: Conversation Persistence Completeness
-// **Validates: Requirement 7.1**
-
-/// A pure model of the conversation record produced by `persist_message`.
-/// Mirrors the ActiveModel construction in `persist_message` which always sets:
-/// id (generated), organizacion_id, sender_phone, role, content, message_type, created_at (now).
 #[derive(Debug, Clone)]
 struct PersistedConversationRecord {
     id: Uuid,
@@ -3603,8 +3198,6 @@ struct PersistedConversationRecord {
     created_at: DateTimeWithTimeZone,
 }
 
-/// Pure model of persist_message: constructs the record that would be inserted.
-/// This mirrors the logic in `persist_message` without requiring a database connection.
 fn build_persisted_record(
     org_id: Uuid,
     sender_phone: &str,
@@ -3623,12 +3216,10 @@ fn build_persisted_record(
     }
 }
 
-/// Generate a valid role for conversation messages.
 fn arb_message_role() -> impl Strategy<Value = String> {
     prop_oneof![Just("user".to_string()), Just("assistant".to_string()),]
 }
 
-/// Generate a valid message_type for conversation messages.
 fn arb_message_type() -> impl Strategy<Value = String> {
     prop_oneof![
         Just("text".to_string()),
@@ -3637,14 +3228,10 @@ fn arb_message_type() -> impl Strategy<Value = String> {
     ]
 }
 
-/// Generate non-empty message content.
 fn arb_message_content() -> impl Strategy<Value = String> {
     "[A-Za-z0-9 .,!?Ã¡Ã©Ã­Ã³ÃºÃ±]{1,500}"
 }
 
-/// Property 13a: For any valid inputs, the persisted record has non-null sender_phone,
-/// organizacion_id, role, content, message_type, and created_at.
-/// Both user and assistant messages satisfy this property.
 #[test]
 fn conversation_persistence_completeness_all_fields_present() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -3666,7 +3253,6 @@ fn conversation_persistence_completeness_all_fields_present() {
                 let record =
                     build_persisted_record(org_id, &sender_phone, &role, &content, &message_type);
 
-                // Verify all required fields are non-null (non-empty for strings)
                 prop_assert!(
                     !record.sender_phone.is_empty(),
                     "sender_phone must be non-empty, got empty string"
@@ -3687,8 +3273,6 @@ fn conversation_persistence_completeness_all_fields_present() {
                     !record.message_type.is_empty(),
                     "message_type must be non-empty, got empty string"
                 );
-                // created_at is always set (DateTimeWithTimeZone is non-nullable by construction)
-                // Verify it's a reasonable timestamp (not zero/epoch)
                 let epoch: DateTimeWithTimeZone =
                     chrono::TimeZone::with_ymd_and_hms(&Utc, 2020, 1, 1, 0, 0, 0)
                         .unwrap()
@@ -3705,8 +3289,6 @@ fn conversation_persistence_completeness_all_fields_present() {
         .expect("conversation_persistence_completeness_all_fields_present failed");
 }
 
-/// Property 13b: Both user messages and assistant replies produce complete records.
-/// For a message exchange (one user + one assistant), both records have all required fields.
 #[test]
 fn conversation_persistence_both_roles_complete() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -3726,7 +3308,6 @@ fn conversation_persistence_both_roles_complete() {
             |(org_seed, sender_phone, user_content, assistant_content, message_type)| {
                 let org_id = Uuid::from_u128(org_seed);
 
-                // Simulate a message exchange: user message + assistant reply
                 let user_record = build_persisted_record(
                     org_id,
                     &sender_phone,
@@ -3742,7 +3323,6 @@ fn conversation_persistence_both_roles_complete() {
                     "text",
                 );
 
-                // Verify user record completeness
                 prop_assert!(
                     !user_record.sender_phone.is_empty(),
                     "user sender_phone must be non-empty"
@@ -3761,7 +3341,6 @@ fn conversation_persistence_both_roles_complete() {
                     "user message_type must be non-empty"
                 );
 
-                // Verify assistant record completeness
                 prop_assert!(
                     !assistant_record.sender_phone.is_empty(),
                     "assistant sender_phone must be non-empty"
@@ -3784,7 +3363,6 @@ fn conversation_persistence_both_roles_complete() {
                     "assistant message_type must be non-empty"
                 );
 
-                // Both share the same org_id and sender_phone
                 prop_assert_eq!(
                     user_record.organizacion_id,
                     assistant_record.organizacion_id,
@@ -3802,7 +3380,6 @@ fn conversation_persistence_both_roles_complete() {
         .expect("conversation_persistence_both_roles_complete failed");
 }
 
-/// Property 13c: The generated id is always a valid non-nil UUID (unique per record).
 #[test]
 fn conversation_persistence_generates_valid_id() {
     let mut runner = TestRunner::new(ProptestConfig {

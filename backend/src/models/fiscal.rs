@@ -2,11 +2,6 @@ use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// Fiscal classification of an Organizacion per DR tax law.
-///
-/// - `PersonaJuridica`: Company with 9-digit RNC (SRL, SAS, etc.)
-/// - `PersonaFisica`: Registered individual (cédula serves as RNC)
-/// - `Informal`: Unregistered, no fiscal obligations
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TipoFiscal {
@@ -25,11 +20,6 @@ impl fmt::Display for TipoFiscal {
     }
 }
 
-/// Request to update the fiscal type of an Organizacion.
-///
-/// When transitioning to `PersonaJuridica`, `identificador` must be a valid 9-digit RNC.
-/// When transitioning to `PersonaFisica`, `identificador` must be a valid 11-digit cédula.
-/// When transitioning to `Informal`, `identificador` is optional.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ActualizarTipoFiscalRequest {
@@ -37,7 +27,6 @@ pub struct ActualizarTipoFiscalRequest {
     pub identificador: Option<String>,
 }
 
-/// Response containing the current fiscal state of an Organizacion.
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct EstadoFiscalResponse {

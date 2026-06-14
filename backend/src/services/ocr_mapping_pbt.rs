@@ -55,7 +55,6 @@ fn non_empty_alpha_string() -> impl Strategy<Value = String> {
         .prop_filter("must be non-empty", |s| !s.is_empty())
 }
 
-// Feature: ocr-form-prefill, Property 6: map_cedula produces exactly the required fields
 fn cedula_ocr_result() -> impl Strategy<Value = OcrResult> {
     (
         eleven_digits_with_optional_dashes(),
@@ -108,7 +107,6 @@ fn dr_date() -> impl Strategy<Value = String> {
         .prop_map(|(day, month, year)| format!("{day:02}/{month:02}/{year}"))
 }
 
-// Feature: ocr-form-prefill, Property 7: map_contrato produces the required fields with graceful degradation
 fn contrato_ocr_result_full() -> impl Strategy<Value = OcrResult> {
     (
         monetary_amount(),
@@ -212,7 +210,6 @@ fn contrato_ocr_result_without_monto() -> impl Strategy<Value = OcrResult> {
         })
 }
 
-// Feature: ocr-form-prefill, Property 8: Field confidence matches highest matching OCR line
 fn confidence_cedula_ocr_result() -> impl Strategy<Value = (OcrResult, HashMap<String, f64>)> {
     (
         eleven_digits_with_optional_dashes(),
@@ -369,7 +366,6 @@ fn map_fields_for_type(doc_type: &str, result: &OcrResult) -> Vec<ExtractField> 
     }
 }
 
-// Feature: ocr-form-prefill, Property 5: Extract response contains required structure
 fn random_ocr_result() -> impl Strategy<Value = (String, OcrResult)> {
     valid_document_type().prop_map(|doc_type| {
         let result = ocr_result_for_document_type(&doc_type);
@@ -380,8 +376,6 @@ fn random_ocr_result() -> impl Strategy<Value = (String, OcrResult)> {
 proptest! {
     #![proptest_config(ProptestConfig { cases: crate::test_support::pbt_cases(), ..Default::default() })]
 
-    // Feature: ocr-form-prefill, Property 1: Cédula normalization is idempotent and format-preserving
-    /// **Validates: Requirements 2.3, 4.4**
     #[test]
     fn cedula_normalization_idempotent_and_format_preserving(
         input in eleven_digits_with_optional_dashes()
@@ -402,8 +396,6 @@ proptest! {
         );
     }
 
-    // Feature: ocr-form-prefill, Property 6: map_cedula produces exactly the required fields
-    /// **Validates: Requirements 4.2, 4.4**
     #[test]
     fn map_cedula_produces_required_fields(
         result in cedula_ocr_result()
@@ -431,8 +423,6 @@ proptest! {
         );
     }
 
-    // Feature: ocr-form-prefill, Property 7a: map_contrato with all fields present
-    /// **Validates: Requirements 5.2, 5.4**
     #[test]
     fn map_contrato_produces_required_fields(
         result in contrato_ocr_result_full()
@@ -469,8 +459,6 @@ proptest! {
         );
     }
 
-    // Feature: ocr-form-prefill, Property 7b: map_contrato graceful degradation without monto_mensual
-    /// **Validates: Requirements 5.2, 5.4**
     #[test]
     fn map_contrato_graceful_degradation_without_monto(
         result in contrato_ocr_result_without_monto()
@@ -509,8 +497,6 @@ proptest! {
         );
     }
 
-    // Feature: ocr-form-prefill, Property 8: Field confidence matches highest matching OCR line
-    /// **Validates: Requirements 4.3**
     #[test]
     fn field_confidence_matches_highest_matching_ocr_line(
         (result, expected_confidences) in confidence_cedula_ocr_result()
@@ -532,8 +518,6 @@ proptest! {
         }
     }
 
-    // Feature: ocr-form-prefill, Property 4: Provided document_type is used verbatim
-    /// **Validates: Requirements 1.3**
     #[test]
     fn document_type_passthrough(
         doc_type in valid_document_type()
@@ -564,8 +548,6 @@ proptest! {
         );
     }
 
-    // Feature: ocr-form-prefill, Property 5: Extract response contains required structure
-    /// **Validates: Requirements 1.5**
     #[test]
     fn extract_response_contains_required_structure(
         (doc_type, ocr_result) in random_ocr_result()

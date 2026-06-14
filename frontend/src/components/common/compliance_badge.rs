@@ -125,10 +125,10 @@ pub fn ComplianceProfile(props: &ComplianceProfileProps) -> Html {
                 {"Cumplimiento Documental"}
             </h3>
             {render_meter(resp.porcentaje)}
-            {render_section("Requeridos", &required, "📋", "var(--text-primary)")}
-            {render_section("Presentes", &present, "✓", "var(--color-success)")}
-            {render_section("Faltantes", &missing, "✗", "var(--color-error)")}
-            {render_section("Por vencer (30 días)", &expiring, "⚠", "var(--color-warning)")}
+            {render_section("Requeridos", &required, "ðŸ“‹", "var(--text-primary)")}
+            {render_section("Presentes", &present, "âœ“", "var(--color-success)")}
+            {render_section("Faltantes", &missing, "âœ—", "var(--color-error)")}
+            {render_section("Por vencer (30 dÃ­as)", &expiring, "âš ", "var(--color-warning)")}
         </div>
     }
 }

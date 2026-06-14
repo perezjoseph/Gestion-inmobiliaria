@@ -6,12 +6,9 @@ use serde::{Deserialize, Serialize};
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
-    /// The `preview_id` from the OCR extraction flow.
     pub preview_id: Uuid,
     pub organizacion_id: Uuid,
-    /// "pago" or "gasto"
     pub entity_type: String,
-    /// The ID of the created pago or gasto.
     pub entity_id: Uuid,
     pub created_at: DateTimeWithTimeZone,
 }

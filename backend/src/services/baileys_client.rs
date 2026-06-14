@@ -6,53 +6,38 @@ use uuid::Uuid;
 use crate::config::ChatbotEnvConfig;
 use crate::errors::AppError;
 
-/// HTTP client for communicating with the Baileys `WhatsApp` sidecar service.
-///
-/// Designed to be stored in Actix `app_data` and shared across handlers.
-/// Uses a persistent `reqwest::Client` with connection pooling.
 #[derive(Clone)]
 pub struct BaileysClient {
     base_url: String,
     client: reqwest::Client,
 }
 
-/// Response from `POST /sessions/{realmId}/start`.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StartSessionResponse {
-    /// Base64-encoded QR code data (present when status is `qr_pending`).
     pub qr: Option<String>,
-    /// Current connection status after the start attempt.
     pub status: String,
 }
 
-/// Response from `POST /sessions/{realmId}/send`.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SendMessageResponse {
-    /// Whether the message was successfully queued/sent.
     pub success: bool,
-    /// Optional message ID from `WhatsApp`.
     pub message_id: Option<String>,
 }
 
-/// Response from `GET /sessions/{realmId}/status`.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionStatusResponse {
-    /// Current connection status: `disconnected`, `qr_pending`, `connected`, `logged_out`.
     pub status: String,
 }
 
-/// Response from `POST /sessions/{realmId}/stop`.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StopSessionResponse {
-    /// Whether the session was successfully stopped.
     pub success: bool,
 }
 
-/// Request body for `POST /sessions/{realmId}/send`.
 #[derive(Debug, Serialize)]
 struct SendMessageRequest {
     phone: String,
@@ -60,7 +45,6 @@ struct SendMessageRequest {
 }
 
 impl BaileysClient {
-    /// Creates a new `BaileysClient` from the chatbot environment configuration.
     pub fn new(config: &ChatbotEnvConfig) -> Result<Self, AppError> {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(15))
@@ -77,10 +61,6 @@ impl BaileysClient {
         })
     }
 
-    /// Starts a `WhatsApp` session for the given organization.
-    ///
-    /// Calls `POST /sessions/{realmId}/start` on the Baileys sidecar.
-    /// Returns QR code data or current connection status.
     #[instrument(name = "baileys.start_session", skip(self), fields(realm_id = %realm_id))]
     pub async fn start_session(&self, realm_id: Uuid) -> Result<StartSessionResponse, AppError> {
         let url = format!("{}/sessions/{}/start", self.base_url, realm_id);
@@ -92,9 +72,6 @@ impl BaileysClient {
         self.handle_response(response).await
     }
 
-    /// Sends a `WhatsApp` message to a recipient via the Baileys sidecar.
-    ///
-    /// Calls `POST /sessions/{realmId}/send` with the phone number and content.
     #[instrument(name = "baileys.send_message", skip(self, content), fields(realm_id = %realm_id))]
     pub async fn send_message(
         &self,
@@ -122,9 +99,6 @@ impl BaileysClient {
         self.handle_response(response).await
     }
 
-    /// Stops the `WhatsApp` session for the given organization.
-    ///
-    /// Calls `POST /sessions/{realmId}/stop` on the Baileys sidecar.
     #[instrument(name = "baileys.stop_session", skip(self), fields(realm_id = %realm_id))]
     pub async fn stop_session(&self, realm_id: Uuid) -> Result<StopSessionResponse, AppError> {
         let url = format!("{}/sessions/{}/stop", self.base_url, realm_id);
@@ -136,9 +110,6 @@ impl BaileysClient {
         self.handle_response(response).await
     }
 
-    /// Gets the current connection status for the given organization.
-    ///
-    /// Calls `GET /sessions/{realmId}/status` on the Baileys sidecar.
     #[instrument(name = "baileys.get_status", skip(self), fields(realm_id = %realm_id))]
     pub async fn get_status(&self, realm_id: Uuid) -> Result<SessionStatusResponse, AppError> {
         let url = format!("{}/sessions/{}/status", self.base_url, realm_id);
@@ -150,9 +121,6 @@ impl BaileysClient {
         self.handle_response(response).await
     }
 
-    /// Handles the HTTP response from the Baileys service.
-    ///
-    /// Returns the deserialized body on success, or an `AppError` on failure.
     async fn handle_response<T: serde::de::DeserializeOwned>(
         &self,
         response: reqwest::Response,

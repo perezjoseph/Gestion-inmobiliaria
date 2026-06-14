@@ -67,7 +67,6 @@ pub async fn upload(
             }
             file_data = Some(data);
         } else {
-            // Read text field value
             let mut value = String::new();
             while let Some(chunk) = field.next().await {
                 let chunk = chunk
@@ -90,7 +89,7 @@ pub async fn upload(
                 "notas_verificacion" if !value.is_empty() => {
                     notas_verificacion = Some(value);
                 }
-                _ => {} // ignore unknown fields
+                _ => {}
             }
         }
     }
@@ -145,8 +144,6 @@ pub async fn listar(
     Ok(HttpResponse::Ok().json(docs))
 }
 
-// ── Verificar handler (PUT /{id}/verificar) ────────────────────
-
 pub async fn verificar(
     db: web::Data<DatabaseConnection>,
     access: WriteAccess,
@@ -165,8 +162,6 @@ pub async fn verificar(
     Ok(HttpResponse::Ok().json(result))
 }
 
-// ── Eliminar handler (DELETE /{id}) ────────────────────────────
-
 pub async fn eliminar(
     db: web::Data<DatabaseConnection>,
     access: WriteAccess,
@@ -183,8 +178,6 @@ pub async fn eliminar(
     Ok(HttpResponse::NoContent().finish())
 }
 
-// ── Por vencer handler (GET /por-vencer) ───────────────────────
-
 pub async fn por_vencer(
     db: web::Data<DatabaseConnection>,
     claims: Claims,
@@ -193,8 +186,6 @@ pub async fn por_vencer(
     let docs = documentos::por_vencer(db.get_ref(), query.dias, claims.organizacion_id).await?;
     Ok(HttpResponse::Ok().json(docs))
 }
-
-// ── Cumplimiento handler (GET /cumplimiento/{entity_type}/{entity_id}) ──
 
 pub async fn cumplimiento(
     db: web::Data<DatabaseConnection>,
@@ -212,8 +203,6 @@ pub async fn cumplimiento(
     Ok(HttpResponse::Ok().json(result))
 }
 
-// ── Cumplimiento resumen handler (GET /cumplimiento/resumen) ───
-
 pub async fn cumplimiento_resumen(
     db: web::Data<DatabaseConnection>,
     claims: Claims,
@@ -223,8 +212,6 @@ pub async fn cumplimiento_resumen(
             .await?;
     Ok(HttpResponse::Ok().json(result))
 }
-
-// ── Plantillas handlers ────────────────────────────────────────
 
 #[derive(serde::Deserialize)]
 pub struct PlantillaListParams {
@@ -268,8 +255,6 @@ pub async fn rellenar_plantilla(
     .await?;
     Ok(HttpResponse::Ok().json(result))
 }
-
-// ── Digitalizar handler (POST /digitalizar/{entity_type}/{entity_id}) ──
 
 #[allow(clippy::future_not_send)]
 pub async fn digitalizar(
@@ -342,8 +327,6 @@ pub async fn digitalizar(
     Ok(HttpResponse::Ok().json(result))
 }
 
-// ── Guardar contenido handler (PUT /{id}/contenido) ────────────
-
 pub async fn guardar_contenido(
     db: web::Data<DatabaseConnection>,
     access: WriteAccess,
@@ -362,8 +345,6 @@ pub async fn guardar_contenido(
     Ok(HttpResponse::Ok().json(result))
 }
 
-// ── Exportar PDF handler (GET /{id}/exportar-pdf) ──────────────
-
 pub async fn exportar_pdf(
     db: web::Data<DatabaseConnection>,
     claims: Claims,
@@ -380,8 +361,6 @@ pub async fn exportar_pdf(
         ))
         .body(pdf_bytes))
 }
-
-// ── Template CRUD handlers ─────────────────────────────────────
 
 pub async fn crear_plantilla(
     db: web::Data<DatabaseConnection>,
@@ -429,8 +408,6 @@ pub async fn eliminar_plantilla(
     plantillas::eliminar(db.get_ref(), id, access.0.organizacion_id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
-
-// ── Exportar DOCX handler (GET /{id}/exportar-docx) ────────────
 
 pub async fn exportar_docx(
     db: web::Data<DatabaseConnection>,

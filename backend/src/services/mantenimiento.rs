@@ -149,7 +149,6 @@ pub async fn create<C: ConnectionTrait>(
 
     let record = model.insert(db).await?;
 
-    // Track maintenance creation metric
     crate::metrics::MANTENIMIENTO_CREADAS
         .with_label_values(&[record.prioridad.as_str()])
         .inc();

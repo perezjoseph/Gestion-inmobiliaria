@@ -88,7 +88,7 @@ pub fn Auditoria() -> Html {
 
     let headers = vec![
         "Fecha".into(),
-        "Acción".into(),
+        "AcciÃ³n".into(),
         "Entidad".into(),
         "ID Entidad".into(),
         "Cambios".into(),
@@ -116,7 +116,7 @@ pub fn Auditoria() -> Html {
     html! {
         <div>
             <div class="gi-page-header">
-                <h1 class="gi-page-title">{"Registro de Auditoría"}</h1>
+                <h1 class="gi-page-title">{"Registro de AuditorÃ­a"}</h1>
             </div>
 
             if let Some(err) = (*error).as_ref() {
@@ -142,8 +142,8 @@ pub fn Auditoria() -> Html {
 
             if (*items).is_empty() {
                 <div class="gi-empty-state">
-                    <div class="gi-empty-state-title">{"Sin registros de auditoría"}</div>
-                    <p class="gi-empty-state-text">{"Las acciones realizadas en el sistema se registrarán aquí."}</p>
+                    <div class="gi-empty-state-title">{"Sin registros de auditorÃ­a"}</div>
+                    <p class="gi-empty-state-text">{"Las acciones realizadas en el sistema se registrarÃ¡n aquÃ­."}</p>
                 </div>
             } else {
                 <DataTable headers={headers}>
@@ -151,12 +151,12 @@ pub fn Auditoria() -> Html {
                         let changes_str = serde_json::to_string_pretty(&entry.cambios)
                             .unwrap_or_else(|_| "{}".into());
                         let short_changes = if changes_str.len() > 80 {
-                            format!("{}…", &changes_str[..80])
+                            format!("{}â€¦", &changes_str[..80])
                         } else {
                             changes_str.clone()
                         };
                         let short_id = if entry.entity_id.len() > 8 {
-                            format!("{}…", &entry.entity_id[..8])
+                            format!("{}â€¦", &entry.entity_id[..8])
                         } else {
                             entry.entity_id.clone()
                         };

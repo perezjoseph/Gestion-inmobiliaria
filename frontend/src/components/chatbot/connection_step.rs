@@ -5,11 +5,8 @@ use yew::prelude::*;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::services::chatbot;
 
-/// Polling interval when disconnected/reconnecting (fast recovery detection).
 const POLL_INTERVAL_RECOVERING_MS: u32 = 5_000;
-/// Polling interval when connected (heartbeat to detect drops).
 const POLL_INTERVAL_CONNECTED_MS: u32 = 30_000;
-/// Polling interval while QR is pending (check if scan completed).
 const POLL_INTERVAL_QR_MS: u32 = 3_000;
 
 #[derive(Properties, PartialEq)]
@@ -26,9 +23,6 @@ pub fn ConnectionStep(props: &ConnectionStepProps) -> Html {
     let loading = use_state(|| false);
     let qr_code = use_state(|| Option::<String>::None);
 
-    // --- Status polling ---
-    // Poll the baileys-service status to detect reconnections after refresh
-    // and connection drops while the page is open.
     {
         let on_status_change = props.on_status_change.clone();
         let qr_code = qr_code.clone();
@@ -54,7 +48,6 @@ pub fn ConnectionStep(props: &ConnectionStepProps) -> Html {
                 });
             });
 
-            // Cleanup: drop the interval when status changes or component unmounts
             move || drop(interval)
         });
     }
@@ -120,10 +113,10 @@ pub fn ConnectionStep(props: &ConnectionStepProps) -> Html {
         <section class="gi-card" style="padding: var(--space-5);">
             <header class="mb-4">
                 <h3 class="text-base font-semibold text-[var(--text-primary)]">
-                    {"Conexión WhatsApp"}
+                    {"ConexiÃ³n WhatsApp"}
                 </h3>
                 <p class="text-xs text-[var(--text-tertiary)] mt-1">
-                    {"Vincule el número que el bot usará para responder a sus inquilinos."}
+                    {"Vincule el nÃºmero que el bot usarÃ¡ para responder a sus inquilinos."}
                 </p>
             </header>
 
@@ -156,10 +149,6 @@ pub fn ConnectionStep(props: &ConnectionStepProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// ConnectedPanel
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct ConnectedPanelProps {
     phone: Option<String>,
@@ -173,7 +162,7 @@ fn ConnectedPanel(props: &ConnectedPanelProps) -> Html {
     let phone_display = props
         .phone
         .as_deref()
-        .map_or_else(|| "Número no disponible".to_string(), format_phone);
+        .map_or_else(|| "NÃºmero no disponible".to_string(), format_phone);
     let connected_label = props
         .connected_at
         .as_deref()
@@ -202,7 +191,7 @@ fn ConnectedPanel(props: &ConnectedPanelProps) -> Html {
                         </div>
                     }
                     <div class="text-xs mt-1" style="color: var(--color-success-dark);">
-                        {"Sesión activa"}
+                        {"SesiÃ³n activa"}
                     </div>
                 </div>
             </div>
@@ -218,10 +207,6 @@ fn ConnectedPanel(props: &ConnectedPanelProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// QrScanPanel — QR code with numbered steps beside it
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct QrScanPanelProps {
     qr_code: Option<String>,
@@ -236,13 +221,13 @@ fn QrScanPanel(props: &QrScanPanelProps) -> Html {
             <div
                 class="flex items-center justify-center rounded-lg gi-spinner"
                 style="width: 220px; height: 220px; border: 1px dashed var(--border-default);"
-                aria-label="Generando código QR"
+                aria-label="Generando cÃ³digo QR"
             />
         },
         |qr| html! {
             <img
                 src={format!("data:image/png;base64,{qr}")}
-                alt="Código QR para vincular WhatsApp"
+                alt="CÃ³digo QR para vincular WhatsApp"
                 class="rounded-lg"
                 style="width: 220px; height: 220px; background: #fff; padding: 8px; image-rendering: pixelated; border: 1px solid var(--border-default);"
             />
@@ -254,7 +239,7 @@ fn QrScanPanel(props: &QrScanPanelProps) -> Html {
             <div class="flex flex-col items-center gap-2">
                 {qr_visual}
                 <p class="text-xs" style="color: var(--color-warning-dark);">
-                    {"El código caduca en pocos segundos"}
+                    {"El cÃ³digo caduca en pocos segundos"}
                 </p>
             </div>
 
@@ -262,17 +247,17 @@ fn QrScanPanel(props: &QrScanPanelProps) -> Html {
                 <StepInstruction
                     step={1}
                     title="Abra WhatsApp"
-                    body="Preferiblemente un número dedicado al negocio, no su línea personal."
+                    body="Preferiblemente un nÃºmero dedicado al negocio, no su lÃ­nea personal."
                 />
                 <StepInstruction
                     step={2}
-                    title="Configuración → Dispositivos vinculados"
-                    body="Toque “Vincular un dispositivo”."
+                    title="ConfiguraciÃ³n â†’ Dispositivos vinculados"
+                    body="Toque â€œVincular un dispositivoâ€."
                 />
                 <StepInstruction
                     step={3}
-                    title="Escanee el código"
-                    body="Apunte la cámara al QR. La vinculación se mantiene activa hasta que cierre la sesión."
+                    title="Escanee el cÃ³digo"
+                    body="Apunte la cÃ¡mara al QR. La vinculaciÃ³n se mantiene activa hasta que cierre la sesiÃ³n."
                 />
                 <div class="mt-1">
                     <button
@@ -281,7 +266,7 @@ fn QrScanPanel(props: &QrScanPanelProps) -> Html {
                         onclick={props.on_disconnect.clone()}
                         disabled={props.loading}
                     >
-                        {"Cancelar vinculación"}
+                        {"Cancelar vinculaciÃ³n"}
                     </button>
                 </div>
             </ol>
@@ -317,10 +302,6 @@ fn StepInstruction(props: &StepInstructionProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// DisconnectedPanel
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct DisconnectedPanelProps {
     loading: bool,
@@ -343,10 +324,10 @@ fn DisconnectedPanel(props: &DisconnectedPanelProps) -> Html {
                 </div>
                 <div>
                     <div class="text-sm font-medium text-[var(--text-primary)]">
-                        {"Sin conexión a WhatsApp"}
+                        {"Sin conexiÃ³n a WhatsApp"}
                     </div>
                     <div class="text-xs text-[var(--text-tertiary)] mt-0.5">
-                        {"Vincule un número para que el bot pueda recibir y enviar mensajes."}
+                        {"Vincule un nÃºmero para que el bot pueda recibir y enviar mensajes."}
                     </div>
                 </div>
             </div>
@@ -362,11 +343,6 @@ fn DisconnectedPanel(props: &DisconnectedPanelProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/// Format a phone string like `18091234567` or `+18091234567` as `+1 809 123 4567`.
 fn format_phone(phone: &str) -> String {
     let digits: String = phone.chars().filter(char::is_ascii_digit).collect();
     match digits.len() {
@@ -378,9 +354,7 @@ fn format_phone(phone: &str) -> String {
     }
 }
 
-/// Format an ISO-8601 date as `DD/MM/YYYY`. Falls back to the input on parse failure.
 fn format_date_es(iso: &str) -> String {
-    // Accept `YYYY-MM-DD...` — just swap to `DD/MM/YYYY`.
     let date_part = iso.split('T').next().unwrap_or(iso);
     let parts: Vec<&str> = date_part.split('-').collect();
     if parts.len() == 3 {

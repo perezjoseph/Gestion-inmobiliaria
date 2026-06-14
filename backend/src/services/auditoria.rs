@@ -36,7 +36,6 @@ pub async fn registrar<C>(db: &C, entry: CreateAuditoriaEntry) -> Result<(), App
 where
     C: sea_orm::ConnectionTrait,
 {
-    // Map nil UUID (used by background jobs) to NULL in the database
     let usuario_id = if entry.usuario_id.is_nil() {
         None
     } else {
@@ -57,8 +56,6 @@ where
     Ok(())
 }
 
-/// Best-effort audit: logs failures instead of propagating them.
-/// Use in services where an audit failure should not roll back the business operation.
 pub async fn registrar_best_effort<C>(db: &C, entry: CreateAuditoriaEntry)
 where
     C: sea_orm::ConnectionTrait,
@@ -76,7 +73,6 @@ pub async fn listar(
     let page = query.page.unwrap_or(1).max(1);
     let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
 
-    // Filter audit logs to users belonging to this organization
     let org_user_ids: Vec<Uuid> = usuario::Entity::find()
         .filter(usuario::Column::OrganizacionId.eq(org_id))
         .all(db)

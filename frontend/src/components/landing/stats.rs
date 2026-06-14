@@ -11,11 +11,11 @@ pub fn LandingStats() -> Html {
                 </div>
                 <div class="gi-l-trust-item">
                     <span class="gi-l-dot gi-l-dot--accent"></span>
-                    <span>{"Gratis, sin límites, sin letra pequeña"}</span>
+                    <span>{"Gratis, sin lÃ­mites, sin letra pequeÃ±a"}</span>
                 </div>
                 <div class="gi-l-trust-item">
                     <span class="gi-l-dot gi-l-dot--ok"></span>
-                    <span>{"Hecho para República Dominicana"}</span>
+                    <span>{"Hecho para RepÃºblica Dominicana"}</span>
                 </div>
             </div>
         </section>

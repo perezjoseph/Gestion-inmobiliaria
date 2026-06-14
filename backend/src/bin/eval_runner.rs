@@ -1,11 +1,3 @@
-//! CLI binary for running eval suites against the chatbot agent.
-//!
-//! Gated behind the `evals` feature flag.
-//!
-//! Usage:
-//!   cargo run --bin eval-runner --features evals -- --suite-id <UUID>
-//!   cargo run --bin eval-runner --features evals -- --suite-id <UUID> --concurrency 5
-
 use anyhow::Context;
 use clap::Parser;
 use sea_orm::{Database, EntityTrait};
@@ -19,15 +11,12 @@ use realestate_backend::services::ai_module::evals::{
     EvalRunConfig, EvalRunResult, EvalRunner, EvalSuite,
 };
 
-/// CLI arguments for the eval runner.
 #[derive(Parser, Debug)]
 #[command(name = "eval-runner", about = "Run chatbot eval suites")]
 struct EvalRunnerArgs {
-    /// UUID of the eval suite to run.
     #[arg(long)]
     suite_id: Uuid,
 
-    /// Maximum number of cases to run concurrently.
     #[arg(long, default_value_t = 3)]
     concurrency: usize,
 }
@@ -68,7 +57,6 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Loads an eval suite from the database by ID.
 async fn load_suite(db: &sea_orm::DatabaseConnection, suite_id: Uuid) -> anyhow::Result<EvalSuite> {
     let entity = chatbot_eval_suite::Entity::find_by_id(suite_id)
         .one(db)
@@ -92,7 +80,6 @@ async fn load_suite(db: &sea_orm::DatabaseConnection, suite_id: Uuid) -> anyhow:
     })
 }
 
-/// Persists eval run results to the `chatbot_eval_run` table.
 async fn persist_results(
     db: &sea_orm::DatabaseConnection,
     results: &EvalRunResult,

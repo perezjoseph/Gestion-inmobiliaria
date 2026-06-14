@@ -19,10 +19,6 @@ use crate::types::chatbot::{
     Capabilities, ChatbotConfigResponse, ChatbotConfigUpdateRequest, FaqEntry,
 };
 
-// ---------------------------------------------------------------------------
-// Save status
-// ---------------------------------------------------------------------------
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum SaveStatus {
     Idle,
@@ -30,10 +26,6 @@ enum SaveStatus {
     Saving,
     Saved,
 }
-
-// ---------------------------------------------------------------------------
-// Section keys for the settings accordion
-// ---------------------------------------------------------------------------
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
@@ -49,7 +41,7 @@ enum Section {
 impl Section {
     const fn title(self) -> &'static str {
         match self {
-            Self::Connection => "Conexión",
+            Self::Connection => "ConexiÃ³n",
             Self::Persona => "Personalidad",
             Self::GuidanceRules => "Reglas del agente",
             Self::Capabilities => "Capacidades",
@@ -70,14 +62,10 @@ impl Section {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Loading skeleton
-// ---------------------------------------------------------------------------
-
 #[component]
 fn ChatbotConfigSkeleton() -> Html {
     html! {
-        <div aria-busy="true" aria-label="Cargando configuración del chatbot" class="flex flex-col gap-5">
+        <div aria-busy="true" aria-label="Cargando configuraciÃ³n del chatbot" class="flex flex-col gap-5">
             <div class="rounded-lg p-5" style="background: var(--surface-raised); border: 1px solid var(--border-default);">
                 <Skeleton width="60px" height="1rem" radius="999px" />
                 <div class="mt-3">
@@ -99,10 +87,6 @@ fn ChatbotConfigSkeleton() -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
 #[component]
 pub fn ChatbotConfig() -> Html {
     let toasts = use_context::<ToastContext>();
@@ -118,7 +102,6 @@ pub fn ChatbotConfig() -> Html {
     let confirm_toggle = use_state(|| Option::<bool>::None);
     let open_section = use_state(|| Option::<Section>::None);
 
-    // Load config and dashboard data on mount
     {
         let config = config.clone();
         let loading = loading.clone();
@@ -129,9 +112,6 @@ pub fn ChatbotConfig() -> Html {
         let connected_at = connected_at.clone();
         use_effect_with((), move |()| {
             spawn_local(async move {
-                // Fetch config and live Baileys status concurrently, then merge the
-                // live status into the config so the UI reflects the real session state
-                // on first render rather than the stale connection_status column from the DB.
                 let (cfg_res, status_res) =
                     futures::future::join(chatbot::get_config(), chatbot::status()).await;
                 match cfg_res {
@@ -158,8 +138,6 @@ pub fn ChatbotConfig() -> Html {
         });
     }
 
-    // Debounced save: 600ms delay. Wrap in Rc<dyn Fn> so it can be cloned into
-    // sub-component props without re-creating the closure on every render.
     let save_config: std::rc::Rc<dyn Fn(ChatbotConfigUpdateRequest)> = {
         let config = config.clone();
         let save_status = save_status.clone();
@@ -203,7 +181,6 @@ pub fn ChatbotConfig() -> Html {
         std::rc::Rc::new(inner)
     };
 
-    // Activation toggle with confirmation
     let on_activation_request = {
         let confirm_toggle = confirm_toggle.clone();
         Callback::from(move |activo: bool| {
@@ -269,9 +246,9 @@ pub fn ChatbotConfig() -> Html {
     let sender_scope = sender_scope_label(&cfg.sender_policy, cfg.allowlist.as_deref());
 
     let confirm_message = if confirm_toggle.is_some_and(|v| v) {
-        "¿Activar el chatbot? Los inquilinos comenzarán a recibir respuestas automáticas de inmediato."
+        "Â¿Activar el chatbot? Los inquilinos comenzarÃ¡n a recibir respuestas automÃ¡ticas de inmediato."
     } else {
-        "¿Desactivar el chatbot? Los inquilinos dejarán de recibir respuestas automáticas."
+        "Â¿Desactivar el chatbot? Los inquilinos dejarÃ¡n de recibir respuestas automÃ¡ticas."
     };
 
     let confirm_label = if confirm_toggle.is_some_and(|v| v) {
@@ -321,10 +298,6 @@ pub fn ChatbotConfig() -> Html {
         </div>
     }
 }
-
-// ---------------------------------------------------------------------------
-// ControlPanelLayout — two-column layout for settings + test chat
-// ---------------------------------------------------------------------------
 
 #[derive(Properties)]
 struct ControlPanelLayoutProps {
@@ -379,10 +352,6 @@ fn ControlPanelLayout(props: &ControlPanelLayoutProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// SettingsColumn — settings accordion
-// ---------------------------------------------------------------------------
-
 #[derive(Properties)]
 struct SettingsColumnProps {
     cfg: ChatbotConfigResponse,
@@ -416,7 +385,7 @@ fn SettingsColumn(props: &SettingsColumnProps) -> Html {
         <div class="flex flex-col gap-3">
             <div class="flex items-center justify-between">
                 <h3 class="text-sm font-semibold text-[var(--text-primary)]">
-                    {"Configuración"}
+                    {"ConfiguraciÃ³n"}
                 </h3>
                 <SaveIndicator status={props.save_status} />
             </div>
@@ -467,10 +436,6 @@ fn SettingsColumn(props: &SettingsColumnProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// ConnectionSection — always visible, no accordion (it's load-bearing)
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct ConnectionSectionProps {
     status: String,
@@ -490,10 +455,6 @@ fn ConnectionSection(props: &ConnectionSectionProps) -> Html {
         />
     }
 }
-
-// ---------------------------------------------------------------------------
-// Collapsible accordion sections
-// ---------------------------------------------------------------------------
 
 #[derive(Properties)]
 struct AccordionSectionProps {
@@ -585,10 +546,6 @@ fn Chevron(props: &ChevronProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Individual section wrappers
-// ---------------------------------------------------------------------------
-
 #[derive(Properties)]
 struct PersonaSectionProps {
     open: bool,
@@ -655,12 +612,7 @@ fn GuidanceRulesSection(props: &GuidanceRulesSectionProps) -> Html {
     let active_count = props.rules.iter().filter(|r| r.enabled).count();
     let summary = format!("{active_count} de {} reglas activas", props.rules.len());
 
-    // Trigger a page-level config reload when rules change.
-    // For now, this is a no-op callback since rule CRUD is handled inside
-    // the step component via its own API calls + local state refresh.
-    let on_change = Callback::from(|()| {
-        // Future: trigger config reload from parent if needed
-    });
+    let on_change = Callback::from(|()| {});
 
     html! {
         <AccordionSection
@@ -893,10 +845,6 @@ fn SendersSection(props: &SendersSectionProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// SaveIndicator — ambient save status
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct SaveIndicatorProps {
     status: SaveStatus,
@@ -922,10 +870,6 @@ fn SaveIndicator(props: &SaveIndicatorProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 fn render_load_error(error: &UseStateHandle<Option<String>>) -> Html {
     html! {
         <div>
@@ -935,7 +879,7 @@ fn render_load_error(error: &UseStateHandle<Option<String>>) -> Html {
                 })} />
             }
             <p class="text-sm text-[var(--text-secondary)]">
-                {"No se pudo cargar la configuración del chatbot."}
+                {"No se pudo cargar la configuraciÃ³n del chatbot."}
             </p>
         </div>
     }
@@ -973,7 +917,7 @@ fn sender_scope_label(policy: &str, allowlist: Option<&[String]>) -> String {
         "tenants_and_prospects" => "Inquilinos y prospectos".to_string(),
         "allowlist" => allowlist.map_or_else(
             || "Lista permitida".to_string(),
-            |l| format!("{} números permitidos", l.len()),
+            |l| format!("{} nÃºmeros permitidos", l.len()),
         ),
         _ => "Sin configurar".to_string(),
     }
@@ -982,14 +926,14 @@ fn sender_scope_label(policy: &str, allowlist: Option<&[String]>) -> String {
 fn persona_summary(cfg: &ChatbotConfigResponse) -> String {
     let name = cfg.display_name.as_deref().unwrap_or("Sin nombre");
     let tone = cfg.tone.as_deref().unwrap_or("sin tono definido");
-    format!("{name} · {tone}")
+    format!("{name} Â· {tone}")
 }
 
 fn knowledge_summary(faq_count: usize, has_policies: bool) -> String {
     let policies_label = if has_policies {
-        "con políticas"
+        "con polÃ­ticas"
     } else {
-        "sin políticas"
+        "sin polÃ­ticas"
     };
-    format!("{faq_count} preguntas · {policies_label}")
+    format!("{faq_count} preguntas Â· {policies_label}")
 }

@@ -7,17 +7,10 @@ use crate::errors::AppError;
 
 const CLAVE_RECARGO_DEFECTO: &str = "recargo_porcentaje_defecto";
 
-/// Calcula el recargo: monto * (porcentaje / 100), redondeado a 2 decimales.
-/// Función pura, sin I/O.
 pub fn calcular_recargo(monto: Decimal, porcentaje: Decimal) -> Decimal {
     (monto * porcentaje / Decimal::from(100)).round_dp(2)
 }
 
-/// Resuelve el porcentaje de recargo efectivo: contrato > org > None.
-///
-/// 1. Si el contrato tiene `recargo_porcentaje` definido, lo retorna.
-/// 2. Si no, busca en `configuracion` con clave `recargo_porcentaje_defecto`.
-/// 3. Si tampoco existe, retorna `None`.
 pub async fn resolver_porcentaje_recargo<C: ConnectionTrait>(
     db: &C,
     contrato: &contrato::Model,
@@ -39,11 +32,6 @@ pub async fn resolver_porcentaje_recargo<C: ConnectionTrait>(
     }
 }
 
-/// Calcula y almacena el recargo en un pago atrasado.
-///
-/// Resuelve el porcentaje efectivo, calcula el recargo si hay porcentaje,
-/// actualiza el campo `pago.recargo`, y retorna el valor calculado.
-/// Si el porcentaje es `None`, retorna `Ok(None)` sin actualizar.
 pub async fn aplicar_recargo<C: ConnectionTrait>(
     db: &C,
     pago_id: Uuid,
@@ -69,10 +57,6 @@ pub async fn aplicar_recargo<C: ConnectionTrait>(
     Ok(Some(recargo))
 }
 
-/// Parses a Decimal from a JSONB `valor` field.
-///
-/// The valor field can contain a JSON number (e.g., `5.5`) or a JSON string
-/// (e.g., `"5.50"`). Returns `None` if the value is JSON null.
 fn parse_decimal_from_json(valor: &serde_json::Value) -> Result<Option<Decimal>, AppError> {
     if valor.is_null() {
         return Ok(None);
@@ -139,7 +123,6 @@ mod tests {
     #[test]
     #[allow(clippy::unwrap_used)]
     fn calcular_recargo_redondeo_dos_decimales() {
-        // 333.33 * 3.33% = 11.099889 → rounded to 11.10
         let monto = Decimal::from_str("333.33").unwrap();
         let porcentaje = Decimal::from_str("3.33").unwrap();
         assert_eq!(

@@ -17,7 +17,6 @@ use crate::models::reporte::{
     RentabilidadReportQuery, RentabilidadReportRow, RentabilidadReportSummary,
 };
 
-/// Default row cap for report exports. Configurable via `REPORT_ROW_CAP` env var.
 const DEFAULT_REPORT_ROW_CAP: u64 = 50_000;
 
 fn get_report_row_cap() -> u64 {
@@ -83,7 +82,6 @@ pub async fn generar_reporte_ingresos(
         pago_select = pago_select.filter(pago::Column::ContratoId.is_in(contrato_ids));
     }
 
-    // Row cap check before fetching all data
     let row_count = pago_select.clone().count(db).await?;
     let cap = get_report_row_cap();
     if row_count > cap {
@@ -276,7 +274,6 @@ pub async fn generar_reporte_rentabilidad(
 
     let prop_ids: Vec<uuid::Uuid> = propiedades.iter().map(|p| p.id).collect();
 
-    // Batch-load all contratos for the target propiedades
     let all_contratos = contrato::Entity::find()
         .filter(contrato::Column::PropiedadId.is_in(prop_ids.clone()))
         .all(db)
@@ -284,7 +281,6 @@ pub async fn generar_reporte_rentabilidad(
 
     let all_contrato_ids: Vec<uuid::Uuid> = all_contratos.iter().map(|c| c.id).collect();
 
-    // Row cap check before fetching all data
     let cap = get_report_row_cap();
     let pago_count = if all_contrato_ids.is_empty() {
         0
@@ -311,7 +307,6 @@ pub async fn generar_reporte_rentabilidad(
         )));
     }
 
-    // Batch-load all paid pagos for those contratos in the date range
     let all_pagos = if all_contrato_ids.is_empty() {
         vec![]
     } else {
@@ -324,7 +319,6 @@ pub async fn generar_reporte_rentabilidad(
             .await?
     };
 
-    // Batch-load all paid gastos for those propiedades in the date range
     let all_gastos = gasto::Entity::find()
         .filter(gasto::Column::PropiedadId.is_in(prop_ids))
         .filter(gasto::Column::Estado.eq("pagado"))
@@ -333,13 +327,11 @@ pub async fn generar_reporte_rentabilidad(
         .all(db)
         .await?;
 
-    // Build lookup maps: contrato -> propiedad, pago -> contrato
     let contrato_prop_map: HashMap<uuid::Uuid, uuid::Uuid> = all_contratos
         .iter()
         .map(|c| (c.id, c.propiedad_id))
         .collect();
 
-    // Aggregate income per propiedad via contrato linkage
     let mut income_by_prop: HashMap<uuid::Uuid, Decimal> = HashMap::new();
     for p in &all_pagos {
         if let Some(&prop_id) = contrato_prop_map.get(&p.contrato_id) {
@@ -347,7 +339,6 @@ pub async fn generar_reporte_rentabilidad(
         }
     }
 
-    // Aggregate expenses per propiedad
     let mut expense_by_prop: HashMap<uuid::Uuid, Decimal> = HashMap::new();
     for g in &all_gastos {
         *expense_by_prop

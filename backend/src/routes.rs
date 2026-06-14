@@ -7,8 +7,6 @@ use crate::middleware::rate_limit::FallbackPeerIpKeyExtractor;
 
 type RateLimitConfig = GovernorConfig<FallbackPeerIpKeyExtractor, NoOpMiddleware>;
 
-// ── Rate limiter configurations ──────────────────────────────────────
-
 #[allow(clippy::unwrap_used)]
 fn auth_governor() -> RateLimitConfig {
     GovernorConfigBuilder::default()
@@ -48,8 +46,6 @@ fn webhook_governor() -> RateLimitConfig {
         .finish()
         .unwrap()
 }
-
-// ── Main router ──────────────────────────────────────────────────────
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -96,8 +92,6 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(configure_indexacion()),
     );
 }
-
-// ── Per-domain route groups ──────────────────────────────────────────
 
 fn configure_firmas() -> impl actix_web::dev::HttpServiceFactory {
     web::scope("/firmas")
@@ -454,7 +448,6 @@ fn configure_reportes() -> impl actix_web::dev::HttpServiceFactory {
 fn configure_documentos() -> impl actix_web::dev::HttpServiceFactory {
     web::scope("/documentos")
         .wrap(Governor::new(&write_governor()))
-        // Static paths first
         .route(
             "/por-vencer",
             web::get().to(handlers::documentos::por_vencer),
@@ -479,7 +472,6 @@ fn configure_documentos() -> impl actix_web::dev::HttpServiceFactory {
             "/plantillas/{id}",
             web::delete().to(handlers::documentos::eliminar_plantilla),
         )
-        // Parameterized static paths
         .route(
             "/plantillas/{id}/rellenar/{entity_type}/{entity_id}",
             web::get().to(handlers::documentos::rellenar_plantilla),
@@ -496,7 +488,6 @@ fn configure_documentos() -> impl actix_web::dev::HttpServiceFactory {
             "/digitalizar/{entity_type}/{entity_id}",
             web::post().to(handlers::documentos::digitalizar),
         )
-        // Dynamic paths
         .route(
             "/{id}/verificar",
             web::put().to(handlers::documentos::verificar),
@@ -513,7 +504,6 @@ fn configure_documentos() -> impl actix_web::dev::HttpServiceFactory {
             "/{id}/exportar-docx",
             web::get().to(handlers::documentos::exportar_docx),
         )
-        // Signature routes (authenticated)
         .route("/{id}/firmar", web::post().to(handlers::firmas::firmar))
         .route(
             "/{id}/solicitar-firma",
@@ -524,7 +514,6 @@ fn configure_documentos() -> impl actix_web::dev::HttpServiceFactory {
             web::get().to(handlers::firmas::listar_firmas),
         )
         .route("/{id}", web::delete().to(handlers::documentos::eliminar))
-        // Existing routes (most dynamic — two path segments)
         .route(
             "/{entity_type}/{entity_id}",
             web::post().to(handlers::documentos::upload),

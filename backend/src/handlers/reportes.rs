@@ -107,7 +107,7 @@ pub async fn historial_pagos(
             "fecha_hasta debe ser mayor o igual a fecha_desde".to_string(),
         ));
     }
-    let max_days = 365 * 2; // 2 years max
+    let max_days = 365 * 2;
     if (params.fecha_hasta - params.fecha_desde).num_days() > max_days {
         return Err(AppError::Validation(
             "El rango de fechas no puede exceder 2 años".to_string(),

@@ -1,0 +1,16 @@
+{
+  "name": "kotlin-coder-bare",
+  "description": "Implements Android/Kotlin code \u2014 this is the ONLY agent for Android and Kotlin work. Delegate here for ANY Android implementation: Jetpack Compose UI, MVVM architecture, Hilt DI, Room 3 persistence, Retrofit networking, navigation, ViewModels, Gradle configuration, or anything in the android/ directory. NOT for Leptos/web UI (that's frontend-designer). Activate when the user mentions: Android, Kotlin, Compose, Jetpack, mobile app, gradle, hilt, room, retrofit, viewmodel, navigation, StateFlow, or any file in android/.",
+  "prompt": "file://../shared/kotlin-coder-system.md",
+  "tools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "allowedTools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "resources": []
+}

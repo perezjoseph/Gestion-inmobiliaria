@@ -177,7 +177,6 @@ fn PagoForm(props: &PagoFormProps) -> Html {
         }};
     }
 
-    // Date input callback: stores ISO internally but user types DD/MM/YYYY
     let date_input_cb = |state: &UseStateHandle<String>| -> Callback<InputEvent> {
         let s = state.clone();
         Callback::from(move |e: InputEvent| {
@@ -221,7 +220,7 @@ fn PagoForm(props: &PagoFormProps) -> Html {
             <OcrScanButton
                 document_type="deposito_bancario"
                 on_result={props.on_ocr_result.clone()}
-                label={AttrValue::from("📷 Escanear Recibo")}
+                label={AttrValue::from("ðŸ“· Escanear Recibo")}
             />
         }
     };
@@ -233,19 +232,18 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                     {if props.is_editing { "Editar Pago" } else { "Nuevo Pago" }}</h2>
                 {scan_button}
             </div>
-            // Prominent currency toggle at the top
             <div style="margin-bottom: var(--space-4);">
                 <label class="gi-label" style="margin-bottom: var(--space-2);">{"Moneda"}</label>
                 <div class="gi-currency-toggle gi-currency-toggle--prominent">
                     <button type="button"
                         class={if *props.moneda == "DOP" { "gi-currency-toggle__btn gi-currency-toggle__btn--active" } else { "gi-currency-toggle__btn" }}
                         onclick={select_cb_val!(props.moneda, "DOP")}>
-                        {"🇩🇴 Peso Dominicano (DOP)"}
+                        {"ðŸ‡©ðŸ‡´ Peso Dominicano (DOP)"}
                     </button>
                     <button type="button"
                         class={if *props.moneda == "USD" { "gi-currency-toggle__btn gi-currency-toggle__btn--active" } else { "gi-currency-toggle__btn" }}
                         onclick={select_cb_val!(props.moneda, "USD")}>
-                        {"🇺🇸 Dólar (USD)"}
+                        {"ðŸ‡ºðŸ‡¸ DÃ³lar (USD)"}
                     </button>
                 </div>
             </div>
@@ -254,7 +252,7 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                     <label class="gi-label">{"Contrato *"}</label>
                     <select onchange={select_cb!(props.contrato_id)} disabled={props.is_editing}
                         class={input_class(fe.contrato_id.is_some())}>
-                        <option value="" selected={props.contrato_id.is_empty()}>{"— Seleccionar contrato —"}</option>
+                        <option value="" selected={props.contrato_id.is_empty()}>{"â€” Seleccionar contrato â€”"}</option>
                         { for props.contratos.iter().map(|c| {
                             let sel = *props.contrato_id == c.id;
                             let label = props.contrato_label.emit(c.id.clone());
@@ -276,7 +274,7 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                 </div>
                 <div>
                     <label class="gi-label">{"Fecha de Vencimiento *"}
-                        <HelpTooltip text="Fecha límite para recibir el pago sin que se considere atrasado." id="help-fecha-venc" />
+                        <HelpTooltip text="Fecha lÃ­mite para recibir el pago sin que se considere atrasado." id="help-fecha-venc" />
                     </label>
                     <input type="text" placeholder="DD/MM/AAAA"
                         value={iso_to_display(&props.fecha_vencimiento)}
@@ -297,9 +295,9 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                     <span class="gi-hint">{"Formato: DD/MM/AAAA"}</span>
                 </div>
                 <div>
-                    <label class="gi-label">{"Método de Pago"}</label>
+                    <label class="gi-label">{"MÃ©todo de Pago"}</label>
                     <select onchange={select_cb!(props.metodo_pago)} class="gi-input">
-                        <option value="" selected={props.metodo_pago.is_empty()}>{"— Sin especificar —"}</option>
+                        <option value="" selected={props.metodo_pago.is_empty()}>{"â€” Sin especificar â€”"}</option>
                         <option value="efectivo" selected={*props.metodo_pago == "efectivo"}>{"Efectivo"}</option>
                         <option value="transferencia" selected={*props.metodo_pago == "transferencia"}>{"Transferencia"}</option>
                         <option value="cheque" selected={*props.metodo_pago == "cheque"}>{"Cheque"}</option>
@@ -384,10 +382,10 @@ fn render_pago_row(
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={p.monto} moneda={p.moneda.clone()} /></td>
             {recargo_cell}
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
-                {p.fecha_pago.as_deref().map_or_else(|| "—".into(), format_date_display)}</td>
+                {p.fecha_pago.as_deref().map_or_else(|| "â€”".into(), format_date_display)}</td>
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&p.fecha_vencimiento)}</td>
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
-                {p.metodo_pago.as_deref().map_or("—", metodo_label)}</td>
+                {p.metodo_pago.as_deref().map_or("â€”", metodo_label)}</td>
             <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
             {actions}
         </tr>
@@ -415,10 +413,10 @@ fn render_pago_cells(
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={p.monto} moneda={p.moneda.clone()} /></td>
             {recargo_cell}
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
-                {p.fecha_pago.as_deref().map_or_else(|| "—".into(), format_date_display)}</td>
+                {p.fecha_pago.as_deref().map_or_else(|| "â€”".into(), format_date_display)}</td>
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&p.fecha_vencimiento)}</td>
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
-                {p.metodo_pago.as_deref().map_or("—", metodo_label)}</td>
+                {p.metodo_pago.as_deref().map_or("â€”", metodo_label)}</td>
             <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
             {actions}
         </>
@@ -428,7 +426,7 @@ fn render_pago_cells(
 fn render_recargo_cell(recargo: Option<f64>, moneda: &str) -> Html {
     recargo.map_or_else(
         || html! {
-            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{"—"}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{"â€”"}</td>
         },
         |r| html! {
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--color-error);">
@@ -477,23 +475,44 @@ fn render_pago_actions(
 
 fn render_pago_empty_state(user_rol: &str, on_new: &Callback<MouseEvent>) -> Html {
     html! {
-        <div class="gi-empty-state">
-            <div class="gi-empty-state-icon">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
-                    <line x1="12" y1="1" x2="12" y2="23"/>
-                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        <div class="gi-empty-state" role="status" aria-label="Sin pagos registrados">
+            <div class="gi-empty-state-icon" style="background: var(--color-primary-50, #eff6ff); border-radius: 50%; width: 80px; height: 80px; display: inline-flex; align-items: center; justify-content: center;">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary-500, #3b82f6)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="2" y="5" width="20" height="14" rx="2"/>
+                    <path d="M2 10h20"/>
+                    <path d="M12 15l2-2-2-2"/>
+                    <path d="M7 15h7"/>
                 </svg>
             </div>
-            <div class="gi-empty-state-title">{"Sin pagos registrados"}</div>
-            <p class="gi-empty-state-text">{"Los pagos se registran contra contratos activos. Necesita al menos un contrato vigente para comenzar a registrar cobros."}</p>
+            <div class="gi-empty-state-title">{"Registre su primer cobro"}</div>
+            <p class="gi-empty-state-text">
+                {"Lleve un control preciso de los cobros de alquiler. Cada pago se vincula a un contrato activo para generar recibos y reportes automÃ¡ticamente."}
+            </p>
+            <div style="display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4); font-size: var(--text-xs); color: var(--text-secondary); max-width: 32ch; margin-left: auto; margin-right: auto; text-align: left;">
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--color-success-100, #dcfce7); color: var(--color-success-700, #15803d); font-size: 10px; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; flex-shrink: 0;">{"1"}</span>
+                    {"Registre una propiedad"}
+                </div>
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--color-success-100, #dcfce7); color: var(--color-success-700, #15803d); font-size: 10px; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; flex-shrink: 0;">{"2"}</span>
+                    {"Cree un contrato activo"}
+                </div>
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--color-primary-100, #dbeafe); color: var(--color-primary-700, #1d4ed8); font-size: 10px; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; flex-shrink: 0;">{"3"}</span>
+                    <strong>{"Registre pagos aquÃ­"}</strong>
+                </div>
+            </div>
             if can_write(user_rol) {
-                <button onclick={on_new.clone()} class="gi-btn gi-btn-primary" style="margin-top: var(--space-3);">{"+ Nuevo Pago"}</button>
+                <button onclick={on_new.clone()} class="gi-btn gi-btn-primary" style="margin-top: var(--space-5);">
+                    {"+ Registrar Primer Pago"}
+                </button>
             }
             <div class="gi-empty-state-hint">
-                {"¿No tiene contratos? "}
+                {"Â¿AÃºn no tiene contratos? "}
                 <Link<Route> to={Route::Contratos} classes="gi-btn-text">
-                    {"Crear contrato primero"}
+                    {"Crear un contrato"}
                 </Link<Route>>
+                {" para empezar."}
             </div>
         </div>
     }
@@ -673,7 +692,7 @@ fn validate_pago_fields(contrato_id: &str, monto: &str, fecha_vencimiento: &str)
     }
     match monto.parse::<f64>() {
         Ok(v) if v <= 0.0 => errs.monto = Some("El monto debe ser mayor a 0".into()),
-        Err(_) => errs.monto = Some("Monto inválido".into()),
+        Err(_) => errs.monto = Some("Monto invÃ¡lido".into()),
         _ => {}
     }
     if fecha_vencimiento.is_empty() {
@@ -702,16 +721,16 @@ fn format_contrato_label(
             let prop_name = propiedades
                 .iter()
                 .find(|p| p.id == c.propiedad_id)
-                .map_or("—", |p| p.titulo.as_str());
+                .map_or("â€”", |p| p.titulo.as_str());
             let tenant_name = inquilinos
                 .iter()
                 .find(|i| i.id == c.inquilino_id)
                 .map_or_else(String::new, |i| format!("{} {}", i.nombre, i.apellido));
             if tenant_name.is_empty() {
-                format!("{} — {} {}", prop_name, c.moneda, c.monto_mensual)
+                format!("{} â€” {} {}", prop_name, c.moneda, c.monto_mensual)
             } else {
                 format!(
-                    "{} ({}) — {} {}",
+                    "{} ({}) â€” {} {}",
                     prop_name, tenant_name, c.moneda, c.monto_mensual
                 )
             }
@@ -1407,7 +1426,7 @@ fn render_pagos_view(
         "Recargo".into(),
         "Fecha Pago".into(),
         "Vencimiento".into(),
-        "Método".into(),
+        "MÃ©todo".into(),
         "Estado".into(),
         last_header,
     ];
@@ -1509,7 +1528,7 @@ fn render_pagos_view(
                 on_clear={on_clear_selection.clone()}
             >
                 <button onclick={on_bulk_mark_paid.clone()} class="gi-btn gi-btn-primary gi-btn-sm">
-                    {"✓ Marcar como pagado"}
+                    {"âœ“ Marcar como pagado"}
                 </button>
             </BulkActionBar>
         </div>
@@ -1561,7 +1580,7 @@ fn render_delete_confirm_pago(
         || html! {},
         |p| html! {
             <DeleteConfirmModal
-                message={format!("¿Está seguro de que desea eliminar el pago de {}? Esta acción no se puede deshacer.", format_currency(&p.moneda, p.monto))}
+                message={format!("Â¿EstÃ¡ seguro de que desea eliminar el pago de {}? Esta acciÃ³n no se puede deshacer.", format_currency(&p.moneda, p.monto))}
                 on_confirm={on_confirm.clone()} on_cancel={on_cancel.clone()}
             />
         },

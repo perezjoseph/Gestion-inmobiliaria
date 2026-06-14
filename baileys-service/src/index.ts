@@ -13,9 +13,6 @@ if (!INTERNAL_TOKEN || INTERNAL_TOKEN.length < 32) {
   logger.warn('BAILEYS_INTERNAL_TOKEN not set or too short (<32 chars) — requests will be rejected');
 }
 
-// Render QR at 2x the displayed 256px size for crisp scanning on high-DPI screens,
-// with a proper quiet zone margin and medium error correction (WhatsApp's QR payload
-// is large enough that 'H' would overflow).
 const QR_OPTIONS: QRCodeToDataURLOptions = {
   width: 512,
   margin: 4,
@@ -27,15 +24,12 @@ const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '100kb' }));
 
-// --- Authentication middleware ---
-
 function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   const token = req.headers['x-internal-token'] as string | undefined;
   if (!INTERNAL_TOKEN || !token) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
-  // Constant-time comparison to prevent timing attacks
   const tokenBuf = Buffer.from(token);
   const expectedBuf = Buffer.from(INTERNAL_TOKEN);
   if (tokenBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(tokenBuf, expectedBuf)) {
@@ -44,8 +38,6 @@ function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   }
   next();
 }
-
-// --- Health endpoint (unauthenticated — used by K8s probes) ---
 
 app.get('/health', (_req: Request, res: Response) => {
   const counts = getConnectionCounts();
@@ -56,13 +48,8 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// --- Session API endpoints (authenticated) ---
 app.use('/sessions', authMiddleware);
 
-/**
- * POST /sessions/:realmId/start
- * Create a WASocket for the organization, return QR data or current status.
- */
 app.post('/sessions/:realmId/start', async (req: Request, res: Response) => {
   const realmId = req.params.realmId as string;
   try {
@@ -85,10 +72,6 @@ app.post('/sessions/:realmId/start', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * POST /sessions/:realmId/send
- * Send a message to a recipient phone number through the active session.
- */
 app.post('/sessions/:realmId/send', async (req: Request, res: Response) => {
   const realmId = req.params.realmId as string;
   const { recipientPhone, content } = req.body;
@@ -108,10 +91,6 @@ app.post('/sessions/:realmId/send', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * POST /sessions/:realmId/stop
- * Disconnect and cleanup the session for the organization.
- */
 app.post('/sessions/:realmId/stop', async (req: Request, res: Response) => {
   const realmId = req.params.realmId as string;
   try {
@@ -123,10 +102,6 @@ app.post('/sessions/:realmId/stop', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * GET /sessions/:realmId/status
- * Return the current connection status for the organization.
- */
 app.get('/sessions/:realmId/status', async (req: Request, res: Response) => {
   const realmId = req.params.realmId as string;
   const sessionStatus = getStatus(realmId);

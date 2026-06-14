@@ -9,16 +9,12 @@ use crate::errors::AppError;
 
 use super::client::{MailClient, OutgoingMail};
 
-/// Production SMTP mail client backed by `lettre`.
-///
-/// Connects to Mailcow SMTP via STARTTLS.
 pub struct SmtpMailClient {
     transport: AsyncSmtpTransport<Tokio1Executor>,
     from: Mailbox,
 }
 
 impl SmtpMailClient {
-    /// Build from environment-sourced SMTP configuration.
     pub fn from_config(cfg: &SmtpConfig) -> Result<Self, AppError> {
         let creds = Credentials::new(cfg.user.clone(), cfg.pass.clone());
         let transport = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&cfg.host)

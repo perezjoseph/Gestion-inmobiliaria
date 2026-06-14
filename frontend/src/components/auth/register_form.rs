@@ -18,7 +18,7 @@ pub fn validate_nombre(input: &str) -> Option<String> {
 pub fn validate_email(input: &str) -> Option<String> {
     let trimmed = input.trim();
     if trimmed.is_empty() || !trimmed.contains('@') {
-        Some("Correo electrónico inválido".into())
+        Some("Correo electrÃ³nico invÃ¡lido".into())
     } else {
         None
     }
@@ -26,7 +26,7 @@ pub fn validate_email(input: &str) -> Option<String> {
 
 pub fn validate_password(input: &str) -> Option<String> {
     if input.len() < 8 {
-        Some("La contraseña debe tener al menos 8 caracteres".into())
+        Some("La contraseÃ±a debe tener al menos 8 caracteres".into())
     } else {
         None
     }
@@ -36,7 +36,7 @@ pub fn validate_confirm_password(password: &str, confirm: &str) -> Option<String
     if password == confirm {
         None
     } else {
-        Some("Las contraseñas no coinciden".into())
+        Some("Las contraseÃ±as no coinciden".into())
     }
 }
 
@@ -90,10 +90,10 @@ const fn input_class(has_error: bool) -> &'static str {
 }
 
 fn humanize_register_error(err: String) -> String {
-    if err.contains("ya está registrad") || err.contains("409") {
-        "Este correo electrónico o documento fiscal ya está registrado".to_string()
+    if err.contains("ya estÃ¡ registrad") || err.contains("409") {
+        "Este correo electrÃ³nico o documento fiscal ya estÃ¡ registrado".to_string()
     } else if err.contains("Error de red") {
-        "Error de conexión. Intente nuevamente.".to_string()
+        "Error de conexiÃ³n. Intente nuevamente.".to_string()
     } else {
         err
     }
@@ -122,26 +122,22 @@ pub struct RegisterFormProps {
 
 #[component]
 pub fn RegisterForm(props: &RegisterFormProps) -> Html {
-    // Common fields
     let nombre = use_state(String::new);
     let email = use_state(String::new);
     let password = use_state(String::new);
     let confirm_password = use_state(String::new);
     let tipo = use_state(|| "persona_fisica".to_string());
 
-    // persona_fisica fields
     let cedula = use_state(String::new);
     let telefono = use_state(String::new);
     let nombre_org = use_state(String::new);
 
-    // persona_juridica fields
     let rnc = use_state(String::new);
     let razon_social = use_state(String::new);
     let nombre_comercial = use_state(String::new);
     let direccion_fiscal = use_state(String::new);
     let representante_legal = use_state(String::new);
 
-    // Validation errors
     let nombre_error = use_state(|| Option::<String>::None);
     let email_error = use_state(|| Option::<String>::None);
     let password_error = use_state(|| Option::<String>::None);
@@ -158,7 +154,6 @@ pub fn RegisterForm(props: &RegisterFormProps) -> Html {
     let loading = use_state(|| false);
     let on_success = props.on_success.clone();
 
-    // Input change handlers
     let make_handler = |state: UseStateHandle<String>| {
         Callback::from(move |e: InputEvent| {
             let input: web_sys::HtmlInputElement = e.target_unchecked_into();
@@ -172,7 +167,7 @@ pub fn RegisterForm(props: &RegisterFormProps) -> Html {
         Callback::from(move |e: InputEvent| {
             let input: web_sys::HtmlInputElement = e.target_unchecked_into();
             let value = input.value();
-            nombre_error.set(validate_nombre(&value)); // clears once non-empty
+            nombre_error.set(validate_nombre(&value));
             nombre.set(value);
         })
     };
@@ -234,7 +229,6 @@ pub fn RegisterForm(props: &RegisterFormProps) -> Html {
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
 
-            // Validate common fields
             let n_err = validate_nombre(&nombre);
             let e_err = validate_email(&email);
             let p_err = validate_password(&password);
@@ -248,17 +242,15 @@ pub fn RegisterForm(props: &RegisterFormProps) -> Html {
             let mut has_error =
                 n_err.is_some() || e_err.is_some() || p_err.is_some() || c_err.is_some();
 
-            // Validate tipo-specific fields
             let is_fisica = *tipo == "persona_fisica";
 
             if is_fisica {
-                let ced_err = validate_required(&cedula, "La cédula");
-                let tel_err = validate_required(&telefono, "El teléfono");
-                let org_err = validate_required(&nombre_org, "El nombre de la organización");
+                let ced_err = validate_required(&cedula, "La cÃ©dula");
+                let tel_err = validate_required(&telefono, "El telÃ©fono");
+                let org_err = validate_required(&nombre_org, "El nombre de la organizaciÃ³n");
                 cedula_error.set(ced_err.clone());
                 telefono_error.set(tel_err.clone());
                 nombre_org_error.set(org_err.clone());
-                // Clear juridica errors
                 rnc_error.set(None);
                 razon_social_error.set(None);
                 nombre_comercial_error.set(None);
@@ -269,16 +261,15 @@ pub fn RegisterForm(props: &RegisterFormProps) -> Html {
                 }
             } else {
                 let rnc_e = validate_required(&rnc, "El RNC");
-                let rs_e = validate_required(&razon_social, "La razón social");
+                let rs_e = validate_required(&razon_social, "La razÃ³n social");
                 let nc_e = validate_required(&nombre_comercial, "El nombre comercial");
-                let df_e = validate_required(&direccion_fiscal, "La dirección fiscal");
+                let df_e = validate_required(&direccion_fiscal, "La direcciÃ³n fiscal");
                 let rl_e = validate_required(&representante_legal, "El representante legal");
                 rnc_error.set(rnc_e.clone());
                 razon_social_error.set(rs_e.clone());
                 nombre_comercial_error.set(nc_e.clone());
                 direccion_fiscal_error.set(df_e.clone());
                 representante_legal_error.set(rl_e.clone());
-                // Clear fisica errors
                 cedula_error.set(None);
                 telefono_error.set(None);
                 nombre_org_error.set(None);
@@ -359,7 +350,6 @@ pub fn RegisterForm(props: &RegisterFormProps) -> Html {
                 <ErrorBanner message={err.clone()} onclose={close_error} />
             }
 
-            // Common fields: Nombre
             <div>
                 <label class="gi-label">{"Nombre"}</label>
                 <input type="text" value={(*nombre).clone()} oninput={on_nombre_change}
@@ -368,42 +358,37 @@ pub fn RegisterForm(props: &RegisterFormProps) -> Html {
                     <p class="gi-field-error">{err}</p>
                 }
             </div>
-            // Common fields: Email
             <div>
-                <label class="gi-label">{"Correo electrónico"}</label>
+                <label class="gi-label">{"Correo electrÃ³nico"}</label>
                 <input type="email" value={(*email).clone()} oninput={on_email_change}
                     class={email_cls} placeholder="correo@ejemplo.com" />
                 if let Some(err) = (*email_error).as_ref() {
                     <p class="gi-field-error">{err}</p>
                 }
             </div>
-            // Common fields: Password
             <div>
-                <label class="gi-label">{"Contraseña"}</label>
+                <label class="gi-label">{"ContraseÃ±a"}</label>
                 <input type="password" value={(*password).clone()} oninput={on_password_change}
                     class={pass_cls} />
                 if let Some(err) = (*password_error).as_ref() {
                     <p class="gi-field-error">{err}</p>
                 }
             </div>
-            // Common fields: Confirm password
             <div>
-                <label class="gi-label">{"Confirmar contraseña"}</label>
+                <label class="gi-label">{"Confirmar contraseÃ±a"}</label>
                 <input type="password" value={(*confirm_password).clone()} oninput={on_confirm_change}
                     class={confirm_cls} />
                 if let Some(err) = (*confirm_error).as_ref() {
                     <p class="gi-field-error">{err}</p>
                 }
             </div>
-            // Organization type selector
             <div>
                 <label class="gi-label">{"Tipo de persona"}</label>
                 <select class="gi-input" onchange={on_tipo_change} value={(*tipo).clone()}>
-                    <option value="persona_fisica" selected={is_fisica}>{"Persona Física"}</option>
-                    <option value="persona_juridica" selected={!is_fisica}>{"Persona Jurídica"}</option>
+                    <option value="persona_fisica" selected={is_fisica}>{"Persona FÃ­sica"}</option>
+                    <option value="persona_juridica" selected={!is_fisica}>{"Persona JurÃ­dica"}</option>
                 </select>
             </div>
-            // Conditional fields based on tipo
             if is_fisica {
                 <PersonaFisicaFields
                     cedula={(*cedula).clone()}
@@ -441,14 +426,12 @@ pub fn RegisterForm(props: &RegisterFormProps) -> Html {
             </button>
             <p style="text-align: center; font-size: var(--text-sm); color: var(--text-secondary);">
                 <Link<Route> to={Route::Login} classes="gi-btn-text">
-                    {"¿Ya tienes cuenta? Inicia sesión"}
+                    {"Â¿Ya tienes cuenta? Inicia sesiÃ³n"}
                 </Link<Route>>
             </p>
         </form>
     }
 }
-
-// ── Sub-components to keep html! blocks small ──────────────────
 
 #[derive(Properties, PartialEq)]
 struct PersonaFisicaFieldsProps {
@@ -472,7 +455,7 @@ fn PersonaFisicaFields(props: &PersonaFisicaFieldsProps) -> Html {
     html! {
         <>
             <div>
-                <label class="gi-label">{"Cédula *"}</label>
+                <label class="gi-label">{"CÃ©dula *"}</label>
                 <input type="text" value={props.cedula.clone()} oninput={props.on_cedula_change.clone()}
                     class={ced_cls} placeholder="000-0000000-0" />
                 if let Some(err) = props.cedula_error.as_ref() {
@@ -480,7 +463,7 @@ fn PersonaFisicaFields(props: &PersonaFisicaFieldsProps) -> Html {
                 }
             </div>
             <div>
-                <label class="gi-label">{"Teléfono *"}</label>
+                <label class="gi-label">{"TelÃ©fono *"}</label>
                 <input type="tel" value={props.telefono.clone()} oninput={props.on_telefono_change.clone()}
                     class={tel_cls} placeholder="809-555-1234" />
                 if let Some(err) = props.telefono_error.as_ref() {
@@ -488,7 +471,7 @@ fn PersonaFisicaFields(props: &PersonaFisicaFieldsProps) -> Html {
                 }
             </div>
             <div>
-                <label class="gi-label">{"Nombre de la organización *"}</label>
+                <label class="gi-label">{"Nombre de la organizaciÃ³n *"}</label>
                 <input type="text" value={props.nombre_org.clone()} oninput={props.on_nombre_org_change.clone()}
                     class={org_cls} placeholder="Mi Inmobiliaria" />
                 if let Some(err) = props.nombre_org_error.as_ref() {
@@ -537,7 +520,7 @@ fn PersonaJuridicaFields(props: &PersonaJuridicaFieldsProps) -> Html {
                 }
             </div>
             <div>
-                <label class="gi-label">{"Razón social *"}</label>
+                <label class="gi-label">{"RazÃ³n social *"}</label>
                 <input type="text" value={props.razon_social.clone()} oninput={props.on_razon_social_change.clone()}
                     class={rs_cls} placeholder="Empresa S.R.L." />
                 if let Some(err) = props.razon_social_error.as_ref() {
@@ -553,7 +536,7 @@ fn PersonaJuridicaFields(props: &PersonaJuridicaFieldsProps) -> Html {
                 }
             </div>
             <div>
-                <label class="gi-label">{"Dirección fiscal *"}</label>
+                <label class="gi-label">{"DirecciÃ³n fiscal *"}</label>
                 <input type="text" value={props.direccion_fiscal.clone()} oninput={props.on_direccion_fiscal_change.clone()}
                     class={df_cls} placeholder="Calle Principal #1, Santo Domingo" />
                 if let Some(err) = props.direccion_fiscal_error.as_ref() {
@@ -571,8 +554,6 @@ fn PersonaJuridicaFields(props: &PersonaJuridicaFieldsProps) -> Html {
         </>
     }
 }
-
-// ── Tests ──────────────────────────────────────────────────────
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::panic)]
@@ -609,7 +590,7 @@ mod tests {
     fn test_validate_email_empty() {
         assert_eq!(
             validate_email(""),
-            Some("Correo electrónico inválido".into())
+            Some("Correo electrÃ³nico invÃ¡lido".into())
         );
     }
 
@@ -617,7 +598,7 @@ mod tests {
     fn test_validate_email_missing_at() {
         assert_eq!(
             validate_email("juangmail.com"),
-            Some("Correo electrónico inválido".into())
+            Some("Correo electrÃ³nico invÃ¡lido".into())
         );
     }
 
@@ -625,7 +606,7 @@ mod tests {
     fn test_validate_email_whitespace_only() {
         assert_eq!(
             validate_email("   "),
-            Some("Correo electrónico inválido".into())
+            Some("Correo electrÃ³nico invÃ¡lido".into())
         );
     }
 
@@ -638,7 +619,7 @@ mod tests {
     fn test_validate_password_too_short() {
         assert_eq!(
             validate_password("abc"),
-            Some("La contraseña debe tener al menos 8 caracteres".into())
+            Some("La contraseÃ±a debe tener al menos 8 caracteres".into())
         );
     }
 
@@ -647,7 +628,7 @@ mod tests {
         let pw = "a".repeat(7);
         assert_eq!(
             validate_password(&pw),
-            Some("La contraseña debe tener al menos 8 caracteres".into())
+            Some("La contraseÃ±a debe tener al menos 8 caracteres".into())
         );
     }
 
@@ -669,7 +650,7 @@ mod tests {
         let pw2 = test_password("second");
         assert_eq!(
             validate_confirm_password(&pw1, &pw2),
-            Some("Las contraseñas no coinciden".into())
+            Some("Las contraseÃ±as no coinciden".into())
         );
     }
 
@@ -726,8 +707,8 @@ mod tests {
     #[test]
     fn test_validate_required_empty() {
         assert_eq!(
-            validate_required("", "La cédula"),
-            Some("La cédula es obligatorio".into())
+            validate_required("", "La cÃ©dula"),
+            Some("La cÃ©dula es obligatorio".into())
         );
     }
 
@@ -741,6 +722,6 @@ mod tests {
 
     #[test]
     fn test_validate_required_valid() {
-        assert_eq!(validate_required("12345", "La cédula"), None);
+        assert_eq!(validate_required("12345", "La cÃ©dula"), None);
     }
 }

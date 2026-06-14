@@ -5,8 +5,6 @@ use yew::prelude::*;
 
 use crate::services::api::BASE_URL;
 
-// ── Props ──────────────────────────────────────────────────────────────
-
 #[derive(Properties, PartialEq)]
 pub struct DocumentEditorProps {
     #[prop_or_default]
@@ -21,8 +19,6 @@ pub struct DocumentEditorProps {
     pub documento_id: Option<AttrValue>,
     pub on_save: Callback<Value>,
 }
-
-// ── Block model ────────────────────────────────────────────────────────
 
 #[derive(Clone, Debug, PartialEq)]
 struct EditorBlock {
@@ -122,7 +118,6 @@ fn has_placeholder(text: &str) -> bool {
     text.contains("{{") && text.contains("}}")
 }
 
-/// Highlight `{{placeholder}}` spans with the `.gi-editor-placeholder` class.
 fn highlight_placeholders(text: &str) -> Html {
     let mut parts: Vec<Html> = Vec::new();
     let mut remaining = text;
@@ -147,8 +142,6 @@ fn highlight_placeholders(text: &str) -> Html {
     }
     html! { <>{ for parts }</> }
 }
-
-// ── Toolbar sub-component ──────────────────────────────────────────────
 
 #[derive(Properties, PartialEq)]
 struct EditorToolbarProps {
@@ -201,7 +194,7 @@ fn EditorToolbar(props: &EditorToolbarProps) -> Html {
                 <button class="gi-editor-toolbar-btn" onclick={fmt("insertUnorderedList")} aria-label="Lista sin orden" title="Lista sin orden">{"UL"}</button>
                 <div class="gi-editor-toolbar-sep" />
                 <button class="gi-editor-toolbar-btn" onclick={fmt("insertTable")} aria-label="Insertar tabla" title="Insertar tabla">{"Tabla"}</button>
-                <button class="gi-editor-toolbar-btn" onclick={fmt("insertHorizontalRule")} aria-label="Salto de página" title="Salto de página">{"—"}</button>
+                <button class="gi-editor-toolbar-btn" onclick={fmt("insertHorizontalRule")} aria-label="Salto de pÃ¡gina" title="Salto de pÃ¡gina">{"â€”"}</button>
                 <div class="gi-editor-toolbar-sep" />
                 <button class="gi-btn gi-btn-primary" style="font-size: var(--text-sm); padding: var(--space-1) var(--space-3);" onclick={on_save_click}>
                     {"Guardar"}
@@ -226,8 +219,6 @@ fn EditorToolbar(props: &EditorToolbarProps) -> Html {
         </div>
     }
 }
-
-// ── Content renderer (read-only blocks) ────────────────────────────────
 
 #[derive(Properties, PartialEq)]
 struct EditorBlocksViewProps {
@@ -258,7 +249,6 @@ fn render_block(block: &EditorBlock) -> Html {
         "list" => render_list(block, ocr_class, confidence_title),
         "table" => render_table(block, ocr_class, confidence_title),
         "page_break" => html! { <hr class="gi-editor-page-break" /> },
-        // "paragraph" and any unknown type render as paragraph
         _ => render_paragraph(block, ocr_class, confidence_title),
     }
 }
@@ -324,8 +314,6 @@ fn render_table(block: &EditorBlock, ocr_class: String, title: Option<String>) -
         </table>
     }
 }
-
-// ── Serialize contenteditable back to JSON ─────────────────────────────
 
 fn serialize_editor_content() -> Value {
     let Some(doc) = web_sys::window().and_then(|w| w.document()) else {
@@ -448,7 +436,6 @@ fn extract_table(html_str: &str) -> (Vec<String>, Vec<Vec<String>>) {
     let mut headers = Vec::new();
     let mut rows = Vec::new();
 
-    // Extract <th> elements
     let mut search_from = 0;
     while let Some(start) = lower[search_from..].find("<th") {
         let abs_start = search_from + start;
@@ -468,7 +455,6 @@ fn extract_table(html_str: &str) -> (Vec<String>, Vec<Vec<String>>) {
         }
     }
 
-    // Extract <tr> rows with <td> cells
     let tbody_start = lower.find("<tbody").unwrap_or(0);
     let mut tr_from = tbody_start;
     while let Some(tr_start) = lower[tr_from..].find("<tr") {
@@ -505,8 +491,6 @@ fn extract_table(html_str: &str) -> (Vec<String>, Vec<Vec<String>>) {
     (headers, rows)
 }
 
-// ── exec_command helper ────────────────────────────────────────────────
-
 fn exec_format_command(cmd: &str) {
     let Some(doc) = web_sys::window().and_then(|w| w.document()) else {
         return;
@@ -529,21 +513,16 @@ fn exec_format_command(cmd: &str) {
     }
 }
 
-// ── PDF export helper ──────────────────────────────────────────────────
-
 fn export_pdf(documento_id: AttrValue, exporting: UseStateHandle<bool>) {
     spawn_local(async move {
         exporting.set(true);
         let url = format!("{BASE_URL}/documentos/{documento_id}/exportar-pdf");
-        // Open the PDF URL directly — the browser will handle the download
         if let Some(win) = web_sys::window() {
             let _ = win.open_with_url(&url);
         }
         exporting.set(false);
     });
 }
-
-// ── DOCX export helper ─────────────────────────────────────────────────
 
 fn export_docx(documento_id: AttrValue, exporting: UseStateHandle<bool>) {
     spawn_local(async move {
@@ -555,8 +534,6 @@ fn export_docx(documento_id: AttrValue, exporting: UseStateHandle<bool>) {
         exporting.set(false);
     });
 }
-
-// ── Main DocumentEditor component ──────────────────────────────────────
 
 #[component]
 pub fn DocumentEditor(props: &DocumentEditorProps) -> Html {
@@ -619,8 +596,6 @@ pub fn DocumentEditor(props: &DocumentEditorProps) -> Html {
         </div>
     }
 }
-
-// ── Content area sub-component ─────────────────────────────────────────
 
 #[derive(Properties, PartialEq)]
 struct EditorContentAreaProps {

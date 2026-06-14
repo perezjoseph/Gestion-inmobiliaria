@@ -3,8 +3,6 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// IPI liability calculation result for an organization.
-/// Shows the breakdown of how the annual property tax is computed.
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct IpiLiabilityResponse {
@@ -16,8 +14,6 @@ pub struct IpiLiabilityResponse {
     pub proxima_fecha: NaiveDate,
 }
 
-/// A co-owner record for a property, used for proportional IPI calculation
-/// per the 2026 Supreme Court ruling.
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CopropietarioResponse {
@@ -28,7 +24,6 @@ pub struct CopropietarioResponse {
     pub porcentaje_propiedad: Decimal,
 }
 
-/// Request to configure IPI parameters for a given year.
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfiguracionIpiRequest {

@@ -1,20 +1,14 @@
 use yew::prelude::*;
 
-/// A single card in the mobile card list.
 #[derive(Properties, PartialEq)]
 pub struct MobileCardProps {
-    /// Primary label (entity name/title). Shown bold.
     pub title: AttrValue,
-    /// Secondary detail line (amount, date, etc).
     #[prop_or_default]
     pub subtitle: AttrValue,
-    /// Optional status badge HTML (pass a rendered gi-badge span).
     #[prop_or_default]
     pub badge: Html,
-    /// Optional tertiary info line.
     #[prop_or_default]
     pub detail: AttrValue,
-    /// Click handler for the card (e.g., navigate to detail).
     #[prop_or_default]
     pub onclick: Option<Callback<MouseEvent>>,
 }
@@ -51,8 +45,6 @@ pub fn MobileCard(props: &MobileCardProps) -> Html {
     }
 }
 
-/// Container for a list of mobile cards. Only visible at ≤768px (via CSS).
-/// Pair with `DataTable` which is hidden on mobile via `.gi-mobile-hidden`.
 #[derive(Properties, PartialEq)]
 pub struct MobileCardListProps {
     #[prop_or_default]

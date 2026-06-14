@@ -2,14 +2,12 @@ use yew::prelude::*;
 
 use crate::types::chatbot::ChatbotConfigResponse;
 
-/// Predefined tone presets. The last value (`""`) allows the user to clear back
-/// to a custom free-text tone typed in the override field.
 const TONE_PRESETS: &[(&str, &str)] = &[
     ("Formal", "formal, profesional, usted"),
-    ("Cercano", "cercano, amable, tú"),
+    ("Cercano", "cercano, amable, tÃº"),
     ("Directo", "directo, breve, sin rodeos"),
     ("Cordial", "cordial, respetuoso, servicial"),
-    ("Amistoso", "amistoso, cálido, conversacional"),
+    ("Amistoso", "amistoso, cÃ¡lido, conversacional"),
 ];
 
 #[derive(Properties, PartialEq)]
@@ -123,7 +121,7 @@ pub fn PersonaStep(props: &PersonaStepProps) -> Html {
                         oninput={on_name_input}
                     />
                     <p class="text-xs text-[var(--text-tertiary)] mt-1">
-                        {"Así se presentará en el primer mensaje."}
+                        {"AsÃ­ se presentarÃ¡ en el primer mensaje."}
                     </p>
                 </div>
 
@@ -194,10 +192,6 @@ pub fn PersonaStep(props: &PersonaStepProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// PersonaPreview — WhatsApp-style conversation preview
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct PersonaPreviewProps {
     name: String,
@@ -214,7 +208,7 @@ fn PersonaPreview(props: &PersonaPreviewProps) -> Html {
     };
 
     let greeting = if props.greeting.trim().is_empty() {
-        format!("Hola, soy {display_name}. ¿En qué puedo ayudarle?")
+        format!("Hola, soy {display_name}. Â¿En quÃ© puedo ayudarle?")
     } else {
         props.greeting.clone()
     };
@@ -248,7 +242,7 @@ fn PersonaPreview(props: &PersonaPreviewProps) -> Html {
             <div class="flex flex-col gap-2 px-4 py-4 flex-1">
                 <PreviewBubble
                     from_user={true}
-                    text={AttrValue::from("¿Cuánto debo este mes?")}
+                    text={AttrValue::from("Â¿CuÃ¡nto debo este mes?")}
                 />
                 <PreviewBubble
                     from_user={false}
@@ -261,7 +255,7 @@ fn PersonaPreview(props: &PersonaPreviewProps) -> Html {
             </div>
 
             <footer class="px-4 py-2 text-xs text-[var(--text-tertiary)]" style="border-top: 1px solid var(--border-subtle);">
-                {"Los mensajes reales pueden variar según la pregunta del inquilino."}
+                {"Los mensajes reales pueden variar segÃºn la pregunta del inquilino."}
             </footer>
         </aside>
     }
@@ -294,24 +288,22 @@ fn PreviewBubble(props: &PreviewBubbleProps) -> Html {
     }
 }
 
-/// Pick a sample reply that reflects the tone. The match is heuristic: looks for
-/// keywords in the tone string. Falls back to a neutral reply.
 fn sample_reply_for_tone(tone: &str, name: &str) -> String {
     let t = tone.to_lowercase();
     if t.contains("formal") || t.contains("usted") {
-        "Con gusto le ayudo. Según nuestro sistema, su saldo pendiente al día de hoy es de RD$ 18,500.00. ¿Desea que le envíe el recibo correspondiente?".to_string()
+        "Con gusto le ayudo. SegÃºn nuestro sistema, su saldo pendiente al dÃ­a de hoy es de RD$ 18,500.00. Â¿Desea que le envÃ­e el recibo correspondiente?".to_string()
     } else if t.contains("directo") || t.contains("breve") {
         "Debe RD$ 18,500.00. Vence el 15 de este mes.".to_string()
     } else if t.contains("cercano")
         || t.contains("amistoso")
         || t.contains("amable")
-        || t.contains("tú")
+        || t.contains("tÃº")
         || t.contains("tu")
     {
-        "¡Hola! Claro, revisé tu cuenta y tienes pendiente RD$ 18,500.00 para este mes. ¿Te envío los datos para pagar?".to_string()
+        "Â¡Hola! Claro, revisÃ© tu cuenta y tienes pendiente RD$ 18,500.00 para este mes. Â¿Te envÃ­o los datos para pagar?".to_string()
     } else {
         format!(
-            "Su saldo pendiente es de RD$ 18,500.00 con vencimiento el 15 de este mes. Dígame si necesita los datos bancarios o puedo ayudarle con algo más. {name} a la orden."
+            "Su saldo pendiente es de RD$ 18,500.00 con vencimiento el 15 de este mes. DÃ­game si necesita los datos bancarios o puedo ayudarle con algo mÃ¡s. {name} a la orden."
         )
     }
 }

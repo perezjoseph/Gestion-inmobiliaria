@@ -4,10 +4,6 @@
     clippy::doc_markdown,
     clippy::empty_line_after_doc_comments
 )]
-//! Property-based tests for `RentalGuardrailHook`.
-//!
-//! Tests argument validation, side-effect capture, tools-invoked tracking,
-//! and output safety filtering using proptest.
 
 use std::sync::{Arc, Mutex};
 
@@ -21,9 +17,6 @@ use super::guardrail_hook::RentalGuardrailHook;
 use super::{CreateMaintenanceRequestInput, GuardrailConfig};
 use crate::services::ai_module::tools::PaymentReceipt;
 
-// ── Helpers ────────────────────────────────────────────────────────────
-
-/// Build a `RentalGuardrailHook` with the given `GuardrailConfig`.
 fn make_hook(config: GuardrailConfig) -> RentalGuardrailHook {
     RentalGuardrailHook {
         captured_receipt: Arc::new(Mutex::new(None)),
@@ -33,12 +26,10 @@ fn make_hook(config: GuardrailConfig) -> RentalGuardrailHook {
     }
 }
 
-/// Build a default hook (max_description_length = 1000, no blocked patterns).
 fn default_hook() -> RentalGuardrailHook {
     make_hook(GuardrailConfig::default())
 }
 
-/// Call `on_tool_call` synchronously using a tokio runtime.
 fn call_on_tool_call(
     hook: &RentalGuardrailHook,
     tool_name: &str,
@@ -59,7 +50,6 @@ fn call_on_tool_call(
     })
 }
 
-/// Call `on_tool_result` synchronously using a tokio runtime.
 fn call_on_tool_result(hook: &RentalGuardrailHook, tool_name: &str, result: &str) -> HookAction {
     use rig::agent::PromptHook;
 
@@ -77,14 +67,10 @@ fn call_on_tool_result(hook: &RentalGuardrailHook, tool_name: &str, result: &str
     })
 }
 
-// ── Custom Strategies ──────────────────────────────────────────────────
-
-/// Generate a string of exactly `n` bytes (ASCII 'a' repeated).
 fn string_of_len(n: usize) -> String {
     "a".repeat(n)
 }
 
-/// Generate a valid `CreateMaintenanceRequestInput` JSON with a given description.
 fn maintenance_args_with_description(desc: &str) -> String {
     let input = CreateMaintenanceRequestInput {
         inquilino_id: Uuid::new_v4().to_string(),
@@ -95,12 +81,10 @@ fn maintenance_args_with_description(desc: &str) -> String {
     serde_json::to_string(&input).unwrap()
 }
 
-/// Generate an arbitrary tool name (alphanumeric + underscore).
 fn arb_tool_name() -> impl Strategy<Value = String> {
     "[a-z_]{1,30}"
 }
 
-/// Generate arbitrary JSON-like args strings (valid, invalid, empty, etc.).
 fn arb_args_string() -> impl Strategy<Value = String> {
     prop_oneof![
         Just("{}".to_string()),
@@ -112,7 +96,6 @@ fn arb_args_string() -> impl Strategy<Value = String> {
     ]
 }
 
-/// Generate a valid PaymentReceipt JSON string.
 fn arb_payment_receipt_json() -> impl Strategy<Value = String> {
     (
         proptest::option::of("[A-Za-z ]{3,20}"),
@@ -132,7 +115,6 @@ fn arb_payment_receipt_json() -> impl Strategy<Value = String> {
         })
 }
 
-/// Generate strings that are NOT valid PaymentReceipt JSON.
 fn arb_invalid_receipt_json() -> impl Strategy<Value = String> {
     prop_oneof![
         Just("not json".to_string()),
@@ -143,11 +125,6 @@ fn arb_invalid_receipt_json() -> impl Strategy<Value = String> {
     ]
 }
 
-// ── Property 2: Argument Validation Bounds ─────────────────────────────
-
-// Feature: native-rig-agent-guardrails, Property 2: Argument Validation Bounds
-// **Validates: Requirements 3.1, 3.2, 3.3**
-
 #[test]
 fn test_argument_validation_bounds() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -155,10 +132,8 @@ fn test_argument_validation_bounds() {
         ..Default::default()
     });
 
-    // Use a smaller max_description_length for faster testing
     let max_len = 1000usize;
 
-    // Generate description lengths across the full range
     runner
         .run(&(0usize..2048), |desc_len| {
             let hook = make_hook(GuardrailConfig {
@@ -171,7 +146,6 @@ fn test_argument_validation_bounds() {
             let action = call_on_tool_call(&hook, "create_maintenance_request", &args);
 
             if desc_len < 2 {
-                // Too short → Skip
                 prop_assert!(
                     matches!(action, ToolCallHookAction::Skip { .. }),
                     "Expected Skip for desc_len={}, got {:?}",
@@ -179,7 +153,6 @@ fn test_argument_validation_bounds() {
                     action
                 );
             } else if desc_len > max_len {
-                // Too long → Skip
                 prop_assert!(
                     matches!(action, ToolCallHookAction::Skip { .. }),
                     "Expected Skip for desc_len={}, got {:?}",
@@ -187,7 +160,6 @@ fn test_argument_validation_bounds() {
                     action
                 );
             } else {
-                // Valid range → Continue
                 prop_assert!(
                     matches!(action, ToolCallHookAction::Continue),
                     "Expected Continue for desc_len={}, got {:?}",
@@ -200,11 +172,6 @@ fn test_argument_validation_bounds() {
         })
         .unwrap();
 }
-
-// ── Property 3: Argument Validation Never Terminates ───────────────────
-
-// Feature: native-rig-agent-guardrails, Property 3: Argument Validation Never Terminates
-// **Validates: Requirements 3.4, 3.5**
 
 #[test]
 fn test_argument_validation_never_terminates() {
@@ -220,7 +187,6 @@ fn test_argument_validation_never_terminates() {
                 let hook = default_hook();
                 let action = call_on_tool_call(&hook, &tool_name, &args);
 
-                // on_tool_call must NEVER return Terminate for any input
                 prop_assert!(
                     !matches!(action, ToolCallHookAction::Terminate { .. }),
                     "on_tool_call returned Terminate for tool_name='{}', args='{}'",
@@ -234,11 +200,6 @@ fn test_argument_validation_never_terminates() {
         .unwrap();
 }
 
-// ── Property 4: Receipt Capture Consistency ────────────────────────────
-
-// Feature: native-rig-agent-guardrails, Property 4: Receipt Capture Consistency
-// **Validates: Requirements 4.1, 4.2**
-
 #[test]
 fn test_receipt_capture_consistency() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -246,7 +207,6 @@ fn test_receipt_capture_consistency() {
         ..Default::default()
     });
 
-    // Generate sequences of (is_valid, receipt_or_garbage) pairs
     let strategy = proptest::collection::vec(
         prop_oneof![
             arb_payment_receipt_json().prop_map(|json| (true, json)),
@@ -264,20 +224,17 @@ fn test_receipt_capture_consistency() {
                 call_on_tool_result(&hook, "extract_receipt", result_json);
 
                 if *is_valid {
-                    // If it's valid JSON that deserializes to PaymentReceipt, update expected
                     if let Ok(receipt) = serde_json::from_str::<PaymentReceipt>(result_json) {
                         last_valid_receipt = Some(receipt);
                     }
                 }
-                // If invalid, captured_receipt should remain unchanged
             }
 
             let captured = hook.captured_receipt.lock().unwrap().clone();
 
             match (&last_valid_receipt, &captured) {
-                (None, None) => {} // No valid receipts → still None
+                (None, None) => {}
                 (Some(expected), Some(actual)) => {
-                    // Last valid receipt should match
                     prop_assert_eq!(expected.amount, actual.amount);
                     prop_assert_eq!(&expected.currency, &actual.currency);
                 }
@@ -294,11 +251,6 @@ fn test_receipt_capture_consistency() {
         .unwrap();
 }
 
-// ── Property 5: Tools Invoked Tracking ─────────────────────────────────
-
-// Feature: native-rig-agent-guardrails, Property 5: Tools Invoked Tracking
-// **Validates: Requirements 4.3, 4.4**
-
 #[test]
 fn test_tools_invoked_tracking() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -306,7 +258,6 @@ fn test_tools_invoked_tracking() {
         ..Default::default()
     });
 
-    // Generate sequences of (tool_name, result) pairs
     let strategy = proptest::collection::vec((arb_tool_name(), "[a-zA-Z0-9 {}]{0,50}"), 1..30);
 
     runner
@@ -319,7 +270,6 @@ fn test_tools_invoked_tracking() {
 
             let invoked = hook.tools_invoked.lock().unwrap().clone();
 
-            // Verify: exactly N entries
             prop_assert_eq!(
                 invoked.len(),
                 sequence.len(),
@@ -328,7 +278,6 @@ fn test_tools_invoked_tracking() {
                 invoked.len()
             );
 
-            // Verify: each entry matches the tool_name in order
             for (i, (expected_name, _)) in sequence.iter().enumerate() {
                 prop_assert_eq!(
                     &invoked[i],
@@ -345,15 +294,6 @@ fn test_tools_invoked_tracking() {
         .unwrap();
 }
 
-// ── Property 6: Output Safety Filter Correctness ───────────────────────
-
-// Feature: native-rig-agent-guardrails, Property 6: Output Safety Filter Correctness
-// **Validates: Requirements 5.1, 5.2**
-
-/// Tests the regex pattern matching logic used by `on_completion_response`.
-/// Since constructing a full `CompletionResponse` is complex, we test the
-/// pattern-matching logic directly: given text and a set of patterns, verify
-/// that a match triggers Terminate and no match triggers Continue.
 #[test]
 fn test_output_safety_filter_correctness() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -361,29 +301,22 @@ fn test_output_safety_filter_correctness() {
         ..Default::default()
     });
 
-    // Strategy: generate a set of simple regex patterns and text to check against
     let strategy = (
-        // Generate 0..5 simple patterns (word-like patterns that are valid regex)
         proptest::collection::vec("[a-z]{3,8}", 0..5),
-        // Generate text to check
         "[a-z ]{0,100}",
     );
 
     runner
         .run(&strategy, |(patterns, text)| {
-            // Compile patterns into Regex (filter out any that fail to compile)
             let compiled: Vec<Regex> = patterns.iter().filter_map(|p| Regex::new(p).ok()).collect();
 
-            // Check if any pattern matches the text
             let should_block = compiled.iter().any(|re| re.is_match(&text));
 
-            // Build a hook with these patterns
             let hook = make_hook(GuardrailConfig {
                 blocked_output_patterns: compiled.clone(),
                 ..GuardrailConfig::default()
             });
 
-            // Simulate what on_completion_response does: check text against patterns
             let action = if hook.guardrail_config.blocked_output_patterns.is_empty() {
                 HookAction::Continue
             } else {
@@ -415,7 +348,6 @@ fn test_output_safety_filter_correctness() {
                 );
             }
 
-            // Verify: empty patterns list → always Continue
             if compiled.is_empty() {
                 prop_assert!(
                     matches!(action, HookAction::Continue),

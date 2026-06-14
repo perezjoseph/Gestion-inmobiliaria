@@ -29,31 +29,21 @@ use crate::models::chatbot::{
 use crate::services::ocr_client::OcrClient;
 use crate::services::ovms_provider::OvmsCompletionModel;
 
-// Re-export tool types for backward compatibility
 pub use tools::{ExtractReceiptInput, ExtractReceiptTool, InlineBase64MediaStore, PaymentReceipt};
 
-// =============================================================================
-// GuardrailConfig — validation limits for the guardrail hook
-// =============================================================================
-
-/// Configuration for argument validation and output safety in the guardrail hook.
 #[derive(Clone)]
 pub struct GuardrailConfig {
-    /// Maximum allowed payment amount for receipt extraction (DOP).
     pub max_receipt_amount_dop: Decimal,
-    /// Maximum allowed payment amount for receipt extraction (USD).
     pub max_receipt_amount_usd: Decimal,
-    /// Maximum description length for maintenance requests.
     pub max_description_length: usize,
-    /// Blocked output patterns (compiled regexes for safety filtering).
     pub blocked_output_patterns: Vec<Regex>,
 }
 
 impl Default for GuardrailConfig {
     fn default() -> Self {
         Self {
-            max_receipt_amount_dop: Decimal::new(10_000_000, 2), // RD$100,000
-            max_receipt_amount_usd: Decimal::new(500_000, 2),    // US$5,000
+            max_receipt_amount_dop: Decimal::new(10_000_000, 2),
+            max_receipt_amount_usd: Decimal::new(500_000, 2),
             max_description_length: 1000,
             blocked_output_patterns: vec![],
         }
@@ -102,45 +92,26 @@ impl From<GuardrailOverrides> for GuardrailConfig {
     }
 }
 
-// =============================================================================
-// Types for process_message entry point
-// =============================================================================
-
-/// A user message passed to the AI module (text + optional image attachment).
 #[derive(Debug, Clone)]
 pub struct UserMessage {
-    /// Text content of the message.
     pub content: String,
-    /// Optional base64-encoded image attachment.
     pub image_base64: Option<String>,
 }
 
-/// A conversation history entry with role and content.
 #[derive(Debug, Clone)]
 pub struct ConversationEntry {
-    /// `"user"` or `"assistant"`.
     pub role: String,
-    /// Message content.
     pub content: String,
 }
 
-/// Response from the AI agent after processing a message.
 #[derive(Debug, Clone, Serialize)]
 pub struct AgentResponse {
-    /// The text reply to send back to the user.
     pub reply: String,
-    /// Names of tools that were invoked during processing.
     pub tools_invoked: Vec<String>,
-    /// If `extract_receipt` was successfully invoked, carries the extracted receipt data.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extracted_receipt: Option<PaymentReceipt>,
 }
 
-// =============================================================================
-// Persona and context types
-// =============================================================================
-
-/// Subset of chatbot persona configuration used for system prompt composition.
 #[derive(Debug, Clone)]
 pub struct ChatbotPersona {
     pub tone: Option<String>,
@@ -149,20 +120,16 @@ pub struct ChatbotPersona {
     pub language: String,
 }
 
-/// Resolved tenant information used to personalize AI responses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TenantContext {
     pub name: String,
 }
 
-/// AI module that wraps an [`OvmsCompletionModel`] for Rig's native agent loop.
-/// Stateless — receives all context as parameters.
 pub struct AiModule {
     pub(crate) model: OvmsCompletionModel,
     pub(crate) timeout_secs: u64,
 }
 
-/// Context passed to [`AiModule::process_message`] grouping all per-invocation parameters.
 pub struct ProcessMessageContext<'a> {
     pub config: &'a ChatbotPersona,
     pub tenant_context: Option<&'a TenantContext>,
@@ -175,16 +142,11 @@ pub struct ProcessMessageContext<'a> {
     pub db: &'a DatabaseConnection,
     pub organizacion_id: Uuid,
     pub sender_phone: &'a str,
-    /// Parsed guidance rules from the chatbot config JSONB.
     pub guidance_rules: &'a [GuidanceRule],
-    /// The organization's sender policy (e.g., `"tenants_only"`, `"tenants_and_prospects"`, `"allowlist"`).
-    /// Used by tools to enforce code-level access control.
     pub sender_policy: &'a str,
 }
 
 impl AiModule {
-    /// Creates a new [`AiModule`] from the chatbot environment configuration.
-    /// Uses the custom [`OvmsCompletionModel`] that handles OVMS's missing `id` field.
     pub fn new(config: &ChatbotEnvConfig) -> Result<Self, anyhow::Error> {
         let model = OvmsCompletionModel::new(
             &config.vllm_chat_model,
@@ -198,15 +160,6 @@ impl AiModule {
         })
     }
 
-    /// Single entry point for all messages (text or image).
-    ///
-    /// Uses Rig's native agent loop with the OVMS provider. The LLM decides
-    /// which tools to invoke based on content. This method:
-    /// 1. Composes the system prompt from persona config + tenant context
-    /// 2. Resolves `AgentConfig` and builds the guardrail hook with shared state
-    /// 3. Builds a Rig agent via `AgentBuilder` with tools, hook, and config
-    /// 4. Invokes the agent with timeout
-    /// 5. Extracts side-effects from shared state and returns `AgentResponse`
     pub async fn process_message(
         &self,
         ctx: &ProcessMessageContext<'_>,
@@ -215,7 +168,6 @@ impl AiModule {
         use rig::message::{self, UserContent};
         use rig::one_or_many::OneOrMany;
 
-        // 1. Compose system prompt
         let system_prompt = compose_system_prompt(
             ctx.config,
             ctx.tenant_context,
@@ -225,17 +177,13 @@ impl AiModule {
             ctx.guidance_rules,
         );
 
-        // 2. Resolve AgentConfig from hardcoded defaults (no longer user-configurable)
         let resolved = AgentConfig::default().resolve();
 
-        // 3. Build shared state for the hook
         let captured_receipt: Arc<Mutex<Option<PaymentReceipt>>> = Arc::new(Mutex::new(None));
         let tools_invoked: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
 
-        // 4. Construct GuardrailConfig from resolved guardrails
         let guardrail_config: GuardrailConfig = resolved.guardrails.clone().into();
 
-        // 5. Construct RentalGuardrailHook
         let hook = guardrail_hook::RentalGuardrailHook {
             captured_receipt: captured_receipt.clone(),
             tools_invoked: tools_invoked.clone(),
@@ -243,7 +191,6 @@ impl AiModule {
             guardrail_config,
         };
 
-        // 6. Build tools based on tool_registration strategy
         let capabilities_for_tools = match resolved.tool_registration {
             ToolRegistrationStrategy::Selective => ctx.capabilities,
             ToolRegistrationStrategy::AllWithHookGating => &Capabilities::all(),
@@ -257,7 +204,6 @@ impl AiModule {
             ctx.user_message.image_base64.as_deref(),
         );
 
-        // 7. Build agent via AgentBuilder
         let mut builder = AgentBuilder::new(self.model.clone())
             .preamble(&system_prompt)
             .hook(hook)
@@ -272,7 +218,6 @@ impl AiModule {
 
         let agent = builder.tools(tools).build();
 
-        // 8. Compose the user prompt (include image reference if present)
         let user_prompt = ctx.user_message.image_base64.as_ref().map_or_else(
             || ctx.user_message.content.clone(),
             |_| {
@@ -284,7 +229,6 @@ impl AiModule {
             },
         );
 
-        // 9. Convert conversation history to Rig Message format
         let chat_history: Vec<message::Message> = ctx
             .history
             .iter()
@@ -300,7 +244,6 @@ impl AiModule {
             })
             .collect();
 
-        // 10. Invoke agent with timeout
         let timeout_duration = Duration::from_secs(self.timeout_secs);
 
         let result = tokio::time::timeout(timeout_duration, async {
@@ -311,10 +254,8 @@ impl AiModule {
         })
         .await;
 
-        // 11. Handle result and extract side-effects from shared state
         match result {
             Ok(Ok(reply)) => {
-                // Check for empty reply (Req 1.6)
                 if reply.trim().is_empty() {
                     tracing::error!(
                         organizacion_id = %ctx.organizacion_id,
@@ -343,7 +284,6 @@ impl AiModule {
             Ok(Err(e)) => {
                 let error_msg = e.to_string();
 
-                // Handle HookAction::Terminate from safety filter (Req 5.3)
                 if error_msg.contains("Response blocked by safety filter") {
                     tracing::warn!(
                         organizacion_id = %ctx.organizacion_id,
@@ -388,11 +328,6 @@ impl AiModule {
     }
 }
 
-/// Composes a system prompt from the organization's persona configuration,
-/// guidance rules, FAQs, policies, tenant context, and handoff keywords.
-///
-/// Enabled guidance rules are grouped by category and formatted with Spanish
-/// section headers. Disabled rules and empty categories are omitted entirely.
 pub fn compose_system_prompt(
     config: &ChatbotPersona,
     tenant_context: Option<&TenantContext>,
@@ -403,7 +338,6 @@ pub fn compose_system_prompt(
 ) -> String {
     let mut sections: Vec<String> = Vec::with_capacity(8);
 
-    // Persona section — tone, language, greeting
     if let Some(tone) = &config.tone {
         sections.push(format!("Tono: {tone}"));
     }
@@ -413,13 +347,11 @@ pub fn compose_system_prompt(
         sections.push(format!("Saludo: {greeting}"));
     }
 
-    // Guidance rules section
     let rules_section = format_guidance_rules(guidance_rules);
     if !rules_section.is_empty() {
         sections.push(rules_section);
     }
 
-    // FAQs
     if !faqs.is_empty() {
         let mut faq_section = String::from("Preguntas frecuentes:");
         for entry in faqs {
@@ -428,19 +360,16 @@ pub fn compose_system_prompt(
         sections.push(faq_section);
     }
 
-    // Policies
     if let Some(policies_text) = policies {
         if !policies_text.is_empty() {
             sections.push(format!("Políticas:\n{policies_text}"));
         }
     }
 
-    // Tenant context
     if let Some(ctx) = tenant_context {
         sections.push(format!("Inquilino: {}", ctx.name));
     }
 
-    // Handoff keywords
     if !handoff_keywords.is_empty() {
         sections.push(format!(
             "Palabras clave para transferir a humano: {}",
@@ -451,28 +380,13 @@ pub fn compose_system_prompt(
     sections.join("\n\n")
 }
 
-/// Formats enabled guidance rules into a structured section with category headers.
-///
-/// Returns an empty string if there are zero enabled rules. Otherwise returns:
-/// ```text
-/// ## Reglas de comportamiento
-///
-/// ### Estilo de comunicación
-/// - instruction 1
-/// - instruction 2
-///
-/// ### Escalamiento
-/// - instruction 3
-/// ```
 fn format_guidance_rules(rules: &[GuidanceRule]) -> String {
-    // Filter to enabled rules only
     let enabled: Vec<&GuidanceRule> = rules.iter().filter(|r| r.enabled).collect();
 
     if enabled.is_empty() {
         return String::new();
     }
 
-    // Category ordering and their Spanish display names
     let categories = [
         (
             GuidanceCategory::EstiloComunicacion,
@@ -499,7 +413,6 @@ fn format_guidance_rules(rules: &[GuidanceRule]) -> String {
             continue;
         }
 
-        // Sort by sort_order within category
         cat_rules.sort_by_key(|r| r.sort_order);
 
         let _ = write!(section, "\n\n### {header}");
@@ -511,11 +424,6 @@ fn format_guidance_rules(rules: &[GuidanceRule]) -> String {
     section
 }
 
-// =============================================================================
-// Rig Tool Definitions (other tools remain inline)
-// =============================================================================
-
-/// Error type for all chatbot AI tools (except `ExtractReceiptTool` which has its own).
 #[derive(Debug, thiserror::Error)]
 pub enum ChatbotToolError {
     #[error("Error de servicio: {0}")]
@@ -526,22 +434,12 @@ pub enum ChatbotToolError {
     Validation(String),
 }
 
-// --- QueryBalanceTool ---
-
-/// Input the LLM provides when it wants to query a tenant's balance.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, JsonSchema)]
 pub struct QueryBalanceInput {
-    /// UUID del inquilino cuyo balance se desea consultar
     pub inquilino_id: String,
-    /// UUID de la organización
     pub organizacion_id: String,
 }
 
-/// Rig tool that calls [`query_tenant_balance`](super::chatbot::query_tenant_balance).
-///
-/// When `sender_policy` is `"tenants_and_prospects"`, performs a code-level check
-/// to verify the sender phone is linked to a known tenant before executing any
-/// balance query. This prevents unlinked senders from accessing balance data.
 #[derive(Clone)]
 pub struct QueryBalanceTool {
     pub db: DatabaseConnection,
@@ -583,22 +481,14 @@ impl Tool for QueryBalanceTool {
     }
 }
 
-// --- CreateMaintenanceRequestTool ---
-
-/// Input the LLM provides when creating a maintenance request.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, JsonSchema)]
 pub struct CreateMaintenanceRequestInput {
-    /// UUID del inquilino que reporta el problema
     pub inquilino_id: String,
-    /// UUID de la organización
     pub organizacion_id: String,
-    /// Descripción del problema de mantenimiento (2–1000 caracteres)
     pub description: String,
-    /// Prioridad de la solicitud: `baja`, `media`, `alta` o `urgente`
     pub priority: Option<String>,
 }
 
-/// Output returned to the LLM after creating a maintenance request.
 #[derive(Debug, Serialize)]
 pub struct MaintenanceRequestResult {
     pub request_id: Uuid,
@@ -607,7 +497,6 @@ pub struct MaintenanceRequestResult {
     pub message: String,
 }
 
-/// Rig tool that calls [`create_maintenance_from_chat`](super::chatbot::create_maintenance_from_chat).
 #[derive(Clone)]
 pub struct CreateMaintenanceRequestTool {
     pub db: DatabaseConnection,
@@ -653,20 +542,13 @@ impl Tool for CreateMaintenanceRequestTool {
     }
 }
 
-// --- GetPaymentHistoryTool ---
-
-/// Input the LLM provides when querying payment history.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, JsonSchema)]
 pub struct GetPaymentHistoryInput {
-    /// UUID del inquilino
     pub inquilino_id: String,
-    /// UUID de la organización
     pub organizacion_id: String,
-    /// Cantidad máxima de pagos a devolver (por defecto 10)
     pub limit: Option<u32>,
 }
 
-/// A single payment record in the history response.
 #[derive(Debug, Serialize)]
 pub struct PaymentHistoryEntry {
     pub amount: Decimal,
@@ -677,14 +559,12 @@ pub struct PaymentHistoryEntry {
     pub payment_date: Option<String>,
 }
 
-/// Output returned to the LLM with recent payment history.
 #[derive(Debug, Serialize)]
 pub struct PaymentHistoryResult {
     pub payments: Vec<PaymentHistoryEntry>,
     pub total_count: usize,
 }
 
-/// Rig tool that queries recent payments for a tenant.
 #[derive(Clone)]
 pub struct GetPaymentHistoryTool {
     pub db: DatabaseConnection,
@@ -717,7 +597,6 @@ impl Tool for GetPaymentHistoryTool {
 
         let limit = u64::from(args.limit.unwrap_or(10).min(50));
 
-        // Find all contrato IDs for this tenant in this org
         let contrato_ids: Vec<Uuid> = contrato::Entity::find()
             .filter(contrato::Column::InquilinoId.eq(inquilino_id))
             .filter(contrato::Column::OrganizacionId.eq(org_id))
@@ -735,7 +614,6 @@ impl Tool for GetPaymentHistoryTool {
             });
         }
 
-        // Query pagos for those contracts, ordered by due date descending
         let pagos = pago::Entity::find()
             .filter(pago::Column::ContratoId.is_in(contrato_ids))
             .filter(pago::Column::OrganizacionId.eq(org_id))
@@ -765,23 +643,17 @@ impl Tool for GetPaymentHistoryTool {
     }
 }
 
-// --- HandoffToHumanTool ---
-
-/// Input the LLM provides when handing off to a human operator.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, JsonSchema)]
 pub struct HandoffToHumanInput {
-    /// Razón por la cual se transfiere a un operador humano
     pub reason: Option<String>,
 }
 
-/// Output returned to the LLM after flagging for human handoff.
 #[derive(Debug, Serialize)]
 pub struct HandoffResult {
     pub status: String,
     pub message: String,
 }
 
-/// Rig tool that flags the conversation for human operator handoff.
 #[derive(Clone)]
 pub struct HandoffToHumanTool {
     pub db: DatabaseConnection,
@@ -805,7 +677,6 @@ impl Tool for HandoffToHumanTool {
     }
 
     async fn call(&self, _args: Self::Args) -> Result<Self::Output, Self::Error> {
-        // Set conversation handoff_status to `awaiting_human`
         crate::services::chatbot::set_handoff(&self.db, self.organizacion_id, &self.sender_phone)
             .await
             .map_err(|e| ChatbotToolError::Service(format!("Error setting handoff: {e}")))?;
@@ -817,18 +688,6 @@ impl Tool for HandoffToHumanTool {
     }
 }
 
-// =============================================================================
-// Capability-Gated Tool Registration
-// =============================================================================
-
-/// Returns the list of tool names that should be registered on the AI agent
-/// based on the organization's enabled capabilities.
-///
-/// Mapping:
-/// - `receipt_ocr` → [`ExtractReceiptTool`] (`"extract_receipt"`)
-/// - `balance_queries` → [`QueryBalanceTool`] (`"query_balance"`) + [`GetPaymentHistoryTool`] (`"get_payment_history"`)
-/// - `maintenance_requests` → [`CreateMaintenanceRequestTool`] (`"create_maintenance_request"`)
-/// - `human_handoff` → [`HandoffToHumanTool`] (`"handoff_to_human"`)
 pub fn get_enabled_tools(capabilities: &Capabilities) -> Vec<&'static str> {
     let mut tools = Vec::with_capacity(5);
 
@@ -849,8 +708,6 @@ pub fn get_enabled_tools(capabilities: &Capabilities) -> Vec<&'static str> {
     tools
 }
 
-/// Builds the tool vector based on enabled capabilities.
-/// Only enabled tools are registered — the LLM never sees disabled tool definitions.
 pub fn build_tools(
     capabilities: &Capabilities,
     db: &DatabaseConnection,
@@ -937,21 +794,15 @@ mod tests {
             &[],
         );
 
-        // Tone keyword present
         assert!(prompt.contains("profesional"));
-        // Greeting present
         assert!(prompt.contains("Bienvenido a su asistente"));
-        // Tenant name present
         assert!(prompt.contains("Juan Pérez"));
-        // All FAQ Q&A pairs present
         assert!(prompt.contains("¿Cuándo se paga?"));
         assert!(prompt.contains("El día 5 de cada mes."));
         assert!(prompt.contains("¿Aceptan transferencia?"));
         assert!(prompt.contains("Sí, Banreservas y Popular."));
-        // Policies text present
         assert!(prompt.contains("No se permiten mascotas"));
         assert!(prompt.contains("Horario de ruido: 10pm-7am."));
-        // Handoff keywords present
         assert!(prompt.contains("hablar con humano"));
         assert!(prompt.contains("agente"));
     }
@@ -968,7 +819,6 @@ mod tests {
         let prompt = compose_system_prompt(&config, None, &[], None, &[], &[]);
 
         assert!(prompt.contains("Idioma: es-DO"));
-        // Should not contain optional section headers when empty
         assert!(!prompt.contains("Preguntas frecuentes:"));
         assert!(!prompt.contains("Políticas:"));
         assert!(!prompt.contains("Palabras clave"));
@@ -1043,7 +893,7 @@ mod tests {
                 id: Uuid::new_v4(),
                 category: GuidanceCategory::Politicas,
                 instruction: "Nunca compartir datos bancarios".to_string(),
-                enabled: false, // disabled — should NOT appear
+                enabled: false,
                 is_template: true,
                 sort_order: 1,
                 created_at: now,
@@ -1053,20 +903,14 @@ mod tests {
 
         let prompt = compose_system_prompt(&config, None, &[], None, &[], &rules);
 
-        // Header present
         assert!(prompt.contains("## Reglas de comportamiento"));
-        // Estilo section with both enabled rules
         assert!(prompt.contains("### Estilo de comunicación"));
         assert!(prompt.contains("- Tratar a todos de usted"));
         assert!(prompt.contains("- Responder en español"));
-        // Escalamiento section
         assert!(prompt.contains("### Escalamiento"));
         assert!(prompt.contains("- Transferir si menciona abogado"));
-        // Disabled rule excluded
         assert!(!prompt.contains("Nunca compartir datos bancarios"));
-        // Políticas section omitted (only rule is disabled)
         assert!(!prompt.contains("### Políticas"));
-        // ContextoClarificacion section omitted (no rules)
         assert!(!prompt.contains("### Contexto y clarificación"));
     }
 
@@ -1095,7 +939,6 @@ mod tests {
 
         let prompt = compose_system_prompt(&config, None, &[], None, &[], &rules);
 
-        // No guidance section at all
         assert!(!prompt.contains("Reglas de comportamiento"));
     }
 
@@ -1143,8 +986,6 @@ mod tests {
             "Rules should be sorted by sort_order"
         );
     }
-
-    // --- get_enabled_tools tests ---
 
     #[test]
     fn get_enabled_tools_all_enabled() {
@@ -1213,7 +1054,6 @@ mod tests {
         assert_eq!(tools.len(), 2);
         assert!(tools.contains(&"extract_receipt"));
         assert!(tools.contains(&"create_maintenance_request"));
-        // payment_reminders has no tool mapping
         assert!(!tools.contains(&"query_balance"));
         assert!(!tools.contains(&"handoff_to_human"));
     }

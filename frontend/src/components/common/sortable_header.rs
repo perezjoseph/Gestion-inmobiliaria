@@ -38,9 +38,9 @@ pub fn SortableHeader(props: &SortableHeaderProps) -> Html {
 
     let indicator = if is_active {
         if current_order == "asc" {
-            " ▲"
+            " â–²"
         } else {
-            " ▼"
+            " â–¼"
         }
     } else {
         ""

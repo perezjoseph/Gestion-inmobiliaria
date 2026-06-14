@@ -6,10 +6,6 @@ use crate::errors::AppError;
 use crate::models::fiscal::{EstadoFiscalResponse, TipoFiscal};
 use crate::services::validacion_fiscal::{validar_cedula, validar_rnc};
 
-/// Verify that the organization has fiscal access (is not informal).
-///
-/// Returns `AppError::Forbidden` (403) if the org has `tipo_fiscal = "informal"`,
-/// since fiscal features (ITBIS, NCF/e-CF, 606/607) require DGII registration.
 pub fn verificar_acceso_fiscal(org: &organizacion::Model) -> Result<(), AppError> {
     if org.tipo_fiscal == "informal" {
         return Err(AppError::Forbidden(
@@ -19,7 +15,6 @@ pub fn verificar_acceso_fiscal(org: &organizacion::Model) -> Result<(), AppError
     Ok(())
 }
 
-/// Fetch an organization by ID and verify it has fiscal access.
 pub async fn obtener_org_con_acceso_fiscal(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -32,7 +27,6 @@ pub async fn obtener_org_con_acceso_fiscal(
     Ok(org)
 }
 
-/// Retrieve the current fiscal state of an organization.
 pub async fn obtener_estado_fiscal(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -45,7 +39,6 @@ pub async fn obtener_estado_fiscal(
     Ok(obtener_estado_fiscal_from_model(&org))
 }
 
-/// Build the fiscal state response from an organization model.
 pub fn obtener_estado_fiscal_from_model(org: &organizacion::Model) -> EstadoFiscalResponse {
     let tipo_fiscal = match org.tipo_fiscal.as_str() {
         "persona_juridica" => TipoFiscal::PersonaJuridica,
@@ -64,13 +57,6 @@ pub fn obtener_estado_fiscal_from_model(org: &organizacion::Model) -> EstadoFisc
     }
 }
 
-/// Update the fiscal type of an organization, validating the identifier before persisting.
-///
-/// - `persona_juridica` requires a valid 9-digit RNC (DGII check-digit algorithm).
-/// - `persona_fisica` requires a valid 11-digit cédula (Luhn algorithm).
-/// - `informal` does not require an identifier.
-///
-/// Returns the updated `organizacion::Model` on success, or an `AppError` on failure.
 pub async fn actualizar_tipo_fiscal(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -79,7 +65,6 @@ pub async fn actualizar_tipo_fiscal(
 ) -> Result<organizacion::Model, AppError> {
     use sea_orm::ActiveModelTrait;
 
-    // Validate identifier based on the target tipo_fiscal
     match &nuevo_tipo {
         TipoFiscal::PersonaJuridica => {
             let rnc = identificador.ok_or_else(|| {
@@ -93,18 +78,14 @@ pub async fn actualizar_tipo_fiscal(
             })?;
             validar_cedula(cedula)?;
         }
-        TipoFiscal::Informal => {
-            // No identifier required for informal
-        }
+        TipoFiscal::Informal => {}
     }
 
-    // Find the existing organization
     let org = organizacion::Entity::find_by_id(org_id)
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Organización no encontrada".to_string()))?;
 
-    // Build the active model with the fields to update
     let mut active: organizacion::ActiveModel = org.into();
     active.tipo_fiscal = Set(nuevo_tipo.to_string());
 
@@ -115,9 +96,7 @@ pub async fn actualizar_tipo_fiscal(
         TipoFiscal::PersonaFisica => {
             active.cedula = Set(identificador.map(std::string::ToString::to_string));
         }
-        TipoFiscal::Informal => {
-            // Keep existing rnc/cedula as-is (may store optionally per requirement 1.4)
-        }
+        TipoFiscal::Informal => {}
     }
 
     let updated = active.update(db).await?;
@@ -129,7 +108,6 @@ mod tests {
     use super::*;
     use chrono::Utc;
 
-    /// Helper to create a test organizacion Model with a given tipo_fiscal.
     fn make_org(tipo_fiscal: &str) -> organizacion::Model {
         organizacion::Model {
             id: Uuid::new_v4(),

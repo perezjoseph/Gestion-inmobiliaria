@@ -39,11 +39,11 @@ fn tipo_color(tipo: &str) -> &'static str {
 
 fn tipo_icon(tipo: &str) -> &'static str {
     match tipo {
-        "pago_vencido" => "💰",
-        "contrato_por_vencer" => "📄",
-        "documento_vencido" => "📁",
-        "mantenimiento_actualizado" => "🔧",
-        _ => "🔔",
+        "pago_vencido" => "ðŸ’°",
+        "contrato_por_vencer" => "ðŸ“„",
+        "documento_vencido" => "ðŸ“",
+        "mantenimiento_actualizado" => "ðŸ”§",
+        _ => "ðŸ””",
     }
 }
 
@@ -84,8 +84,8 @@ fn NotificacionFilterBar(props: &NotificacionFilterBarProps) -> Html {
                     <label class="gi-label">{"Estado"}</label>
                     <select onchange={on_leida_change} class="gi-input">
                         <option value="" selected={props.filter_leida.is_empty()}>{"Todas"}</option>
-                        <option value="false" selected={*props.filter_leida == "false"}>{"No leídas"}</option>
-                        <option value="true" selected={*props.filter_leida == "true"}>{"Leídas"}</option>
+                        <option value="false" selected={*props.filter_leida == "false"}>{"No leÃ­das"}</option>
+                        <option value="true" selected={*props.filter_leida == "true"}>{"LeÃ­das"}</option>
                     </select>
                 </div>
                 <div style="display: flex; gap: var(--space-2);">
@@ -115,11 +115,11 @@ fn render_notificacion_row(n: &Notificacion, on_mark_read: &Callback<String>) ->
         html! {
             <button onclick={Callback::from(move |_: MouseEvent| cb.emit(id.clone()))}
                 class="gi-btn-text" style="font-size: var(--text-xs);">
-                {"Marcar leída"}
+                {"Marcar leÃ­da"}
             </button>
         }
     } else {
-        html! { <span style="font-size: var(--text-xs); color: var(--text-tertiary);">{"✓ Leída"}</span> }
+        html! { <span style="font-size: var(--text-xs); color: var(--text-tertiary);">{"âœ“ LeÃ­da"}</span> }
     };
 
     html! {
@@ -164,7 +164,7 @@ fn NotificacionList(props: &NotificacionListProps) -> Html {
                     </svg>
                 </div>
                 <div class="gi-empty-state-title">{"Sin notificaciones"}</div>
-                <p class="gi-empty-state-text">{"No tiene notificaciones en este momento. Las notificaciones aparecerán cuando haya pagos vencidos, contratos por vencer u otros eventos del sistema."}</p>
+                <p class="gi-empty-state-text">{"No tiene notificaciones en este momento. Las notificaciones aparecerÃ¡n cuando haya pagos vencidos, contratos por vencer u otros eventos del sistema."}</p>
             </div>
         };
     }
@@ -234,7 +234,6 @@ pub fn Notificaciones() -> Html {
     let applied_tipo = use_state(String::new);
     let applied_leida = use_state(String::new);
 
-    // Load data on mount and when reload/page changes
     {
         let items = items.clone();
         let total = total.clone();
@@ -251,7 +250,6 @@ pub fn Notificaciones() -> Html {
         });
     }
 
-    // Filter apply
     let on_filter_apply = {
         let filter_tipo = filter_tipo.clone();
         let filter_leida = filter_leida.clone();
@@ -267,7 +265,6 @@ pub fn Notificaciones() -> Html {
         })
     };
 
-    // Filter clear
     let on_filter_clear = {
         let filter_tipo = filter_tipo.clone();
         let filter_leida = filter_leida.clone();
@@ -285,7 +282,6 @@ pub fn Notificaciones() -> Html {
         })
     };
 
-    // Mark single as read
     let on_mark_read = {
         let reload = reload.clone();
         let error = error.clone();
@@ -301,7 +297,7 @@ pub fn Notificaciones() -> Html {
                         reload.set(*reload + 1);
                         push_toast(
                             toasts.as_ref(),
-                            "Notificación marcada como leída",
+                            "NotificaciÃ³n marcada como leÃ­da",
                             ToastKind::Success,
                         );
                     }
@@ -311,7 +307,6 @@ pub fn Notificaciones() -> Html {
         })
     };
 
-    // Mark all as read
     let on_mark_all_read = {
         let reload = reload.clone();
         let error = error.clone();
@@ -325,7 +320,7 @@ pub fn Notificaciones() -> Html {
                     Ok(resp) => {
                         reload.set(*reload + 1);
                         let msg =
-                            format!("{} notificaciones marcadas como leídas", resp.actualizadas);
+                            format!("{} notificaciones marcadas como leÃ­das", resp.actualizadas);
                         push_toast(toasts.as_ref(), &msg, ToastKind::Success);
                     }
                     Err(err) => error.set(Some(err)),
@@ -360,7 +355,7 @@ pub fn Notificaciones() -> Html {
 
     let headers = vec![
         "Tipo".into(),
-        "Título".into(),
+        "TÃ­tulo".into(),
         "Mensaje".into(),
         "Estado".into(),
         "Fecha".into(),
@@ -371,7 +366,7 @@ pub fn Notificaciones() -> Html {
             <div class="gi-page-header">
                 <h1 class="gi-page-title">{"Notificaciones"}</h1>
                 <button onclick={on_mark_all_read} class="gi-btn gi-btn-primary">
-                    {"Marcar todas como leídas"}
+                    {"Marcar todas como leÃ­das"}
                 </button>
             </div>
 

@@ -1,10 +1,8 @@
 use crate::errors::AppError;
 
-// ── Shared domain constants ──────────────────────────────────────────
 pub const MONEDAS: &[&str] = &["DOP", "USD"];
 pub const METODOS_PAGO: &[&str] = &["efectivo", "transferencia", "cheque", "tarjeta"];
 
-// ── Per-domain estado constants ──────────────────────────────────────
 pub const ESTADOS_CONTRATO: &[&str] =
     &["activo", "vencido", "cancelado", "finalizado", "terminado"];
 pub const ESTADOS_PAGO: &[&str] = &["pendiente", "pagado", "atrasado"];
@@ -14,8 +12,6 @@ pub const ESTADOS_MANTENIMIENTO: &[&str] = &["pendiente", "en_progreso", "comple
 pub const ESTADOS_DESAHUCIO: &[&str] = &["iniciado", "en_progreso", "completado"];
 pub const PRIORIDADES_MANTENIMIENTO: &[&str] = &["baja", "media", "alta", "urgente"];
 
-/// DGII-aligned `Forma_Pago` values (Norma General 07-2018).
-/// Superset of `METODOS_PAGO`; used for fiscal/partial payment flows.
 pub const METODOS_PAGO_DGII: &[&str] = &[
     "efectivo",
     "transferencia",

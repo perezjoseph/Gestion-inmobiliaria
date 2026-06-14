@@ -9,7 +9,6 @@ use crate::types::chatbot::{
 const CHATBOT_PATH: &str = "/chatbot";
 const GUIDANCE_RULES_PATH: &str = "/chatbot/guidance-rules";
 
-/// Returns the full URL for the streaming test chat endpoint.
 pub fn test_chat_stream_url() -> String {
     format!("{BASE_URL}{CHATBOT_PATH}/test/stream")
 }
@@ -71,8 +70,6 @@ pub async fn reject_receipt(
 ) -> Result<ReceiptExtractionResponse, String> {
     api_post(&format!("{CHATBOT_PATH}/receipts/{id}/reject"), request).await
 }
-
-// --- Guidance Rules API ---
 
 #[allow(clippy::future_not_send)]
 pub async fn create_guidance_rule(

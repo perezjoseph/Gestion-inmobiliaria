@@ -10,14 +10,10 @@ use crate::models::fiscal::TipoFiscal;
 use crate::services::condominios::calcular_billing_con_cuota;
 use crate::services::itbis::calcular_itbis;
 
-// ── Custom Strategies ──────────────────────────────────────────────────
-
-/// Generate a positive monto as Decimal (centavos: 1..10_000_000_00 → 0.01..100_000.00).
 fn positive_monto() -> impl Strategy<Value = Decimal> {
     (1i64..10_000_000i64).prop_map(|cents| Decimal::new(cents, 2))
 }
 
-/// Generate any `TipoFiscal` variant.
 fn any_tipo_fiscal() -> impl Strategy<Value = TipoFiscal> {
     prop_oneof![
         Just(TipoFiscal::PersonaJuridica),
@@ -26,12 +22,10 @@ fn any_tipo_fiscal() -> impl Strategy<Value = TipoFiscal> {
     ]
 }
 
-/// Generate any property type.
 fn any_tipo_propiedad() -> impl Strategy<Value = &'static str> {
     prop_oneof![Just("comercial"), Just("industrial"), Just("residencial"),]
 }
 
-/// Build a passthrough cuota_condominio Model with the given monto and fecha_inicio.
 fn make_cuota(monto: Decimal, fecha_inicio: NaiveDate) -> cuota_condominio::Model {
     cuota_condominio::Model {
         id: Uuid::nil(),
@@ -49,7 +43,6 @@ fn make_cuota(monto: Decimal, fecha_inicio: NaiveDate) -> cuota_condominio::Mode
     }
 }
 
-/// Generate a year/month/day triple that forms a valid NaiveDate.
 fn valid_date() -> impl Strategy<Value = NaiveDate> {
     (2020i32..2030, 1u32..13, 1u32..29).prop_map(|(y, m, d)| {
         NaiveDate::from_ymd_opt(y, m, d)
@@ -60,11 +53,6 @@ fn valid_date() -> impl Strategy<Value = NaiveDate> {
 proptest! {
     #![proptest_config(ProptestConfig { cases: crate::test_support::pbt_cases(), ..Default::default() })]
 
-    // Feature: dr-landlord-compliance, Property 5: Billing Desglose with Condominium Fee
-    /// **Validates: Requirements 2.3, 2.4**
-    ///
-    /// For any (monto_base, cuota) where cuota is passthrough, total equals
-    /// monto_base + cuota + ITBIS(base) + ITBIS(cuota) with each as separate line item.
     #[test]
     fn billing_desglose_with_condominium_fee(
         monto_base in positive_monto(),
@@ -81,14 +69,12 @@ proptest! {
             &tipo_fiscal,
         );
 
-        // The cuota line item must equal the cuota monto (passthrough)
         prop_assert_eq!(
             result.cuota_condominio, cuota_monto,
             "Cuota line item must match cuota monto. Got {}, expected {}",
             result.cuota_condominio, cuota_monto
         );
 
-        // ITBIS on base and cuota must match independent calcular_itbis results
         let expected_itbis_base = calcular_itbis(monto_base, tipo_propiedad, &tipo_fiscal, None).monto_itbis;
         let expected_itbis_cuota = calcular_itbis(cuota_monto, tipo_propiedad, &tipo_fiscal, None).monto_itbis;
 
@@ -103,7 +89,6 @@ proptest! {
             tipo_fiscal, tipo_propiedad
         );
 
-        // Total must equal the sum of all components
         let expected_total = monto_base + cuota_monto + expected_itbis_base + expected_itbis_cuota;
         prop_assert_eq!(
             result.total, expected_total,
@@ -112,40 +97,27 @@ proptest! {
             result.total, expected_total
         );
 
-        // monto_base is preserved
         prop_assert_eq!(
             result.monto_base, monto_base,
             "monto_base must be preserved in result"
         );
     }
 
-    // Feature: dr-landlord-compliance, Property 6: Condominium Fee Change Temporal Boundary
-    /// **Validates: Requirements 2.5**
-    ///
-    /// For any cuota change with effective date, periods before use old amount,
-    /// periods after use new amount. We test by comparing two cuota models
-    /// and verifying the billing picks up the correct one based on temporal logic.
     #[test]
     fn condominium_fee_change_temporal_boundary(
         old_monto in positive_monto(),
         new_monto in positive_monto(),
         change_date in valid_date(),
     ) {
-        // Old cuota starts well before the change date
         let old_cuota = make_cuota(
             old_monto,
             NaiveDate::from_ymd_opt(2020, 1, 1).expect("date"),
         );
 
-        // New cuota starts at the change date
         let new_cuota = make_cuota(new_monto, change_date);
 
-        // A billing period BEFORE the change date should use old cuota
         let before_date = change_date.pred_opt().unwrap_or(change_date);
 
-        // Temporal boundary logic: if the billing period start < change_date,
-        // use old; if >= change_date, use new.
-        // We verify the old cuota produces old_monto in billing
         let result_old = calcular_billing_con_cuota(
             Decimal::new(10000, 2),
             Some(&old_cuota),
@@ -159,7 +131,6 @@ proptest! {
             before_date, change_date, old_monto, new_monto
         );
 
-        // And the new cuota produces new_monto in billing
         let result_new = calcular_billing_con_cuota(
             Decimal::new(10000, 2),
             Some(&new_cuota),
@@ -173,7 +144,6 @@ proptest! {
             change_date, old_monto, new_monto
         );
 
-        // Key property: old and new amounts differ when montos differ
         if old_monto != new_monto {
             prop_assert_ne!(
                 result_old.cuota_condominio, result_new.cuota_condominio,
@@ -182,11 +152,6 @@ proptest! {
         }
     }
 
-    // Feature: dr-landlord-compliance, Property 7: Condominium Fee Increase Uncapped
-    /// **Validates: Requirements 2.7**
-    ///
-    /// For any cuota increase (even > 10%), the system accepts it without applying
-    /// the Ley 85-25 rent cap. The new amount is used directly in billing.
     #[test]
     fn condominium_fee_increase_uncapped(
         base_monto_cents in 100i64..1_000_000i64,
@@ -194,12 +159,9 @@ proptest! {
     ) {
         let base_monto = Decimal::new(base_monto_cents, 2);
 
-        // Calculate a new monto that exceeds 10% increase (Ley 85-25 cap for rent)
         let increase_factor = Decimal::new(i64::from(increase_pct), 2);
         let new_monto = base_monto + (base_monto * increase_factor / Decimal::new(100, 0));
 
-        // Verify increase exceeds or is within various ranges — the key point is
-        // the system doesn't cap it
         let cuota = make_cuota(new_monto, NaiveDate::from_ymd_opt(2026, 6, 1).expect("date"));
 
         let result = calcular_billing_con_cuota(
@@ -209,14 +171,12 @@ proptest! {
             &TipoFiscal::PersonaJuridica,
         );
 
-        // The cuota in billing must be the FULL new_monto — no cap applied
         prop_assert_eq!(
             result.cuota_condominio, new_monto,
             "Cuota increase must not be capped. Expected {} ({}% increase from {}), got {}",
             new_monto, increase_pct, base_monto, result.cuota_condominio
         );
 
-        // Verify that even large increases (> 10%) pass through uncapped
         if increase_pct > 10 {
             let ten_pct_cap = base_monto + (base_monto * Decimal::new(10, 2));
             prop_assert!(

@@ -18,7 +18,6 @@ pub struct EstadoRequest {
     pub estado: String,
 }
 
-/// POST /api/v1/reportes-dgii/607 — generate 607 report
 pub async fn generar_607_handler(
     db: web::Data<DatabaseConnection>,
     user: WriteAccess,
@@ -37,7 +36,6 @@ pub async fn generar_607_handler(
     Ok(HttpResponse::Ok().json(reporte))
 }
 
-/// POST /api/v1/reportes-dgii/606 — generate 606 report
 pub async fn generar_606_handler(
     db: web::Data<DatabaseConnection>,
     user: WriteAccess,
@@ -56,7 +54,6 @@ pub async fn generar_606_handler(
     Ok(HttpResponse::Ok().json(reporte))
 }
 
-/// GET /api/v1/reportes-dgii/preview/{tipo}/{periodo} — preview report as JSON
 pub async fn preview_reporte(
     db: web::Data<DatabaseConnection>,
     user: WriteAccess,
@@ -69,7 +66,6 @@ pub async fn preview_reporte(
     Ok(HttpResponse::Ok().json(reporte))
 }
 
-/// PUT /api/v1/reportes-dgii/{id}/estado — mark report as enviado
 pub async fn actualizar_estado(
     db: web::Data<DatabaseConnection>,
     user: WriteAccess,

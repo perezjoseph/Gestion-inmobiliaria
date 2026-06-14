@@ -9,12 +9,6 @@ use crate::types::fiscal::{
     SecuenciaNcfResponse, TipoFiscal,
 };
 
-// ---------------------------------------------------------------------------
-// Main Page
-// ---------------------------------------------------------------------------
-
-/// Página de Configuración Fiscal
-/// Permite configurar tipo fiscal, RNC/cédula y rangos NCF de la organización.
 #[function_component(ConfiguracionFiscal)]
 pub fn configuracion_fiscal() -> Html {
     let estado = use_state(|| Option::<EstadoFiscalResponse>::None);
@@ -24,7 +18,6 @@ pub fn configuracion_fiscal() -> Html {
     let error = use_state(|| Option::<String>::None);
     let reload = use_state(|| 0u32);
 
-    // Fetch fiscal state, sequences, and alerts
     {
         let estado = estado.clone();
         let secuencias = secuencias.clone();
@@ -69,9 +62,9 @@ pub fn configuracion_fiscal() -> Html {
     html! {
         <div>
             <div class="gi-page-header">
-                <h1 class="gi-page-title">{"Configuración Fiscal"}</h1>
+                <h1 class="gi-page-title">{"ConfiguraciÃ³n Fiscal"}</h1>
                 <p class="gi-page-subtitle">
-                    {"Administre el tipo fiscal, RNC/cédula y rangos de NCF de su organización."}
+                    {"Administre el tipo fiscal, RNC/cÃ©dula y rangos de NCF de su organizaciÃ³n."}
                 </p>
             </div>
 
@@ -98,10 +91,6 @@ pub fn configuracion_fiscal() -> Html {
         </div>
     }
 }
-
-// ---------------------------------------------------------------------------
-// Tipo Fiscal Form
-// ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct TipoFiscalFormProps {
@@ -148,10 +137,8 @@ fn tipo_fiscal_form(props: &TipoFiscalFormProps) -> Html {
         Callback::from(move |e: InputEvent| {
             let input: web_sys::HtmlInputElement = e.target_unchecked_into();
             let val = input.value();
-            // Strip non-digits for validation
             let digits: String = val.chars().filter(char::is_ascii_digit).collect();
             identificador.set(digits.clone());
-            // Validate
             let msg = validate_identificador(&tipo_fiscal, &digits);
             validation_msg.set(msg);
         })
@@ -170,7 +157,6 @@ fn tipo_fiscal_form(props: &TipoFiscalFormProps) -> Html {
             let tf = (*tipo_fiscal).clone();
             let id_val = (*identificador).clone();
 
-            // Validate before submit
             if tf.is_registered() {
                 if let Some(msg) = validate_identificador(&tf, &id_val) {
                     validation_msg.set(Some(msg));
@@ -213,8 +199,8 @@ fn tipo_fiscal_form(props: &TipoFiscalFormProps) -> Html {
 
     let show_identificador = tipo_fiscal.is_registered();
     let id_label = match *tipo_fiscal {
-        TipoFiscal::PersonaJuridica => "RNC (9 dígitos)",
-        TipoFiscal::PersonaFisica => "Cédula (11 dígitos)",
+        TipoFiscal::PersonaJuridica => "RNC (9 dÃ­gitos)",
+        TipoFiscal::PersonaFisica => "CÃ©dula (11 dÃ­gitos)",
         TipoFiscal::Informal => "",
     };
     let id_placeholder = match *tipo_fiscal {
@@ -238,7 +224,7 @@ fn tipo_fiscal_form(props: &TipoFiscalFormProps) -> Html {
                 }
                 if *success {
                     <div style="padding: var(--space-3); margin-bottom: var(--space-3); background: var(--surface-success); border-radius: var(--radius-md); color: var(--color-success-text);">
-                        {"✓ Configuración fiscal actualizada correctamente."}
+                        {"âœ“ ConfiguraciÃ³n fiscal actualizada correctamente."}
                     </div>
                 }
                 <form onsubmit={on_submit}>
@@ -248,11 +234,11 @@ fn tipo_fiscal_form(props: &TipoFiscalFormProps) -> Html {
                             <select class="gi-input" onchange={on_tipo_change}>
                                 <option value="persona_juridica"
                                     selected={*tipo_fiscal == TipoFiscal::PersonaJuridica}>
-                                    {"Persona Jurídica"}
+                                    {"Persona JurÃ­dica"}
                                 </option>
                                 <option value="persona_fisica"
                                     selected={*tipo_fiscal == TipoFiscal::PersonaFisica}>
-                                    {"Persona Física"}
+                                    {"Persona FÃ­sica"}
                                 </option>
                                 <option value="informal"
                                     selected={*tipo_fiscal == TipoFiscal::Informal}>
@@ -277,21 +263,17 @@ fn tipo_fiscal_form(props: &TipoFiscalFormProps) -> Html {
                     </div>
                     if let Some(ref razon) = props.estado.razon_social {
                         <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-3);">
-                            {format!("Razón Social: {razon}")}
+                            {format!("RazÃ³n Social: {razon}")}
                         </p>
                     }
                     <button type="submit" class="gi-btn gi-btn-primary" disabled={*saving}>
-                        {if *saving { "Guardando..." } else { "Guardar Configuración" }}
+                        {if *saving { "Guardando..." } else { "Guardar ConfiguraciÃ³n" }}
                     </button>
                 </form>
             </div>
         </div>
     }
 }
-
-// ---------------------------------------------------------------------------
-// Identificador Validation Feedback
-// ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct IdentificadorFeedbackProps {
@@ -312,10 +294,6 @@ fn identificador_feedback(props: &IdentificadorFeedbackProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Alertas de Rango NCF
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct AlertasRangoPanelProps {
     alertas: Vec<AlertaRango>,
@@ -331,13 +309,13 @@ fn alertas_rango_panel(props: &AlertasRangoPanelProps) -> Html {
         <div class="gi-card" style="margin-bottom: var(--space-5); border-left: 4px solid var(--color-warning); background: var(--surface-warning);">
             <div style="padding: var(--space-4);">
                 <h3 style="font-size: var(--text-base); font-weight: 600; margin-bottom: var(--space-3); color: var(--color-warning-text);">
-                    {"⚠️ Alertas de Secuencias NCF"}
+                    {"âš ï¸ Alertas de Secuencias NCF"}
                 </h3>
                 { for props.alertas.iter().map(|a| {
                     html! {
                         <div style="margin-bottom: var(--space-2); font-size: var(--text-sm);">
                             <span style="font-weight: 500;">{&a.tipo_ncf}</span>
-                            {format!(" — {:.1}% consumido, {} restantes", a.consumo_porcentaje, a.restantes)}
+                            {format!(" â€” {:.1}% consumido, {} restantes", a.consumo_porcentaje, a.restantes)}
                         </div>
                     }
                 })}
@@ -345,10 +323,6 @@ fn alertas_rango_panel(props: &AlertasRangoPanelProps) -> Html {
         </div>
     }
 }
-
-// ---------------------------------------------------------------------------
-// Secuencias NCF Table
-// ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct SecuenciasNcfTableProps {
@@ -362,7 +336,7 @@ fn secuencias_ncf_table(props: &SecuenciasNcfTableProps) -> Html {
             <div class="gi-card" style="margin-bottom: var(--space-5);">
                 <div style="padding: var(--space-4);">
                     <div class="gi-empty-state">
-                        <div class="gi-empty-state-icon">{"🔢"}</div>
+                        <div class="gi-empty-state-icon">{"ðŸ”¢"}</div>
                         <div class="gi-empty-state-title">{"Sin secuencias NCF"}</div>
                         <p class="gi-empty-state-text">
                             {"No hay secuencias NCF configuradas. Use el formulario inferior para agregar un rango."}
@@ -445,10 +419,6 @@ fn render_secuencia_row(sec: &SecuenciaNcfResponse) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Configurar Rango Form
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct ConfigurarRangoFormProps {
     on_saved: Callback<()>,
@@ -478,13 +448,13 @@ fn configurar_rango_form(props: &ConfigurarRangoFormProps) -> Html {
             let desde: i32 = if let Ok(v) = (*rango_desde).parse() {
                 v
             } else {
-                error.set(Some("Rango desde inválido".to_string()));
+                error.set(Some("Rango desde invÃ¡lido".to_string()));
                 return;
             };
             let hasta: i32 = if let Ok(v) = (*rango_hasta).parse() {
                 v
             } else {
-                error.set(Some("Rango hasta inválido".to_string()));
+                error.set(Some("Rango hasta invÃ¡lido".to_string()));
                 return;
             };
             if desde >= hasta {
@@ -568,7 +538,7 @@ fn configurar_rango_form(props: &ConfigurarRangoFormProps) -> Html {
                 }
                 if *success {
                     <div style="padding: var(--space-3); margin-bottom: var(--space-3); background: var(--surface-success); border-radius: var(--radius-md); color: var(--color-success-text);">
-                        {"✓ Rango NCF configurado correctamente."}
+                        {"âœ“ Rango NCF configurado correctamente."}
                     </div>
                 }
                 <form onsubmit={on_submit}>
@@ -591,10 +561,6 @@ fn configurar_rango_form(props: &ConfigurarRangoFormProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Rango Form Fields (split to keep html! blocks small)
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct RangoFormFieldsProps {
     tipo_ncf: String,
@@ -614,9 +580,9 @@ fn rango_form_fields(props: &RangoFormFieldsProps) -> Html {
             <div>
                 <label class="gi-label">{"Tipo NCF"}</label>
                 <select class="gi-input" onchange={props.on_tipo_ncf.clone()}>
-                    <option value="B01" selected={props.tipo_ncf == "B01"}>{"B01 - Crédito Fiscal"}</option>
+                    <option value="B01" selected={props.tipo_ncf == "B01"}>{"B01 - CrÃ©dito Fiscal"}</option>
                     <option value="B02" selected={props.tipo_ncf == "B02"}>{"B02 - Consumidor Final"}</option>
-                    <option value="B14" selected={props.tipo_ncf == "B14"}>{"B14 - Régimen Especial"}</option>
+                    <option value="B14" selected={props.tipo_ncf == "B14"}>{"B14 - RÃ©gimen Especial"}</option>
                     <option value="B15" selected={props.tipo_ncf == "B15"}>{"B15 - Gubernamental"}</option>
                     <option value="B16" selected={props.tipo_ncf == "B16"}>{"B16 - Exportaciones"}</option>
                 </select>
@@ -657,12 +623,6 @@ fn rango_form_fields(props: &RangoFormFieldsProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Validation Helpers
-// ---------------------------------------------------------------------------
-
-/// Validates RNC (9 digits) or cédula (11 digits) based on tipo fiscal.
-/// Returns `None` if valid, `Some(error_message)` if invalid.
 fn validate_identificador(tipo: &TipoFiscal, digits: &str) -> Option<String> {
     match tipo {
         TipoFiscal::PersonaJuridica => {
@@ -670,22 +630,22 @@ fn validate_identificador(tipo: &TipoFiscal, digits: &str) -> Option<String> {
                 return Some("Debe ingresar el RNC".to_string());
             }
             if digits.len() != 9 {
-                return Some("RNC inválido: debe tener 9 dígitos".to_string());
+                return Some("RNC invÃ¡lido: debe tener 9 dÃ­gitos".to_string());
             }
             if !validate_rnc_check_digit(digits) {
-                return Some("RNC inválido: formato o dígito verificador incorrecto".to_string());
+                return Some("RNC invÃ¡lido: formato o dÃ­gito verificador incorrecto".to_string());
             }
             None
         }
         TipoFiscal::PersonaFisica => {
             if digits.is_empty() {
-                return Some("Debe ingresar la cédula".to_string());
+                return Some("Debe ingresar la cÃ©dula".to_string());
             }
             if digits.len() != 11 {
-                return Some("Cédula inválida: debe tener 11 dígitos".to_string());
+                return Some("CÃ©dula invÃ¡lida: debe tener 11 dÃ­gitos".to_string());
             }
             if !validate_cedula_check_digit(digits) {
-                return Some("Cédula inválida".to_string());
+                return Some("CÃ©dula invÃ¡lida".to_string());
             }
             None
         }
@@ -693,7 +653,6 @@ fn validate_identificador(tipo: &TipoFiscal, digits: &str) -> Option<String> {
     }
 }
 
-/// RNC check digit validation (Luhn mod 11 variant used by DGII)
 fn validate_rnc_check_digit(rnc: &str) -> bool {
     if rnc.len() != 9 {
         return false;
@@ -715,7 +674,6 @@ fn validate_rnc_check_digit(rnc: &str) -> bool {
     digits[8] == expected
 }
 
-/// Cédula check digit validation (Luhn algorithm)
 fn validate_cedula_check_digit(cedula: &str) -> bool {
     if cedula.len() != 11 {
         return false;

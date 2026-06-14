@@ -3,16 +3,6 @@ use actix_web::HttpRequest;
 use actix_web::dev::ServiceRequest;
 use std::net::{IpAddr, Ipv4Addr};
 
-/// A [`KeyExtractor`] that uses the real client IP for rate limiting.
-///
-/// Priority chain:
-/// 1. `CF-Connecting-IP` — set by Cloudflare, cannot be spoofed by end users.
-/// 2. `X-Real-Ip` — set by Traefik for local ingress.
-/// 3. `peer_addr()` — socket-level fallback.
-///
-/// `X-Forwarded-For` is explicitly NOT trusted as it can be spoofed by clients.
-///
-/// For IPv6, the last 9 bytes are zeroed to group /56 subnets together.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FallbackPeerIpKeyExtractor;
 
@@ -26,10 +16,6 @@ impl KeyExtractor for FallbackPeerIpKeyExtractor {
     }
 }
 
-/// Extract the client IP from a [`ServiceRequest`] using the trusted header priority chain:
-/// `CF-Connecting-IP` → `X-Real-Ip` → `peer_addr`.
-///
-/// This function is public so it can be reused for audit logging (Requirement 1.5).
 pub fn extract_client_ip(req: &ServiceRequest) -> IpAddr {
     req.headers()
         .get("CF-Connecting-IP")
@@ -47,11 +33,6 @@ pub fn extract_client_ip(req: &ServiceRequest) -> IpAddr {
         })
 }
 
-/// Extract the client IP from an [`HttpRequest`] using the same trusted header
-/// priority chain: `CF-Connecting-IP` → `X-Real-Ip` → `peer_addr`.
-///
-/// This variant is intended for use in handlers where only an `HttpRequest` is
-/// available (e.g., security event logging in the login handler).
 pub fn extract_client_ip_from_request(req: &HttpRequest) -> IpAddr {
     req.headers()
         .get("CF-Connecting-IP")
@@ -69,7 +50,6 @@ pub fn extract_client_ip_from_request(req: &HttpRequest) -> IpAddr {
         })
 }
 
-/// Normalize IPv6 addresses by zeroing the last 9 bytes to group /56 subnets.
 fn normalize_ipv6(ip: IpAddr) -> IpAddr {
     if let IpAddr::V6(ipv6) = ip {
         let mut octets = ipv6.octets();
@@ -85,8 +65,6 @@ fn normalize_ipv6(ip: IpAddr) -> IpAddr {
 mod tests {
     use super::*;
     use actix_web::test::TestRequest;
-
-    // ── Header priority tests ──
 
     #[test]
     fn cf_connecting_ip_takes_highest_priority() {
@@ -126,8 +104,6 @@ mod tests {
 
     #[test]
     fn x_forwarded_for_is_never_trusted() {
-        // Even when X-Forwarded-For is present and no other headers exist,
-        // the extractor should fall back to peer_addr, NOT use X-Forwarded-For.
         let sreq = TestRequest::default()
             .insert_header(("X-Forwarded-For", "1.2.3.4"))
             .peer_addr("10.10.10.10:5000".parse().unwrap())
@@ -167,8 +143,6 @@ mod tests {
         assert_eq!(ip, "192.168.0.1".parse::<IpAddr>().unwrap());
     }
 
-    // ── IPv6 normalization tests ──
-
     #[test]
     fn ipv6_is_normalized_to_56_subnet() {
         let sreq = TestRequest::default()
@@ -178,9 +152,6 @@ mod tests {
         let extractor = FallbackPeerIpKeyExtractor;
         let key = extractor.extract(&sreq).unwrap();
 
-        // octets: [20 01 0d b8 85 a3 12 34 56 78 8a 2e 03 70 73 34]
-        // After zeroing [7..16]: [20 01 0d b8 85 a3 12 00 00 00 00 00 00 00 00 00]
-        // = 2001:0db8:85a3:1200::
         let expected: IpAddr = "2001:db8:85a3:1200::".parse().unwrap();
         assert_eq!(key, expected);
     }
@@ -205,9 +176,6 @@ mod tests {
         let extractor = FallbackPeerIpKeyExtractor;
         let key = extractor.extract(&sreq).unwrap();
 
-        // octets: [20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 01]
-        // After zeroing [7..16]: [20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 00]
-        // = 2001:db8::
         let expected: IpAddr = "2001:db8::".parse().unwrap();
         assert_eq!(key, expected);
     }

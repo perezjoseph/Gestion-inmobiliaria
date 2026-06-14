@@ -33,7 +33,7 @@ pub fn documentos_por_vencer() -> Html {
         <div>
             <div class="gi-page-header">
                 <h1 class="gi-page-title">{"Documentos por Vencer"}</h1>
-                <p class="gi-page-subtitle">{"Documentos cuya fecha de expiración está próxima (30 días)"}</p>
+                <p class="gi-page-subtitle">{"Documentos cuya fecha de expiraciÃ³n estÃ¡ prÃ³xima (30 dÃ­as)"}</p>
             </div>
 
             if *loading {
@@ -47,9 +47,9 @@ pub fn documentos_por_vencer() -> Html {
                 </div>
             } else if docs.is_empty() {
                 <div class="gi-empty-state">
-                    <div class="gi-empty-state-icon">{"📄"}</div>
+                    <div class="gi-empty-state-icon">{"ðŸ“„"}</div>
                     <div class="gi-empty-state-title">{"Sin documentos por vencer"}</div>
-                    <p class="gi-empty-state-text">{"No hay documentos próximos a vencer en los próximos 30 días."}</p>
+                    <p class="gi-empty-state-text">{"No hay documentos prÃ³ximos a vencer en los prÃ³ximos 30 dÃ­as."}</p>
                 </div>
             } else {
                 <DocumentosPorVencerTable docs={(*docs).clone()} />
@@ -91,12 +91,12 @@ fn render_row(doc: &DocumentoResponse) -> Html {
     let fecha = doc
         .fecha_vencimiento
         .as_deref()
-        .map_or_else(|| "—".to_string(), format_date_display);
+        .map_or_else(|| "â€”".to_string(), format_date_display);
 
     let tipo_label = doc
         .tipo_documento
         .as_deref()
-        .unwrap_or("—")
+        .unwrap_or("â€”")
         .replace('_', " ");
 
     let estado_label = doc.estado_verificacion.as_deref().unwrap_or("pendiente");

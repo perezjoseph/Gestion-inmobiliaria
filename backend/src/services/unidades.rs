@@ -69,34 +69,28 @@ pub async fn create<C: ConnectionTrait>(
     input: CreateUnidadRequest,
     usuario_id: Uuid,
 ) -> Result<UnidadResponse, AppError> {
-    // Validate propiedad exists and belongs to org
     propiedad::Entity::find_by_id(propiedad_id)
         .filter(propiedad::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Propiedad no encontrada".to_string()))?;
 
-    // Validate numero_unidad not empty/whitespace
     if input.numero_unidad.trim().is_empty() {
         return Err(AppError::Validation(
             "El número de unidad es requerido".to_string(),
         ));
     }
 
-    // Validate uniqueness
     validate_numero_unidad_unique(db, propiedad_id, &input.numero_unidad, None).await?;
 
-    // Validate moneda
     if let Some(ref moneda) = input.moneda {
         validate_enum("moneda", moneda, MONEDAS)?;
     }
 
-    // Validate estado
     if let Some(ref estado) = input.estado {
         validate_enum("estado", estado, ESTADOS_UNIDAD)?;
     }
 
-    // Validate precio >= 0
     if input.precio < Decimal::ZERO {
         return Err(AppError::Validation(
             "El precio debe ser mayor o igual a cero".to_string(),
@@ -145,7 +139,6 @@ pub async fn get_by_id(
     org_id: Uuid,
     id: Uuid,
 ) -> Result<UnidadResponse, AppError> {
-    // Verify propiedad belongs to org
     propiedad::Entity::find_by_id(propiedad_id)
         .filter(propiedad::Column::OrganizacionId.eq(org_id))
         .one(db)
@@ -158,13 +151,11 @@ pub async fn get_by_id(
         .await?
         .ok_or_else(|| AppError::NotFound("Unidad no encontrada".to_string()))?;
 
-    // Count gastos associated with this unidad
     let gastos_count = gasto::Entity::find()
         .filter(gasto::Column::UnidadId.eq(id))
         .count(db)
         .await?;
 
-    // Count mantenimiento associated with this unidad
     let mantenimiento_count = solicitud_mantenimiento::Entity::find()
         .filter(solicitud_mantenimiento::Column::UnidadId.eq(id))
         .count(db)
@@ -183,7 +174,6 @@ pub async fn list(
     org_id: Uuid,
     query: UnidadListQuery,
 ) -> Result<PaginatedResponse<UnidadResponse>, AppError> {
-    // Validate propiedad exists and belongs to org
     propiedad::Entity::find_by_id(propiedad_id)
         .filter(propiedad::Column::OrganizacionId.eq(org_id))
         .one(db)
@@ -222,7 +212,6 @@ pub async fn update<C: ConnectionTrait>(
     input: UpdateUnidadRequest,
     usuario_id: Uuid,
 ) -> Result<UnidadResponse, AppError> {
-    // Validate propiedad belongs to org
     propiedad::Entity::find_by_id(propiedad_id)
         .filter(propiedad::Column::OrganizacionId.eq(org_id))
         .one(db)
@@ -235,7 +224,6 @@ pub async fn update<C: ConnectionTrait>(
         .await?
         .ok_or_else(|| AppError::NotFound("Unidad no encontrada".to_string()))?;
 
-    // Validate uniqueness if numero_unidad changed
     if let Some(ref numero_unidad) = input.numero_unidad {
         if numero_unidad.trim().is_empty() {
             return Err(AppError::Validation(
@@ -247,17 +235,14 @@ pub async fn update<C: ConnectionTrait>(
         }
     }
 
-    // Validate moneda if changed
     if let Some(ref moneda) = input.moneda {
         validate_enum("moneda", moneda, MONEDAS)?;
     }
 
-    // Validate estado if changed
     if let Some(ref estado) = input.estado {
         validate_enum("estado", estado, ESTADOS_UNIDAD)?;
     }
 
-    // Validate precio if changed
     if let Some(ref precio) = input.precio {
         if *precio < Decimal::ZERO {
             return Err(AppError::Validation(
@@ -322,7 +307,6 @@ pub async fn delete<C: ConnectionTrait>(
     id: Uuid,
     usuario_id: Uuid,
 ) -> Result<(), AppError> {
-    // Validate propiedad belongs to org
     propiedad::Entity::find_by_id(propiedad_id)
         .filter(propiedad::Column::OrganizacionId.eq(org_id))
         .one(db)

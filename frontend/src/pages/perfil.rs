@@ -25,12 +25,12 @@ fn PasswordChangeForm() -> Html {
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
             if *password_nuevo != *password_confirmar {
-                pwd_error.set(Some("Las contraseñas no coinciden".into()));
+                pwd_error.set(Some("Las contraseÃ±as no coinciden".into()));
                 return;
             }
             if password_nuevo.len() < 6 {
                 pwd_error.set(Some(
-                    "La contraseña debe tener al menos 6 caracteres".into(),
+                    "La contraseÃ±a debe tener al menos 6 caracteres".into(),
                 ));
                 return;
             }
@@ -52,7 +52,7 @@ fn PasswordChangeForm() -> Html {
                         pwd_error.set(None);
                         if let Some(t) = &toasts {
                             t.dispatch(ToastAction::Push(
-                                "Contraseña actualizada".into(),
+                                "ContraseÃ±a actualizada".into(),
                                 ToastKind::Success,
                             ));
                         }
@@ -76,7 +76,7 @@ fn PasswordChangeForm() -> Html {
     html! {
         <div class="gi-card" style="padding: var(--space-5);">
             <h2 style="font-size: var(--text-base); font-weight: 600; color: var(--text-primary); margin-bottom: var(--space-4);">
-                {"Cambiar Contraseña"}
+                {"Cambiar ContraseÃ±a"}
             </h2>
             if let Some(err) = (*pwd_error).as_ref() {
                 <div class="gi-error-banner" role="alert" style="margin-bottom: var(--space-3);">
@@ -85,19 +85,19 @@ fn PasswordChangeForm() -> Html {
             }
             <form onsubmit={on_change_password} style="display: flex; flex-direction: column; gap: var(--space-3);">
                 <div>
-                    <label class="gi-label">{"Contraseña Actual"}</label>
+                    <label class="gi-label">{"ContraseÃ±a Actual"}</label>
                     <input type="password" value={(*password_actual).clone()} oninput={input_cb!(password_actual)} class="gi-input" />
                 </div>
                 <div>
-                    <label class="gi-label">{"Nueva Contraseña"}</label>
+                    <label class="gi-label">{"Nueva ContraseÃ±a"}</label>
                     <input type="password" value={(*password_nuevo).clone()} oninput={input_cb!(password_nuevo)} class="gi-input" />
                 </div>
                 <div>
-                    <label class="gi-label">{"Confirmar Nueva Contraseña"}</label>
+                    <label class="gi-label">{"Confirmar Nueva ContraseÃ±a"}</label>
                     <input type="password" value={(*password_confirmar).clone()} oninput={input_cb!(password_confirmar)} class="gi-input" />
                 </div>
                 <div style="display: flex; justify-content: flex-end;">
-                    <button type="submit" class="gi-btn gi-btn-primary">{"Cambiar Contraseña"}</button>
+                    <button type="submit" class="gi-btn gi-btn-primary">{"Cambiar ContraseÃ±a"}</button>
                 </div>
             </form>
         </div>

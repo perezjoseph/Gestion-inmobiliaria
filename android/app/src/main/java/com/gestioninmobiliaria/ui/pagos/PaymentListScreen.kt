@@ -17,9 +17,9 @@ import com.gestioninmobiliaria.data.model.Pago
 import java.text.NumberFormat
 import java.util.Locale
 
-private val PendienteColor = Color(0xFFF59E0B) // amber
-private val PagadoColor = Color(0xFF10B981)    // green
-private val AtrasadoColor = Color(0xFFEF4444)  // red
+private val PendienteColor = Color(0xFFF59E0B)
+private val PagadoColor = Color(0xFF10B981)
+private val AtrasadoColor = Color(0xFFEF4444)
 
 private fun estadoColor(estado: EstadoPago): Color = when (estado) {
     EstadoPago.pendiente -> PendienteColor

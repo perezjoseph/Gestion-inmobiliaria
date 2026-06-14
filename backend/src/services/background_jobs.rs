@@ -40,13 +40,12 @@ pub const TAREAS_VALIDAS: &[&str] = &[
     "generar_mantenimiento_programado",
 ];
 
-/// Per-task interval in seconds. Tasks that need more frequent execution get shorter intervals.
 fn intervalo_para_tarea(nombre: &str) -> u64 {
     match nombre {
-        "marcar_pagos_atrasados" => 3_600,  // Every hour
-        "generar_notificaciones" => 14_400, // Every 4 hours
-        "marcar_contratos_vencidos" | "marcar_documentos_vencidos" => 21_600, // Every 6 hours
-        _ => 86_400,                        // Daily (default for all others)
+        "marcar_pagos_atrasados" => 3_600,
+        "generar_notificaciones" => 14_400,
+        "marcar_contratos_vencidos" | "marcar_documentos_vencidos" => 21_600,
+        _ => 86_400,
     }
 }
 
@@ -64,8 +63,6 @@ pub fn iniciar_scheduler(
 
         let handle = tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(intervalo));
-            // The first tick completes immediately — skip it so the first
-            // execution happens after one full interval.
             interval.tick().await;
             loop {
                 tokio::select! {
@@ -79,8 +76,6 @@ pub fn iniciar_scheduler(
                 let db_ref = db.clone();
                 let nombre_ref = nombre.clone();
                 // SAFETY: Each iteration creates fresh owned values (db_ref, nombre_ref).
-                // No shared mutable state survives across the panic boundary, so
-                // AssertUnwindSafe is sound here.
                 let result = std::panic::catch_unwind(AssertUnwindSafe(|| {
                     Box::pin(ejecutar_tarea_con_registro(db_ref, nombre_ref))
                 }));

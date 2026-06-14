@@ -281,6 +281,9 @@ spec:
             - name: dashboard-backend-api
               mountPath: /var/lib/grafana/dashboards/application/backend-api-dashboard.json
               subPath: backend-api-dashboard.json
+            - name: dashboard-backend-health
+              mountPath: /var/lib/grafana/dashboards/application/backend-health-dashboard.json
+              subPath: backend-health-dashboard.json
             - name: dashboard-slo
               mountPath: /var/lib/grafana/dashboards/application/slo-dashboard.json
               subPath: slo-dashboard.json
@@ -325,6 +328,9 @@ spec:
         - name: dashboard-backend-api
           configMap:
             name: grafana-dashboard-backend-api
+        - name: dashboard-backend-health
+          configMap:
+            name: grafana-dashboard-backend-health
         - name: dashboard-slo
           configMap:
             name: grafana-dashboard-slo

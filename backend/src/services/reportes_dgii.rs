@@ -10,7 +10,6 @@ use crate::models::reportes_dgii::{
 };
 use crate::services::fiscal::verificar_acceso_fiscal;
 
-/// Format a single 607 record as a pipe-delimited line per Norma 07-2018.
 pub fn formatear_linea_607(record: &Registro607) -> String {
     format!(
         "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
@@ -27,7 +26,6 @@ pub fn formatear_linea_607(record: &Registro607) -> String {
     )
 }
 
-/// Format a single 606 record as a pipe-delimited line per Norma 07-2018.
 pub fn formatear_linea_606(record: &Registro606) -> String {
     format!(
         "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
@@ -45,14 +43,10 @@ pub fn formatear_linea_606(record: &Registro606) -> String {
     )
 }
 
-/// Generate the header line for a 606 or 607 report.
-///
-/// Format: `RNC|YYYYMM|count|total`
 pub fn generar_header(rnc: &str, periodo: &str, cantidad: u32, total: Decimal) -> String {
     format!("{rnc}|{periodo}|{cantidad}|{total}")
 }
 
-/// Parse a periodo string (YYYYMM) into the first and last day of that month.
 fn parse_periodo(periodo: &str) -> Result<(NaiveDate, NaiveDate), AppError> {
     if periodo.len() != 6 {
         return Err(AppError::Validation(
@@ -74,7 +68,6 @@ fn parse_periodo(periodo: &str) -> Result<(NaiveDate, NaiveDate), AppError> {
     let first_day = NaiveDate::from_ymd_opt(year, month, 1)
         .ok_or_else(|| AppError::Validation("Periodo: fecha inválida".to_string()))?;
 
-    // Last day: go to next month day 1, subtract 1 day
     let last_day = if month == 12 {
         NaiveDate::from_ymd_opt(year + 1, 1, 1)
     } else {
@@ -97,30 +90,22 @@ fn mapear_forma_pago(metodo_pago: Option<&str>) -> &'static str {
     }
 }
 
-/// Determine if a property is residential based on its `tipo_propiedad`.
 fn is_residencial(tipo_propiedad: &str) -> bool {
     matches!(tipo_propiedad, "residencial" | "apartamento" | "casa")
 }
 
-/// Generate the 607 report (income/sales) for a given organization and period.
-///
-/// Filters payments by `fecha_pago` within the requested month. Excludes records
-/// missing RNC or `fecha_comprobante`. Includes records with blank NCF if other
-/// data is complete. Tracks report status as borrador; prevents double-submission.
 pub async fn generar_607(
     db: &DatabaseConnection,
     org_id: Uuid,
     periodo: &str,
     user_id: Uuid,
 ) -> Result<ReporteGenerado, AppError> {
-    // Verify fiscal access
     let org = organizacion::Entity::find_by_id(org_id)
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Organización no encontrada".to_string()))?;
     verificar_acceso_fiscal(&org)?;
 
-    // Check for existing submitted report (prevent double-submission)
     let existing_enviado = reporte_dgii::Entity::find()
         .filter(reporte_dgii::Column::OrganizacionId.eq(org_id))
         .filter(reporte_dgii::Column::TipoReporte.eq("607"))
@@ -139,7 +124,6 @@ pub async fn generar_607(
 
     let org_rnc = org.rnc.clone().unwrap_or_default();
 
-    // Fetch payments with fecha_pago in the target month for this organization
     let pagos = pago::Entity::find()
         .filter(pago::Column::OrganizacionId.eq(org_id))
         .filter(pago::Column::FechaPago.is_not_null())
@@ -149,25 +133,21 @@ pub async fn generar_607(
         .all(db)
         .await?;
 
-    // Fetch all contratos for this org to get tenant info and property type
     let contratos = contrato::Entity::find()
         .filter(contrato::Column::OrganizacionId.eq(org_id))
         .all(db)
         .await?;
 
-    // Fetch all inquilinos for this org
     let inquilinos = inquilino::Entity::find()
         .filter(inquilino::Column::OrganizacionId.eq(org_id))
         .all(db)
         .await?;
 
-    // Fetch all properties for this org
     let propiedades = propiedad::Entity::find()
         .filter(propiedad::Column::OrganizacionId.eq(org_id))
         .all(db)
         .await?;
 
-    // Build lookup maps
     let contrato_map: std::collections::HashMap<Uuid, &contrato::Model> =
         contratos.iter().map(|c| (c.id, c)).collect();
     let inquilino_map: std::collections::HashMap<Uuid, &inquilino::Model> =
@@ -181,15 +161,12 @@ pub async fn generar_607(
     let mut itbis_total = Decimal::ZERO;
 
     for p in &pagos {
-        // Resolve contrato → inquilino → RNC/cédula
         let contrato = contrato_map.get(&p.contrato_id);
         let inquilino = contrato.and_then(|c| inquilino_map.get(&c.inquilino_id));
         let propiedad_model = contrato.and_then(|c| propiedad_map.get(&c.propiedad_id));
 
-        // Get the tenant's RNC/cédula
         let rnc_cliente = inquilino.map(|i| i.cedula.clone());
 
-        // Check exclusion: missing RNC
         if rnc_cliente.as_ref().is_none_or(String::is_empty) {
             excluidos.push(RegistroExcluido {
                 razon: "Falta RNC/cédula del cliente".to_string(),
@@ -198,7 +175,6 @@ pub async fn generar_607(
             continue;
         }
 
-        // Check exclusion: missing fecha_comprobante
         if p.fecha_comprobante.is_none() {
             excluidos.push(RegistroExcluido {
                 razon: "Falta fecha_comprobante".to_string(),
@@ -212,7 +188,6 @@ pub async fn generar_607(
         let fecha_pago = p.fecha_pago.unwrap_or(fecha_inicio);
         let tipo_propiedad = propiedad_model.map_or("residencial", |pr| pr.tipo_propiedad.as_str());
 
-        // Residential income has ITBIS = 0
         let itbis_facturado = if is_residencial(tipo_propiedad) {
             Decimal::ZERO
         } else {
@@ -223,7 +198,6 @@ pub async fn generar_607(
         let itbis_retenido = p.monto_itbis_retenido.unwrap_or(Decimal::ZERO);
         let forma_pago = mapear_forma_pago(p.metodo_pago.as_deref());
 
-        // NCF can be blank if other data is complete
         let ncf = p.ncf.clone().unwrap_or_default();
         let tipo_ncf = p.tipo_ncf.clone().unwrap_or_default();
 
@@ -234,7 +208,7 @@ pub async fn generar_607(
             fecha_comprobante,
             fecha_pago,
             monto_servicios,
-            monto_bienes: Decimal::ZERO, // Rental is a service, bienes = 0
+            monto_bienes: Decimal::ZERO,
             itbis_facturado,
             itbis_retenido,
             forma_pago: forma_pago.to_string(),
@@ -245,7 +219,6 @@ pub async fn generar_607(
         registros.push(registro);
     }
 
-    // Build report content
     #[allow(clippy::cast_possible_wrap)]
     let cantidad = registros.len() as u32;
     let header = generar_header(&org_rnc, periodo, cantidad, monto_total);
@@ -257,7 +230,6 @@ pub async fn generar_607(
     }
     let contenido = lines.join("\n");
 
-    // Build preview
     let preview: Vec<RegistroPreview> = registros
         .iter()
         .map(|r| RegistroPreview {
@@ -276,7 +248,6 @@ pub async fn generar_607(
         })
         .collect();
 
-    // Persist as borrador (overwrite existing borrador if any)
     persist_borrador_607(
         db,
         org_id,
@@ -300,7 +271,6 @@ pub async fn generar_607(
     })
 }
 
-/// Persist the 607 report as a borrador, updating existing or creating new.
 #[allow(clippy::too_many_arguments)]
 async fn persist_borrador_607(
     db: &DatabaseConnection,
@@ -366,7 +336,6 @@ async fn persist_borrador_607(
     Ok(())
 }
 
-/// Persist the 606 report as a borrador, updating existing or creating new.
 #[allow(clippy::too_many_arguments)]
 async fn persist_borrador_606(
     db: &DatabaseConnection,
@@ -432,25 +401,18 @@ async fn persist_borrador_606(
     Ok(())
 }
 
-/// Generate the 606 report (purchases/expenses) for a given organization and period.
-///
-/// Filters expenses by `fecha_gasto` (used as `fecha_pago`) within the requested month.
-/// Excludes records missing proveedor (RNC) or without a valid date.
-/// Includes records with blank NCF if other fiscal data is present.
 pub async fn generar_606(
     db: &DatabaseConnection,
     org_id: Uuid,
     periodo: &str,
     user_id: Uuid,
 ) -> Result<ReporteGenerado, AppError> {
-    // Verify fiscal access
     let org = organizacion::Entity::find_by_id(org_id)
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Organización no encontrada".to_string()))?;
     verificar_acceso_fiscal(&org)?;
 
-    // Check for existing submitted report (prevent double-submission)
     let existing_enviado = reporte_dgii::Entity::find()
         .filter(reporte_dgii::Column::OrganizacionId.eq(org_id))
         .filter(reporte_dgii::Column::TipoReporte.eq("606"))
@@ -468,7 +430,6 @@ pub async fn generar_606(
     let (fecha_inicio, fecha_fin) = parse_periodo(periodo)?;
     let org_rnc = org.rnc.clone().unwrap_or_default();
 
-    // Fetch expenses with fecha_gasto in the target month
     let gastos = gasto::Entity::find()
         .filter(gasto::Column::OrganizacionId.eq(org_id))
         .filter(gasto::Column::FechaGasto.gte(fecha_inicio))
@@ -483,10 +444,8 @@ pub async fn generar_606(
     let mut itbis_total = Decimal::ZERO;
 
     for g in &gastos {
-        // For 606: proveedor serves as RNC (supplier identifier)
         let rnc_proveedor = g.proveedor.clone();
 
-        // Exclude if missing RNC (proveedor)
         if rnc_proveedor.as_ref().is_none_or(String::is_empty) {
             excluidos.push(RegistroExcluido {
                 razon: "Falta RNC/cédula del proveedor".to_string(),
@@ -495,18 +454,14 @@ pub async fn generar_606(
             continue;
         }
 
-        // fecha_gasto acts as both fecha_comprobante and fecha_pago for expenses
-        // that don't have separate fiscal date fields
         let fecha_comprobante = g.fecha_gasto;
         let fecha_pago = g.fecha_gasto;
 
         let rnc_proveedor = rnc_proveedor.unwrap_or_default();
-        // NCF from numero_factura if available; blank NCF is allowed
         let ncf_proveedor = g.numero_factura.clone().unwrap_or_default();
         let tipo_ncf = if ncf_proveedor.is_empty() {
             String::new()
         } else {
-            // Infer tipo from NCF prefix (first 3 chars like B01, B02, etc.)
             ncf_proveedor.get(..3).unwrap_or("").to_string()
         };
 
@@ -520,7 +475,7 @@ pub async fn generar_606(
             fecha_pago,
             monto_servicios,
             monto_bienes: Decimal::ZERO,
-            itbis_facturado: Decimal::ZERO, // No ITBIS fields on gasto entity yet
+            itbis_facturado: Decimal::ZERO,
             itbis_retenido: Decimal::ZERO,
             itbis_al_costo: Decimal::ZERO,
             forma_pago: "otro".to_string(),
@@ -531,7 +486,6 @@ pub async fn generar_606(
         registros.push(registro);
     }
 
-    // Build report content
     #[allow(clippy::cast_possible_wrap)]
     let cantidad = registros.len() as u32;
     let header = generar_header(&org_rnc, periodo, cantidad, monto_total);
@@ -543,7 +497,6 @@ pub async fn generar_606(
     }
     let contenido = lines.join("\n");
 
-    // Build preview
     let preview: Vec<RegistroPreview> = registros
         .iter()
         .map(|r| RegistroPreview {
@@ -563,7 +516,6 @@ pub async fn generar_606(
         })
         .collect();
 
-    // Persist as borrador
     persist_borrador_606(
         db,
         org_id,
@@ -587,14 +539,11 @@ pub async fn generar_606(
     })
 }
 
-/// Calculate the net ITBIS (ITBIS cobrado from 607 - ITBIS pagado from 606)
-/// for a given organization and period.
 pub async fn calcular_itbis_neto(
     db: &DatabaseConnection,
     org_id: Uuid,
     periodo: &str,
 ) -> Result<ItbisNetoResult, AppError> {
-    // Verify fiscal access
     let org = organizacion::Entity::find_by_id(org_id)
         .one(db)
         .await?
@@ -603,7 +552,6 @@ pub async fn calcular_itbis_neto(
 
     let (fecha_inicio, fecha_fin) = parse_periodo(periodo)?;
 
-    // Sum ITBIS collected from payments (607) in this period
     let pagos = pago::Entity::find()
         .filter(pago::Column::OrganizacionId.eq(org_id))
         .filter(pago::Column::FechaPago.is_not_null())
@@ -613,7 +561,6 @@ pub async fn calcular_itbis_neto(
         .all(db)
         .await?;
 
-    // For ITBIS cobrado: check property type to ensure residential = 0
     let contratos = contrato::Entity::find()
         .filter(contrato::Column::OrganizacionId.eq(org_id))
         .all(db)
@@ -634,14 +581,11 @@ pub async fn calcular_itbis_neto(
         let propiedad_ref = contrato_ref.and_then(|c| propiedad_map.get(&c.propiedad_id));
         let tipo_propiedad = propiedad_ref.map_or("residencial", |pr| pr.tipo_propiedad.as_str());
 
-        // Residential income has ITBIS = 0
         if !is_residencial(tipo_propiedad) {
             itbis_cobrado += p.monto_itbis.unwrap_or(Decimal::ZERO);
         }
     }
 
-    // Sum ITBIS paid from expenses (606) in this period
-    // Currently gastos don't have ITBIS fields; this is zero until migration adds them
     let _gastos = gasto::Entity::find()
         .filter(gasto::Column::OrganizacionId.eq(org_id))
         .filter(gasto::Column::FechaGasto.gte(fecha_inicio))
@@ -660,7 +604,6 @@ pub async fn calcular_itbis_neto(
     })
 }
 
-/// Preview an existing borrador report for a given tipo and periodo.
 pub async fn preview_reporte(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -689,7 +632,6 @@ pub async fn preview_reporte(
         })
 }
 
-/// Mark a report as "enviado". Prevents double-submission.
 pub async fn actualizar_estado_reporte(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -733,8 +675,6 @@ pub async fn actualizar_estado_reporte(
 mod tests {
     use super::*;
 
-    // ── formatear_linea_607 tests ─────────────────────────────
-
     #[test]
     fn formatear_linea_607_basic() {
         let record = Registro607 {
@@ -771,10 +711,8 @@ mod tests {
             forma_pago: "efectivo".to_string(),
         };
         let line = formatear_linea_607(&record);
-        assert!(line.contains("||")); // Blank NCF shows as empty between pipes
+        assert!(line.contains("||"));
     }
-
-    // ── formatear_linea_606 tests ─────────────────────────────
 
     #[test]
     fn formatear_linea_606_basic() {
@@ -798,8 +736,6 @@ mod tests {
         );
     }
 
-    // ── generar_header tests ──────────────────────────────────
-
     #[test]
     fn generar_header_formato_correcto() {
         let header = generar_header("123456789", "202606", 5, Decimal::new(250_000, 2));
@@ -811,8 +747,6 @@ mod tests {
         let header = generar_header("111222333", "202601", 0, Decimal::ZERO);
         assert_eq!(header, "111222333|202601|0|0");
     }
-
-    // ── parse_periodo tests ───────────────────────────────────
 
     #[test]
     fn parse_periodo_valid() {
@@ -846,8 +780,6 @@ mod tests {
         assert!(parse_periodo("2026012").is_err());
     }
 
-    // ── mapear_forma_pago tests ───────────────────────────────
-
     #[test]
     fn mapear_forma_pago_values() {
         assert_eq!(mapear_forma_pago(Some("efectivo")), "efectivo");
@@ -860,8 +792,6 @@ mod tests {
         assert_eq!(mapear_forma_pago(Some("otro")), "otro");
         assert_eq!(mapear_forma_pago(None), "otro");
     }
-
-    // ── is_residencial tests ──────────────────────────────────
 
     #[test]
     fn is_residencial_values() {

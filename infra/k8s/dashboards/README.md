@@ -12,6 +12,7 @@ dashboards/
 │   └── grafana-kubernetes-dashboard.json
 └── application/       → "Application" folder in Grafana
     ├── grafana-backend-api-dashboard.json
+    ├── grafana-backend-health-dashboard.json
     ├── grafana-slo-dashboard.json
     ├── grafana-database-dashboard.json
     └── grafana-business-kpi-dashboard.json
@@ -26,6 +27,11 @@ After editing a dashboard JSON, recreate its ConfigMap:
 kubectl create configmap grafana-dashboard-backend-api \
   --namespace monitoring \
   --from-file=backend-api-dashboard.json=application/grafana-backend-api-dashboard.json \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create configmap grafana-dashboard-backend-health \
+  --namespace monitoring \
+  --from-file=backend-health-dashboard.json=application/grafana-backend-health-dashboard.json \
   --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl create configmap grafana-dashboard-slo \

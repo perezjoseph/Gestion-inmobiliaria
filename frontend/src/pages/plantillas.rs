@@ -42,7 +42,7 @@ const TIPOS_DOCUMENTO: &[(&str, &str)] = &[
     ("acuerdo", "Acuerdo"),
     ("recibo", "Recibo"),
     ("carta", "Carta"),
-    ("notificacion", "Notificación"),
+    ("notificacion", "NotificaciÃ³n"),
     ("otro", "Otro"),
 ];
 
@@ -54,7 +54,6 @@ const ENTITY_TYPES: &[(&str, &str)] = &[
     ("gasto", "Gasto"),
 ];
 
-/// Converts block JSON content to a human-readable text representation for editing.
 fn blocks_to_text(contenido: &Value) -> String {
     let blocks = contenido
         .get("blocks")
@@ -104,7 +103,6 @@ fn blocks_to_text(contenido: &Value) -> String {
     lines.join("\n")
 }
 
-/// Converts text back to block JSON format.
 fn text_to_blocks(text: &str) -> Value {
     let mut blocks = Vec::new();
     for line in text.lines() {
@@ -141,7 +139,6 @@ fn text_to_blocks(text: &str) -> Value {
         }
     }
 
-    // Merge consecutive list items of the same type
     let mut merged: Vec<Value> = Vec::new();
     for block in blocks {
         let is_list = block.get("type").and_then(Value::as_str) == Some("list");
@@ -185,7 +182,6 @@ pub fn Plantillas() -> Html {
     let error = use_state(|| Option::<String>::None);
     let reload = use_state(|| 0u32);
 
-    // Form state
     let editing_id = use_state(|| Option::<String>::None);
     let form_nombre = use_state(String::new);
     let form_tipo = use_state(|| "contrato_arrendamiento".to_string());
@@ -199,7 +195,6 @@ pub fn Plantillas() -> Html {
         .and_then(|a| a.user.as_ref())
         .is_some_and(|u| can_write(&u.rol));
 
-    // Fetch templates
     {
         let plantillas = plantillas.clone();
         let loading = loading.clone();
@@ -364,7 +359,7 @@ pub fn Plantillas() -> Html {
 
             if plantillas.is_empty() {
                 <div class="gi-empty-state">
-                    <div class="gi-empty-state-icon">{"📄"}</div>
+                    <div class="gi-empty-state-icon">{"ðŸ“„"}</div>
                     <div class="gi-empty-state-title">{"No hay plantillas"}</div>
                     <p class="gi-empty-state-text">{"Cree una plantilla para comenzar a generar documentos."}</p>
                 </div>
@@ -377,7 +372,6 @@ pub fn Plantillas() -> Html {
                 />
             }
 
-            // Create/Edit form modal
             if *show_form {
                 <PlantillaFormModal
                     editing_id={(*editing_id).clone()}
@@ -390,10 +384,9 @@ pub fn Plantillas() -> Html {
                 />
             }
 
-            // Delete confirmation modal
             if show_delete.is_some() {
                 <DeleteConfirmModal
-                    message="¿Está seguro de que desea eliminar esta plantilla? Esta acción no se puede deshacer."
+                    message="Â¿EstÃ¡ seguro de que desea eliminar esta plantilla? Esta acciÃ³n no se puede deshacer."
                     on_confirm={on_delete_confirm}
                     on_cancel={on_delete_cancel}
                 />
@@ -401,8 +394,6 @@ pub fn Plantillas() -> Html {
         </div>
     }
 }
-
-// ── Table sub-component ────────────────────────────────────────────────
 
 #[derive(Properties, PartialEq)]
 struct PlantillasTableProps {
@@ -458,8 +449,6 @@ fn PlantillasTable(props: &PlantillasTableProps) -> Html {
         </DataTable>
     }
 }
-
-// ── Form modal sub-component ───────────────────────────────────────────
 
 #[derive(Properties, PartialEq)]
 struct PlantillaFormModalProps {
@@ -522,13 +511,13 @@ fn PlantillaFormModal(props: &PlantillaFormModalProps) -> Html {
                     <div class="gi-form-group">
                         <label class="gi-label">{"Contenido"}</label>
                         <p style="font-size: var(--text-xs); color: var(--text-tertiary); margin-bottom: var(--space-1);">
-                            {"Use # para títulos, - para listas, --- para saltos de página. Placeholders: {{entidad.campo}}"}
+                            {"Use # para tÃ­tulos, - para listas, --- para saltos de pÃ¡gina. Placeholders: {{entidad.campo}}"}
                         </p>
                         <textarea
                             class="gi-input"
                             rows="10"
                             style="font-family: monospace; resize: vertical; min-height: 160px;"
-                            placeholder={"# Título del documento\n\nContenido del documento con {{contrato.fecha_inicio}}..."}
+                            placeholder={"# TÃ­tulo del documento\n\nContenido del documento con {{contrato.fecha_inicio}}..."}
                             value={(*form_contenido).clone()}
                             oninput={let fc = form_contenido.clone(); Callback::from(move |e: InputEvent| {
                                 let input: web_sys::HtmlTextAreaElement = e.target_unchecked_into();

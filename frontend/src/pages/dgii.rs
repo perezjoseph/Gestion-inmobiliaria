@@ -25,7 +25,7 @@ pub fn Dgii() -> Html {
     if !can_write {
         return html! {
             <div class="gi-empty-state">
-                <div class="gi-empty-state-title">{"No tiene permisos para acceder a esta sección"}</div>
+                <div class="gi-empty-state-title">{"No tiene permisos para acceder a esta secciÃ³n"}</div>
             </div>
         };
     }
@@ -124,7 +124,7 @@ pub fn Dgii() -> Html {
         <div>
             <div class="gi-page-header">
                 <h1 class="gi-page-title">{"Consulta DGII"}</h1>
-                <button class="gi-btn gi-btn-ghost" onclick={on_invalidar_cache}>{"Invalidar Caché"}</button>
+                <button class="gi-btn gi-btn-ghost" onclick={on_invalidar_cache}>{"Invalidar CachÃ©"}</button>
             </div>
 
             if let Some(err) = (*error).as_ref() {
@@ -136,7 +136,7 @@ pub fn Dgii() -> Html {
             <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-4);">
                 <DgiiSearchSection
                     label="Buscar por RNC"
-                    placeholder="Ingrese RNC o Cédula"
+                    placeholder="Ingrese RNC o CÃ©dula"
                     value={(*rnc_input).clone()}
                     oninput={on_rnc_change}
                     onclick={on_search_rnc}
@@ -147,7 +147,7 @@ pub fn Dgii() -> Html {
             <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-4);">
                 <DgiiSearchSection
                     label="Buscar por nombre"
-                    placeholder="Ingrese nombre o razón social"
+                    placeholder="Ingrese nombre o razÃ³n social"
                     value={(*nombre_input).clone()}
                     oninput={on_nombre_change}
                     onclick={on_search_nombre}
@@ -214,14 +214,14 @@ fn DgiiRncResultCard(props: &DgiiRncResultCardProps) -> Html {
     html! {
         <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-4);">
             <h3 style="margin-bottom: var(--space-4); font-size: var(--text-lg);">{"Resultado"}</h3>
-            <DgiiField label="Cédula/RNC" value={d.cedula_rnc.clone()} />
-            <DgiiField label="Nombre/Razón Social" value={d.nombre_razon_social.clone()} />
+            <DgiiField label="CÃ©dula/RNC" value={d.cedula_rnc.clone()} />
+            <DgiiField label="Nombre/RazÃ³n Social" value={d.nombre_razon_social.clone()} />
             <DgiiField label="Nombre Comercial" value={d.nombre_comercial.clone().unwrap_or_default()} />
             <DgiiField label="Estado" value={d.estado.clone()} />
-            <DgiiField label="Régimen de Pagos" value={d.regimen_de_pagos.clone().unwrap_or_default()} />
-            <DgiiField label="Actividad Económica" value={d.actividad_economica.clone().unwrap_or_default()} />
+            <DgiiField label="RÃ©gimen de Pagos" value={d.regimen_de_pagos.clone().unwrap_or_default()} />
+            <DgiiField label="Actividad EconÃ³mica" value={d.actividad_economica.clone().unwrap_or_default()} />
             if d.cached {
-                <p style="font-size: var(--text-xs); color: var(--text-secondary); margin-top: var(--space-2);">{"(resultado desde caché)"}</p>
+                <p style="font-size: var(--text-xs); color: var(--text-secondary); margin-top: var(--space-2);">{"(resultado desde cachÃ©)"}</p>
             }
         </div>
     }
@@ -267,8 +267,8 @@ fn DgiiNombreResultTable(props: &DgiiNombreResultTableProps) -> Html {
             <table class="gi-table">
                 <thead>
                     <tr>
-                        <th style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{"Cédula/RNC"}</th>
-                        <th style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{"Nombre/Razón Social"}</th>
+                        <th style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{"CÃ©dula/RNC"}</th>
+                        <th style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{"Nombre/RazÃ³n Social"}</th>
                         <th style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{"Nombre Comercial"}</th>
                         <th style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{"Estado"}</th>
                     </tr>

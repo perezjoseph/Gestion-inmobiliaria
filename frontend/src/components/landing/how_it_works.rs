@@ -10,7 +10,7 @@ const STEPS: &[Step] = &[
     Step {
         number: "1",
         title: "Registra tus propiedades",
-        description: "Añade tus inmuebles con dirección, unidades y precio. Todo organizado desde el inicio.",
+        description: "AÃ±ade tus inmuebles con direcciÃ³n, unidades y precio. Todo organizado desde el inicio.",
     },
     Step {
         number: "2",
@@ -30,7 +30,7 @@ pub fn LandingHowItWorks() -> Html {
         <section class="gi-l-how">
             <div class="gi-l-container">
                 <div class="gi-l-section-head">
-                    <h2 class="gi-l-section-title">{"Cómo funciona"}</h2>
+                    <h2 class="gi-l-section-title">{"CÃ³mo funciona"}</h2>
                 </div>
                 <div class="gi-l-steps">
                     { for STEPS.iter().map(|step| html! {

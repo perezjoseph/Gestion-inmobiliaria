@@ -2,16 +2,12 @@ use gloo_events::EventListener;
 use web_sys::window;
 use yew::prelude::*;
 
-/// Returns the current browser online status via `navigator.onLine`.
 pub fn is_online() -> bool {
     window()
         .and_then(|w| w.navigator().on_line().then_some(true))
         .unwrap_or(false)
 }
 
-/// Subscribes to browser `online`/`offline` events and invokes the callback
-/// with the new status. Returns the two `EventListener` guards — drop them
-/// to unsubscribe.
 pub fn subscribe_online_status(
     on_change: Callback<bool>,
 ) -> Option<(EventListener, EventListener)> {

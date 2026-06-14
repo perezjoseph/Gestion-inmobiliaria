@@ -8,8 +8,6 @@ pub struct BulkActionBarProps {
     pub children: Html,
 }
 
-/// A floating action bar that appears when items are selected in a table.
-/// Pass action buttons as children.
 #[component]
 pub fn BulkActionBar(props: &BulkActionBarProps) -> Html {
     if props.selected_count == 0 {
@@ -29,7 +27,7 @@ pub fn BulkActionBar(props: &BulkActionBarProps) -> Html {
                 class="gi-btn gi-btn-ghost gi-btn-sm"
                 aria-label="Deseleccionar todo"
             >
-                {"✕ Limpiar"}
+                {"âœ• Limpiar"}
             </button>
         </div>
     }

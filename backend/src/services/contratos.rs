@@ -73,36 +73,25 @@ fn validar_retencion(
 
 pub const ESTADOS_DEPOSITO: &[&str] = &["pendiente", "cobrado", "devuelto", "retenido"];
 
-/// Pure validation of deposit state transitions.
-///
-/// Valid transitions:
-///   pendiente → cobrado
-///   cobrado   → devuelto
-///   cobrado   → retenido
 pub fn validar_transicion_deposito(
     estado_actual: &str,
     nuevo_estado: &str,
 ) -> Result<(), AppError> {
     match (estado_actual, nuevo_estado) {
-        // Valid transitions
         ("pendiente", "cobrado") | ("cobrado", "devuelto" | "retenido") => Ok(()),
 
-        // pendiente cannot skip to devuelto or retenido
         ("pendiente", "devuelto" | "retenido") => Err(AppError::Validation(
             "El depósito debe ser cobrado antes de ser devuelto o retenido".to_string(),
         )),
 
-        // Terminal states cannot transition
         ("devuelto" | "retenido", _) => Err(AppError::Validation(
             "Los depósitos devueltos o retenidos no pueden cambiar de estado".to_string(),
         )),
 
-        // cobrado cannot revert to pendiente
         ("cobrado", "pendiente") => Err(AppError::Validation(
             "No se puede revertir un depósito cobrado a pendiente".to_string(),
         )),
 
-        // Any other combination (e.g. same state, unknown states)
         _ => Err(AppError::Validation(format!(
             "Transición de estado de depósito no válida: {estado_actual} → {nuevo_estado}"
         ))),
@@ -299,7 +288,6 @@ pub async fn create(
         validate_enum("moneda", moneda, MONEDAS)?;
     }
 
-    // Deposit cap validation (Ley 4314)
     if let Some(deposito) = input.deposito {
         if deposito > input.monto_mensual {
             return Err(AppError::Validation(
@@ -315,7 +303,6 @@ pub async fn create(
 
     let txn = db.begin().await?;
 
-    // Single propiedad lookup — reused for both validation and status update
     let prop = propiedad::Entity::find_by_id(input.propiedad_id)
         .one(&txn)
         .await?
@@ -420,7 +407,6 @@ pub async fn get_by_id(
     Ok(ContratoResponse::from(record))
 }
 
-/// Data needed by the pago generation/preview pipeline.
 pub struct ContratoForPagos {
     pub fecha_inicio: NaiveDate,
     pub fecha_fin: NaiveDate,
@@ -430,7 +416,6 @@ pub struct ContratoForPagos {
     pub organizacion_id: Uuid,
 }
 
-/// Load a contrato's raw fields needed for pago generation, scoped to org.
 pub async fn get_contrato_for_pagos<C: ConnectionTrait>(
     db: &C,
     org_id: Uuid,
@@ -452,7 +437,6 @@ pub async fn get_contrato_for_pagos<C: ConnectionTrait>(
     })
 }
 
-/// Load all pago due dates for a given contrato.
 pub async fn get_pago_fechas_for_contrato<C: ConnectionTrait>(
     db: &C,
     contrato_id: Uuid,
@@ -465,7 +449,6 @@ pub async fn get_pago_fechas_for_contrato<C: ConnectionTrait>(
     Ok(existing_pagos.iter().map(|p| p.fecha_vencimiento).collect())
 }
 
-/// Load pagos for a contrato filtered to those whose (year, month) matches any in `new_pagos`.
 pub async fn get_pagos_by_months(
     db: &DatabaseConnection,
     contrato_id: Uuid,
@@ -536,7 +519,6 @@ pub async fn update(
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
 
-    // Deposit cap validation (Ley 4314)
     if let Some(deposito) = input.deposito {
         let monto_ref = input.monto_mensual.unwrap_or(existing.monto_mensual);
         if deposito > monto_ref {
@@ -687,9 +669,6 @@ pub async fn delete(
     Ok(())
 }
 
-/// Suggests renewal parameters for a contract based on IPC data.
-/// Returns the current monthly amount, the maximum allowed by law (IPC capped at 10%),
-/// and the suggested new start date.
 pub async fn sugerir_renovacion(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -723,7 +702,6 @@ pub async fn sugerir_renovacion(
         .succ_opt()
         .unwrap_or(contrato_record.fecha_fin);
 
-    // Suggest same duration as current contract
     let duracion_dias = (contrato_record.fecha_fin - contrato_record.fecha_inicio).num_days();
     let fecha_fin_sugerida = fecha_inicio_sugerida + Duration::days(duracion_dias);
 
@@ -764,7 +742,6 @@ pub async fn renovar(
         ));
     }
 
-    // IPC cap validation (Ley 85-25: máximo 10% anual)
     match super::ipc::obtener_ipc_actual(db).await? {
         Some(ipc_data) => {
             let max_allowed =
@@ -943,7 +920,6 @@ pub async fn terminar(
     )
     .await;
 
-    // Cancel future pending pagos
     let pagos_cancelados =
         cancelar_pagos_futuros(&txn, contrato_id, input.fecha_terminacion).await?;
 
@@ -966,12 +942,9 @@ pub async fn terminar(
     Ok(ContratoResponse::from(updated))
 }
 
-/// Marks expired contracts across ALL organizations. Intentionally not
-/// org-scoped because this runs as a global background job via the scheduler.
 pub async fn marcar_vencidos(db: &DatabaseConnection) -> Result<u64, AppError> {
     let today = Utc::now().date_naive();
 
-    // Find contracts that will expire so we can cascade propiedad estado
     let expiring = contrato::Entity::find()
         .filter(contrato::Column::FechaFin.lt(today))
         .filter(contrato::Column::Estado.eq("activo"))
@@ -985,7 +958,6 @@ pub async fn marcar_vencidos(db: &DatabaseConnection) -> Result<u64, AppError> {
     let txn = db.begin().await?;
     let now = Utc::now().into();
 
-    // Collect unique propiedad_ids before updating
     let mut propiedad_ids: Vec<Uuid> = expiring.iter().map(|c| c.propiedad_id).collect();
     propiedad_ids.sort_unstable();
     propiedad_ids.dedup();
@@ -1005,7 +977,6 @@ pub async fn marcar_vencidos(db: &DatabaseConnection) -> Result<u64, AppError> {
         .exec(&txn)
         .await?;
 
-    // For each affected propiedad, set to disponible if no remaining active contratos
     for prop_id in &propiedad_ids {
         let still_active = contrato::Entity::find()
             .filter(
@@ -1065,11 +1036,8 @@ pub async fn cambiar_estado_deposito(
     input: CambiarEstadoDepositoRequest,
     usuario_id: Uuid,
 ) -> Result<ContratoResponse, AppError> {
-    // 1. Validate estado enum (before opening transaction)
     validate_enum("estado de depósito", &input.estado, ESTADOS_DEPOSITO)?;
 
-    // 2. For retenido: pre-validate that required fields are present
-    // (full validation against deposito amount happens after reading the contrato)
     if input.estado == "retenido" {
         if input.monto_retenido.is_none() {
             return Err(AppError::Validation(
@@ -1084,17 +1052,14 @@ pub async fn cambiar_estado_deposito(
         }
     }
 
-    // 3. Open transaction — read and write within the same transaction for consistency
     let txn = db.begin().await?;
 
-    // 4. Find contrato by ID, scoped to org (within transaction)
     let existing = contrato::Entity::find_by_id(contrato_id)
         .filter(contrato::Column::OrganizacionId.eq(org_id))
         .one(&txn)
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
 
-    // 5. Validate contrato has deposito > 0
     let deposito = existing
         .deposito
         .filter(|d| *d > rust_decimal::Decimal::ZERO)
@@ -1102,15 +1067,12 @@ pub async fn cambiar_estado_deposito(
             AppError::Validation("El contrato no tiene depósito de garantía".to_string())
         })?;
 
-    // 6. Get current estado_deposito
     let estado_actual = existing.estado_deposito.clone().ok_or_else(|| {
         AppError::Validation("El contrato no tiene depósito de garantía".to_string())
     })?;
 
-    // 7. Validate transition
     validar_transicion_deposito(&estado_actual, &input.estado)?;
 
-    // 8. For retenido: validate monto against deposito
     if input.estado == "retenido" {
         validar_retencion(
             input.monto_retenido,
@@ -1119,7 +1081,6 @@ pub async fn cambiar_estado_deposito(
         )?;
     }
 
-    // 9. Update fields based on new estado
     let mut active: contrato::ActiveModel = existing.into();
     active.estado_deposito = Set(Some(input.estado.clone()));
     active.updated_at = Set(Utc::now().into());
@@ -1141,7 +1102,6 @@ pub async fn cambiar_estado_deposito(
 
     let updated = active.update(&txn).await?;
 
-    // 8. Register auditoría
     auditoria::registrar_best_effort(
         &txn,
         CreateAuditoriaEntry {
@@ -1158,7 +1118,6 @@ pub async fn cambiar_estado_deposito(
     )
     .await;
 
-    // 9. Commit and return
     txn.commit().await?;
 
     Ok(ContratoResponse::from(updated))
@@ -1167,8 +1126,6 @@ pub async fn cambiar_estado_deposito(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // --- Valid transitions ---
 
     #[test]
     fn transicion_pendiente_a_cobrado_ok() {
@@ -1184,8 +1141,6 @@ mod tests {
     fn transicion_cobrado_a_retenido_ok() {
         assert!(validar_transicion_deposito("cobrado", "retenido").is_ok());
     }
-
-    // --- Invalid transitions ---
 
     #[test]
     fn transicion_pendiente_a_devuelto_err() {

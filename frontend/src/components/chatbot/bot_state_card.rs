@@ -35,7 +35,7 @@ pub fn BotStateCard(props: &BotStateCardProps) -> Html {
         )
     } else if !is_connected {
         (
-            "Sin conexión",
+            "Sin conexiÃ³n",
             "var(--color-error-dark)",
             "var(--color-error-light)",
         )
@@ -97,8 +97,8 @@ pub fn BotStateCard(props: &BotStateCardProps) -> Html {
                         <line x1="12" y1="17" x2="12.01" y2="17"/>
                     </svg>
                     <span>
-                        {"Vincule WhatsApp antes de activar el chatbot. Vea la sección "}
-                        <strong>{"Conexión"}</strong>
+                        {"Vincule WhatsApp antes de activar el chatbot. Vea la secciÃ³n "}
+                        <strong>{"ConexiÃ³n"}</strong>
                         {" abajo."}
                     </span>
                 </div>
@@ -119,7 +119,7 @@ pub fn BotStateCard(props: &BotStateCardProps) -> Html {
                 <StatChip
                     label="Esta semana"
                     value={format!(
-                        "{} conv · {} recibos",
+                        "{} conv Â· {} recibos",
                         props.conversations_count, props.pending_receipts,
                     )}
                 />
@@ -130,9 +130,9 @@ pub fn BotStateCard(props: &BotStateCardProps) -> Html {
 
 const fn state_description(activo: bool, is_connected: bool) -> &'static str {
     match (activo, is_connected) {
-        (true, true) => "El bot está respondiendo mensajes entrantes según la configuración.",
-        (false, true) => "El bot está configurado y conectado, pero no está respondiendo.",
-        (_, false) => "El bot no puede responder sin una sesión de WhatsApp vinculada.",
+        (true, true) => "El bot estÃ¡ respondiendo mensajes entrantes segÃºn la configuraciÃ³n.",
+        (false, true) => "El bot estÃ¡ configurado y conectado, pero no estÃ¡ respondiendo.",
+        (_, false) => "El bot no puede responder sin una sesiÃ³n de WhatsApp vinculada.",
     }
 }
 

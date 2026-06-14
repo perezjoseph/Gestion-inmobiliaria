@@ -21,7 +21,6 @@ use crate::services::baileys_client::BaileysClient;
 use crate::services::chatbot;
 use crate::services::ovms_provider::OvmsCompletionModel;
 
-/// GET /api/v1/chatbot/config — return chatbot config for the current org.
 pub async fn get_config(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,
@@ -30,7 +29,6 @@ pub async fn get_config(
     Ok(HttpResponse::Ok().json(config))
 }
 
-/// PUT /api/v1/chatbot/config — create or update chatbot config (validate, persist, audit).
 pub async fn update_config(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,
@@ -47,10 +45,6 @@ pub async fn update_config(
     Ok(HttpResponse::Ok().json(result))
 }
 
-/// POST `/api/v1/chatbot/connect` — initiate connection via `Baileys` Service.
-///
-/// Calls `POST /sessions/{realmId}/start` on the `Baileys` sidecar and returns
-/// the QR code data or current connection status.
 pub async fn connect(
     baileys: Option<web::Data<BaileysClient>>,
     claims: WriteAccess,
@@ -70,9 +64,6 @@ pub async fn connect(
     Ok(HttpResponse::Ok().json(normalize_baileys_response(&body)))
 }
 
-/// POST `/api/v1/chatbot/disconnect` — disconnect `WhatsApp` session via `Baileys` Service.
-///
-/// Calls `POST /sessions/{realmId}/stop` on the `Baileys` sidecar.
 pub async fn disconnect(
     baileys: Option<web::Data<BaileysClient>>,
     claims: WriteAccess,
@@ -92,15 +83,6 @@ pub async fn disconnect(
     Ok(HttpResponse::Ok().json(normalize_baileys_response(&body)))
 }
 
-/// GET `/api/v1/chatbot/status` — get current `WhatsApp` connection status.
-///
-/// Calls `GET /sessions/{realmId}/status` on the `Baileys` sidecar.
-///
-/// The frontend polls this endpoint on an interval. When the `Baileys` sidecar
-/// is unconfigured or unreachable, we degrade gracefully to a `disconnected`
-/// status (HTTP 200) instead of returning 500, so the client can keep polling
-/// for recovery without surfacing an error on every tick. Explicit user actions
-/// (`connect`/`disconnect`) still return errors so the user gets feedback.
 pub async fn status(
     baileys: Option<web::Data<BaileysClient>>,
     claims: WriteAccess,
@@ -133,8 +115,6 @@ pub async fn status(
     }
 }
 
-/// Builds a degraded `disconnected` status payload matching the normalized shape
-/// returned by [`normalize_baileys_response`].
 fn disconnected_status() -> serde_json::Value {
     serde_json::json!({
         "status": "disconnected",
@@ -144,19 +124,12 @@ fn disconnected_status() -> serde_json::Value {
     })
 }
 
-// --- Conversation Query Params ---
-
 #[derive(Debug, Deserialize)]
 pub struct ConversationListQuery {
     pub page: Option<u64>,
     pub per_page: Option<u64>,
 }
 
-// --- Conversation Handlers ---
-
-/// GET `/api/v1/chatbot/conversations` — list recent conversations (paginated).
-///
-/// Returns distinct sender phones with their latest message and message count.
 pub async fn list_conversations(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,
@@ -170,7 +143,6 @@ pub async fn list_conversations(
     Ok(HttpResponse::Ok().json(result))
 }
 
-/// GET `/api/v1/chatbot/conversations/{phone}` — get conversation history for a phone.
 pub async fn get_conversation_history(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,
@@ -199,9 +171,6 @@ pub async fn get_conversation_history(
     Ok(HttpResponse::Ok().json(response))
 }
 
-// --- Receipt Handlers ---
-
-/// GET `/api/v1/chatbot/receipts/pending` — list pending receipt confirmations.
 pub async fn list_pending_receipts(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,
@@ -215,7 +184,6 @@ pub async fn list_pending_receipts(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// POST `/api/v1/chatbot/receipts/{id}/confirm` — confirm a receipt extraction.
 pub async fn confirm_receipt(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,
@@ -228,7 +196,6 @@ pub async fn confirm_receipt(
     Ok(HttpResponse::Ok().json(extraction_to_response(updated)))
 }
 
-/// POST `/api/v1/chatbot/receipts/{id}/reject` — reject a receipt extraction.
 pub async fn reject_receipt(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,
@@ -243,19 +210,12 @@ pub async fn reject_receipt(
     Ok(HttpResponse::Ok().json(extraction_to_response(updated)))
 }
 
-// --- Helpers ---
-
-/// Normalizes a Baileys sidecar JSON response to the shape the frontend expects.
-///
-/// Baileys returns `{ "realmId": "...", "status": "...", "qr": "data:image/png;base64,..." }`.
-/// The frontend expects `{ "status": "...", "qrCode": "<base64 only>" }`.
 fn normalize_baileys_response(body: &serde_json::Value) -> serde_json::Value {
     let status = body
         .get("status")
         .and_then(|v| v.as_str())
         .unwrap_or("disconnected");
 
-    // Strip the data URI prefix if present — frontend adds it back.
     let qr_code = body.get("qr").and_then(|v| v.as_str()).map(|raw| {
         raw.strip_prefix("data:image/png;base64,")
             .unwrap_or(raw)
@@ -280,7 +240,6 @@ fn normalize_baileys_response(body: &serde_json::Value) -> serde_json::Value {
     })
 }
 
-/// Converts a `chatbot_receipt_extraction::Model` to the API response DTO.
 fn extraction_to_response(
     model: crate::entities::chatbot_receipt_extraction::Model,
 ) -> ReceiptExtractionResponse {
@@ -337,14 +296,6 @@ fn extraction_to_response(
     }
 }
 
-// --- Test Chat Handler ---
-
-/// POST `/api/v1/chatbot/test` — process a test message through the full AI pipeline.
-///
-/// Uses the current (possibly unsaved draft) configuration from the request body.
-/// Does NOT persist messages in the production `chatbot_conversation` table.
-/// Does NOT send via `Baileys`.
-/// Returns the AI response or an error indication.
 pub async fn test_chat(
     db: web::Data<DatabaseConnection>,
     app_config: web::Data<AppConfig>,
@@ -356,10 +307,8 @@ pub async fn test_chat(
     let org_id = claims.0.organizacion_id;
     let request = body.into_inner();
 
-    // Load the saved config as a baseline
     let saved_config = chatbot::get_config_model(db.get_ref(), org_id).await?;
 
-    // Determine effective persona — use override if provided, else saved config
     let (persona, faqs, policies, capabilities, handoff_keywords, _) =
         if let Some(overrides) = &request.config_override {
             let persona = ChatbotPersona {
@@ -472,7 +421,6 @@ pub async fn test_chat(
             )
         };
 
-    // For test chat, use the history provided by the frontend (multi-turn sandbox)
     let history: Vec<ConversationEntry> = request
         .history
         .iter()
@@ -487,7 +435,6 @@ pub async fn test_chat(
         image_base64: None,
     };
 
-    // Initialize AI module and process the message
     let ai_module = AiModule::new(chatbot_env)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error inicializando AI module: {e}")))?;
 
@@ -496,7 +443,7 @@ pub async fn test_chat(
 
     let ctx = ProcessMessageContext {
         config: &persona,
-        tenant_context: None, // No tenant context in test mode
+        tenant_context: None,
         faqs: &faqs,
         policies: policies.as_deref(),
         handoff_keywords: &handoff_keywords,
@@ -521,7 +468,6 @@ pub async fn test_chat(
                 error = %e,
                 "Error en test chat AI pipeline"
             );
-            // Return error indication per Requirement 12.5
             Ok(HttpResponse::Ok().json(TestChatResponse {
                 reply: format!("Error en el pipeline AI: {e}"),
                 tools_invoked: vec![],
@@ -530,10 +476,6 @@ pub async fn test_chat(
     }
 }
 
-/// POST `/api/v1/chatbot/test/stream` — streaming version of test chat.
-///
-/// Streams AI responses via SSE using Rig's `CompletionModel` streaming interface.
-/// Uses the same auth and config resolution as `test_chat`.
 pub async fn test_chat_stream(
     db: web::Data<DatabaseConnection>,
     app_config: web::Data<AppConfig>,
@@ -698,12 +640,6 @@ pub async fn test_chat_stream(
         .streaming(sse_stream))
 }
 
-// --- Handoff Handlers ---
-
-/// POST `/api/v1/chatbot/handoff/clear` — clear human handoff for a conversation.
-///
-/// Resumes AI processing for the specified sender phone.
-/// Only `admin` or `gerente` roles may call this.
 pub async fn clear_handoff(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,
@@ -721,9 +657,6 @@ pub async fn clear_handoff(
     }))
 }
 
-// --- Guidance Rule Handlers ---
-
-/// POST `/api/v1/chatbot/guidance-rules` — create a custom guidance rule.
 pub async fn create_guidance_rule_handler(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,
@@ -739,7 +672,6 @@ pub async fn create_guidance_rule_handler(
     Ok(HttpResponse::Created().json(rule))
 }
 
-/// PUT `/api/v1/chatbot/guidance-rules/{id}` — update a guidance rule.
 pub async fn update_guidance_rule_handler(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,
@@ -758,9 +690,6 @@ pub async fn update_guidance_rule_handler(
     Ok(HttpResponse::Ok().json(rule))
 }
 
-/// DELETE `/api/v1/chatbot/guidance-rules/{id}` — delete a custom guidance rule.
-///
-/// Returns 403 if the rule is a template.
 pub async fn delete_guidance_rule_handler(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,
@@ -777,7 +706,6 @@ pub async fn delete_guidance_rule_handler(
     Ok(HttpResponse::NoContent().finish())
 }
 
-/// PUT `/api/v1/chatbot/guidance-rules/batch` — Batch-update `enabled` and `sort_order` for multiple rules.
 pub async fn batch_update_guidance_rules_handler(
     db: web::Data<DatabaseConnection>,
     claims: WriteAccess,

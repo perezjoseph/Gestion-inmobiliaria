@@ -9,21 +9,15 @@ use crate::app::{AuthContext, Route};
 use crate::services::api::api_get;
 use crate::types::DashboardStats;
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
 const FRECUENTES_KEY: &str = "gi_frecuentes";
 const SIDEBAR_COLLAPSED_KEY: &str = "gi_sidebar_collapsed";
 const MAX_FRECUENTES: usize = 4;
-
-// ─── Props ───────────────────────────────────────────────────────────────────
 
 #[derive(Properties, PartialEq)]
 pub struct SidebarProps {
     pub is_open: bool,
     pub on_nav_click: Callback<()>,
 }
-
-// ─── LocalStorage helpers ────────────────────────────────────────────────────
 
 fn storage_get(key: &str) -> Option<String> {
     web_sys::window()?
@@ -42,8 +36,6 @@ fn storage_set(key: &str, value: &str) {
         let _ = storage.set_item(key, value);
     }
 }
-
-// ─── Route helpers ───────────────────────────────────────────────────────────
 
 const fn is_trackable_route(route: &Route) -> bool {
     matches!(
@@ -120,8 +112,6 @@ fn route_icon(route: &Route) -> Html {
     }
 }
 
-// ─── Frecuentes ──────────────────────────────────────────────────────────────
-
 fn load_visit_counts() -> HashMap<String, u32> {
     storage_get(FRECUENTES_KEY)
         .and_then(|s| serde_json::from_str(&s).ok())
@@ -159,8 +149,6 @@ fn top_frecuentes() -> Vec<Route> {
         .collect()
 }
 
-// ─── Collapsed groups ────────────────────────────────────────────────────────
-
 fn load_collapsed_groups() -> Vec<String> {
     storage_get(SIDEBAR_COLLAPSED_KEY)
         .and_then(|s| serde_json::from_str(&s).ok())
@@ -172,8 +160,6 @@ fn save_collapsed_groups(groups: &[String]) {
         storage_set(SIDEBAR_COLLAPSED_KEY, &json);
     }
 }
-
-// ─── Icons ───────────────────────────────────────────────────────────────────
 
 fn icon_dashboard() -> Html {
     html! {
@@ -382,8 +368,6 @@ fn icon_organizacion() -> Html {
     }
 }
 
-// ─── Badge helper ────────────────────────────────────────────────────────────
-
 fn attention_badge(count: u64) -> Html {
     if count == 0 {
         return html! {};
@@ -398,8 +382,6 @@ fn attention_badge(count: u64) -> Html {
     }
 }
 
-// ─── Main Component ──────────────────────────────────────────────────────────
-
 #[component]
 pub fn Sidebar(props: &SidebarProps) -> Html {
     let current_route = use_route::<Route>();
@@ -412,10 +394,8 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
     let is_admin = user_rol == "admin";
     let can_write = user_rol == "admin" || user_rol == "gerente";
 
-    // Collapsed groups state
     let collapsed_groups = use_state(load_collapsed_groups);
 
-    // Attention badge counts
     let pagos_atrasados = use_state(|| 0u64);
     {
         let pagos_atrasados = pagos_atrasados.clone();
@@ -428,7 +408,6 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
         });
     }
 
-    // Frecuentes tracking
     let frecuentes = use_state(top_frecuentes);
     {
         let frecuentes = frecuentes.clone();
@@ -463,7 +442,6 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
         })
     };
 
-    // Group toggle
     let make_toggle = |group_id: &'static str| -> Callback<MouseEvent> {
         let collapsed_groups = collapsed_groups.clone();
         Callback::from(move |_: MouseEvent| {
@@ -514,7 +492,6 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
         "gi-group-chevron gi-group-chevron-open"
     };
 
-    // Frecuentes section
     let frecuentes_html = if frecuentes.is_empty() {
         html! {}
     } else {
@@ -541,7 +518,7 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
 
     html! {
         <aside class={format!("gi-sidebar w-64 min-h-screen flex flex-col{open_class}")}
-               role="navigation" aria-label="Menú principal">
+               role="navigation" aria-label="MenÃº principal">
             <div class="gi-sidebar-brand">
                 <div class="gi-logo-mark gi-logo-mark-sm">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -557,10 +534,8 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                 </div>
             </div>
             <nav class="flex-1 overflow-y-auto">
-                // Frecuentes
                 {frecuentes_html}
 
-                // Operaciones
                 <div class="gi-sidebar-group">
                     <button class="gi-sidebar-group-toggle" onclick={make_toggle("operaciones")}
                         aria-expanded={(!ops_collapsed).to_string()}>
@@ -608,7 +583,7 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                                     {icon_maintenance()}{"Mantenimiento"}
                                 </Link<Route>>
                             </li>
-                            <li onclick={make_click(on_nav_click.clone())} title="Proceso legal de desalojo — Seguimiento de procedimientos de desahucio">
+                            <li onclick={make_click(on_nav_click.clone())} title="Proceso legal de desalojo â€” Seguimiento de procedimientos de desahucio">
                                 <Link<Route> to={Route::Desahucios} classes={classes!(link_class(&Route::Desahucios))}>
                                     {icon_desahucios()}{"Desahucios"}
                                 </Link<Route>>
@@ -617,7 +592,6 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                     </div>
                 </div>
 
-                // Herramientas
                 if can_write {
                     <div class="gi-sidebar-group">
                         <div class="gi-sidebar-divider" />
@@ -646,14 +620,14 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                                         {icon_plantillas()}{"Plantillas"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())} title="Dirección General de Impuestos Internos — Reportes fiscales y formularios">
+                                <li onclick={make_click(on_nav_click.clone())} title="DirecciÃ³n General de Impuestos Internos â€” Reportes fiscales y formularios">
                                     <Link<Route> to={Route::Dgii} classes={classes!(link_class(&Route::Dgii))}>
                                         {icon_dgii()}{"DGII"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())} title="Agua, luz, gas — Control de responsabilidades de servicios por unidad">
+                                <li onclick={make_click(on_nav_click.clone())} title="Agua, luz, gas â€” Control de responsabilidades de servicios por unidad">
                                     <Link<Route> to={Route::ServiciosPublicos} classes={classes!(link_class(&Route::ServiciosPublicos))}>
-                                        {icon_servicios_publicos()}{"Servicios Públicos"}
+                                        {icon_servicios_publicos()}{"Servicios PÃºblicos"}
                                     </Link<Route>>
                                 </li>
                             </ul>
@@ -661,7 +635,6 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                     </div>
                 }
 
-                // Sistema
                 <div class="gi-sidebar-group">
                     <div class="gi-sidebar-divider" />
                     <button class="gi-sidebar-group-toggle" onclick={make_toggle("sistema")}
@@ -680,35 +653,35 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                                         {icon_users()}{"Usuarios"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())} title="Registro de cambios — Historial de todas las modificaciones del sistema">
+                                <li onclick={make_click(on_nav_click.clone())} title="Registro de cambios â€” Historial de todas las modificaciones del sistema">
                                     <Link<Route> to={Route::AuditoriaPage} classes={classes!(link_class(&Route::AuditoriaPage))}>
-                                        {icon_audit()}{"Auditoría"}
+                                        {icon_audit()}{"AuditorÃ­a"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())} title="Números de Comprobantes Fiscales — Secuencias de facturación requeridas por la DGII">
+                                <li onclick={make_click(on_nav_click.clone())} title="NÃºmeros de Comprobantes Fiscales â€” Secuencias de facturaciÃ³n requeridas por la DGII">
                                     <Link<Route> to={Route::Ncf} classes={classes!(link_class(&Route::Ncf))}>
                                         {icon_ncf()}{"NCF"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())} title="Tareas programadas del sistema — Historial de ejecuciones automáticas">
+                                <li onclick={make_click(on_nav_click.clone())} title="Tareas programadas del sistema â€” Historial de ejecuciones automÃ¡ticas">
                                     <Link<Route> to={Route::Tareas} classes={classes!(link_class(&Route::Tareas))}>
                                         {icon_tareas()}{"Tareas"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())} title="Invitar usuarios — Enviar accesos a nuevos miembros del equipo">
+                                <li onclick={make_click(on_nav_click.clone())} title="Invitar usuarios â€” Enviar accesos a nuevos miembros del equipo">
                                     <Link<Route> to={Route::Invitaciones} classes={classes!(link_class(&Route::Invitaciones))}>
                                         {icon_invitaciones()}{"Invitaciones"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())} title="Datos de la empresa — Información fiscal y de contacto de su organización">
+                                <li onclick={make_click(on_nav_click.clone())} title="Datos de la empresa â€” InformaciÃ³n fiscal y de contacto de su organizaciÃ³n">
                                     <Link<Route> to={Route::Organizacion} classes={classes!(link_class(&Route::Organizacion))}>
-                                        {icon_organizacion()}{"Organización"}
+                                        {icon_organizacion()}{"OrganizaciÃ³n"}
                                     </Link<Route>>
                                 </li>
                             }
                             <li onclick={make_click(on_nav_click.clone())}>
                                 <Link<Route> to={Route::Configuracion} classes={classes!(link_class(&Route::Configuracion))}>
-                                    {icon_settings()}{"Configuración"}
+                                    {icon_settings()}{"ConfiguraciÃ³n"}
                                 </Link<Route>>
                             </li>
                             <li onclick={make_click(on_nav_click.clone())}>
@@ -721,7 +694,7 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                 </div>
             </nav>
             <div class="gi-sidebar-footer">
-                {"Gestión Inmobiliaria RD"}
+                {"GestiÃ³n Inmobiliaria RD"}
             </div>
         </aside>
     }

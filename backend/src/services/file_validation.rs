@@ -1,10 +1,5 @@
 use crate::errors::AppError;
 
-/// Validates that the first bytes of file data match the expected magic bytes
-/// for the declared content type.
-///
-/// Only allows known safe content types (JPEG, PNG, PDF, DOCX, XLSX).
-/// Unknown or unsupported content types are rejected by default.
 pub fn validate_magic_bytes(data: &[u8], declared_content_type: &str) -> Result<(), AppError> {
     let valid = match declared_content_type {
         "image/jpeg" => data.starts_with(&[0xFF, 0xD8, 0xFF]),

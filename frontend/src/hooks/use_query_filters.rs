@@ -2,8 +2,6 @@ use std::collections::HashMap;
 
 use web_sys::window;
 
-/// Reads query parameters from the current URL.
-/// Returns a `HashMap` of key-value pairs.
 pub fn read_query_params() -> HashMap<String, String> {
     let mut params = HashMap::new();
     let Some(win) = window() else {
@@ -26,8 +24,6 @@ pub fn read_query_params() -> HashMap<String, String> {
     params
 }
 
-/// Updates the browser URL with the given query parameters without triggering navigation.
-/// Empty values are omitted from the URL.
 pub fn write_query_params(params: &[(&str, &str)]) {
     let Some(win) = window() else {
         return;

@@ -48,10 +48,10 @@ use serde::{Deserialize, Serialize};
 
 const CATEGORIAS: &[(&str, &str)] = &[
     ("mantenimiento", "Mantenimiento"),
-    ("servicio_publico", "Servicio Público"),
+    ("servicio_publico", "Servicio PÃºblico"),
     ("impuestos", "Impuestos"),
     ("seguros", "Seguros"),
-    ("administracion", "Administración"),
+    ("administracion", "AdministraciÃ³n"),
     ("mejoras", "Mejoras"),
     ("legal", "Legal"),
     ("otro", "Otro"),
@@ -138,7 +138,7 @@ fn GastoFilterBar(props: &GastoFilterBarProps) -> Html {
                     </select>
                 </div>
                 <div>
-                    <label class="gi-label">{"Categoría"}</label>
+                    <label class="gi-label">{"CategorÃ­a"}</label>
                     <select onchange={on_cat_change} class="gi-input">
                         <option value="" selected={props.filter_categoria.is_empty()}>{"Todas"}</option>
                         { for CATEGORIAS.iter().map(|(val, label)| {
@@ -258,7 +258,7 @@ fn GastoForm(props: &GastoFormProps) -> Html {
             <OcrScanButton
                 document_type="recibo_gasto"
                 on_result={props.on_ocr_result.clone()}
-                label={AttrValue::from("📷 Escanear Factura")}
+                label={AttrValue::from("ðŸ“· Escanear Factura")}
             />
         }
     };
@@ -275,7 +275,7 @@ fn GastoForm(props: &GastoFormProps) -> Html {
                     <label class="gi-label">{"Propiedad *"}</label>
                     <select onchange={props.on_propiedad_change.clone()} disabled={props.is_editing}
                         class={input_class(fe.propiedad_id.is_some())}>
-                        <option value="" selected={props.propiedad_id.is_empty()}>{"— Seleccionar propiedad —"}</option>
+                        <option value="" selected={props.propiedad_id.is_empty()}>{"â€” Seleccionar propiedad â€”"}</option>
                         { for props.propiedades.iter().map(|p| {
                             let sel = *props.propiedad_id == p.id;
                             html! { <option value={p.id.clone()} selected={sel}>{&p.titulo}</option> }
@@ -286,7 +286,7 @@ fn GastoForm(props: &GastoFormProps) -> Html {
                 <div>
                     <label class="gi-label">{"Unidad"}</label>
                     <select onchange={select_cb!(props.unidad_id)} class="gi-input">
-                        <option value="" selected={props.unidad_id.is_empty()}>{"— Sin unidad —"}</option>
+                        <option value="" selected={props.unidad_id.is_empty()}>{"â€” Sin unidad â€”"}</option>
                         { for filtered_unidades.iter().map(|u| {
                             let sel = *props.unidad_id == u.id;
                             html! { <option value={u.id.clone()} selected={sel}>{&u.numero_unidad}</option> }
@@ -294,10 +294,10 @@ fn GastoForm(props: &GastoFormProps) -> Html {
                     </select>
                 </div>
                 <div>
-                    <label class="gi-label">{"Categoría *"}</label>
+                    <label class="gi-label">{"CategorÃ­a *"}</label>
                     <select onchange={select_cb!(props.categoria)}
                         class={input_class(fe.categoria.is_some())}>
-                        <option value="" selected={props.categoria.is_empty()}>{"— Seleccionar categoría —"}</option>
+                        <option value="" selected={props.categoria.is_empty()}>{"â€” Seleccionar categorÃ­a â€”"}</option>
                         { for CATEGORIAS.iter().map(|(val, label)| {
                             let sel = *props.categoria == *val;
                             html! { <option value={*val} selected={sel}>{*label}</option> }
@@ -306,9 +306,9 @@ fn GastoForm(props: &GastoFormProps) -> Html {
                     {field_error(&fe.categoria)}
                 </div>
                 <div>
-                    <label class="gi-label">{"Descripción *"}</label>
+                    <label class="gi-label">{"DescripciÃ³n *"}</label>
                     <input type="text" value={(*props.descripcion).clone()} oninput={input_cb!(props.descripcion)}
-                        placeholder="Descripción del gasto"
+                        placeholder="DescripciÃ³n del gasto"
                         class={input_class(fe.descripcion.is_some())} />
                     {field_error(&fe.descripcion)}
                 </div>
@@ -352,10 +352,10 @@ fn GastoForm(props: &GastoFormProps) -> Html {
                         />
                     </div>
                     <div>
-                        <label class="gi-label">{"Número de Cuenta"}</label>
+                        <label class="gi-label">{"NÃºmero de Cuenta"}</label>
                         <input type="text" value={(*props.numero_cuenta).clone()}
                             oninput={input_cb!(props.numero_cuenta)}
-                            placeholder="Número de cuenta del servicio" class="gi-input" />
+                            placeholder="NÃºmero de cuenta del servicio" class="gi-input" />
                     </div>
                     <div>
                         <label class="gi-label">{"Periodo Inicio"}</label>
@@ -369,7 +369,7 @@ fn GastoForm(props: &GastoFormProps) -> Html {
                     </div>
                 }
                 <div>
-                    <label class="gi-label">{"Número de Factura"}</label>
+                    <label class="gi-label">{"NÃºmero de Factura"}</label>
                     <ConfidenceInput
                         value={AttrValue::from((*props.numero_factura).clone())}
                         confidence={confidence_for("numero_factura")}
@@ -469,7 +469,7 @@ fn render_gasto_row(
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={g.monto} moneda={g.moneda.clone()} /></td>
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&g.fecha_gasto)}</td>
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
-                {g.proveedor.as_deref().unwrap_or("—")}</td>
+                {g.proveedor.as_deref().unwrap_or("â€”")}</td>
             <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
             {actions}
         </tr>
@@ -528,14 +528,14 @@ fn validate_gasto_fields(
         errs.propiedad_id = Some("Debe seleccionar una propiedad".into());
     }
     if categoria.is_empty() {
-        errs.categoria = Some("Debe seleccionar una categoría".into());
+        errs.categoria = Some("Debe seleccionar una categorÃ­a".into());
     }
     if descripcion.trim().is_empty() {
-        errs.descripcion = Some("La descripción es obligatoria".into());
+        errs.descripcion = Some("La descripciÃ³n es obligatoria".into());
     }
     match monto.parse::<f64>() {
         Ok(v) if v <= 0.0 => errs.monto = Some("El monto debe ser mayor a 0".into()),
-        Err(_) => errs.monto = Some("Monto inválido".into()),
+        Err(_) => errs.monto = Some("Monto invÃ¡lido".into()),
         _ => {}
     }
     if fecha_gasto.is_empty() {
@@ -1272,7 +1272,7 @@ fn render_gastos_view(
     };
     let headers: Vec<String> = vec![
         "Propiedad".into(),
-        "Categoría".into(),
+        "CategorÃ­a".into(),
         "Monto".into(),
         "Fecha".into(),
         "Proveedor".into(),
@@ -1298,7 +1298,7 @@ fn render_gastos_view(
         || html! {},
         |g| html! {
             <DeleteConfirmModal
-                message={format!("¿Está seguro de que desea eliminar el gasto de {}? Esta acción no se puede deshacer.", format_currency(&g.moneda, g.monto))}
+                message={format!("Â¿EstÃ¡ seguro de que desea eliminar el gasto de {}? Esta acciÃ³n no se puede deshacer.", format_currency(&g.moneda, g.monto))}
                 on_confirm={on_delete_confirm} on_cancel={on_delete_cancel}
             />
         },

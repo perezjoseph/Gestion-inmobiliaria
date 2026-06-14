@@ -10,7 +10,6 @@ use crate::models::ipc::{IpcData, UpdateIpcRequest};
 
 const CLAVE_IPC: &str = "ipc_banco_central";
 
-/// Fetch current IPC from configuracion store.
 pub async fn obtener_ipc_actual(db: &DatabaseConnection) -> Result<Option<IpcData>, AppError> {
     let config = configuracion::Entity::find_by_id(CLAVE_IPC).one(db).await?;
 
@@ -25,7 +24,6 @@ pub async fn obtener_ipc_actual(db: &DatabaseConnection) -> Result<Option<IpcDat
     }
 }
 
-/// Manually override IPC value (admin only).
 pub async fn actualizar_ipc_manual(
     db: &DatabaseConnection,
     input: UpdateIpcRequest,
@@ -59,7 +57,6 @@ pub async fn actualizar_ipc_manual(
     Ok(data)
 }
 
-/// Fetch IPC from Banco Central API and persist to configuracion.
 pub async fn fetch_ipc_from_bcrd(db: &DatabaseConnection) -> Result<i64, AppError> {
     let token = std::env::var("BCRD_API_TOKEN").map_err(|_| {
         AppError::Internal(anyhow::anyhow!(
@@ -110,7 +107,6 @@ pub async fn fetch_ipc_from_bcrd(db: &DatabaseConnection) -> Result<i64, AppErro
         .await
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error parseando respuesta BCRD: {e}")))?;
 
-    // Extract IPC value from response
     let ipc_value = resp_json
         .get("values")
         .and_then(|v| v.as_array())
@@ -154,12 +150,8 @@ pub async fn fetch_ipc_from_bcrd(db: &DatabaseConnection) -> Result<i64, AppErro
     Ok(1)
 }
 
-/// Maximum annual rent increase percentage allowed by Ley 85-25.
 const TOPE_LEGAL_PORCENTAJE: Decimal = Decimal::TEN;
 
-/// Calculate maximum allowed rent for a renewal.
-/// Applies the IPC percentage capped at 10% (Ley 85-25).
-/// Returns `monto_actual * (1 + min(ipc_porcentaje, 10) / 100)`.
 pub fn calcular_monto_maximo(monto_actual: Decimal, ipc_porcentaje: Decimal) -> Decimal {
     let porcentaje_aplicable = if ipc_porcentaje > TOPE_LEGAL_PORCENTAJE {
         TOPE_LEGAL_PORCENTAJE

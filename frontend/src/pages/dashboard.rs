@@ -94,7 +94,6 @@ pub fn Dashboard() -> Html {
 
     let has_data = stats.is_some();
 
-    // Collapsible state: read initial value from localStorage (default open)
     let details_open = use_state(|| {
         web_sys::window()
             .and_then(|w| w.local_storage().ok().flatten())
@@ -129,7 +128,6 @@ pub fn Dashboard() -> Html {
                     overdue_pagos={(*overdue_pagos).clone()}
                     stats={(*stats).clone()}
                 />
-                // Visual separator between attention and details
                 <div style="border-top: 1px solid var(--border-subtle); margin-top: var(--space-5); padding-top: var(--space-5);">
                     <div class="gi-collapsible-trigger" onclick={on_toggle_details.clone()}
                         role="button" tabindex="0"
@@ -140,7 +138,7 @@ pub fn Dashboard() -> Html {
                             "display: inline-block; transition: transform var(--duration-normal) var(--ease-out); transform: rotate({}deg);",
                             if *details_open { 180 } else { 0 }
                         )}>
-                            {"▾"}
+                            {"â–¾"}
                         </span>
                     </div>
                     <div class="gi-collapsible-content" id="dashboard-details-panel"
@@ -163,7 +161,7 @@ fn WelcomeCard() -> Html {
     html! {
         <div class="gi-welcome-card">
             <h2 class="text-display gi-text-xl gi-font-bold gi-text-primary gi-mb-2">
-                {"Bienvenido a Gestión Inmobiliaria"}
+                {"Bienvenido a GestiÃ³n Inmobiliaria"}
             </h2>
             <p class="gi-text-sm gi-text-secondary gi-mb-6">
                 {"Comience configurando su portafolio en tres pasos:"}
@@ -173,14 +171,14 @@ fn WelcomeCard() -> Html {
                     <div class="gi-welcome-step-num">{"1"}</div>
                     <div>
                         <div class="gi-welcome-step-title">{"Agregue una propiedad"}</div>
-                        <div class="gi-welcome-step-desc">{"Registre la dirección, tipo y precio de alquiler."}</div>
+                        <div class="gi-welcome-step-desc">{"Registre la direcciÃ³n, tipo y precio de alquiler."}</div>
                     </div>
                 </div>
                 <div class="gi-welcome-step">
                     <div class="gi-welcome-step-num">{"2"}</div>
                     <div>
                         <div class="gi-welcome-step-title">{"Registre un inquilino"}</div>
-                        <div class="gi-welcome-step-desc">{"Agregue los datos del arrendatario con su cédula."}</div>
+                        <div class="gi-welcome-step-desc">{"Agregue los datos del arrendatario con su cÃ©dula."}</div>
                     </div>
                 </div>
                 <div class="gi-welcome-step">
@@ -213,7 +211,7 @@ fn StatsHeader(props: &StatsHeaderProps) -> Html {
         <div class="gi-dashboard-header">
             <div class="gi-dashboard-hero">
                 <div class="gi-occupancy-ring">
-                    <svg viewBox="0 0 36 36" role="img" aria-label={format!("Ocupación del portafolio: {:.0}%", s.tasa_ocupacion)}>
+                    <svg viewBox="0 0 36 36" role="img" aria-label={format!("OcupaciÃ³n del portafolio: {:.0}%", s.tasa_ocupacion)}>
                         <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--border-subtle)" stroke-width="3"/>
                         <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--color-success)" stroke-width="3"
                             stroke-dasharray={format!("{:.1} 100", s.tasa_ocupacion)} stroke-linecap="round"/>
@@ -221,7 +219,7 @@ fn StatsHeader(props: &StatsHeaderProps) -> Html {
                     <div class="gi-occupancy-ring-label">{format!("{:.0}%", s.tasa_ocupacion)}</div>
                 </div>
                 <div class="gi-dashboard-hero-metric">
-                    <p class="gi-stat-label">{"Ocupación del portafolio"}</p>
+                    <p class="gi-stat-label">{"OcupaciÃ³n del portafolio"}</p>
                     <p class="gi-stat-value">
                         <CurrencyDisplay monto={s.ingreso_mensual} moneda={"DOP".to_string()} />
                         <span class="gi-stat-suffix">{"/ mes"}</span>
@@ -232,24 +230,24 @@ fn StatsHeader(props: &StatsHeaderProps) -> Html {
                 </div>
             </div>
             <div class={if s.pagos_atrasados > 0 { "gi-dashboard-secondary gi-dashboard-alert" } else { "gi-dashboard-secondary" }}>
-                <p class="gi-stat-label">{if s.pagos_atrasados > 0 { "⚠ Pagos atrasados" } else { "Pagos atrasados" }}</p>
+                <p class="gi-stat-label">{if s.pagos_atrasados > 0 { "âš  Pagos atrasados" } else { "Pagos atrasados" }}</p>
                 <p class="gi-stat-value">{s.pagos_atrasados}</p>
                 if s.pagos_atrasados > 0 {
                     <div class="gi-overdue-age">
                         <span class="gi-overdue-age-item">
                             <span class="gi-overdue-age-dot gi-overdue-age-dot-recent" />
-                            {"< 15 días"}
+                            {"< 15 dÃ­as"}
                         </span>
                         <span class="gi-overdue-age-item">
                             <span class="gi-overdue-age-dot gi-overdue-age-dot-old" />
-                            {"> 30 días"}
+                            {"> 30 dÃ­as"}
                         </span>
                     </div>
                     <span class="gi-mt-1">
-                        <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-xs">{"Ver detalles →"}</Link<Route>>
+                        <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-xs">{"Ver detalles â†’"}</Link<Route>>
                     </span>
                 } else {
-                    <p class="gi-text-xs gi-text-tertiary gi-mt-1">{"Todo al día"}</p>
+                    <p class="gi-text-xs gi-text-tertiary gi-mt-1">{"Todo al dÃ­a"}</p>
                 }
             </div>
             if let Some(ref comp) = props.ingreso_comp {
@@ -290,8 +288,8 @@ fn AttentionSection(props: &AttentionSectionProps) -> Html {
         return html! {
             <div class="gi-card-section gi-attention-clear">
                 <p class="gi-text-sm" style="color: var(--color-success-dark); display: flex; align-items: center; gap: var(--space-2);">
-                    <span>{"✓"}</span>
-                    {"Todo al día. Sin asuntos pendientes."}
+                    <span>{"âœ“"}</span>
+                    {"Todo al dÃ­a. Sin asuntos pendientes."}
                 </p>
             </div>
         };
@@ -301,7 +299,7 @@ fn AttentionSection(props: &AttentionSectionProps) -> Html {
         <div class="gi-card-section gi-attention-section">
             <div class="gi-section-header">
                 <h2 class="gi-section-header-title">
-                    {"Requiere Atención"}
+                    {"Requiere AtenciÃ³n"}
                     <span class="gi-badge gi-badge-error" style="margin-left: var(--space-2); font-size: var(--text-xs);">
                         {total_alerts}
                     </span>
@@ -311,7 +309,7 @@ fn AttentionSection(props: &AttentionSectionProps) -> Html {
                 <div class="gi-attention-group">
                     <div class="gi-attention-group-header">
                         <span class="gi-text-sm gi-font-semibold">{"Pagos Atrasados"}</span>
-                        <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-xs">{"Ver todos →"}</Link<Route>>
+                        <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-xs">{"Ver todos â†’"}</Link<Route>>
                     </div>
                     <div class="gi-flex-col gi-gap-2">
                         { for props.overdue_pagos.iter().take(3).map(|p| html! {
@@ -319,16 +317,16 @@ fn AttentionSection(props: &AttentionSectionProps) -> Html {
                                 <div class="gi-min-w-0 gi-flex-1">
                                     <div class="gi-overdue-row-title">{&p.propiedad_titulo}</div>
                                     <div class="gi-overdue-row-detail">
-                                        {format!("{} {} — ", p.inquilino_nombre, p.inquilino_apellido)}<CurrencyDisplay monto={p.monto} moneda={p.moneda.clone()} />
+                                        {format!("{} {} â€” ", p.inquilino_nombre, p.inquilino_apellido)}<CurrencyDisplay monto={p.monto} moneda={p.moneda.clone()} />
                                     </div>
                                 </div>
-                                <span class="gi-badge gi-badge-error">{format!("{} días", p.dias_vencido)}</span>
+                                <span class="gi-badge gi-badge-error">{format!("{} dÃ­as", p.dias_vencido)}</span>
                             </div>
                         })}
                         if overdue_count > 3 {
                             <span style="align-self: flex-start;">
                                 <Link<Route> to={Route::Pagos} classes="gi-btn gi-btn-primary gi-btn-sm">
-                                    {format!("Ver {} más", overdue_count - 3)}
+                                    {format!("Ver {} mÃ¡s", overdue_count - 3)}
                                 </Link<Route>>
                             </span>
                         }
@@ -339,7 +337,7 @@ fn AttentionSection(props: &AttentionSectionProps) -> Html {
                 <div class="gi-attention-group">
                     <div class="gi-attention-group-header">
                         <span class="gi-text-sm gi-font-semibold">{"Cumplimiento Documental"}</span>
-                        <Link<Route> to={Route::DocumentosPorVencer} classes="gi-btn-text gi-text-xs">{"Ver detalles →"}</Link<Route>>
+                        <Link<Route> to={Route::DocumentosPorVencer} classes="gi-btn-text gi-text-xs">{"Ver detalles â†’"}</Link<Route>>
                     </div>
                     <div style="display: flex; gap: var(--space-4); flex-wrap: wrap;">
                         if docs_vencidos > 0 {
@@ -398,14 +396,13 @@ fn ComplianceCounters(props: &ComplianceCountersProps) -> Html {
     }
 }
 
-/// Computes the date 30 days from now as YYYY-MM-DD for the API query.
 fn thirty_days_from_now() -> String {
     const THIRTY_DAYS_MS: f64 = 30.0 * 24.0 * 60.0 * 60.0 * 1000.0;
     let now = js_sys::Date::new_0();
     let future = js_sys::Date::new_0();
     future.set_time(now.get_time() + THIRTY_DAYS_MS);
     let y = future.get_full_year();
-    let m = future.get_month() + 1; // 0-indexed
+    let m = future.get_month() + 1;
     let d = future.get_date();
     format!("{y:04}-{m:02}-{d:02}")
 }
@@ -443,11 +440,11 @@ fn UpcomingPaymentsWidget() -> Html {
     html! {
         <div class="gi-card-section">
             <div class="gi-section-header">
-                <h2 class="gi-section-header-title">{"Próximos Pagos"}</h2>
-                <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-xs">{"Ver todos →"}</Link<Route>>
+                <h2 class="gi-section-header-title">{"PrÃ³ximos Pagos"}</h2>
+                <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-xs">{"Ver todos â†’"}</Link<Route>>
             </div>
             if pagos.is_empty() {
-                <p class="gi-text-sm gi-text-tertiary gi-py-3">{"Sin pagos pendientes en los próximos 30 días."}</p>
+                <p class="gi-text-sm gi-text-tertiary gi-py-3">{"Sin pagos pendientes en los prÃ³ximos 30 dÃ­as."}</p>
             } else {
                 <div class="gi-flex-col gi-gap-2">
                     { for pagos.iter().map(|p| html! {
@@ -505,7 +502,7 @@ fn OccupancyChart(props: &OccupancyChartProps) -> Html {
         <div class="gi-card-section">
             <LineChart
                 points={points}
-                title={AttrValue::from("Ocupación últimos 12 meses")}
+                title={AttrValue::from("OcupaciÃ³n Ãºltimos 12 meses")}
                 suffix={AttrValue::from("%")}
             />
         </div>
@@ -566,11 +563,11 @@ fn ContratosPorVencerWidget() -> Html {
         <div class="gi-card-section">
             <div class="gi-section-header">
                 <h2 class="gi-section-header-title">{"Contratos por vencer"}</h2>
-                <Link<Route> to={Route::Contratos} classes="gi-btn-text gi-text-xs">{"Ver todos →"}</Link<Route>>
+                <Link<Route> to={Route::Contratos} classes="gi-btn-text gi-text-xs">{"Ver todos â†’"}</Link<Route>>
             </div>
-            <ContratosBucket label="Próximos 30 días" contratos={(*contratos_30).clone()} />
-            <ContratosBucket label="Próximos 60 días" contratos={(*contratos_60).clone()} />
-            <ContratosBucket label="Próximos 90 días" contratos={(*contratos_90).clone()} />
+            <ContratosBucket label="PrÃ³ximos 30 dÃ­as" contratos={(*contratos_30).clone()} />
+            <ContratosBucket label="PrÃ³ximos 60 dÃ­as" contratos={(*contratos_60).clone()} />
+            <ContratosBucket label="PrÃ³ximos 90 dÃ­as" contratos={(*contratos_90).clone()} />
         </div>
     }
 }
@@ -589,7 +586,7 @@ fn ContratosBucket(props: &ContratosBucketProps) -> Html {
                 {&props.label}{format!(" ({})", props.contratos.len())}
             </p>
             if props.contratos.is_empty() {
-                <p class="gi-text-sm gi-text-tertiary">{"Sin contratos en este período."}</p>
+                <p class="gi-text-sm gi-text-tertiary">{"Sin contratos en este perÃ­odo."}</p>
             } else {
                 <div class="gi-flex-col gi-gap-1">
                     { for props.contratos.iter().map(|c| html! {
@@ -640,7 +637,7 @@ fn ExpenseCard(props: &ExpenseCardProps) -> Html {
         <div class="gi-card-section">
             <div class="gi-section-header">
                 <h2 class="gi-section-header-title">{"Resumen de Gastos"}</h2>
-                <Link<Route> to={Route::Gastos} classes="gi-btn-text gi-text-xs">{"Ver todos →"}</Link<Route>>
+                <Link<Route> to={Route::Gastos} classes="gi-btn-text gi-text-xs">{"Ver todos â†’"}</Link<Route>>
             </div>
             <div class="gi-dashboard-header">
                 <div class="gi-dashboard-secondary">

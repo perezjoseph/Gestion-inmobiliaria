@@ -25,9 +25,6 @@ use crate::services::validation::validate_enum;
 
 const SENDER_POLICIES: &[&str] = &["tenants_only", "tenants_and_prospects", "allowlist"];
 
-// --- Configuration Service ---
-
-/// Load chatbot config for an organization, or return a default response if none exists.
 pub async fn get_config<C: ConnectionTrait>(
     db: &C,
     org_id: Uuid,
@@ -43,9 +40,6 @@ pub async fn get_config<C: ConnectionTrait>(
     }
 }
 
-/// Load the raw chatbot config entity model for an organization.
-/// Returns a default model if none exists. Used by the test chat handler
-/// to build persona/capabilities from the saved (or default) config.
 pub async fn get_config_model<C: ConnectionTrait>(
     db: &C,
     org_id: Uuid,
@@ -81,8 +75,6 @@ pub async fn get_config_model<C: ConnectionTrait>(
     }))
 }
 
-/// Create or update chatbot config for an organization.
-/// Enforces role check: only `admin` or `gerente` may call this.
 pub async fn upsert_config<C: ConnectionTrait>(
     db: &C,
     org_id: Uuid,
@@ -157,17 +149,6 @@ pub async fn upsert_config<C: ConnectionTrait>(
     config_model_to_response(record)
 }
 
-// --- Validation ---
-
-/// Validate a chatbot config update request.
-/// Rules:
-/// - `display_name`: 1–100 characters
-/// - `tone`: 1–50 characters
-/// - `faqs`: max 50 entries, question max 200 chars, answer max 1000 chars
-/// - `policies`: max 5000 characters
-/// - `sender_policy`: must be one of the allowed values
-/// - `history_limit`: 1–50
-/// - `retention_days`: 1–365
 pub fn validate_config(input: &ChatbotConfigUpdateRequest) -> Result<(), AppError> {
     if let Some(ref name) = input.display_name {
         if name.is_empty() || name.len() > 100 {
@@ -245,10 +226,6 @@ fn validate_faqs(faqs: &[FaqEntry]) -> Result<(), AppError> {
     Ok(())
 }
 
-// --- Guidance Rules Template Seeding ---
-
-/// Returns the 16 predefined template guidance rules for new organizations.
-/// All rules are enabled by default and marked as templates (cannot be deleted).
 pub fn seed_template_rules() -> Vec<GuidanceRule> {
     let now = Utc::now();
     let mut rules = Vec::with_capacity(16);
@@ -312,9 +289,6 @@ pub fn seed_template_rules() -> Vec<GuidanceRule> {
     rules
 }
 
-// --- Role Enforcement ---
-
-/// Only `admin` or `gerente` roles may modify chatbot configuration.
 pub(crate) fn enforce_config_role(role: &str) -> Result<(), AppError> {
     match role {
         "admin" | "gerente" => Ok(()),
@@ -324,8 +298,6 @@ pub(crate) fn enforce_config_role(role: &str) -> Result<(), AppError> {
         )),
     }
 }
-
-// --- Helpers ---
 
 fn apply_update_fields(
     active: &mut chatbot_config::ActiveModel,
@@ -470,16 +442,6 @@ fn default_config_response(org_id: Uuid) -> ChatbotConfigResponse {
     }
 }
 
-// --- Sender Policy Engine ---
-
-/// Determines whether an incoming sender is authorized to interact with the chatbot
-/// based on the organization's configured sender policy.
-///
-/// Policies:
-/// - `tenants_only`: allowed only if the phone matches a tenant in the org (requires DB)
-/// - `tenants_and_prospects`: all senders allowed
-/// - `allowlist`: allowed only if the phone appears in the org's configured allowlist
-/// - Any unrecognized value: denied (fail-closed)
 pub async fn is_sender_allowed<C: ConnectionTrait>(
     sender_policy: &str,
     phone: &str,
@@ -491,35 +453,27 @@ pub async fn is_sender_allowed<C: ConnectionTrait>(
         "tenants_only" => tenant_exists_by_phone(phone, org_id, db).await,
         "tenants_and_prospects" => true,
         "allowlist" => is_phone_in_allowlist(phone, allowlist),
-        _ => false, // fail-closed for unrecognized policies
+        _ => false,
     }
 }
 
-/// Pure policy check: returns true iff the phone appears in the allowlist.
-/// Returns false if the allowlist is `None` or empty.
 pub fn is_phone_in_allowlist(phone: &str, allowlist: Option<&[String]>) -> bool {
     allowlist.is_some_and(|list| list.iter().any(|entry| entry == phone))
 }
 
-/// Pure policy check for sender policy without DB access.
-///
-/// Handles `tenants_and_prospects` (always true), `allowlist` (check list),
-/// and any unrecognized policy (always false / fail-closed).
-/// For `tenants_only`, returns `None` indicating DB lookup is required.
 pub fn check_sender_policy_no_db(
     sender_policy: &str,
     phone: &str,
     allowlist: Option<&[String]>,
 ) -> Option<bool> {
     match sender_policy {
-        "tenants_only" => None, // requires DB lookup
+        "tenants_only" => None,
         "tenants_and_prospects" => Some(true),
         "allowlist" => Some(is_phone_in_allowlist(phone, allowlist)),
-        _ => Some(false), // fail-closed for unrecognized policies
+        _ => Some(false),
     }
 }
 
-/// Check if a tenant exists with the given phone in the specified organization.
 async fn tenant_exists_by_phone<C: ConnectionTrait>(phone: &str, org_id: Uuid, db: &C) -> bool {
     use crate::entities::inquilino;
 
@@ -533,15 +487,12 @@ async fn tenant_exists_by_phone<C: ConnectionTrait>(phone: &str, org_id: Uuid, d
         .is_some()
 }
 
-/// Resolved tenant info for the incoming webhook pipeline.
 pub struct ResolvedTenant {
     pub id: Uuid,
     pub nombre: String,
     pub apellido: String,
 }
 
-/// Find a tenant by phone number and organization.
-/// Returns `None` if no tenant matches.
 pub async fn find_tenant_by_phone<C: ConnectionTrait>(
     db: &C,
     phone: &str,
@@ -562,16 +513,9 @@ pub async fn find_tenant_by_phone<C: ConnectionTrait>(
     }))
 }
 
-// --- Phone Number Validation & Normalization ---
-
-/// Validates that a phone number conforms to E.164 format.
-///
-/// E.164: a `+` followed by 1–15 digits, where the first digit is not zero.
-/// Pattern: `^\+[1-9]\d{1,14}$`
 pub fn validate_e164(phone: &str) -> Result<(), AppError> {
     let bytes = phone.as_bytes();
 
-    // Must start with '+'
     if bytes.first() != Some(&b'+') {
         return Err(AppError::Validation(
             "Número de teléfono debe comenzar con '+'".to_string(),
@@ -580,21 +524,18 @@ pub fn validate_e164(phone: &str) -> Result<(), AppError> {
 
     let digits = &phone[1..];
 
-    // Must have 1–15 digits after the '+'
     if digits.is_empty() || digits.len() > 15 {
         return Err(AppError::Validation(
             "Número E.164 debe tener entre 1 y 15 dígitos después del '+'".to_string(),
         ));
     }
 
-    // First digit must not be zero
     if digits.starts_with('0') {
         return Err(AppError::Validation(
             "Primer dígito después del '+' no puede ser cero".to_string(),
         ));
     }
 
-    // All characters after '+' must be digits
     if !digits.bytes().all(|b| b.is_ascii_digit()) {
         return Err(AppError::Validation(
             "Número E.164 solo puede contener dígitos después del '+'".to_string(),
@@ -604,18 +545,6 @@ pub fn validate_e164(phone: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Normalizes a phone number input to E.164 format.
-///
-/// Steps:
-/// 1. If the input starts with '+', preserve it and strip non-digit chars from the rest.
-/// 2. Otherwise, strip all non-digit characters.
-/// 3. Remove leading trunk zeros (zeros at the start of the digit string).
-/// 4. Prepend the `default_country_code` (e.g., "+1") if the number doesn't already have one.
-/// 5. Validate the result is valid E.164.
-///
-/// Rejects numbers that:
-/// - Have fewer than 7 digits after stripping
-/// - Contain non-numeric characters other than a leading '+'
 pub fn normalize_phone(input: &str, default_country_code: &str) -> Result<String, AppError> {
     let trimmed = input.trim();
 
@@ -625,7 +554,6 @@ pub fn normalize_phone(input: &str, default_country_code: &str) -> Result<String
         ));
     }
 
-    // Check for invalid characters: only digits, '+', spaces, dashes, dots, parens allowed
     let has_invalid_chars = trimmed.chars().any(|c| {
         !c.is_ascii_digit() && c != '+' && c != '-' && c != ' ' && c != '.' && c != '(' && c != ')'
     });
@@ -646,7 +574,6 @@ pub fn normalize_phone(input: &str, default_country_code: &str) -> Result<String
         },
     );
 
-    // Remove leading trunk zeros
     let stripped = raw_digits.trim_start_matches('0');
 
     if stripped.is_empty() {
@@ -655,7 +582,6 @@ pub fn normalize_phone(input: &str, default_country_code: &str) -> Result<String
         ));
     }
 
-    // Build the normalized number
     let normalized = if has_plus {
         format!("+{stripped}")
     } else {
@@ -663,36 +589,24 @@ pub fn normalize_phone(input: &str, default_country_code: &str) -> Result<String
         format!("+{code}{stripped}")
     };
 
-    // Check minimum digit count (at least 7 digits after '+')
-    let digit_count = normalized.len() - 1; // subtract the '+'
+    let digit_count = normalized.len() - 1;
     if digit_count < 7 {
         return Err(AppError::Validation(format!(
             "Número de teléfono debe tener al menos 7 dígitos, tiene {digit_count}"
         )));
     }
 
-    // Validate the final result as E.164
     validate_e164(&normalized)?;
 
     Ok(normalized)
 }
 
-// --- Conversation History Service ---
-
-/// A lightweight message representation for pure windowing logic.
-/// Used in property-based testing to model the DB query behavior without requiring a database.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TimestampedMessage {
     pub content: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
-/// Pure function modeling the conversation history windowing logic.
-///
-/// Given a list of messages (in any order) and a history limit N,
-/// returns the min(len, N) most recent messages sorted by `created_at` DESC.
-///
-/// This mirrors the DB query: `ORDER BY created_at DESC LIMIT N`.
 pub fn window_history(messages: &[TimestampedMessage], limit: usize) -> Vec<&TimestampedMessage> {
     let mut sorted: Vec<&TimestampedMessage> = messages.iter().collect();
     sorted.sort_by_key(|m| std::cmp::Reverse(m.created_at));
@@ -700,9 +614,6 @@ pub fn window_history(messages: &[TimestampedMessage], limit: usize) -> Vec<&Tim
     sorted
 }
 
-/// Persist a message (user or assistant) in the conversation history.
-///
-/// Auto-generates a UUID for the record and uses the current timestamp.
 pub async fn persist_message<C: ConnectionTrait>(
     db: &C,
     org_id: Uuid,
@@ -729,8 +640,6 @@ pub async fn persist_message<C: ConnectionTrait>(
     Ok(record)
 }
 
-/// Load the last N messages for a specific (`org_id`, `sender_phone`) pair,
-/// ordered by `created_at` DESC.
 pub async fn load_history<C: ConnectionTrait>(
     db: &C,
     org_id: Uuid,
@@ -748,9 +657,6 @@ pub async fn load_history<C: ConnectionTrait>(
     Ok(messages)
 }
 
-/// List recent conversations for an organization (paginated).
-///
-/// Returns distinct sender phones with their latest message, timestamp, and message count.
 pub async fn list_conversations<C: ConnectionTrait>(
     db: &C,
     org_id: Uuid,
@@ -759,7 +665,6 @@ pub async fn list_conversations<C: ConnectionTrait>(
 ) -> Result<PaginatedResponse<ConversationListResponse>, AppError> {
     use sea_orm::{DbBackend, FromQueryResult, Statement, Value};
 
-    // We need a custom query to get distinct sender_phone with aggregates.
     #[derive(Debug, FromQueryResult)]
     struct ConversationRow {
         sender_phone: String,
@@ -771,7 +676,6 @@ pub async fn list_conversations<C: ConnectionTrait>(
 
     let offset = (page - 1) * per_page;
 
-    // Count distinct sender phones (parameterized to prevent SQL injection)
     let count_sql = "SELECT COUNT(DISTINCT sender_phone) as count FROM chatbot_conversation WHERE organizacion_id = $1";
     let count_result: Option<i64> = db
         .query_one(Statement::from_sql_and_values(
@@ -783,7 +687,6 @@ pub async fn list_conversations<C: ConnectionTrait>(
         .and_then(|r| r.try_get_by_index::<i64>(0).ok());
     let total = count_result.unwrap_or(0) as u64;
 
-    // Get paginated distinct conversations with latest message (parameterized)
     let query_sql = "
         SELECT DISTINCT ON (sender_phone)
             sender_phone,
@@ -830,10 +733,6 @@ pub async fn list_conversations<C: ConnectionTrait>(
     })
 }
 
-/// Delete conversation messages older than the retention period for an organization.
-///
-/// Deletes all messages where `created_at < (now - retention_days)`.
-/// Returns the number of rows deleted.
 pub async fn cleanup_expired<C: ConnectionTrait>(
     db: &C,
     org_id: Uuid,
@@ -850,17 +749,6 @@ pub async fn cleanup_expired<C: ConnectionTrait>(
     Ok(result.rows_affected)
 }
 
-// --- Balance Query Service ---
-
-/// Queries the outstanding balance for a tenant, with code-level sender verification.
-///
-/// When `sender_policy` is `"tenants_and_prospects"`, verifies that the sender phone
-/// is linked to a known `inquilino` in the organization before executing any balance
-/// query. If no linked tenant is found, returns a polite decline message without
-/// executing the DB balance query.
-///
-/// For other policies (e.g., `"tenants_only"`), the sender is already verified at
-/// the policy gate, so no additional check is needed here.
 pub async fn query_tenant_balance_with_sender_check<C: ConnectionTrait>(
     db: &C,
     inquilino_id: Uuid,
@@ -868,9 +756,6 @@ pub async fn query_tenant_balance_with_sender_check<C: ConnectionTrait>(
     sender_phone: &str,
     sender_policy: &str,
 ) -> Result<BalanceResponse, AppError> {
-    // Code-level sender verification for "tenants_and_prospects" policy.
-    // Under this policy, any phone can message the chatbot, but balance queries
-    // must only be served to phones linked to a known tenant via find_tenant_by_phone.
     if sender_policy == "tenants_and_prospects" {
         let tenant = find_tenant_by_phone(db, sender_phone, org_id).await?;
         if tenant.is_none() {
@@ -885,17 +770,11 @@ pub async fn query_tenant_balance_with_sender_check<C: ConnectionTrait>(
     query_tenant_balance(db, inquilino_id, org_id).await
 }
 
-/// Queries the outstanding balance for a tenant within an organization.
-///
-/// Finds all payments with status `pendiente` or `atrasado` belonging to
-/// the tenant's contracts, groups totals by currency, and formats amounts
-/// with the appropriate currency symbol.
 pub async fn query_tenant_balance<C: ConnectionTrait>(
     db: &C,
     inquilino_id: Uuid,
     org_id: Uuid,
 ) -> Result<BalanceResponse, AppError> {
-    // Step 1: Find all contrato IDs for this tenant in this org
     let contrato_ids: Vec<Uuid> = contrato::Entity::find()
         .filter(contrato::Column::InquilinoId.eq(inquilino_id))
         .filter(contrato::Column::OrganizacionId.eq(org_id))
@@ -912,7 +791,6 @@ pub async fn query_tenant_balance<C: ConnectionTrait>(
         });
     }
 
-    // Step 2: Find all pagos with status pendiente or atrasado for those contracts
     let pagos = pago::Entity::find()
         .filter(pago::Column::ContratoId.is_in(contrato_ids))
         .filter(pago::Column::OrganizacionId.eq(org_id))
@@ -925,7 +803,6 @@ pub async fn query_tenant_balance<C: ConnectionTrait>(
         .all(db)
         .await?;
 
-    // Step 3: Build payment details and group totals by currency
     let mut totals_map: HashMap<String, Decimal> = HashMap::new();
     let mut payments = Vec::with_capacity(pagos.len());
 
@@ -942,7 +819,6 @@ pub async fn query_tenant_balance<C: ConnectionTrait>(
         });
     }
 
-    // Step 4: Build per-currency totals
     let mut totals: Vec<CurrencyTotal> = totals_map
         .into_iter()
         .map(|(currency, total)| CurrencyTotal {
@@ -952,22 +828,11 @@ pub async fn query_tenant_balance<C: ConnectionTrait>(
         })
         .collect();
 
-    // Sort for deterministic output (DOP first, then USD)
     totals.sort_by(|a, b| a.currency.cmp(&b.currency));
 
     Ok(BalanceResponse { payments, totals })
 }
 
-// --- Receipt Extraction Service ---
-
-/// Records a receipt extraction result in the `chatbot_receipt_extraction` table.
-///
-/// Routing logic (per requirements 4.3, 4.4, 4.5):
-/// - All extractions are stored with status `pending_confirmation`.
-/// - The difference in confidence level affects the reply to the tenant (handled elsewhere),
-///   but all extractions queue for landlord confirmation regardless.
-///
-/// Auto-generates a UUID for the record and uses the current timestamp.
 pub async fn record_extraction<C: ConnectionTrait>(
     db: &C,
     org_id: Uuid,
@@ -998,19 +863,6 @@ pub async fn record_extraction<C: ConnectionTrait>(
     Ok(record)
 }
 
-// --- Post-Loop Extraction Persistence ---
-
-/// Persists a receipt extraction from the AI agent's multi-turn loop.
-///
-/// Stores the result in the `chatbot_receipt_extraction` table, delegating to
-/// `confirmar_preview` for domain entity creation once the extraction is confirmed.
-///
-/// Called when `invoke_agent` returns `Final` and the history contains a
-/// successful `ExtractReceiptTool` result. This stores the extraction with
-/// `pending_confirmation` status so the landlord can review and confirm it.
-///
-/// Requirement 8.3: When `ExtractReceiptTool` returns a successful extraction,
-/// the `WhatsApp` AI service SHALL invoke `Record_Extraction` to persist the result.
 #[allow(clippy::doc_markdown)]
 pub async fn record_extraction_from_agent<C: ConnectionTrait>(
     db: &C,
@@ -1021,7 +873,6 @@ pub async fn record_extraction_from_agent<C: ConnectionTrait>(
     let extracted_data = serde_json::to_value(receipt)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error serializando recibo: {e}")))?;
 
-    // Create a placeholder conversation record to satisfy the FK constraint
     let conversation_id = Uuid::new_v4();
     let now = Utc::now().into();
     let conv = crate::entities::chatbot_conversation::ActiveModel {
@@ -1041,18 +892,14 @@ pub async fn record_extraction_from_agent<C: ConnectionTrait>(
         db,
         organizacion_id,
         conversation_id,
-        None, // inquilino_id resolved during confirmation
-        None, // contrato_id resolved during confirmation
+        None,
+        None,
         extracted_data,
         &receipt.confidence,
     )
     .await
 }
 
-// --- Receipt Confirmation Workflow ---
-
-/// Lists all receipt extractions with status `pending_confirmation` for an organization,
-/// ordered by `created_at` DESC.
 pub async fn list_pending_receipts<C: ConnectionTrait>(
     db: &C,
     org_id: Uuid,
@@ -1067,16 +914,11 @@ pub async fn list_pending_receipts<C: ConnectionTrait>(
     Ok(records)
 }
 
-/// Confirms a receipt extraction: sets status to `confirmed`, records the confirming user,
-/// and creates a Pago record from the extracted data.
-///
-/// Enforces atomic status transition: rejects if not in `pending_confirmation`.
 pub async fn confirm_receipt<C: ConnectionTrait>(
     db: &C,
     extraction_id: Uuid,
     user_id: Uuid,
 ) -> Result<chatbot_receipt_extraction::Model, AppError> {
-    // Load extraction
     let extraction = chatbot_receipt_extraction::Entity::find_by_id(extraction_id)
         .one(db)
         .await?
@@ -1086,14 +928,12 @@ pub async fn confirm_receipt<C: ConnectionTrait>(
             ))
         })?;
 
-    // Enforce atomic status transition
     if extraction.status != "pending_confirmation" {
         return Err(AppError::Conflict(
             "La extracción ya fue procesada y no está pendiente de confirmación".to_string(),
         ));
     }
 
-    // Extract payment data from JSONB
     let data = &extraction.extracted_data;
     let amount: Decimal = data
         .get("amount")
@@ -1118,7 +958,6 @@ pub async fn confirm_receipt<C: ConnectionTrait>(
         .and_then(|v| v.as_str())
         .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
 
-    // We need a contrato_id to create the Pago
     let contrato_id = extraction.contrato_id.ok_or_else(|| {
         AppError::Validation(
             "La extracción no tiene un contrato asociado para crear el pago".to_string(),
@@ -1127,7 +966,6 @@ pub async fn confirm_receipt<C: ConnectionTrait>(
 
     let now = Utc::now().into();
 
-    // Create Pago record
     let pago_active = pago::ActiveModel {
         id: Set(Uuid::new_v4()),
         contrato_id: Set(contrato_id),
@@ -1156,7 +994,6 @@ pub async fn confirm_receipt<C: ConnectionTrait>(
     };
     pago_active.insert(db).await?;
 
-    // Update extraction status to confirmed
     let mut active: chatbot_receipt_extraction::ActiveModel = extraction.into();
     active.status = Set("confirmed".to_string());
     active.confirmed_by = Set(Some(user_id));
@@ -1166,17 +1003,12 @@ pub async fn confirm_receipt<C: ConnectionTrait>(
     Ok(updated)
 }
 
-/// Rejects a receipt extraction: sets status to `rejected` and persists the rejection reason
-/// in the `extracted_data` JSONB (under key `rejection_reason`).
-///
-/// Enforces atomic status transition: rejects if not in `pending_confirmation`.
 pub async fn reject_receipt<C: ConnectionTrait>(
     db: &C,
     extraction_id: Uuid,
     user_id: Uuid,
     reason: Option<&str>,
 ) -> Result<chatbot_receipt_extraction::Model, AppError> {
-    // Load extraction
     let extraction = chatbot_receipt_extraction::Entity::find_by_id(extraction_id)
         .one(db)
         .await?
@@ -1186,7 +1018,6 @@ pub async fn reject_receipt<C: ConnectionTrait>(
             ))
         })?;
 
-    // Enforce atomic status transition
     if extraction.status != "pending_confirmation" {
         return Err(AppError::Conflict(
             "La extracción ya fue procesada y no está pendiente de confirmación".to_string(),
@@ -1195,7 +1026,6 @@ pub async fn reject_receipt<C: ConnectionTrait>(
 
     let now = Utc::now().into();
 
-    // Store rejection reason in extracted_data JSONB
     let mut updated_data = extraction.extracted_data.clone();
     if let Some(r) = reason {
         if let Some(obj) = updated_data.as_object_mut() {
@@ -1219,17 +1049,8 @@ pub async fn reject_receipt<C: ConnectionTrait>(
     Ok(updated)
 }
 
-// --- Maintenance Request Creation (Chatbot) ---
-
 const VALID_PRIORITIES: &[&str] = &["baja", "media", "alta", "urgente"];
 
-/// Creates a maintenance request (`SolicitudMantenimiento`) from a chatbot interaction.
-///
-/// Finds the tenant's active contract(s) in the organization, picks the most recently
-/// started one, and links the request to that contract's property.
-///
-/// Defaults: status = `pendiente`, priority = `media` (unless specified).
-/// Validates description length: 2–1000 characters.
 pub async fn create_maintenance_from_chat<C: ConnectionTrait>(
     db: &C,
     inquilino_id: Uuid,
@@ -1237,7 +1058,6 @@ pub async fn create_maintenance_from_chat<C: ConnectionTrait>(
     description: &str,
     priority: Option<&str>,
 ) -> Result<solicitud_mantenimiento::Model, AppError> {
-    // Validate description length (2–1000 chars)
     let desc_len = description.chars().count();
     if !(2..=1000).contains(&desc_len) {
         return Err(AppError::Validation(
@@ -1245,11 +1065,9 @@ pub async fn create_maintenance_from_chat<C: ConnectionTrait>(
         ));
     }
 
-    // Validate priority if provided
     let prioridad = priority.unwrap_or("media");
     validate_enum("prioridad", prioridad, VALID_PRIORITIES)?;
 
-    // Find active contracts for this tenant in this org, ordered by fecha_inicio DESC
     let active_contract = contrato::Entity::find()
         .filter(contrato::Column::InquilinoId.eq(inquilino_id))
         .filter(contrato::Column::OrganizacionId.eq(org_id))
@@ -1289,25 +1107,16 @@ pub async fn create_maintenance_from_chat<C: ConnectionTrait>(
     Ok(record)
 }
 
-// --- Human Handoff State Management ---
-
-/// Handoff status values for a conversation.
 const HANDOFF_STATUS_AWAITING: &str = "awaiting_human";
 const HANDOFF_STATUS_NONE: &str = "none";
 
-/// Metadata key used to store handoff status in conversation messages.
 const HANDOFF_METADATA_KEY: &str = "handoff_status";
 
-/// Checks whether a human handoff is currently active for a given (`org_id`, `sender_phone`) pair.
-///
-/// Looks at the most recent conversation message with handoff metadata and checks
-/// if its status is `awaiting_human`.
 pub async fn is_handoff_active<C: ConnectionTrait>(
     db: &C,
     org_id: Uuid,
     sender_phone: &str,
 ) -> Result<bool, AppError> {
-    // Find the most recent message that has handoff metadata for this conversation
     let recent = chatbot_conversation::Entity::find()
         .filter(chatbot_conversation::Column::OrganizacionId.eq(org_id))
         .filter(chatbot_conversation::Column::SenderPhone.eq(sender_phone))
@@ -1320,7 +1129,6 @@ pub async fn is_handoff_active<C: ConnectionTrait>(
         return Ok(false);
     };
 
-    // Check the metadata for handoff_status
     let is_active = msg
         .metadata
         .as_ref()
@@ -1331,10 +1139,6 @@ pub async fn is_handoff_active<C: ConnectionTrait>(
     Ok(is_active)
 }
 
-/// Sets the handoff status to `awaiting_human` for a (`org_id`, `sender_phone`) pair.
-///
-/// Persists a special marker message in the conversation history with
-/// `message_type = "handoff_status"` and metadata `{"handoff_status": "awaiting_human"}`.
 pub async fn set_handoff<C: ConnectionTrait>(
     db: &C,
     org_id: Uuid,
@@ -1357,12 +1161,6 @@ pub async fn set_handoff<C: ConnectionTrait>(
     .await
 }
 
-/// Clears the handoff status for a (`org_id`, `sender_phone`) pair, resuming AI processing.
-///
-/// Persists a marker message with `message_type = "handoff_status"` and
-/// metadata `{"handoff_status": "none"}`.
-///
-/// Only `admin` or `gerente` roles may call this.
 pub async fn clear_handoff<C: ConnectionTrait>(
     db: &C,
     org_id: Uuid,
@@ -1388,36 +1186,18 @@ pub async fn clear_handoff<C: ConnectionTrait>(
     .await
 }
 
-// --- Pure Maintenance Request Defaults (for PBT) ---
-
-/// Result of validating and resolving maintenance request defaults.
-/// Models the pure logic of `create_maintenance_from_chat` without DB access.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MaintenanceRequestDefaults {
-    /// The property ID from the contract.
     pub propiedad_id: Uuid,
-    /// Always `"pendiente"`.
     pub status: String,
-    /// Defaults to `"media"` unless a valid priority is explicitly provided.
     pub priority: String,
 }
 
-/// Pure validation and default resolution for maintenance requests.
-///
-/// Given a description and optional priority, validates inputs and returns
-/// the resolved defaults (status, priority) along with the linked property.
-///
-/// - `description`: must be 2–1000 characters
-/// - `priority`: if `None`, defaults to `"media"`; if `Some`, must be one of `VALID_PRIORITIES`
-/// - `propiedad_id`: the property from the tenant's active contract
-///
-/// Returns `Err` if validation fails, `Ok(MaintenanceRequestDefaults)` otherwise.
 pub fn resolve_maintenance_defaults(
     description: &str,
     priority: Option<&str>,
     propiedad_id: Uuid,
 ) -> Result<MaintenanceRequestDefaults, AppError> {
-    // Validate description length (2–1000 chars)
     let desc_len = description.chars().count();
     if !(2..=1000).contains(&desc_len) {
         return Err(AppError::Validation(
@@ -1425,7 +1205,6 @@ pub fn resolve_maintenance_defaults(
         ));
     }
 
-    // Validate and resolve priority
     let prioridad = priority.unwrap_or("media");
     validate_enum("prioridad", prioridad, VALID_PRIORITIES)?;
 
@@ -1436,9 +1215,6 @@ pub fn resolve_maintenance_defaults(
     })
 }
 
-// --- OCR Preview Confirmation (Requirement 5) ---
-
-/// Discriminator for confirmed OCR previews.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DocumentType {
@@ -1446,7 +1222,6 @@ pub enum DocumentType {
     Gasto,
 }
 
-/// Result of confirming an OCR preview — identifies the created entity.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ConfirmedEntity {
@@ -1454,7 +1229,6 @@ pub enum ConfirmedEntity {
     Gasto(Uuid),
 }
 
-/// Input for the `confirmar_preview` function.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OcrPreviewConfirm {
@@ -1472,23 +1246,12 @@ pub struct OcrPreviewConfirm {
     pub notas: Option<String>,
 }
 
-/// Synchronous OCR preview confirmation that persists the extraction as a domain entity.
-///
-/// - Idempotent: looks up by `preview.id` within org first; returns existing if present.
-/// - Routes to `pagos::create` for `Recibo`, `gastos::create` for `Gasto`.
-/// - Records the preview→entity mapping in `preview_index` before commit.
-///
-/// Requirement 5.1: synchronous insert before returning confirmation response.
-/// Requirement 5.2: `Recibo` → Pago row.
-/// Requirement 5.3: `Gasto` → Gasto row.
-// Feature: spec-gap-remediation, Property 4
 pub async fn confirmar_preview(
     db: &DatabaseConnection,
     preview: OcrPreviewConfirm,
     organizacion_id: Uuid,
     usuario_id: Uuid,
 ) -> Result<ConfirmedEntity, AppError> {
-    // Idempotency: lookup by preview.id within org first
     if let Some(existing) = preview_index::Entity::find()
         .filter(preview_index::Column::PreviewId.eq(preview.id))
         .filter(preview_index::Column::OrganizacionId.eq(organizacion_id))
@@ -1501,7 +1264,6 @@ pub async fn confirmar_preview(
         };
     }
 
-    // Validate basic fields
     if preview.monto <= Decimal::ZERO {
         return Err(AppError::Validation("Datos de OCR inválidos".to_string()));
     }
@@ -1567,7 +1329,6 @@ pub async fn confirmar_preview(
         }
     };
 
-    // Record the preview→entity mapping
     let (entity_type_str, entity_id) = match &result {
         ConfirmedEntity::Pago(id) => ("pago", *id),
         ConfirmedEntity::Gasto(id) => ("gasto", *id),
@@ -1589,15 +1350,9 @@ pub async fn confirmar_preview(
     Ok(result)
 }
 
-// --- Guidance Rules CRUD ---
-
-/// Maximum number of active (enabled) rules per organization.
 const MAX_ACTIVE_RULES: usize = 30;
-/// Maximum instruction length in characters.
 const MAX_INSTRUCTION_CHARS: usize = 500;
 
-/// Loads the guidance rules from the `chatbot_config` for an org.
-/// Returns (the config model, parsed rules).
 async fn load_guidance_rules(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -1618,7 +1373,6 @@ async fn load_guidance_rules(
     Ok((config, rules))
 }
 
-/// Persists guidance rules back to the `chatbot_config` row.
 async fn save_guidance_rules(
     db: &DatabaseConnection,
     config: chatbot_config::Model,
@@ -1635,7 +1389,6 @@ async fn save_guidance_rules(
     Ok(())
 }
 
-/// Validates a guidance rule instruction: non-empty and max 500 characters.
 fn validate_instruction(instruction: &str) -> Result<(), AppError> {
     let char_count = instruction.chars().count();
     if char_count == 0 {
@@ -1651,15 +1404,10 @@ fn validate_instruction(instruction: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Counts active (enabled) rules in a slice.
 fn count_active(rules: &[GuidanceRule]) -> usize {
     rules.iter().filter(|r| r.enabled).count()
 }
 
-/// Create a new custom guidance rule.
-///
-/// Validates instruction (non-empty, max 500 chars), checks active count < 30,
-/// assigns UUID and timestamps, appends to the JSONB array.
 pub async fn create_guidance_rule(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -1672,7 +1420,6 @@ pub async fn create_guidance_rule(
 
     let enabled = req.enabled.unwrap_or(true);
 
-    // Check active count limit when the new rule will be enabled
     if enabled && count_active(&rules) >= MAX_ACTIVE_RULES {
         return Err(AppError::Validation(format!(
             "No se pueden tener más de {MAX_ACTIVE_RULES} reglas activas"
@@ -1716,10 +1463,6 @@ pub async fn create_guidance_rule(
     Ok(rule)
 }
 
-/// Update an existing guidance rule.
-///
-/// Finds by ID, validates template constraints (cannot change instruction on templates),
-/// validates active count on enable, updates fields.
 pub async fn update_guidance_rule(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -1734,19 +1477,16 @@ pub async fn update_guidance_rule(
         .position(|r| r.id == rule_id)
         .ok_or_else(|| AppError::NotFound(format!("Regla no encontrada: {rule_id}")))?;
 
-    // Template constraint: cannot change instruction
     if rules[rule_idx].is_template && req.instruction.is_some() {
         return Err(AppError::Forbidden(
             "No se puede modificar la instrucción de una regla predefinida".to_string(),
         ));
     }
 
-    // Validate instruction if provided
     if let Some(ref instruction) = req.instruction {
         validate_instruction(instruction)?;
     }
 
-    // Check active count limit if enabling a currently-disabled rule
     if req.enabled == Some(true)
         && !rules[rule_idx].enabled
         && count_active(&rules) >= MAX_ACTIVE_RULES
@@ -1756,7 +1496,6 @@ pub async fn update_guidance_rule(
         )));
     }
 
-    // Build cambios JSON tracking what changed
     let mut cambios = serde_json::Map::new();
     if let Some(ref instruction) = req.instruction {
         cambios.insert("instruction".to_string(), serde_json::json!(instruction));
@@ -1768,7 +1507,6 @@ pub async fn update_guidance_rule(
         cambios.insert("sort_order".to_string(), serde_json::json!(sort_order));
     }
 
-    // Apply updates
     let rule = &mut rules[rule_idx];
     if let Some(instruction) = req.instruction {
         rule.instruction = instruction;
@@ -1799,9 +1537,6 @@ pub async fn update_guidance_rule(
     Ok(updated)
 }
 
-/// Delete a guidance rule.
-///
-/// Finds by ID, rejects if `is_template`, removes from JSONB array.
 pub async fn delete_guidance_rule(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -1842,10 +1577,6 @@ pub async fn delete_guidance_rule(
     Ok(())
 }
 
-/// Batch-update multiple guidance rules (`enabled`/`sort_order` changes in one write).
-///
-/// Validates each item exists, applies `enabled`/`sort_order` changes,
-/// and enforces the active count limit across the final state.
 pub async fn batch_update_guidance_rules(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -1871,7 +1602,6 @@ pub async fn batch_update_guidance_rules(
         rule.updated_at = now;
     }
 
-    // Validate active count after all changes applied
     if count_active(&rules) > MAX_ACTIVE_RULES {
         return Err(AppError::Validation(format!(
             "No se pueden tener más de {MAX_ACTIVE_RULES} reglas activas"
@@ -1880,7 +1610,6 @@ pub async fn batch_update_guidance_rules(
 
     save_guidance_rules(db, config, &rules).await?;
 
-    // Return the updated rules that were part of the batch
     let updated_ids: Vec<Uuid> = req.rules.iter().map(|item| item.id).collect();
     let updated_rules: Vec<GuidanceRule> = rules
         .into_iter()
@@ -1894,8 +1623,6 @@ pub async fn batch_update_guidance_rules(
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-
-    // ── validate_e164 tests ──────────────────────────────────────────
 
     #[test]
     fn validate_e164_accepts_valid_dr_number() {
@@ -1946,8 +1673,6 @@ mod tests {
     fn validate_e164_rejects_empty_string() {
         assert!(validate_e164("").is_err());
     }
-
-    // ── normalize_phone tests ────────────────────────────────────────
 
     #[test]
     fn normalize_strips_dashes_and_prepends_country_code() {
@@ -2014,8 +1739,6 @@ mod tests {
         let result = normalize_phone("  +18091234567  ", "+1").unwrap();
         assert_eq!(result, "+18091234567");
     }
-
-    // ── Configuration validation tests ───────────────────────────────
 
     #[test]
     fn validate_config_accepts_valid_full_update() {
@@ -2245,20 +1968,20 @@ mod tests {
     #[test]
     fn validate_config_accepts_boundary_values() {
         let input = ChatbotConfigUpdateRequest {
-            display_name: Some("a".to_string()), // min 1
-            tone: Some("b".to_string()),         // min 1
-            history_limit: Some(1),              // min
-            retention_days: Some(1),             // min
+            display_name: Some("a".to_string()),
+            tone: Some("b".to_string()),
+            history_limit: Some(1),
+            retention_days: Some(1),
             ..default_update()
         };
         assert!(validate_config(&input).is_ok());
 
         let input = ChatbotConfigUpdateRequest {
-            display_name: Some("a".repeat(100)), // max 100
-            tone: Some("b".repeat(50)),          // max 50
-            history_limit: Some(50),             // max
-            retention_days: Some(365),           // max
-            policies: Some("c".repeat(5000)),    // max
+            display_name: Some("a".repeat(100)),
+            tone: Some("b".repeat(50)),
+            history_limit: Some(50),
+            retention_days: Some(365),
+            policies: Some("c".repeat(5000)),
             ..default_update()
         };
         assert!(validate_config(&input).is_ok());
@@ -2300,7 +2023,6 @@ mod tests {
         assert!(!resp.capabilities.balance_queries);
     }
 
-    // Helper to create a default empty update request for tests
     fn default_update() -> ChatbotConfigUpdateRequest {
         ChatbotConfigUpdateRequest {
             activo: None,

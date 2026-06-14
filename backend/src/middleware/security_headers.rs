@@ -3,7 +3,6 @@ use std::future::{Ready, ready};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Middleware que agrega cabeceras de seguridad a todas las respuestas.
 pub struct SecurityHeaders;
 
 impl<S, B> Transform<S, ServiceRequest> for SecurityHeaders

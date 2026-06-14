@@ -5,23 +5,18 @@ use uuid::Uuid;
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RegisterRequest {
-    // User fields
     pub nombre: String,
     pub email: String,
     pub password: String,
-    // Organization type discriminator
-    pub tipo: Option<String>, // "persona_fisica" | "persona_juridica"
-    // persona_fisica fields
+    pub tipo: Option<String>,
     pub cedula: Option<String>,
     pub telefono: Option<String>,
     pub nombre_organizacion: Option<String>,
-    // persona_juridica fields
     pub rnc: Option<String>,
     pub razon_social: Option<String>,
     pub nombre_comercial: Option<String>,
     pub direccion_fiscal: Option<String>,
     pub representante_legal: Option<String>,
-    // Invitation flow (mutually exclusive with tipo)
     pub token_invitacion: Option<String>,
 }
 

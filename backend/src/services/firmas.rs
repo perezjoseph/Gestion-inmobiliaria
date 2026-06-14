@@ -15,10 +15,8 @@ use crate::models::firma::{
 };
 use crate::services::auth;
 
-/// Maximum decoded size for `firma_imagen` (500 KB).
 const MAX_FIRMA_IMAGEN_BYTES: usize = 500 * 1024;
 
-/// Validate that a base64 string decodes to valid data under 500 KB.
 pub(crate) fn validar_firma_imagen(firma_imagen_b64: &str) -> Result<Vec<u8>, AppError> {
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(firma_imagen_b64)
@@ -39,7 +37,6 @@ pub(crate) fn validar_firma_imagen(firma_imagen_b64: &str) -> Result<Vec<u8>, Ap
     Ok(bytes)
 }
 
-/// Determine `firmante_tipo` based on user role.
 pub(crate) fn firmante_tipo_from_rol(rol: &str) -> &'static str {
     match rol {
         "admin" | "gerente" => "propietario",
@@ -47,7 +44,6 @@ pub(crate) fn firmante_tipo_from_rol(rol: &str) -> &'static str {
     }
 }
 
-/// Convert a `firma_documento` model to a `FirmaResponse` DTO.
 fn model_to_response(m: firma_documento::Model) -> FirmaResponse {
     FirmaResponse {
         id: m.id,
@@ -60,7 +56,6 @@ fn model_to_response(m: firma_documento::Model) -> FirmaResponse {
     }
 }
 
-/// Manager signs a document (authenticated).
 pub async fn firmar_autenticado(
     db: &DatabaseConnection,
     documento_id: Uuid,
@@ -71,7 +66,6 @@ pub async fn firmar_autenticado(
     user_agent: String,
     organizacion_id: Uuid,
 ) -> Result<FirmaResponse, AppError> {
-    // Validate document exists and belongs to caller's org
     let doc = documento::Entity::find_by_id(documento_id)
         .one(db)
         .await?
@@ -84,7 +78,6 @@ pub async fn firmar_autenticado(
     )
     .await?;
 
-    // Validate and decode firma_imagen
     let firma_bytes = validar_firma_imagen(firma_imagen_b64)?;
 
     let now = Utc::now();
@@ -108,13 +101,11 @@ pub async fn firmar_autenticado(
 
     let inserted = firma.insert(db).await?;
 
-    // Check if document should be sealed
     verificar_y_sellar(db, documento_id).await?;
 
     Ok(model_to_response(inserted))
 }
 
-/// Request tenant signature (generates token + password).
 pub async fn solicitar_firma(
     db: &DatabaseConnection,
     documento_id: Uuid,
@@ -122,7 +113,6 @@ pub async fn solicitar_firma(
     organizacion_id: Uuid,
     mail: &dyn crate::services::mail::MailClient,
 ) -> Result<SolicitarFirmaResponse, AppError> {
-    // Validate document exists and belongs to caller's org
     let doc = documento::Entity::find_by_id(documento_id)
         .one(db)
         .await?
@@ -135,13 +125,10 @@ pub async fn solicitar_firma(
     )
     .await?;
 
-    // Generate token (UUID v4 = 122 bits of randomness, exceeds 32-byte minimum)
     let token = Uuid::new_v4().to_string();
 
-    // Generate random 16-char alphanumeric password
     let password = generar_password();
 
-    // Hash password with argon2
     let password_hash = auth::hash_password(&password)?;
 
     let now = Utc::now();
@@ -165,7 +152,6 @@ pub async fn solicitar_firma(
 
     let inserted = firma.insert(db).await?;
 
-    // Send email with link + password (log on failure, don't block the response)
     let email_enviado = match enviar_email_firma(mail, &input.email, &token, &password).await {
         Ok(()) => true,
         Err(e) => {
@@ -187,7 +173,6 @@ pub async fn solicitar_firma(
     })
 }
 
-/// Verify token + password, return document for review.
 pub async fn verificar_token(
     db: &DatabaseConnection,
     token: &str,
@@ -199,14 +184,12 @@ pub async fn verificar_token(
         .await?
         .ok_or_else(|| AppError::NotFound("Token de firma no encontrado".to_string()))?;
 
-    // Check expiry
     if let Some(expira_at) = firma.expira_at {
         if Utc::now() > expira_at.with_timezone(&Utc) {
             return Err(AppError::Gone("El enlace de firma ha expirado".to_string()));
         }
     }
 
-    // Verify password
     let hash = firma
         .password_hash
         .as_deref()
@@ -219,7 +202,6 @@ pub async fn verificar_token(
         )));
     }
 
-    // Fetch document content
     let doc = documento::Entity::find_by_id(firma.documento_id)
         .one(db)
         .await?
@@ -239,7 +221,6 @@ pub async fn verificar_token(
     })
 }
 
-/// Tenant signs via presigned link.
 pub async fn firmar_con_token(
     db: &DatabaseConnection,
     token: &str,
@@ -254,14 +235,12 @@ pub async fn firmar_con_token(
         .await?
         .ok_or_else(|| AppError::NotFound("Token de firma no encontrado".to_string()))?;
 
-    // Check expiry
     if let Some(expira_at) = firma.expira_at {
         if Utc::now() > expira_at.with_timezone(&Utc) {
             return Err(AppError::Gone("El enlace de firma ha expirado".to_string()));
         }
     }
 
-    // Re-verify password
     let hash = firma
         .password_hash
         .as_deref()
@@ -274,20 +253,17 @@ pub async fn firmar_con_token(
         )));
     }
 
-    // Check estado == "pendiente"
     if firma.estado != "pendiente" {
         return Err(AppError::Conflict(
             "Esta firma ya fue procesada".to_string(),
         ));
     }
 
-    // Validate and decode firma_imagen
     let firma_bytes = validar_firma_imagen(firma_imagen_b64)?;
 
     let now = Utc::now();
     let documento_id = firma.documento_id;
 
-    // Update the firma record
     let mut active: firma_documento::ActiveModel = firma.into_active_model();
     active.firma_imagen = Set(Some(firma_bytes));
     active.ip_address = Set(Some(ip_address));
@@ -297,13 +273,11 @@ pub async fn firmar_con_token(
 
     let updated = active.update(db).await?;
 
-    // Check if document should be sealed
     verificar_y_sellar(db, documento_id).await?;
 
     Ok(model_to_response(updated))
 }
 
-/// Check if all parties signed and seal if complete.
 async fn verificar_y_sellar(db: &DatabaseConnection, documento_id: Uuid) -> Result<(), AppError> {
     use crate::entities::contrato;
 
@@ -326,7 +300,6 @@ async fn verificar_y_sellar(db: &DatabaseConnection, documento_id: Uuid) -> Resu
             .await?
             .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
 
-        // Only seal if not already sealed
         if !doc.sellado {
             let now = Utc::now();
             let mut active: documento::ActiveModel = doc.clone().into_active_model();
@@ -334,8 +307,6 @@ async fn verificar_y_sellar(db: &DatabaseConnection, documento_id: Uuid) -> Resu
             active.sellado_at = Set(Some(now.into()));
             active.update(db).await?;
 
-            // Generate sealed PDF (best-effort, log on failure)
-            // Resolve the contrato from the document's entity_id
             if doc.entity_type == "contrato" {
                 let contrato_model = contrato::Entity::find_by_id(doc.entity_id)
                     .one(db)
@@ -360,13 +331,11 @@ async fn verificar_y_sellar(db: &DatabaseConnection, documento_id: Uuid) -> Resu
     Ok(())
 }
 
-/// List all firmas for a document.
 pub async fn listar_firmas(
     db: &DatabaseConnection,
     documento_id: Uuid,
     organizacion_id: Uuid,
 ) -> Result<Vec<FirmaResponse>, AppError> {
-    // Validate document exists and belongs to caller's org
     let doc = documento::Entity::find_by_id(documento_id)
         .one(db)
         .await?
@@ -387,9 +356,6 @@ pub async fn listar_firmas(
     Ok(firmas.into_iter().map(model_to_response).collect())
 }
 
-// ── Private helpers ────────────────────────────────────────────
-
-/// Generate a random 16-character alphanumeric password.
 pub(crate) fn generar_password() -> String {
     let mut rng = rng();
     const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -401,8 +367,6 @@ pub(crate) fn generar_password() -> String {
         .collect()
 }
 
-/// Send email with signing link and password via the `MailClient` trait.
-/// Returns `Ok(())` on success, or an `AppError` on failure.
 pub async fn enviar_email_firma(
     mail: &dyn crate::services::mail::MailClient,
     email: &str,
@@ -410,10 +374,9 @@ pub async fn enviar_email_firma(
     password: &str,
 ) -> Result<(), AppError> {
     let link = format!("/firmas/{token}");
-    let contrato_id = Uuid::nil(); // Placeholder — the full signing flow passes the real ID
+    let contrato_id = Uuid::nil();
     let mut outgoing = crate::services::mail::signature_link_mail(contrato_id, &link);
     outgoing.to = email.to_string();
-    // Append password info to the body
     let password_note_text = format!(
         "\n\nSu contraseña de acceso es: {password}\n\
          Por favor, no comparta esta información."
@@ -436,11 +399,6 @@ pub async fn enviar_email_firma(
     })
 }
 
-/// Generate a sealed PDF and persist it as a new `Documento` record.
-///
-/// Renders the contract document as PDF via `documento_editor::exportar_pdf`,
-/// writes the file to `uploads/contratos/{contrato_id}/sellado.pdf`, and inserts
-/// a `Documento` row with `sellado = true` and `documento_origen_id = contrato.id`.
 pub async fn generar_pdf_sellado(
     db: &DatabaseConnection,
     contrato: &crate::entities::contrato::Model,
@@ -448,7 +406,6 @@ pub async fn generar_pdf_sellado(
 ) -> Result<documento::Model, AppError> {
     use crate::services::documento_editor;
 
-    // Find the source document for this contract
     let source_doc = documento::Entity::find()
         .filter(documento::Column::EntityType.eq("contrato"))
         .filter(documento::Column::EntityId.eq(contrato.id))
@@ -462,10 +419,8 @@ pub async fn generar_pdf_sellado(
             ))
         })?;
 
-    // Generate PDF using existing export function
     let pdf_bytes = documento_editor::exportar_pdf(db, source_doc.id, organizacion_id).await?;
 
-    // Write to uploads/contratos/{contrato_id}/sellado.pdf
     let dest = std::path::PathBuf::from("uploads/contratos")
         .join(contrato.id.to_string())
         .join("sellado.pdf");
@@ -482,7 +437,6 @@ pub async fn generar_pdf_sellado(
     #[allow(clippy::cast_possible_wrap)]
     let file_size = pdf_bytes.len() as i64;
 
-    // Insert a new Documento record for the sealed PDF
     let doc = documento::ActiveModel {
         id: Set(Uuid::new_v4()),
         entity_type: Set("contrato".to_string()),

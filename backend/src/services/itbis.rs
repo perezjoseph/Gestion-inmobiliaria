@@ -3,21 +3,10 @@ use rust_decimal::Decimal;
 use crate::models::fiscal::TipoFiscal;
 use crate::models::itbis::{ItbisResult, RetencionResult};
 
-/// Default ITBIS rate: 18% (represented as 0.18)
 const TASA_ITBIS_DEFAULT: Decimal = Decimal::from_parts(18, 0, 0, false, 2);
 
-/// ITBIS retention rate: 30% when tenant is persona jurídica (represented as 0.30)
 const TASA_RETENCION: Decimal = Decimal::from_parts(30, 0, 0, false, 2);
 
-/// Calculate ITBIS (Dominican VAT) on a base amount.
-///
-/// ITBIS applies ONLY when:
-/// - `tipo_fiscal` is `PersonaJuridica` or `PersonaFisica` (registered entity), AND
-/// - `tipo_propiedad` is "comercial" or "industrial"
-///
-/// For residential properties or informal organizations, ITBIS is always zero.
-///
-/// The `tasa` parameter overrides the default 18% rate (future-proofing for 16%).
 pub fn calcular_itbis(
     monto_base: Decimal,
     tipo_propiedad: &str,
@@ -50,13 +39,6 @@ pub fn calcular_itbis(
     }
 }
 
-/// Calculate ITBIS retention when the tenant is persona jurídica.
-///
-/// Per DR tax law, when the tenant is a registered legal entity (persona jurídica),
-/// they retain 30% of the ITBIS amount and remit it directly to DGII.
-/// The landlord receives the remaining 70%.
-///
-/// For any other tenant `tipo_fiscal`, no retention applies.
 pub fn calcular_retencion(
     monto_itbis: Decimal,
     tenant_tipo_fiscal: &TipoFiscal,
@@ -76,8 +58,6 @@ pub fn calcular_retencion(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // ── calcular_itbis tests ───────────────────────────────────
 
     #[test]
     fn itbis_comercial_persona_juridica() {
@@ -182,8 +162,6 @@ mod tests {
         assert_eq!(result.monto_itbis, Decimal::ZERO);
         assert_eq!(result.monto_total, Decimal::new(10000, 0));
     }
-
-    // ── calcular_retencion tests ──────────────────────────────
 
     #[test]
     fn retencion_persona_juridica() {

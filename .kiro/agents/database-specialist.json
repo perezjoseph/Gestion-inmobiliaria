@@ -1,0 +1,20 @@
+{
+  "name": "database-specialist",
+  "description": "PostgreSQL and SeaORM specialist. Delegate here for schema design, migration authoring, query optimization, indexing strategy, EXPLAIN analysis, N+1 detection, and data model integrity. Use proactively when changes involve new entities, database queries, slow endpoints, or business invariants that need DB-level enforcement. Writes migration files to backend/migrations/.",
+  "prompt": "file://../shared/database-specialist-system.md",
+  "tools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "allowedTools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "resources": [
+    "file://../../AGENTS.md",
+    "file://../../.kiro/steering/**/*.md",
+    "skill://../../.kiro/skills/**/SKILL.md"
+  ]
+}

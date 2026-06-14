@@ -3,9 +3,6 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-// --- Confidence Level ---
-
-/// Three-level confidence classification derived from OCR confidence scores.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Confidence {
@@ -14,12 +11,6 @@ pub enum Confidence {
     Low,
 }
 
-/// Maps a raw OCR confidence score (0.0–1.0) to a `Confidence` level.
-///
-/// Thresholds:
-/// - score >= 0.85 → High
-/// - score >= 0.60 → Medium
-/// - score < 0.60 → Low
 pub fn map_confidence(score: f64) -> Confidence {
     if score >= 0.85 {
         Confidence::High
@@ -30,14 +21,10 @@ pub fn map_confidence(score: f64) -> Confidence {
     }
 }
 
-// --- Configuration DTOs ---
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FaqEntry {
-    /// Max 200 characters
     pub question: String,
-    /// Max 1000 characters
     pub answer: String,
 }
 
@@ -52,8 +39,6 @@ pub struct Capabilities {
 }
 
 impl Capabilities {
-    /// Returns a `Capabilities` instance with all flags enabled.
-    /// Used for `AllWithHookGating` strategy where all tools are registered.
     pub const fn all() -> Self {
         Self {
             receipt_ocr: true,
@@ -65,27 +50,17 @@ impl Capabilities {
     }
 }
 
-// --- Agent Configuration ---
-
-/// Per-organization agent configuration. Stored in `chatbot_config.agent_config` JSONB.
-/// All fields are optional — defaults are applied when absent.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentConfig {
-    /// Maximum multi-turn depth (tool call rounds). Default: 5, range: 1–15.
     pub max_turns: Option<u8>,
-    /// LLM sampling temperature. Default: None (model default), range: 0.0–2.0.
     pub temperature: Option<f64>,
-    /// Maximum response tokens. Default: None (model default), range: 1–4096.
     pub max_tokens: Option<u64>,
-    /// Tool registration strategy.
     pub tool_registration: Option<ToolRegistrationStrategy>,
-    /// Guardrail configuration overrides.
     pub guardrails: Option<GuardrailOverrides>,
 }
 
 impl AgentConfig {
-    /// Resolves all optional fields to concrete values using defaults and clamping.
     pub fn resolve(&self) -> ResolvedAgentConfig {
         ResolvedAgentConfig {
             max_turns: self.max_turns.unwrap_or(5).clamp(1, 15) as usize,
@@ -100,27 +75,19 @@ impl AgentConfig {
     }
 }
 
-/// How tools are registered on the agent.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ToolRegistrationStrategy {
-    /// Only register tools for enabled capabilities (default, native Rig way).
     Selective,
-    /// Register all tools but gate via hook (defense-in-depth, wastes tokens).
     AllWithHookGating,
 }
 
-/// Overridable guardrail thresholds per organization.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GuardrailOverrides {
-    /// Max receipt amount in DOP before requiring human confirmation.
     pub max_receipt_amount_dop: Option<f64>,
-    /// Max receipt amount in USD before requiring human confirmation.
     pub max_receipt_amount_usd: Option<f64>,
-    /// Blocked output regex patterns (org-specific additions).
     pub blocked_patterns: Option<Vec<String>>,
-    /// Whether to enable output safety filtering. Default: true.
     pub output_safety_enabled: Option<bool>,
 }
 
@@ -135,24 +102,15 @@ impl Default for GuardrailOverrides {
     }
 }
 
-/// Resolved agent configuration with all defaults applied and values clamped.
 #[derive(Debug, Clone)]
 pub struct ResolvedAgentConfig {
-    /// Multi-turn depth, clamped to 1–15.
     pub max_turns: usize,
-    /// Temperature if within valid range (0.0–2.0), None otherwise.
     pub temperature: Option<f64>,
-    /// Max tokens if within valid range (1–4096), None otherwise.
     pub max_tokens: Option<u64>,
-    /// Tool registration strategy (defaults to Selective).
     pub tool_registration: ToolRegistrationStrategy,
-    /// Guardrail overrides (defaults applied).
     pub guardrails: GuardrailOverrides,
 }
 
-// --- Guidance Rules ---
-
-/// Category for a guidance rule, mapping to sections in the assembled system prompt.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum GuidanceCategory {
@@ -162,8 +120,6 @@ pub enum GuidanceCategory {
     Politicas,
 }
 
-/// A single behavioral instruction for the chatbot agent.
-/// Stored as JSONB array in `chatbot_config.guidance_rules`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct GuidanceRule {
@@ -177,20 +133,16 @@ pub struct GuidanceRule {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Response type for guidance rule endpoints. Same shape as `GuidanceRule` (already camelCase + Serialize).
 pub type GuidanceRuleResponse = GuidanceRule;
 
-/// Request body to create a new custom guidance rule.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateGuidanceRuleRequest {
     pub category: GuidanceCategory,
     pub instruction: String,
-    /// Defaults to `true` if not provided.
     pub enabled: Option<bool>,
 }
 
-/// Request body to update an existing guidance rule.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateGuidanceRuleRequest {
@@ -199,7 +151,6 @@ pub struct UpdateGuidanceRuleRequest {
     pub sort_order: Option<i32>,
 }
 
-/// A single item within a batch update request.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchUpdateItem {
@@ -208,14 +159,11 @@ pub struct BatchUpdateItem {
     pub sort_order: Option<i32>,
 }
 
-/// Request body for batch-updating multiple guidance rules (reorder / bulk toggle).
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchUpdateRequest {
     pub rules: Vec<BatchUpdateItem>,
 }
-
-// --- Chatbot Config Response ---
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -241,13 +189,6 @@ pub struct ChatbotConfigResponse {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Partial update request. All fields optional.
-///
-/// Validation (enforced in service layer):
-/// - `display_name`: 1–100 characters
-/// - tone: 1–50 characters
-/// - faqs: max 50 entries, question max 200 chars, answer max 1000 chars
-/// - policies: max 5000 characters
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatbotConfigUpdateRequest {
@@ -266,10 +207,6 @@ pub struct ChatbotConfigUpdateRequest {
     pub retention_days: Option<i32>,
 }
 
-// --- Webhook DTOs ---
-
-/// Incoming message from Baileys sidecar via internal webhook.
-/// Authenticated via X-Internal-Token header.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IncomingWebhookPayload {
@@ -284,7 +221,6 @@ pub struct IncomingWebhookPayload {
     pub session_phone: Option<String>,
 }
 
-/// Request to send a message via Baileys service.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SendMessageRequest {
@@ -292,8 +228,6 @@ pub struct SendMessageRequest {
     pub content: String,
     pub message_type: String,
 }
-
-// --- Conversation DTOs ---
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -316,8 +250,6 @@ pub struct ConversationListResponse {
     pub last_message_at: DateTime<Utc>,
     pub message_count: i64,
 }
-
-// --- Receipt DTOs ---
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -348,9 +280,6 @@ pub struct ReceiptConfirmRequest {
     pub rejection_reason: Option<String>,
 }
 
-// --- Balance Query DTOs ---
-
-/// Individual payment detail in a balance response.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PaymentDetail {
@@ -361,7 +290,6 @@ pub struct PaymentDetail {
     pub status: String,
 }
 
-/// Per-currency total in a balance response.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CurrencyTotal {
@@ -370,7 +298,6 @@ pub struct CurrencyTotal {
     pub formatted_total: String,
 }
 
-/// Full balance response with individual payments and per-currency totals.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BalanceResponse {
@@ -378,10 +305,6 @@ pub struct BalanceResponse {
     pub totals: Vec<CurrencyTotal>,
 }
 
-/// Formats a monetary amount with the appropriate currency symbol and two decimal places.
-///
-/// - DOP → "RD$1,500.00"
-/// - USD → "US$500.00"
 pub fn format_currency(amount: Decimal, currency: &str) -> String {
     let symbol = match currency {
         "DOP" => "RD$",
@@ -389,14 +312,12 @@ pub fn format_currency(amount: Decimal, currency: &str) -> String {
         _ => "",
     };
 
-    // Format with two decimal places and thousands separators
     let abs_amount = if amount.is_sign_negative() {
         -amount
     } else {
         amount
     };
 
-    // Split into integer and fractional parts
     let scaled = abs_amount.round_dp(2).to_string();
     let parts: Vec<&str> = scaled.split('.').collect();
     let integer_part = parts[0];
@@ -406,7 +327,6 @@ pub fn format_currency(amount: Decimal, currency: &str) -> String {
         "00".to_string()
     };
 
-    // Add thousands separators
     let integer_with_commas = add_thousands_separator(integer_part);
 
     if amount.is_sign_negative() {
@@ -416,7 +336,6 @@ pub fn format_currency(amount: Decimal, currency: &str) -> String {
     }
 }
 
-/// Adds comma thousands separators to an integer string.
 fn add_thousands_separator(s: &str) -> String {
     let len = s.len();
     if len <= 3 {
@@ -434,25 +353,15 @@ fn add_thousands_separator(s: &str) -> String {
     result
 }
 
-// --- Test Chat DTOs ---
-
-/// Request body for the test chat endpoint.
-/// Includes the test message and optionally the current (possibly unsaved) config
-/// so the AI pipeline uses the draft persona/capabilities/FAQs.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TestChatRequest {
     pub message: String,
-    /// Optional config override — if provided, the test uses these settings
-    /// instead of the persisted org config.
     pub config_override: Option<TestChatConfigOverride>,
-    /// Conversation history from the test UI (role + content pairs).
-    /// Allows multi-turn context in the test chat sandbox.
     #[serde(default)]
     pub history: Vec<TestChatHistoryEntry>,
 }
 
-/// A single message in the test chat conversation history.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TestChatHistoryEntry {
@@ -460,8 +369,6 @@ pub struct TestChatHistoryEntry {
     pub content: String,
 }
 
-/// Optional configuration override for test chat.
-/// Mirrors the persona/capabilities/knowledge fields from the config wizard.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TestChatConfigOverride {
@@ -484,8 +391,6 @@ pub struct TestChatResponse {
     pub tools_invoked: Vec<String>,
 }
 
-// --- Connection Status ---
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionStatusResponse {
@@ -494,16 +399,12 @@ pub struct ConnectionStatusResponse {
     pub connected_at: Option<DateTime<Utc>>,
 }
 
-// --- Handoff DTOs ---
-
-/// Request body for clearing a human handoff on a conversation.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClearHandoffRequest {
     pub sender_phone: String,
 }
 
-/// Response after clearing or setting handoff status.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HandoffStatusResponse {
@@ -664,8 +565,6 @@ mod tests {
         assert_eq!(req.rejection_reason.as_deref(), Some("Monto incorrecto"));
     }
 
-    // --- AgentConfig tests ---
-
     #[test]
     fn agent_config_resolve_defaults() {
         let config = AgentConfig::default();
@@ -721,7 +620,6 @@ mod tests {
         };
         assert_eq!(config.resolve().temperature, None);
 
-        // Boundary: exactly 0.0 and 2.0 are valid
         let config = AgentConfig {
             temperature: Some(0.0),
             ..Default::default()
@@ -755,7 +653,6 @@ mod tests {
         };
         assert_eq!(config.resolve().max_tokens, None);
 
-        // Boundary: exactly 1 and 4096 are valid
         let config = AgentConfig {
             max_tokens: Some(1),
             ..Default::default()

@@ -2,22 +2,12 @@ use gloo_events::EventListener;
 use wasm_bindgen::JsCast;
 use yew::prelude::*;
 
-/// Slide-over drawer component.
-///
-/// On desktop (>768px): slides in from the right, 420px wide, with a dimmed backdrop.
-/// On mobile (≤768px): slides up from the bottom as a full-width sheet.
-///
-/// Closes on: Escape key, backdrop click, or explicit `on_close` callback.
 #[derive(Properties, PartialEq)]
 pub struct DrawerProps {
-    /// Whether the drawer is currently open.
     pub open: bool,
-    /// Callback to close the drawer.
     pub on_close: Callback<()>,
-    /// Title shown in the drawer header.
     #[prop_or_default]
     pub title: AttrValue,
-    /// Content rendered inside the drawer body.
     #[prop_or_default]
     pub children: Html,
 }
@@ -26,7 +16,6 @@ pub struct DrawerProps {
 pub fn Drawer(props: &DrawerProps) -> Html {
     let on_close = props.on_close.clone();
 
-    // Escape key listener
     {
         let on_close = on_close.clone();
         let open = props.open;
@@ -44,12 +33,10 @@ pub fn Drawer(props: &DrawerProps) -> Html {
                     }
                 })
             });
-            // Keep listener alive until cleanup
             drop(listener);
         });
     }
 
-    // Backdrop click
     let on_backdrop_click = {
         let on_close = on_close.clone();
         Callback::from(move |_: MouseEvent| {
@@ -57,7 +44,6 @@ pub fn Drawer(props: &DrawerProps) -> Html {
         })
     };
 
-    // Close button
     let on_close_btn = {
         Callback::from(move |_: MouseEvent| {
             on_close.emit(());

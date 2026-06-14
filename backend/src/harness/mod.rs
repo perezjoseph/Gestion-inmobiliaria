@@ -1,16 +1,7 @@
-//! Pure logic functions for the CI autofix harness.
-//!
-//! These functions encapsulate deterministic decisions (formatter dispatch,
-//! sensor selection, loop control, commit formatting) so they can be
-//! property-tested independently of the LLM agent.
-
 use std::collections::HashSet;
 use std::fmt::Write;
 use std::path::Path;
 
-// ── Enums ──────────────────────────────────────────────────────────────
-
-/// Language stack sensor suites that can be activated during verification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SensorSuite {
     Rust,
@@ -18,14 +9,12 @@ pub enum SensorSuite {
     Kotlin,
 }
 
-/// Decision returned by the verify-fix loop controller.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LoopDecision {
     Continue,
     Stop { exit_code: u8 },
 }
 
-/// Category of a CI failure, ordered by fix priority.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FailureType {
     Compilation = 0,
@@ -33,37 +22,24 @@ pub enum FailureType {
     Test = 2,
 }
 
-/// A single CI failure with its type and message.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Failure {
     pub failure_type: FailureType,
     pub message: String,
 }
 
-/// Result of running a single feedback sensor.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SensorResult {
     pub name: String,
     pub passed: bool,
 }
 
-/// Status of the fix attempt for commit messages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FixStatus {
     Clean,
     Partial,
 }
 
-// ── Pure Functions ─────────────────────────────────────────────────────
-
-/// Returns the formatter command for a given file path, or `None` if no
-/// formatter applies.
-///
-/// Dispatch rules:
-/// - `*.rs` → `cargo fmt -- {file}`
-/// - `*/baileys-service/*.ts` or `*.tsx` → `npx eslint --fix {file}`
-/// - `*/android/*.kt` → `./gradlew spotlessApply`
-/// - Everything else → None
 pub fn dispatch_formatter(file_path: &str) -> Option<String> {
     let ext = Path::new(file_path).extension().and_then(|e| e.to_str());
     if matches!(ext, Some(e) if e.eq_ignore_ascii_case("rs")) {
@@ -81,14 +57,6 @@ pub fn dispatch_formatter(file_path: &str) -> Option<String> {
     }
 }
 
-/// Returns the set of sensor suites to activate based on modified file paths.
-///
-/// Rules:
-/// - `.rs` files → Rust sensors
-/// - `.ts`, `.tsx`, `.json` under `baileys-service/` → TypeScript sensors
-/// - `.kt`, `.kts` under `android/` → Kotlin sensors
-/// - Non-code files (YAML, MD, Dockerfile, K8s manifests) → empty set
-/// - Mixed → union of all applicable stacks
 pub fn select_sensors(modified_files: &[&str]) -> HashSet<SensorSuite> {
     let mut suites = HashSet::new();
 
@@ -105,19 +73,11 @@ pub fn select_sensors(modified_files: &[&str]) -> HashSet<SensorSuite> {
         {
             suites.insert(SensorSuite::Kotlin);
         }
-        // Non-code files (YAML, MD, Dockerfile, etc.) contribute nothing.
     }
 
     suites
 }
 
-/// Parses the `KIRO_MAX_FIX_ITERATIONS` environment variable value.
-///
-/// Returns the parsed positive integer, or the default of 3 for:
-/// - `None` (variable not set)
-/// - Empty string
-/// - Non-numeric strings
-/// - Zero or negative values
 pub fn parse_max_iterations(env_value: Option<&str>) -> u32 {
     const DEFAULT: u32 = 3;
 
@@ -130,16 +90,6 @@ pub fn parse_max_iterations(env_value: Option<&str>) -> u32 {
     })
 }
 
-/// Determines whether the verify-fix loop should continue or stop.
-///
-/// Decision matrix:
-/// - All sensors pass → Stop with exit 0
-/// - `iteration < max` AND sensors fail → Continue
-/// - `iteration >= max` with progress → Stop with exit 1
-/// - `iteration >= max` without progress → Stop with exit 2
-///
-/// "Progress" means at least one sensor passed that previously failed
-/// (approximated here by checking if any sensor passes while others fail).
 pub fn should_continue_loop(
     iteration: u32,
     max: u32,
@@ -155,17 +105,11 @@ pub fn should_continue_loop(
         return LoopDecision::Continue;
     }
 
-    // Max reached with failures remaining — check for progress.
     let progress_made = sensor_results.iter().any(|r| r.passed);
     let exit_code = if progress_made { 1 } else { 2 };
     LoopDecision::Stop { exit_code }
 }
 
-/// Returns the process exit code based on the final loop state.
-///
-/// - `all_pass = true` → 0
-/// - `!all_pass && max_reached && progress_made` → 1
-/// - `!all_pass && max_reached && !progress_made` → 2
 pub const fn determine_exit_code(all_pass: bool, max_reached: bool, progress_made: bool) -> u8 {
     if all_pass {
         0
@@ -174,33 +118,10 @@ pub const fn determine_exit_code(all_pass: bool, max_reached: bool, progress_mad
     } else if max_reached {
         2
     } else {
-        // Not all pass and max not reached — shouldn't normally be called here,
-        // but default to continue-equivalent (no exit yet).
         0
     }
 }
 
-/// Produces a structured commit message following the project convention.
-///
-/// Format:
-/// ```text
-/// fix(<scope>): <subject>
-///
-/// Root cause:
-/// - <root_cause>
-///
-/// Changes:
-/// - <file or logical change per bullet>
-///
-/// Verification:
-/// - <sensor>: PASS|FAIL
-///
-/// Status: CLEAN|PARTIAL
-/// Iteration: <n>/<max>
-/// ```
-///
-/// The first line is truncated to 70 characters if the combined
-/// `fix(<scope>): <subject>` exceeds that limit.
 pub fn format_commit_message(
     scope: &str,
     subject: &str,
@@ -211,7 +132,6 @@ pub fn format_commit_message(
     iteration: u32,
     max_iterations: u32,
 ) -> String {
-    // Build first line, truncating to 70 chars.
     let prefix = format!("fix({scope}): ");
     let max_subject_len = 70usize.saturating_sub(prefix.len());
     let truncated_subject = if subject.len() > max_subject_len {
@@ -246,14 +166,9 @@ pub fn format_commit_message(
     msg
 }
 
-/// Stable-sorts failures by priority: compilation > lint > test.
-///
-/// Within the same failure type, original order is preserved.
 pub fn prioritize_failures(failures: &mut [Failure]) {
     failures.sort_by_key(|f| f.failure_type);
 }
-
-// ── Unit Tests ─────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod harness_pbt;

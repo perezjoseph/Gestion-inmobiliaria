@@ -38,7 +38,6 @@ struct SumResult {
     total: Option<Decimal>,
 }
 
-/// Helper to build a `NaiveDate` from year/month/day, returning an `AppError` on invalid input.
 fn naive_date(year: i32, month: u32, day: u32) -> Result<NaiveDate, AppError> {
     NaiveDate::from_ymd_opt(year, month, day)
         .ok_or_else(|| AppError::Internal(anyhow::anyhow!("Fecha inválida: {year}-{month}-{day}")))
@@ -87,9 +86,6 @@ pub async fn get_stats(db: &DatabaseConnection, org_id: Uuid) -> Result<Dashboar
             .one(db),
     )?;
 
-    // Org-scoped document counts: documents are polymorphic (entity_type/entity_id),
-    // so we must join through parent entities that have organizacion_id.
-    // Only select IDs to avoid loading full entity models into memory.
     let (org_propiedad_ids, org_inquilino_ids, org_contrato_ids) = tokio::try_join!(
         async {
             Ok::<Vec<Uuid>, AppError>(
@@ -166,7 +162,6 @@ pub async fn get_stats(db: &DatabaseConnection, org_id: Uuid) -> Result<Dashboar
 
     let total_gastos_mes = gastos_result.and_then(|r| r.total).unwrap_or(Decimal::ZERO);
 
-    // Calculate entidades_incompletas: count entities with required docs below 100% compliance
     let entidades_incompletas = contar_entidades_incompletas(db, org_id).await?;
 
     Ok(DashboardStats {
@@ -181,14 +176,11 @@ pub async fn get_stats(db: &DatabaseConnection, org_id: Uuid) -> Result<Dashboar
     })
 }
 
-/// Count entities (inquilinos, propiedades, contratos) that have required documents
-/// but are below 100% compliance. Uses batch queries with `is_in()` to avoid N+1.
 #[allow(clippy::cast_possible_truncation)]
 async fn contar_entidades_incompletas(
     db: &DatabaseConnection,
     org_id: Uuid,
 ) -> Result<i64, AppError> {
-    // Fetch all entities of each type that have required documents
     let (all_inquilinos, all_propiedades, all_contratos) = tokio::try_join!(
         inquilino::Entity::find()
             .filter(inquilino::Column::OrganizacionId.eq(org_id))
@@ -201,12 +193,10 @@ async fn contar_entidades_incompletas(
             .all(db),
     )?;
 
-    // Collect all entity IDs per type for batch document queries
     let inquilino_ids: Vec<uuid::Uuid> = all_inquilinos.iter().map(|i| i.id).collect();
     let propiedad_ids: Vec<uuid::Uuid> = all_propiedades.iter().map(|p| p.id).collect();
     let contrato_ids: Vec<uuid::Uuid> = all_contratos.iter().map(|c| c.id).collect();
 
-    // Batch-fetch all documents for these entities in 3 queries (not N+1)
     let (docs_inquilinos, docs_propiedades, docs_contratos) = tokio::try_join!(
         documento::Entity::find()
             .filter(documento::Column::EntityType.eq("inquilino"))
@@ -222,7 +212,6 @@ async fn contar_entidades_incompletas(
             .all(db),
     )?;
 
-    // Group documents by entity_id using HashMaps
     let mut inq_docs: HashMap<uuid::Uuid, Vec<&documento::Model>> = HashMap::new();
     for doc in &docs_inquilinos {
         inq_docs.entry(doc.entity_id).or_default().push(doc);
@@ -238,7 +227,6 @@ async fn contar_entidades_incompletas(
 
     let mut incompletas: i64 = 0;
 
-    // Check inquilinos compliance
     for id in &inquilino_ids {
         let docs = inq_docs.get(id).map_or(&[] as &[_], Vec::as_slice);
         if !is_entity_compliant(docs, REQUERIDOS_INQUILINO) {
@@ -246,7 +234,6 @@ async fn contar_entidades_incompletas(
         }
     }
 
-    // Check propiedades compliance
     for id in &propiedad_ids {
         let docs = prop_docs.get(id).map_or(&[] as &[_], Vec::as_slice);
         if !is_entity_compliant(docs, REQUERIDOS_PROPIEDAD) {
@@ -254,7 +241,6 @@ async fn contar_entidades_incompletas(
         }
     }
 
-    // Check contratos compliance
     for id in &contrato_ids {
         let docs = cont_docs.get(id).map_or(&[] as &[_], Vec::as_slice);
         if !is_entity_compliant(docs, REQUERIDOS_CONTRATO) {
@@ -265,7 +251,6 @@ async fn contar_entidades_incompletas(
     Ok(incompletas)
 }
 
-/// Check if an entity has all required documents with `estado_verificacion` = "verificado".
 fn is_entity_compliant(docs: &[&documento::Model], requeridos: &[&str]) -> bool {
     requeridos.iter().all(|&tipo| {
         docs.iter()
@@ -273,13 +258,11 @@ fn is_entity_compliant(docs: &[&documento::Model], requeridos: &[&str]) -> bool 
     })
 }
 
-/// Compliance summary: returns entities with lowest compliance percentages.
 #[allow(clippy::cast_possible_truncation)]
 pub async fn cumplimiento_resumen(
     db: &DatabaseConnection,
     org_id: Uuid,
 ) -> Result<Vec<CumplimientoResumenItem>, AppError> {
-    // Fetch all entities of each type
     let (all_inquilinos, all_propiedades, all_contratos) = tokio::try_join!(
         inquilino::Entity::find()
             .filter(inquilino::Column::OrganizacionId.eq(org_id))
@@ -296,7 +279,6 @@ pub async fn cumplimiento_resumen(
     let propiedad_ids: Vec<uuid::Uuid> = all_propiedades.iter().map(|p| p.id).collect();
     let contrato_ids: Vec<uuid::Uuid> = all_contratos.iter().map(|c| c.id).collect();
 
-    // Batch-fetch all documents
     let (docs_inquilinos, docs_propiedades, docs_contratos) = tokio::try_join!(
         documento::Entity::find()
             .filter(documento::Column::EntityType.eq("inquilino"))
@@ -312,7 +294,6 @@ pub async fn cumplimiento_resumen(
             .all(db),
     )?;
 
-    // Group documents by entity_id
     let mut inq_docs: HashMap<uuid::Uuid, Vec<&documento::Model>> = HashMap::new();
     for doc in &docs_inquilinos {
         inq_docs.entry(doc.entity_id).or_default().push(doc);
@@ -328,7 +309,6 @@ pub async fn cumplimiento_resumen(
 
     let mut items: Vec<CumplimientoResumenItem> = Vec::new();
 
-    // Calculate compliance for each inquilino
     for id in &inquilino_ids {
         let docs = inq_docs.get(id).map_or(&[] as &[_], Vec::as_slice);
         let porcentaje = calcular_porcentaje_cumplimiento(docs, REQUERIDOS_INQUILINO);
@@ -339,7 +319,6 @@ pub async fn cumplimiento_resumen(
         });
     }
 
-    // Calculate compliance for each propiedad
     for id in &propiedad_ids {
         let docs = prop_docs.get(id).map_or(&[] as &[_], Vec::as_slice);
         let porcentaje = calcular_porcentaje_cumplimiento(docs, REQUERIDOS_PROPIEDAD);
@@ -350,7 +329,6 @@ pub async fn cumplimiento_resumen(
         });
     }
 
-    // Calculate compliance for each contrato
     for id in &contrato_ids {
         let docs = cont_docs.get(id).map_or(&[] as &[_], Vec::as_slice);
         let porcentaje = calcular_porcentaje_cumplimiento(docs, REQUERIDOS_CONTRATO);
@@ -361,14 +339,12 @@ pub async fn cumplimiento_resumen(
         });
     }
 
-    // Sort ascending by porcentaje, take the 10 lowest
     items.sort_by_key(|i| i.porcentaje);
     items.truncate(10);
 
     Ok(items)
 }
 
-/// Calculate compliance percentage for an entity given its documents and required types.
 #[allow(clippy::cast_possible_truncation)]
 fn calcular_porcentaje_cumplimiento(docs: &[&documento::Model], requeridos: &[&str]) -> u8 {
     if requeridos.is_empty() {
@@ -710,22 +686,10 @@ pub async fn gastos_comparacion(
     })
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Dashboard Comparativo (multi-property comparison)
-// ──────────────────────────────────────────────────────────────────────────────
-
-/// Threshold below which `valor_catastral` is considered unreliable for profitability
-/// calculations (`RD$100,000`).
 const VALOR_CATASTRAL_MIN_THRESHOLD: Decimal = Decimal::from_parts(100_000, 0, 0, false, 0);
 
-/// Maximum rentabilidad neta cap (200%).
 const RENTABILIDAD_CAP: Decimal = Decimal::from_parts(200, 0, 0, false, 0);
 
-/// Pure helper: calculates net profitability percentage.
-///
-/// Formula: `(ingresos - gastos - cuotas) / valor_catastral * 100`, capped at 200%.
-/// Returns `(percentage, is_unreliable)` where `is_unreliable` is true when
-/// `valor_catastral < RD$100,000`.
 pub fn calcular_rentabilidad_neta(
     ingresos: Decimal,
     gastos: Decimal,
@@ -750,12 +714,6 @@ pub fn calcular_rentabilidad_neta(
     (capped, is_unreliable)
 }
 
-/// Converts an amount from one currency to another using the provided exchange rate.
-///
-/// `tasa_cambio` is the DOP per 1 USD rate (e.g., `58.50` means 1 USD = 58.50 DOP).
-/// - DOP to USD: `amount / tasa_cambio`
-/// - USD to DOP: `amount * tasa_cambio`
-/// - Same currency: no conversion
 pub(crate) fn normalizar_moneda(
     monto: Decimal,
     moneda_origen: &str,
@@ -769,15 +727,10 @@ pub(crate) fn normalizar_moneda(
     match (moneda_origen, moneda_destino) {
         ("DOP", "USD") => monto / tasa_cambio,
         ("USD", "DOP") => monto * tasa_cambio,
-        _ => monto, // unsupported pair, return as-is
+        _ => monto,
     }
 }
 
-/// Comparative dashboard: per-property analytics with filtering and currency normalization.
-///
-/// When `fecha_desde` and `fecha_hasta` are both `None`, returns only static property info
-/// (no computed financial metrics). When a date range is provided, computes all metrics
-/// within that period.
 pub async fn dashboard_comparativo(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -787,7 +740,6 @@ pub async fn dashboard_comparativo(
     moneda_display: &str,
     tasa_cambio: Decimal,
 ) -> Result<DashboardComparativoResponse, AppError> {
-    // 1. Fetch org to determine fiscal status
     let org = organizacion::Entity::find_by_id(org_id)
         .one(db)
         .await?
@@ -796,7 +748,6 @@ pub async fn dashboard_comparativo(
     let is_registered =
         org.tipo_fiscal == "persona_juridica" || org.tipo_fiscal == "persona_fisica";
 
-    // 2. Fetch properties, optionally filtered by tipo_propiedad
     let mut query = propiedad::Entity::find().filter(propiedad::Column::OrganizacionId.eq(org_id));
 
     if let Some(tipo) = tipo_propiedad {
@@ -812,7 +763,6 @@ pub async fn dashboard_comparativo(
         });
     }
 
-    // If no date range, return static info only
     let has_date_range = fecha_desde.is_some() && fecha_hasta.is_some();
 
     if !has_date_range {
@@ -843,7 +793,6 @@ pub async fn dashboard_comparativo(
         });
     }
 
-    // We have a date range — compute all metrics
     let Some(desde) = fecha_desde else {
         return Err(AppError::BadRequest("fecha_desde requerida".to_string()));
     };
@@ -853,7 +802,6 @@ pub async fn dashboard_comparativo(
 
     let propiedad_ids: Vec<Uuid> = propiedades.iter().map(|p| p.id).collect();
 
-    // 3. Fetch contracts for these properties (for income & occupancy)
     let contratos = contrato::Entity::find()
         .filter(contrato::Column::PropiedadId.is_in(propiedad_ids.clone()))
         .filter(contrato::Column::OrganizacionId.eq(org_id))
@@ -862,7 +810,6 @@ pub async fn dashboard_comparativo(
 
     let contrato_ids: Vec<Uuid> = contratos.iter().map(|c| c.id).collect();
 
-    // 4. Fetch payments within date range for those contracts
     let pagos = if contrato_ids.is_empty() {
         Vec::new()
     } else {
@@ -874,7 +821,6 @@ pub async fn dashboard_comparativo(
             .await?
     };
 
-    // 5. Fetch expenses within date range for these properties
     let gastos_list = gasto::Entity::find()
         .filter(gasto::Column::PropiedadId.is_in(propiedad_ids.clone()))
         .filter(gasto::Column::FechaGasto.gte(desde))
@@ -882,25 +828,20 @@ pub async fn dashboard_comparativo(
         .all(db)
         .await?;
 
-    // 6. Fetch cuotas_condominio for these properties
     let cuotas = cuota_condominio::Entity::find()
         .filter(cuota_condominio::Column::PropiedadId.is_in(propiedad_ids.clone()))
         .filter(cuota_condominio::Column::OrganizacionId.eq(org_id))
         .all(db)
         .await?;
 
-    // Group data by propiedad_id
-    // Map contrato -> propiedad for grouping payments
     let contrato_to_propiedad: HashMap<Uuid, Uuid> =
         contratos.iter().map(|c| (c.id, c.propiedad_id)).collect();
 
-    // Group contratos by propiedad
     let mut contratos_by_prop: HashMap<Uuid, Vec<&contrato::Model>> = HashMap::new();
     for c in &contratos {
         contratos_by_prop.entry(c.propiedad_id).or_default().push(c);
     }
 
-    // Group pagos by propiedad (via contrato)
     let mut pagos_by_prop: HashMap<Uuid, Vec<&pago::Model>> = HashMap::new();
     for p in &pagos {
         if let Some(&prop_id) = contrato_to_propiedad.get(&p.contrato_id) {
@@ -908,22 +849,18 @@ pub async fn dashboard_comparativo(
         }
     }
 
-    // Group gastos by propiedad
     let mut gastos_by_prop: HashMap<Uuid, Vec<&gasto::Model>> = HashMap::new();
     for g in &gastos_list {
         gastos_by_prop.entry(g.propiedad_id).or_default().push(g);
     }
 
-    // Group cuotas by propiedad
     let mut cuotas_by_prop: HashMap<Uuid, Vec<&cuota_condominio::Model>> = HashMap::new();
     for c in &cuotas {
         cuotas_by_prop.entry(c.propiedad_id).or_default().push(c);
     }
 
-    // Total days in the range for occupancy calculation
     let total_days = (hasta - desde).num_days().max(1);
 
-    // 7. Compute per-property metrics
     let comparisons = propiedades
         .iter()
         .map(|prop| {
@@ -940,21 +877,18 @@ pub async fn dashboard_comparativo(
                 .get(&prop.id)
                 .map_or(&[] as &[_], Vec::as_slice);
 
-            // Income: sum of paid payments
             let ingresos_raw: Decimal = prop_pagos
                 .iter()
                 .filter(|p| p.estado == "pagado")
                 .map(|p| normalizar_moneda(p.monto, &p.moneda, moneda_display, tasa_cambio))
                 .sum();
 
-            // Expenses: sum of paid expenses
             let gastos_raw: Decimal = prop_gastos
                 .iter()
                 .filter(|g| g.estado == "pagado")
                 .map(|g| normalizar_moneda(g.monto, &g.moneda, moneda_display, tasa_cambio))
                 .sum();
 
-            // Cuotas condominio: sum of active cuotas within date range, prorated by months
             let cuotas_total: Decimal = prop_cuotas
                 .iter()
                 .filter(|c| c.fecha_inicio <= hasta && c.fecha_fin.is_none_or(|fin| fin >= desde))
@@ -968,7 +902,6 @@ pub async fn dashboard_comparativo(
                 })
                 .sum();
 
-            // Occupancy: fraction of date range with active contracts
             let occupied_days: i64 = prop_contratos
                 .iter()
                 .filter(|c| {
@@ -985,7 +918,6 @@ pub async fn dashboard_comparativo(
             let tasa_ocupacion = (tasa_ocupacion * 10.0).round() / 10.0;
             let tasa_ocupacion = tasa_ocupacion.min(100.0);
 
-            // Morosidad: percentage of payments that are late
             #[allow(clippy::cast_possible_wrap)]
             let morosidad_pct = {
                 let total_pagos = prop_pagos.len();
@@ -998,7 +930,6 @@ pub async fn dashboard_comparativo(
                 }
             };
 
-            // Rentabilidad neta
             let valor_catastral_normalized = prop.valor_catastral.map_or(Decimal::ZERO, |v| {
                 normalizar_moneda(v, "DOP", moneda_display, tasa_cambio)
             });
@@ -1010,7 +941,6 @@ pub async fn dashboard_comparativo(
                 valor_catastral_normalized,
             );
 
-            // ITBIS: only for registered orgs with commercial properties
             let itbis_total = if is_registered
                 && (prop.tipo_propiedad == "comercial" || prop.tipo_propiedad == "industrial")
             {
@@ -1048,8 +978,6 @@ pub async fn dashboard_comparativo(
     })
 }
 
-/// Calculate number of billing periods a cuota covers within a date range,
-/// based on the cuota's frequency.
 fn months_between(start: NaiveDate, end: NaiveDate, frecuencia: &str) -> Decimal {
     if end < start {
         return Decimal::ZERO;
@@ -1061,7 +989,6 @@ fn months_between(start: NaiveDate, end: NaiveDate, frecuencia: &str) -> Decimal
     match frecuencia {
         "trimestral" => approx_months / Decimal::new(3, 0),
         "anual" => approx_months / Decimal::new(12, 0),
-        // "mensual" and any other frequency default to monthly
         _ => approx_months,
     }
 }
@@ -1197,17 +1124,14 @@ mod tests {
         assert!((result - (-50.0)).abs() < f64::EPSILON);
     }
 
-    // ── Dashboard Comparativo tests ──
-
     #[test]
     fn rentabilidad_neta_basic_calculation() {
         let (result, unreliable) = calcular_rentabilidad_neta(
-            Decimal::new(120_000, 0), // ingresos
-            Decimal::new(30_000, 0),  // gastos
-            Decimal::new(10_000, 0),  // cuotas
-            Decimal::new(500_000, 0), // valor_catastral
+            Decimal::new(120_000, 0),
+            Decimal::new(30_000, 0),
+            Decimal::new(10_000, 0),
+            Decimal::new(500_000, 0),
         );
-        // (120000 - 30000 - 10000) / 500000 * 100 = 16%
         assert_eq!(result, Decimal::new(16, 0));
         assert!(!unreliable);
     }
@@ -1220,7 +1144,6 @@ mod tests {
             Decimal::ZERO,
             Decimal::new(100_000, 0),
         );
-        // (1000000 / 100000) * 100 = 1000%, should be capped at 200
         assert_eq!(result, Decimal::new(200, 0));
     }
 
@@ -1230,7 +1153,7 @@ mod tests {
             Decimal::new(10_000, 0),
             Decimal::new(5_000, 0),
             Decimal::ZERO,
-            Decimal::new(50_000, 0), // below 100,000
+            Decimal::new(50_000, 0),
         );
         assert!(unreliable);
     }
@@ -1241,7 +1164,7 @@ mod tests {
             Decimal::new(10_000, 0),
             Decimal::new(5_000, 0),
             Decimal::ZERO,
-            Decimal::new(100_000, 0), // exactly at threshold
+            Decimal::new(100_000, 0),
         );
         assert!(!unreliable);
     }
@@ -1261,12 +1184,11 @@ mod tests {
     #[test]
     fn rentabilidad_neta_negative_result() {
         let (result, _) = calcular_rentabilidad_neta(
-            Decimal::new(10_000, 0),  // ingresos
-            Decimal::new(50_000, 0),  // gastos (more than income)
-            Decimal::new(5_000, 0),   // cuotas
-            Decimal::new(200_000, 0), // valor_catastral
+            Decimal::new(10_000, 0),
+            Decimal::new(50_000, 0),
+            Decimal::new(5_000, 0),
+            Decimal::new(200_000, 0),
         );
-        // (10000 - 50000 - 5000) / 200000 * 100 = -22.5%
         assert_eq!(result, Decimal::new(-225, 1));
     }
 
@@ -1278,24 +1200,14 @@ mod tests {
 
     #[test]
     fn normalizar_moneda_dop_to_usd() {
-        let result = normalizar_moneda(
-            Decimal::new(5850, 0), // 5850 DOP
-            "DOP",
-            "USD",
-            Decimal::new(5850, 2), // 58.50 rate
-        );
-        assert_eq!(result, Decimal::new(100, 0)); // 5850 / 58.50 = 100 USD
+        let result = normalizar_moneda(Decimal::new(5850, 0), "DOP", "USD", Decimal::new(5850, 2));
+        assert_eq!(result, Decimal::new(100, 0));
     }
 
     #[test]
     fn normalizar_moneda_usd_to_dop() {
-        let result = normalizar_moneda(
-            Decimal::new(100, 0), // 100 USD
-            "USD",
-            "DOP",
-            Decimal::new(5850, 2), // 58.50 rate
-        );
-        assert_eq!(result, Decimal::new(5850, 0)); // 100 * 58.50 = 5850 DOP
+        let result = normalizar_moneda(Decimal::new(100, 0), "USD", "DOP", Decimal::new(5850, 2));
+        assert_eq!(result, Decimal::new(5850, 0));
     }
 
     #[test]
@@ -1309,9 +1221,8 @@ mod tests {
         let start = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
         let end = NaiveDate::from_ymd_opt(2025, 1, 31).unwrap();
         let result = super::months_between(start, end, "mensual");
-        // 31 days / 30 ≈ 1.033...
         assert!(result > Decimal::ONE);
-        assert!(result < Decimal::new(11, 1)); // < 1.1
+        assert!(result < Decimal::new(11, 1));
     }
 
     #[test]
@@ -1319,7 +1230,6 @@ mod tests {
         let start = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
         let end = NaiveDate::from_ymd_opt(2025, 3, 31).unwrap();
         let result = super::months_between(start, end, "trimestral");
-        // 90 days / 30 / 3 = 1.0
         assert!(result >= Decimal::ONE);
     }
 

@@ -165,7 +165,6 @@ mod tests {
         assert!(serialized.get("numeroDocumento").is_some());
         assert!(serialized.get("contenidoEditable").is_some());
         assert!(serialized.get("updatedAt").is_some());
-        // Ensure snake_case keys are NOT present
         assert!(serialized.get("entity_type").is_none());
         assert!(serialized.get("tipo_documento").is_none());
         assert!(serialized.get("estado_verificacion").is_none());

@@ -4,9 +4,6 @@
     clippy::doc_markdown,
     clippy::empty_line_after_doc_comments
 )]
-//! Property-based tests for tool Args schema round-trip and selective tool registration.
-//!
-//! **Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 7.4**
 
 use proptest::prelude::*;
 use proptest::test_runner::{Config as ProptestConfig, TestRunner};
@@ -18,19 +15,14 @@ use crate::services::ai_module::{
     CreateMaintenanceRequestInput, GetPaymentHistoryInput, HandoffToHumanInput, QueryBalanceInput,
 };
 
-// ── Custom Strategies ──────────────────────────────────────────────────
-
-/// Generate a valid UUID string.
 fn arb_uuid_string() -> impl Strategy<Value = String> {
     "[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
 }
 
-/// Generate a non-empty base64-like string (alphanumeric + /+=).
 fn arb_base64_string() -> impl Strategy<Value = String> {
     "[A-Za-z0-9+/]{4,100}={0,2}"
 }
 
-/// Generate an arbitrary ExtractReceiptInput.
 fn arb_extract_receipt_input() -> impl Strategy<Value = ExtractReceiptInput> {
     (
         arb_base64_string(),
@@ -42,7 +34,6 @@ fn arb_extract_receipt_input() -> impl Strategy<Value = ExtractReceiptInput> {
         })
 }
 
-/// Generate an arbitrary QueryBalanceInput.
 fn arb_query_balance_input() -> impl Strategy<Value = QueryBalanceInput> {
     (arb_uuid_string(), arb_uuid_string()).prop_map(|(inquilino_id, organizacion_id)| {
         QueryBalanceInput {
@@ -52,7 +43,6 @@ fn arb_query_balance_input() -> impl Strategy<Value = QueryBalanceInput> {
     })
 }
 
-/// Generate an arbitrary GetPaymentHistoryInput.
 fn arb_get_payment_history_input() -> impl Strategy<Value = GetPaymentHistoryInput> {
     (
         arb_uuid_string(),
@@ -68,7 +58,6 @@ fn arb_get_payment_history_input() -> impl Strategy<Value = GetPaymentHistoryInp
         )
 }
 
-/// Generate an arbitrary CreateMaintenanceRequestInput.
 fn arb_create_maintenance_request_input() -> impl Strategy<Value = CreateMaintenanceRequestInput> {
     (
         arb_uuid_string(),
@@ -91,15 +80,9 @@ fn arb_create_maintenance_request_input() -> impl Strategy<Value = CreateMainten
         })
 }
 
-/// Generate an arbitrary HandoffToHumanInput.
 fn arb_handoff_to_human_input() -> impl Strategy<Value = HandoffToHumanInput> {
     proptest::option::of("[a-zA-Z0-9 ]{1,100}").prop_map(|reason| HandoffToHumanInput { reason })
 }
-
-// ── Property 9: Tool Args Schema Round-Trip ────────────────────────────
-
-// Feature: native-rig-agent-guardrails, Property 9: Tool Args Schema Round-Trip
-// **Validates: Requirements 7.4**
 
 #[test]
 fn test_tool_args_round_trip_extract_receipt() {
@@ -191,9 +174,6 @@ fn test_tool_args_round_trip_handoff_to_human() {
         .unwrap();
 }
 
-// ── Strategies for Capabilities ────────────────────────────────────────
-
-/// Generate an arbitrary Capabilities struct with all boolean fields.
 fn arb_capabilities() -> impl Strategy<Value = Capabilities> {
     (
         any::<bool>(),
@@ -221,11 +201,6 @@ fn arb_capabilities() -> impl Strategy<Value = Capabilities> {
         )
 }
 
-// ── Property 1: Selective Tool Registration Completeness ───────────────
-
-// Feature: native-rig-agent-guardrails, Property 1: Selective Tool Registration Completeness
-// **Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5, 2.6**
-
 #[test]
 fn test_selective_tool_registration_completeness() {
     let mut runner = TestRunner::new(ProptestConfig {
@@ -237,18 +212,11 @@ fn test_selective_tool_registration_completeness() {
         .run(&arb_capabilities(), |caps| {
             let tools = get_enabled_tools(&caps);
 
-            // Compute expected count based on the mapping:
-            // receipt_ocr → 1 tool ("extract_receipt")
-            // balance_queries → 2 tools ("query_balance", "get_payment_history")
-            // maintenance_requests → 1 tool ("create_maintenance_request")
-            // human_handoff → 1 tool ("handoff_to_human")
-            // payment_reminders → 0 tools (no tool mapping)
             let expected_count = caps.receipt_ocr as usize
                 + caps.balance_queries as usize * 2
                 + caps.maintenance_requests as usize
                 + caps.human_handoff as usize;
 
-            // Assert tool count equals expected
             prop_assert_eq!(
                 tools.len(),
                 expected_count,
@@ -261,7 +229,6 @@ fn test_selective_tool_registration_completeness() {
                 caps.payment_reminders,
             );
 
-            // Assert specific tool names are present/absent based on flags
             prop_assert_eq!(
                 tools.contains(&"extract_receipt"),
                 caps.receipt_ocr,

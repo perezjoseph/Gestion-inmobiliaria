@@ -15,8 +15,6 @@ use crate::types::documento::{
     SolicitarFirmaResponse,
 };
 
-// ── Props ──────────────────────────────────────────────────────────────
-
 #[derive(Properties, PartialEq, Eq)]
 pub struct DocumentoEditorPageProps {
     pub entity_type: String,
@@ -25,8 +23,6 @@ pub struct DocumentoEditorPageProps {
     pub documento_id: Option<String>,
 }
 
-// ── Page states ────────────────────────────────────────────────────────
-
 #[derive(Clone, PartialEq, Eq)]
 enum PageMode {
     Loading,
@@ -34,15 +30,11 @@ enum PageMode {
     Editor,
 }
 
-// ── Save request body ──────────────────────────────────────────────────
-
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct GuardarEditorRequest {
     contenido_editable: Value,
 }
-
-// ── Main page component ────────────────────────────────────────────────
 
 #[allow(clippy::redundant_clone)]
 #[component]
@@ -63,7 +55,6 @@ pub fn DocumentoEditorPage(props: &DocumentoEditorPageProps) -> Html {
     let entity_id = props.entity_id.clone();
     let documento_id = props.documento_id.clone();
 
-    // On mount: fetch document or load templates
     {
         let mode = mode.clone();
         let contenido = contenido.clone();
@@ -110,7 +101,6 @@ pub fn DocumentoEditorPage(props: &DocumentoEditorPageProps) -> Html {
         );
     }
 
-    // Fetch firmas when document is loaded
     {
         let firmas = firmas.clone();
         let documento = documento.clone();
@@ -134,7 +124,6 @@ pub fn DocumentoEditorPage(props: &DocumentoEditorPageProps) -> Html {
         );
     }
 
-    // Save handler
     let on_save = {
         let documento = documento.clone();
         let error = error.clone();
@@ -172,7 +161,6 @@ pub fn DocumentoEditorPage(props: &DocumentoEditorPageProps) -> Html {
         })
     };
 
-    // Template selection handler
     let on_select_template = {
         let contenido = contenido.clone();
         let mode = mode.clone();
@@ -197,7 +185,6 @@ pub fn DocumentoEditorPage(props: &DocumentoEditorPageProps) -> Html {
         })
     };
 
-    // Blank document handler
     let on_blank = {
         let contenido = contenido.clone();
         let mode = mode.clone();
@@ -207,7 +194,6 @@ pub fn DocumentoEditorPage(props: &DocumentoEditorPageProps) -> Html {
         })
     };
 
-    // Signature modal handlers
     let on_open_signature = {
         let show_signature_modal = show_signature_modal.clone();
         Callback::from(move |_: MouseEvent| show_signature_modal.set(true))
@@ -253,7 +239,6 @@ pub fn DocumentoEditorPage(props: &DocumentoEditorPageProps) -> Html {
         })
     };
 
-    // Solicitar firma handlers
     let on_open_solicitar = {
         let show_solicitar_modal = show_solicitar_modal.clone();
         Callback::from(move |_: MouseEvent| show_solicitar_modal.set(true))
@@ -362,8 +347,6 @@ pub fn DocumentoEditorPage(props: &DocumentoEditorPageProps) -> Html {
     }
 }
 
-// ── Header sub-component ───────────────────────────────────────────────
-
 #[derive(Properties, PartialEq, Eq)]
 struct EditorPageHeaderProps {}
 
@@ -382,7 +365,7 @@ fn EditorPageHeader(_props: &EditorPageHeaderProps) -> Html {
     html! {
         <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4);">
             <button class="gi-btn gi-btn-ghost" onclick={on_back}>
-                {"← Volver"}
+                {"â† Volver"}
             </button>
             <h1 class="text-display" style="font-size: var(--text-lg); font-weight: 600; color: var(--text-primary);">
                 {"Editor de Documento"}
@@ -390,8 +373,6 @@ fn EditorPageHeader(_props: &EditorPageHeaderProps) -> Html {
         </div>
     }
 }
-
-// ── Template selector grid ─────────────────────────────────────────────
 
 #[derive(Properties, PartialEq)]
 struct TemplateSelectorGridProps {
@@ -429,8 +410,6 @@ fn TemplateSelectorGrid(props: &TemplateSelectorGridProps) -> Html {
     }
 }
 
-// ── Template card sub-component ────────────────────────────────────────
-
 #[derive(Properties, PartialEq)]
 struct TemplateCardProps {
     nombre: String,
@@ -440,21 +419,21 @@ struct TemplateCardProps {
 
 fn template_icon(tipo: &str) -> &'static str {
     match tipo {
-        "contrato_arrendamiento" | "addendum" => "📋",
-        "recibo_pago" => "🧾",
-        "acta_notarial" => "📝",
-        "carta_referencia" => "✉️",
-        _ => "📄",
+        "contrato_arrendamiento" | "addendum" => "ðŸ“‹",
+        "recibo_pago" => "ðŸ§¾",
+        "acta_notarial" => "ðŸ“",
+        "carta_referencia" => "âœ‰ï¸",
+        _ => "ðŸ“„",
     }
 }
 
 fn template_description(tipo: &str) -> &'static str {
     match tipo {
-        "contrato_arrendamiento" => "Contrato estándar de alquiler con cláusulas DR",
+        "contrato_arrendamiento" => "Contrato estÃ¡ndar de alquiler con clÃ¡usulas DR",
         "recibo_pago" => "Recibo para pagos de alquiler",
-        "acta_notarial" => "Acta de entrega o devolución de propiedad",
+        "acta_notarial" => "Acta de entrega o devoluciÃ³n de propiedad",
         "carta_referencia" => "Carta de referencia para inquilino",
-        "addendum" => "Modificación a contrato existente",
+        "addendum" => "ModificaciÃ³n a contrato existente",
         _ => "Plantilla de documento",
     }
 }
@@ -491,8 +470,6 @@ fn TemplateCard(props: &TemplateCardProps) -> Html {
     }
 }
 
-// ── API helpers ─────────────────────────────────────────────────────────
-
 #[allow(clippy::future_not_send)]
 async fn fetch_document(
     entity_type: &str,
@@ -522,8 +499,6 @@ async fn fetch_plantilla_rellena(
     ))
     .await
 }
-
-// ── Signature panel sub-component ──────────────────────────────────────
 
 #[derive(Properties, PartialEq)]
 struct SignaturePanelProps {
@@ -581,8 +556,6 @@ fn SignaturePanel(props: &SignaturePanelProps) -> Html {
     }
 }
 
-// ── Signature status row ───────────────────────────────────────────────
-
 #[derive(Properties, PartialEq)]
 struct SignatureStatusRowProps {
     label: &'static str,
@@ -592,15 +565,15 @@ struct SignatureStatusRowProps {
 #[component]
 fn SignatureStatusRow(props: &SignatureStatusRowProps) -> Html {
     let (icon, status_text, color) = match &props.firma {
-        Some(f) if f.estado == "firmado" => ("✓", "Firmado", "var(--color-success-text)"),
-        Some(f) if f.estado == "pendiente" => ("⏳", "Pendiente", "var(--color-warning-text)"),
-        Some(_) | None => ("—", "Sin firma", "var(--text-tertiary)"),
+        Some(f) if f.estado == "firmado" => ("âœ“", "Firmado", "var(--color-success-text)"),
+        Some(f) if f.estado == "pendiente" => ("â³", "Pendiente", "var(--color-warning-text)"),
+        Some(_) | None => ("â€”", "Sin firma", "var(--text-tertiary)"),
     };
 
     let nombre = props
         .firma
         .as_ref()
-        .map_or("—", |f| f.firmante_nombre.as_str());
+        .map_or("â€”", |f| f.firmante_nombre.as_str());
 
     html! {
         <div style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm);">
@@ -611,8 +584,6 @@ fn SignatureStatusRow(props: &SignatureStatusRowProps) -> Html {
         </div>
     }
 }
-
-// ── Signature modal ────────────────────────────────────────────────────
 
 #[derive(Properties, PartialEq)]
 struct SignatureModalProps {
@@ -629,7 +600,7 @@ fn SignatureModal(props: &SignatureModalProps) -> Html {
                     {"Firmar Documento"}
                 </h3>
                 <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-3);">
-                    {"Dibuje su firma en el recuadro a continuación."}
+                    {"Dibuje su firma en el recuadro a continuaciÃ³n."}
                 </p>
                 <SignatureCanvas
                     on_submit={props.on_submit.clone()}
@@ -639,8 +610,6 @@ fn SignatureModal(props: &SignatureModalProps) -> Html {
         </div>
     }
 }
-
-// ── Solicitar firma modal ──────────────────────────────────────────────
 
 #[derive(Properties, PartialEq)]
 struct SolicitarFirmaModalProps {
@@ -713,7 +682,7 @@ fn SolicitarFirmaModal(props: &SolicitarFirmaModalProps) -> Html {
                     </div>
                     <div>
                         <label style="display: block; font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary); margin-bottom: var(--space-1);">
-                            {"Correo electrónico"}
+                            {"Correo electrÃ³nico"}
                         </label>
                         <input
                             type="email"

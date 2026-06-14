@@ -3,18 +3,14 @@ use yew_router::prelude::*;
 
 use crate::app::Route;
 
-/// A breadcrumb segment.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Crumb {
     pub label: AttrValue,
     pub route: Option<Route>,
 }
 
-/// Derives breadcrumbs from the current route.
-/// Returns an empty vec for top-level routes (no breadcrumb needed).
 fn breadcrumbs_for_route(route: &Route) -> Vec<Crumb> {
     match route {
-        // Nested under Propiedades
         Route::Condominios { .. } => vec![
             Crumb {
                 label: "Propiedades".into(),
@@ -26,7 +22,6 @@ fn breadcrumbs_for_route(route: &Route) -> Vec<Crumb> {
             },
         ],
 
-        // Document editor nested routes
         Route::DocumentoEditor { .. } | Route::DocumentoEditorExisting { .. } => vec![
             Crumb {
                 label: "Documentos".into(),
@@ -38,7 +33,6 @@ fn breadcrumbs_for_route(route: &Route) -> Vec<Crumb> {
             },
         ],
 
-        // Dashboard comparativo
         Route::DashboardComparativo => vec![
             Crumb {
                 label: "Panel de Control".into(),
@@ -50,10 +44,9 @@ fn breadcrumbs_for_route(route: &Route) -> Vec<Crumb> {
             },
         ],
 
-        // Configuración sub-routes
         Route::ConfiguracionChatbot => vec![
             Crumb {
-                label: "Configuración".into(),
+                label: "ConfiguraciÃ³n".into(),
                 route: Some(Route::Configuracion),
             },
             Crumb {
@@ -63,7 +56,7 @@ fn breadcrumbs_for_route(route: &Route) -> Vec<Crumb> {
         ],
         Route::ConfiguracionFiscal => vec![
             Crumb {
-                label: "Configuración".into(),
+                label: "ConfiguraciÃ³n".into(),
                 route: Some(Route::Configuracion),
             },
             Crumb {
@@ -72,19 +65,17 @@ fn breadcrumbs_for_route(route: &Route) -> Vec<Crumb> {
             },
         ],
 
-        // Categorías de gastos
         Route::CategoriasGastos => vec![
             Crumb {
                 label: "Gastos".into(),
                 route: Some(Route::Gastos),
             },
             Crumb {
-                label: "Categorías".into(),
+                label: "CategorÃ­as".into(),
                 route: None,
             },
         ],
 
-        // Reportes DGII
         Route::ReportesDgii => vec![
             Crumb {
                 label: "Reportes".into(),
@@ -96,13 +87,11 @@ fn breadcrumbs_for_route(route: &Route) -> Vec<Crumb> {
             },
         ],
 
-        // Documentos por vencer (under a logical "Documentos" parent)
         Route::DocumentosPorVencer => vec![Crumb {
             label: "Documentos por Vencer".into(),
             route: None,
         }],
 
-        // Top-level routes: no breadcrumb
         _ => vec![],
     }
 }
@@ -120,7 +109,7 @@ pub fn Breadcrumb() -> Html {
     }
 
     html! {
-        <nav class="gi-breadcrumb" aria-label="Navegación de migas de pan">
+        <nav class="gi-breadcrumb" aria-label="NavegaciÃ³n de migas de pan">
             <ol class="gi-breadcrumb-list">
                 { for crumbs.iter().enumerate().map(|(i, crumb)| {
                     let is_last = i == crumbs.len() - 1;

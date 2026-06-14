@@ -1,15 +1,4 @@
 #![allow(clippy::doc_markdown)]
-//! Custom Rig `CompletionModel` implementation for OpenVINO Model Server (OVMS).
-//!
-//! OVMS exposes an OpenAI-compatible `/v3/chat/completions` endpoint but omits
-//! the `id` field from responses (documented as unsupported). This module
-//! provides a thin adapter that:
-//!
-//! 1. Converts Rig's `CompletionRequest` into the OVMS request format
-//!    (including `tools`/`tool_choice` for function calling).
-//! 2. Deserializes OVMS responses tolerating the missing `id` field.
-//! 3. Returns Rig's `CompletionResponse` with `tool_calls` properly parsed,
-//!    enabling the full agent loop (multi-turn tool calling, hooks, sub-agents).
 
 use rig::completion::{self, CompletionError, CompletionRequest};
 use rig::message::{self, AssistantContent, UserContent};
@@ -21,11 +10,6 @@ use tracing::instrument;
 use eventsource_stream::Eventsource;
 use futures_util::StreamExt;
 
-// =============================================================================
-// OVMS-specific request/response types
-// =============================================================================
-
-/// OpenAI-compatible chat message for OVMS requests.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "role", rename_all = "lowercase")]
 pub enum OvmsMessage {
@@ -51,7 +35,6 @@ pub enum OvmsMessage {
     },
 }
 
-/// Tool call in OVMS response format.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OvmsToolCall {
     pub id: String,
@@ -60,16 +43,13 @@ pub struct OvmsToolCall {
     pub function: OvmsFunction,
 }
 
-/// Function call details.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OvmsFunction {
     pub name: String,
-    /// Arguments as a JSON string (OVMS returns stringified JSON).
     #[serde(deserialize_with = "deserialize_arguments")]
     pub arguments: serde_json::Value,
 }
 
-/// Tool definition sent to OVMS.
 #[derive(Debug, Clone, Serialize)]
 pub struct OvmsToolDef {
     #[serde(rename = "type")]
@@ -77,7 +57,6 @@ pub struct OvmsToolDef {
     pub function: OvmsFunctionDef,
 }
 
-/// Function definition within a tool.
 #[derive(Debug, Clone, Serialize)]
 pub struct OvmsFunctionDef {
     pub name: String,
@@ -85,7 +64,6 @@ pub struct OvmsFunctionDef {
     pub parameters: serde_json::Value,
 }
 
-/// The full request body sent to OVMS.
 #[derive(Debug, Serialize)]
 pub struct OvmsRequest {
     pub model: String,
@@ -101,10 +79,8 @@ pub struct OvmsRequest {
     pub stream: bool,
 }
 
-/// OVMS chat completion response (tolerates missing `id` field).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OvmsCompletionResponse {
-    /// OVMS omits this field — we default to empty string.
     #[serde(default)]
     pub id: String,
     pub choices: Vec<OvmsChoice>,
@@ -115,7 +91,6 @@ pub struct OvmsCompletionResponse {
     pub usage: Option<OvmsUsage>,
 }
 
-/// A single choice in the OVMS response.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OvmsChoice {
     pub index: usize,
@@ -123,7 +98,6 @@ pub struct OvmsChoice {
     pub finish_reason: Option<String>,
 }
 
-/// The assistant message in a response choice.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OvmsResponseMessage {
     pub role: String,
@@ -132,7 +106,6 @@ pub struct OvmsResponseMessage {
     pub tool_calls: Vec<OvmsToolCall>,
 }
 
-/// Token usage statistics.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OvmsUsage {
     pub prompt_tokens: u64,
@@ -140,11 +113,6 @@ pub struct OvmsUsage {
     pub total_tokens: u64,
 }
 
-// =============================================================================
-// Custom CompletionModel implementation
-// =============================================================================
-
-/// A Rig-compatible completion model that talks to OVMS.
 #[derive(Clone)]
 pub struct OvmsCompletionModel {
     pub(crate) client: reqwest::Client,
@@ -154,11 +122,6 @@ pub struct OvmsCompletionModel {
 }
 
 impl OvmsCompletionModel {
-    /// Creates a new OVMS completion model.
-    ///
-    /// `endpoint` should be the base URL including the version path,
-    /// e.g. `http://ovms:8000/v3`. The `/chat/completions` suffix is appended
-    /// automatically.
     pub fn new(
         model_name: impl Into<String>,
         endpoint: impl Into<String>,
@@ -179,7 +142,6 @@ impl completion::CompletionModel for OvmsCompletionModel {
     type Client = ();
 
     fn make(_client: &Self::Client, model: impl Into<String>) -> Self {
-        // Fallback constructor — prefer OvmsCompletionModel::new() with explicit endpoint.
         Self {
             client: reqwest::Client::new(),
             model_name: model.into(),
@@ -193,7 +155,6 @@ impl completion::CompletionModel for OvmsCompletionModel {
         &self,
         request: CompletionRequest,
     ) -> Result<completion::CompletionResponse<Self::Response>, CompletionError> {
-        // Convert Rig CompletionRequest → OVMS request format
         let ovms_request = build_ovms_request(&self.model_name, &request);
 
         let url = format!("{}/chat/completions", self.endpoint);
@@ -225,7 +186,6 @@ impl completion::CompletionModel for OvmsCompletionModel {
             CompletionError::ProviderError(format!("Error parseando respuesta OVMS: {e}"))
         })?;
 
-        // Convert OVMS response → Rig CompletionResponse
         ovms_response_to_rig(ovms_response)
     }
 
@@ -298,27 +258,19 @@ impl completion::GetTokenUsage for OvmsCompletionResponse {
     }
 }
 
-// =============================================================================
-// Conversion: Rig CompletionRequest → OVMS Request
-// =============================================================================
-
-/// Builds an OVMS-compatible request from Rig's `CompletionRequest`.
 fn build_ovms_request(model_name: &str, request: &CompletionRequest) -> OvmsRequest {
     let mut messages = Vec::new();
 
-    // System prompt (preamble)
     if let Some(preamble) = &request.preamble {
         messages.push(OvmsMessage::System {
             content: preamble.clone(),
         });
     }
 
-    // Chat history + prompt (all in chat_history, last message is the prompt)
     for msg in request.chat_history.iter() {
         messages.push(rig_message_to_ovms(msg));
     }
 
-    // Convert tool definitions
     let tools: Vec<OvmsToolDef> = request
         .tools
         .iter()
@@ -332,7 +284,6 @@ fn build_ovms_request(model_name: &str, request: &CompletionRequest) -> OvmsRequ
         })
         .collect();
 
-    // Convert tool_choice
     let tool_choice = request.tool_choice.as_ref().map(|tc| match tc {
         message::ToolChoice::None => serde_json::json!("none"),
         message::ToolChoice::Auto => serde_json::json!("auto"),
@@ -359,7 +310,6 @@ fn build_ovms_request(model_name: &str, request: &CompletionRequest) -> OvmsRequ
     }
 }
 
-/// Converts a Rig `Message` to an OVMS message.
 fn rig_message_to_ovms(msg: &message::Message) -> OvmsMessage {
     match msg {
         message::Message::System { content } => OvmsMessage::System {
@@ -408,9 +358,7 @@ fn rig_message_to_ovms(msg: &message::Message) -> OvmsMessage {
     }
 }
 
-/// Converts user content to a JSON value suitable for OVMS.
 fn user_content_to_json(content: &OneOrMany<UserContent>) -> serde_json::Value {
-    // Check if it's simple text-only content
     let items: Vec<&UserContent> = content.iter().collect();
 
     if items.len() == 1 {
@@ -419,7 +367,6 @@ fn user_content_to_json(content: &OneOrMany<UserContent>) -> serde_json::Value {
         }
     }
 
-    // For tool results, extract the text content
     let mut parts = Vec::new();
     for item in items {
         match item {
@@ -430,9 +377,6 @@ fn user_content_to_json(content: &OneOrMany<UserContent>) -> serde_json::Value {
                 }));
             }
             UserContent::ToolResult(tr) => {
-                // Tool results are sent as a separate "tool" role message in
-                // OpenAI format, but Rig wraps them as User content. We convert
-                // them to text for OVMS compatibility.
                 let result_text = tr
                     .content
                     .iter()
@@ -459,10 +403,6 @@ fn user_content_to_json(content: &OneOrMany<UserContent>) -> serde_json::Value {
 
     serde_json::Value::Array(parts)
 }
-
-// =============================================================================
-// SSE streaming chunk parsing
-// =============================================================================
 
 #[derive(Debug, Deserialize)]
 struct OvmsStreamChunk {
@@ -495,11 +435,6 @@ fn parse_sse_chunk(
     Ok(RawStreamingChoice::Message(text))
 }
 
-// =============================================================================
-// Conversion: OVMS Response → Rig CompletionResponse
-// =============================================================================
-
-/// Converts an OVMS response into Rig's `CompletionResponse`.
 fn ovms_response_to_rig(
     response: OvmsCompletionResponse,
 ) -> Result<completion::CompletionResponse<OvmsCompletionResponse>, CompletionError> {
@@ -509,14 +444,12 @@ fn ovms_response_to_rig(
 
     let mut content = Vec::new();
 
-    // Extract text content
     if let Some(text) = &choice.message.content {
         if !text.is_empty() {
             content.push(AssistantContent::text(text));
         }
     }
 
-    // Extract tool calls
     for tc in &choice.message.tool_calls {
         content.push(AssistantContent::tool_call(
             &tc.id,
@@ -558,11 +491,6 @@ fn ovms_response_to_rig(
     })
 }
 
-// =============================================================================
-// Serde helpers
-// =============================================================================
-
-/// Deserializes `null` or missing arrays as empty `Vec`.
 fn deserialize_null_or_vec<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -572,7 +500,6 @@ where
     Ok(opt.unwrap_or_default())
 }
 
-/// Deserializes tool call arguments that may be a JSON string or a JSON object.
 fn deserialize_arguments<'de, D>(deserializer: D) -> Result<serde_json::Value, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -585,10 +512,6 @@ where
         other => Ok(other),
     }
 }
-
-// =============================================================================
-// Tests
-// =============================================================================
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::unreadable_literal, clippy::panic)]
@@ -617,7 +540,7 @@ mod tests {
         }"#;
 
         let response: OvmsCompletionResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(response.id, ""); // defaults to empty
+        assert_eq!(response.id, "");
         assert_eq!(response.model, "qwen3.6");
         assert_eq!(response.choices.len(), 1);
         assert_eq!(
@@ -753,7 +676,6 @@ mod tests {
         };
 
         let rig_response = ovms_response_to_rig(response).unwrap();
-        // Should contain a tool call
         let first = rig_response.choice.first();
         match first {
             AssistantContent::ToolCall(tc) => {

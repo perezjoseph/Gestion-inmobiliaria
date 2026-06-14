@@ -7,7 +7,6 @@ use crate::types::mantenimiento::Solicitud;
 use crate::types::pago::Pago;
 use crate::utils::format_date_display;
 
-/// Represents a single calendar event rendered in the view.
 #[derive(Clone, PartialEq)]
 struct CalendarEvent {
     fecha: String,
@@ -44,9 +43,9 @@ impl EventType {
 
     const fn icon(&self) -> &'static str {
         match self {
-            Self::ContratoInicio | Self::ContratoFin => "📋",
-            Self::PagoVencimiento => "💰",
-            Self::Mantenimiento => "🔧",
+            Self::ContratoInicio | Self::ContratoFin => "ðŸ“‹",
+            Self::PagoVencimiento => "ðŸ’°",
+            Self::Mantenimiento => "ðŸ”§",
         }
     }
 }
@@ -65,7 +64,6 @@ pub fn calendario() -> Html {
             spawn_local(async move {
                 let mut all_events = Vec::new();
 
-                // Fetch contratos
                 match api_get::<Vec<Contrato>>("/contratos").await {
                     Ok(contratos) => {
                         for c in &contratos {
@@ -73,7 +71,7 @@ pub fn calendario() -> Html {
                                 fecha: c.fecha_inicio.clone(),
                                 tipo: EventType::ContratoInicio,
                                 descripcion: format!(
-                                    "Contrato #{} — {} {}",
+                                    "Contrato #{} â€” {} {}",
                                     &c.id[..8.min(c.id.len())],
                                     c.moneda,
                                     format_currency(c.monto_mensual)
@@ -96,7 +94,6 @@ pub fn calendario() -> Html {
                     }
                 }
 
-                // Fetch pagos pendientes
                 match api_get::<Vec<Pago>>("/pagos?estado=pendiente").await {
                     Ok(pagos) => {
                         for p in &pagos {
@@ -104,7 +101,7 @@ pub fn calendario() -> Html {
                                 fecha: p.fecha_vencimiento.clone(),
                                 tipo: EventType::PagoVencimiento,
                                 descripcion: format!(
-                                    "Pago #{} — {} {}",
+                                    "Pago #{} â€” {} {}",
                                     &p.id[..8.min(p.id.len())],
                                     p.moneda,
                                     format_currency(p.monto)
@@ -119,7 +116,6 @@ pub fn calendario() -> Html {
                     }
                 }
 
-                // Fetch mantenimientos
                 match api_get::<Vec<Solicitud>>("/mantenimiento").await {
                     Ok(solicitudes) => {
                         for s in &solicitudes {
@@ -130,7 +126,7 @@ pub fn calendario() -> Html {
                             all_events.push(CalendarEvent {
                                 fecha,
                                 tipo: EventType::Mantenimiento,
-                                descripcion: format!("{} — {}", s.titulo, s.estado),
+                                descripcion: format!("{} â€” {}", s.titulo, s.estado),
                             });
                         }
                     }
@@ -141,7 +137,6 @@ pub fn calendario() -> Html {
                     }
                 }
 
-                // Sort by date ascending
                 all_events.sort_by(|a, b| a.fecha.cmp(&b.fecha));
                 events.set(all_events);
                 loading.set(false);
@@ -169,7 +164,7 @@ pub fn calendario() -> Html {
                 </div>
             } else if events.is_empty() {
                 <div class="gi-empty-state">
-                    <div class="gi-empty-state-icon">{"📅"}</div>
+                    <div class="gi-empty-state-icon">{"ðŸ“…"}</div>
                     <div class="gi-empty-state-title">{"Sin eventos"}</div>
                     <p class="gi-empty-state-text">
                         {"No hay contratos, pagos ni mantenimientos programados."}
@@ -181,8 +176,6 @@ pub fn calendario() -> Html {
         </div>
     }
 }
-
-// --- Sub-components (split to keep html! under 150 lines) ---
 
 #[derive(Properties, PartialEq)]
 struct EventListProps {
@@ -199,7 +192,7 @@ fn calendar_event_list(props: &EventListProps) -> Html {
                         <tr>
                             <th>{"Fecha"}</th>
                             <th>{"Tipo"}</th>
-                            <th>{"Descripción"}</th>
+                            <th>{"DescripciÃ³n"}</th>
                         </tr>
                     </thead>
                     <tbody>

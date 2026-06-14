@@ -225,13 +225,13 @@ fn PropiedadForm(props: &PropiedadFormProps) -> Html {
                 {if props.is_editing { "Editar Propiedad" } else { "Nueva Propiedad" }}</h2>
             <form onsubmit={props.on_submit.clone()} style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
                 <div>
-                    <label class="gi-label">{"Título *"}</label>
+                    <label class="gi-label">{"TÃ­tulo *"}</label>
                     <input type="text" value={(*props.titulo).clone()} oninput={input_cb!(props.titulo)}
                         class={input_class(fe.titulo.is_some())} />
                     {field_error(&fe.titulo)}
                 </div>
                 <div>
-                    <label class="gi-label">{"Dirección *"}</label>
+                    <label class="gi-label">{"DirecciÃ³n *"}</label>
                     <input type="text" value={(*props.direccion).clone()} oninput={input_cb!(props.direccion)}
                         class={input_class(fe.direccion.is_some())} />
                     {field_error(&fe.direccion)}
@@ -291,7 +291,7 @@ fn PropiedadForm(props: &PropiedadFormProps) -> Html {
                     <div id="optional-fields" class={if opt_open { "gi-collapsible-content open" } else { "gi-collapsible-content" }}>
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4); padding-top: var(--space-3);">
                             <div style="grid-column: 1 / -1;">
-                                <label for="prop-descripcion" class="gi-label">{"Descripción"}</label>
+                                <label for="prop-descripcion" class="gi-label">{"DescripciÃ³n"}</label>
                                 <input id="prop-descripcion" type="text" value={(*props.descripcion).clone()} oninput={input_cb!(props.descripcion)} class="gi-input" />
                             </div>
                             <div>
@@ -299,11 +299,11 @@ fn PropiedadForm(props: &PropiedadFormProps) -> Html {
                                 <input id="prop-habitaciones" type="number" min="0" value={(*props.habitaciones).clone()} oninput={input_cb!(props.habitaciones)} class="gi-input" />
                             </div>
                             <div>
-                                <label for="prop-banos" class="gi-label">{"Baños"}</label>
+                                <label for="prop-banos" class="gi-label">{"BaÃ±os"}</label>
                                 <input id="prop-banos" type="number" min="0" value={(*props.banos).clone()} oninput={input_cb!(props.banos)} class="gi-input" />
                             </div>
                             <div>
-                                <label for="prop-area" class="gi-label">{"Área (m²)"}</label>
+                                <label for="prop-area" class="gi-label">{"Ãrea (mÂ²)"}</label>
                                 <input id="prop-area" type="number" step="0.01" min="0" value={(*props.area_m2).clone()} oninput={input_cb!(props.area_m2)} class="gi-input" />
                             </div>
                         </div>
@@ -389,7 +389,7 @@ fn render_occupancy_bar(p: &Propiedad) -> Html {
     html! {
         <div class="gi-occupancy-section">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <span style="font-size: var(--text-xs); color: var(--text-tertiary); font-weight: 500;">{"Ocupación"}</span>
+                <span style="font-size: var(--text-xs); color: var(--text-tertiary); font-weight: 500;">{"OcupaciÃ³n"}</span>
                 <div style="display: flex; align-items: baseline; gap: 4px;">
                     <span style={format!("font-size: var(--text-base); font-weight: 700; color: {pct_color};")}>{format!("{pct:.0}%")}</span>
                     <span style="font-size: var(--text-xs); color: var(--text-tertiary);">{format!("({occupied}/{total})")}</span>
@@ -436,10 +436,8 @@ fn render_propiedad_card(
 
     html! {
         <div class="gi-card gi-property-card" onclick={on_card_click} role="article" tabindex="0">
-            // Status indicator stripe at top
             <div style={format!("height: 4px; border-radius: 12px 12px 0 0; background: {estado_dot_color};")}></div>
             <div style="padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); flex: 1;">
-                // Header: title + badge
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-2);">
                     <div style="min-width: 0; flex: 1;">
                         <div style="font-weight: 700; font-size: var(--text-sm); color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
@@ -451,7 +449,6 @@ fn render_propiedad_card(
                     </div>
                     <span class={badge_cls} style="flex-shrink: 0;">{badge_label}</span>
                 </div>
-                // Meta row: type + price
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: var(--text-xs); color: var(--text-tertiary); background: var(--surface-sunken); padding: 2px 8px; border-radius: 4px;">
                         {tipo_label}
@@ -460,9 +457,7 @@ fn render_propiedad_card(
                         <CurrencyDisplay monto={p.precio} moneda={p.moneda.clone()} />
                     </span>
                 </div>
-                // Occupancy
                 {render_occupancy_bar(p)}
-                // Actions
                 if can_write(user_rol) {
                     <div style="display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: auto; padding-top: var(--space-2); border-top: 1px solid var(--border-subtle);">
                         {delete_btn}
@@ -481,7 +476,7 @@ fn render_propiedad_empty_state(user_rol: &str, on_new: &Callback<MouseEvent>) -
                     {"Agregar primera propiedad"}
                 </button>
                 <Link<Route> to={Route::Importar} classes="gi-btn-text">
-                    {"¿Ya tiene datos? Importar"}
+                    {"Â¿Ya tiene datos? Importar"}
                 </Link<Route>>
             </div>
         }
@@ -492,32 +487,26 @@ fn render_propiedad_empty_state(user_rol: &str, on_new: &Callback<MouseEvent>) -
         <div class="gi-empty-state">
             <div class="gi-empty-state-icon">
                 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    // Property card preview outline
                     <rect x="8" y="12" width="48" height="40" rx="4" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
-                    // Roof
                     <path d="M16 28V20l16-8 16 8v8" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
-                    // Door
                     <rect x="27" y="32" width="10" height="14" rx="1" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>
-                    // Windows
                     <rect x="18" y="30" width="6" height="5" rx="0.5" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
                     <rect x="40" y="30" width="6" height="5" rx="0.5" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
-                    // Price tag accent
                     <circle cx="52" cy="16" r="6" fill="var(--color-primary-500)" opacity="0.15"/>
                     <text x="52" y="18" text-anchor="middle" font-size="6" fill="var(--color-primary-500)" font-weight="600" opacity="0.7">{"$"}</text>
                 </svg>
             </div>
             <div class="gi-empty-state-title">{"Comience con su primera propiedad"}</div>
             <p class="gi-empty-state-text">
-                {"Necesitará: nombre, dirección, ciudad y precio de alquiler. Los demás campos son opcionales."}
+                {"NecesitarÃ¡: nombre, direcciÃ³n, ciudad y precio de alquiler. Los demÃ¡s campos son opcionales."}
             </p>
-            // Workflow breadcrumb
             <div style="display: flex; align-items: center; justify-content: center; gap: var(--space-2); margin-top: var(--space-3); font-size: var(--text-xs); color: var(--text-tertiary);">
                 <span style="font-weight: 600; color: var(--color-primary-500);">{"Propiedad"}</span>
-                <span style="opacity: 0.4;">{"→"}</span>
+                <span style="opacity: 0.4;">{"â†’"}</span>
                 <span>{"Inquilino"}</span>
-                <span style="opacity: 0.4;">{"→"}</span>
+                <span style="opacity: 0.4;">{"â†’"}</span>
                 <span>{"Contrato"}</span>
-                <span style="opacity: 0.4;">{"→"}</span>
+                <span style="opacity: 0.4;">{"â†’"}</span>
                 <span>{"Pagos"}</span>
             </div>
             {actions}
@@ -599,12 +588,12 @@ fn validate_propiedad_fields(
     let mut errs = FormErrors::default();
     if titulo.trim().is_empty() {
         errs.titulo = Some(
-            "Ingrese un título para identificar la propiedad, ej: \"Apartamento Naco 3B\"".into(),
+            "Ingrese un tÃ­tulo para identificar la propiedad, ej: \"Apartamento Naco 3B\"".into(),
         );
     }
     if direccion.trim().is_empty() {
         errs.direccion =
-            Some("Ingrese la dirección completa, ej: \"Calle Principal #12, Ens. Naco\"".into());
+            Some("Ingrese la direcciÃ³n completa, ej: \"Calle Principal #12, Ens. Naco\"".into());
     }
     if ciudad.trim().is_empty() {
         errs.ciudad = Some("Ingrese la ciudad, ej: \"Santo Domingo\"".into());
@@ -617,7 +606,7 @@ fn validate_propiedad_fields(
             errs.precio = Some("El precio debe ser mayor a 0".into());
         }
         Err(_) => {
-            errs.precio = Some("Ingrese un monto numérico válido, ej: \"25000.00\"".into());
+            errs.precio = Some("Ingrese un monto numÃ©rico vÃ¡lido, ej: \"25000.00\"".into());
         }
         _ => {}
     }
@@ -759,7 +748,6 @@ fn load_propiedades_data(
                     total.set(resp.total);
                 }
                 Err(err) => {
-                    // Network failed despite being online — try cache fallback
                     if let Some(cached) =
                         idb_cache::read_list::<Propiedad>("propiedades", "list").await
                     {
@@ -925,7 +913,7 @@ fn render_propiedades_domain_header(items: &UseStateHandle<Vec<Propiedad>>) -> H
     };
     html! {
         <DomainHeader>
-            <DomainStat label="ocupación" value={ocupacion} variant={DomainStatVariant::Success} />
+            <DomainStat label="ocupaciÃ³n" value={ocupacion} variant={DomainStatVariant::Success} />
             <DomainStat label="disponibles" value={disponibles.to_string()} />
             if mantenimiento > 0 {
                 <DomainStat label="en mantenimiento" value={mantenimiento.to_string()} variant={DomainStatVariant::Warning} />
@@ -992,7 +980,7 @@ fn render_propiedades_view(
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
                     </svg>
-                    {"Modo solo lectura — no tiene permisos para modificar propiedades"}
+                    {"Modo solo lectura â€” no tiene permisos para modificar propiedades"}
                 </div>
             }
 
@@ -1005,7 +993,7 @@ fn render_propiedades_view(
 
             if let Some(ref target) = **delete_target {
                 <DeleteConfirmModal
-                    message={format!("¿Está seguro de que desea eliminar la propiedad \"{}\"? Esta acción no se puede deshacer.", target.titulo)}
+                    message={format!("Â¿EstÃ¡ seguro de que desea eliminar la propiedad \"{}\"? Esta acciÃ³n no se puede deshacer.", target.titulo)}
                     on_confirm={on_delete_confirm}
                     on_cancel={on_delete_cancel}
                 />
@@ -1177,10 +1165,8 @@ pub fn Propiedades() -> Html {
     let sort_field = use_state(|| Option::<String>::None);
     let sort_order = use_state(|| Option::<String>::None);
 
-    // Track whether initial mount has completed to skip first-run filter effects
     let mounted = use_mut_ref(|| false);
 
-    // Debounce ciudad text input: wait 300ms after last keystroke, then bump reload
     {
         let ciudad_val = (*filter_ciudad).clone();
         let reload = reload.clone();
@@ -1199,7 +1185,6 @@ pub fn Propiedades() -> Html {
         });
     }
 
-    // Dropdowns apply immediately on change
     {
         let tipo_val = (*filter_tipo).clone();
         let reload = reload.clone();
@@ -1227,7 +1212,6 @@ pub fn Propiedades() -> Html {
         });
     }
 
-    // Mark mounted after initial data load effect registers
     {
         use_effect_with((), move |()| {
             *mounted.borrow_mut() = true;

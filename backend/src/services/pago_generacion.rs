@@ -3,7 +3,6 @@ use rust_decimal::Decimal;
 
 use crate::errors::AppError;
 
-/// Datos de un pago a generar (sin ID ni timestamps).
 #[derive(Debug, Clone)]
 pub struct PagoGenerado {
     pub monto: Decimal,
@@ -11,11 +10,6 @@ pub struct PagoGenerado {
     pub fecha_vencimiento: NaiveDate,
 }
 
-/// Calcula los pagos mensuales para un período contractual.
-/// Función pura: no accede a la base de datos.
-///
-/// Itera mes a mes desde el mes de `fecha_inicio` hasta el mes de `fecha_fin` (inclusive).
-/// Para cada mes, calcula `fecha_vencimiento` como `(año, mes, min(dia_vencimiento, último_día_del_mes))`.
 pub fn calcular_pagos(
     fecha_inicio: NaiveDate,
     fecha_fin: NaiveDate,
@@ -38,7 +32,6 @@ pub fn calcular_pagos(
         let last_day = last_day_of_month(year, month);
         let day = dia_vencimiento.min(last_day);
 
-        // Safe: day is clamped to valid range for this year/month
         if let Some(fecha) = NaiveDate::from_ymd_opt(year, month, day) {
             pagos.push(PagoGenerado {
                 monto: monto_mensual,
@@ -51,7 +44,6 @@ pub fn calcular_pagos(
             break;
         }
 
-        // Advance to next month
         if month == 12 {
             month = 1;
             year += 1;
@@ -63,7 +55,6 @@ pub fn calcular_pagos(
     pagos
 }
 
-/// Filtra pagos ya existentes comparando por (año, mes) de `fecha_vencimiento`.
 pub fn filtrar_existentes(
     pagos_calculados: &[PagoGenerado],
     fechas_existentes: &[NaiveDate],
@@ -81,7 +72,6 @@ pub fn filtrar_existentes(
         .collect()
 }
 
-/// Valida que `dia_vencimiento` esté entre 1 y 31.
 pub fn validar_dia_vencimiento(dia: u32) -> Result<(), AppError> {
     if !(1..=31).contains(&dia) {
         return Err(AppError::Validation(
@@ -91,9 +81,7 @@ pub fn validar_dia_vencimiento(dia: u32) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Retorna el último día del mes para un año y mes dados.
 fn last_day_of_month(year: i32, month: u32) -> u32 {
-    // The first day of the next month, minus one day, gives the last day of this month.
     let (next_year, next_month) = if month == 12 {
         (year + 1, 1)
     } else {
@@ -102,7 +90,7 @@ fn last_day_of_month(year: i32, month: u32) -> u32 {
 
     NaiveDate::from_ymd_opt(next_year, next_month, 1)
         .and_then(|d| d.pred_opt())
-        .map_or(28, |d| d.day()) // fallback, should never happen for valid inputs
+        .map_or(28, |d| d.day())
 }
 
 #[cfg(test)]
@@ -113,8 +101,6 @@ mod tests {
 
     use chrono::NaiveDate;
     use rust_decimal::Decimal;
-
-    // ── calcular_pagos ──────────────────────────────────
 
     #[test]
     fn calcular_pagos_single_month_returns_one() {
@@ -194,8 +180,6 @@ mod tests {
         );
     }
 
-    // ── filtrar_existentes ──────────────────────────────
-
     #[test]
     fn filtrar_existentes_all_existing_returns_empty() {
         let monto = Decimal::from_str("15000.00").unwrap();
@@ -263,7 +247,6 @@ mod tests {
                 fecha_vencimiento: NaiveDate::from_ymd_opt(2025, 3, 1).unwrap(),
             },
         ];
-        // Only January exists
         let existentes = vec![NaiveDate::from_ymd_opt(2025, 1, 10).unwrap()];
 
         let resultado = filtrar_existentes(&pagos, &existentes);
@@ -272,8 +255,6 @@ mod tests {
         assert_eq!(resultado[0].fecha_vencimiento.month(), 2);
         assert_eq!(resultado[1].fecha_vencimiento.month(), 3);
     }
-
-    // ── validar_dia_vencimiento ─────────────────────────
 
     #[test]
     fn validar_dia_vencimiento_zero_returns_error() {

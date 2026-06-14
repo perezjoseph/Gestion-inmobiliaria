@@ -18,9 +18,6 @@ use crate::services::{invitaciones, validacion_fiscal};
 
 pub use crate::services::user_security_cache::UserSecurityCache;
 
-/// Result of the public register endpoint.
-/// New-org registrations return only the `User` DTO (no token).
-/// Invitation registrations return the full login response (token + user).
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum RegisterResult {
@@ -80,13 +77,11 @@ pub fn decode_jwt(token: &str, secret: &str) -> Result<Claims, AppError> {
     Ok(token_data.claims)
 }
 
-/// Check if a database error is a duplicate key constraint violation.
 fn is_duplicate_key_error(err: &sea_orm::DbErr) -> bool {
     let msg = err.to_string();
     msg.contains("duplicate key") || msg.contains("unique constraint")
 }
 
-/// Check that no user with the given email exists.
 async fn check_email_unique<C: ConnectionTrait>(db: &C, email: &str) -> Result<(), AppError> {
     let existing = usuario::Entity::find()
         .filter(usuario::Column::Email.eq(email))
@@ -101,7 +96,6 @@ async fn check_email_unique<C: ConnectionTrait>(db: &C, email: &str) -> Result<(
     Ok(())
 }
 
-/// Build a `LoginResponse` (JWT + user data) for a freshly created user.
 fn build_login_response(
     user: &usuario::Model,
     jwt_secret: &str,
@@ -133,9 +127,7 @@ fn build_login_response(
     })
 }
 
-/// Validate common auth input fields.
 fn validate_auth_input(email: &str, password: &str, nombre: Option<&str>) -> Result<(), AppError> {
-    // Email: basic format check + length limit
     if email.len() > 255 {
         return Err(AppError::Validation(
             "El email no puede exceder 255 caracteres".to_string(),
@@ -147,7 +139,6 @@ fn validate_auth_input(email: &str, password: &str, nombre: Option<&str>) -> Res
         ));
     }
 
-    // Password: minimum length
     if password.len() < 8 {
         return Err(AppError::Validation(
             "La contraseña debe tener al menos 8 caracteres".to_string(),
@@ -159,7 +150,6 @@ fn validate_auth_input(email: &str, password: &str, nombre: Option<&str>) -> Res
         ));
     }
 
-    // Name length limit
     if let Some(name) = nombre {
         if name.trim().is_empty() {
             return Err(AppError::Validation(
@@ -192,8 +182,6 @@ pub async fn register(
     }
 }
 
-/// New org flow: validate tipo, validate fiscal ID, check uniqueness, create org + user.
-/// Returns a `LoginResponse` with JWT token so the user can immediately use the app.
 async fn register_new_org(
     db: &DatabaseConnection,
     input: RegisterRequest,
@@ -210,7 +198,6 @@ async fn register_new_org(
         ));
     }
 
-    // Validate fiscal ID and required fields before starting the transaction
     let (
         org_nombre,
         org_cedula,
@@ -246,7 +233,6 @@ async fn register_new_org(
         org_direccion_fiscal = None;
         org_representante_legal = None;
     } else {
-        // persona_juridica
         let rnc = input.rnc.as_deref().ok_or_else(|| {
             AppError::BadRequest("El RNC es requerido para persona jurídica".to_string())
         })?;
@@ -283,10 +269,8 @@ async fn register_new_org(
 
     let password_hash = hash_password(&input.password)?;
 
-    // Single transaction: uniqueness checks + create org + user
     let txn = db.begin().await?;
 
-    // Check uniqueness inside transaction to eliminate race window
     check_email_unique(&txn, &input.email).await?;
 
     if let Some(ref cedula) = org_cedula {
@@ -365,22 +349,18 @@ async fn register_new_org(
     build_login_response(&user, jwt_secret)
 }
 
-/// Invitation flow: validate token, check email, create user, mark invitation used.
 async fn register_with_invitation(
     db: &DatabaseConnection,
     input: RegisterRequest,
     token_inv: &str,
     jwt_secret: &str,
 ) -> Result<LoginResponse, AppError> {
-    // Validate invitation token (checks existence, used, expired)
     let inv = invitaciones::validar_token(db, token_inv).await?;
 
     let password_hash = hash_password(&input.password)?;
 
-    // Single transaction: check uniqueness + create user + mark invitation used
     let txn = db.begin().await?;
 
-    // Check email uniqueness inside transaction to eliminate race window
     check_email_unique(&txn, &input.email).await?;
 
     let now = Utc::now().into();
@@ -406,7 +386,6 @@ async fn register_with_invitation(
         }
     })?;
 
-    // Mark invitation as used
     let mut inv_active: invitacion::ActiveModel = inv.into();
     inv_active.usado = Set(true);
     inv_active.update(&txn).await?;
@@ -476,13 +455,10 @@ mod tests {
         let _ = jsonwebtoken::crypto::rust_crypto::DEFAULT_PROVIDER.install_default();
     }
 
-    /// Build a test-only password at runtime so static analysis does not flag it
-    /// as a hard-coded cryptographic value.
     fn test_password(label: &str) -> String {
         format!("test_pw_{label}")
     }
 
-    /// Build a test-only JWT secret at runtime (≥32 chars).
     fn test_secret(label: &str) -> String {
         format!("test_jwt_secret_{label}_padding_for_length")
     }

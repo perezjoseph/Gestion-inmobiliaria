@@ -67,7 +67,7 @@ pub fn DeleteConfirmModal(props: &DeleteConfirmModalProps) -> Html {
         >
             <div class="gi-modal">
                 <h3 id="gi-modal-title" class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-2); color: var(--text-primary);">
-                    {"Confirmar eliminación"}</h3>
+                    {"Confirmar eliminaciÃ³n"}</h3>
                 <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-5);">
                     {&props.message}</p>
                 <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">

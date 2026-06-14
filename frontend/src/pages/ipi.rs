@@ -9,10 +9,6 @@ use crate::types::ipi::{
     IpiLiabilityResponse, PropiedadIpiInfo,
 };
 
-// ---------------------------------------------------------------------------
-// Main IPI Page
-// ---------------------------------------------------------------------------
-
 #[component]
 pub fn Ipi() -> Html {
     let liability = use_state(|| Option::<IpiLiabilityResponse>::None);
@@ -21,7 +17,6 @@ pub fn Ipi() -> Html {
     let loading = use_state(|| true);
     let reload = use_state(|| 0u32);
 
-    // Fetch IPI data on mount and when reload changes
     {
         let liability = liability.clone();
         let propiedades = propiedades.clone();
@@ -38,7 +33,7 @@ pub fn Ipi() -> Html {
                 }
                 if let Ok(data) = api_get::<Vec<PropiedadIpiInfo>>("/ipi/propiedades").await {
                     propiedades.set(data);
-                } else { /* non-critical, liability is the main data */
+                } else {
                 }
                 loading.set(false);
             });
@@ -84,10 +79,6 @@ pub fn Ipi() -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// IPI Summary Cards
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq, Clone)]
 struct IpiSummaryCardsProps {
     data: IpiLiabilityResponse,
@@ -103,7 +94,7 @@ fn IpiSummaryCards(props: &IpiSummaryCardsProps) -> Html {
             <SummaryCard label={"Exceso Gravable"} value={format_dop(d.exceso)} />
             <SummaryCard label={"IPI Anual (1%)"} value={format_dop(d.ipi_anual)} />
             <SummaryCard label={"Pago Semestral"} value={format_dop(d.pago_semestral)} />
-            <SummaryCard label={"Próximo Pago"} value={format_date(&d.proxima_fecha)} />
+            <SummaryCard label={"PrÃ³ximo Pago"} value={format_date(&d.proxima_fecha)} />
         </div>
     }
 }
@@ -124,10 +115,6 @@ fn SummaryCard(props: &SummaryCardProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Payment Deadline Notice (30 days before March 11 / September 11)
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct PaymentDeadlineNoticeProps {
     proxima_fecha: String,
@@ -138,7 +125,6 @@ fn PaymentDeadlineNotice(props: &PaymentDeadlineNoticeProps) -> Html {
     let today = js_sys::Date::new_0();
     let today_ms = today.get_time();
 
-    // Parse proxima_fecha (YYYY-MM-DD format)
     let deadline_ms = js_sys::Date::parse(&props.proxima_fecha);
 
     if deadline_ms.is_nan() {
@@ -151,10 +137,10 @@ fn PaymentDeadlineNotice(props: &PaymentDeadlineNoticeProps) -> Html {
         html! {
             <div class="gi-card" style="padding: var(--space-4); margin-bottom: var(--space-4); border-left: 4px solid var(--color-warning); background: var(--surface-warning);">
                 <p style="font-weight: 600; color: var(--color-warning-text); margin-bottom: var(--space-1);">
-                    {"⚠️ Próximo vencimiento de pago IPI"}
+                    {"âš ï¸ PrÃ³ximo vencimiento de pago IPI"}
                 </p>
                 <p style="color: var(--text-secondary);">
-                    {format!("El próximo pago semestral vence el {}. Faltan {} días.",
+                    {format!("El prÃ³ximo pago semestral vence el {}. Faltan {} dÃ­as.",
                         format_date(&props.proxima_fecha), days_until)}
                 </p>
             </div>
@@ -164,28 +150,17 @@ fn PaymentDeadlineNotice(props: &PaymentDeadlineNoticeProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Cross-Organization Ownership Warning (Req 9.9)
-// ---------------------------------------------------------------------------
-
 #[component]
 fn CrossOrgWarning() -> Html {
-    // This warning is shown when a person owns properties across multiple
-    // platform organizations, meaning IPI threshold applies per taxpayer,
-    // not per org. We display a static advisory note.
     html! {
         <div class="gi-card" style="padding: var(--space-3); margin-bottom: var(--space-4); border-left: 4px solid var(--color-info); background: var(--surface-info);">
             <p style="font-size: var(--text-sm); color: var(--text-secondary);">
-                <strong>{"ℹ️ Nota:"}</strong>
-                {" El umbral IPI aplica por contribuyente (RNC/cédula), no por organización. Si un propietario tiene inmuebles en múltiples organizaciones, el IPI se calcula sobre el valor combinado total."}
+                <strong>{"â„¹ï¸ Nota:"}</strong>
+                {" El umbral IPI aplica por contribuyente (RNC/cÃ©dula), no por organizaciÃ³n. Si un propietario tiene inmuebles en mÃºltiples organizaciones, el IPI se calcula sobre el valor combinado total."}
             </p>
         </div>
     }
 }
-
-// ---------------------------------------------------------------------------
-// Per-Property Breakdown Table
-// ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct PropiedadesBreakdownProps {
@@ -209,7 +184,7 @@ fn PropiedadesBreakdown(props: &PropiedadesBreakdownProps) -> Html {
                         <th>{"Propiedad"}</th>
                         <th style="text-align: right;">{"Valor Catastral"}</th>
                         <th>{"Estado IPI"}</th>
-                        <th>{"Motivo Exención"}</th>
+                        <th>{"Motivo ExenciÃ³n"}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -226,7 +201,7 @@ fn PropiedadesBreakdown(props: &PropiedadesBreakdownProps) -> Html {
                                     )}
                                 </td>
                                 <td style={estado_class}>{estado}</td>
-                                <td>{p.motivo_exencion.as_deref().unwrap_or("—")}</td>
+                                <td>{p.motivo_exencion.as_deref().unwrap_or("â€”")}</td>
                             </tr>
                         }
                     })}
@@ -235,10 +210,6 @@ fn PropiedadesBreakdown(props: &PropiedadesBreakdownProps) -> Html {
         </div>
     }
 }
-
-// ---------------------------------------------------------------------------
-// Copropietarios Management Section
-// ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct CopropietariosSectionProps {
@@ -253,7 +224,6 @@ fn CopropietariosSection(props: &CopropietariosSectionProps) -> Html {
     let error = use_state(|| Option::<String>::None);
     let show_form = use_state(|| false);
 
-    // Form fields
     let nombre = use_state(String::new);
     let cedula_rnc = use_state(String::new);
     let porcentaje = use_state(String::new);
@@ -341,7 +311,7 @@ fn CopropietariosSection(props: &CopropietariosSectionProps) -> Html {
             let p_val: f64 = if let Ok(v) = p_str.parse() {
                 v
             } else {
-                error.set(Some("Porcentaje inválido".to_string()));
+                error.set(Some("Porcentaje invÃ¡lido".to_string()));
                 return;
             };
 
@@ -359,11 +329,9 @@ fn CopropietariosSection(props: &CopropietariosSectionProps) -> Html {
                         cedula_rnc.set(String::new());
                         porcentaje.set(String::new());
                         show_form.set(false);
-                        // Reload copropietarios list
                         if let Ok(evt) = MouseEvent::new("click") {
                             on_load.emit(evt);
                         }
-                        // Trigger parent reload for recalculation
                         if let Ok(evt) = MouseEvent::new("click") {
                             on_change.emit(evt);
                         }
@@ -438,10 +406,6 @@ fn CopropietariosSection(props: &CopropietariosSectionProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Copropietarios Table
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct CopropietariosTableProps {
     copropietarios: Vec<CopropietarioResponse>,
@@ -458,7 +422,7 @@ fn CopropietariosTable(props: &CopropietariosTableProps) -> Html {
                 <thead>
                     <tr>
                         <th>{"Nombre"}</th>
-                        <th>{"Cédula/RNC"}</th>
+                        <th>{"CÃ©dula/RNC"}</th>
                         <th style="text-align: right;">{"Porcentaje"}</th>
                     </tr>
                 </thead>
@@ -483,16 +447,12 @@ fn CopropietariosTable(props: &CopropietariosTableProps) -> Html {
             </table>
             if !is_valid {
                 <p style="color: var(--color-danger); font-size: var(--text-sm);">
-                    {"⚠️ Los porcentajes de copropietarios deben sumar 100%."}
+                    {"âš ï¸ Los porcentajes de copropietarios deben sumar 100%."}
                 </p>
             }
         </div>
     }
 }
-
-// ---------------------------------------------------------------------------
-// Copropietario Add Form
-// ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct CopropietarioFormProps {
@@ -535,7 +495,7 @@ fn CopropietarioForm(props: &CopropietarioFormProps) -> Html {
                     <input type="text" class="gi-input" required=true value={(*props.nombre).clone()} oninput={on_nombre} placeholder="Nombre completo" />
                 </div>
                 <div>
-                    <label class="gi-label">{"Cédula/RNC"}</label>
+                    <label class="gi-label">{"CÃ©dula/RNC"}</label>
                     <input type="text" class="gi-input" required=true value={(*props.cedula_rnc).clone()} oninput={on_cedula} placeholder="00000000000" />
                 </div>
                 <div>
@@ -547,10 +507,6 @@ fn CopropietarioForm(props: &CopropietarioFormProps) -> Html {
         </form>
     }
 }
-
-// ---------------------------------------------------------------------------
-// Umbral (Threshold) Configuration Section
-// ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct UmbralConfigSectionProps {
@@ -597,7 +553,7 @@ fn UmbralConfigSection(props: &UmbralConfigSectionProps) -> Html {
             let umbral_val: f64 = if let Ok(v) = (*umbral).parse() {
                 v
             } else {
-                error.set(Some("Umbral inválido".to_string()));
+                error.set(Some("Umbral invÃ¡lido".to_string()));
                 return;
             };
             let req = ConfiguracionIpiRequest {
@@ -665,7 +621,7 @@ fn UmbralConfigSection(props: &UmbralConfigSectionProps) -> Html {
     html! {
         <div class="gi-card">
             <div style="padding: var(--space-4); border-bottom: 1px solid var(--border-primary);">
-                <h2 style="font-size: var(--text-lg); font-weight: 600; margin: 0;">{"Configuración Umbral IPI"}</h2>
+                <h2 style="font-size: var(--text-lg); font-weight: 600; margin: 0;">{"ConfiguraciÃ³n Umbral IPI"}</h2>
             </div>
             <div style="padding: var(--space-4);">
                 if let Some(err) = (*error).as_ref() {
@@ -675,7 +631,7 @@ fn UmbralConfigSection(props: &UmbralConfigSectionProps) -> Html {
                 }
                 if *success {
                     <div style="padding: var(--space-3); margin-bottom: var(--space-3); background: var(--surface-success); border-radius: var(--radius-md); color: var(--color-success-text);">
-                        {"✓ Umbral actualizado correctamente."}
+                        {"âœ“ Umbral actualizado correctamente."}
                     </div>
                 }
                 <form onsubmit={on_submit}>
@@ -685,7 +641,7 @@ fn UmbralConfigSection(props: &UmbralConfigSectionProps) -> Html {
                             <input type="number" class="gi-input" required=true value={(*umbral).clone()} oninput={on_umbral_change} min="0" step="0.01" />
                         </div>
                         <div>
-                            <label class="gi-label">{"Año Fiscal"}</label>
+                            <label class="gi-label">{"AÃ±o Fiscal"}</label>
                             <input type="number" class="gi-input" required=true value={anio.to_string()} oninput={on_anio_change} min="2020" max="2100" />
                         </div>
                         <div>
@@ -706,14 +662,9 @@ fn UmbralConfigSection(props: &UmbralConfigSectionProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Helper Functions
-// ---------------------------------------------------------------------------
-
 fn format_dop(value: f64) -> String {
     let abs_val = value.abs();
     let formatted = format!("{abs_val:.2}");
-    // Insert thousands separators manually
     let parts: Vec<&str> = formatted.split('.').collect();
     let integer_part = parts[0];
     let decimal_part = parts.get(1).unwrap_or(&"00");
@@ -732,7 +683,6 @@ fn format_dop(value: f64) -> String {
 }
 
 fn format_date(iso_date: &str) -> String {
-    // Convert YYYY-MM-DD to DD/MM/YYYY
     if let Some((y, rest)) = iso_date.split_once('-') {
         if let Some((m, d)) = rest.split_once('-') {
             return format!("{d}/{m}/{y}");

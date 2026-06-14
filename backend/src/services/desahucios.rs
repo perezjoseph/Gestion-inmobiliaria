@@ -36,7 +36,6 @@ pub async fn create(
     usuario_id: Uuid,
     organizacion_id: Uuid,
 ) -> Result<DesahucioResponse, AppError> {
-    // Validate the contract exists and is active
     let contrato = contrato::Entity::find_by_id(input.contrato_id)
         .filter(contrato::Column::OrganizacionId.eq(organizacion_id))
         .one(db)
@@ -176,8 +175,6 @@ pub async fn list(
     })
 }
 
-/// Validate state transitions for desahucio.
-/// Valid transitions: `iniciado→en_progreso`, `en_progreso→completado`, `iniciado→completado`
 pub fn validate_estado_transition(from: &str, to: &str) -> Result<(), AppError> {
     let valid = matches!(
         (from, to),

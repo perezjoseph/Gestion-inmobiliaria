@@ -12,7 +12,6 @@ use crate::services::auth::is_authenticated;
 pub fn Landing() -> Html {
     let navigator = use_navigator();
 
-    // Redirect authenticated users to dashboard
     use_effect_with((), move |()| {
         if is_authenticated() {
             if let Some(nav) = navigator {
@@ -21,7 +20,6 @@ pub fn Landing() -> Html {
         }
     });
 
-    // If authenticated, render nothing while redirect happens
     if is_authenticated() {
         return html! {};
     }

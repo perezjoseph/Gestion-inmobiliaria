@@ -177,7 +177,6 @@ pub async fn list(
     let mut responses: Vec<PropiedadResponse> =
         records.into_iter().map(PropiedadResponse::from).collect();
 
-    // Batch-query unidades counts using is_in() to avoid N+1
     if !responses.is_empty() {
         let propiedad_ids: Vec<Uuid> = responses.iter().map(|r| r.id).collect();
 
@@ -360,14 +359,12 @@ pub async fn resumen(
     use crate::models::propiedad::{MantenimientoPorEstado, PropiedadResumen};
     use sea_orm::sea_query::Expr;
 
-    // Verify property exists and belongs to org
     propiedad::Entity::find_by_id(id)
         .filter(propiedad::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Propiedad no encontrada".to_string()))?;
 
-    // Count active contracts
     let contratos_activos = contrato::Entity::find()
         .filter(contrato::Column::PropiedadId.eq(id))
         .filter(contrato::Column::OrganizacionId.eq(org_id))
@@ -375,7 +372,6 @@ pub async fn resumen(
         .count(db)
         .await?;
 
-    // Sum pending payments in DOP for contracts of this property
     #[derive(Debug, FromQueryResult)]
     struct SumRow {
         total: Option<rust_decimal::Decimal>,
@@ -405,7 +401,6 @@ pub async fn resumen(
         .and_then(|r| r.total)
         .unwrap_or(rust_decimal::Decimal::ZERO);
 
-    // Maintenance requests by status
     let maint_records = solicitud_mantenimiento::Entity::find()
         .filter(solicitud_mantenimiento::Column::PropiedadId.eq(id))
         .filter(solicitud_mantenimiento::Column::OrganizacionId.eq(org_id))

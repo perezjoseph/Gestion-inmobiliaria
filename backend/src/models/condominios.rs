@@ -3,7 +3,6 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// Request to create a new condominium fee for a property.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CrearCuotaRequest {
@@ -17,7 +16,6 @@ pub struct CrearCuotaRequest {
     pub contrato_id: Option<Uuid>,
 }
 
-/// Request to update an existing condominium fee. All fields optional for partial updates.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCuotaRequest {
@@ -29,7 +27,6 @@ pub struct UpdateCuotaRequest {
     pub contrato_id: Option<Uuid>,
 }
 
-/// Response representing a condominium fee record.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CuotaResponse {
@@ -44,7 +41,6 @@ pub struct CuotaResponse {
     pub contrato_id: Option<Uuid>,
 }
 
-/// Breakdown of billing amounts including base rent, condominium fee, and applicable ITBIS.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BillingDesglose {

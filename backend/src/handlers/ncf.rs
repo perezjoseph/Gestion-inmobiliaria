@@ -6,7 +6,6 @@ use crate::middleware::rbac::AdminOnly;
 use crate::models::ncf::ConfigurarRangoRequest;
 use crate::services::ncf;
 
-/// GET /api/v1/ncf/secuencias — list NCF sequences for the organization.
 pub async fn listar_secuencias(
     db: web::Data<DatabaseConnection>,
     admin: AdminOnly,
@@ -16,7 +15,6 @@ pub async fn listar_secuencias(
     Ok(HttpResponse::Ok().json(responses))
 }
 
-/// POST /api/v1/ncf/configurar-rango — configure an authorized NCF range.
 pub async fn configurar_rango_handler(
     db: web::Data<DatabaseConnection>,
     admin: AdminOnly,
@@ -27,7 +25,6 @@ pub async fn configurar_rango_handler(
     Ok(HttpResponse::Ok().json(result))
 }
 
-/// GET /api/v1/ncf/alertas — check range consumption alerts.
 pub async fn obtener_alertas(
     db: web::Data<DatabaseConnection>,
     admin: AdminOnly,

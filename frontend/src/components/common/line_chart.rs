@@ -1,6 +1,5 @@
 use yew::prelude::*;
 
-/// A data point for the line chart.
 #[derive(Clone, PartialEq)]
 pub struct ChartPoint {
     pub label: AttrValue,
@@ -51,7 +50,6 @@ pub fn LineChart(props: &LineChartProps) -> Html {
         usable_w
     };
 
-    // Build the polyline path
     let path_data: String = points
         .iter()
         .enumerate()
@@ -66,7 +64,6 @@ pub fn LineChart(props: &LineChartProps) -> Html {
         })
         .collect();
 
-    // Build the filled area path
     let area_data = {
         let baseline_y = PADDING_TOP + usable_h;
         let first_x = PADDING_LEFT;
@@ -74,7 +71,6 @@ pub fn LineChart(props: &LineChartProps) -> Html {
         format!("{path_data} L {last_x:.1} {baseline_y:.1} L {first_x:.1} {baseline_y:.1} Z")
     };
 
-    // Y-axis grid lines (4 steps)
     let grid_lines: Vec<Html> = (0..=4)
         .map(|i| {
             let frac = f64::from(i) / 4.0;
@@ -105,7 +101,6 @@ pub fn LineChart(props: &LineChartProps) -> Html {
         })
         .collect();
 
-    // X-axis labels
     let x_labels: Vec<Html> = points
         .iter()
         .enumerate()
@@ -127,7 +122,6 @@ pub fn LineChart(props: &LineChartProps) -> Html {
         })
         .collect();
 
-    // Data point dots
     let dots: Vec<Html> = points
         .iter()
         .enumerate()

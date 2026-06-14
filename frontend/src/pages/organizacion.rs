@@ -44,7 +44,7 @@ pub fn OrganizacionPage() -> Html {
     if !is_admin {
         return html! {
             <div class="gi-empty-state">
-                <div class="gi-empty-state-title">{"No tiene permisos para acceder a esta sección"}</div>
+                <div class="gi-empty-state-title">{"No tiene permisos para acceder a esta secciÃ³n"}</div>
             </div>
         };
     }
@@ -56,7 +56,7 @@ pub fn OrganizacionPage() -> Html {
     html! {
         <div>
             <div class="gi-page-header">
-                <h1 class="gi-page-title">{"Organización"}</h1>
+                <h1 class="gi-page-title">{"OrganizaciÃ³n"}</h1>
                 <button class="gi-btn gi-btn-primary">{"Editar"}</button>
             </div>
 
@@ -68,21 +68,21 @@ pub fn OrganizacionPage() -> Html {
 
             {(*org).as_ref().map_or_else(|| html! {
                 <div class="gi-empty-state">
-                    <div class="gi-empty-state-title">{"Sin datos de organización"}</div>
-                    <p class="gi-empty-state-text">{"La información de la organización aparecerá aquí."}</p>
+                    <div class="gi-empty-state-title">{"Sin datos de organizaciÃ³n"}</div>
+                    <p class="gi-empty-state-text">{"La informaciÃ³n de la organizaciÃ³n aparecerÃ¡ aquÃ­."}</p>
                 </div>
             }, |data| html! {
                 <div class="gi-card" style="padding: var(--space-6);">
                     <OrgField label="Nombre" value={data.nombre.clone()} />
                     <OrgField label="Tipo" value={data.tipo.clone()} />
                     <OrgField label="Estado" value={data.estado.clone()} />
-                    <OrgField label="Cédula" value={data.cedula.clone().unwrap_or_default()} />
+                    <OrgField label="CÃ©dula" value={data.cedula.clone().unwrap_or_default()} />
                     <OrgField label="RNC" value={data.rnc.clone().unwrap_or_default()} />
-                    <OrgField label="Razón Social" value={data.razon_social.clone().unwrap_or_default()} />
+                    <OrgField label="RazÃ³n Social" value={data.razon_social.clone().unwrap_or_default()} />
                     <OrgField label="Nombre Comercial" value={data.nombre_comercial.clone().unwrap_or_default()} />
-                    <OrgField label="Teléfono" value={data.telefono.clone().unwrap_or_default()} />
+                    <OrgField label="TelÃ©fono" value={data.telefono.clone().unwrap_or_default()} />
                     <OrgField label="Email" value={data.email.clone().unwrap_or_default()} />
-                    <OrgField label="Dirección Fiscal" value={data.direccion_fiscal.clone().unwrap_or_default()} />
+                    <OrgField label="DirecciÃ³n Fiscal" value={data.direccion_fiscal.clone().unwrap_or_default()} />
                     <OrgField label="Representante Legal" value={data.representante_legal.clone().unwrap_or_default()} />
                     <OrgField label="Creado" value={format_date_display(&data.created_at)} />
                 </div>

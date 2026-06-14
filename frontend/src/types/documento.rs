@@ -12,7 +12,6 @@ pub struct DocumentoResponse {
     pub file_size: i64,
     pub uploaded_by: String,
     pub created_at: String,
-    // Document management fields
     pub tipo_documento: Option<String>,
     pub estado_verificacion: Option<String>,
     pub fecha_vencimiento: Option<String>,
@@ -21,7 +20,6 @@ pub struct DocumentoResponse {
     pub numero_documento: Option<String>,
     pub contenido_editable: Option<serde_json::Value>,
     pub updated_at: Option<String>,
-    // Signature/sealing fields
     #[serde(default)]
     pub sellado: bool,
     pub sellado_at: Option<String>,

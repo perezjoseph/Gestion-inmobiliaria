@@ -2,8 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::deserialize_f64_from_any;
 
-// --- Guidance Rules ---
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum GuidanceCategory {
@@ -61,8 +59,6 @@ pub struct BatchUpdateItem {
 pub struct BatchUpdateRequest {
     pub rules: Vec<BatchUpdateItem>,
 }
-
-// --- Configuration DTOs ---
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -136,8 +132,6 @@ pub struct ChatbotConfigUpdateRequest {
     pub retention_days: Option<i32>,
 }
 
-// --- Connection Status ---
-
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionStatusResponse {
@@ -146,8 +140,6 @@ pub struct ConnectionStatusResponse {
     pub connected_phone: Option<String>,
     pub connected_at: Option<String>,
 }
-
-// --- Test Chat DTOs ---
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -180,12 +172,10 @@ pub struct TestChatRequest {
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub config_override: Option<TestChatConfigOverride>,
-    /// Conversation history for multi-turn context in the test sandbox.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub history: Vec<TestChatHistoryEntry>,
 }
 
-/// A single message in the test chat conversation history.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct TestChatHistoryEntry {
@@ -200,8 +190,6 @@ pub struct TestChatResponse {
     pub tools_invoked: Vec<String>,
 }
 
-// --- Conversation DTOs ---
-
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ConversationListItem {
@@ -211,8 +199,6 @@ pub struct ConversationListItem {
     pub last_message_at: String,
     pub message_count: i64,
 }
-
-// --- Receipt DTOs ---
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]

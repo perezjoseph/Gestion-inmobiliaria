@@ -77,8 +77,8 @@ pub fn indexacion() -> Html {
     html! {
         <div>
             <div class="gi-page-header">
-                <h1 class="gi-page-title">{"Indexación de Contratos"}</h1>
-                <p class="gi-page-subtitle">{"Contratos próximos a vencer (60 días) — propuestas de ajuste basadas en IPC y Ley 85-25"}</p>
+                <h1 class="gi-page-title">{"IndexaciÃ³n de Contratos"}</h1>
+                <p class="gi-page-subtitle">{"Contratos prÃ³ximos a vencer (60 dÃ­as) â€” propuestas de ajuste basadas en IPC y Ley 85-25"}</p>
             </div>
 
             if *loading {
@@ -87,9 +87,9 @@ pub fn indexacion() -> Html {
                 <ErrorBanner message={err.clone()} />
             } else if contratos.is_empty() {
                 <div class="gi-empty-state">
-                    <div class="gi-empty-state-icon">{"📋"}</div>
+                    <div class="gi-empty-state-icon">{"ðŸ“‹"}</div>
                     <div class="gi-empty-state-title">{"Sin contratos por renovar"}</div>
-                    <p class="gi-empty-state-text">{"No hay contratos con vencimiento en los próximos 60 días."}</p>
+                    <p class="gi-empty-state-text">{"No hay contratos con vencimiento en los prÃ³ximos 60 dÃ­as."}</p>
                 </div>
             } else {
                 <ContratosProximosTable
@@ -110,8 +110,6 @@ pub fn indexacion() -> Html {
     }
 }
 
-// --- Table of upcoming renewals ---
-
 #[derive(Properties, PartialEq)]
 struct ContratosProximosTableProps {
     contratos: Vec<ContratoProximoVencer>,
@@ -130,7 +128,7 @@ fn contratos_proximos_table(props: &ContratosProximosTableProps) -> Html {
                             <th>{"Propiedad"}</th>
                             <th>{"Inquilino"}</th>
                             <th>{"Fecha Fin"}</th>
-                            <th>{"Días Restantes"}</th>
+                            <th>{"DÃ­as Restantes"}</th>
                             <th>{"Monto Actual"}</th>
                             <th>{"Acciones"}</th>
                         </tr>
@@ -172,7 +170,7 @@ fn render_contrato_row(
             <td class="tabular-nums">{format_date_display(&contrato.fecha_fin)}</td>
             <td>
                 <span class={urgency_class}>
-                    {format!("{} días", contrato.dias_restantes)}
+                    {format!("{} dÃ­as", contrato.dias_restantes)}
                 </span>
             </td>
             <td class="tabular-nums">{format_currency(&contrato.moneda, contrato.monto_actual)}</td>
@@ -186,8 +184,6 @@ fn render_contrato_row(
         </tr>
     }
 }
-
-// --- Propuesta Modal ---
 
 #[derive(Properties, PartialEq)]
 struct PropuestaModalProps {
@@ -266,7 +262,7 @@ fn propuesta_modal(props: &PropuestaModalProps) -> Html {
                     Ok(_) => {
                         push_toast(
                             toasts.as_ref(),
-                            "Renovación aprobada exitosamente",
+                            "RenovaciÃ³n aprobada exitosamente",
                             ToastKind::Success,
                         );
                         on_approved.emit(());
@@ -296,13 +292,13 @@ fn propuesta_modal(props: &PropuestaModalProps) -> Html {
             }
             let monto_str = (*override_monto).clone();
             let Ok(monto_val) = monto_str.parse::<f64>() else {
-                submit_error.set(Some("Monto inválido".into()));
+                submit_error.set(Some("Monto invÃ¡lido".into()));
                 return;
             };
             if let Some(ref p) = *propuesta {
                 if monto_val > p.monto_maximo {
                     submit_error.set(Some(
-                        "El monto no puede exceder el máximo permitido por Ley 85-25".into(),
+                        "El monto no puede exceder el mÃ¡ximo permitido por Ley 85-25".into(),
                     ));
                     return;
                 }
@@ -331,7 +327,7 @@ fn propuesta_modal(props: &PropuestaModalProps) -> Html {
                     Ok(_) => {
                         push_toast(
                             toasts.as_ref(),
-                            "Renovación aprobada con monto personalizado",
+                            "RenovaciÃ³n aprobada con monto personalizado",
                             ToastKind::Success,
                         );
                         on_approved.emit(());
@@ -357,7 +353,7 @@ fn propuesta_modal(props: &PropuestaModalProps) -> Html {
         <div class="gi-modal-overlay">
             <div class="gi-modal" style="max-width: 560px;">
                 <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
-                    {"Propuesta de Renovación"}
+                    {"Propuesta de RenovaciÃ³n"}
                 </h3>
 
                 if *loading {
@@ -389,8 +385,6 @@ fn propuesta_modal(props: &PropuestaModalProps) -> Html {
     }
 }
 
-// --- Propuesta detail sub-component ---
-
 #[derive(Properties, PartialEq)]
 struct PropuestaDetailProps {
     propuesta: PropuestaRenovacion,
@@ -410,13 +404,13 @@ fn propuesta_detail(props: &PropuestaDetailProps) -> Html {
         <>
             if p.datos_stale {
                 <div class="gi-alert gi-alert-warning" style="margin-bottom: var(--space-4);">
-                    {"⚠️ Los datos de IPC están desactualizados (más de 90 días). La propuesta se basa en datos en caché."}
+                    {"âš ï¸ Los datos de IPC estÃ¡n desactualizados (mÃ¡s de 90 dÃ­as). La propuesta se basa en datos en cachÃ©."}
                 </div>
             }
 
             <div style="padding: var(--space-4); background: var(--bg-subtle); border-radius: var(--radius-md); margin-bottom: var(--space-4);">
                 <h4 style="font-weight: 600; margin-bottom: var(--space-3); color: var(--text-primary);">
-                    {"Información de Auditoría"}
+                    {"InformaciÃ³n de AuditorÃ­a"}
                 </h4>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
                     <div>
@@ -435,7 +429,7 @@ fn propuesta_detail(props: &PropuestaDetailProps) -> Html {
                         <span class="tabular-nums" style="font-weight: 500;">{format!("RD$ {:.2}", p.monto_actual)}</span>
                     </div>
                     <div>
-                        <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Monto Propuesto (máximo)"}</span>
+                        <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Monto Propuesto (mÃ¡ximo)"}</span>
                         <span class="tabular-nums" style="font-weight: 500; color: var(--color-success);">{format!("RD$ {:.2}", p.monto_maximo)}</span>
                     </div>
                 </div>
@@ -459,7 +453,7 @@ fn propuesta_detail(props: &PropuestaDetailProps) -> Html {
 
                 <div style="border-top: 1px solid var(--border-subtle); padding-top: var(--space-3);">
                     <label class="gi-label" style="margin-bottom: var(--space-2); display: block;">
-                        {"Monto personalizado (solo menor al máximo, per Ley 85-25)"}
+                        {"Monto personalizado (solo menor al mÃ¡ximo, per Ley 85-25)"}
                     </label>
                     <div style="display: flex; gap: var(--space-2);">
                         <input

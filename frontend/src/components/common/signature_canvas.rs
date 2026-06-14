@@ -38,7 +38,6 @@ pub fn SignatureCanvas(props: &SignatureCanvasProps) -> Html {
     let is_drawing = use_state(|| false);
     let has_drawn = use_state(|| false);
 
-    // Set up canvas context on mount
     {
         let canvas_ref = canvas_ref.clone();
         use_effect_with((), move |()| {
@@ -53,7 +52,6 @@ pub fn SignatureCanvas(props: &SignatureCanvasProps) -> Html {
         });
     }
 
-    // Mouse event handlers
     let onmousedown = {
         let canvas_ref = canvas_ref.clone();
         let is_drawing = is_drawing.clone();
@@ -106,7 +104,6 @@ pub fn SignatureCanvas(props: &SignatureCanvasProps) -> Html {
         })
     };
 
-    // Touch event handlers via EventListener (yew doesn't have native touch callbacks)
     {
         let canvas_ref = canvas_ref.clone();
         let is_drawing = is_drawing.clone();
@@ -171,7 +168,6 @@ pub fn SignatureCanvas(props: &SignatureCanvasProps) -> Html {
         });
     }
 
-    // Clear button handler
     let on_clear = {
         let canvas_ref = canvas_ref.clone();
         let has_drawn = has_drawn.clone();
@@ -183,14 +179,12 @@ pub fn SignatureCanvas(props: &SignatureCanvasProps) -> Html {
         })
     };
 
-    // Submit button handler — export canvas as PNG base64
     let on_submit_click = {
         let canvas_ref = canvas_ref.clone();
         let on_submit = props.on_submit.clone();
         Callback::from(move |_: MouseEvent| {
             if let Some(canvas) = canvas_ref.cast::<HtmlCanvasElement>() {
                 if let Ok(data_url) = canvas.to_data_url_with_type("image/png") {
-                    // Strip the "data:image/png;base64," prefix
                     let base64 = data_url
                         .strip_prefix("data:image/png;base64,")
                         .unwrap_or(&data_url)

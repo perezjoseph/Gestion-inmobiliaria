@@ -250,7 +250,6 @@ pub(crate) async fn generar_pagos_vencidos(
         return Ok(0);
     }
 
-    // Batch-fetch contratos
     let contrato_ids: Vec<Uuid> = pagos.iter().map(|p| p.contrato_id).collect();
     let contratos = contrato::Entity::find()
         .filter(contrato::Column::Id.is_in(contrato_ids))
@@ -259,7 +258,6 @@ pub(crate) async fn generar_pagos_vencidos(
     let contrato_map: HashMap<Uuid, &contrato::Model> =
         contratos.iter().map(|c| (c.id, c)).collect();
 
-    // Batch-fetch propiedades
     let propiedad_ids: Vec<Uuid> = contratos.iter().map(|c| c.propiedad_id).collect();
     let propiedades = propiedad::Entity::find()
         .filter(propiedad::Column::Id.is_in(propiedad_ids))
@@ -338,7 +336,6 @@ pub(crate) async fn generar_contratos_por_vencer(
         return Ok(0);
     }
 
-    // Batch-fetch propiedades
     let propiedad_ids: Vec<Uuid> = contratos.iter().map(|c| c.propiedad_id).collect();
     let propiedades = propiedad::Entity::find()
         .filter(propiedad::Column::Id.is_in(propiedad_ids))
@@ -406,8 +403,6 @@ pub(crate) async fn generar_documentos_vencidos(
     let today = Utc::now().date_naive();
     let limit_date = today + chrono::Duration::days(DIAS_ANTICIPACION);
 
-    // Documents are polymorphic (no organizacion_id). Fetch all expiring documents,
-    // then resolve org membership through their parent entities.
     let documentos = documento::Entity::find()
         .filter(documento::Column::FechaVencimiento.is_not_null())
         .filter(documento::Column::FechaVencimiento.lte(limit_date))
@@ -418,7 +413,6 @@ pub(crate) async fn generar_documentos_vencidos(
         return Ok(0);
     }
 
-    // Group document parent entity IDs by entity_type to batch-resolve org membership
     let mut propiedad_doc_ids: Vec<Uuid> = Vec::new();
     let mut contrato_doc_ids: Vec<Uuid> = Vec::new();
 
@@ -430,7 +424,6 @@ pub(crate) async fn generar_documentos_vencidos(
         }
     }
 
-    // Batch-fetch parent entities and build org lookup sets
     let mut entity_org_map: HashMap<(String, Uuid), Uuid> = HashMap::new();
 
     if !propiedad_doc_ids.is_empty() {
@@ -453,10 +446,6 @@ pub(crate) async fn generar_documentos_vencidos(
         }
     }
 
-    // Inquilinos don't have organizacion_id — skip org filtering for those
-    // (they won't match any org and will be excluded)
-
-    // Filter documents to those belonging to the given organization
     let org_docs: Vec<&documento::Model> = documentos
         .iter()
         .filter(|doc| {
@@ -519,8 +508,6 @@ pub(crate) async fn generar_documentos_vencidos(
     Ok(count)
 }
 
-/// Pure helper: given days remaining until contract expiration,
-/// returns which reminder thresholds (90, 60, 30) should fire.
 pub fn thresholds_for_days(days_remaining: i64) -> Vec<i64> {
     [90i64, 60, 30]
         .iter()
@@ -553,7 +540,6 @@ pub(crate) async fn generar_renovacion_reminders(
         return Ok(0);
     }
 
-    // Batch-fetch existing renewal notifications for dedup
     let contrato_ids: Vec<Uuid> = contratos.iter().map(|c| c.id).collect();
     let existing_notifs = notificacion::Entity::find()
         .filter(notificacion::Column::Tipo.eq("contrato_renovacion"))
@@ -574,7 +560,6 @@ pub(crate) async fn generar_renovacion_reminders(
             let marker = format!("[{threshold}d]");
 
             for &uid in &usuario_ids {
-                // Dedup: check if notification with this marker already exists
                 let already_exists = existing_notifs.iter().any(|n| {
                     n.entity_id == contrato_model.id
                         && n.usuario_id == uid
@@ -639,7 +624,6 @@ pub(crate) async fn generar_deposito_devolucion(
 
     let contrato_ids: Vec<Uuid> = contratos.iter().map(|c| c.id).collect();
 
-    // Batch-fetch existing deposit notifications for dedup
     let existing_pending = notificacion::Entity::find()
         .filter(notificacion::Column::Tipo.eq("deposito_devolucion_pendiente"))
         .filter(notificacion::Column::EntityType.eq("contrato"))
@@ -669,7 +653,6 @@ pub(crate) async fn generar_deposito_devolucion(
     let mut batch: Vec<notificacion::ActiveModel> = Vec::new();
 
     for contrato_model in &contratos {
-        // Use updated_at as proxy for termination date
         let termination_date = contrato_model.updated_at;
         let days_since = (today - termination_date.with_timezone(&Utc)).num_days();
 
@@ -722,7 +705,6 @@ pub(crate) async fn generar_deposito_devolucion(
     Ok(count)
 }
 
-/// Días de anticipación para notificar pagos próximos a vencer.
 const DIAS_ANTICIPACION_PAGO: i64 = 5;
 
 pub(crate) async fn generar_pagos_por_vencer(
@@ -744,7 +726,6 @@ pub(crate) async fn generar_pagos_por_vencer(
         return Ok(0);
     }
 
-    // Batch-fetch contratos
     let contrato_ids: Vec<Uuid> = pagos.iter().map(|p| p.contrato_id).collect();
     let contratos = contrato::Entity::find()
         .filter(contrato::Column::Id.is_in(contrato_ids))
@@ -753,7 +734,6 @@ pub(crate) async fn generar_pagos_por_vencer(
     let contrato_map: HashMap<Uuid, &contrato::Model> =
         contratos.iter().map(|c| (c.id, c)).collect();
 
-    // Batch-fetch propiedades
     let propiedad_ids: Vec<Uuid> = contratos.iter().map(|c| c.propiedad_id).collect();
     let propiedades = propiedad::Entity::find()
         .filter(propiedad::Column::Id.is_in(propiedad_ids))
@@ -864,7 +844,6 @@ pub async fn crear_notificacion_mantenimiento<C: sea_orm::ConnectionTrait>(
         return Ok(0);
     }
 
-    // Check for existing notifications to avoid unique constraint violations
     let existing_records = notificacion::Entity::find()
         .filter(notificacion::Column::Tipo.eq("mantenimiento_actualizado"))
         .filter(notificacion::Column::EntityType.eq("solicitud_mantenimiento"))

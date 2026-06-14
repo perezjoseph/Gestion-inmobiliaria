@@ -12,11 +12,11 @@ pub fn LandingHero() -> Html {
                     <p class="gi-l-eyebrow"><span class="gi-l-dot gi-l-dot--accent"></span>{"Simple y gratis"}</p>
                     <h1 class="gi-l-hero-title">
                         {"Gestiona tus propiedades en "}
-                        <span class="gi-l-hero-title-accent">{"República Dominicana"}</span>
+                        <span class="gi-l-hero-title-accent">{"RepÃºblica Dominicana"}</span>
                         {"."}
                     </h1>
                     <p class="gi-l-hero-lead">
-                        {"Una herramienta para administradores que quieren todo en orden: propiedades, inquilinos, contratos, pagos y más, sin complicaciones."}
+                        {"Una herramienta para administradores que quieren todo en orden: propiedades, inquilinos, contratos, pagos y mÃ¡s, sin complicaciones."}
                     </p>
                     <div class="gi-l-cta-row">
                         <Link<Route>
@@ -41,7 +41,7 @@ pub fn LandingHero() -> Html {
                         </div>
                         <div class="gi-l-mini-stat">
                             <span class="gi-l-mini-stat-placeholder"></span>
-                            <span class="gi-l-mini-stat-label">{"Ocupación"}</span>
+                            <span class="gi-l-mini-stat-label">{"OcupaciÃ³n"}</span>
                         </div>
                         <div class="gi-l-mini-stat">
                             <span class="gi-l-mini-stat-placeholder gi-l-mini-stat-placeholder--accent"></span>

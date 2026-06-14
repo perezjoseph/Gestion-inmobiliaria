@@ -10,13 +10,7 @@ use crate::entities::inquilino;
 use crate::errors::AppError;
 use crate::models::ocr::{ExtractField, ImportPreview, OcrResult, PreviewField};
 
-// Feature: spec-gap-remediation, Property 5
 #[allow(clippy::too_long_first_doc_paragraph)]
-/// Best-effort tenant matcher by full name.
-///
-/// Looks up an `inquilino` by `LIKE %trimmed%` over `nombre || ' ' || apellido`
-/// within the caller's `organizacion_id`. Returns `Some(id)` only when exactly
-/// one candidate matches; otherwise `None` (never returns the wrong tenant).
 pub async fn match_inquilino_by_name<C: ConnectionTrait>(
     db: &C,
     nombre_extraido: &str,
@@ -28,7 +22,6 @@ pub async fn match_inquilino_by_name<C: ConnectionTrait>(
     }
     let pattern = format!("%{trimmed}%");
 
-    // Build: (nombre || ' ' || apellido) LIKE '%trimmed%'
     let concat_expr = SimpleExpr::Custom(format!(
         "\"nombre\" || ' ' || \"apellido\" LIKE '{}'",
         pattern.replace('\'', "''")
@@ -52,7 +45,6 @@ fn field_confidence(result: &OcrResult, value: &str) -> f64 {
         return 0.0;
     }
 
-    // 1. Exact substring match (original logic)
     let exact = result
         .lines
         .iter()
@@ -64,7 +56,6 @@ fn field_confidence(result: &OcrResult, value: &str) -> f64 {
         return exact;
     }
 
-    // 2. Digits-only match: strip non-digit chars and compare
     let value_digits: String = value.chars().filter(char::is_ascii_digit).collect();
     if value_digits.len() >= 3 {
         let digits_match = result
@@ -426,7 +417,6 @@ pub fn map_contrato(result: &OcrResult) -> Result<Vec<ExtractField>, AppError> {
         }
     };
 
-    // Party information
     let arrendador_nombre = fields.get("arrendador_nombre").map_or("", String::as_str);
     let arrendador_cedula_raw = fields.get("arrendador_cedula").map_or("", String::as_str);
     let arrendador_cedula = if arrendador_cedula_raw.is_empty() {

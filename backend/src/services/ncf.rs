@@ -12,23 +12,13 @@ use crate::entities::secuencia_ncf;
 use crate::errors::AppError;
 use crate::models::ncf::{AlertaRango, ConfigurarRangoRequest, SecuenciaNcfResponse, TipoNCF};
 
-/// NCF format regex: 1 uppercase letter + 10 digits.
 static NCF_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    // This regex is a compile-time constant and cannot fail.
     #[allow(clippy::expect_used)]
     Regex::new(r"^[A-Z]\d{10}$").expect("NCF regex is valid")
 });
 
-/// Alert threshold: warn when 80% of range is consumed.
 const ALERTA_UMBRAL: f64 = 0.80;
 
-/// Assign the next sequential NCF number for an organization and NCF type.
-///
-/// Uses `SELECT ... FOR UPDATE` row-level locking to guarantee gapless sequential
-/// generation. Retries once on concurrency conflict (constraint violation).
-///
-/// If assignment fails, the caller should leave the payment as `pagado` and flag
-/// it for manual NCF resolution.
 pub async fn asignar_ncf(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -43,14 +33,12 @@ pub async fn asignar_ncf(
                 tipo_ncf = %tipo_ncf,
                 "Conflicto de concurrencia al asignar NCF, reintentando"
             );
-            // Single retry for concurrency conflicts only
             asignar_ncf_interno(db, org_id, &tipo_ncf).await
         }
         Err(e) => Err(e),
     }
 }
 
-/// Internal NCF assignment within a transaction with row-level locking.
 async fn asignar_ncf_interno(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -58,7 +46,6 @@ async fn asignar_ncf_interno(
 ) -> Result<String, AppError> {
     let txn = db.begin().await?;
 
-    // Find the active sequence for this org + tipo_ncf with row-level lock
     let secuencia = secuencia_ncf::Entity::find()
         .filter(secuencia_ncf::Column::OrganizacionId.eq(org_id))
         .filter(secuencia_ncf::Column::TipoNcf.eq(tipo_ncf.to_string()))
@@ -74,25 +61,20 @@ async fn asignar_ncf_interno(
 
     let numero_actual = secuencia.siguiente_numero;
 
-    // Validate number falls within authorized range
     if numero_actual > secuencia.rango_hasta {
         return Err(AppError::Validation(
             "Rango de NCF agotado. Solicite nueva autorización a DGII".to_string(),
         ));
     }
 
-    // Build NCF string: prefijo (1 char) + tipo_code (2 digits) + sequential (8 digits)
     let tipo_code = tipo_ncf_code(tipo_ncf);
     let ncf = format!("{}{}{:08}", secuencia.prefijo, tipo_code, numero_actual);
 
-    // Validate generated NCF format
     validar_formato_ncf(&ncf)?;
 
-    // Capture range values before consuming the model via update
     let rango_desde = secuencia.rango_desde;
     let rango_hasta = secuencia.rango_hasta;
 
-    // Increment the sequence
     let mut active: secuencia_ncf::ActiveModel = secuencia.into();
     active.siguiente_numero = Set(numero_actual + 1);
     active.updated_at = Set(chrono::Utc::now().into());
@@ -100,7 +82,6 @@ async fn asignar_ncf_interno(
 
     txn.commit().await?;
 
-    // Check range consumption and log warning (non-blocking)
     let siguiente = numero_actual + 1;
     let rango_total = rango_hasta - rango_desde;
     let consumido = siguiente - rango_desde;
@@ -119,16 +100,11 @@ async fn asignar_ncf_interno(
     Ok(ncf)
 }
 
-/// Configure an authorized NCF sequence range for an organization.
-///
-/// Creates a new sequence or updates an existing one for the given `tipo_ncf`.
-/// Validates that `rango_desde` < `rango_hasta` and that the prefix is valid.
 pub async fn configurar_rango(
     db: &DatabaseConnection,
     org_id: Uuid,
     input: ConfigurarRangoRequest,
 ) -> Result<SecuenciaNcfResponse, AppError> {
-    // Validate range
     if input.rango_desde >= input.rango_hasta {
         return Err(AppError::Validation(
             "rango_desde debe ser menor que rango_hasta".to_string(),
@@ -141,7 +117,6 @@ pub async fn configurar_rango(
         ));
     }
 
-    // Validate prefix: must be 'B' (physical) or 'E' (e-CF)
     if input.prefijo != 'B' && input.prefijo != 'E' {
         return Err(AppError::Validation(
             "Prefijo debe ser 'B' (físico) o 'E' (e-CF)".to_string(),
@@ -152,7 +127,6 @@ pub async fn configurar_rango(
     let tipo_ncf_str = input.tipo_ncf.to_string();
     let prefijo_str = input.prefijo.to_string();
 
-    // Check if a sequence already exists for this org + tipo_ncf + prefijo
     let existing = secuencia_ncf::Entity::find()
         .filter(secuencia_ncf::Column::OrganizacionId.eq(org_id))
         .filter(secuencia_ncf::Column::TipoNcf.eq(&tipo_ncf_str))
@@ -161,7 +135,6 @@ pub async fn configurar_rango(
         .await?;
 
     let model = if let Some(existing_model) = existing {
-        // Update existing sequence
         let mut active: secuencia_ncf::ActiveModel = existing_model.into();
         active.rango_desde = Set(input.rango_desde);
         active.rango_hasta = Set(input.rango_hasta);
@@ -171,7 +144,6 @@ pub async fn configurar_rango(
         active.updated_at = Set(chrono::Utc::now().into());
         active.update(db).await?
     } else {
-        // Create new sequence
         let now = chrono::Utc::now().into();
         let active = secuencia_ncf::ActiveModel {
             id: Set(Uuid::new_v4()),
@@ -192,10 +164,6 @@ pub async fn configurar_rango(
     Ok(to_response(&model))
 }
 
-/// Validate NCF format: must match `^[A-Z]\d{10}$`.
-///
-/// - 'E' prefix for e-CF organizations
-/// - 'B' prefix for physical NCF
 pub fn validar_formato_ncf(ncf: &str) -> Result<(), AppError> {
     if !NCF_REGEX.is_match(ncf) {
         return Err(AppError::Validation(format!(
@@ -205,7 +173,6 @@ pub fn validar_formato_ncf(ncf: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Returns alerts for sequences that have consumed >= 80% of their range.
 pub async fn verificar_consumo_rango(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -240,12 +207,6 @@ pub async fn verificar_consumo_rango(
     Ok(alertas)
 }
 
-/// List all NCF sequences for an organization.
-///
-/// The fiscal-access gate is intentionally removed from this read path so that any
-/// admin (even of an informal org with no DGII registration) can view the sequence
-/// list (which will simply be empty). RBAC (`AdminOnly`) and the multi-tenant
-/// `organizacion_id` filter remain enforced at the handler layer.
 pub async fn listar_secuencias(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -260,7 +221,6 @@ pub async fn listar_secuencias(
     Ok(responses)
 }
 
-/// Get NCF range consumption alerts (with fiscal access check).
 pub async fn obtener_alertas(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -271,7 +231,6 @@ pub async fn obtener_alertas(
     verificar_consumo_rango(db, org_id).await
 }
 
-/// Configure an NCF range (with fiscal access check).
 pub async fn configurar_rango_con_acceso(
     db: &DatabaseConnection,
     org_id: Uuid,
@@ -283,9 +242,6 @@ pub async fn configurar_rango_con_acceso(
     configurar_rango(db, org_id, input).await
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-/// Map `TipoNCF` to its 2-digit type code for NCF string construction.
 const fn tipo_ncf_code(tipo: &TipoNCF) -> &'static str {
     match tipo {
         TipoNCF::B01 => "01",
@@ -295,7 +251,6 @@ const fn tipo_ncf_code(tipo: &TipoNCF) -> &'static str {
     }
 }
 
-/// Parse a string into `TipoNCF`.
 fn parse_tipo_ncf(s: &str) -> Result<TipoNCF, AppError> {
     match s {
         "B01" => Ok(TipoNCF::B01),
@@ -306,7 +261,6 @@ fn parse_tipo_ncf(s: &str) -> Result<TipoNCF, AppError> {
     }
 }
 
-/// Determine if an error represents a concurrency conflict (constraint violation).
 fn is_concurrency_conflict(err: &AppError) -> bool {
     match err {
         AppError::Internal(e) => {
@@ -320,7 +274,6 @@ fn is_concurrency_conflict(err: &AppError) -> bool {
     }
 }
 
-/// Convert a `secuencia_ncf` Model to the response DTO.
 fn to_response(model: &secuencia_ncf::Model) -> SecuenciaNcfResponse {
     let tipo_ncf = parse_tipo_ncf(&model.tipo_ncf).unwrap_or(TipoNCF::B02);
     SecuenciaNcfResponse {
@@ -339,8 +292,6 @@ fn to_response(model: &secuencia_ncf::Model) -> SecuenciaNcfResponse {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-
-    // ── validar_formato_ncf tests ──────────────────────────────
 
     #[test]
     fn formato_ncf_valido_b01() {
@@ -387,8 +338,6 @@ mod tests {
         assert!(validar_formato_ncf("").is_err());
     }
 
-    // ── tipo_ncf_code tests ────────────────────────────────────
-
     #[test]
     fn tipo_ncf_code_mapping() {
         assert_eq!(tipo_ncf_code(&TipoNCF::B01), "01");
@@ -396,8 +345,6 @@ mod tests {
         assert_eq!(tipo_ncf_code(&TipoNCF::B14), "14");
         assert_eq!(tipo_ncf_code(&TipoNCF::B15), "15");
     }
-
-    // ── parse_tipo_ncf tests ───────────────────────────────────
 
     #[test]
     fn parse_tipo_ncf_valido() {
@@ -413,8 +360,6 @@ mod tests {
         assert!(parse_tipo_ncf("").is_err());
         assert!(parse_tipo_ncf("X01").is_err());
     }
-
-    // ── is_concurrency_conflict tests ──────────────────────────
 
     #[test]
     fn detecta_conflicto_unique_constraint() {
@@ -452,12 +397,8 @@ mod tests {
         assert!(!is_concurrency_conflict(&err));
     }
 
-    // ── NCF construction tests ─────────────────────────────────
-
     #[test]
     fn ncf_construction_format() {
-        // Simulate what asignar_ncf_interno builds:
-        // prefijo "B" + tipo_code "01" + sequential 1 zero-padded to 8 digits
         let ncf = format!("{}{}{:08}", "B", "01", 1);
         assert_eq!(ncf, "B0100000001");
         assert!(validar_formato_ncf(&ncf).is_ok());
@@ -479,13 +420,9 @@ mod tests {
 
     #[test]
     fn ncf_construction_overflow_detection() {
-        // 9 digits would overflow the 8-digit field, producing 12 chars total
         let ncf = format!("{}{}{:08}", "B", "01", 100_000_000);
-        // This produces "B01100000000" which is 12 chars — should fail format validation
         assert!(validar_formato_ncf(&ncf).is_err());
     }
-
-    // ── configurar_rango validation tests ──────────────────────
 
     #[test]
     fn configurar_rango_rechaza_rango_invertido() {
@@ -495,7 +432,6 @@ mod tests {
             rango_desde: 100,
             rango_hasta: 50,
         };
-        // We can't call the async fn without a db, but we can validate inline
         assert!(input.rango_desde >= input.rango_hasta);
     }
 

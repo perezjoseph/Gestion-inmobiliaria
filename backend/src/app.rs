@@ -21,12 +21,10 @@ use crate::services::mail::{MailClient, OutgoingMail, SmtpMailClient};
 use crate::services::ocr_preview::PreviewStore;
 use crate::services::user_security_cache::UserSecurityCache;
 
-/// Liveness probe — confirms the process is running. No dependencies checked.
 async fn livez() -> HttpResponse {
     HttpResponse::Ok().json(serde_json::json!({"status": "alive"}))
 }
 
-/// Readiness probe — confirms the service can handle traffic (DB reachable).
 async fn health(db: web::Data<DatabaseConnection>) -> HttpResponse {
     use sea_orm::ConnectionTrait;
     let db_ok = db.execute_unprepared("SELECT 1").await.is_ok();
@@ -51,9 +49,6 @@ async fn metrics_handler(_claims: crate::middleware::rbac::AdminOnly) -> HttpRes
         .body(buffer)
 }
 
-/// Internal metrics endpoint for Prometheus scraping.
-/// If `METRICS_TOKEN` is set, requires `Authorization: Bearer <token>`.
-/// Protected by `NetworkPolicy` — only monitoring namespace can reach it.
 #[allow(clippy::future_not_send)]
 async fn internal_metrics(
     config: web::Data<AppConfig>,
@@ -90,7 +85,6 @@ async fn serve_upload(
     let upload_dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
     let requested_path = path.into_inner();
 
-    // Reject obvious traversal attempts before filesystem access
     if requested_path.contains("..") {
         return Err(AppError::Forbidden("Acceso denegado".to_string()));
     }
@@ -99,7 +93,6 @@ async fn serve_upload(
     let upload_dir_clone = upload_dir.clone();
     let full_path_clone = full_path.clone();
 
-    // Perform canonicalization on a blocking thread
     let canonical_file =
         tokio::task::spawn_blocking(move || -> Result<std::path::PathBuf, AppError> {
             let canonical_dir = std::fs::canonicalize(&upload_dir_clone)
@@ -162,13 +155,13 @@ pub fn create_app(
 > {
     let cors = build_cors(&config);
 
-    #[allow(clippy::panic)] // Fatal: app cannot start without metrics middleware
+    #[allow(clippy::panic)]
     let prometheus = PrometheusMetricsBuilder::new("api")
         .build()
         .unwrap_or_else(|e| panic!("Error inicializando métricas Prometheus: {e}"));
 
     let json_cfg = JsonConfig::default()
-        .limit(1_048_576) // 1 MB
+        .limit(1_048_576)
         .error_handler(|err, _req| {
             let message = err.to_string();
             actix_web::error::InternalError::from_response(
@@ -178,12 +171,10 @@ pub fn create_app(
             .into()
         });
 
-    // Limit multipart uploads to 20 MB total
     let multipart_cfg = actix_multipart::form::MultipartFormConfig::default()
         .total_limit(20 * 1024 * 1024)
         .memory_limit(2 * 1024 * 1024);
 
-    // Create login lockout tracker and spawn background cleanup task
     let lockout = web::Data::new(LoginLockout::new());
     {
         let lockout_clone = lockout.clone();
@@ -196,7 +187,6 @@ pub fn create_app(
         });
     }
 
-    // Construct the mail client from SMTP env vars (graceful fallback if not configured)
     let mail_client: Arc<dyn MailClient> = match SmtpConfig::from_env() {
         Ok(smtp_cfg) => match SmtpMailClient::from_config(&smtp_cfg) {
             Ok(client) => {
@@ -214,7 +204,6 @@ pub fn create_app(
         }
     };
 
-    // Construct BaileysClient from chatbot config (always available since chatbot is required)
     let baileys_client = match BaileysClient::new(&config.chatbot) {
         Ok(client) => {
             tracing::info!("BaileysClient configurado correctamente");
@@ -255,8 +244,6 @@ pub fn create_app(
     app
 }
 
-/// No-op mail client used when SMTP is not configured.
-/// Logs the email instead of sending it.
 struct NoopMailClient;
 
 impl MailClient for NoopMailClient {

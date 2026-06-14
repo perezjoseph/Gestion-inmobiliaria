@@ -15,7 +15,6 @@ use sea_orm_migration::MigratorTrait;
 async fn main() -> std::io::Result<()> {
     let _otel_guard = telemetry::init_telemetry();
 
-    // Register all custom Prometheus metrics eagerly so they appear in /metrics from boot.
     realestate_backend::metrics::init();
 
     let config = AppConfig::from_env().expect("Error cargando configuración");
@@ -24,10 +23,9 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Error conectando a la base de datos");
 
-    // Use PostgreSQL advisory lock to prevent concurrent migration runs across replicas
     {
         use sea_orm::ConnectionTrait;
-        const MIGRATION_LOCK_ID: i64 = 0x5245_4D49_4752; // "REMIGR" as hex
+        const MIGRATION_LOCK_ID: i64 = 0x5245_4D49_4752;
         db.execute_unprepared(&format!("SELECT pg_advisory_lock({MIGRATION_LOCK_ID})"))
             .await
             .expect("Error adquiriendo lock de migraciones");
@@ -53,7 +51,6 @@ async fn main() -> std::io::Result<()> {
         }
     });
 
-    // Iniciar scheduler de tareas de fondo
     let scheduler_db = db.clone();
     let shutdown_token = tokio_util::sync::CancellationToken::new();
     let scheduler_handles = realestate_backend::services::background_jobs::iniciar_scheduler(
@@ -75,24 +72,18 @@ async fn main() -> std::io::Result<()> {
 
     let server_handle = server.handle();
 
-    // Spawn graceful shutdown listener
     let shutdown_handle = tokio::spawn(async move {
         tokio::signal::ctrl_c()
             .await
             .expect("Error registrando señal de shutdown");
         tracing::info!("Señal de shutdown recibida, cerrando servidor...");
 
-        // Cancel background tasks first
         shutdown_token.cancel();
-
-        // Gracefully stop accepting new connections, finish in-flight requests
         server_handle.stop(true).await;
     });
 
-    // Run server until shutdown signal
     server.await?;
 
-    // Wait for background tasks to finish
     for handle in scheduler_handles {
         let _ = handle.await;
     }

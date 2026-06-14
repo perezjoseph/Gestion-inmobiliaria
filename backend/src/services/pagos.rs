@@ -19,8 +19,6 @@ use crate::services::{
     validation::{METODOS_PAGO, METODOS_PAGO_DGII, MONEDAS, validate_enum},
 };
 
-/// Parse a database string into a `TipoFiscal` enum value.
-/// Defaults to `Informal` for unrecognized values.
 fn parse_tipo_fiscal(s: &str) -> TipoFiscal {
     match s {
         "persona_juridica" => TipoFiscal::PersonaJuridica,
@@ -29,14 +27,6 @@ fn parse_tipo_fiscal(s: &str) -> TipoFiscal {
     }
 }
 
-/// Infer the fiscal type of a tenant based on their cédula.
-///
-/// In the DR context:
-/// - A 9-digit identifier suggests an RNC (persona jurídica / company)
-/// - An 11-digit cédula suggests an individual (persona física)
-/// - Anything else defaults to Informal
-///
-/// This is used for ITBIS retention: only persona jurídica tenants retain 30%.
 fn infer_tenant_tipo_fiscal(cedula: &str) -> TipoFiscal {
     let digits: String = cedula.chars().filter(char::is_ascii_digit).collect();
     match digits.len() {
@@ -48,8 +38,6 @@ fn infer_tenant_tipo_fiscal(cedula: &str) -> TipoFiscal {
 
 const ESTADOS_PAGO: &[&str] = &["pendiente", "pagado", "atrasado", "cancelado"];
 
-/// Valid state transitions for payments.
-/// Each entry is (`from_state`, &[`allowed_to_states`]).
 const VALID_TRANSITIONS: &[(&str, &[&str])] = &[
     ("pendiente", &["pagado", "atrasado", "cancelado"]),
     ("atrasado", &["pagado", "cancelado"]),
@@ -57,7 +45,6 @@ const VALID_TRANSITIONS: &[(&str, &[&str])] = &[
     ("cancelado", &[]),
 ];
 
-/// Validates that a payment state transition is allowed.
 fn validate_transition(old: &str, new: &str) -> Result<(), AppError> {
     if old == new {
         return Ok(());
@@ -115,7 +102,6 @@ pub async fn create<C: ConnectionTrait>(
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
 
-    // Look up propiedad and organizacion to determine ITBIS applicability
     let propiedad_model = propiedad::Entity::find_by_id(contrato_model.propiedad_id)
         .one(db)
         .await?
@@ -128,7 +114,6 @@ pub async fn create<C: ConnectionTrait>(
 
     let tipo_fiscal = parse_tipo_fiscal(&org_model.tipo_fiscal);
 
-    // Calculate ITBIS based on org fiscal type and property type
     let itbis_result = itbis::calcular_itbis(
         input.monto,
         &propiedad_model.tipo_propiedad,
@@ -136,7 +121,6 @@ pub async fn create<C: ConnectionTrait>(
         None,
     );
 
-    // Determine tenant retention: look up inquilino's cedula to infer fiscal type
     let monto_itbis_retenido = if itbis_result.monto_itbis > Decimal::ZERO {
         let inquilino_model = inquilino::Entity::find_by_id(contrato_model.inquilino_id)
             .one(db)
@@ -157,7 +141,6 @@ pub async fn create<C: ConnectionTrait>(
     let now = Utc::now().into();
     let id = Uuid::new_v4();
 
-    // Save metric labels before fields are moved into the ActiveModel
     let metric_metodo = input
         .metodo_pago
         .as_deref()
@@ -192,7 +175,6 @@ pub async fn create<C: ConnectionTrait>(
 
     let record = model.insert(db).await?;
 
-    // Track payment metric
     crate::metrics::PAGOS_PROCESADOS
         .with_label_values(&[&metric_metodo, &metric_moneda])
         .inc();
@@ -209,7 +191,6 @@ pub async fn create<C: ConnectionTrait>(
     )
     .await;
 
-    // Wire passthrough cuota_condominio into billing as a separate pago record
     let active_cuotas = cuota_condominio::Entity::find()
         .filter(cuota_condominio::Column::PropiedadId.eq(propiedad_model.id))
         .filter(cuota_condominio::Column::OrganizacionId.eq(organizacion_id))
@@ -219,7 +200,6 @@ pub async fn create<C: ConnectionTrait>(
         .await?;
 
     for cuota in &active_cuotas {
-        // Skip cuotas that have ended before the payment due date
         if let Some(fecha_fin) = cuota.fecha_fin {
             if fecha_fin <= input.fecha_vencimiento {
                 continue;
@@ -340,7 +320,6 @@ pub async fn update<C: ConnectionTrait>(
     let contrato_id = existing.contrato_id;
     let pago_id = existing.id;
 
-    // Validate state transition before applying any changes
     if let Some(ref estado) = input.estado {
         validate_transition(&old_estado, estado)?;
     }
@@ -367,20 +346,16 @@ pub async fn update<C: ConnectionTrait>(
 
     let mut updated = active.update(db).await?;
 
-    // Recargo logic based on estado transitions
     let new_estado = &updated.estado;
     if new_estado == "atrasado" && old_estado != "atrasado" {
-        // Transitioning to atrasado: calculate and apply recargo
         if let Some(contrato_model) = contrato::Entity::find_by_id(contrato_id).one(db).await? {
             recargos::aplicar_recargo(db, pago_id, &contrato_model).await?;
-            // Re-fetch to get the updated recargo value
             updated = pago::Entity::find_by_id(pago_id)
                 .one(db)
                 .await?
                 .ok_or_else(|| AppError::NotFound("Pago no encontrado".to_string()))?;
         }
     } else if old_estado == "atrasado" && new_estado != "atrasado" {
-        // Transitioning from atrasado: clear recargo
         let mut clear_active: pago::ActiveModel = updated.into();
         clear_active.recargo = Set(None);
         updated = clear_active.update(db).await?;
@@ -453,7 +428,6 @@ pub async fn bulk_marcar_pagado<C: ConnectionTrait>(
         ));
     }
 
-    // Verify all pagos exist, belong to org, and are in updatable state
     let pagos = pago::Entity::find()
         .filter(pago::Column::Id.is_in(pago_ids.to_vec()))
         .filter(pago::Column::OrganizacionId.eq(org_id))
@@ -581,7 +555,6 @@ pub async fn mark_overdue(db: &DatabaseConnection) -> Result<u64, AppError> {
     let affected_count = result.rows_affected;
 
     let mut recargos_calculated: u64 = 0;
-    // Process recargos concurrently in batches to avoid sequential N+1
     for chunk in recargo_candidates.chunks(20) {
         let futures: Vec<_> = chunk
             .iter()
@@ -621,16 +594,6 @@ pub async fn mark_overdue(db: &DatabaseConnection) -> Result<u64, AppError> {
     Ok(affected_count)
 }
 
-/// Registers a partial payment against the oldest unpaid billing period (FIFO).
-///
-/// - Validates `monto` is strictly less than the period's remaining balance.
-///   If monto equals the full amount due, rejects with a validation error
-///   (caller should use the regular full-payment flow instead).
-/// - Updates `saldo_pendiente` for the billing period.
-/// - Marks the period as `pagado` when total payments >= amount due.
-/// - Cascades any surplus to the next unpaid period (pago adelantado).
-///
-/// Returns all pago records created during this operation (one per period touched).
 pub async fn registrar_pago_parcial<C: ConnectionTrait>(
     db: &C,
     contrato_id: Uuid,
@@ -647,14 +610,12 @@ pub async fn registrar_pago_parcial<C: ConnectionTrait>(
         ));
     }
 
-    // Verify contrato exists and belongs to org
     let contrato_model = contrato::Entity::find_by_id(contrato_id)
         .filter(contrato::Column::OrganizacionId.eq(org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
 
-    // Find all unpaid periods for this contrato, ordered by fecha_vencimiento (FIFO)
     let unpaid_periods = pago::Entity::find()
         .filter(pago::Column::ContratoId.eq(contrato_id))
         .filter(pago::Column::OrganizacionId.eq(org_id))
@@ -670,7 +631,6 @@ pub async fn registrar_pago_parcial<C: ConnectionTrait>(
         ));
     }
 
-    // Calculate total owed across all unpaid periods
     let total_owed: Decimal = unpaid_periods
         .iter()
         .map(|p| balance_remaining(p, &contrato_model))
@@ -696,8 +656,6 @@ pub async fn registrar_pago_parcial<C: ConnectionTrait>(
             continue;
         }
 
-        // For the first period, if monto exactly equals amount_due and there's no
-        // surplus scenario, reject — caller should use full payment flow.
         if created_records.is_empty() && remaining == amount_due && unpaid_periods.len() == 1 {
             return Err(AppError::Validation(
                 "El monto es igual al saldo pendiente. Use el flujo de pago completo en vez de pago parcial".to_string(),
@@ -710,7 +668,6 @@ pub async fn registrar_pago_parcial<C: ConnectionTrait>(
         let new_balance = amount_due - applied;
         let is_fully_paid = new_balance <= Decimal::ZERO;
 
-        // Create the partial payment record
         let now = Utc::now().into();
         let pago_id = Uuid::new_v4();
         let today = Utc::now().date_naive();
@@ -743,7 +700,6 @@ pub async fn registrar_pago_parcial<C: ConnectionTrait>(
         let record = partial_record.insert(db).await?;
         created_records.push(record);
 
-        // Update the original period record
         let mut active: pago::ActiveModel = period.clone().into();
         if is_fully_paid {
             active.estado = Set("pagado".to_string());
@@ -758,56 +714,31 @@ pub async fn registrar_pago_parcial<C: ConnectionTrait>(
     Ok(created_records)
 }
 
-/// Determine the appropriate NCF type based on the tenant's fiscal characteristics.
-///
-/// Per DGII classification:
-/// - B01 (Crédito Fiscal): issued to tenants who are persona jurídica or persona física registrada
-/// - B02 (Consumo Final): issued to unregistered individuals (default for tenants with cédula only)
-/// - B14 (Régimen Especial): issued to entities in special tax regimes
-/// - B15 (Gubernamental): issued to government entities
-///
-/// Currently, the inquilino entity only stores cédula, so most tenants default to B02.
-/// This function is extensible for future tenant fiscal classification.
 #[allow(clippy::missing_const_for_fn)]
 fn determinar_tipo_ncf_para_inquilino(_inquilino: &inquilino::Model) -> TipoNCF {
-    // All tenants in the current schema are individuals with a cédula.
-    // They receive B02 (Consumo Final) since they don't have a registered RNC
-    // for fiscal credit purposes.
     TipoNCF::B02
 }
 
-/// Attempt to assign an NCF to a payment that has transitioned to `pagado`.
-///
-/// This is a best-effort operation: if NCF assignment fails for any reason,
-/// the payment remains `pagado` without an NCF and is flagged for manual resolution
-/// via a warning log.
-///
-/// Only attempts NCF assignment when the organization is registered (`persona_juridica`
-/// or `persona_fisica`). Informal organizations do not issue NCFs.
 pub async fn intentar_asignar_ncf(
     db: &DatabaseConnection,
     pago_id: Uuid,
     contrato_id: Uuid,
     org_id: Uuid,
 ) -> Result<(), AppError> {
-    // Fetch the organization to check fiscal type
     let org = organizacion::Entity::find_by_id(org_id)
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Organización no encontrada".to_string()))?;
 
-    // Only registered organizations issue NCFs
     if org.tipo_fiscal == "informal" {
         return Ok(());
     }
 
-    // Fetch the contrato to get the inquilino
     let contrato_model = contrato::Entity::find_by_id(contrato_id)
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
 
-    // Fetch the inquilino to determine NCF type
     let inquilino_model = inquilino::Entity::find_by_id(contrato_model.inquilino_id)
         .one(db)
         .await?
@@ -816,10 +747,8 @@ pub async fn intentar_asignar_ncf(
     let tipo_ncf = determinar_tipo_ncf_para_inquilino(&inquilino_model);
     let fecha_comprobante = Utc::now().date_naive();
 
-    // Attempt NCF assignment — handle failure gracefully
     match ncf::asignar_ncf(db, org_id, tipo_ncf.clone(), fecha_comprobante).await {
         Ok(ncf_string) => {
-            // Success: store the NCF on the pago record
             let pago_model = pago::Entity::find_by_id(pago_id)
                 .one(db)
                 .await?
@@ -833,8 +762,6 @@ pub async fn intentar_asignar_ncf(
             active.update(db).await?;
         }
         Err(e) => {
-            // Failure: log warning, leave payment as pagado without NCF.
-            // The payment is flagged for manual resolution by having ncf = None.
             warn!(
                 pago_id = %pago_id,
                 org_id = %org_id,
@@ -847,14 +774,9 @@ pub async fn intentar_asignar_ncf(
     Ok(())
 }
 
-/// Computes the remaining balance for a billing period.
-/// If `saldo_pendiente` is already set (from a prior partial payment), use that.
-/// Otherwise, the full amount due is the period's `monto` plus any recargo.
 fn balance_remaining(period: &pago::Model, _contrato: &contrato::Model) -> Decimal {
     if let Some(saldo) = period.saldo_pendiente {
         return saldo;
     }
-    // The amount due for the period is the original monto (which equals monto_mensual
-    // at generation time) plus any applied recargo.
     period.monto + period.recargo.unwrap_or(Decimal::ZERO)
 }

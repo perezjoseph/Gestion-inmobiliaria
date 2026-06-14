@@ -19,7 +19,6 @@ impl FromRequest for Claims {
         Box::pin(async move {
             let claims = claims_result?;
 
-            // If cache and db are available, validate user security state
             if let (Some(db), Some(cache)) = (db, cache) {
                 let valid = cache
                     .is_token_valid(db.get_ref(), claims.sub, claims.iat)

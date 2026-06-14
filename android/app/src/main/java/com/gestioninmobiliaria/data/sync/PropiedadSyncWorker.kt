@@ -26,7 +26,6 @@ class PropiedadSyncWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result = try {
         repository.refresh()
-        // Re-enqueue one-shot so next connectivity change triggers a fresh sync
         enqueue(WorkManager.getInstance(applicationContext))
         Result.success()
     } catch (_: Exception) {
@@ -42,7 +41,6 @@ class PropiedadSyncWorker @AssistedInject constructor(
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
 
-            // Periodic background sync
             val periodic = PeriodicWorkRequestBuilder<PropiedadSyncWorker>(1, TimeUnit.HOURS)
                 .setConstraints(connected)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
@@ -53,7 +51,6 @@ class PropiedadSyncWorker @AssistedInject constructor(
                 periodic,
             )
 
-            // One-shot sync that fires as soon as network is available
             val onConnect = OneTimeWorkRequestBuilder<PropiedadSyncWorker>()
                 .setConstraints(connected)
                 .build()

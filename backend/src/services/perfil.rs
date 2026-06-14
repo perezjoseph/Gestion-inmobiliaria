@@ -26,7 +26,6 @@ pub async fn actualizar_perfil(
     nombre: Option<String>,
     email: Option<String>,
 ) -> Result<UsuarioResponse, AppError> {
-    // Validate input lengths
     if let Some(ref name) = nombre {
         if name.trim().is_empty() {
             return Err(AppError::Validation(
@@ -92,7 +91,6 @@ pub async fn cambiar_password(
     password_nuevo: &str,
     cache: &UserSecurityCache,
 ) -> Result<(), AppError> {
-    // Validate password lengths to prevent DoS via Argon2 on huge inputs
     if password_actual.len() > 128 {
         return Err(AppError::Validation(
             "La contraseña actual es incorrecta".to_string(),

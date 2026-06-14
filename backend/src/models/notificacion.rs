@@ -159,7 +159,6 @@ mod tests {
         assert!(json.get("usuarioId").is_some());
         assert_eq!(json["usuarioId"], usuario_id.to_string());
         assert!(json.get("createdAt").is_some());
-        // Verify snake_case keys are absent
         assert!(json.get("entity_type").is_none());
         assert!(json.get("entity_id").is_none());
         assert!(json.get("usuario_id").is_none());
@@ -242,7 +241,6 @@ mod tests {
         assert!(json.get("ncfRangoConsumo").is_some());
         assert_eq!(json["ncfRangoConsumo"], 3);
         assert_eq!(json["total"], 18);
-        // Verify snake_case keys are absent
         assert!(json.get("pago_vencido").is_none());
         assert!(json.get("contrato_por_vencer").is_none());
         assert!(json.get("documento_vencido").is_none());

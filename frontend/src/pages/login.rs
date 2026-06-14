@@ -48,16 +48,16 @@ pub fn Login() -> Html {
                             </svg>
                         </div>
                         <h1 class="text-display gi-login-title">
-                            {"Gestión Inmobiliaria"}
+                            {"GestiÃ³n Inmobiliaria"}
                         </h1>
                         <p class="gi-login-subtitle">
-                            {"Inicie sesión para continuar"}
+                            {"Inicie sesiÃ³n para continuar"}
                         </p>
                     </div>
                     <LoginForm on_success={on_success} />
                     <p class="gi-login-footer">
                         <Link<Route> to={Route::Registro} classes="gi-btn-text">
-                            {"¿No tiene cuenta? Regístrese"}
+                            {"Â¿No tiene cuenta? RegÃ­strese"}
                         </Link<Route>>
                     </p>
                 </div>

@@ -13,17 +13,10 @@ use crate::models::indexacion::{ContratoProximoVencer, PropuestaRenovacion};
 use crate::services::auditoria::{self, CreateAuditoriaEntry};
 use crate::services::ipc;
 
-/// Maximum annual rent increase percentage allowed by Ley 85-25.
 const TOPE_LEGAL_PORCENTAJE: Decimal = Decimal::TEN;
 
-/// IPC data is considered stale if older than this many days.
 const IPC_STALE_DAYS: i64 = 90;
 
-/// Calculate a renewal proposal for a given contract based on IPC and Ley 85-25 cap.
-///
-/// Formula: `monto_actual * (1 + min(ipc_interanual, 10) / 100)`
-/// Result never exceeds `monto_actual * 1.10` regardless of IPC value.
-/// If IPC cache is > 90 days old, uses cached value but sets `datos_stale = true`.
 pub async fn calcular_propuesta_renovacion(
     db: &DatabaseConnection,
     contrato_id: Uuid,
@@ -45,7 +38,6 @@ pub async fn calcular_propuesta_renovacion(
         ))
     })?;
 
-    // Determine if IPC data is stale (> 90 days old)
     let now = Utc::now();
     let days_since_fetch = (now - ipc_data.ultimo_fetch_exitoso).num_days();
     let datos_stale = days_since_fetch > IPC_STALE_DAYS;
@@ -53,7 +45,6 @@ pub async fn calcular_propuesta_renovacion(
     let ipc_porcentaje = ipc_data.valor_ipc;
     let monto_actual = contrato_record.monto_mensual;
 
-    // Apply formula: monto * (1 + min(ipc, 10%) / 100)
     let porcentaje_aplicable = if ipc_porcentaje > TOPE_LEGAL_PORCENTAJE {
         TOPE_LEGAL_PORCENTAJE
     } else {
@@ -73,11 +64,6 @@ pub async fn calcular_propuesta_renovacion(
     })
 }
 
-/// Approve a renewal: verify calculation integrity, create renewed contrato, record audit trail.
-///
-/// The approved amount must not exceed `monto_actual * 1.10` (absolute legal cap).
-/// Sets old contrato to "finalizado" and creates a new one with `estado="activo"`.
-/// Supports custom escalation clause overrides (lower-than-IPC increases).
 pub async fn aprobar_renovacion(
     db: &DatabaseConnection,
     contrato_id: Uuid,
@@ -97,7 +83,6 @@ pub async fn aprobar_renovacion(
         ));
     }
 
-    // Verify calculation integrity: approved amount must not exceed 10% legal cap
     let max_allowed =
         original.monto_mensual * (Decimal::ONE + TOPE_LEGAL_PORCENTAJE / Decimal::from(100));
 
@@ -107,26 +92,21 @@ pub async fn aprobar_renovacion(
         )));
     }
 
-    // Approved amount must be at least the current amount (no decreases via this endpoint)
     if monto_aprobado < original.monto_mensual {
         return Err(AppError::Validation(
             "El monto aprobado no puede ser menor al monto actual".to_string(),
         ));
     }
 
-    // Fetch IPC for audit trail
     let ipc_data = ipc::obtener_ipc_actual(db).await?;
     let ipc_porcentaje = ipc_data.as_ref().map_or(Decimal::ZERO, |d| d.valor_ipc);
 
-    // Calculate the actual percentage applied
     let porcentaje_aplicado = if original.monto_mensual > Decimal::ZERO {
         ((monto_aprobado - original.monto_mensual) / original.monto_mensual) * Decimal::from(100)
     } else {
         Decimal::ZERO
     };
 
-    // Create renewed contrato: new period starts the day after old one ends,
-    // same duration as original contract (anniversary-based indexation).
     let duracion_dias = (original.fecha_fin - original.fecha_inicio).num_days();
     let new_fecha_inicio = original
         .fecha_fin
@@ -162,13 +142,11 @@ pub async fn aprobar_renovacion(
 
     let new_record = new_contrato.insert(&txn).await?;
 
-    // Set the original contrato to "finalizado"
     let mut original_active: contrato::ActiveModel = original.clone().into();
     original_active.estado = Set("finalizado".to_string());
     original_active.updated_at = Set(Utc::now().into());
     original_active.update(&txn).await?;
 
-    // Record audit trail with all required information per Ley 85-25
     auditoria::registrar_best_effort(
         &txn,
         CreateAuditoriaEntry {
@@ -193,10 +171,6 @@ pub async fn aprobar_renovacion(
     Ok(new_record)
 }
 
-/// Find active contracts expiring within the given number of days.
-///
-/// Returns contracts where `fecha_fin - today <= dias` AND `estado = "activo"`.
-/// Includes property title and tenant name for display purposes.
 pub async fn contratos_proximos_vencer(
     db: &DatabaseConnection,
     org_id: Uuid,

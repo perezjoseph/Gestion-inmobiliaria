@@ -8,9 +8,6 @@ use crate::middleware::rbac::WriteAccess;
 use crate::models::indexacion::AprobarRenovacionRequest;
 use crate::services::indexacion;
 
-/// `GET /api/v1/indexacion/propuesta/{contrato_id}`
-///
-/// Returns a renewal proposal for the given contract based on IPC and Ley 85-25 cap.
 pub async fn obtener_propuesta(
     db: web::Data<sea_orm::DatabaseConnection>,
     _user: WriteAccess,
@@ -21,9 +18,6 @@ pub async fn obtener_propuesta(
     Ok(HttpResponse::Ok().json(propuesta))
 }
 
-/// `POST /api/v1/indexacion/aprobar/{contrato_id}`
-///
-/// Approves a renewal with the specified amount. Validates against the 10% legal cap.
 pub async fn aprobar_renovacion_handler(
     db: web::Data<sea_orm::DatabaseConnection>,
     user: WriteAccess,
@@ -39,9 +33,6 @@ pub async fn aprobar_renovacion_handler(
     Ok(HttpResponse::Ok().json(new_contrato))
 }
 
-/// `GET /api/v1/indexacion/proximos-vencer`
-///
-/// Lists active contracts expiring within 60 days for the user's organization.
 pub async fn proximos_vencer(
     db: web::Data<sea_orm::DatabaseConnection>,
     user: WriteAccess,

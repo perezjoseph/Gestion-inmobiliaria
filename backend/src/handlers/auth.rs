@@ -20,7 +20,7 @@ pub async fn register(
     }
 }
 
-#[allow(clippy::future_not_send)] // actix-web HttpRequest is !Send by design
+#[allow(clippy::future_not_send)]
 pub async fn login(
     req: HttpRequest,
     db: web::Data<DatabaseConnection>,
@@ -32,7 +32,6 @@ pub async fn login(
     let email = input.email.clone();
     let client_ip = extract_client_ip_from_request(&req);
 
-    // Check lockout BEFORE attempting login (Req 2.7: does not reveal if email exists)
     if let Err(info) = lockout.check(&email) {
         tracing::warn!(
             event = "login_blocked_lockout",

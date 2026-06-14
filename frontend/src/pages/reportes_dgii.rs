@@ -11,10 +11,6 @@ use crate::types::reportes_dgii::{
     EstadoRequest, ItbisNetoResult, PeriodoRequest, ReporteGenerado, ReportePreviewResponse,
 };
 
-// ---------------------------------------------------------------------------
-// Main page component
-// ---------------------------------------------------------------------------
-
 #[component]
 pub fn ReportesDgii() -> Html {
     let mes = use_state(|| {
@@ -39,7 +35,6 @@ pub fn ReportesDgii() -> Html {
 
     let periodo = format!("{}{:02}", *anio, *mes);
 
-    // --- Generate 607 ---
     let on_generar_607 = {
         let mes = mes.clone();
         let anio = anio.clone();
@@ -64,7 +59,6 @@ pub fn ReportesDgii() -> Html {
         })
     };
 
-    // --- Generate 606 ---
     let on_generar_606 = {
         let mes = mes.clone();
         let anio = anio.clone();
@@ -89,7 +83,6 @@ pub fn ReportesDgii() -> Html {
         })
     };
 
-    // --- Preview existing report ---
     let on_preview = {
         let preview = preview.clone();
         let itbis_neto = itbis_neto.clone();
@@ -104,12 +97,10 @@ pub fn ReportesDgii() -> Html {
             loading.set(true);
             error.set(None);
             spawn_local(async move {
-                // Try to fetch 607 preview first
                 let url = format!("/reportes-dgii/preview/607/{periodo}");
                 match api_get::<ReportePreviewResponse>(&url).await {
                     Ok(data) => preview.set(Some(data)),
                     Err(err) => {
-                        // If 607 not found, try 606
                         let url_606 = format!("/reportes-dgii/preview/606/{periodo}");
                         match api_get::<ReportePreviewResponse>(&url_606).await {
                             Ok(data) => preview.set(Some(data)),
@@ -117,7 +108,6 @@ pub fn ReportesDgii() -> Html {
                         }
                     }
                 }
-                // Fetch ITBIS neto (best effort, ignore error)
                 let url_neto = format!("/reportes-dgii/itbis-neto/{periodo}");
                 if let Ok(neto) = api_get::<ItbisNetoResult>(&url_neto).await {
                     itbis_neto_state.set(Some(neto));
@@ -127,7 +117,6 @@ pub fn ReportesDgii() -> Html {
         })
     };
 
-    // --- Mark as submitted ---
     let on_marcar_enviado = {
         let preview = preview.clone();
         let error = error.clone();
@@ -159,7 +148,6 @@ pub fn ReportesDgii() -> Html {
         })
     };
 
-    // --- Download TXT ---
     let on_download_607 = {
         let reporte_607 = reporte_607.clone();
         let anio = anio.clone();
@@ -182,7 +170,6 @@ pub fn ReportesDgii() -> Html {
         })
     };
 
-    // --- Period selectors ---
     let on_mes_change = {
         let mes = mes.clone();
         Callback::from(move |e: Event| {
@@ -261,10 +248,6 @@ pub fn ReportesDgii() -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Period selector sub-component
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct PeriodSelectorProps {
     mes: u32,
@@ -306,7 +289,7 @@ fn PeriodSelector(props: &PeriodSelectorProps) -> Html {
                     </select>
                 </div>
                 <div>
-                    <label class="gi-label">{"Año"}</label>
+                    <label class="gi-label">{"AÃ±o"}</label>
                     <input
                         type="number"
                         class="gi-input"
@@ -344,10 +327,6 @@ fn PeriodSelector(props: &PeriodSelectorProps) -> Html {
         </div>
     }
 }
-
-// ---------------------------------------------------------------------------
-// ITBIS Neto card
-// ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct ItbisNetoCardProps {
@@ -387,10 +366,6 @@ fn ItbisNetoCard(props: &ItbisNetoCardProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Report status card with submit button
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct ReporteStatusCardProps {
     preview: ReportePreviewResponse,
@@ -413,7 +388,7 @@ fn ReporteStatusCard(props: &ReporteStatusCardProps) -> Html {
             <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3);">
                 <div>
                     <p style="font-weight: 600; margin-bottom: var(--space-1);">
-                        {format!("Reporte {} — Período {}", p.tipo_reporte, p.periodo)}
+                        {format!("Reporte {} â€” PerÃ­odo {}", p.tipo_reporte, p.periodo)}
                     </p>
                     <p style="font-size: var(--text-sm); color: var(--text-secondary);">
                         {format!("Registros: {} | Total: RD$ {:.2} | ITBIS: RD$ {:.2}",
@@ -438,10 +413,6 @@ fn ReporteStatusCard(props: &ReporteStatusCardProps) -> Html {
         </div>
     }
 }
-
-// ---------------------------------------------------------------------------
-// Report result section (preview table + excluded + download)
-// ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct ReporteResultSectionProps {
@@ -493,10 +464,6 @@ fn ReporteResultSection(props: &ReporteResultSectionProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Preview table sub-component
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct PreviewTableProps {
     rows: Rc<Vec<RegistroPreview>>,
@@ -532,10 +499,6 @@ fn PreviewTable(props: &PreviewTableProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Excluded records table
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq)]
 struct ExcluidosTableProps {
     excluidos: Rc<Vec<RegistroExcluido>>,
@@ -559,7 +522,7 @@ fn ExcluidosTable(props: &ExcluidosTableProps) -> Html {
                 <thead>
                     <tr>
                         <th>{"Referencia"}</th>
-                        <th>{"Razón de Exclusión"}</th>
+                        <th>{"RazÃ³n de ExclusiÃ³n"}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -576,10 +539,6 @@ fn ExcluidosTable(props: &ExcluidosTableProps) -> Html {
         </div>
     }
 }
-
-// ---------------------------------------------------------------------------
-// Helper: trigger browser download of TXT content
-// ---------------------------------------------------------------------------
 
 fn trigger_txt_download(content: &str, filename: &str) {
     let Some(window) = web_sys::window() else {

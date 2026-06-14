@@ -1,12 +1,3 @@
-//! OpenTelemetry tracing initialization.
-//!
-//! Configures a layered tracing subscriber that emits:
-//! - Structured logs to stdout (for Alloy/Loki collection)
-//! - OTLP traces to the Alloy collector (forwarded to Tempo)
-//!
-//! When `OTEL_EXPORTER_OTLP_ENDPOINT` is not set, tracing falls back to
-//! stdout-only mode (no traces exported). This keeps local development simple.
-
 use opentelemetry::trace::TracerProvider;
 use opentelemetry_otlp::{SpanExporter, WithExportConfig};
 use opentelemetry_sdk::Resource;
@@ -15,17 +6,6 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, Registry};
 
-/// Initializes the global tracing subscriber with OpenTelemetry export.
-///
-/// Returns an [`OtelGuard`] that must be held for the lifetime of the application.
-/// When dropped, it flushes pending spans to the collector.
-///
-/// # Environment Variables
-///
-/// - `OTEL_EXPORTER_OTLP_ENDPOINT`: OTLP collector endpoint (e.g. `http://alloy-otlp.monitoring.svc.cluster.local:4317`).
-///   If unset, OTLP export is disabled and only stdout logging is active.
-/// - `OTEL_SERVICE_NAME`: Service name reported in traces (defaults to `realestate-backend`).
-/// - `RUST_LOG`: Controls log verbosity via `EnvFilter`.
 pub fn init_telemetry() -> OtelGuard {
     let env_filter = EnvFilter::from_default_env();
 
@@ -33,7 +13,6 @@ pub fn init_telemetry() -> OtelGuard {
         .with_target(true)
         .with_thread_ids(false);
 
-    // Only enable OTLP export when the endpoint is configured
     let otel_endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok();
 
     if let Some(endpoint) = otel_endpoint {
@@ -80,9 +59,6 @@ pub fn init_telemetry() -> OtelGuard {
     }
 }
 
-/// Guard that ensures pending traces are flushed on shutdown.
-///
-/// Hold this in `main()` — dropping it triggers a graceful flush.
 pub struct OtelGuard {
     provider: Option<SdkTracerProvider>,
 }

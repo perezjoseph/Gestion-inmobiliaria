@@ -22,10 +22,6 @@ fn push_toast(toasts: Option<&ToastContext>, msg: &str, kind: ToastKind) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Estado badge
-// ---------------------------------------------------------------------------
-
 fn estado_badge(estado: &str) -> (&'static str, &'static str) {
     match estado {
         "disponible" => ("gi-badge gi-badge-success", "Disponible"),
@@ -34,10 +30,6 @@ fn estado_badge(estado: &str) -> (&'static str, &'static str) {
         _ => ("gi-badge gi-badge-neutral", "Desconocido"),
     }
 }
-
-// ---------------------------------------------------------------------------
-// Form errors
-// ---------------------------------------------------------------------------
 
 #[derive(Clone, Default, PartialEq)]
 struct FormErrors {
@@ -49,10 +41,6 @@ impl FormErrors {
         self.numero_unidad.is_some()
     }
 }
-
-// ---------------------------------------------------------------------------
-// Filter bar sub-component
-// ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct UnidadFilterBarProps {
@@ -88,10 +76,6 @@ fn UnidadFilterBar(props: &UnidadFilterBarProps) -> Html {
         </div>
     }
 }
-
-// ---------------------------------------------------------------------------
-// Form sub-component
-// ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct UnidadFormProps {
@@ -141,7 +125,7 @@ fn UnidadForm(props: &UnidadFormProps) -> Html {
             </h2>
             <form onsubmit={props.on_submit.clone()} style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
                 <div>
-                    <label class="gi-label">{"Número de Unidad *"}</label>
+                    <label class="gi-label">{"NÃºmero de Unidad *"}</label>
                     <input type="text" value={(*props.numero_unidad).clone()} oninput={input_cb!(props.numero_unidad)}
                         placeholder="Ej: 101, A-3" class={input_class(fe.numero_unidad.is_some())} />
                     {field_error(&fe.numero_unidad)}
@@ -155,11 +139,11 @@ fn UnidadForm(props: &UnidadFormProps) -> Html {
                     <input type="number" min="0" value={(*props.habitaciones).clone()} oninput={input_cb!(props.habitaciones)} class="gi-input" />
                 </div>
                 <div>
-                    <label class="gi-label">{"Baños"}</label>
+                    <label class="gi-label">{"BaÃ±os"}</label>
                     <input type="number" min="0" value={(*props.banos).clone()} oninput={input_cb!(props.banos)} class="gi-input" />
                 </div>
                 <div>
-                    <label class="gi-label">{"Área (m²)"}</label>
+                    <label class="gi-label">{"Ãrea (mÂ²)"}</label>
                     <input type="number" step="0.01" min="0" value={(*props.area_m2).clone()} oninput={input_cb!(props.area_m2)} class="gi-input" />
                 </div>
                 <div>
@@ -183,9 +167,9 @@ fn UnidadForm(props: &UnidadFormProps) -> Html {
                     </select>
                 </div>
                 <div style="grid-column: 1 / -1;">
-                    <label class="gi-label">{"Descripción"}</label>
+                    <label class="gi-label">{"DescripciÃ³n"}</label>
                     <input type="text" value={(*props.descripcion).clone()} oninput={input_cb!(props.descripcion)}
-                        placeholder="Descripción opcional" class="gi-input" />
+                        placeholder="DescripciÃ³n opcional" class="gi-input" />
                 </div>
                 <div style="grid-column: 1 / -1; display: flex; gap: var(--space-2); justify-content: flex-end;">
                     <button type="button" onclick={props.on_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
@@ -197,10 +181,6 @@ fn UnidadForm(props: &UnidadFormProps) -> Html {
         </div>
     }
 }
-
-// ---------------------------------------------------------------------------
-// List sub-component
-// ---------------------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct UnidadListProps {
@@ -226,7 +206,7 @@ fn render_unidad_row(
     let (badge_cls, badge_label) = estado_badge(&u.estado);
     let area_display = u
         .area_m2
-        .map_or_else(|| "—".to_string(), |a| format!("{a:.2} m²"));
+        .map_or_else(|| "â€”".to_string(), |a| format!("{a:.2} mÂ²"));
     let uc = u.clone();
     let ud = u.clone();
     let on_edit = on_edit.clone();
@@ -251,9 +231,9 @@ fn render_unidad_row(
     html! {
         <tr>
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{&u.numero_unidad}</td>
-            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{u.piso.map_or_else(|| "—".to_string(), |v| v.to_string())}</td>
-            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{u.habitaciones.map_or_else(|| "—".to_string(), |v| v.to_string())}</td>
-            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{u.banos.map_or_else(|| "—".to_string(), |v| v.to_string())}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{u.piso.map_or_else(|| "â€”".to_string(), |v| v.to_string())}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{u.habitaciones.map_or_else(|| "â€”".to_string(), |v| v.to_string())}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{u.banos.map_or_else(|| "â€”".to_string(), |v| v.to_string())}</td>
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{area_display}</td>
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={u.precio} moneda={u.moneda.clone()} /></td>
             <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
@@ -304,14 +284,10 @@ fn UnidadList(props: &UnidadListProps) -> Html {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Helper functions
-// ---------------------------------------------------------------------------
-
 fn validate_unidad_fields(numero_unidad: &str) -> FormErrors {
     let mut errs = FormErrors::default();
     if numero_unidad.trim().is_empty() {
-        errs.numero_unidad = Some("El número de unidad es requerido".into());
+        errs.numero_unidad = Some("El nÃºmero de unidad es requerido".into());
     }
     errs
 }
@@ -486,10 +462,6 @@ fn make_unidad_edit_cb(
     })
 }
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
 #[derive(Properties, PartialEq, Eq)]
 pub struct UnidadesTabProps {
     pub propiedad_id: AttrValue,
@@ -519,7 +491,6 @@ pub fn UnidadesTab(props: &UnidadesTabProps) -> Html {
     let form_errors = use_state(FormErrors::default);
     let reload = use_state(|| 0u32);
 
-    // Form fields
     let numero_unidad = use_state(String::new);
     let piso = use_state(String::new);
     let habitaciones = use_state(String::new);
@@ -532,7 +503,6 @@ pub fn UnidadesTab(props: &UnidadesTabProps) -> Html {
 
     let filter_estado = use_state(String::new);
 
-    // Data fetching — depends on (reload_val, page) only
     {
         let items = items.clone();
         let total = total.clone();
@@ -549,7 +519,6 @@ pub fn UnidadesTab(props: &UnidadesTabProps) -> Html {
         });
     }
 
-    // Reset form closure
     let reset_form = {
         let numero_unidad = numero_unidad.clone();
         let piso = piso.clone();
@@ -579,7 +548,6 @@ pub fn UnidadesTab(props: &UnidadesTabProps) -> Html {
         }
     };
 
-    // Escape key handler
     let escape_handler = use_mut_ref(|| None::<Box<dyn Fn()>>);
     {
         let delete_target = delete_target.clone();
@@ -602,7 +570,6 @@ pub fn UnidadesTab(props: &UnidadesTabProps) -> Html {
         });
     }
 
-    // Callbacks
     let on_new = {
         let reset_form = reset_form.clone();
         let show_form = show_form.clone();
@@ -811,10 +778,6 @@ pub fn UnidadesTab(props: &UnidadesTabProps) -> Html {
     )
 }
 
-// ---------------------------------------------------------------------------
-// Render view (split from main component to keep html! blocks small)
-// ---------------------------------------------------------------------------
-
 #[allow(clippy::too_many_arguments)]
 fn render_unidades_view(
     loading: &UseStateHandle<bool>,
@@ -861,11 +824,11 @@ fn render_unidades_view(
         String::new()
     };
     let headers: Vec<String> = vec![
-        "Número".into(),
+        "NÃºmero".into(),
         "Piso".into(),
         "Hab.".into(),
-        "Baños".into(),
-        "Área".into(),
+        "BaÃ±os".into(),
+        "Ãrea".into(),
         "Precio".into(),
         "Estado".into(),
         last_header,
@@ -889,7 +852,7 @@ fn render_unidades_view(
         || html! {},
         |u| html! {
             <DeleteConfirmModal
-                message={format!("¿Está seguro de que desea eliminar la unidad \"{}\"? Esta acción no se puede deshacer.", u.numero_unidad)}
+                message={format!("Â¿EstÃ¡ seguro de que desea eliminar la unidad \"{}\"? Esta acciÃ³n no se puede deshacer.", u.numero_unidad)}
                 on_confirm={on_delete_confirm} on_cancel={on_delete_cancel}
             />
         },

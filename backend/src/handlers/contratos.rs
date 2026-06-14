@@ -177,12 +177,10 @@ pub async fn preview_pagos(
     let contrato_id = path.into_inner();
     let dia_vencimiento = query.into_inner().dia_vencimiento.unwrap_or(1);
 
-    // Load contrato scoped to org
     let contrato_record =
         contratos::get_contrato_for_pagos(db.get_ref(), claims.organizacion_id, contrato_id)
             .await?;
 
-    // Calculate all pagos for the contract period
     let all_pagos = calcular_pagos(
         contrato_record.fecha_inicio,
         contrato_record.fecha_fin,
@@ -191,11 +189,9 @@ pub async fn preview_pagos(
         dia_vencimiento,
     );
 
-    // Query existing pagos for this contrato
     let fechas_existentes =
         contratos::get_pago_fechas_for_contrato(db.get_ref(), contrato_id).await?;
 
-    // Filter to get only new pagos
     let new_pagos = filtrar_existentes(&all_pagos, &fechas_existentes);
 
     let total_pagos = all_pagos.len();
@@ -240,20 +236,16 @@ pub async fn generar_pagos(
         validar_dia_vencimiento(dia_vencimiento)?;
     }
 
-    // Open transaction — read and write within the same transaction for consistency
     let txn = db.begin().await?;
 
-    // Load contrato scoped to org (within transaction)
     let contrato_record = contratos::get_contrato_for_pagos(&txn, org_id, contrato_id).await?;
 
-    // Validate contrato is active
     if contrato_record.estado != "activo" {
         return Err(AppError::Validation(
             "Solo se pueden generar pagos para contratos activos".to_string(),
         ));
     }
 
-    // Calculate all pagos for the contract period
     let all_pagos = calcular_pagos(
         contrato_record.fecha_inicio,
         contrato_record.fecha_fin,
@@ -262,10 +254,8 @@ pub async fn generar_pagos(
         dia_vencimiento,
     );
 
-    // Query existing pagos for this contrato (within transaction)
     let fechas_existentes = contratos::get_pago_fechas_for_contrato(&txn, contrato_id).await?;
 
-    // Filter to get only new pagos
     let new_pagos = filtrar_existentes(&all_pagos, &fechas_existentes);
 
     let pagos_generados = contratos::insertar_pagos_generados(
@@ -276,7 +266,6 @@ pub async fn generar_pagos(
     )
     .await?;
 
-    // Register audit entry
     auditoria::registrar_best_effort(
         &txn,
         CreateAuditoriaEntry {
@@ -294,7 +283,6 @@ pub async fn generar_pagos(
 
     txn.commit().await?;
 
-    // Query the newly inserted pagos to build PagoResponse list
     let generated_pagos =
         contratos::get_pagos_by_months(db.get_ref(), contrato_id, &new_pagos).await?;
 

@@ -17,16 +17,10 @@ use crate::models::documento::{DigitalizarResponse, DocumentoResponse};
 use crate::models::ocr::{OcrLine, OcrResult};
 use crate::services::{auditoria, documentos, ocr_client::OcrClient};
 
-// ── Vertical proximity threshold (in bbox units) for paragraph grouping ──
 const PARAGRAPH_GAP_THRESHOLD: f64 = 15.0;
 
-// ── Confidence threshold for flagging low-confidence fields ──
 const LOW_CONFIDENCE_THRESHOLD: f64 = 0.80;
 
-// ── Digitalizar: OCR scan → editable document ──────────────────
-
-/// Upload a scanned file, run OCR, and convert the result to an editable
-/// document in the editor JSON format.
 pub async fn digitalizar(
     db: &DatabaseConnection,
     entity_type: &str,
@@ -37,7 +31,6 @@ pub async fn digitalizar(
     uploaded_by: Uuid,
     organizacion_id: Uuid,
 ) -> Result<DigitalizarResponse, AppError> {
-    // 1. Store the original file as a Documento with tipo_documento="otro"
     let doc_response = documentos::upload(
         db,
         entity_type,
@@ -48,23 +41,20 @@ pub async fn digitalizar(
         uploaded_by,
         organizacion_id,
         "otro",
-        None, // fecha_vencimiento
-        None, // numero_documento
-        None, // notas_verificacion
+        None,
+        None,
+        None,
     )
     .await?;
 
-    // 2. Call OCR service to extract text
     let ocr_client = OcrClient::new()?;
     let ocr_result = ocr_client
         .extract(file_data, filename, mime_type, None)
         .await?;
 
-    // 3. Convert OcrResult to editor JSON
     let (contenido_editable, campos_baja_confianza) =
         convertir_ocr_a_editor(db, &ocr_result).await?;
 
-    // 4. Store the editor content on the original document
     let doc_model = documento::Entity::find_by_id(doc_response.id)
         .one(db)
         .await?
@@ -88,13 +78,6 @@ pub async fn digitalizar(
     })
 }
 
-// ── OCR-to-Editor conversion ───────────────────────────────────
-
-/// Convert an `OcrResult` into editor JSON format.
-///
-/// Groups OCR lines into paragraphs by vertical proximity (bbox y-coordinates),
-/// sets confidence per block as the minimum confidence of constituent lines,
-/// and attempts to match a Plantilla if the document type is known.
 async fn convertir_ocr_a_editor(
     db: &DatabaseConnection,
     ocr_result: &OcrResult,
@@ -132,7 +115,6 @@ async fn convertir_ocr_a_editor(
         blocks.push(block);
     }
 
-    // If document_type is known (not "unknown"), try to match a Plantilla and merge fields
     if ocr_result.document_type != "unknown" && !ocr_result.document_type.is_empty() {
         if let Some(plantilla) = find_matching_plantilla(db, &ocr_result.document_type).await? {
             merge_plantilla_fields(
@@ -151,8 +133,6 @@ async fn convertir_ocr_a_editor(
     Ok((contenido, campos_baja_confianza))
 }
 
-/// Group OCR lines into paragraphs based on vertical proximity of bounding boxes.
-/// Lines whose y-coordinate gap exceeds `PARAGRAPH_GAP_THRESHOLD` start a new paragraph.
 fn group_lines_into_paragraphs(lines: &[OcrLine]) -> Vec<Vec<&OcrLine>> {
     if lines.is_empty() {
         return Vec::new();
@@ -162,8 +142,8 @@ fn group_lines_into_paragraphs(lines: &[OcrLine]) -> Vec<Vec<&OcrLine>> {
     let mut current_paragraph: Vec<&OcrLine> = vec![&lines[0]];
 
     for i in 1..lines.len() {
-        let prev_line = lines[i - 1].bbox.get(3).copied().unwrap_or(0.0); // bottom y of previous
-        let curr_line = lines[i].bbox.get(1).copied().unwrap_or(0.0); // top y of current
+        let prev_line = lines[i - 1].bbox.get(3).copied().unwrap_or(0.0);
+        let curr_line = lines[i].bbox.get(1).copied().unwrap_or(0.0);
 
         let gap = (curr_line - prev_line).abs();
 
@@ -182,7 +162,6 @@ fn group_lines_into_paragraphs(lines: &[OcrLine]) -> Vec<Vec<&OcrLine>> {
     paragraphs
 }
 
-/// Find a Plantilla matching the OCR-detected document type.
 async fn find_matching_plantilla(
     db: &DatabaseConnection,
     document_type: &str,
@@ -196,8 +175,6 @@ async fn find_matching_plantilla(
     Ok(plantilla)
 }
 
-/// Merge structured OCR fields into the editor blocks using the template structure.
-/// If the template has placeholder fields that match OCR `structured_fields`, inject them.
 fn merge_plantilla_fields(
     blocks: &mut Vec<serde_json::Value>,
     plantilla_contenido: &serde_json::Value,
@@ -207,11 +184,9 @@ fn merge_plantilla_fields(
         return;
     }
 
-    // Extract template blocks to understand the expected structure
     let template_blocks = plantilla_contenido.get("blocks").and_then(|b| b.as_array());
 
     if let Some(template_blocks) = template_blocks {
-        // For each template block, check if it contains placeholders that match OCR fields
         for template_block in template_blocks {
             if let Some(text) = template_block.get("text").and_then(|t| t.as_str()) {
                 let mut resolved_text = text.to_string();
@@ -249,9 +224,6 @@ fn merge_plantilla_fields(
     }
 }
 
-// ── Guardar contenido ──────────────────────────────────────────
-
-/// Save editor content to a document's `contenido_editable` field.
 pub async fn guardar_contenido(
     db: &DatabaseConnection,
     documento_id: Uuid,
@@ -270,7 +242,6 @@ pub async fn guardar_contenido(
         ));
     }
 
-    // Verify the document's parent entity belongs to the caller's org
     crate::services::documentos::verificar_entidad_pertenece_a_org(
         db,
         &doc.entity_type,
@@ -285,7 +256,6 @@ pub async fn guardar_contenido(
 
     let updated = active.update(db).await?;
 
-    // Audit trail (best-effort)
     auditoria::registrar_best_effort(
         db,
         auditoria::CreateAuditoriaEntry {
@@ -303,9 +273,6 @@ pub async fn guardar_contenido(
     Ok(model_to_response(updated))
 }
 
-// ── Exportar PDF ───────────────────────────────────────────────
-
-/// Export a document's `contenido_editable` as a PDF.
 pub async fn exportar_pdf(
     db: &DatabaseConnection,
     documento_id: Uuid,
@@ -316,7 +283,6 @@ pub async fn exportar_pdf(
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
 
-    // Verify the document's parent entity belongs to the caller's org
     crate::services::documentos::verificar_entidad_pertenece_a_org(
         db,
         &doc.entity_type,
@@ -359,8 +325,6 @@ pub async fn exportar_pdf(
     Ok(buf)
 }
 
-// ── PDF rendering helpers ──────────────────────────────────────
-
 fn load_font_family() -> Result<
     numaelis_rckive_genpdf::fonts::FontFamily<numaelis_rckive_genpdf::fonts::FontData>,
     AppError,
@@ -394,7 +358,6 @@ fn load_font_family() -> Result<
     })
 }
 
-/// Render a single editor block into the PDF document.
 fn render_block(doc: &mut numaelis_rckive_genpdf::Document, block: &serde_json::Value) {
     let block_type = block
         .get("type")
@@ -410,7 +373,6 @@ fn render_block(doc: &mut numaelis_rckive_genpdf::Document, block: &serde_json::
             doc.push(elements::PageBreak::new());
         }
         _ => {
-            // Unknown block type: render as paragraph
             render_paragraph(doc, block);
         }
     }
@@ -490,7 +452,6 @@ fn render_table(doc: &mut numaelis_rckive_genpdf::Document, block: &serde_json::
     let mut table = elements::TableLayout::new(weights);
     table.set_cell_decorator(elements::FrameCellDecorator::new(true, true, false));
 
-    // Header row
     if let Some(headers) = headers {
         let mut row = table.row();
         for header in headers {
@@ -507,7 +468,6 @@ fn render_table(doc: &mut numaelis_rckive_genpdf::Document, block: &serde_json::
             .ok();
     }
 
-    // Data rows
     if let Some(rows) = rows {
         for row_data in rows {
             if let Some(cells) = row_data.as_array() {
@@ -532,9 +492,6 @@ fn render_table(doc: &mut numaelis_rckive_genpdf::Document, block: &serde_json::
     doc.push(elements::Break::new(0.3));
 }
 
-// ── Exportar DOCX ──────────────────────────────────────────────
-
-/// Export a document's `contenido_editable` as a DOCX file.
 pub async fn exportar_docx(
     db: &DatabaseConnection,
     documento_id: Uuid,
@@ -545,7 +502,6 @@ pub async fn exportar_docx(
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Documento {documento_id} no encontrado")))?;
 
-    // Verify the document's parent entity belongs to the caller's org
     crate::services::documentos::verificar_entidad_pertenece_a_org(
         db,
         &doc.entity_type,
@@ -572,10 +528,8 @@ pub async fn exportar_docx(
     Ok(buf)
 }
 
-/// Build a DOCX document from `Block_JSON` blocks.
 pub fn build_docx(blocks: &[serde_json::Value]) -> Result<Docx, AppError> {
-    // 15mm margins in twips (1mm = ~56.7 twips)
-    let margin_twips = 850; // ~15mm
+    let margin_twips = 850;
 
     let mut docx = Docx::new().page_margin(
         docx_rs::PageMargin::new()
@@ -585,7 +539,6 @@ pub fn build_docx(blocks: &[serde_json::Value]) -> Result<Docx, AppError> {
             .right(margin_twips),
     );
 
-    // Define numbering for ordered lists (id=1)
     docx = docx
         .add_abstract_numbering(
             AbstractNumbering::new(1).add_level(
@@ -606,7 +559,6 @@ pub fn build_docx(blocks: &[serde_json::Value]) -> Result<Docx, AppError> {
         )
         .add_numbering(Numbering::new(1, 1));
 
-    // Define numbering for unordered/bullet lists (id=2)
     docx = docx
         .add_abstract_numbering(
             AbstractNumbering::new(2).add_level(
@@ -650,7 +602,6 @@ pub fn build_docx(blocks: &[serde_json::Value]) -> Result<Docx, AppError> {
                 docx = docx.add_paragraph(Paragraph::new().page_break_before(true));
             }
             _ => {
-                // Unknown block type: render as paragraph
                 docx = render_docx_paragraph(docx, block);
             }
         }
@@ -658,8 +609,6 @@ pub fn build_docx(blocks: &[serde_json::Value]) -> Result<Docx, AppError> {
 
     Ok(docx)
 }
-
-// ── DOCX rendering helpers ─────────────────────────────────────
 
 fn render_docx_heading(docx: Docx, block: &serde_json::Value) -> Docx {
     let text = block
@@ -671,7 +620,6 @@ fn render_docx_heading(docx: Docx, block: &serde_json::Value) -> Docx {
         .and_then(serde_json::Value::as_u64)
         .unwrap_or(1);
 
-    // Font sizes in half-points: level 1=36, 2=30, 3=26
     let size_half_points = match level {
         1 => 36,
         2 => 30,
@@ -693,7 +641,7 @@ fn render_docx_paragraph(docx: Docx, block: &serde_json::Value) -> Docx {
 
     let run = Run::new()
         .add_text(text)
-        .size(22) // 11pt in half-points
+        .size(22)
         .fonts(RunFonts::new().ascii("Arial"));
 
     docx.add_paragraph(Paragraph::new().add_run(run))
@@ -735,7 +683,6 @@ fn render_docx_table(docx: Docx, block: &serde_json::Value) -> Docx {
 
     let mut table_rows: Vec<TableRow> = Vec::new();
 
-    // Header row with bold text
     if let Some(headers) = headers {
         let cells: Vec<TableCell> = headers
             .iter()
@@ -752,7 +699,6 @@ fn render_docx_table(docx: Docx, block: &serde_json::Value) -> Docx {
         table_rows.push(TableRow::new(cells));
     }
 
-    // Data rows
     if let Some(rows) = rows {
         for row_data in rows {
             if let Some(cells_data) = row_data.as_array() {
@@ -779,8 +725,6 @@ fn render_docx_table(docx: Docx, block: &serde_json::Value) -> Docx {
     let table = Table::new(table_rows).align(TableAlignmentType::Left);
     docx.add_table(table)
 }
-
-// ── model_to_response (same pattern as documentos.rs) ──────────
 
 fn model_to_response(d: documento::Model) -> DocumentoResponse {
     DocumentoResponse {
@@ -841,7 +785,7 @@ mod tests {
             OcrLine {
                 text: "Line 2".to_string(),
                 confidence: 0.85,
-                bbox: vec![0.0, 12.0, 100.0, 22.0], // gap = |12 - 10| = 2 < 15
+                bbox: vec![0.0, 12.0, 100.0, 22.0],
             },
         ];
         let result = group_lines_into_paragraphs(&lines);
@@ -860,7 +804,7 @@ mod tests {
             OcrLine {
                 text: "Paragraph 2".to_string(),
                 confidence: 0.85,
-                bbox: vec![0.0, 50.0, 100.0, 60.0], // gap = |50 - 10| = 40 > 15
+                bbox: vec![0.0, 50.0, 100.0, 60.0],
             },
         ];
         let result = group_lines_into_paragraphs(&lines);
@@ -886,7 +830,6 @@ mod tests {
         let paragraphs = group_lines_into_paragraphs(&lines);
         assert_eq!(paragraphs.len(), 2);
 
-        // Check that the second paragraph has low confidence
         let min_conf = paragraphs[1]
             .iter()
             .map(|l| l.confidence)
@@ -901,7 +844,6 @@ mod tests {
         let fields = std::collections::HashMap::new();
 
         merge_plantilla_fields(&mut blocks, &plantilla, &fields);
-        // No new blocks should be added
         assert_eq!(blocks.len(), 1);
     }
 
