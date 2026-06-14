@@ -68,20 +68,20 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Assert each new and pre-existing denied path is matched; assert a non-denied source path is allowed
     - **Validates: Requirements 9.1, 9.2, 9.3, 9.5, 9.6**
 
-- [ ] 5. Suppression guard (F6)
+- [x] 5. Suppression guard (F6)
   - [x] 5.1 Add the `preToolUse` suppression guards to `autofix.json`
     - Add `str_replace` and `fs_write` matcher hooks that count suppression tokens (`#[allow(`, `@ts-ignore`, `@ts-nocheck`, `eslint-disable`, `@Suppress`, `# type: ignore`, `# noqa`) and `exit 2` only when the new count exceeds the old (treating a non-existent file as 0)
     - Parse input via `jq -r ... // empty` with quoted expansions; never `eval` agent strings
     - Document that this hard `preToolUse` denial is exempt from the max-2-block escape hatch
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-  - [~] 5.2 Write property test for the suppression guard
+  - [x] 5.2 Write property test for the suppression guard
     - **Property 3: Suppression impossibility — a write that increases the suppression-token count is blocked (exit 2); a write that leaves the count unchanged, including relocating an existing suppression, is allowed**
     - Cover both `str_replace` (newStr vs oldStr) and `fs_write` (text vs on-disk file) paths, including the count-neutral relocate case
     - **Validates: Requirements 7.1, 7.2, 7.3**
 
 - [ ] 6. Diff-budget guard (F7, advisory)
-  - [~] 6.1 Add the advisory `postToolUse` diff-budget guard to `autofix.json`
+  - [-] 6.1 Add the advisory `postToolUse` diff-budget guard to `autofix.json`
     - Count distinct files in `Modified_Files_State`; emit `::notice::` at the soft threshold and `::warning::` at the hard threshold instructing the agent to narrow scope or exit `Status: PARTIAL`
     - Read thresholds from `KIRO_DIFF_SOFT` (default 8) and `KIRO_DIFF_HARD` (default 15); block no write and gate no exit
     - _Requirements: 8.1, 8.2, 8.3, 8.4_
@@ -99,7 +99,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Allow short attempt notes to be appended during the run so later artifacts in the same Queue_Run benefit from earlier ones; record only artifact names, diagnostic signatures, file paths, verdicts, and short summaries
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 13.3, 14.3_
 
-  - [~] 8.2 Write test for within-run scratch behavior
+  - [-] 8.2 Write test for within-run scratch behavior
     - **Property 5: Within-run memory — notes appended while processing earlier artifacts are visible when processing a later artifact in the same run; the file is ephemeral and never git-seeded**
     - **Validates: Requirements 5.1, 5.2, 5.3, 5.4**
 

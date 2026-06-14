@@ -88,6 +88,14 @@
       {
         "matcher": "execute_bash",
         "command": "bash -c 'CMD=$(cat | jq -r .tool_input.command 2>/dev/null); DIR=\"${RUNNER_TEMP:-/tmp}/autofix-sensors-ran.d\"; mkdir -p \"$DIR\"; case \"$CMD\" in *\"cargo clippy\"*|*\"cargo test\"*|*\"cargo fmt\"*) touch \"$DIR/rust\" ;; *\"npm run build\"*|*\"npm test\"*|*\"npx eslint\"*) touch \"$DIR/ts\" ;; *\"gradlew build\"*|*\"gradlew test\"*) touch \"$DIR/kotlin\" ;; *\"pytest\"*|*\"ruff check\"*|*\"ruff format\"*) touch \"$DIR/python\" ;; *hadolint*) touch \"$DIR/docker\" ;; *kubeconform*) touch \"$DIR/k8s\" ;; *shellcheck*) touch \"$DIR/shell\" ;; esac'"
+      },
+      {
+        "matcher": "fs_write",
+        "command": "bash -c 'MODIFIED=\"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\"; SOFT=\"${KIRO_DIFF_SOFT:-8}\"; HARD=\"${KIRO_DIFF_HARD:-15}\"; if [ -f \"$MODIFIED\" ]; then COUNT=$(sort -u \"$MODIFIED\" | wc -l | tr -d \" \"); if [ \"$COUNT\" -ge \"$HARD\" ]; then echo \"::warning::Diff budget exceeded: $COUNT distinct files modified (hard limit: $HARD). Stop expanding scope. If this fix genuinely needs this many files, exit with Status: PARTIAL.\"; elif [ \"$COUNT\" -ge \"$SOFT\" ]; then echo \"::notice::Diff budget advisory: $COUNT distinct files modified (soft limit: $SOFT). Confirm each change traces directly to the diagnosed failure.\"; fi; fi'"
+      },
+      {
+        "matcher": "str_replace",
+        "command": "bash -c 'MODIFIED=\"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\"; SOFT=\"${KIRO_DIFF_SOFT:-8}\"; HARD=\"${KIRO_DIFF_HARD:-15}\"; if [ -f \"$MODIFIED\" ]; then COUNT=$(sort -u \"$MODIFIED\" | wc -l | tr -d \" \"); if [ \"$COUNT\" -ge \"$HARD\" ]; then echo \"::warning::Diff budget exceeded: $COUNT distinct files modified (hard limit: $HARD). Stop expanding scope. If this fix genuinely needs this many files, exit with Status: PARTIAL.\"; elif [ \"$COUNT\" -ge \"$SOFT\" ]; then echo \"::notice::Diff budget advisory: $COUNT distinct files modified (soft limit: $SOFT). Confirm each change traces directly to the diagnosed failure.\"; fi; fi'"
       }
     ],
     "stop": [
