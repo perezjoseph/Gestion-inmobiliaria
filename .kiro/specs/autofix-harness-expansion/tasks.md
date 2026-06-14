@@ -181,7 +181,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - **Validates: Requirements 10.12**
 
 - [ ] 15. Lifecycle integration and control preservation (F9, R13, R14)
-  - [-] 15.1 Expose the per-stack sensor-ran state as the `harness.sensors_ran` signal
+  - [x] 15.1 Expose the per-stack sensor-ran state as the `harness.sensors_ran` signal
     - Surface `Sensor_Ran_State` so the observability pipeline can compute `verification_gap` per stack; delegate all trace/metric/eval persistence to `.kiro/plans/harness-observability.md` and add no new trace design; do not recreate a git-tracked learnings JSONL
     - _Requirements: 13.1, 13.2, 13.3_
 
