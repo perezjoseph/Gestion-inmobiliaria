@@ -156,7 +156,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Bake `chat.enableKnowledge true` and `knowledge.indexType Fast` into the runner image (or set them idempotently at job start)
     - _Requirements: 10.4, 10.5_
 
-  - [-] 13.4 Add the F10 KB advisory to `autofix-system.md`
+  - [x] 13.4 Add the F10 KB advisory to `autofix-system.md`
     - Instruct the agent to search the Persistent_KB via the `knowledge` tool for the current `(artifact, diag_sig)` Memory_Key before a fix, avoid approaches recorded as `failed`, and store a lesson keyed by the Memory_Key after the stop gate confirms a verified outcome
     - Specify `diag_sig` normalization (lint name, error code, test name, ruff/hadolint rule, or hash of first error line) and that entries record only safe metadata, never file contents/tokens/env values
     - _Requirements: 10.6, 10.7, 10.8, 10.9, 14.3_
