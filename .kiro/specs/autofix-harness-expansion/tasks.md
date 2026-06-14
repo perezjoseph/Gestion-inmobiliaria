@@ -29,13 +29,13 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Use a table-driven `hypothesis` generator under `ocr-service/` (or a shell corpus) over representative and adversarial paths
     - **Validates: Requirements 4.1, 4.2**
 
-- [ ] 2. Python sensor suite for ocr-service (F1)
+- [x] 2. Python sensor suite for ocr-service (F1)
   - [x] 2.1 Document the Python sensor suite in `autofix-system.md`
     - Add the Verify-section commands run from `ocr-service/`: `ruff format --check`, then `ruff check`, then `python -m pytest`, in Keep-Quality-Left order
     - State reuse of existing `.trunk/configs/ruff.toml` and the existing `pytest`/`hypothesis` tests; introduce no new runtime dependency
     - _Requirements: 1.1, 1.2, 1.4_
 
-  - [-] 2.2 Add the Python row to the `verify-fix-loop` SKILL sensor-selection table
+  - [x] 2.2 Add the Python row to the `verify-fix-loop` SKILL sensor-selection table
     - Mirror the same three commands and ordering so the skill and system prompt agree
     - _Requirements: 1.3_
 
