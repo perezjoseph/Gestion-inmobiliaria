@@ -115,7 +115,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - State they do not authorize writes to `infra/**`, which remains write-denied; if a required tool is absent from PATH after the retry-wrapped install, the stack is treated as un-verified so the stop gate blocks
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-  - [-] 10.2 Add the non-code validator row to the `verify-fix-loop` SKILL table
+  - [x] 10.2 Add the non-code validator row to the `verify-fix-loop` SKILL table
     - Mirror the three validators and their stacks
     - _Requirements: 2.1, 2.2, 2.3_
 
