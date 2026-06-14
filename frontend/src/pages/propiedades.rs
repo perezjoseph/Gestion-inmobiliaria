@@ -391,7 +391,7 @@ fn render_occupancy_bar(p: &Propiedad) -> Html {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                 <span style="font-size: var(--text-xs); color: var(--text-tertiary); font-weight: 500;">{"Ocupación"}</span>
                 <div style="display: flex; align-items: baseline; gap: 4px;">
-                    <span style={format!("font-size: var(--text-base); font-weight: 700; color: {};", pct_color)}>{format!("{pct:.0}%")}</span>
+                    <span style={format!("font-size: var(--text-base); font-weight: 700; color: {pct_color};")}>{format!("{pct:.0}%")}</span>
                     <span style="font-size: var(--text-xs); color: var(--text-tertiary);">{format!("({occupied}/{total})")}</span>
                 </div>
             </div>
@@ -437,7 +437,7 @@ fn render_propiedad_card(
     html! {
         <div class="gi-card gi-property-card" onclick={on_card_click} role="article" tabindex="0">
             // Status indicator stripe at top
-            <div style={format!("height: 4px; border-radius: 12px 12px 0 0; background: {};", estado_dot_color)}></div>
+            <div style={format!("height: 4px; border-radius: 12px 12px 0 0; background: {estado_dot_color};")}></div>
             <div style="padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); flex: 1;">
                 // Header: title + badge
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-2);">
