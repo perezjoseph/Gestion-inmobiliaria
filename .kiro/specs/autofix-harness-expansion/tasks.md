@@ -94,7 +94,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 8. Within-run scratch learnings (F4)
-  - [-] 8.1 Keep the queue-start scratch reset in the autofix trigger workflow
+  - [x] 8.1 Keep the queue-start scratch reset in the autofix trigger workflow
     - Confirm/keep `: > "$LEARNINGS_FILE"` (`$RUNNER_TEMP/autofix-learnings.txt`) at queue start; ensure there is no seed-from-git step and no commit-of-memory step
     - Allow short attempt notes to be appended during the run so later artifacts in the same Queue_Run benefit from earlier ones; record only artifact names, diagnostic signatures, file paths, verdicts, and short summaries
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 13.3, 14.3_
