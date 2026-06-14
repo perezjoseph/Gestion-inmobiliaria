@@ -220,7 +220,7 @@ fn IngresosFilterBar(props: &IngresosFilterBarProps) -> Html {
                     </select>
                 </div>
                 <div>
-                    <label class="gi-label">{"AÃ±o"}</label>
+                    <label class="gi-label">{"Año"}</label>
                     <input
                         type="number"
                         class="gi-input"
@@ -285,7 +285,7 @@ fn IngresosResult(props: &IngresosResultProps) -> Html {
                     </p>
                 </div>
                 <div class="gi-card" style="padding: var(--space-4);">
-                    <p class="gi-label" style="margin-bottom: var(--space-1);">{"Tasa OcupaciÃ³n"}</p>
+                    <p class="gi-label" style="margin-bottom: var(--space-1);">{"Tasa Ocupación"}</p>
                     <p style="font-size: var(--text-xl); font-weight: 600;">
                         {format!("{:.1}%", r.tasa_ocupacion)}
                     </p>
@@ -484,7 +484,7 @@ fn RentabilidadFilterBar(props: &RentabilidadFilterBarProps) -> Html {
                     </select>
                 </div>
                 <div>
-                    <label class="gi-label">{"AÃ±o"}</label>
+                    <label class="gi-label">{"Año"}</label>
                     <input
                         type="number"
                         class="gi-input"
@@ -587,7 +587,7 @@ fn RentabilidadTable(props: &RentabilidadTableProps) -> Html {
     if props.rows.is_empty() {
         return html! {
             <div class="gi-card" style="padding: var(--space-6); text-align: center; color: var(--text-secondary);">
-                {"No se encontraron datos para el perÃodo seleccionado."}
+                {"No se encontraron datos para el período seleccionado."}
             </div>
         };
     }

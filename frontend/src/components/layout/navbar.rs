@@ -57,7 +57,7 @@ fn NavbarSearch() -> Html {
             if *search_open {
                 <input type="text"
                     class="gi-input gi-navbar-search"
-                    placeholder="Ir a secciÃ³n... (propiedades, pagos, contratos)"
+                    placeholder="Ir a sección... (propiedades, pagos, contratos)"
                     value={(*search_query).clone()}
                     oninput={on_search_input}
                     onkeydown={on_search_keydown}
@@ -65,12 +65,12 @@ fn NavbarSearch() -> Html {
                 />
             }
             <button class="gi-btn gi-btn-ghost gi-navbar-search-btn" onclick={on_toggle_search}
-                aria-label="Ir a secciÃ³n" title="Ir a secciÃ³n"
+                aria-label="Ir a sección" title="Ir a sección"
                 style="padding: var(--space-2); border: none; display: flex; align-items: center; gap: var(--space-1);">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                     <polyline points="9 18 15 12 9 6"/>
                 </svg>
-                <span style="font-size: var(--text-xs); font-weight: 500;">{"Ir aâ€¦"}</span>
+                <span style="font-size: var(--text-xs); font-weight: 500;">{"Ir a…"}</span>
             </button>
             <kbd class="gi-kbd" title="Abrir paleta de comandos">{"\u{2318}K"}</kbd>
         </>
@@ -166,7 +166,7 @@ fn UserMenu(props: &UserMenuProps) -> Html {
             </div>
             <button onclick={on_logout} class="gi-btn gi-btn-ghost gi-navbar-logout"
                 style="font-size: var(--text-xs);">
-                {"Cerrar sesiÃ³n"}
+                {"Cerrar sesión"}
             </button>
         </div>
     }
@@ -185,7 +185,7 @@ pub fn Navbar(props: &NavbarProps) -> Html {
         <nav class="gi-navbar">
             <div class="gi-navbar-left">
                 <button class="gi-hamburger" onclick={props.on_toggle_sidebar.clone()}
-                    aria-label="Abrir menÃº">
+                    aria-label="Abrir menú">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                         <line x1="3" y1="6" x2="21" y2="6"/>
                         <line x1="3" y1="12" x2="21" y2="12"/>
@@ -193,7 +193,7 @@ pub fn Navbar(props: &NavbarProps) -> Html {
                     </svg>
                 </button>
                 <span class="gi-navbar-title text-display">
-                    {"GestiÃ³n Inmobiliaria"}
+                    {"Gestión Inmobiliaria"}
                 </span>
             </div>
             <div class="gi-navbar-right">

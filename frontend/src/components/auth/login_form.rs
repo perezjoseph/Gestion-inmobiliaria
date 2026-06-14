@@ -13,7 +13,7 @@ pub struct LoginFormProps {
 
 fn validate_email(value: &str) -> Option<String> {
     if value.trim().is_empty() || !value.contains('@') {
-        Some("Correo electrÃ³nico invÃ¡lido".into())
+        Some("Correo electrónico inválido".into())
     } else {
         None
     }
@@ -21,7 +21,7 @@ fn validate_email(value: &str) -> Option<String> {
 
 fn validate_password(value: &str) -> Option<String> {
     if value.len() < 6 {
-        Some("La contraseÃ±a debe tener al menos 6 caracteres".into())
+        Some("La contraseña debe tener al menos 6 caracteres".into())
     } else {
         None
     }
@@ -29,11 +29,11 @@ fn validate_password(value: &str) -> Option<String> {
 
 fn friendly_server_error(err: &str) -> String {
     if err.contains("401") || err.to_lowercase().contains("unauthorized") {
-        "Correo o contraseÃ±a incorrectos. Verifique sus datos e intente de nuevo.".to_string()
+        "Correo o contraseña incorrectos. Verifique sus datos e intente de nuevo.".to_string()
     } else if err.to_lowercase().contains("network") || err.to_lowercase().contains("fetch") {
-        "No se pudo conectar al servidor. Verifique su conexiÃ³n a internet.".to_string()
+        "No se pudo conectar al servidor. Verifique su conexión a internet.".to_string()
     } else {
-        format!("Error al iniciar sesiÃ³n: {err}")
+        format!("Error al iniciar sesión: {err}")
     }
 }
 
@@ -147,7 +147,7 @@ pub fn LoginForm(props: &LoginFormProps) -> Html {
             }
             <FormErrorSummary errors={form_errors} />
             <div>
-                <label class="gi-label" for="login-email">{"Correo electrÃ³nico"}</label>
+                <label class="gi-label" for="login-email">{"Correo electrónico"}</label>
                 <input
                     id="login-email"
                     type="email"
@@ -164,7 +164,7 @@ pub fn LoginForm(props: &LoginFormProps) -> Html {
                 }
             </div>
             <div>
-                <label class="gi-label" for="login-password">{"ContraseÃ±a"}</label>
+                <label class="gi-label" for="login-password">{"Contraseña"}</label>
                 <input
                     id="login-password"
                     type="password"
@@ -181,7 +181,7 @@ pub fn LoginForm(props: &LoginFormProps) -> Html {
             </div>
             <button type="submit" disabled={*loading} class="gi-btn gi-btn-primary"
                 style="width: 100%; padding: var(--space-3) var(--space-4);">
-                if *loading { {"Ingresando..."} } else { {"Iniciar SesiÃ³n"} }
+                if *loading { {"Ingresando..."} } else { {"Iniciar Sesión"} }
             </button>
         </form>
     }

@@ -29,7 +29,7 @@ pub fn ErrorBanner(props: &ErrorBannerProps) -> Html {
                         style="background: none; border: none; color: var(--color-error); cursor: pointer; font-size: var(--text-lg); font-weight: 700; line-height: 1; padding: var(--space-1);"
                         aria-label="Cerrar"
                     >
-                        {"Ã—"}
+                        {"×"}
                     </button>
                 }
             </div>

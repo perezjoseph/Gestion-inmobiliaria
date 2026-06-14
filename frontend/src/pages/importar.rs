@@ -151,7 +151,7 @@ pub fn Importar() -> Html {
     html! {
         <div>
             <div class="gi-page-header">
-                <h1 class="gi-page-title">{"ImportaciÃ³n Masiva"}</h1>
+                <h1 class="gi-page-title">{"Importación Masiva"}</h1>
             </div>
 
             if let Some(err) = (*error).as_ref() {
@@ -180,7 +180,7 @@ pub fn Importar() -> Html {
                             class="gi-btn gi-btn-primary"
                             style={if *uploading { "opacity: 0.5; pointer-events: none;" } else { "" }}
                         >
-                            { if *uploading { "Importando..." } else { "ðŸ“ Seleccionar Archivo" } }
+                            { if *uploading { "Importando..." } else { "📁 Seleccionar Archivo" } }
                             <input
                                 type="file"
                                 accept=".csv,.xlsx,.jpg,.jpeg,.png,.pdf"
@@ -195,7 +195,7 @@ pub fn Importar() -> Html {
                 </div>
 
                 <div style="margin-top: var(--space-3); font-size: var(--text-xs); color: var(--text-tertiary);">
-                    {"Formatos aceptados: CSV (.csv), Excel (.xlsx) e imÃ¡genes (.jpg, .jpeg, .png, .pdf). La primera fila debe contener los encabezados para archivos CSV/XLSX."}
+                    {"Formatos aceptados: CSV (.csv), Excel (.xlsx) e imágenes (.jpg, .jpeg, .png, .pdf). La primera fila debe contener los encabezados para archivos CSV/XLSX."}
                 </div>
             </div>
 
@@ -210,7 +210,7 @@ pub fn Importar() -> Html {
             if let Some(ref r) = *result {
                 <div class="gi-card" style="padding: var(--space-5); margin-top: var(--space-4);">
                     <h3 style="font-size: var(--text-base); font-weight: 600; color: var(--text-primary); margin-bottom: var(--space-3);">
-                        {"Resultado de la ImportaciÃ³n"}
+                        {"Resultado de la Importación"}
                     </h3>
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); margin-bottom: var(--space-3);">
                         <div class="gi-inline-stat">

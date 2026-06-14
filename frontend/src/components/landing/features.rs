@@ -12,8 +12,8 @@ const BLOCKS: &[FeatureBlock] = &[
         title: "Propiedades, inquilinos y contratos",
         points: &[
             "Registra inmuebles con unidades, precios y estado.",
-            "Asocia inquilinos con cÃ©dula y datos de contacto.",
-            "Contratos con fechas, montos y renovaciÃ³n automÃ¡tica.",
+            "Asocia inquilinos con cédula y datos de contacto.",
+            "Contratos con fechas, montos y renovación automática.",
         ],
     },
     FeatureBlock {
@@ -21,15 +21,15 @@ const BLOCKS: &[FeatureBlock] = &[
         title: "Pagos, gastos y reportes",
         points: &[
             "Cobros en DOP o USD con seguimiento de atrasos.",
-            "Gastos por categorÃa vinculados a cada propiedad.",
-            "Reportes de ocupaciÃ³n, ingresos y cumplimiento fiscal.",
+            "Gastos por categoría vinculados a cada propiedad.",
+            "Reportes de ocupación, ingresos y cumplimiento fiscal.",
         ],
     },
     FeatureBlock {
         number: "03",
         title: "Mantenimiento y operaciones",
         points: &[
-            "Solicitudes de reparaciÃ³n con prioridad y seguimiento.",
+            "Solicitudes de reparación con prioridad y seguimiento.",
             "Dashboard en tiempo real con alertas de vencimiento.",
             "Documentos, plantillas y comprobantes fiscales (NCF).",
         ],

@@ -42,7 +42,7 @@ const TIPOS_DOCUMENTO: &[(&str, &str)] = &[
     ("acuerdo", "Acuerdo"),
     ("recibo", "Recibo"),
     ("carta", "Carta"),
-    ("notificacion", "NotificaciÃ³n"),
+    ("notificacion", "Notificación"),
     ("otro", "Otro"),
 ];
 
@@ -359,7 +359,7 @@ pub fn Plantillas() -> Html {
 
             if plantillas.is_empty() {
                 <div class="gi-empty-state">
-                    <div class="gi-empty-state-icon">{"ðŸ“„"}</div>
+                    <div class="gi-empty-state-icon">{"📄"}</div>
                     <div class="gi-empty-state-title">{"No hay plantillas"}</div>
                     <p class="gi-empty-state-text">{"Cree una plantilla para comenzar a generar documentos."}</p>
                 </div>
@@ -386,7 +386,7 @@ pub fn Plantillas() -> Html {
 
             if show_delete.is_some() {
                 <DeleteConfirmModal
-                    message="Â¿EstÃ¡ seguro de que desea eliminar esta plantilla? Esta acciÃ³n no se puede deshacer."
+                    message="¿Está seguro de que desea eliminar esta plantilla? Esta acción no se puede deshacer."
                     on_confirm={on_delete_confirm}
                     on_cancel={on_delete_cancel}
                 />
@@ -511,13 +511,13 @@ fn PlantillaFormModal(props: &PlantillaFormModalProps) -> Html {
                     <div class="gi-form-group">
                         <label class="gi-label">{"Contenido"}</label>
                         <p style="font-size: var(--text-xs); color: var(--text-tertiary); margin-bottom: var(--space-1);">
-                            {"Use # para tÃtulos, - para listas, --- para saltos de pÃ¡gina. Placeholders: {{entidad.campo}}"}
+                            {"Use # para títulos, - para listas, --- para saltos de página. Placeholders: {{entidad.campo}}"}
                         </p>
                         <textarea
                             class="gi-input"
                             rows="10"
                             style="font-family: monospace; resize: vertical; min-height: 160px;"
-                            placeholder={"# TÃtulo del documento\n\nContenido del documento con {{contrato.fecha_inicio}}..."}
+                            placeholder={"# Título del documento\n\nContenido del documento con {{contrato.fecha_inicio}}..."}
                             value={(*form_contenido).clone()}
                             oninput={let fc = form_contenido.clone(); Callback::from(move |e: InputEvent| {
                                 let input: web_sys::HtmlTextAreaElement = e.target_unchecked_into();

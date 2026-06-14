@@ -220,7 +220,7 @@ fn PagoForm(props: &PagoFormProps) -> Html {
             <OcrScanButton
                 document_type="deposito_bancario"
                 on_result={props.on_ocr_result.clone()}
-                label={AttrValue::from("ðŸ“· Escanear Recibo")}
+                label={AttrValue::from("📷 Escanear Recibo")}
             />
         }
     };
@@ -238,12 +238,12 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                     <button type="button"
                         class={if *props.moneda == "DOP" { "gi-currency-toggle__btn gi-currency-toggle__btn--active" } else { "gi-currency-toggle__btn" }}
                         onclick={select_cb_val!(props.moneda, "DOP")}>
-                        {"ðŸ‡©ðŸ‡´ Peso Dominicano (DOP)"}
+                        {"🇩🇴 Peso Dominicano (DOP)"}
                     </button>
                     <button type="button"
                         class={if *props.moneda == "USD" { "gi-currency-toggle__btn gi-currency-toggle__btn--active" } else { "gi-currency-toggle__btn" }}
                         onclick={select_cb_val!(props.moneda, "USD")}>
-                        {"ðŸ‡ºðŸ‡¸ DÃ³lar (USD)"}
+                        {"🇺🇸 Dólar (USD)"}
                     </button>
                 </div>
             </div>
@@ -252,7 +252,7 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                     <label class="gi-label">{"Contrato *"}</label>
                     <select onchange={select_cb!(props.contrato_id)} disabled={props.is_editing}
                         class={input_class(fe.contrato_id.is_some())}>
-                        <option value="" selected={props.contrato_id.is_empty()}>{"â€” Seleccionar contrato â€”"}</option>
+                        <option value="" selected={props.contrato_id.is_empty()}>{"— Seleccionar contrato —"}</option>
                         { for props.contratos.iter().map(|c| {
                             let sel = *props.contrato_id == c.id;
                             let label = props.contrato_label.emit(c.id.clone());
@@ -274,7 +274,7 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                 </div>
                 <div>
                     <label class="gi-label">{"Fecha de Vencimiento *"}
-                        <HelpTooltip text="Fecha lÃmite para recibir el pago sin que se considere atrasado." id="help-fecha-venc" />
+                        <HelpTooltip text="Fecha límite para recibir el pago sin que se considere atrasado." id="help-fecha-venc" />
                     </label>
                     <input type="text" placeholder="DD/MM/AAAA"
                         value={iso_to_display(&props.fecha_vencimiento)}
@@ -295,9 +295,9 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                     <span class="gi-hint">{"Formato: DD/MM/AAAA"}</span>
                 </div>
                 <div>
-                    <label class="gi-label">{"MÃ©todo de Pago"}</label>
+                    <label class="gi-label">{"Método de Pago"}</label>
                     <select onchange={select_cb!(props.metodo_pago)} class="gi-input">
-                        <option value="" selected={props.metodo_pago.is_empty()}>{"â€” Sin especificar â€”"}</option>
+                        <option value="" selected={props.metodo_pago.is_empty()}>{"— Sin especificar —"}</option>
                         <option value="efectivo" selected={*props.metodo_pago == "efectivo"}>{"Efectivo"}</option>
                         <option value="transferencia" selected={*props.metodo_pago == "transferencia"}>{"Transferencia"}</option>
                         <option value="cheque" selected={*props.metodo_pago == "cheque"}>{"Cheque"}</option>
@@ -382,10 +382,10 @@ fn render_pago_row(
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={p.monto} moneda={p.moneda.clone()} /></td>
             {recargo_cell}
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
-                {p.fecha_pago.as_deref().map_or_else(|| "â€”".into(), format_date_display)}</td>
+                {p.fecha_pago.as_deref().map_or_else(|| "—".into(), format_date_display)}</td>
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&p.fecha_vencimiento)}</td>
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
-                {p.metodo_pago.as_deref().map_or("â€”", metodo_label)}</td>
+                {p.metodo_pago.as_deref().map_or("—", metodo_label)}</td>
             <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
             {actions}
         </tr>
@@ -413,10 +413,10 @@ fn render_pago_cells(
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={p.monto} moneda={p.moneda.clone()} /></td>
             {recargo_cell}
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
-                {p.fecha_pago.as_deref().map_or_else(|| "â€”".into(), format_date_display)}</td>
+                {p.fecha_pago.as_deref().map_or_else(|| "—".into(), format_date_display)}</td>
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{format_date_display(&p.fecha_vencimiento)}</td>
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
-                {p.metodo_pago.as_deref().map_or("â€”", metodo_label)}</td>
+                {p.metodo_pago.as_deref().map_or("—", metodo_label)}</td>
             <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
             {actions}
         </>
@@ -426,7 +426,7 @@ fn render_pago_cells(
 fn render_recargo_cell(recargo: Option<f64>, moneda: &str) -> Html {
     recargo.map_or_else(
         || html! {
-            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{"â€”"}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{"—"}</td>
         },
         |r| html! {
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--color-error);">
@@ -486,7 +486,7 @@ fn render_pago_empty_state(user_rol: &str, on_new: &Callback<MouseEvent>) -> Htm
             </div>
             <div class="gi-empty-state-title">{"Registre su primer cobro"}</div>
             <p class="gi-empty-state-text">
-                {"Lleve un control preciso de los cobros de alquiler. Cada pago se vincula a un contrato activo para generar recibos y reportes automÃ¡ticamente."}
+                {"Lleve un control preciso de los cobros de alquiler. Cada pago se vincula a un contrato activo para generar recibos y reportes automáticamente."}
             </p>
             <div style="display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4); font-size: var(--text-xs); color: var(--text-secondary); max-width: 32ch; margin-left: auto; margin-right: auto; text-align: left;">
                 <div style="display: flex; align-items: center; gap: var(--space-2);">
@@ -499,7 +499,7 @@ fn render_pago_empty_state(user_rol: &str, on_new: &Callback<MouseEvent>) -> Htm
                 </div>
                 <div style="display: flex; align-items: center; gap: var(--space-2);">
                     <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--color-primary-100, #dbeafe); color: var(--color-primary-700, #1d4ed8); font-size: 10px; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; flex-shrink: 0;">{"3"}</span>
-                    <strong>{"Registre pagos aquÃ"}</strong>
+                    <strong>{"Registre pagos aquí"}</strong>
                 </div>
             </div>
             if can_write(user_rol) {
@@ -508,7 +508,7 @@ fn render_pago_empty_state(user_rol: &str, on_new: &Callback<MouseEvent>) -> Htm
                 </button>
             }
             <div class="gi-empty-state-hint">
-                {"Â¿AÃºn no tiene contratos? "}
+                {"¿Aún no tiene contratos? "}
                 <Link<Route> to={Route::Contratos} classes="gi-btn-text">
                     {"Crear un contrato"}
                 </Link<Route>>
@@ -692,7 +692,7 @@ fn validate_pago_fields(contrato_id: &str, monto: &str, fecha_vencimiento: &str)
     }
     match monto.parse::<f64>() {
         Ok(v) if v <= 0.0 => errs.monto = Some("El monto debe ser mayor a 0".into()),
-        Err(_) => errs.monto = Some("Monto invÃ¡lido".into()),
+        Err(_) => errs.monto = Some("Monto inválido".into()),
         _ => {}
     }
     if fecha_vencimiento.is_empty() {
@@ -721,16 +721,16 @@ fn format_contrato_label(
             let prop_name = propiedades
                 .iter()
                 .find(|p| p.id == c.propiedad_id)
-                .map_or("â€”", |p| p.titulo.as_str());
+                .map_or("—", |p| p.titulo.as_str());
             let tenant_name = inquilinos
                 .iter()
                 .find(|i| i.id == c.inquilino_id)
                 .map_or_else(String::new, |i| format!("{} {}", i.nombre, i.apellido));
             if tenant_name.is_empty() {
-                format!("{} â€” {} {}", prop_name, c.moneda, c.monto_mensual)
+                format!("{} — {} {}", prop_name, c.moneda, c.monto_mensual)
             } else {
                 format!(
-                    "{} ({}) â€” {} {}",
+                    "{} ({}) — {} {}",
                     prop_name, tenant_name, c.moneda, c.monto_mensual
                 )
             }
@@ -1426,7 +1426,7 @@ fn render_pagos_view(
         "Recargo".into(),
         "Fecha Pago".into(),
         "Vencimiento".into(),
-        "MÃ©todo".into(),
+        "Método".into(),
         "Estado".into(),
         last_header,
     ];
@@ -1528,7 +1528,7 @@ fn render_pagos_view(
                 on_clear={on_clear_selection.clone()}
             >
                 <button onclick={on_bulk_mark_paid.clone()} class="gi-btn gi-btn-primary gi-btn-sm">
-                    {"âœ“ Marcar como pagado"}
+                    {"✓ Marcar como pagado"}
                 </button>
             </BulkActionBar>
         </div>
@@ -1580,7 +1580,7 @@ fn render_delete_confirm_pago(
         || html! {},
         |p| html! {
             <DeleteConfirmModal
-                message={format!("Â¿EstÃ¡ seguro de que desea eliminar el pago de {}? Esta acciÃ³n no se puede deshacer.", format_currency(&p.moneda, p.monto))}
+                message={format!("¿Está seguro de que desea eliminar el pago de {}? Esta acción no se puede deshacer.", format_currency(&p.moneda, p.monto))}
                 on_confirm={on_confirm.clone()} on_cancel={on_cancel.clone()}
             />
         },

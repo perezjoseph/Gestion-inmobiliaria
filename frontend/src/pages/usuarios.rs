@@ -184,7 +184,7 @@ pub fn Usuarios() -> Html {
     html! {
         <div>
             <div class="gi-page-header">
-                <h1 class="gi-page-title">{"GestiÃ³n de Usuarios"}</h1>
+                <h1 class="gi-page-title">{"Gestión de Usuarios"}</h1>
             </div>
 
             if let Some(err) = (*error).as_ref() {

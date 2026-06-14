@@ -24,7 +24,7 @@ pub fn OfflineBanner() -> Html {
 
     html! {
         <div style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 9999; padding: var(--space-3) var(--space-4); background: var(--color-warning); color: var(--color-sand-900); text-align: center; font-size: var(--text-sm); font-weight: 500;">
-            {"âš  Sin conexiÃ³n a internet â€” Se requiere conexiÃ³n a internet para realizar cambios"}
+            {"⚠ Sin conexión a internet — Se requiere conexión a internet para realizar cambios"}
         </div>
     }
 }

@@ -140,7 +140,7 @@ fn MantenimientoForm(props: &MantenimientoFormProps) -> Html {
                     <div>
                         <label class="gi-label">{"Propiedad *"}</label>
                         <select onchange={select_cb!(props.f_propiedad_id)} disabled={props.is_editing} class={prop_class}>
-                            <option value="" selected={props.f_propiedad_id.is_empty()}>{"â€” Seleccionar propiedad â€”"}</option>
+                            <option value="" selected={props.f_propiedad_id.is_empty()}>{"— Seleccionar propiedad —"}</option>
                             { for props.propiedades.iter().map(|p| {
                                 let sel = *props.f_propiedad_id == p.id;
                                 html! { <option value={p.id.clone()} selected={sel}>{&p.titulo}</option> }
@@ -151,7 +151,7 @@ fn MantenimientoForm(props: &MantenimientoFormProps) -> Html {
                     <div>
                         <label class="gi-label">{"Unidad"}</label>
                         <select onchange={select_cb!(props.f_unidad_id)} class="gi-input">
-                            <option value="" selected={props.f_unidad_id.is_empty()}>{"â€” Sin unidad â€”"}</option>
+                            <option value="" selected={props.f_unidad_id.is_empty()}>{"— Sin unidad —"}</option>
                             { for filtered_unidades.iter().map(|u| {
                                 let sel = *props.f_unidad_id == u.id;
                                 html! { <option value={u.id.clone()} selected={sel}>{&u.numero_unidad}</option> }
@@ -161,7 +161,7 @@ fn MantenimientoForm(props: &MantenimientoFormProps) -> Html {
                     <div>
                         <label class="gi-label">{"Inquilino"}</label>
                         <select onchange={select_cb!(props.f_inquilino_id)} class="gi-input">
-                            <option value="" selected={props.f_inquilino_id.is_empty()}>{"â€” Sin inquilino â€”"}</option>
+                            <option value="" selected={props.f_inquilino_id.is_empty()}>{"— Sin inquilino —"}</option>
                             { for props.inquilinos_list.iter().map(|i| {
                                 let sel = *props.f_inquilino_id == i.id;
                                 let label = format!("{} {}", i.nombre, i.apellido);
@@ -170,13 +170,13 @@ fn MantenimientoForm(props: &MantenimientoFormProps) -> Html {
                         </select>
                     </div>
                     <div>
-                        <label class="gi-label">{"TÃtulo *"}</label>
+                        <label class="gi-label">{"Título *"}</label>
                         <input type="text" value={(*props.f_titulo).clone()} oninput={input_cb!(props.f_titulo)}
-                            class={titulo_class} placeholder="DescripciÃ³n breve del problema" />
+                            class={titulo_class} placeholder="Descripción breve del problema" />
                         {titulo_error_html}
                     </div>
                     <div style="grid-column: 1 / -1;">
-                        <label class="gi-label">{"DescripciÃ³n"}</label>
+                        <label class="gi-label">{"Descripción"}</label>
                         <textarea value={(*props.f_descripcion).clone()} oninput={textarea_cb!(props.f_descripcion)}
                             class="gi-input" style="min-height: 80px;" placeholder="Detalles adicionales del problema" />
                     </div>
@@ -195,7 +195,7 @@ fn MantenimientoForm(props: &MantenimientoFormProps) -> Html {
                             class="gi-input" placeholder="Nombre del proveedor" />
                     </div>
                     <div>
-                        <label class="gi-label">{"TelÃ©fono Proveedor"}</label>
+                        <label class="gi-label">{"Teléfono Proveedor"}</label>
                         <input type="text" value={(*props.f_telefono_proveedor).clone()} oninput={input_cb!(props.f_telefono_proveedor)}
                             class="gi-input" placeholder="809-555-1234" />
                     </div>
@@ -324,9 +324,9 @@ fn render_detail_fields(sol: &Solicitud, prop_label: &Callback<String, String>) 
                     <span class="gi-label">{"Prioridad"}</span>
                     <div>{prioridad_badge(&sol.prioridad)}</div>
                 </div>
-                {render_optional_field("DescripciÃ³n", sol.descripcion.as_ref(), "grid-column: 1 / -1;")}
+                {render_optional_field("Descripción", sol.descripcion.as_ref(), "grid-column: 1 / -1;")}
                 {render_optional_field("Proveedor", sol.nombre_proveedor.as_ref(), "")}
-                {render_optional_field("TelÃ©fono Proveedor", sol.telefono_proveedor.as_ref(), "")}
+                {render_optional_field("Teléfono Proveedor", sol.telefono_proveedor.as_ref(), "")}
                 {render_optional_field("Email Proveedor", sol.email_proveedor.as_ref(), "")}
                 {costo_html}
                 {fecha_inicio_html}
@@ -375,7 +375,7 @@ fn render_detail_notas(
 
     let notas_list = sol.notas.as_deref().unwrap_or_default();
     let notas_html = if notas_list.is_empty() {
-        html! { <p style="font-size: var(--text-sm); color: var(--text-tertiary);">{"Sin notas aÃºn."}</p> }
+        html! { <p style="font-size: var(--text-sm); color: var(--text-tertiary);">{"Sin notas aún."}</p> }
     } else {
         html! {
             <div style="display: flex; flex-direction: column; gap: var(--space-3);">
@@ -406,7 +406,7 @@ fn MantenimientoDetail(props: &MantenimientoDetailProps) -> Html {
         <div>
             <div class="gi-page-header">
                 <div style="display: flex; align-items: center; gap: var(--space-3);">
-                    <button onclick={props.on_back.clone()} class="gi-btn gi-btn-ghost">{"â† Volver"}</button>
+                    <button onclick={props.on_back.clone()} class="gi-btn gi-btn-ghost">{"← Volver"}</button>
                     <h1 class="gi-page-title">{&sol.titulo}</h1>
                 </div>
                 {render_detail_actions(&sol.id, &sol.estado, &props.user_rol, &props.on_cambiar_estado)}
@@ -450,7 +450,7 @@ fn render_mantenimiento_row(
     let p_label = prop_label.emit(s.propiedad_id.clone());
     let costo_display = match (&s.costo_monto, &s.costo_moneda) {
         (Some(monto), Some(moneda)) => format_currency(moneda, *monto),
-        _ => "â€”".into(),
+        _ => "—".into(),
     };
     let sc = s.clone();
     let sd = s.clone();
@@ -470,7 +470,7 @@ fn render_mantenimiento_row(
             <td style="padding: var(--space-3) var(--space-5);">{prioridad_badge(&s.prioridad)}</td>
             <td style="padding: var(--space-3) var(--space-5);">{estado_badge(&s.estado)}</td>
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">
-                {s.nombre_proveedor.as_deref().unwrap_or("â€”")}</td>
+                {s.nombre_proveedor.as_deref().unwrap_or("—")}</td>
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{costo_display}</td>
             {actions_html}
         </tr>
@@ -591,7 +591,7 @@ fn make_mantenimiento_edit_cb(
 fn validate_mantenimiento_fields(titulo: &str, propiedad_id: &str) -> FormErrors {
     let mut errs = FormErrors::default();
     if titulo.trim().is_empty() {
-        errs.titulo = Some("El tÃtulo es obligatorio".into());
+        errs.titulo = Some("El título es obligatorio".into());
     }
     if propiedad_id.is_empty() {
         errs.propiedad_id = Some("Debe seleccionar una propiedad".into());
@@ -979,7 +979,7 @@ fn render_mantenimiento_view(
             propiedades
                 .iter()
                 .find(|p| p.id == id)
-                .map_or_else(|| "â€”".into(), |p| p.titulo.clone())
+                .map_or_else(|| "—".into(), |p| p.titulo.clone())
         })
     };
 
@@ -1096,7 +1096,7 @@ fn render_mantenimiento_list_view(
     };
     let headers = vec![
         "Propiedad".into(),
-        "TÃtulo".into(),
+        "Título".into(),
         "Prioridad".into(),
         "Estado".into(),
         "Proveedor".into(),
@@ -1156,7 +1156,7 @@ fn render_delete_confirm_mant(
         || html! {},
         |t| html! {
             <DeleteConfirmModal
-                message={format!("Â¿EstÃ¡ seguro de que desea eliminar la solicitud \"{}\"? Esta acciÃ³n no se puede deshacer.", t.titulo)}
+                message={format!("¿Está seguro de que desea eliminar la solicitud \"{}\"? Esta acción no se puede deshacer.", t.titulo)}
                 on_confirm={on_confirm} on_cancel={on_cancel}
             />
         },

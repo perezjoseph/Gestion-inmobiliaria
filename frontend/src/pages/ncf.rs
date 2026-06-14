@@ -44,7 +44,7 @@ pub fn Ncf() -> Html {
     if !is_admin {
         return html! {
             <div class="gi-empty-state">
-                <div class="gi-empty-state-title">{"No tiene permisos para acceder a esta secciÃ³n"}</div>
+                <div class="gi-empty-state-title">{"No tiene permisos para acceder a esta sección"}</div>
             </div>
         };
     }
@@ -56,7 +56,7 @@ pub fn Ncf() -> Html {
     let headers = vec![
         "Tipo NCF".into(),
         "Prefijo".into(),
-        "Siguiente NÃºmero".into(),
+        "Siguiente Número".into(),
         "Rango Desde".into(),
         "Rango Hasta".into(),
         "Activo".into(),
@@ -78,13 +78,13 @@ pub fn Ncf() -> Html {
             if (*items).is_empty() {
                 <div class="gi-empty-state">
                     <div class="gi-empty-state-title">{"Sin secuencias NCF configuradas"}</div>
-                    <p class="gi-empty-state-text">{"Configure los rangos de comprobantes fiscales aquÃ."}</p>
+                    <p class="gi-empty-state-text">{"Configure los rangos de comprobantes fiscales aquí."}</p>
                 </div>
             } else {
                 <DataTable headers={headers}>
                     { for (*items).iter().map(|item| {
                         let activo_badge = if item.is_active {
-                            html! { <span class="gi-badge gi-badge-success">{"SÃ"}</span> }
+                            html! { <span class="gi-badge gi-badge-success">{"Sí"}</span> }
                         } else {
                             html! { <span class="gi-badge gi-badge-neutral">{"No"}</span> }
                         };

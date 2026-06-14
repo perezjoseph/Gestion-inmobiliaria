@@ -43,9 +43,9 @@ impl EventType {
 
     const fn icon(&self) -> &'static str {
         match self {
-            Self::ContratoInicio | Self::ContratoFin => "ðŸ“‹",
-            Self::PagoVencimiento => "ðŸ’°",
-            Self::Mantenimiento => "ðŸ”§",
+            Self::ContratoInicio | Self::ContratoFin => "📋",
+            Self::PagoVencimiento => "💰",
+            Self::Mantenimiento => "🔧",
         }
     }
 }
@@ -71,7 +71,7 @@ pub fn calendario() -> Html {
                                 fecha: c.fecha_inicio.clone(),
                                 tipo: EventType::ContratoInicio,
                                 descripcion: format!(
-                                    "Contrato #{} â€” {} {}",
+                                    "Contrato #{} — {} {}",
                                     &c.id[..8.min(c.id.len())],
                                     c.moneda,
                                     format_currency(c.monto_mensual)
@@ -101,7 +101,7 @@ pub fn calendario() -> Html {
                                 fecha: p.fecha_vencimiento.clone(),
                                 tipo: EventType::PagoVencimiento,
                                 descripcion: format!(
-                                    "Pago #{} â€” {} {}",
+                                    "Pago #{} — {} {}",
                                     &p.id[..8.min(p.id.len())],
                                     p.moneda,
                                     format_currency(p.monto)
@@ -126,7 +126,7 @@ pub fn calendario() -> Html {
                             all_events.push(CalendarEvent {
                                 fecha,
                                 tipo: EventType::Mantenimiento,
-                                descripcion: format!("{} â€” {}", s.titulo, s.estado),
+                                descripcion: format!("{} — {}", s.titulo, s.estado),
                             });
                         }
                     }
@@ -164,7 +164,7 @@ pub fn calendario() -> Html {
                 </div>
             } else if events.is_empty() {
                 <div class="gi-empty-state">
-                    <div class="gi-empty-state-icon">{"ðŸ“…"}</div>
+                    <div class="gi-empty-state-icon">{"📅"}</div>
                     <div class="gi-empty-state-title">{"Sin eventos"}</div>
                     <p class="gi-empty-state-text">
                         {"No hay contratos, pagos ni mantenimientos programados."}
@@ -192,7 +192,7 @@ fn calendar_event_list(props: &EventListProps) -> Html {
                         <tr>
                             <th>{"Fecha"}</th>
                             <th>{"Tipo"}</th>
-                            <th>{"DescripciÃ³n"}</th>
+                            <th>{"Descripción"}</th>
                         </tr>
                     </thead>
                     <tbody>

@@ -46,7 +46,7 @@ fn breadcrumbs_for_route(route: &Route) -> Vec<Crumb> {
 
         Route::ConfiguracionChatbot => vec![
             Crumb {
-                label: "ConfiguraciÃ³n".into(),
+                label: "Configuración".into(),
                 route: Some(Route::Configuracion),
             },
             Crumb {
@@ -56,7 +56,7 @@ fn breadcrumbs_for_route(route: &Route) -> Vec<Crumb> {
         ],
         Route::ConfiguracionFiscal => vec![
             Crumb {
-                label: "ConfiguraciÃ³n".into(),
+                label: "Configuración".into(),
                 route: Some(Route::Configuracion),
             },
             Crumb {
@@ -71,7 +71,7 @@ fn breadcrumbs_for_route(route: &Route) -> Vec<Crumb> {
                 route: Some(Route::Gastos),
             },
             Crumb {
-                label: "CategorÃas".into(),
+                label: "Categorías".into(),
                 route: None,
             },
         ],
@@ -109,7 +109,7 @@ pub fn Breadcrumb() -> Html {
     }
 
     html! {
-        <nav class="gi-breadcrumb" aria-label="NavegaciÃ³n de migas de pan">
+        <nav class="gi-breadcrumb" aria-label="Navegación de migas de pan">
             <ol class="gi-breadcrumb-list">
                 { for crumbs.iter().enumerate().map(|(i, crumb)| {
                     let is_last = i == crumbs.len() - 1;

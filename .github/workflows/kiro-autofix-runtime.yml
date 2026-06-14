@@ -114,6 +114,14 @@ jobs:
           fi
           echo "Attempt $((count + 1)) of ${MAX_ATTEMPTS}"
 
+      - name: Prepare kiro-cli data directory
+        run: |
+          umask 077
+          DATA_HOME="${RUNNER_TEMP}/kiro-data"
+          mkdir -p "${DATA_HOME}/kiro-cli" "${HOME}/.local/share/kiro-cli"
+          echo "XDG_DATA_HOME=${DATA_HOME}" >> "$GITHUB_ENV"
+          echo "kiro-cli data dir ready: ${DATA_HOME}/kiro-cli"
+
       - name: Run Kiro CLI agent
         id: kiro
         env:

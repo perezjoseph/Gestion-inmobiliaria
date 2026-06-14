@@ -11,8 +11,8 @@ pub enum TipoFiscal {
 impl TipoFiscal {
     pub const fn label(&self) -> &'static str {
         match self {
-            Self::PersonaJuridica => "Persona JurÃdica",
-            Self::PersonaFisica => "Persona FÃsica",
+            Self::PersonaJuridica => "Persona Jurídica",
+            Self::PersonaFisica => "Persona Física",
             Self::Informal => "Informal",
         }
     }

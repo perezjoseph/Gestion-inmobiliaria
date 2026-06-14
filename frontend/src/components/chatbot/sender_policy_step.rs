@@ -72,21 +72,21 @@ pub fn SenderPolicyStep(props: &SenderPolicyStepProps) -> Html {
             <RadioOption
                 value="tenants_only"
                 label="Solo inquilinos"
-                description="Solo los nÃºmeros registrados como inquilinos reciben respuesta."
+                description="Solo los números registrados como inquilinos reciben respuesta."
                 selected={*policy == "tenants_only"}
                 on_select={on_policy_select("tenants_only")}
             />
             <RadioOption
                 value="tenants_and_prospects"
                 label="Inquilinos y prospectos"
-                description="Cualquier persona puede escribir al bot (Ãºtil para consultas de alquiler)."
+                description="Cualquier persona puede escribir al bot (útil para consultas de alquiler)."
                 selected={*policy == "tenants_and_prospects"}
                 on_select={on_policy_select("tenants_and_prospects")}
             />
             <RadioOption
                 value="allowlist"
-                label="Solo nÃºmeros permitidos"
-                description="Ãšnicamente los nÃºmeros de la lista reciben respuesta."
+                label="Solo números permitidos"
+                description="Únicamente los números de la lista reciben respuesta."
                 selected={*policy == "allowlist"}
                 on_select={on_policy_select("allowlist")}
             />
@@ -161,7 +161,7 @@ struct AllowlistEditorProps {
 fn AllowlistEditor(props: &AllowlistEditorProps) -> Html {
     html! {
         <div class="pt-3" style="border-top: 1px solid var(--border-subtle);">
-            <label class="gi-label" for="allowlist-phone">{"NÃºmeros permitidos"}</label>
+            <label class="gi-label" for="allowlist-phone">{"Números permitidos"}</label>
             <div class="flex gap-2 mb-3">
                 <input
                     id="allowlist-phone"
@@ -182,7 +182,7 @@ fn AllowlistEditor(props: &AllowlistEditorProps) -> Html {
 
             if props.allowlist.is_empty() {
                 <p class="text-xs text-[var(--text-tertiary)]">
-                    {"AÃºn no hay nÃºmeros en la lista. Agregue al menos uno para activar esta polÃtica."}
+                    {"Aún no hay números en la lista. Agregue al menos uno para activar esta política."}
                 </p>
             } else {
                 <div class="flex flex-wrap gap-2">

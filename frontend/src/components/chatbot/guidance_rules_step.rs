@@ -11,14 +11,14 @@ fn category_entries() -> Vec<(GuidanceCategory, &'static str)> {
     vec![
         (
             GuidanceCategory::EstiloComunicacion,
-            "Estilo de comunicaciÃ³n",
+            "Estilo de comunicación",
         ),
         (
             GuidanceCategory::ContextoClarificacion,
-            "Contexto y clarificaciÃ³n",
+            "Contexto y clarificación",
         ),
         (GuidanceCategory::Escalamiento, "Escalamiento"),
-        (GuidanceCategory::Politicas, "PolÃticas"),
+        (GuidanceCategory::Politicas, "Políticas"),
     ]
 }
 
@@ -117,7 +117,7 @@ fn CategorySection(props: &CategorySectionProps) -> Html {
         })
     };
 
-    let chevron = if *expanded { "â–¼" } else { "â–¶" };
+    let chevron = if *expanded { "▼" } else { "▶" };
     let section_id = format!(
         "category-header-{}",
         props.label.to_lowercase().replace(' ', "-")
@@ -270,7 +270,7 @@ fn RuleRow(props: &RuleRowProps) -> Html {
                 label={AttrValue::from(props.rule.instruction.clone())}
             />
             if props.rule.is_template {
-                <span class="text-xs mt-0.5" title="Regla predefinida" aria-hidden="true">{"ðŸ”’"}</span>
+                <span class="text-xs mt-0.5" title="Regla predefinida" aria-hidden="true">{"🔒"}</span>
             }
             <span class="text-sm text-[var(--text-primary)] flex-1 leading-snug mt-0.5">
                 {&props.rule.instruction}
@@ -284,7 +284,7 @@ fn RuleRow(props: &RuleRowProps) -> Html {
                         aria-label="Editar regla"
                         onclick={on_edit_click}
                     >
-                        {"âœï¸"}
+                        {"✏️"}
                     </button>
                     <button
                         type="button"
@@ -293,7 +293,7 @@ fn RuleRow(props: &RuleRowProps) -> Html {
                         aria-label="Eliminar regla"
                         onclick={on_delete}
                     >
-                        {"ðŸ—‘ï¸"}
+                        {"🗑️"}
                     </button>
                 </div>
             }
@@ -356,8 +356,8 @@ fn InlineRuleForm(props: &InlineRuleFormProps) -> Html {
                 class="gi-input text-sm"
                 rows="2"
                 maxlength="500"
-                placeholder="Escribe la instrucciÃ³n para el agente..."
-                aria-label="InstrucciÃ³n de la regla"
+                placeholder="Escribe la instrucción para el agente..."
+                aria-label="Instrucción de la regla"
                 value={(*text).clone()}
                 oninput={on_input}
             />

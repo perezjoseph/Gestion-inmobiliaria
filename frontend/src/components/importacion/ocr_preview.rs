@@ -101,7 +101,7 @@ pub fn OcrPreview(props: &OcrPreviewProps) -> Html {
     };
 
     let doc_label = match props.preview.document_type.as_str() {
-        "deposito_bancario" => "DepÃ³sito Bancario",
+        "deposito_bancario" => "Depósito Bancario",
         "recibo_gasto" => "Recibo de Gasto",
         _ => "Documento",
     };
@@ -109,10 +109,10 @@ pub fn OcrPreview(props: &OcrPreviewProps) -> Html {
     html! {
         <div class="gi-card" style="padding: var(--space-5); margin-top: var(--space-4);">
             <h3 style="font-size: var(--text-base); font-weight: 600; color: var(--text-primary); margin-bottom: var(--space-3);">
-                {"Vista Previa OCR â€” "}{doc_label}
+                {"Vista Previa OCR — "}{doc_label}
             </h3>
             <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-4);">
-                {"Revise y corrija los datos extraÃdos antes de confirmar."}
+                {"Revise y corrija los datos extraídos antes de confirmar."}
             </p>
 
             if let Some(err) = (*error).as_ref() {
@@ -167,7 +167,7 @@ pub fn OcrPreview(props: &OcrPreviewProps) -> Html {
                             />
                             if low_confidence {
                                 <span style="font-size: var(--text-xs); color: #f59e0b;">
-                                    {"âš  Baja confianza â€” verifique este campo"}
+                                    {"⚠ Baja confianza — verifique este campo"}
                                 </span>
                             }
                         </div>

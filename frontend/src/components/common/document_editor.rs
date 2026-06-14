@@ -194,7 +194,7 @@ fn EditorToolbar(props: &EditorToolbarProps) -> Html {
                 <button class="gi-editor-toolbar-btn" onclick={fmt("insertUnorderedList")} aria-label="Lista sin orden" title="Lista sin orden">{"UL"}</button>
                 <div class="gi-editor-toolbar-sep" />
                 <button class="gi-editor-toolbar-btn" onclick={fmt("insertTable")} aria-label="Insertar tabla" title="Insertar tabla">{"Tabla"}</button>
-                <button class="gi-editor-toolbar-btn" onclick={fmt("insertHorizontalRule")} aria-label="Salto de pÃ¡gina" title="Salto de pÃ¡gina">{"â€”"}</button>
+                <button class="gi-editor-toolbar-btn" onclick={fmt("insertHorizontalRule")} aria-label="Salto de página" title="Salto de página">{"—"}</button>
                 <div class="gi-editor-toolbar-sep" />
                 <button class="gi-btn gi-btn-primary" style="font-size: var(--text-sm); padding: var(--space-1) var(--space-3);" onclick={on_save_click}>
                     {"Guardar"}

@@ -34,6 +34,8 @@ pub struct Claims {
     pub jti: Uuid,
     pub iat: i64,
     pub exp: usize,
+    pub iss: String,
+    pub aud: String,
 }
 
 pub fn hash_password(password: &str) -> Result<String, AppError> {
@@ -65,6 +67,8 @@ pub fn encode_jwt(claims: &Claims, secret: &str) -> Result<String, AppError> {
 pub fn decode_jwt(token: &str, secret: &str) -> Result<Claims, AppError> {
     let mut validation = Validation::new(jsonwebtoken::Algorithm::HS256);
     validation.set_required_spec_claims(&["exp", "sub", "iat"]);
+    validation.set_audience(&["realestate-api"]);
+    validation.set_issuer(&["realestate-api"]);
     validation.leeway = 30;
     validation.validate_nbf = true;
 
@@ -110,6 +114,8 @@ fn build_login_response(
         jti: Uuid::new_v4(),
         iat: now.timestamp(),
         exp,
+        iss: "realestate-api".to_string(),
+        aud: "realestate-api".to_string(),
     };
     let token = encode_jwt(&claims, jwt_secret)?;
 
@@ -429,6 +435,8 @@ pub async fn login(
         jti: Uuid::new_v4(),
         iat: now.timestamp(),
         exp,
+        iss: "realestate-api".to_string(),
+        aud: "realestate-api".to_string(),
     };
 
     let token = encode_jwt(&claims, jwt_secret)?;
@@ -493,6 +501,8 @@ mod tests {
             jti: Uuid::new_v4(),
             iat: Utc::now().timestamp(),
             exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
+            iss: "realestate-api".to_string(),
+            aud: "realestate-api".to_string(),
         };
 
         let token = encode_jwt(&claims, &secret).unwrap();
@@ -518,6 +528,8 @@ mod tests {
             jti: Uuid::new_v4(),
             iat: Utc::now().timestamp(),
             exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
+            iss: "realestate-api".to_string(),
+            aud: "realestate-api".to_string(),
         };
 
         let token = encode_jwt(&claims, &secret_a).unwrap();
@@ -538,6 +550,8 @@ mod tests {
             jti: Uuid::new_v4(),
             iat: Utc::now().timestamp(),
             exp: 0,
+            iss: "realestate-api".to_string(),
+            aud: "realestate-api".to_string(),
         };
 
         let token = encode_jwt(&claims, &secret).unwrap();

@@ -11,10 +11,10 @@ pub fn RecibosInformales() -> Html {
                 </p>
             </div>
             <div class="gi-empty-state">
-                <div class="gi-empty-state-icon">{"ðŸ§¾"}</div>
+                <div class="gi-empty-state-icon">{"🧾"}</div>
                 <div class="gi-empty-state-title">{"Recibos Informales"}</div>
                 <p class="gi-empty-state-text">
-                    {"AquÃ puede registrar pagos parciales y generar recibos internos para organizaciones informales."}
+                    {"Aquí puede registrar pagos parciales y generar recibos internos para organizaciones informales."}
                 </p>
             </div>
         </div>

@@ -194,6 +194,15 @@ jobs:
           } > "$HISTORY_LOG"
           echo "history_log=$HISTORY_LOG" >> "$GITHUB_OUTPUT"
 
+      - name: Prepare kiro-cli data directory
+        if: steps.attempts.outputs.exceeded == 'false'
+        run: |
+          umask 077
+          DATA_HOME="${RUNNER_TEMP}/kiro-data"
+          mkdir -p "${DATA_HOME}/kiro-cli" "${HOME}/.local/share/kiro-cli"
+          echo "XDG_DATA_HOME=${DATA_HOME}" >> "$GITHUB_ENV"
+          echo "kiro-cli data dir ready: ${DATA_HOME}/kiro-cli"
+
       - name: Run Kiro CLI agent to fix errors
         id: kiro
         if: steps.attempts.outputs.exceeded == 'false'

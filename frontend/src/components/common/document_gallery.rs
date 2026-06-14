@@ -441,7 +441,7 @@ fn UploadForm(props: &UploadFormProps) -> Html {
             <div>
                 <label class="gi-label" style="font-size: var(--text-xs);">{"Tipo de documento"}</label>
                 <select onchange={on_tipo_select} class="gi-input" style="font-size: var(--text-xs); padding: var(--space-1) var(--space-2);">
-                    <option value="" selected={props.selected_tipo_doc.is_empty()}>{"â€” Seleccionar â€”"}</option>
+                    <option value="" selected={props.selected_tipo_doc.is_empty()}>{"— Seleccionar —"}</option>
                     { for tipos.iter().map(|(val, label)| {
                         html! {
                             <option value={*val} selected={props.selected_tipo_doc == *val}>{label}</option>
@@ -691,7 +691,7 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
             </div>
             <div class="gi-doc-card-actions">
                 if *confirm_delete {
-                    <span class="text-xs text-[var(--text-secondary)]">{"Â¿Eliminar?"}</span>
+                    <span class="text-xs text-[var(--text-secondary)]">{"¿Eliminar?"}</span>
                     <button
                         class="gi-btn gi-btn-sm gi-btn-danger"
                         style="font-size: var(--text-xs);"

@@ -164,6 +164,8 @@ mod pbt_async {
             jti: Uuid::new_v4(),
             iat: Utc::now().timestamp(),
             exp: (Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
+            iss: "realestate-api".to_string(),
+            aud: "realestate-api".to_string(),
         };
         encode_jwt(&claims, JWT_SECRET).unwrap()
     }
@@ -918,6 +920,8 @@ mod pbt_async {
                 jti: Uuid::new_v4(),
                 iat: Utc::now().timestamp(),
                 exp: (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
+                iss: "realestate-api".to_string(),
+                aud: "realestate-api".to_string(),
             };
             let token_a = encode_jwt(&claims_a, JWT_SECRET).unwrap();
 
@@ -954,6 +958,8 @@ mod pbt_async {
                 jti: Uuid::new_v4(),
                 iat: Utc::now().timestamp(),
                 exp: (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
+                iss: "realestate-api".to_string(),
+                aud: "realestate-api".to_string(),
             };
             let token_b = encode_jwt(&claims_b, JWT_SECRET).unwrap();
 

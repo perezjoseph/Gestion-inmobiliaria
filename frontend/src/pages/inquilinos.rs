@@ -55,7 +55,7 @@ fn InquilinoSearchBar(props: &InquilinoSearchBarProps) -> Html {
                 <div>
                     <label class="gi-label">{"Buscar"}</label>
                     <input type="text" value={(*props.search).clone()} oninput={on_input}
-                        class="gi-input" placeholder="Buscar por nombre, apellido o cÃ©dula" />
+                        class="gi-input" placeholder="Buscar por nombre, apellido o cédula" />
                 </div>
                 <div style="display: flex; gap: var(--space-2);">
                     <button onclick={props.on_apply.clone()} class="gi-btn gi-btn-primary">{"Buscar"}</button>
@@ -138,7 +138,7 @@ fn InquilinoForm(props: &InquilinoFormProps) -> Html {
             <OcrScanButton
                 document_type="cedula"
                 on_result={props.on_ocr_result.clone()}
-                label={AttrValue::from("ðŸ“· Escanear CÃ©dula")}
+                label={AttrValue::from("📷 Escanear Cédula")}
             />
         }
     };
@@ -180,7 +180,7 @@ fn InquilinoForm(props: &InquilinoFormProps) -> Html {
                     {field_error(&fe.apellido)}
                 </div>
                 <div>
-                    <label class="gi-label" title="Documento de identidad dominicano. Formato: XXX-XXXXXXX-X">{"CÃ©dula *"}</label>
+                    <label class="gi-label" title="Documento de identidad dominicano. Formato: XXX-XXXXXXX-X">{"Cédula *"}</label>
                     <ConfidenceInput
                         value={AttrValue::from((*props.cedula).clone())}
                         confidence={confidence_for("cedula")}
@@ -204,7 +204,7 @@ fn InquilinoForm(props: &InquilinoFormProps) -> Html {
                                 <input type="email" value={(*props.email).clone()} oninput={input_cb!(props.email)} class="gi-input" />
                             </div>
                             <div>
-                                <label class="gi-label">{"TelÃ©fono"}</label>
+                                <label class="gi-label">{"Teléfono"}</label>
                                 <input type="text" value={(*props.telefono).clone()} oninput={input_cb!(props.telefono)} class="gi-input" />
                             </div>
                             <div>
@@ -297,10 +297,10 @@ fn render_inquilino_empty_state(user_rol: &str, on_new: &Callback<MouseEvent>) -
                 </svg>
             </div>
             <div class="gi-empty-state-title">{"Sin inquilinos registrados"}</div>
-            <p class="gi-empty-state-text">{"Registre sus inquilinos con nombre y cÃ©dula. Luego podrÃ¡ vincularlos a propiedades mediante contratos."}</p>
+            <p class="gi-empty-state-text">{"Registre sus inquilinos con nombre y cédula. Luego podrá vincularlos a propiedades mediante contratos."}</p>
             {btn}
             <div class="gi-empty-state-hint">
-                {"Â¿AÃºn no tiene propiedades? "}
+                {"¿Aún no tiene propiedades? "}
                 <Link<Route> to={Route::Propiedades} classes="gi-btn-text">{"Agregar propiedad primero"}</Link<Route>>
             </div>
         </div>
@@ -319,8 +319,8 @@ fn render_inquilino_row(
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{&i.nombre}</td>
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&i.apellido}</td>
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&i.cedula}</td>
-            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{i.email.as_deref().unwrap_or("â€”")}</td>
-            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{i.telefono.as_deref().unwrap_or("â€”")}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{i.email.as_deref().unwrap_or("—")}</td>
+            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{i.telefono.as_deref().unwrap_or("—")}</td>
             {actions}
         </tr>
     }
@@ -361,7 +361,7 @@ fn validate_inquilino_fields(nombre: &str, apellido: &str, cedula: &str) -> Form
         errs.apellido = Some("El apellido es obligatorio".into());
     }
     if cedula.trim().is_empty() {
-        errs.cedula = Some("La cÃ©dula es obligatoria".into());
+        errs.cedula = Some("La cédula es obligatoria".into());
     }
     errs
 }
@@ -659,9 +659,9 @@ fn render_inquilinos_view(
     let headers = vec![
         "Nombre".into(),
         "Apellido".into(),
-        "CÃ©dula".into(),
+        "Cédula".into(),
         "Email".into(),
-        "TelÃ©fono".into(),
+        "Teléfono".into(),
         if can_write(user_rol) {
             "Acciones".into()
         } else {
@@ -687,7 +687,7 @@ fn render_inquilinos_view(
 
             if let Some(ref target) = **delete_target {
                 <DeleteConfirmModal
-                    message={format!("Â¿EstÃ¡ seguro de que desea eliminar al inquilino \"{} {}\"? Esta acciÃ³n no se puede deshacer.", target.nombre, target.apellido)}
+                    message={format!("¿Está seguro de que desea eliminar al inquilino \"{} {}\"? Esta acción no se puede deshacer.", target.nombre, target.apellido)}
                     on_confirm={on_delete_confirm}
                     on_cancel={on_delete_cancel}
                 />

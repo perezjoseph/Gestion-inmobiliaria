@@ -127,10 +127,10 @@ pub fn TestChatStep() -> Html {
             <header class="flex items-center justify-between mb-3">
                 <div>
                     <h3 class="text-sm font-semibold text-[var(--text-primary)]">
-                        {"Probar conversaciÃ³n"}
+                        {"Probar conversación"}
                     </h3>
                     <p class="text-xs text-[var(--text-tertiary)] mt-0.5">
-                        {"Simule un mensaje de inquilino con la configuraciÃ³n actual."}
+                        {"Simule un mensaje de inquilino con la configuración actual."}
                     </p>
                 </div>
                 if has_messages {
@@ -138,7 +138,7 @@ pub fn TestChatStep() -> Html {
                         type="button"
                         class="gi-btn gi-btn-secondary text-xs"
                         onclick={on_reset}
-                        aria-label="Reiniciar conversaciÃ³n"
+                        aria-label="Reiniciar conversación"
                     >
                         {"Reiniciar"}
                     </button>
@@ -165,7 +165,7 @@ pub fn TestChatStep() -> Html {
                             {"Escriba un mensaje de ejemplo"}
                         </p>
                         <p class="text-xs text-[var(--text-tertiary)]">
-                            {"Ej: Â¿CuÃ¡nto debo este mes? o Â¿CuÃ¡ndo vence mi pago?"}
+                            {"Ej: ¿Cuánto debo este mes? o ¿Cuándo vence mi pago?"}
                         </p>
                     </div>
                 }
@@ -382,14 +382,14 @@ async fn stream_chat_response(
 
     let response: Response = resp_value
         .dyn_into()
-        .map_err(|_| "Respuesta invÃ¡lida".to_string())?;
+        .map_err(|_| "Respuesta inválida".to_string())?;
 
     if !response.ok() {
         let status = response.status();
         if status == 401 {
-            return Err("SesiÃ³n expirada. Redirigiendo al inicio de sesiÃ³n.".to_string());
+            return Err("Sesión expirada. Redirigiendo al inicio de sesión.".to_string());
         }
-        return Err(format!("Error del servidor (cÃ³digo {status})"));
+        return Err(format!("Error del servidor (código {status})"));
     }
 
     Ok(response)

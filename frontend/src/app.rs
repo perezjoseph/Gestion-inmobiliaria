@@ -269,9 +269,9 @@ fn switch(routes: Route) -> Html {
         Route::NotFound => {
             html! {
                 <div class="gi-empty-state">
-                    <div class="gi-empty-state-icon">{"ðŸï¸"}</div>
-                    <div class="gi-empty-state-title">{"404 â€” PÃ¡gina no encontrada"}</div>
-                    <p class="gi-empty-state-text">{"La pÃ¡gina que busca no existe o fue movida."}</p>
+                    <div class="gi-empty-state-icon">{"🏝️"}</div>
+                    <div class="gi-empty-state-title">{"404 — Página no encontrada"}</div>
+                    <p class="gi-empty-state-text">{"La página que busca no existe o fue movida."}</p>
                     <div style="margin-top: var(--space-5);">
                         <Link<Route> to={Route::Landing} classes="gi-btn gi-btn-primary">
                             {"Volver al inicio"}
@@ -408,7 +408,7 @@ pub fn App() -> Html {
             <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background-color: var(--surface-base);">
                 <div style="text-align: center;">
                     <div class="gi-spinner" style="margin: 0 auto var(--space-3);"></div>
-                    <span style="font-size: var(--text-sm); color: var(--text-tertiary);">{"Cargando sesiÃ³n..."}</span>
+                    <span style="font-size: var(--text-sm); color: var(--text-tertiary);">{"Cargando sesión..."}</span>
                 </div>
             </div>
         };

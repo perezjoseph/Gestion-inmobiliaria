@@ -140,7 +140,7 @@ fn ContratoForm(props: &ContratoFormProps) -> Html {
             <OcrScanButton
                 document_type="contrato"
                 on_result={props.on_ocr_result.clone()}
-                label={AttrValue::from("ðŸ“· Escanear Contrato")}
+                label={AttrValue::from("📷 Escanear Contrato")}
             />
         }
     };
@@ -157,10 +157,10 @@ fn ContratoForm(props: &ContratoFormProps) -> Html {
                     <label class="gi-label">{"Propiedad *"}</label>
                     <select onchange={select_cb!(props.propiedad_id)} disabled={props.is_editing}
                         class={input_class(fe.propiedad_id.is_some())}>
-                        <option value="" selected={props.propiedad_id.is_empty()}>{"â€” Seleccionar propiedad â€”"}</option>
+                        <option value="" selected={props.propiedad_id.is_empty()}>{"— Seleccionar propiedad —"}</option>
                         { for props.propiedades.iter().map(|p| {
                             let sel = *props.propiedad_id == p.id;
-                            html! { <option value={p.id.clone()} selected={sel}>{format!("{} â€” {}", p.titulo, p.direccion)}</option> }
+                            html! { <option value={p.id.clone()} selected={sel}>{format!("{} — {}", p.titulo, p.direccion)}</option> }
                         })}
                     </select>
                     {field_error(&fe.propiedad_id)}
@@ -169,7 +169,7 @@ fn ContratoForm(props: &ContratoFormProps) -> Html {
                     <label class="gi-label">{"Inquilino *"}</label>
                     <select onchange={select_cb!(props.inquilino_id)} disabled={props.is_editing}
                         class={input_class(fe.inquilino_id.is_some())}>
-                        <option value="" selected={props.inquilino_id.is_empty()}>{"â€” Seleccionar inquilino â€”"}</option>
+                        <option value="" selected={props.inquilino_id.is_empty()}>{"— Seleccionar inquilino —"}</option>
                         { for props.inquilinos.iter().map(|i| {
                             let sel = *props.inquilino_id == i.id;
                             html! { <option value={i.id.clone()} selected={sel}>{format!("{} {} ({})", i.nombre, i.apellido, i.cedula)}</option> }
@@ -215,7 +215,7 @@ fn ContratoForm(props: &ContratoFormProps) -> Html {
                     {field_error(&fe.monto_mensual)}
                 </div>
                 <div>
-                    <label class="gi-label">{"DepÃ³sito"}</label>
+                    <label class="gi-label">{"Depósito"}</label>
                     <ConfidenceInput
                         value={AttrValue::from((*props.deposito).clone())}
                         confidence={confidence_for("deposito")}
@@ -239,17 +239,17 @@ fn ContratoForm(props: &ContratoFormProps) -> Html {
                         placeholder="Usar valor por defecto" />
                     if props.recargo_porcentaje.is_empty() {
                         <span style="font-size: var(--text-xs); color: var(--text-secondary); margin-top: var(--space-1); display: block;">
-                            {"(usa valor por defecto de la organizaciÃ³n)"}
+                            {"(usa valor por defecto de la organización)"}
                         </span>
                     }
                 </div>
                 <div>
-                    <label class="gi-label">{"DÃas de Gracia"}</label>
+                    <label class="gi-label">{"Días de Gracia"}</label>
                     <input type="number" min="0" step="1"
                         value={(*props.dias_gracia).clone()}
                         oninput={input_cb_conf(&props.dias_gracia, "dias_gracia")}
                         class="gi-input"
-                        placeholder="Sin perÃodo de gracia" />
+                        placeholder="Sin período de gracia" />
                 </div>
                 if props.is_editing {
                     <div>
@@ -352,7 +352,7 @@ fn TerminateModal(props: &TerminateModalProps) -> Html {
             <div class="gi-modal">
                 <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">{"Terminar Contrato Anticipadamente"}</h3>
                 <div style="margin-bottom: var(--space-4);">
-                    <label class="gi-label">{"Fecha de TerminaciÃ³n *"}</label>
+                    <label class="gi-label">{"Fecha de Terminación *"}</label>
                     <input type="date" value={(*props.terminate_fecha).clone()}
                         oninput={Callback::from({
                             let terminate_fecha = props.terminate_fecha.clone();
@@ -388,7 +388,7 @@ fn GenerarPagosPreviewModal(props: &GenerarPagosPreviewModalProps) -> Html {
         <div class="gi-modal-overlay">
             <div class="gi-modal" style="max-width: 640px; max-height: 80vh; display: flex; flex-direction: column;">
                 <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
-                    {"Generar Pagos â€” Vista Previa"}
+                    {"Generar Pagos — Vista Previa"}
                 </h3>
                 {summary}
                 <div style="overflow-y: auto; flex: 1; margin-bottom: var(--space-4);">
@@ -491,7 +491,7 @@ fn DepositoSection(props: &DepositoSectionProps) -> Html {
     html! {
         <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
             <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; color: var(--text-primary); margin-bottom: var(--space-4);">
-                {"DepÃ³sito de GarantÃa"}
+                {"Depósito de Garantía"}
             </h3>
             {info_html}
             {retention_html}
@@ -515,7 +515,7 @@ fn render_deposito_info(
     html! {
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4);">
             <div>
-                <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Monto del DepÃ³sito"}</span>
+                <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Monto del Depósito"}</span>
                 <span class="tabular-nums" style="font-weight: 500;">
                     <CurrencyDisplay monto={deposito_val} moneda={c.moneda.clone()} />
                 </span>
@@ -534,7 +534,7 @@ fn render_deposito_info(
             }
             if let Some(fecha) = fecha_devolucion {
                 <div>
-                    <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Fecha de DevoluciÃ³n"}</span>
+                    <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Fecha de Devolución"}</span>
                     <span class="tabular-nums">{fecha}</span>
                 </div>
             }
@@ -568,7 +568,7 @@ fn render_deposito_retention(c: &Contrato, deposito_val: f64, estado_dep: &str) 
                 </div>
             </div>
             <div>
-                <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Motivo de RetenciÃ³n"}</span>
+                <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Motivo de Retención"}</span>
                 <p style="margin: 0; color: var(--text-primary);">{motivo}</p>
             </div>
         </div>
@@ -606,7 +606,7 @@ fn render_deposito_buttons(
                 |cb| {
                     html! {
                         <button onclick={cb.clone()} class="gi-btn gi-btn-primary">
-                            {"Devolver DepÃ³sito"}
+                            {"Devolver Depósito"}
                         </button>
                     }
                 },
@@ -616,7 +616,7 @@ fn render_deposito_buttons(
                 |cb| {
                     html! {
                         <button onclick={cb.clone()} class="gi-btn gi-btn-danger">
-                            {"Retener DepÃ³sito"}
+                            {"Retener Depósito"}
                         </button>
                     }
                 },
@@ -674,7 +674,7 @@ fn RetenerDepositoModal(props: &RetenerDepositoModalProps) -> Html {
                 _ => {}
             }
             if motivo_retencion.trim().is_empty() {
-                errs.motivo_retencion = Some("El motivo de retenciÃ³n es requerido".into());
+                errs.motivo_retencion = Some("El motivo de retención es requerido".into());
             }
             let valid = errs.monto_retenido.is_none() && errs.motivo_retencion.is_none();
             form_errors.set(errs);
@@ -718,7 +718,7 @@ fn RetenerDepositoModal(props: &RetenerDepositoModalProps) -> Html {
                     Ok(_) => {
                         push_toast(
                             toasts.as_ref(),
-                            "DepÃ³sito retenido exitosamente",
+                            "Depósito retenido exitosamente",
                             ToastKind::Success,
                         );
                         on_success.emit(());
@@ -746,13 +746,13 @@ fn RetenerDepositoModal(props: &RetenerDepositoModalProps) -> Html {
         <div class="gi-modal-overlay">
             <div class="gi-modal">
                 <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
-                    {"Retener DepÃ³sito"}
+                    {"Retener Depósito"}
                 </h3>
                 {form_body}
                 <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
                     <button onclick={on_cancel} class="gi-btn gi-btn-ghost" disabled={*submitting}>{"Cancelar"}</button>
                     <button onclick={on_confirm} class="gi-btn gi-btn-danger" disabled={*submitting}>
-                        {if *submitting { "Reteniendo..." } else { "Confirmar RetenciÃ³n" }}
+                        {if *submitting { "Reteniendo..." } else { "Confirmar Retención" }}
                     </button>
                 </div>
             </div>
@@ -797,13 +797,13 @@ fn render_retener_form_body(
                 {field_error(&fe.monto_retenido)}
             </div>
             <div>
-                <label class="gi-label">{"Motivo de RetenciÃ³n *"}</label>
+                <label class="gi-label">{"Motivo de Retención *"}</label>
                 <textarea
                     rows="3"
                     value={AttrValue::from(motivo_val)}
                     oninput={on_motivo_input}
                     class={input_class(fe.motivo_retencion.is_some())}
-                    placeholder="Describa el motivo de la retenciÃ³n..."
+                    placeholder="Describa el motivo de la retención..."
                 />
                 {field_error(&fe.motivo_retencion)}
             </div>
@@ -873,7 +873,7 @@ fn render_contrato_empty_state() -> Html {
             <p class="gi-empty-state-text">{"Un contrato vincula una propiedad con un inquilino. Necesita tener al menos una propiedad y un inquilino registrados antes de crear un contrato."}</p>
             <div class="gi-empty-state-hint">
                 <Link<Route> to={Route::Propiedades} classes="gi-btn-text">{"Propiedades"}</Link<Route>>
-                {" Â· "}
+                {" · "}
                 <Link<Route> to={Route::Inquilinos} classes="gi-btn-text">{"Inquilinos"}</Link<Route>>
             </div>
         </div>
@@ -1022,7 +1022,7 @@ fn validate_contrato_fields(
     }
     match monto_mensual.parse::<f64>() {
         Ok(v) if v <= 0.0 => errs.monto_mensual = Some("El monto debe ser mayor a 0".into()),
-        Err(_) => errs.monto_mensual = Some("Monto invÃ¡lido".into()),
+        Err(_) => errs.monto_mensual = Some("Monto inválido".into()),
         _ => {}
     }
     errs
@@ -1053,7 +1053,7 @@ fn do_save_contrato(
                 reset_form();
                 reload.set(*reload + 1);
                 let msg = match pagos_gen {
-                    Some(n) if n > 0 => format!("Contrato guardado â€” {n} pagos generados"),
+                    Some(n) if n > 0 => format!("Contrato guardado — {n} pagos generados"),
                     _ => "Contrato guardado".to_string(),
                 };
                 push_toast(toasts.as_ref(), &msg, ToastKind::Success);
@@ -1567,7 +1567,7 @@ fn render_delete_confirm_contrato(
         || html! {},
         |t| html! {
             <DeleteConfirmModal
-                message={format!("Â¿EstÃ¡ seguro de que desea eliminar el contrato de la propiedad \"{}\"? Esta acciÃ³n no se puede deshacer.", prop_label.emit(t.propiedad_id.clone()))}
+                message={format!("¿Está seguro de que desea eliminar el contrato de la propiedad \"{}\"? Esta acción no se puede deshacer.", prop_label.emit(t.propiedad_id.clone()))}
                 on_confirm={on_confirm.clone()} on_cancel={on_cancel.clone()}
             />
         },
@@ -1605,14 +1605,14 @@ fn render_recargo_detail(c: &Contrato) -> Html {
     let recargo_text = c.recargo_porcentaje.map_or_else(
         || html! {
             <span style="color: var(--text-secondary); font-style: italic;">
-                {"(usa valor por defecto de la organizaciÃ³n)"}
+                {"(usa valor por defecto de la organización)"}
             </span>
         },
         |v| html! { <span class="tabular-nums" style="font-weight: 500;">{format!("{v:.2}%")}</span> },
     );
     let gracia_text = c.dias_gracia.map_or_else(
         || html! { <span style="color: var(--text-secondary);">{"No definido"}</span> },
-        |v| html! { <span class="tabular-nums" style="font-weight: 500;">{format!("{v} dÃas")}</span> },
+        |v| html! { <span class="tabular-nums" style="font-weight: 500;">{format!("{v} días")}</span> },
     );
     html! {
         <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
@@ -1625,7 +1625,7 @@ fn render_recargo_detail(c: &Contrato) -> Html {
                     {recargo_text}
                 </div>
                 <div>
-                    <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"DÃas de Gracia"}</span>
+                    <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"Días de Gracia"}</span>
                     {gracia_text}
                 </div>
             </div>
@@ -1804,10 +1804,10 @@ pub fn Contratos() -> Html {
     let prop_label = {
         let propiedades = propiedades.clone();
         Callback::from(move |id: String| -> String {
-            propiedades.iter().find(|p| p.id == id).map_or_else(
-                || id.clone(),
-                |p| format!("{} â€” {}", p.titulo, p.direccion),
-            )
+            propiedades
+                .iter()
+                .find(|p| p.id == id)
+                .map_or_else(|| id.clone(), |p| format!("{} — {}", p.titulo, p.direccion))
         })
     };
 
@@ -2150,7 +2150,7 @@ pub fn Contratos() -> Html {
                     Ok(_) => {
                         push_toast(
                             toasts.as_ref(),
-                            "DepÃ³sito marcado como cobrado",
+                            "Depósito marcado como cobrado",
                             ToastKind::Success,
                         );
                         reload.set(*reload + 1);
@@ -2184,7 +2184,7 @@ pub fn Contratos() -> Html {
                     Ok(_) => {
                         push_toast(
                             toasts.as_ref(),
-                            "DepÃ³sito devuelto exitosamente",
+                            "Depósito devuelto exitosamente",
                             ToastKind::Success,
                         );
                         reload.set(*reload + 1);

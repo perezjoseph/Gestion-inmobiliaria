@@ -27,7 +27,7 @@ pub fn BulkActionBar(props: &BulkActionBarProps) -> Html {
                 class="gi-btn gi-btn-ghost gi-btn-sm"
                 aria-label="Deseleccionar todo"
             >
-                {"âœ• Limpiar"}
+                {"✕ Limpiar"}
             </button>
         </div>
     }

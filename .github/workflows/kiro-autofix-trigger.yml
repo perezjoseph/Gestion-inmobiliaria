@@ -407,6 +407,23 @@ jobs:
           echo "KIRO_KB_BRANCH=${SANITIZED}" >> "$GITHUB_ENV"
           echo "Per-branch KB segment: ${SANITIZED}"
 
+      # kiro-cli stores session state in a SQLite DB under its data dir
+      # ($XDG_DATA_HOME/kiro-cli or $HOME/.local/share/kiro-cli). On the
+      # ephemeral arc-runner-dind runner those parent directories may not
+      # exist, and SQLite does not create missing parents — it fails with
+      # "unable to open database file", which aborts the agent (exit 1, no
+      # changes) and stops the whole queue. Pre-create a guaranteed-writable
+      # data dir under RUNNER_TEMP and pin XDG_DATA_HOME at it for all
+      # subsequent steps so kiro-cli can always open its database.
+      - name: Prepare kiro-cli data directory
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0' && steps.baseline.outputs.still_failing != 'false'
+        run: |
+          umask 077
+          DATA_HOME="${RUNNER_TEMP}/kiro-data"
+          mkdir -p "${DATA_HOME}/kiro-cli" "${HOME}/.local/share/kiro-cli"
+          echo "XDG_DATA_HOME=${DATA_HOME}" >> "$GITHUB_ENV"
+          echo "kiro-cli data dir ready: ${DATA_HOME}/kiro-cli"
+
       - name: Process queue (one Kiro run + one commit per artifact)
         id: queue
         if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0' && steps.baseline.outputs.still_failing != 'false'

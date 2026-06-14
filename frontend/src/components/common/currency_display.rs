@@ -32,8 +32,8 @@ pub fn CurrencyDisplay(props: &CurrencyDisplayProps) -> Html {
         <span class="inline-flex items-center gap-1">
             <span>{formatted}</span>
             if let Some(conv) = conversion {
-                <span style="font-size: 0.85em; opacity: 0.7;" title="ConversiÃ³n aproximada">
-                    {format!("(â‰ˆ {conv})")}
+                <span style="font-size: 0.85em; opacity: 0.7;" title="Conversión aproximada">
+                    {format!("(≈ {conv})")}
                 </span>
             }
         </span>

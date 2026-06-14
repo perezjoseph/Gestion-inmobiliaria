@@ -65,7 +65,7 @@ fn ConfigTabNav(props: &ConfigTabNavProps) -> Html {
     };
 
     html! {
-        <div role="tablist" aria-label="Secciones de configuraciÃ³n" class="gi-config-tabs">
+        <div role="tablist" aria-label="Secciones de configuración" class="gi-config-tabs">
             {tab_btn(ConfigTab::General, "General", general_icon)}
             if props.can_write {
                 {tab_btn(ConfigTab::Chatbot, "Chatbot WhatsApp", chatbot_icon)}
@@ -119,7 +119,7 @@ fn RecargoSection(props: &RecargoSectionProps) -> Html {
             e.prevent_default();
             let val = (*input_value).trim().to_string();
             let Ok(parsed) = val.parse::<f64>() else {
-                error.set(Some("Ingrese un nÃºmero vÃ¡lido".into()));
+                error.set(Some("Ingrese un número válido".into()));
                 return;
             };
             if !(0.0..=100.0).contains(&parsed) {
@@ -271,7 +271,7 @@ pub fn Configuracion() -> Html {
     html! {
         <div>
             <div class="gi-page-header">
-                <h1 class="gi-page-title">{"ConfiguraciÃ³n"}</h1>
+                <h1 class="gi-page-title">{"Configuración"}</h1>
             </div>
 
             <ConfigTabNav active={active_tab} on_tab={on_tab} can_write={can_write} />

@@ -110,7 +110,7 @@ pub fn Desahucios() -> Html {
             if (*items).is_empty() {
                 <div class="gi-empty-state">
                     <div class="gi-empty-state-title">{"Sin desahucios registrados"}</div>
-                    <p class="gi-empty-state-text">{"Los procesos de desahucio aparecerÃ¡n aquÃ."}</p>
+                    <p class="gi-empty-state-text">{"Los procesos de desahucio aparecerán aquí."}</p>
                 </div>
             } else {
                 <DataTable headers={headers}>

@@ -365,7 +365,7 @@ fn EditorPageHeader(_props: &EditorPageHeaderProps) -> Html {
     html! {
         <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4);">
             <button class="gi-btn gi-btn-ghost" onclick={on_back}>
-                {"â† Volver"}
+                {"← Volver"}
             </button>
             <h1 class="text-display" style="font-size: var(--text-lg); font-weight: 600; color: var(--text-primary);">
                 {"Editor de Documento"}
@@ -419,21 +419,21 @@ struct TemplateCardProps {
 
 fn template_icon(tipo: &str) -> &'static str {
     match tipo {
-        "contrato_arrendamiento" | "addendum" => "ðŸ“‹",
-        "recibo_pago" => "ðŸ§¾",
-        "acta_notarial" => "ðŸ“",
-        "carta_referencia" => "âœ‰ï¸",
-        _ => "ðŸ“„",
+        "contrato_arrendamiento" | "addendum" => "📋",
+        "recibo_pago" => "🧾",
+        "acta_notarial" => "📝",
+        "carta_referencia" => "✉️",
+        _ => "📄",
     }
 }
 
 fn template_description(tipo: &str) -> &'static str {
     match tipo {
-        "contrato_arrendamiento" => "Contrato estÃ¡ndar de alquiler con clÃ¡usulas DR",
+        "contrato_arrendamiento" => "Contrato estándar de alquiler con cláusulas DR",
         "recibo_pago" => "Recibo para pagos de alquiler",
-        "acta_notarial" => "Acta de entrega o devoluciÃ³n de propiedad",
+        "acta_notarial" => "Acta de entrega o devolución de propiedad",
         "carta_referencia" => "Carta de referencia para inquilino",
-        "addendum" => "ModificaciÃ³n a contrato existente",
+        "addendum" => "Modificación a contrato existente",
         _ => "Plantilla de documento",
     }
 }
@@ -565,15 +565,15 @@ struct SignatureStatusRowProps {
 #[component]
 fn SignatureStatusRow(props: &SignatureStatusRowProps) -> Html {
     let (icon, status_text, color) = match &props.firma {
-        Some(f) if f.estado == "firmado" => ("âœ“", "Firmado", "var(--color-success-text)"),
-        Some(f) if f.estado == "pendiente" => ("â³", "Pendiente", "var(--color-warning-text)"),
-        Some(_) | None => ("â€”", "Sin firma", "var(--text-tertiary)"),
+        Some(f) if f.estado == "firmado" => ("✓", "Firmado", "var(--color-success-text)"),
+        Some(f) if f.estado == "pendiente" => ("⏳", "Pendiente", "var(--color-warning-text)"),
+        Some(_) | None => ("—", "Sin firma", "var(--text-tertiary)"),
     };
 
     let nombre = props
         .firma
         .as_ref()
-        .map_or("â€”", |f| f.firmante_nombre.as_str());
+        .map_or("—", |f| f.firmante_nombre.as_str());
 
     html! {
         <div style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm);">
@@ -600,7 +600,7 @@ fn SignatureModal(props: &SignatureModalProps) -> Html {
                     {"Firmar Documento"}
                 </h3>
                 <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-3);">
-                    {"Dibuje su firma en el recuadro a continuaciÃ³n."}
+                    {"Dibuje su firma en el recuadro a continuación."}
                 </p>
                 <SignatureCanvas
                     on_submit={props.on_submit.clone()}
@@ -682,7 +682,7 @@ fn SolicitarFirmaModal(props: &SolicitarFirmaModalProps) -> Html {
                     </div>
                     <div>
                         <label style="display: block; font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary); margin-bottom: var(--space-1);">
-                            {"Correo electrÃ³nico"}
+                            {"Correo electrónico"}
                         </label>
                         <input
                             type="email"

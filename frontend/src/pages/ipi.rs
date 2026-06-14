@@ -93,7 +93,7 @@ fn IpiSummaryCards(props: &IpiSummaryCardsProps) -> Html {
             <SummaryCard label={"Exceso Gravable"} value={format_dop(d.exceso)} />
             <SummaryCard label={"IPI Anual (1%)"} value={format_dop(d.ipi_anual)} />
             <SummaryCard label={"Pago Semestral"} value={format_dop(d.pago_semestral)} />
-            <SummaryCard label={"PrÃ³ximo Pago"} value={format_date(&d.proxima_fecha)} />
+            <SummaryCard label={"Próximo Pago"} value={format_date(&d.proxima_fecha)} />
         </div>
     }
 }
@@ -136,10 +136,10 @@ fn PaymentDeadlineNotice(props: &PaymentDeadlineNoticeProps) -> Html {
         html! {
             <div class="gi-card" style="padding: var(--space-4); margin-bottom: var(--space-4); border-left: 4px solid var(--color-warning); background: var(--surface-warning);">
                 <p style="font-weight: 600; color: var(--color-warning-text); margin-bottom: var(--space-1);">
-                    {"âš ï¸ PrÃ³ximo vencimiento de pago IPI"}
+                    {"⚠️ Próximo vencimiento de pago IPI"}
                 </p>
                 <p style="color: var(--text-secondary);">
-                    {format!("El prÃ³ximo pago semestral vence el {}. Faltan {} dÃas.",
+                    {format!("El próximo pago semestral vence el {}. Faltan {} días.",
                         format_date(&props.proxima_fecha), days_until)}
                 </p>
             </div>
@@ -154,8 +154,8 @@ fn CrossOrgWarning() -> Html {
     html! {
         <div class="gi-card" style="padding: var(--space-3); margin-bottom: var(--space-4); border-left: 4px solid var(--color-info); background: var(--surface-info);">
             <p style="font-size: var(--text-sm); color: var(--text-secondary);">
-                <strong>{"â„¹ï¸ Nota:"}</strong>
-                {" El umbral IPI aplica por contribuyente (RNC/cÃ©dula), no por organizaciÃ³n. Si un propietario tiene inmuebles en mÃºltiples organizaciones, el IPI se calcula sobre el valor combinado total."}
+                <strong>{"ℹ️ Nota:"}</strong>
+                {" El umbral IPI aplica por contribuyente (RNC/cédula), no por organización. Si un propietario tiene inmuebles en múltiples organizaciones, el IPI se calcula sobre el valor combinado total."}
             </p>
         </div>
     }
@@ -183,7 +183,7 @@ fn PropiedadesBreakdown(props: &PropiedadesBreakdownProps) -> Html {
                         <th>{"Propiedad"}</th>
                         <th style="text-align: right;">{"Valor Catastral"}</th>
                         <th>{"Estado IPI"}</th>
-                        <th>{"Motivo ExenciÃ³n"}</th>
+                        <th>{"Motivo Exención"}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -200,7 +200,7 @@ fn PropiedadesBreakdown(props: &PropiedadesBreakdownProps) -> Html {
                                     )}
                                 </td>
                                 <td style={estado_class}>{estado}</td>
-                                <td>{p.motivo_exencion.as_deref().unwrap_or("â€”")}</td>
+                                <td>{p.motivo_exencion.as_deref().unwrap_or("—")}</td>
                             </tr>
                         }
                     })}
@@ -310,7 +310,7 @@ fn CopropietariosSection(props: &CopropietariosSectionProps) -> Html {
             let p_val: f64 = if let Ok(v) = p_str.parse() {
                 v
             } else {
-                error.set(Some("Porcentaje invÃ¡lido".to_string()));
+                error.set(Some("Porcentaje inválido".to_string()));
                 return;
             };
 
@@ -421,7 +421,7 @@ fn CopropietariosTable(props: &CopropietariosTableProps) -> Html {
                 <thead>
                     <tr>
                         <th>{"Nombre"}</th>
-                        <th>{"CÃ©dula/RNC"}</th>
+                        <th>{"Cédula/RNC"}</th>
                         <th style="text-align: right;">{"Porcentaje"}</th>
                     </tr>
                 </thead>
@@ -446,7 +446,7 @@ fn CopropietariosTable(props: &CopropietariosTableProps) -> Html {
             </table>
             if !is_valid {
                 <p style="color: var(--color-danger); font-size: var(--text-sm);">
-                    {"âš ï¸ Los porcentajes de copropietarios deben sumar 100%."}
+                    {"⚠️ Los porcentajes de copropietarios deben sumar 100%."}
                 </p>
             }
         </div>
@@ -494,7 +494,7 @@ fn CopropietarioForm(props: &CopropietarioFormProps) -> Html {
                     <input type="text" class="gi-input" required=true value={(*props.nombre).clone()} oninput={on_nombre} placeholder="Nombre completo" />
                 </div>
                 <div>
-                    <label class="gi-label">{"CÃ©dula/RNC"}</label>
+                    <label class="gi-label">{"Cédula/RNC"}</label>
                     <input type="text" class="gi-input" required=true value={(*props.cedula_rnc).clone()} oninput={on_cedula} placeholder="00000000000" />
                 </div>
                 <div>
@@ -552,7 +552,7 @@ fn UmbralConfigSection(props: &UmbralConfigSectionProps) -> Html {
             let umbral_val: f64 = if let Ok(v) = (*umbral).parse() {
                 v
             } else {
-                error.set(Some("Umbral invÃ¡lido".to_string()));
+                error.set(Some("Umbral inválido".to_string()));
                 return;
             };
             let req = ConfiguracionIpiRequest {
@@ -620,7 +620,7 @@ fn UmbralConfigSection(props: &UmbralConfigSectionProps) -> Html {
     html! {
         <div class="gi-card">
             <div style="padding: var(--space-4); border-bottom: 1px solid var(--border-primary);">
-                <h2 style="font-size: var(--text-lg); font-weight: 600; margin: 0;">{"ConfiguraciÃ³n Umbral IPI"}</h2>
+                <h2 style="font-size: var(--text-lg); font-weight: 600; margin: 0;">{"Configuración Umbral IPI"}</h2>
             </div>
             <div style="padding: var(--space-4);">
                 if let Some(err) = (*error).as_ref() {
@@ -630,7 +630,7 @@ fn UmbralConfigSection(props: &UmbralConfigSectionProps) -> Html {
                 }
                 if *success {
                     <div style="padding: var(--space-3); margin-bottom: var(--space-3); background: var(--surface-success); border-radius: var(--radius-md); color: var(--color-success-text);">
-                        {"âœ“ Umbral actualizado correctamente."}
+                        {"✓ Umbral actualizado correctamente."}
                     </div>
                 }
                 <form onsubmit={on_submit}>
@@ -640,7 +640,7 @@ fn UmbralConfigSection(props: &UmbralConfigSectionProps) -> Html {
                             <input type="number" class="gi-input" required=true value={(*umbral).clone()} oninput={on_umbral_change} min="0" step="0.01" />
                         </div>
                         <div>
-                            <label class="gi-label">{"AÃ±o Fiscal"}</label>
+                            <label class="gi-label">{"Año Fiscal"}</label>
                             <input type="number" class="gi-input" required=true value={anio.to_string()} oninput={on_anio_change} min="2020" max="2100" />
                         </div>
                         <div>

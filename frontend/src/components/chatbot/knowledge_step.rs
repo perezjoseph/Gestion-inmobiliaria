@@ -119,7 +119,7 @@ pub fn KnowledgeStep(props: &KnowledgeStepProps) -> Html {
                             {"Preguntas frecuentes"}
                         </h4>
                         <p class="text-xs text-[var(--text-tertiary)] mt-0.5">
-                            {format!("{faq_count} de 50 entradas. El bot responderÃ¡ con estas respuestas cuando detecte la pregunta.")}
+                            {format!("{faq_count} de 50 entradas. El bot responderá con estas respuestas cuando detecte la pregunta.")}
                         </p>
                     </div>
                     if faq_count < 50 {
@@ -166,10 +166,10 @@ pub fn KnowledgeStep(props: &KnowledgeStepProps) -> Html {
 
             <div>
                 <label for="knowledge-policies" class="gi-label">
-                    {"PolÃticas y reglas"}
+                    {"Políticas y reglas"}
                 </label>
                 <p class="text-xs text-[var(--text-tertiary)] mb-2">
-                    {"Instrucciones que el bot seguirÃ¡ siempre (ej. no dar informaciÃ³n financiera sin verificar)."}
+                    {"Instrucciones que el bot seguirá siempre (ej. no dar información financiera sin verificar)."}
                 </p>
                 <textarea
                     id="knowledge-policies"
@@ -264,14 +264,14 @@ fn FaqItem(props: &FaqItemProps) -> Html {
                 </span>
                 if *confirming {
                     <span class="flex items-center gap-2 text-xs">
-                        <span class="text-[var(--text-secondary)]">{"Â¿Eliminar?"}</span>
+                        <span class="text-[var(--text-secondary)]">{"¿Eliminar?"}</span>
                         <button
                             type="button"
                             class="gi-btn gi-btn-danger text-xs"
                             style="padding: 2px 8px;"
                             onclick={on_confirm_remove}
                         >
-                            {"SÃ"}
+                            {"Sí"}
                         </button>
                         <button
                             type="button"
@@ -303,7 +303,7 @@ fn FaqItem(props: &FaqItemProps) -> Html {
                 type="text"
                 class="gi-input mb-2"
                 maxlength="200"
-                placeholder="Ej: Â¿CuÃ¡l es la fecha de corte?"
+                placeholder="Ej: ¿Cuál es la fecha de corte?"
                 value={props.question.clone()}
                 oninput={props.on_question_change.clone()}
             />
@@ -311,7 +311,7 @@ fn FaqItem(props: &FaqItemProps) -> Html {
                 class="gi-input"
                 rows="2"
                 maxlength="1000"
-                placeholder="Respuesta que el bot darÃ¡ (mÃ¡x. 1000 caracteres)"
+                placeholder="Respuesta que el bot dará (máx. 1000 caracteres)"
                 value={props.answer.clone()}
                 oninput={props.on_answer_change.clone()}
             />

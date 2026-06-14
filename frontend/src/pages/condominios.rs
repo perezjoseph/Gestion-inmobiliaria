@@ -18,7 +18,7 @@ pub fn Condominios(props: &CondominiosProps) -> Html {
                 </p>
             </div>
             <div class="gi-empty-state">
-                <div class="gi-empty-state-icon">{"ðŸ¢"}</div>
+                <div class="gi-empty-state-icon">{"🏢"}</div>
                 <div class="gi-empty-state-title">{"Cuotas de Condominio"}</div>
                 <p class="gi-empty-state-text">
                     {"Agregue y gestione las cuotas de condominio, configure el pass-through a inquilinos."}

@@ -5,6 +5,7 @@ use sea_orm::DatabaseConnection;
 use uuid::Uuid;
 
 use crate::errors::AppError;
+use crate::middleware::rate_limit::extract_client_ip_from_request;
 use crate::middleware::rbac::WriteAccess;
 use crate::models::firma::{
     FirmarConTokenRequest, FirmarRequest, SolicitarFirmaRequest, VerificarTokenRequest,
@@ -14,17 +15,7 @@ use crate::services::firmas;
 use crate::services::mail::MailClient;
 
 fn extract_ip(req: &HttpRequest) -> String {
-    req.headers()
-        .get("X-Forwarded-For")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.split(',').next())
-        .map_or_else(
-            || {
-                req.peer_addr()
-                    .map_or_else(|| "unknown".to_string(), |addr| addr.ip().to_string())
-            },
-            |s| s.trim().to_string(),
-        )
+    extract_client_ip_from_request(req).to_string()
 }
 
 fn extract_user_agent(req: &HttpRequest) -> String {

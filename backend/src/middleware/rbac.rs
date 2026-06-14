@@ -70,6 +70,8 @@ mod tests {
             jti: Uuid::new_v4(),
             iat: 0,
             exp: 9_999_999_999,
+            iss: "realestate-api".to_string(),
+            aud: "realestate-api".to_string(),
         }
     }
 

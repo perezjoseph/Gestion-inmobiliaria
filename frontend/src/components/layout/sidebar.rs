@@ -518,7 +518,7 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
 
     html! {
         <aside class={format!("gi-sidebar w-64 min-h-screen flex flex-col{open_class}")}
-               role="navigation" aria-label="MenÃº principal">
+               role="navigation" aria-label="Menú principal">
             <div class="gi-sidebar-brand">
                 <div class="gi-logo-mark gi-logo-mark-sm">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -583,7 +583,7 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                                     {icon_maintenance()}{"Mantenimiento"}
                                 </Link<Route>>
                             </li>
-                            <li onclick={make_click(on_nav_click.clone())} title="Proceso legal de desalojo â€” Seguimiento de procedimientos de desahucio">
+                            <li onclick={make_click(on_nav_click.clone())} title="Proceso legal de desalojo — Seguimiento de procedimientos de desahucio">
                                 <Link<Route> to={Route::Desahucios} classes={classes!(link_class(&Route::Desahucios))}>
                                     {icon_desahucios()}{"Desahucios"}
                                 </Link<Route>>
@@ -620,14 +620,14 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                                         {icon_plantillas()}{"Plantillas"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())} title="DirecciÃ³n General de Impuestos Internos â€” Reportes fiscales y formularios">
+                                <li onclick={make_click(on_nav_click.clone())} title="Dirección General de Impuestos Internos — Reportes fiscales y formularios">
                                     <Link<Route> to={Route::Dgii} classes={classes!(link_class(&Route::Dgii))}>
                                         {icon_dgii()}{"DGII"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())} title="Agua, luz, gas â€” Control de responsabilidades de servicios por unidad">
+                                <li onclick={make_click(on_nav_click.clone())} title="Agua, luz, gas — Control de responsabilidades de servicios por unidad">
                                     <Link<Route> to={Route::ServiciosPublicos} classes={classes!(link_class(&Route::ServiciosPublicos))}>
-                                        {icon_servicios_publicos()}{"Servicios PÃºblicos"}
+                                        {icon_servicios_publicos()}{"Servicios Públicos"}
                                     </Link<Route>>
                                 </li>
                             </ul>
@@ -653,35 +653,35 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                                         {icon_users()}{"Usuarios"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())} title="Registro de cambios â€” Historial de todas las modificaciones del sistema">
+                                <li onclick={make_click(on_nav_click.clone())} title="Registro de cambios — Historial de todas las modificaciones del sistema">
                                     <Link<Route> to={Route::AuditoriaPage} classes={classes!(link_class(&Route::AuditoriaPage))}>
-                                        {icon_audit()}{"AuditorÃa"}
+                                        {icon_audit()}{"Auditoría"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())} title="NÃºmeros de Comprobantes Fiscales â€” Secuencias de facturaciÃ³n requeridas por la DGII">
+                                <li onclick={make_click(on_nav_click.clone())} title="Números de Comprobantes Fiscales — Secuencias de facturación requeridas por la DGII">
                                     <Link<Route> to={Route::Ncf} classes={classes!(link_class(&Route::Ncf))}>
                                         {icon_ncf()}{"NCF"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())} title="Tareas programadas del sistema â€” Historial de ejecuciones automÃ¡ticas">
+                                <li onclick={make_click(on_nav_click.clone())} title="Tareas programadas del sistema — Historial de ejecuciones automáticas">
                                     <Link<Route> to={Route::Tareas} classes={classes!(link_class(&Route::Tareas))}>
                                         {icon_tareas()}{"Tareas"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())} title="Invitar usuarios â€” Enviar accesos a nuevos miembros del equipo">
+                                <li onclick={make_click(on_nav_click.clone())} title="Invitar usuarios — Enviar accesos a nuevos miembros del equipo">
                                     <Link<Route> to={Route::Invitaciones} classes={classes!(link_class(&Route::Invitaciones))}>
                                         {icon_invitaciones()}{"Invitaciones"}
                                     </Link<Route>>
                                 </li>
-                                <li onclick={make_click(on_nav_click.clone())} title="Datos de la empresa â€” InformaciÃ³n fiscal y de contacto de su organizaciÃ³n">
+                                <li onclick={make_click(on_nav_click.clone())} title="Datos de la empresa — Información fiscal y de contacto de su organización">
                                     <Link<Route> to={Route::Organizacion} classes={classes!(link_class(&Route::Organizacion))}>
-                                        {icon_organizacion()}{"OrganizaciÃ³n"}
+                                        {icon_organizacion()}{"Organización"}
                                     </Link<Route>>
                                 </li>
                             }
                             <li onclick={make_click(on_nav_click.clone())}>
                                 <Link<Route> to={Route::Configuracion} classes={classes!(link_class(&Route::Configuracion))}>
-                                    {icon_settings()}{"ConfiguraciÃ³n"}
+                                    {icon_settings()}{"Configuración"}
                                 </Link<Route>>
                             </li>
                             <li onclick={make_click(on_nav_click.clone())}>
@@ -694,7 +694,7 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                 </div>
             </nav>
             <div class="gi-sidebar-footer">
-                {"GestiÃ³n Inmobiliaria RD"}
+                {"Gestión Inmobiliaria RD"}
             </div>
         </aside>
     }

@@ -41,7 +41,7 @@ enum Section {
 impl Section {
     const fn title(self) -> &'static str {
         match self {
-            Self::Connection => "ConexiÃ³n",
+            Self::Connection => "Conexión",
             Self::Persona => "Personalidad",
             Self::GuidanceRules => "Reglas del agente",
             Self::Capabilities => "Capacidades",
@@ -65,7 +65,7 @@ impl Section {
 #[component]
 fn ChatbotConfigSkeleton() -> Html {
     html! {
-        <div aria-busy="true" aria-label="Cargando configuraciÃ³n del chatbot" class="flex flex-col gap-5">
+        <div aria-busy="true" aria-label="Cargando configuración del chatbot" class="flex flex-col gap-5">
             <div class="rounded-lg p-5" style="background: var(--surface-raised); border: 1px solid var(--border-default);">
                 <Skeleton width="60px" height="1rem" radius="999px" />
                 <div class="mt-3">
@@ -246,9 +246,9 @@ pub fn ChatbotConfig() -> Html {
     let sender_scope = sender_scope_label(&cfg.sender_policy, cfg.allowlist.as_deref());
 
     let confirm_message = if confirm_toggle.is_some_and(|v| v) {
-        "Â¿Activar el chatbot? Los inquilinos comenzarÃ¡n a recibir respuestas automÃ¡ticas de inmediato."
+        "¿Activar el chatbot? Los inquilinos comenzarán a recibir respuestas automáticas de inmediato."
     } else {
-        "Â¿Desactivar el chatbot? Los inquilinos dejarÃ¡n de recibir respuestas automÃ¡ticas."
+        "¿Desactivar el chatbot? Los inquilinos dejarán de recibir respuestas automáticas."
     };
 
     let confirm_label = if confirm_toggle.is_some_and(|v| v) {
@@ -385,7 +385,7 @@ fn SettingsColumn(props: &SettingsColumnProps) -> Html {
         <div class="flex flex-col gap-3">
             <div class="flex items-center justify-between">
                 <h3 class="text-sm font-semibold text-[var(--text-primary)]">
-                    {"ConfiguraciÃ³n"}
+                    {"Configuración"}
                 </h3>
                 <SaveIndicator status={props.save_status} />
             </div>
@@ -879,7 +879,7 @@ fn render_load_error(error: &UseStateHandle<Option<String>>) -> Html {
                 })} />
             }
             <p class="text-sm text-[var(--text-secondary)]">
-                {"No se pudo cargar la configuraciÃ³n del chatbot."}
+                {"No se pudo cargar la configuración del chatbot."}
             </p>
         </div>
     }
@@ -917,7 +917,7 @@ fn sender_scope_label(policy: &str, allowlist: Option<&[String]>) -> String {
         "tenants_and_prospects" => "Inquilinos y prospectos".to_string(),
         "allowlist" => allowlist.map_or_else(
             || "Lista permitida".to_string(),
-            |l| format!("{} nÃºmeros permitidos", l.len()),
+            |l| format!("{} números permitidos", l.len()),
         ),
         _ => "Sin configurar".to_string(),
     }
@@ -926,14 +926,14 @@ fn sender_scope_label(policy: &str, allowlist: Option<&[String]>) -> String {
 fn persona_summary(cfg: &ChatbotConfigResponse) -> String {
     let name = cfg.display_name.as_deref().unwrap_or("Sin nombre");
     let tone = cfg.tone.as_deref().unwrap_or("sin tono definido");
-    format!("{name} Â· {tone}")
+    format!("{name} · {tone}")
 }
 
 fn knowledge_summary(faq_count: usize, has_policies: bool) -> String {
     let policies_label = if has_policies {
-        "con polÃticas"
+        "con políticas"
     } else {
-        "sin polÃticas"
+        "sin políticas"
     };
-    format!("{faq_count} preguntas Â· {policies_label}")
+    format!("{faq_count} preguntas · {policies_label}")
 }

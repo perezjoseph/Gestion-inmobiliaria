@@ -33,7 +33,7 @@ pub fn ServiciosPublicos() -> Html {
     if !can_write {
         return html! {
             <div class="gi-empty-state">
-                <div class="gi-empty-state-title">{"No tiene permisos para acceder a esta secciÃ³n"}</div>
+                <div class="gi-empty-state-title">{"No tiene permisos para acceder a esta sección"}</div>
             </div>
         };
     }
@@ -137,7 +137,7 @@ pub fn ServiciosPublicos() -> Html {
     html! {
         <div>
             <div class="gi-page-header">
-                <h1 class="gi-page-title">{"Servicios PÃºblicos"}</h1>
+                <h1 class="gi-page-title">{"Servicios Públicos"}</h1>
                 if can_write && (*selected_unit).is_some() {
                     <button class="gi-btn gi-btn-primary">{"Asignar"}</button>
                 }
@@ -175,14 +175,14 @@ pub fn ServiciosPublicos() -> Html {
             if (*selected_unit).is_none() {
                 <div class="gi-empty-state">
                     <div class="gi-empty-state-title">{"Seleccione una propiedad y unidad"}</div>
-                    <p class="gi-empty-state-text">{"Seleccione una propiedad y unidad para ver las responsabilidades de servicios pÃºblicos."}</p>
+                    <p class="gi-empty-state-text">{"Seleccione una propiedad y unidad para ver las responsabilidades de servicios públicos."}</p>
                 </div>
             } else if *loading {
                 <TableSkeleton title_width="200px" columns={3} has_filter=false />
             } else if (*items).is_empty() {
                 <div class="gi-empty-state">
                     <div class="gi-empty-state-title">{"Sin responsabilidades asignadas"}</div>
-                    <p class="gi-empty-state-text">{"No hay servicios pÃºblicos configurados para esta unidad."}</p>
+                    <p class="gi-empty-state-text">{"No hay servicios públicos configurados para esta unidad."}</p>
                 </div>
             } else {
                 {render_servicios_table(&items)}
@@ -202,7 +202,7 @@ fn render_servicios_table(items: &[ResponsabilidadEfectiva]) -> Html {
         <DataTable headers={headers}>
             { for items.iter().map(|item| {
                 let override_badge = if item.es_override_contrato {
-                    html! { <span class="gi-badge gi-badge-warning">{"SÃ"}</span> }
+                    html! { <span class="gi-badge gi-badge-warning">{"Sí"}</span> }
                 } else {
                     html! { <span class="gi-badge gi-badge-neutral">{"No"}</span> }
                 };

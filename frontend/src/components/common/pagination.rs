@@ -58,7 +58,7 @@ pub fn Pagination(props: &PaginationProps) -> Html {
         <div class="flex flex-wrap items-center justify-between gap-4 py-3 px-1"
              style="font-size: var(--text-sm); color: var(--text-secondary);">
             <span>
-                {format!("Mostrando {start}â€“{end} de {total}")}
+                {format!("Mostrando {start}–{end} de {total}")}
             </span>
 
             <div class="flex items-center gap-2">
@@ -66,14 +66,14 @@ pub fn Pagination(props: &PaginationProps) -> Html {
                     onclick={on_prev}
                     disabled={page <= 1}
                     class="gi-btn gi-btn-sm gi-btn-ghost"
-                    aria-label="PÃ¡gina anterior"
+                    aria-label="Página anterior"
                 >
-                    {"â† Anterior"}
+                    {"← Anterior"}
                 </button>
 
                 { for page_numbers.iter().map(|&pn| {
                     if pn == 0 {
-                        html! { <span class="px-1">{"â€¦"}</span> }
+                        html! { <span class="px-1">{"…"}</span> }
                     } else {
                         let cb = props.on_page_change.clone();
                         let is_current = pn == page;
@@ -86,7 +86,7 @@ pub fn Pagination(props: &PaginationProps) -> Html {
                                     "gi-btn", "gi-btn-sm",
                                     if is_current { "gi-btn-primary" } else { "gi-btn-ghost" }
                                 )}
-                                aria-label={format!("PÃ¡gina {pn}")}
+                                aria-label={format!("Página {pn}")}
                                 aria-current={if is_current { Some("page") } else { None }}
                             >
                                 {pn}
@@ -99,14 +99,14 @@ pub fn Pagination(props: &PaginationProps) -> Html {
                     onclick={on_next}
                     disabled={page >= total_pages}
                     class="gi-btn gi-btn-sm gi-btn-ghost"
-                    aria-label="PÃ¡gina siguiente"
+                    aria-label="Página siguiente"
                 >
-                    {"Siguiente â†’"}
+                    {"Siguiente →"}
                 </button>
             </div>
 
             <div class="flex items-center gap-2">
-                <label for="per-page-select">{"Por pÃ¡gina:"}</label>
+                <label for="per-page-select">{"Por página:"}</label>
                 <select
                     id="per-page-select"
                     onchange={on_per_page}

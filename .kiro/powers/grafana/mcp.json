@@ -1,0 +1,32 @@
+{
+    "mcpServers": {
+        "grafana": {
+            "command": "uvx",
+            "args": [
+                "mcp-grafana"
+            ],
+            "env": {
+                "GRAFANA_URL": "http://grafana.local",
+                "GRAFANA_SERVICE_ACCOUNT_TOKEN": ""
+            },
+            "disabled": false,
+            "autoApprove": [
+                "search_dashboards",
+                "get_dashboard_by_uid",
+                "get_dashboard_summary",
+                "get_dashboard_property",
+                "get_dashboard_panel_queries",
+                "list_datasources",
+                "get_datasource",
+                "list_prometheus_metric_names",
+                "list_prometheus_label_names",
+                "list_prometheus_label_values",
+                "query_prometheus",
+                "query_loki_logs",
+                "list_loki_label_names",
+                "list_loki_label_values"
+            ],
+            "disabledTools": []
+        }
+    }
+}

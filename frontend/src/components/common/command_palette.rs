@@ -18,7 +18,7 @@ fn all_items(can_write: bool) -> Vec<PaletteItem> {
         PaletteItem {
             label: "Panel de Control",
             route: Route::Dashboard,
-            icon: "âŒ‚",
+            icon: "⌂",
             is_action: false,
         },
         PaletteItem {
@@ -227,7 +227,7 @@ pub fn CommandPalette() -> Html {
                     ref={input_ref}
                     type="text"
                     class="gi-palette-input"
-                    placeholder="Buscar secciÃ³n o acciÃ³n..."
+                    placeholder="Buscar sección o acción..."
                     value={(*query).clone()}
                     oninput={on_input}
                     onkeydown={on_keydown}

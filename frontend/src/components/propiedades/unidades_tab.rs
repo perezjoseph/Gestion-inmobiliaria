@@ -125,7 +125,7 @@ fn UnidadForm(props: &UnidadFormProps) -> Html {
             </h2>
             <form onsubmit={props.on_submit.clone()} style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
                 <div>
-                    <label class="gi-label">{"NÃºmero de Unidad *"}</label>
+                    <label class="gi-label">{"Número de Unidad *"}</label>
                     <input type="text" value={(*props.numero_unidad).clone()} oninput={input_cb!(props.numero_unidad)}
                         placeholder="Ej: 101, A-3" class={input_class(fe.numero_unidad.is_some())} />
                     {field_error(&fe.numero_unidad)}
@@ -139,11 +139,11 @@ fn UnidadForm(props: &UnidadFormProps) -> Html {
                     <input type="number" min="0" value={(*props.habitaciones).clone()} oninput={input_cb!(props.habitaciones)} class="gi-input" />
                 </div>
                 <div>
-                    <label class="gi-label">{"BaÃ±os"}</label>
+                    <label class="gi-label">{"Baños"}</label>
                     <input type="number" min="0" value={(*props.banos).clone()} oninput={input_cb!(props.banos)} class="gi-input" />
                 </div>
                 <div>
-                    <label class="gi-label">{"Ãrea (mÂ²)"}</label>
+                    <label class="gi-label">{"Área (m²)"}</label>
                     <input type="number" step="0.01" min="0" value={(*props.area_m2).clone()} oninput={input_cb!(props.area_m2)} class="gi-input" />
                 </div>
                 <div>
@@ -167,9 +167,9 @@ fn UnidadForm(props: &UnidadFormProps) -> Html {
                     </select>
                 </div>
                 <div style="grid-column: 1 / -1;">
-                    <label class="gi-label">{"DescripciÃ³n"}</label>
+                    <label class="gi-label">{"Descripción"}</label>
                     <input type="text" value={(*props.descripcion).clone()} oninput={input_cb!(props.descripcion)}
-                        placeholder="DescripciÃ³n opcional" class="gi-input" />
+                        placeholder="Descripción opcional" class="gi-input" />
                 </div>
                 <div style="grid-column: 1 / -1; display: flex; gap: var(--space-2); justify-content: flex-end;">
                     <button type="button" onclick={props.on_cancel.clone()} class="gi-btn gi-btn-ghost">{"Cancelar"}</button>
@@ -206,7 +206,7 @@ fn render_unidad_row(
     let (badge_cls, badge_label) = estado_badge(&u.estado);
     let area_display = u
         .area_m2
-        .map_or_else(|| "â€”".to_string(), |a| format!("{a:.2} mÂ²"));
+        .map_or_else(|| "—".to_string(), |a| format!("{a:.2} m²"));
     let uc = u.clone();
     let ud = u.clone();
     let on_edit = on_edit.clone();
@@ -231,9 +231,9 @@ fn render_unidad_row(
     html! {
         <tr>
             <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">{&u.numero_unidad}</td>
-            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{u.piso.map_or_else(|| "â€”".to_string(), |v| v.to_string())}</td>
-            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{u.habitaciones.map_or_else(|| "â€”".to_string(), |v| v.to_string())}</td>
-            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{u.banos.map_or_else(|| "â€”".to_string(), |v| v.to_string())}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{u.piso.map_or_else(|| "—".to_string(), |v| v.to_string())}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{u.habitaciones.map_or_else(|| "—".to_string(), |v| v.to_string())}</td>
+            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{u.banos.map_or_else(|| "—".to_string(), |v| v.to_string())}</td>
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{area_display}</td>
             <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={u.precio} moneda={u.moneda.clone()} /></td>
             <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
@@ -287,7 +287,7 @@ fn UnidadList(props: &UnidadListProps) -> Html {
 fn validate_unidad_fields(numero_unidad: &str) -> FormErrors {
     let mut errs = FormErrors::default();
     if numero_unidad.trim().is_empty() {
-        errs.numero_unidad = Some("El nÃºmero de unidad es requerido".into());
+        errs.numero_unidad = Some("El número de unidad es requerido".into());
     }
     errs
 }
@@ -824,11 +824,11 @@ fn render_unidades_view(
         String::new()
     };
     let headers: Vec<String> = vec![
-        "NÃºmero".into(),
+        "Número".into(),
         "Piso".into(),
         "Hab.".into(),
-        "BaÃ±os".into(),
-        "Ãrea".into(),
+        "Baños".into(),
+        "Área".into(),
         "Precio".into(),
         "Estado".into(),
         last_header,
@@ -852,7 +852,7 @@ fn render_unidades_view(
         || html! {},
         |u| html! {
             <DeleteConfirmModal
-                message={format!("Â¿EstÃ¡ seguro de que desea eliminar la unidad \"{}\"? Esta acciÃ³n no se puede deshacer.", u.numero_unidad)}
+                message={format!("¿Está seguro de que desea eliminar la unidad \"{}\"? Esta acción no se puede deshacer.", u.numero_unidad)}
                 on_confirm={on_delete_confirm} on_cancel={on_delete_cancel}
             />
         },

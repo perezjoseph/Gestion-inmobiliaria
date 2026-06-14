@@ -70,6 +70,7 @@ lettre = { version = "0.11", default-features = false, features = [
     "file-transport",
     "builder",
 ] }
+subtle = "2"
 
 [[test]]
 name = "integration"

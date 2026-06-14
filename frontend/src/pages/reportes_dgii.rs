@@ -289,7 +289,7 @@ fn PeriodSelector(props: &PeriodSelectorProps) -> Html {
                     </select>
                 </div>
                 <div>
-                    <label class="gi-label">{"AÃ±o"}</label>
+                    <label class="gi-label">{"Año"}</label>
                     <input
                         type="number"
                         class="gi-input"
@@ -388,7 +388,7 @@ fn ReporteStatusCard(props: &ReporteStatusCardProps) -> Html {
             <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3);">
                 <div>
                     <p style="font-weight: 600; margin-bottom: var(--space-1);">
-                        {format!("Reporte {} â€” PerÃodo {}", p.tipo_reporte, p.periodo)}
+                        {format!("Reporte {} — Período {}", p.tipo_reporte, p.periodo)}
                     </p>
                     <p style="font-size: var(--text-sm); color: var(--text-secondary);">
                         {format!("Registros: {} | Total: RD$ {:.2} | ITBIS: RD$ {:.2}",
@@ -522,7 +522,7 @@ fn ExcluidosTable(props: &ExcluidosTableProps) -> Html {
                 <thead>
                     <tr>
                         <th>{"Referencia"}</th>
-                        <th>{"RazÃ³n de ExclusiÃ³n"}</th>
+                        <th>{"Razón de Exclusión"}</th>
                     </tr>
                 </thead>
                 <tbody>

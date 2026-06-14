@@ -11,10 +11,10 @@ pub fn DashboardComparativo() -> Html {
                 </p>
             </div>
             <div class="gi-empty-state">
-                <div class="gi-empty-state-icon">{"ðŸ“Š"}</div>
-                <div class="gi-empty-state-title">{"ComparaciÃ³n de Propiedades"}</div>
+                <div class="gi-empty-state-icon">{"📊"}</div>
+                <div class="gi-empty-state-title">{"Comparación de Propiedades"}</div>
                 <p class="gi-empty-state-text">
-                    {"Visualice ingresos, gastos, rentabilidad y ocupaciÃ³n por propiedad con filtros de fecha y tipo."}
+                    {"Visualice ingresos, gastos, rentabilidad y ocupación por propiedad con filtros de fecha y tipo."}
                 </p>
             </div>
         </div>

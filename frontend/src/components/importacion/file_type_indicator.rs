@@ -16,9 +16,9 @@ fn is_image_file(name: &str) -> bool {
 #[component]
 pub fn FileTypeIndicator(props: &FileTypeIndicatorProps) -> Html {
     let (icon, label) = if is_image_file(&props.filename) {
-        ("ðŸ–¼ï¸", "Imagen")
+        ("🖼️", "Imagen")
     } else {
-        ("ðŸ“Š", "Hoja de cÃ¡lculo")
+        ("📊", "Hoja de cálculo")
     };
 
     html! {
