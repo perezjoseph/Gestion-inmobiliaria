@@ -257,7 +257,7 @@ mod db_async {
     }
 
     fn base_uri() -> &'static str {
-        "/api/inquilinos"
+        "/api/v1/inquilinos"
     }
 
     pub fn crud_cycle() {
