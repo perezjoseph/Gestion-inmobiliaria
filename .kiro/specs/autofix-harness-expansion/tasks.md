@@ -109,7 +109,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Populate the FILES field from the existing `Modified_Files_State` side-channel
     - _Requirements: 6.1, 6.2, 6.3_
 
-- [ ] 10. Non-code validators (F2)
+- [x] 10. Non-code validators (F2)
   - [x] 10.1 Add the non-code validator tier to `autofix-system.md`
     - Document `hadolint` (docker), `kubeconform -strict -ignore-missing-schemas` (k8s), `shellcheck` (shell) as validation-only sensors
     - State they do not authorize writes to `infra/**`, which remains write-denied; if a required tool is absent from PATH after the retry-wrapped install, the stack is treated as un-verified so the stop gate blocks
@@ -123,7 +123,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Add `hadolint`, `kubeconform`, and `shellcheck` to `ghcr.io/perezjoseph/realestate-runner` (pin exact versions; ensure `ruff` is also on PATH), fetched via the retry-wrapped install pattern
     - _Requirements: 2.5, 1.4_
 
-  - [-] 10.4 Write tests for non-code stack classification and tracking
+  - [x] 10.4 Write tests for non-code stack classification and tracking
     - Assert the classifier maps Dockerfile/`infra/k8s` manifests/`*.sh` to `docker`/`k8s`/`shell`, and the tracker creates the matching markers for `hadolint`/`kubeconform`/`shellcheck` commands
     - _Requirements: 2.1, 2.2, 2.3, 3.1_
 
