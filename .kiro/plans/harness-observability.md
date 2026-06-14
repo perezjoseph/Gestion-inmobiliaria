@@ -82,6 +82,23 @@ Format: OTel GenAI semconv (`gen_ai.*`) + `harness.*` namespace.
 - Feed prior learnings to the agent via `KIRO_LEARNINGS_FILE` at queue start.
 - **Done when:** queue run N+1 sees run N's structured learnings, not just commit diffs.
 
+## Signals
+
+### `harness.sensors_ran`
+
+Per-stack verification state exposed for the observability pipeline.
+
+| Field | Value |
+|-------|-------|
+| Location | `$RUNNER_TEMP/autofix-sensors-ran.d/` |
+| Format | One empty marker file per stack that had its sensors run |
+| Stacks | `rust`, `ts`, `kotlin`, `python`, `docker`, `k8s`, `shell` |
+| Producer | `postToolUse` execute_bash hook (touches marker on sensor command match) |
+| Consumer | Phase 2 metrics script computes `verification_gap = modified_stacks - sensors_ran_stacks` |
+| Lifecycle | Created during the run; cleared by `agentSpawn` and the `stop` gate on clean exit |
+
+Cross-run memory is the Persistent_KB only. No git-tracked learnings JSONL.
+
 ## Sequencing
 
 Phase 0 blocks 3. Phases 1→2→5 are the minimum viable trend (git-native, no Tempo). Phase 3 adds live obs. Phase 4 completes the headline metric. 1+2 alone close the worst gaps (G1, G2, G5-partial) in one step and are the recommended first PR.

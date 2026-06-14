@@ -165,7 +165,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - **Property 12: Graceful degradation — when the NFS KB dir is absent, `agentSpawn` announces no-memory and the run continues (soft, not hard, failure); state is still cleared**
     - **Validates: Requirements 12.1, 12.3**
 
-- [ ] 14. Persistent memory — infrastructure delta (F10, human-applied / CODEOWNERS)
+- [x] 14. Persistent memory — infrastructure delta (F10, human-applied / CODEOWNERS)
   - [x] 14.1 Author the proposed NFS-volume delta to `runner-scale-set-values.yml`
     - Add the `kiro-memory` NFS volume (server `192.168.88.22`, path under `/volume1/docker/k3s-cache/`), mount it in the `runner` container at the kiro-cli data dir, and extend the `init-nfs-permissions` initContainer to make the mount writable, reusing the existing cargo-cache pattern
     - Mark as human-applied and CODEOWNERS-reviewed; `infra/**` is write-denied to the autofix agent and the `helm upgrade` application is performed by a human
@@ -175,17 +175,17 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Create a Kubernetes CronJob that mounts the same `kiro-memory` NFS path and trims the store by an age cap and a size cap (oldest-first eviction); human-applied/CODEOWNERS
     - _Requirements: 10.12_
 
-  - [~] 14.3 Write test for the GC policy
+  - [x] 14.3 Write test for the GC policy
     - **Property 7: Bounded memory store — after a GC run the store is trimmed to the configured age and/or size cap**
     - Exercise the prune logic against a synthetic store fixture and assert age/size caps are enforced
     - **Validates: Requirements 10.12**
 
 - [ ] 15. Lifecycle integration and control preservation (F9, R13, R14)
-  - [~] 15.1 Expose the per-stack sensor-ran state as the `harness.sensors_ran` signal
+  - [-] 15.1 Expose the per-stack sensor-ran state as the `harness.sensors_ran` signal
     - Surface `Sensor_Ran_State` so the observability pipeline can compute `verification_gap` per stack; delegate all trace/metric/eval persistence to `.kiro/plans/harness-observability.md` and add no new trace design; do not recreate a git-tracked learnings JSONL
     - _Requirements: 13.1, 13.2, 13.3_
 
-  - [~] 15.2 Verify security posture of all new hooks and denials
+  - [-] 15.2 Verify security posture of all new hooks and denials
     - Confirm every hook parses input with safe `jq` extraction and quoted expansions and executes no agent-provided strings; confirm scratch/KB entries record only safe metadata; confirm `infra/`, `.github/workflows/`, and `.github/actions/` remain write-denied and CODEOWNERS-gated
     - _Requirements: 14.2, 14.3, 14.4_
 
