@@ -17,14 +17,14 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
 
 ## Tasks
 
-- [ ] 1. Shared stack classifier (F3 supporting component)
+- [x] 1. Shared stack classifier (F3 supporting component)
   - [x] 1.1 Create the shared `classify_stack`/`sensor_pattern` bash function
     - Add a single sourced script (e.g. `.kiro/shared/autofix-stack-classify.sh`) mapping a file path to exactly one of `rust | ts | kotlin | python | docker | k8s | shell | none`, mirroring the `classify()` switch in the design
     - Return `none` for files that legitimately need no sensor (e.g. Markdown), so the stop gate does not block on them
     - Expose it as the single source of truth referenced by both the `postToolUse` sensor-ran tracker and the `stop` gate
     - _Requirements: 4.1, 4.2, 4.3_
 
-  - [-] 1.2 Write property test for the stack classifier
+  - [x] 1.2 Write property test for the stack classifier
     - **Property (Classifier totality): `classify_stack(f)` returns exactly one stack for any path, and `none` only for paths with no sensor suite**
     - Use a table-driven `hypothesis` generator under `ocr-service/` (or a shell corpus) over representative and adversarial paths
     - **Validates: Requirements 4.1, 4.2**
