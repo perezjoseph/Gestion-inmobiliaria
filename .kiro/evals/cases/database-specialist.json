@@ -1,0 +1,79 @@
+{
+    "agent": "database-specialist",
+    "evals": [
+        {
+            "id": "db-01",
+            "name": "index-for-payment-queries",
+            "prompt": "Payment listing queries are slow. They filter by contrato_id and order by fecha_vencimiento. Add a composite index to improve this query pattern.",
+            "assertions": [
+                {
+                    "text": "Creates a composite index on (contrato_id, fecha_vencimiento)",
+                    "weight": 2
+                },
+                {
+                    "text": "Writes a SeaORM migration file (not raw SQL script)",
+                    "weight": 2
+                },
+                {
+                    "text": "Index name follows convention (idx-table-columns)",
+                    "weight": 1
+                },
+                {
+                    "text": "Places migration in backend/migrations/ with correct timestamp prefix",
+                    "weight": 1
+                },
+                {
+                    "text": "Does not modify existing migration files",
+                    "weight": 1
+                }
+            ],
+            "contaminants": [
+                "Tailwind",
+                "Leptos",
+                "Docker",
+                "Playwright",
+                "Jetpack"
+            ],
+            "context_files": [
+                "backend/src/entities/pago.rs"
+            ]
+        },
+        {
+            "id": "db-02",
+            "name": "schema-design-unidades",
+            "prompt": "Design a migration to add a 'piso' (floor) column to the unidades table. It should be an optional integer. Also add a check constraint that piso >= 0.",
+            "assertions": [
+                {
+                    "text": "Adds a nullable integer column named 'piso'",
+                    "weight": 2
+                },
+                {
+                    "text": "Adds a CHECK constraint ensuring piso >= 0",
+                    "weight": 2
+                },
+                {
+                    "text": "Uses SeaORM migration API (ColumnDef, Table alter)",
+                    "weight": 1
+                },
+                {
+                    "text": "Migration is reversible (has down method that drops the column)",
+                    "weight": 1
+                },
+                {
+                    "text": "Does not alter unrelated columns or tables",
+                    "weight": 1
+                }
+            ],
+            "contaminants": [
+                "Kubernetes",
+                "GitHub Actions",
+                "Compose UI",
+                "OVMS",
+                "Caddy"
+            ],
+            "context_files": [
+                "backend/src/entities/unidad.rs"
+            ]
+        }
+    ]
+}

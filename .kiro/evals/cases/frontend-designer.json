@@ -1,0 +1,79 @@
+{
+    "agent": "frontend-designer",
+    "evals": [
+        {
+            "id": "fd-01",
+            "name": "responsive-card-grid",
+            "prompt": "The property listing page shows all cards in a single column on tablet viewports. Fix it to use a 2-column grid on tablet (md breakpoint) and 3-column on desktop (lg). The component is in frontend/src/pages/propiedades.rs.",
+            "assertions": [
+                {
+                    "text": "Uses Tailwind responsive breakpoints (md: and lg: prefixes)",
+                    "weight": 2
+                },
+                {
+                    "text": "Applies grid-cols-2 at md and grid-cols-3 at lg",
+                    "weight": 2
+                },
+                {
+                    "text": "Keeps single column (grid-cols-1) on mobile",
+                    "weight": 1
+                },
+                {
+                    "text": "Works within Leptos view! macro syntax",
+                    "weight": 1
+                },
+                {
+                    "text": "Does not break existing card component structure",
+                    "weight": 1
+                }
+            ],
+            "contaminants": [
+                "Kubernetes",
+                "SeaORM",
+                "cargo clippy",
+                "Hilt",
+                "OVMS"
+            ],
+            "context_files": [
+                "frontend/src/pages/propiedades.rs"
+            ]
+        },
+        {
+            "id": "fd-02",
+            "name": "accessibility-form-labels",
+            "prompt": "The tenant creation form is missing labels and aria attributes. Add proper accessible labels to all form inputs, associate them with for/id pairs, and add aria-required for mandatory fields.",
+            "assertions": [
+                {
+                    "text": "Adds <label> elements with for attributes matching input ids",
+                    "weight": 2
+                },
+                {
+                    "text": "Adds aria-required='true' on mandatory fields (nombre, apellido, cedula)",
+                    "weight": 2
+                },
+                {
+                    "text": "Uses Leptos view! macro syntax correctly",
+                    "weight": 1
+                },
+                {
+                    "text": "Labels are in Spanish matching the product domain",
+                    "weight": 1
+                },
+                {
+                    "text": "Does not remove existing form functionality",
+                    "weight": 1
+                }
+            ],
+            "contaminants": [
+                "Docker",
+                "migration",
+                "GitHub Actions",
+                "Retrofit",
+                "OpenVINO"
+            ],
+            "context_files": [
+                "frontend/src/pages/inquilinos.rs"
+            ]
+        }
+    ]
+}

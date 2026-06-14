@@ -1,0 +1,79 @@
+{
+    "agent": "infra-ops",
+    "evals": [
+        {
+            "id": "io-01",
+            "name": "hpa-for-backend",
+            "prompt": "Add a HorizontalPodAutoscaler for the backend deployment. Target 70% CPU, scale between 2-8 replicas. The deployment is in infra/k8s/app/backend.yaml.",
+            "assertions": [
+                {
+                    "text": "Produces a valid HPA manifest with apiVersion autoscaling/v2",
+                    "weight": 2
+                },
+                {
+                    "text": "References the correct deployment name from backend.yaml",
+                    "weight": 2
+                },
+                {
+                    "text": "Sets minReplicas=2 and maxReplicas=8",
+                    "weight": 1
+                },
+                {
+                    "text": "Targets CPU utilization at 70%",
+                    "weight": 1
+                },
+                {
+                    "text": "Places the manifest in the correct directory (infra/k8s/app/)",
+                    "weight": 1
+                }
+            ],
+            "contaminants": [
+                "SeaORM",
+                "Leptos",
+                "Cargo.toml",
+                "PaddleOCR",
+                "Compose UI"
+            ],
+            "context_files": [
+                "infra/k8s/app/backend.yaml"
+            ]
+        },
+        {
+            "id": "io-02",
+            "name": "github-action-security-scan",
+            "prompt": "Add a job to the CI workflow that runs Trivy container scanning on the backend Docker image. It should fail the build on HIGH or CRITICAL vulnerabilities.",
+            "assertions": [
+                {
+                    "text": "Uses the aquasecurity/trivy-action GitHub Action",
+                    "weight": 2
+                },
+                {
+                    "text": "Configures severity filter for HIGH,CRITICAL",
+                    "weight": 2
+                },
+                {
+                    "text": "Sets exit-code to 1 so the build fails on findings",
+                    "weight": 1
+                },
+                {
+                    "text": "Scans the correct Docker image (backend)",
+                    "weight": 1
+                },
+                {
+                    "text": "Integrates as a job in an existing workflow file",
+                    "weight": 1
+                }
+            ],
+            "contaminants": [
+                "SeaORM",
+                "Actix-web",
+                "Tailwind",
+                "Room database",
+                "Retrofit"
+            ],
+            "context_files": [
+                ".github/workflows/ci.yml"
+            ]
+        }
+    ]
+}

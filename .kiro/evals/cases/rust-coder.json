@@ -1,0 +1,114 @@
+{
+    "agent": "rust-coder",
+    "evals": [
+        {
+            "id": "rc-01",
+            "name": "error-handling-refactor",
+            "prompt": "Refactor the create_propiedad handler to return proper AppError variants instead of generic 500 errors. Map database constraint violations to AppError::Conflict and missing fields to AppError::Validation.",
+            "assertions": [
+                {
+                    "text": "Uses AppError enum variants (not generic 500 or anyhow)",
+                    "weight": 2
+                },
+                {
+                    "text": "Maps database constraint violations to a conflict/duplicate error",
+                    "weight": 2
+                },
+                {
+                    "text": "Maps missing or invalid fields to a validation error",
+                    "weight": 1
+                },
+                {
+                    "text": "Does not introduce unwrap() or expect() in handler code",
+                    "weight": 1
+                },
+                {
+                    "text": "Follows the existing error handling patterns in the codebase",
+                    "weight": 1
+                }
+            ],
+            "contaminants": [
+                "Kubernetes",
+                "Docker",
+                "Playwright",
+                "Jetpack Compose",
+                "Tailwind"
+            ],
+            "context_files": [
+                "backend/src/handlers/propiedades.rs"
+            ]
+        },
+        {
+            "id": "rc-02",
+            "name": "new-service-method",
+            "prompt": "Add a method to the contratos service that checks for overlapping active contracts on a property before creating a new one. If overlap exists, return an error. Follow the project's domain workflow pattern.",
+            "assertions": [
+                {
+                    "text": "Implements overlap detection by checking date ranges of active contracts on the same propiedad",
+                    "weight": 2
+                },
+                {
+                    "text": "Returns a domain error (not panic) when overlap is found",
+                    "weight": 2
+                },
+                {
+                    "text": "Uses SeaORM query builder (not raw SQL)",
+                    "weight": 1
+                },
+                {
+                    "text": "Respects the snake_case naming convention",
+                    "weight": 1
+                },
+                {
+                    "text": "Method signature uses Result return type",
+                    "weight": 1
+                }
+            ],
+            "contaminants": [
+                "React",
+                "npm",
+                "Android",
+                "Grafana"
+            ],
+            "context_files": [
+                "backend/src/services/contratos.rs"
+            ]
+        },
+        {
+            "id": "rc-03",
+            "name": "add-pagination",
+            "prompt": "Add cursor-based pagination to the list_pagos handler. Support limit and optional cursor (last seen ID). Return the items plus a next_cursor field.",
+            "assertions": [
+                {
+                    "text": "Implements cursor-based pagination (not offset-based)",
+                    "weight": 2
+                },
+                {
+                    "text": "Accepts limit and optional cursor parameters",
+                    "weight": 1
+                },
+                {
+                    "text": "Returns a next_cursor field in the response for the client to use",
+                    "weight": 2
+                },
+                {
+                    "text": "Uses SeaORM for the query with proper ordering",
+                    "weight": 1
+                },
+                {
+                    "text": "Handler extracts params via Actix-web extractors (Query or Path)",
+                    "weight": 1
+                }
+            ],
+            "contaminants": [
+                "Leptos",
+                "Tailwind",
+                "GitHub Actions",
+                "OpenVINO"
+            ],
+            "context_files": [
+                "backend/src/handlers/pagos.rs"
+            ]
+        }
+    ]
+}

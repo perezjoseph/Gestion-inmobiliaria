@@ -85,3 +85,4 @@ data/state_store.db
 eval/
 .deepeval/
 subagent-eval/
+.kiro/evals/runs/

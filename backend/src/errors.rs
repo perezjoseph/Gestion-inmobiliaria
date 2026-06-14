@@ -83,8 +83,42 @@ impl actix_web::error::ResponseError for AppError {
 
 impl From<sea_orm::DbErr> for AppError {
     fn from(err: sea_orm::DbErr) -> Self {
+        let msg = err.to_string();
+        if msg.contains("duplicate key") || msg.contains("unique constraint") {
+            return Self::Conflict(extract_constraint_message(&msg));
+        }
+        if msg.contains("foreign key") || msg.contains("violates foreign key") {
+            return Self::Validation("Referencia a un recurso inexistente".to_string());
+        }
+        if msg.contains("not-null constraint") || msg.contains("null value in column") {
+            return Self::Validation(extract_null_column(&msg));
+        }
         Self::Internal(anyhow::anyhow!(err))
     }
+}
+
+fn extract_constraint_message(msg: &str) -> String {
+    if let Some(detail_start) = msg.find("Detail:") {
+        let detail = &msg[detail_start..];
+        if let Some(key_start) = detail.find("Key (") {
+            if let Some(key_end) = detail[key_start..].find(')') {
+                let column = &detail[key_start + 5..key_start + key_end];
+                return format!("Ya existe un registro con el mismo valor de '{column}'");
+            }
+        }
+    }
+    "Ya existe un registro con valores duplicados".to_string()
+}
+
+fn extract_null_column(msg: &str) -> String {
+    if let Some(start) = msg.find("null value in column \"") {
+        let rest = &msg[start + 22..];
+        if let Some(end) = rest.find('"') {
+            let column = &rest[..end];
+            return format!("El campo '{column}' es requerido");
+        }
+    }
+    "Falta un campo requerido".to_string()
 }
 
 #[cfg(test)]
@@ -159,9 +193,59 @@ mod tests {
     }
 
     #[test]
-    fn db_err_converts_to_app_error() {
+    fn db_err_converts_to_internal_for_generic_errors() {
         let db_err = sea_orm::DbErr::Custom("test error".to_string());
         let app_err: AppError = db_err.into();
         assert_eq!(app_err.status_code(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn db_err_converts_to_conflict_for_duplicate_key() {
+        let db_err = sea_orm::DbErr::Custom(
+            "duplicate key value violates unique constraint \"propiedades_titulo_key\" Detail: Key (titulo)=(Mi Casa) already exists.".to_string(),
+        );
+        let app_err: AppError = db_err.into();
+        assert_eq!(app_err.status_code(), StatusCode::CONFLICT);
+    }
+
+    #[test]
+    fn db_err_converts_to_conflict_for_unique_constraint() {
+        let db_err =
+            sea_orm::DbErr::Custom("unique constraint violation on column email".to_string());
+        let app_err: AppError = db_err.into();
+        assert_eq!(app_err.status_code(), StatusCode::CONFLICT);
+    }
+
+    #[test]
+    fn db_err_converts_to_validation_for_not_null() {
+        let db_err = sea_orm::DbErr::Custom(
+            "null value in column \"titulo\" of relation \"propiedades\" violates not-null constraint".to_string(),
+        );
+        let app_err: AppError = db_err.into();
+        assert_eq!(app_err.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(app_err.to_string().contains("titulo"));
+    }
+
+    #[test]
+    fn db_err_converts_to_validation_for_foreign_key() {
+        let db_err = sea_orm::DbErr::Custom(
+            "violates foreign key constraint on table propiedades".to_string(),
+        );
+        let app_err: AppError = db_err.into();
+        assert_eq!(app_err.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[test]
+    fn extract_constraint_message_parses_detail() {
+        let msg = "duplicate key value violates unique constraint Detail: Key (titulo)=(test) already exists.";
+        let result = super::extract_constraint_message(msg);
+        assert!(result.contains("titulo"));
+    }
+
+    #[test]
+    fn extract_null_column_parses_column_name() {
+        let msg = "null value in column \"direccion\" violates not-null constraint";
+        let result = super::extract_null_column(msg);
+        assert!(result.contains("direccion"));
     }
 }
