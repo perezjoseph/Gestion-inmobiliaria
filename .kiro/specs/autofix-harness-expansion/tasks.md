@@ -147,7 +147,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Announce memory available + already indexed when the NFS KB dir is present; announce proceeding WITHOUT memory (soft degradation) when absent; never rebuild or re-index from source
     - _Requirements: 12.1, 12.2, 12.3, 12.4_
 
-  - [-] 13.2 Add the per-branch KB export step to the autofix workflows
+  - [x] 13.2 Add the per-branch KB export step to the autofix workflows
     - Export a sanitized branch segment from `github.event.workflow_run.head_branch` (replace `/` and any non-`[A-Za-z0-9._-]` char with `_`) so the KB points at `knowledge_bases/<branch>/`
     - Reuse the existing `kiro-autofix-${{ head_branch }}` concurrency group; add no new concurrency group
     - _Requirements: 10.10, 10.11_
