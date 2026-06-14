@@ -81,7 +81,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - **Validates: Requirements 7.1, 7.2, 7.3**
 
 - [ ] 6. Diff-budget guard (F7, advisory)
-  - [-] 6.1 Add the advisory `postToolUse` diff-budget guard to `autofix.json`
+  - [x] 6.1 Add the advisory `postToolUse` diff-budget guard to `autofix.json`
     - Count distinct files in `Modified_Files_State`; emit `::notice::` at the soft threshold and `::warning::` at the hard threshold instructing the agent to narrow scope or exit `Status: PARTIAL`
     - Read thresholds from `KIRO_DIFF_SOFT` (default 8) and `KIRO_DIFF_HARD` (default 15); block no write and gate no exit
     - _Requirements: 8.1, 8.2, 8.3, 8.4_
