@@ -105,8 +105,8 @@ eval/
 | **OTEL Infrastructure**  | otelcol-contrib (file exporter → JSONL)                           |
 | **Evaluation**          | DeepEval (GEval for LLM-as-Judge)                                 |
 | **LLM Service**          | LiteLLM                                                           |
-| **LLM Provider**         | Amazon Bedrock                                                    |
-| **LLM Model**            | us.anthropic.claude-sonnet-4-20250514-v1:0                        |
+| **LLM Provider**         | kiro-cli (eval-judge agent, no tools)                             |
+| **LLM Model**            | claude-opus-4-6 via eval-judge agent                              |
 | **Agent Integration**    | `kiro-cli chat --no-interactive --trust-all-tools`                |
 | **Results Storage**      | JSON files in `eval/results/`                                     |
 
@@ -131,6 +131,7 @@ pyyaml
 | 2026-06-13 18:47    | `/evalkit.plan` | Evaluate subagent orchestration: agent selection, DAG structure, output quality          |
 | 2026-06-13 18:50    | `/evalkit.data` | Generate test cases                                                                     |
 | 2026-06-13 19:04    | `/evalkit.trace` | Revised: external OTel tracing, 2-3 prompts per domain, routing/quality/faithfulness metrics |
+| 2026-06-13 21:03    | `/evalkit.report` | Generate evaluation report with recommendations                                              |
 
 ### 6.2 Evaluation Progress
 
@@ -139,6 +140,8 @@ pyyaml
 | 2026-06-13 18:47    | Evaluation Plan        | Completed     | Initial plan on branch `002-eval-pipeline`                          |
 | 2026-06-13 18:50    | Test Data              | Completed     | 25 test cases in `eval/test-cases.jsonl`                            |
 | 2026-06-13 19:04    | Trace Instrumentation  | Completed     | `agent_runner.py` with external OTel SDK tracing                    |
-| —                   | Agent Execution        | Not Started   | Run `python eval/agent_runner.py`                                   |
-| —                   | Metrics Implementation | Not Started   | 3 metrics: routing accuracy, response quality, faithfulness         |
-| —                   | Evaluation Run         | Not Started   | Pending traces + metrics                                            |
+| 2026-06-13 19:10    | Agent Execution        | Completed     | 25/25 passed (exit=0), 25 trace files in `eval/traces/`             |
+| 2026-06-13 20:33    | Metrics Implementation | Completed     | 3 GEval metrics with eval-judge agent (no tools, JSON-only)         |
+| 2026-06-13 20:33    | Evaluation Run         | Completed     | Routing: 0.732 PASS, Quality: 0.628 FAIL, Faithfulness: 0.712 PASS  |
+| 2026-06-13 20:33    | Documentation          | Completed     | `eval/README.md` with usage instructions                            |
+| 2026-06-13 21:03    | Evaluation Report      | Completed     | `eval/eval-report.md` — 5 prioritized action items                  |

@@ -68,7 +68,7 @@ android/local.properties
 .playwright/
 .playwright-cli/
 .worktrees/
-tools/
+/tools/
 
 # Kiro / skills / state
 .kiro/skills/*
@@ -81,5 +81,7 @@ k3s/
 # State store (redb)
 data/state_store.db
 
-# Large binary (OpenTelemetry collector)
-subagent-eval/.evalkit/tracing/otelcol-contrib
+# Agent evals
+eval/
+.deepeval/
+subagent-eval/

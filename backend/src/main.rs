@@ -66,6 +66,7 @@ async fn main() -> std::io::Result<()> {
     let server = actix_web::HttpServer::new(move || {
         app::create_app(db.clone(), config.clone(), preview_store.clone())
     })
+    .workers(2)
     .client_request_timeout(std::time::Duration::from_secs(60))
     .client_disconnect_timeout(std::time::Duration::from_secs(5))
     .keep_alive(std::time::Duration::from_secs(75))

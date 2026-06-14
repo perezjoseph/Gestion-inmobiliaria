@@ -41,6 +41,8 @@ spec:
               value: GPU
             - name: OPENVINO_TELEMETRY_ENABLE
               value: "0"
+            - name: OCR_REC_BATCH_SIZE
+              value: "16"
           resources:
             requests:
               cpu: 50m

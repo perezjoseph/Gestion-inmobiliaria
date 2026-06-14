@@ -8,7 +8,6 @@ use yew_router::prelude::*;
 use crate::app::{AuthContext, Route};
 use crate::components::common::compliance_badge::ComplianceProfile;
 use crate::components::common::currency_display::CurrencyDisplay;
-use crate::components::common::data_table::DataTable;
 use crate::components::common::delete_confirm_modal::DeleteConfirmModal;
 use crate::components::common::document_gallery::DocumentGallery;
 use crate::components::common::domain_header::{DomainHeader, DomainStat, DomainStatVariant};
@@ -342,14 +341,9 @@ fn PropiedadForm(props: &PropiedadFormProps) -> Html {
 struct PropiedadListProps {
     items: Vec<Propiedad>,
     user_rol: String,
-    headers: Vec<String>,
-    sortable_fields: Vec<String>,
-    current_sort: Option<String>,
-    current_order: Option<String>,
     total: u64,
     page: u64,
     per_page: u64,
-    on_sort: Callback<(String, String)>,
     on_edit: Callback<Propiedad>,
     on_delete: Callback<Propiedad>,
     on_new: Callback<MouseEvent>,
@@ -365,14 +359,117 @@ fn PropiedadList(props: &PropiedadListProps) -> Html {
 
     html! {
         <>
-            <DataTable headers={props.headers.clone()} sortable_fields={props.sortable_fields.clone()} current_sort={props.current_sort.clone()} current_order={props.current_order.clone()} on_sort={props.on_sort.clone()}>
-                { for props.items.iter().map(|p| render_propiedad_row(p, &props.user_rol, &props.on_edit, &props.on_delete)) }
-            </DataTable>
+            <div class="gi-property-grid">
+                { for props.items.iter().map(|p| render_propiedad_card(p, &props.user_rol, &props.on_edit, &props.on_delete)) }
+            </div>
             <Pagination
                 total={props.total} page={props.page} per_page={props.per_page}
                 on_page_change={props.on_page_change.clone()} on_per_page_change={props.on_per_page_change.clone()}
             />
         </>
+    }
+}
+
+fn render_occupancy_bar(p: &Propiedad) -> Html {
+    let (total, occupied, pct) = match p.total_unidades {
+        Some(n) if n > 0 => {
+            let occ = p.unidades_ocupadas.unwrap_or(0);
+            let tasa = p.tasa_ocupacion.unwrap_or(0.0);
+            (n, occ, tasa)
+        }
+        _ => return html! {},
+    };
+    let (bar_color, pct_color) = if pct >= 80.0 {
+        ("var(--color-success-dark)", "var(--color-success-dark)")
+    } else if pct >= 50.0 {
+        ("var(--color-warning-dark)", "var(--color-warning-dark)")
+    } else {
+        ("var(--color-error-dark)", "var(--color-error-dark)")
+    };
+    html! {
+        <div class="gi-occupancy-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-size: var(--text-xs); color: var(--text-tertiary); font-weight: 500;">{"Ocupación"}</span>
+                <div style="display: flex; align-items: baseline; gap: 4px;">
+                    <span style={format!("font-size: var(--text-base); font-weight: 700; color: {};", pct_color)}>{format!("{pct:.0}%")}</span>
+                    <span style="font-size: var(--text-xs); color: var(--text-tertiary);">{format!("({occupied}/{total})")}</span>
+                </div>
+            </div>
+            <div style="height: 8px; border-radius: 4px; background: var(--surface-sunken); overflow: hidden;">
+                <div style={format!("height: 100%; width: {pct:.1}%; background: {bar_color}; border-radius: 4px; transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);")}></div>
+            </div>
+        </div>
+    }
+}
+
+fn render_propiedad_card(
+    p: &Propiedad,
+    user_rol: &str,
+    on_edit: &Callback<Propiedad>,
+    on_delete: &Callback<Propiedad>,
+) -> Html {
+    let (badge_cls, badge_label) = estado_badge(&p.estado);
+    let tipo_label = tipo_propiedad_label(&p.tipo_propiedad);
+    let pc = p.clone();
+    let on_edit_cb = on_edit.clone();
+    let on_card_click = Callback::from(move |_: MouseEvent| on_edit_cb.emit(pc.clone()));
+
+    let delete_btn = if can_delete(user_rol) {
+        let pd = p.clone();
+        let on_del = on_delete.clone();
+        html! {
+            <button onclick={Callback::from(move |e: MouseEvent| { e.stop_propagation(); on_del.emit(pd.clone()); })}
+                class="gi-btn-text" style="color: var(--color-error); font-size: var(--text-xs);">
+                {"Eliminar"}
+            </button>
+        }
+    } else {
+        html! {}
+    };
+
+    let estado_dot_color = match p.estado.as_str() {
+        "disponible" => "var(--color-success-dark)",
+        "ocupada" => "var(--color-primary-500)",
+        "mantenimiento" => "var(--color-warning-dark)",
+        _ => "var(--text-tertiary)",
+    };
+
+    html! {
+        <div class="gi-card gi-property-card" onclick={on_card_click} role="article" tabindex="0">
+            // Status indicator stripe at top
+            <div style={format!("height: 4px; border-radius: 12px 12px 0 0; background: {};", estado_dot_color)}></div>
+            <div style="padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); flex: 1;">
+                // Header: title + badge
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-2);">
+                    <div style="min-width: 0; flex: 1;">
+                        <div style="font-weight: 700; font-size: var(--text-sm); color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            {&p.titulo}
+                        </div>
+                        <div style="font-size: var(--text-xs); color: var(--text-tertiary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            {&p.direccion}{", "}{&p.ciudad}
+                        </div>
+                    </div>
+                    <span class={badge_cls} style="flex-shrink: 0;">{badge_label}</span>
+                </div>
+                // Meta row: type + price
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: var(--text-xs); color: var(--text-tertiary); background: var(--surface-sunken); padding: 2px 8px; border-radius: 4px;">
+                        {tipo_label}
+                    </span>
+                    <span class="tabular-nums" style="font-weight: 700; font-size: var(--text-sm); color: var(--text-primary);">
+                        <CurrencyDisplay monto={p.precio} moneda={p.moneda.clone()} />
+                    </span>
+                </div>
+                // Occupancy
+                {render_occupancy_bar(p)}
+                // Actions
+                if can_write(user_rol) {
+                    <div style="display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: auto; padding-top: var(--space-2); border-top: 1px solid var(--border-subtle);">
+                        {delete_btn}
+                    </div>
+                }
+            </div>
+        </div>
     }
 }
 
@@ -436,70 +533,6 @@ fn tipo_propiedad_label(tipo: &str) -> &str {
         "terreno" => "Terreno",
         "oficina" => "Oficina",
         other => other,
-    }
-}
-
-fn render_propiedad_row(
-    p: &Propiedad,
-    user_rol: &str,
-    on_edit: &Callback<Propiedad>,
-    on_delete: &Callback<Propiedad>,
-) -> Html {
-    let (badge_cls, badge_label) = estado_badge(&p.estado);
-    let tipo_label = tipo_propiedad_label(&p.tipo_propiedad);
-    let actions = render_propiedad_actions(user_rol, p, on_edit, on_delete);
-    let ocupacion_info = match p.total_unidades {
-        Some(n) if n > 0 => {
-            let tasa = p.tasa_ocupacion.unwrap_or(0.0);
-            html! {
-                <div style="font-size: var(--text-xs); color: var(--text-tertiary); margin-top: 2px;">
-                    {format!("{n} unidades · {tasa:.1}% ocupación")}
-                </div>
-            }
-        }
-        _ => html! {},
-    };
-    html! {
-        <tr>
-            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;">
-                {&p.titulo}
-                {ocupacion_info}
-            </td>
-            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{&p.direccion}</td>
-            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--text-secondary);">{&p.ciudad}</td>
-            <td style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);">{tipo_label}</td>
-            <td class="tabular-nums" style="padding: var(--space-3) var(--space-5); font-size: var(--text-sm);"><CurrencyDisplay monto={p.precio} moneda={p.moneda.clone()} /></td>
-            <td style="padding: var(--space-3) var(--space-5);"><span class={badge_cls}>{badge_label}</span></td>
-            {actions}
-        </tr>
-    }
-}
-
-fn render_propiedad_actions(
-    user_rol: &str,
-    p: &Propiedad,
-    on_edit: &Callback<Propiedad>,
-    on_delete: &Callback<Propiedad>,
-) -> Html {
-    if !can_write(user_rol) {
-        return html! {};
-    }
-    let pc = p.clone();
-    let pd = p.clone();
-    let on_edit = on_edit.clone();
-    let on_delete_click = on_delete.clone();
-    let delete_btn = if can_delete(user_rol) {
-        html! { <button onclick={Callback::from(move |_: MouseEvent| on_delete_click.emit(pd.clone()))} class="gi-btn-text" style="color: var(--color-error);">{"Eliminar"}</button> }
-    } else {
-        html! {}
-    };
-    html! {
-        <td style="padding: var(--space-3) var(--space-5);">
-            <div class="gi-row-actions">
-                <button onclick={Callback::from(move |_: MouseEvent| on_edit.emit(pc.clone()))} class="gi-btn-text">{"Editar"}</button>
-                {delete_btn}
-            </div>
-        </td>
     }
 }
 
@@ -935,12 +968,9 @@ fn render_propiedades_view(
     editing_id: Option<String>,
     token: String,
     items: &UseStateHandle<Vec<Propiedad>>,
-    sort_field: &UseStateHandle<Option<String>>,
-    sort_order: &UseStateHandle<Option<String>>,
     total: &UseStateHandle<u64>,
     page: &UseStateHandle<u64>,
     per_page: &UseStateHandle<u64>,
-    on_sort: Callback<(String, String)>,
     on_edit: Callback<Propiedad>,
     on_delete_click: Callback<Propiedad>,
     on_new: Callback<MouseEvent>,
@@ -948,26 +978,6 @@ fn render_propiedades_view(
     on_per_page_change: Callback<u64>,
     detail_tab: &UseStateHandle<String>,
 ) -> Html {
-    let last_header = if can_write(user_rol) { "Acciones" } else { "" };
-    let headers: Vec<String> = vec![
-        "Título".into(),
-        "Dirección".into(),
-        "Ciudad".into(),
-        "Tipo".into(),
-        "Precio".into(),
-        "Estado".into(),
-        last_header.into(),
-    ];
-    let sortable_fields: Vec<String> = vec![
-        "titulo".into(),
-        "direccion".into(),
-        "ciudad".into(),
-        String::new(),
-        "precio".into(),
-        "estado".into(),
-        String::new(),
-    ];
-
     html! {
         <div>
             <div class="gi-page-header">
@@ -1085,14 +1095,9 @@ fn render_propiedades_view(
                     <PropiedadList
                         items={(*(*items)).clone()}
                         user_rol={user_rol.to_string()}
-                        headers={headers}
-                        sortable_fields={sortable_fields}
-                        current_sort={(*(*sort_field)).clone()}
-                        current_order={(*(*sort_order)).clone()}
                         total={**total}
                         page={**page}
                         per_page={**per_page}
-                        on_sort={on_sort}
                         on_edit={on_edit.clone()}
                         on_delete={on_delete_click}
                         on_new={on_new.clone()}
@@ -1434,22 +1439,6 @@ pub fn Propiedades() -> Html {
     let (on_page_change, on_per_page_change) =
         super::page_helpers::pagination_cbs(&page, &per_page, &reload);
 
-    let on_sort = {
-        #[allow(clippy::redundant_clone)]
-        let sort_field = sort_field.clone();
-        #[allow(clippy::redundant_clone)]
-        let sort_order = sort_order.clone();
-        #[allow(clippy::redundant_clone)]
-        let reload = reload.clone();
-        let page = page.clone();
-        Callback::from(move |(field, order): (String, String)| {
-            sort_field.set(Some(field));
-            sort_order.set(Some(order));
-            page.set(1);
-            reload.set(*reload + 1);
-        })
-    };
-
     let editing_id = editing.as_ref().map(|e| e.id.clone());
     let token = auth
         .as_ref()
@@ -1489,12 +1478,9 @@ pub fn Propiedades() -> Html {
         editing_id,
         token,
         &items,
-        &sort_field,
-        &sort_order,
         &total,
         &page,
         &per_page,
-        on_sort,
         on_edit,
         on_delete_click,
         on_new,

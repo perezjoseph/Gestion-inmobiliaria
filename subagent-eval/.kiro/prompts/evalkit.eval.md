@@ -73,6 +73,7 @@ This ensures production-ready code that follows current best practices and avoid
 ### Code Patterns/Examples
 - If using DeepEval, please refer to `.evalkit/reference/deepeval/` for implementation patterns and examples.
 - If using Strands Evals SDK, please refer to `.evalkit/reference/strands/` for implementation patterns and examples.
+- If user requests **kiro-cli** as judge, refer to `.evalkit/reference/deepeval/code-patterns.md` for the `KiroModel` pattern (custom `DeepEvalBaseLLM` subclass that shells out to `kiro-cli chat`). No Bedrock/LiteLLM dependencies needed in this case.
 
 
 ## Environment Setup Guidelines
@@ -89,9 +90,14 @@ This ensures production-ready code that follows current best practices and avoid
    ```bash
    # Check if evaluation dependencies are already present
    grep -q "deepeval" requirements.txt || echo "deepeval>=0.21.0" >> requirements.txt
+   
+   # If using Bedrock (default):
    grep -q "boto3" requirements.txt || echo "boto3>=1.35.0" >> requirements.txt
    grep -q "litellm" requirements.txt || echo "litellm>=1.0.0" >> requirements.txt
-   # Add other evaluation-specific dependencies as needed based on evaluation plan
+   grep -q "aiobotocore" requirements.txt || echo "aiobotocore>=2.0.0" >> requirements.txt
+   
+   # If using kiro-cli as judge: no additional deps needed (only deepeval + pyyaml)
+   # kiro-cli must be installed and on PATH
    ```
 
 3. **Installation**: Use `uv` for dependency management

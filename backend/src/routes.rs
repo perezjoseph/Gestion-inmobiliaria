@@ -151,6 +151,10 @@ fn configure_propiedades() -> impl actix_web::dev::HttpServiceFactory {
         .route("", web::get().to(handlers::propiedades::list))
         .route("", web::post().to(handlers::propiedades::create))
         .route("/{id}", web::get().to(handlers::propiedades::get_by_id))
+        .route(
+            "/{id}/resumen",
+            web::get().to(handlers::propiedades::resumen),
+        )
         .route("/{id}", web::put().to(handlers::propiedades::update))
         .route("/{id}", web::delete().to(handlers::propiedades::delete))
         .service(

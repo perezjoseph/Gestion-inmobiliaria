@@ -13,21 +13,14 @@ from starlette.testclient import TestClient
 from main import app, ocr_engine, _classify_document, _extract_structured_fields
 
 def _mock_predict_result(lines):
-    """Convert old-style OCR lines to PaddleOCR 3.5 predict() result format."""
+    """Convert old-style OCR lines to the dict-based format returned by OpenVINOOCREngine.predict()."""
     if not lines:
         return []
-    import numpy as np
-    rec_texts = [text for _, (text, _) in lines]
-    rec_scores = np.array([conf for _, (_, conf) in lines])
-    dt_polys = np.array([bbox for bbox, _ in lines], dtype=np.int16)
-    result = MagicMock()
-    result.rec_texts = rec_texts
-    result.rec_scores = rec_scores
-    result.dt_polys = dt_polys
-    # Support dict-style access too
-    result.__getitem__ = lambda self, key: getattr(self, key)
-    result.__contains__ = lambda self, key: hasattr(self, key)
-    return [result]
+    results = []
+    for bbox, (text, conf) in lines:
+        flat_bbox = [float(coord) for point in bbox for coord in point]
+        results.append({"text": text, "confidence": conf, "bbox": flat_bbox})
+    return results
 
 
 @pytest.fixture()

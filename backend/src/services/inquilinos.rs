@@ -173,6 +173,17 @@ pub async fn update<C: ConnectionTrait>(
         active.telefono = Set(Some(telefono));
     }
     if let Some(cedula) = input.cedula {
+        let conflict = inquilino::Entity::find()
+            .filter(inquilino::Column::OrganizacionId.eq(org_id))
+            .filter(inquilino::Column::Cedula.eq(&cedula))
+            .filter(inquilino::Column::Id.ne(id))
+            .one(db)
+            .await?;
+        if conflict.is_some() {
+            return Err(AppError::Conflict(
+                "Ya existe un inquilino con esta cédula".to_string(),
+            ));
+        }
         active.cedula = Set(cedula);
     }
     if let Some(contacto_emergencia) = input.contacto_emergencia {

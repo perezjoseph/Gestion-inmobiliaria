@@ -166,3 +166,13 @@ pub async fn delete(
     txn.commit().await?;
     Ok(HttpResponse::NoContent().finish())
 }
+
+pub async fn resumen(
+    db: web::Data<DatabaseConnection>,
+    claims: Claims,
+    path: web::Path<Uuid>,
+) -> Result<HttpResponse, AppError> {
+    let id = path.into_inner();
+    let result = propiedades::resumen(db.get_ref(), claims.organizacion_id, id).await?;
+    Ok(HttpResponse::Ok().json(result))
+}

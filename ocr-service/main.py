@@ -29,7 +29,7 @@ def _pdf_first_page_to_array(file_bytes: bytes) -> np.ndarray:
     """Convert the first page of a PDF to a numpy RGB array using PyMuPDF."""
     doc = fitz.open(stream=file_bytes, filetype="pdf")
     page = doc.load_page(0)
-    pix = page.get_pixmap(dpi=300)
+    pix = page.get_pixmap(dpi=120)
     img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
     doc.close()
     return np.array(img)

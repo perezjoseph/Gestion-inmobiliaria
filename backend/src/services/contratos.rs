@@ -549,7 +549,7 @@ pub async fn update(
     let is_terminating = input
         .estado
         .as_ref()
-        .is_some_and(|e| e == "terminado" || e == "vencido");
+        .is_some_and(|e| e == "terminado" || e == "vencido" || e == "cancelado");
 
     let propiedad_id = existing.propiedad_id;
     let fecha_inicio = existing.fecha_inicio;
@@ -585,14 +585,27 @@ pub async fn update(
     let updated = active.update(&txn).await?;
 
     if is_terminating {
-        let mut prop_active: propiedad::ActiveModel = propiedad::Entity::find_by_id(propiedad_id)
+        let other_active = contrato::Entity::find()
+            .filter(
+                Condition::all()
+                    .add(contrato::Column::PropiedadId.eq(propiedad_id))
+                    .add(contrato::Column::Estado.eq("activo"))
+                    .add(contrato::Column::Id.ne(id)),
+            )
             .one(&txn)
-            .await?
-            .ok_or_else(|| AppError::NotFound("Propiedad no encontrada".to_string()))?
-            .into();
-        prop_active.estado = Set("disponible".to_string());
-        prop_active.updated_at = Set(Utc::now().into());
-        prop_active.update(&txn).await?;
+            .await?;
+
+        if other_active.is_none() {
+            let mut prop_active: propiedad::ActiveModel =
+                propiedad::Entity::find_by_id(propiedad_id)
+                    .one(&txn)
+                    .await?
+                    .ok_or_else(|| AppError::NotFound("Propiedad no encontrada".to_string()))?
+                    .into();
+            prop_active.estado = Set("disponible".to_string());
+            prop_active.updated_at = Set(Utc::now().into());
+            prop_active.update(&txn).await?;
+        }
     }
 
     auditoria::registrar_best_effort(
@@ -626,8 +639,36 @@ pub async fn delete(
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
 
+    let was_active = existing.estado == "activo";
+    let propiedad_id = existing.propiedad_id;
+
     let active: contrato::ActiveModel = existing.into();
     active.delete(&txn).await?;
+
+    if was_active {
+        let other_active = contrato::Entity::find()
+            .filter(
+                Condition::all()
+                    .add(contrato::Column::PropiedadId.eq(propiedad_id))
+                    .add(contrato::Column::Estado.eq("activo")),
+            )
+            .one(&txn)
+            .await?;
+
+        if other_active.is_none() {
+            if let Some(prop) = propiedad::Entity::find_by_id(propiedad_id)
+                .one(&txn)
+                .await?
+            {
+                if prop.estado == "ocupada" {
+                    let mut prop_active: propiedad::ActiveModel = prop.into();
+                    prop_active.estado = Set("disponible".to_string());
+                    prop_active.updated_at = Set(Utc::now().into());
+                    prop_active.update(&txn).await?;
+                }
+            }
+        }
+    }
 
     auditoria::registrar_best_effort(
         &txn,
@@ -930,21 +971,67 @@ pub async fn terminar(
 pub async fn marcar_vencidos(db: &DatabaseConnection) -> Result<u64, AppError> {
     let today = Utc::now().date_naive();
 
-    let result = contrato::Entity::update_many()
+    // Find contracts that will expire so we can cascade propiedad estado
+    let expiring = contrato::Entity::find()
+        .filter(contrato::Column::FechaFin.lt(today))
+        .filter(contrato::Column::Estado.eq("activo"))
+        .all(db)
+        .await?;
+
+    if expiring.is_empty() {
+        return Ok(0);
+    }
+
+    let txn = db.begin().await?;
+    let now = Utc::now().into();
+
+    // Collect unique propiedad_ids before updating
+    let mut propiedad_ids: Vec<Uuid> = expiring.iter().map(|c| c.propiedad_id).collect();
+    propiedad_ids.sort_unstable();
+    propiedad_ids.dedup();
+
+    let ids: Vec<Uuid> = expiring.iter().map(|c| c.id).collect();
+
+    contrato::Entity::update_many()
         .col_expr(
             contrato::Column::Estado,
             sea_orm::sea_query::Expr::value("vencido"),
         )
         .col_expr(
             contrato::Column::UpdatedAt,
-            sea_orm::sea_query::Expr::value(Utc::now().fixed_offset()),
+            sea_orm::sea_query::Expr::value(now),
         )
-        .filter(contrato::Column::FechaFin.lt(today))
-        .filter(contrato::Column::Estado.eq("activo"))
-        .exec(db)
+        .filter(contrato::Column::Id.is_in(ids.clone()))
+        .exec(&txn)
         .await?;
 
-    Ok(result.rows_affected)
+    // For each affected propiedad, set to disponible if no remaining active contratos
+    for prop_id in &propiedad_ids {
+        let still_active = contrato::Entity::find()
+            .filter(
+                Condition::all()
+                    .add(contrato::Column::PropiedadId.eq(*prop_id))
+                    .add(contrato::Column::Estado.eq("activo")),
+            )
+            .one(&txn)
+            .await?;
+
+        if still_active.is_none() {
+            let prop = propiedad::Entity::find_by_id(*prop_id).one(&txn).await?;
+            if let Some(p) = prop {
+                if p.estado == "ocupada" {
+                    let mut prop_active: propiedad::ActiveModel = p.into();
+                    prop_active.estado = Set("disponible".to_string());
+                    prop_active.updated_at = Set(now);
+                    prop_active.update(&txn).await?;
+                }
+            }
+        }
+    }
+
+    txn.commit().await?;
+
+    Ok(ids.len() as u64)
 }
 
 pub async fn listar_por_vencer(
