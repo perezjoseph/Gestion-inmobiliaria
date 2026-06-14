@@ -103,8 +103,8 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - **Property 5: Within-run memory — notes appended while processing earlier artifacts are visible when processing a later artifact in the same run; the file is ephemeral and never git-seeded**
     - **Validates: Requirements 5.1, 5.2, 5.3, 5.4**
 
-- [ ] 9. Structured compaction handoff (F5)
-  - [-] 9.1 Add the "Handoff on Compaction" section to `autofix-system.md`
+- [x] 9. Structured compaction handoff (F5)
+  - [x] 9.1 Add the "Handoff on Compaction" section to `autofix-system.md`
     - Instruct the agent to write a handoff block (goal, constraints, progress done/in-progress/blocked, decisions, next steps, cumulative modified files) when context approaches the limit
     - Populate the FILES field from the existing `Modified_Files_State` side-channel
     - _Requirements: 6.1, 6.2, 6.3_
