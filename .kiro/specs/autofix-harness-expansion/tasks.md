@@ -119,7 +119,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Mirror the three validators and their stacks
     - _Requirements: 2.1, 2.2, 2.3_
 
-  - [-] 10.3 Add validator tools to the runner image with pinned versions
+  - [x] 10.3 Add validator tools to the runner image with pinned versions
     - Add `hadolint`, `kubeconform`, and `shellcheck` to `ghcr.io/perezjoseph/realestate-runner` (pin exact versions; ensure `ruff` is also on PATH), fetched via the retry-wrapped install pattern
     - _Requirements: 2.5, 1.4_
 
