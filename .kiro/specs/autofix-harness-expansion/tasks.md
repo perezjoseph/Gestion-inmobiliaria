@@ -90,7 +90,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Assert no annotation below soft, `::notice::` at soft, `::warning::` at hard, and that exit code is always 0 (advisory only)
     - _Requirements: 8.1, 8.2, 8.3, 8.4_
 
-- [~] 7. Checkpoint — Verification and Scope controls
+- [x] 7. Checkpoint — Verification and Scope controls
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 8. Within-run scratch learnings (F4)
