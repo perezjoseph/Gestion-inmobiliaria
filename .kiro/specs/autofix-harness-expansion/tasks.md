@@ -180,7 +180,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Exercise the prune logic against a synthetic store fixture and assert age/size caps are enforced
     - **Validates: Requirements 10.12**
 
-- [ ] 15. Lifecycle integration and control preservation (F9, R13, R14)
+- [x] 15. Lifecycle integration and control preservation (F9, R13, R14)
   - [x] 15.1 Expose the per-stack sensor-ran state as the `harness.sensors_ran` signal
     - Surface `Sensor_Ran_State` so the observability pipeline can compute `verification_gap` per stack; delegate all trace/metric/eval persistence to `.kiro/plans/harness-observability.md` and add no new trace design; do not recreate a git-tracked learnings JSONL
     - _Requirements: 13.1, 13.2, 13.3_
@@ -189,7 +189,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Confirm every hook parses input with safe `jq` extraction and quoted expansions and executes no agent-provided strings; confirm scratch/KB entries record only safe metadata; confirm `infra/`, `.github/workflows/`, and `.github/actions/` remain write-denied and CODEOWNERS-gated
     - _Requirements: 14.2, 14.3, 14.4_
 
-  - [~] 15.3 Write regression test for preserved existing controls
+  - [x] 15.3 Write regression test for preserved existing controls
     - **Property 6: No regression — every pre-existing `deniedPaths` entry, the git-block guard, the auto-format behavior, and the max-2-block escape hatch are preserved unchanged**
     - **Validates: Requirements 14.1**
 
