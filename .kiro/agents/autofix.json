@@ -66,6 +66,14 @@
       {
         "matcher": "execute_bash",
         "command": "bash -c 'CMD=$(cat | jq -r .tool_input.command 2>/dev/null); if echo \"$CMD\" | grep -qE \"(^|[;&|]\\s*|\\bsh\\s+-c\\s+|\\bbash\\s+-c\\s+)git\\s+(-[a-zA-Z]\\s+)*(commit|push|checkout|reset|rebase|merge|stash|branch\\s+-[dD]|clean|tag\\s+-d)\"; then echo \"BLOCKED: git operation not allowed — the workflow handles git.\" >&2; exit 2; fi'"
+      },
+      {
+        "matcher": "str_replace",
+        "command": "bash -c 'INPUT=$(cat); RE=\"#\\[allow\\(|@ts-ignore|@ts-nocheck|eslint-disable|@Suppress|# type: ignore|# noqa\"; NEW=$(echo \"$INPUT\" | jq -r \".tool_input.newStr // empty\" 2>/dev/null); OLD=$(echo \"$INPUT\" | jq -r \".tool_input.oldStr // empty\" 2>/dev/null); NEW_N=$(printf \"%s\" \"$NEW\" | grep -oE \"$RE\" | wc -l | tr -d \" \"); OLD_N=$(printf \"%s\" \"$OLD\" | grep -oE \"$RE\" | wc -l | tr -d \" \"); if [ \"$NEW_N\" -gt \"$OLD_N\" ]; then echo \"BLOCKED: this edit adds a NET-NEW suppression directive ($OLD_N -> $NEW_N). Fix the root cause instead of silencing the warning (see autofix-system.md: No suppressed warnings).\" >&2; exit 2; fi'"
+      },
+      {
+        "matcher": "fs_write",
+        "command": "bash -c 'INPUT=$(cat); RE=\"#\\[allow\\(|@ts-ignore|@ts-nocheck|eslint-disable|@Suppress|# type: ignore|# noqa\"; PATH_=$(echo \"$INPUT\" | jq -r \".tool_input.path // empty\" 2>/dev/null); NEW=$(echo \"$INPUT\" | jq -r \".tool_input.text // empty\" 2>/dev/null); NEW_N=$(printf \"%s\" \"$NEW\" | grep -oE \"$RE\" | wc -l | tr -d \" \"); OLD_N=0; if [ -f \"$PATH_\" ]; then OLD_N=$(grep -oE \"$RE\" \"$PATH_\" | wc -l | tr -d \" \"); fi; if [ \"$NEW_N\" -gt \"$OLD_N\" ]; then echo \"BLOCKED: this write adds a NET-NEW suppression directive ($OLD_N -> $NEW_N). Fix the root cause instead of silencing the warning (see autofix-system.md: No suppressed warnings).\" >&2; exit 2; fi'"
       }
     ],
     "postToolUse": [

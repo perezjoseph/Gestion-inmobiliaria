@@ -63,13 +63,13 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Retain every pre-existing `deniedPaths` entry unchanged
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.6, 14.1_
 
-  - [~] 4.2 Write property test for dependency immutability
+  - [-] 4.2 Write property test for dependency immutability
     - **Property 4: Dependency immutability — any write targeting a lockfile or pinned-dependency manifest is denied**
     - Assert each new and pre-existing denied path is matched; assert a non-denied source path is allowed
     - **Validates: Requirements 9.1, 9.2, 9.3, 9.5, 9.6**
 
 - [ ] 5. Suppression guard (F6)
-  - [~] 5.1 Add the `preToolUse` suppression guards to `autofix.json`
+  - [x] 5.1 Add the `preToolUse` suppression guards to `autofix.json`
     - Add `str_replace` and `fs_write` matcher hooks that count suppression tokens (`#[allow(`, `@ts-ignore`, `@ts-nocheck`, `eslint-disable`, `@Suppress`, `# type: ignore`, `# noqa`) and `exit 2` only when the new count exceeds the old (treating a non-existent file as 0)
     - Parse input via `jq -r ... // empty` with quoted expansions; never `eval` agent strings
     - Document that this hard `preToolUse` denial is exempt from the max-2-block escape hatch
@@ -123,7 +123,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Add `hadolint`, `kubeconform`, and `shellcheck` to `ghcr.io/perezjoseph/realestate-runner` (pin exact versions; ensure `ruff` is also on PATH), fetched via the retry-wrapped install pattern
     - _Requirements: 2.5, 1.4_
 
-  - [~] 10.4 Write tests for non-code stack classification and tracking
+  - [-] 10.4 Write tests for non-code stack classification and tracking
     - Assert the classifier maps Dockerfile/`infra/k8s` manifests/`*.sh` to `docker`/`k8s`/`shell`, and the tracker creates the matching markers for `hadolint`/`kubeconform`/`shellcheck` commands
     - _Requirements: 2.1, 2.2, 2.3, 3.1_
 
