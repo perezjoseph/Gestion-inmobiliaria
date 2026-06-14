@@ -127,12 +127,12 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Assert the classifier maps Dockerfile/`infra/k8s` manifests/`*.sh` to `docker`/`k8s`/`shell`, and the tracker creates the matching markers for `hadolint`/`kubeconform`/`shellcheck` commands
     - _Requirements: 2.1, 2.2, 2.3, 3.1_
 
-- [ ] 11. F10 validation spike — HARD GATE
+- [x] 11. F10 validation spike — HARD GATE
   - [x] 11.1 Grant the `knowledge` tool in `autofix.json`
     - Add `"knowledge"` to BOTH the `tools` and `allowedTools` arrays so the headless `--no-interactive` agent can use it
     - _Requirements: 10.3_
 
-  - [~] 11.2 Author and run the headless knowledge spike
+  - [x] 11.2 Author and run the headless knowledge spike
     - Write a spike script that runs `kiro-cli chat --agent autofix --no-interactive --trust-all-tools` on the runner image and confirms (1) a knowledge `search` returns results and (2) a knowledge `store` persists; record the result
     - Determine the real KB store path on the runner image (do not trust the documented path blindly)
     - Gate decision: if the tool does not function headless, redesign or drop F10 and do NOT proceed to any `infra/` or helm work
