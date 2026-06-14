@@ -138,7 +138,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Gate decision: if the tool does not function headless, redesign or drop F10 and do NOT proceed to any `infra/` or helm work
     - _Requirements: 11.1, 11.2, 11.3_
 
-- [~] 12. Checkpoint — F10 spike gate
+- [x] 12. Checkpoint — F10 spike gate
   - Ensure all tests pass, ask the user if questions arise. Do not start tasks 13–14 unless the spike (11.2) confirmed the knowledge tool functions headless and the real KB path is known.
 
 - [x] 13. Persistent memory — agent, settings, and workflow (F10)
