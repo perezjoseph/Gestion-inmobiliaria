@@ -152,7 +152,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Reuse the existing `kiro-autofix-${{ head_branch }}` concurrency group; add no new concurrency group
     - _Requirements: 10.10, 10.11_
 
-  - [-] 13.3 Persist knowledge settings on the runner image
+  - [x] 13.3 Persist knowledge settings on the runner image
     - Bake `chat.enableKnowledge true` and `knowledge.indexType Fast` into the runner image (or set them idempotently at job start)
     - _Requirements: 10.4, 10.5_
 
