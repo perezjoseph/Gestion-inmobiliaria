@@ -1,4 +1,8 @@
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::inconsistent_digit_grouping
+)]
 
 use proptest::prelude::*;
 use rust_decimal::Decimal;

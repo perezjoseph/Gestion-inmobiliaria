@@ -20,6 +20,7 @@ pub fn validate_magic_bytes(data: &[u8], declared_content_type: &str) -> Result<
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

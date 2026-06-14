@@ -1,4 +1,9 @@
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::match_same_arms,
+    clippy::cast_possible_wrap
+)]
 
 use chrono::{Datelike, NaiveDate};
 use proptest::prelude::*;

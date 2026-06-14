@@ -4,7 +4,8 @@
     clippy::panic,
     clippy::if_not_else,
     clippy::doc_markdown,
-    unused_doc_comments
+    unused_doc_comments,
+    clippy::uninlined_format_args
 )]
 //! Property 13: Bug Condition — Servicios Públicos calls an existing property endpoint
 //!

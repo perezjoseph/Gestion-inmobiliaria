@@ -157,7 +157,11 @@ fn to_response(model: &cuota_condominio::Model) -> CuotaResponse {
 }
 
 #[cfg(test)]
-#[allow(clippy::inconsistent_digit_grouping, clippy::unreadable_literal)]
+#[allow(
+    clippy::inconsistent_digit_grouping,
+    clippy::unreadable_literal,
+    clippy::unwrap_used
+)]
 mod tests {
     use super::*;
     use chrono::NaiveDate;

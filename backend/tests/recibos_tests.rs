@@ -105,7 +105,7 @@ mod db_async {
     fn make_token(user_id: Uuid, org_id: Uuid, rol: &str) -> String {
         let claims = Claims {
             sub: user_id,
-            email: format!("user-{}@test.com", user_id),
+            email: format!("user-{user_id}@test.com"),
             rol: rol.to_string(),
             organizacion_id: org_id,
             jti: Uuid::new_v4(),

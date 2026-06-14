@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Clippy on Save",
+  "description": "Runs cargo clippy when a Rust file is saved and asks the agent to fix any issues found.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*.rs"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Run `cargo clippy -p backend --lib -- -D clippy::unwrap_used -D warnings` and check for any clippy errors or warnings in the edited file. If there are issues, fix them automatically. If the file is clean, do nothing and don't report back."
+  }
+}

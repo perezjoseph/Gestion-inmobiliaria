@@ -38,7 +38,7 @@ struct PaginatedResponseShape {
 /// We generate org IDs representing orgs with zero invitations to demonstrate
 /// the shape mismatch.
 fn org_id_strategy() -> impl Strategy<Value = uuid::Uuid> {
-    any::<[u8; 16]>().prop_map(|bytes| uuid::Uuid::from_bytes(bytes))
+    any::<[u8; 16]>().prop_map(uuid::Uuid::from_bytes)
 }
 
 // ── Property Test ───────────────────────────────────────────────────────

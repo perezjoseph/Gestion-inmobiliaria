@@ -41,11 +41,11 @@ mod tests {
     #[test]
     fn ipi_liability_response_serializes_camel_case() {
         let response = IpiLiabilityResponse {
-            valor_total: Decimal::new(15_000_000_00, 2),
-            umbral: Decimal::new(10_695_494_00, 2),
-            exceso: Decimal::new(4_304_506_00, 2),
-            ipi_anual: Decimal::new(43_045_06, 2),
-            pago_semestral: Decimal::new(21_522_53, 2),
+            valor_total: Decimal::new(1_500_000_000, 2),
+            umbral: Decimal::new(1_069_549_400, 2),
+            exceso: Decimal::new(430_450_600, 2),
+            ipi_anual: Decimal::new(4_304_506, 2),
+            pago_semestral: Decimal::new(2_152_253, 2),
             proxima_fecha: NaiveDate::from_ymd_opt(2026, 9, 11).unwrap(),
         };
         let json = serde_json::to_value(&response).unwrap();
@@ -83,7 +83,7 @@ mod tests {
             "fechaPago2": "2026-09-11"
         });
         let request: ConfiguracionIpiRequest = serde_json::from_value(json).unwrap();
-        assert_eq!(request.umbral_ipi, Decimal::new(10_695_494_00, 2));
+        assert_eq!(request.umbral_ipi, Decimal::new(1_069_549_400, 2));
         assert_eq!(request.anio, 2026);
         assert_eq!(
             request.fecha_pago_1,

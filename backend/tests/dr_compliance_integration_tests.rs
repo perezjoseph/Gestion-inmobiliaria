@@ -1,3 +1,8 @@
+#![allow(
+    clippy::inconsistent_digit_grouping,
+    clippy::unreadable_literal,
+    clippy::useless_vec
+)]
 //! Integration tests for DR Landlord Compliance end-to-end flows.
 //!
 //! These tests verify the logical flow by calling service functions in sequence

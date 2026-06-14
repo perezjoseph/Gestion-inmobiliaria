@@ -19,7 +19,9 @@
     clippy::option_if_let_else,
     clippy::range_plus_one,
     clippy::if_not_else,
-    clippy::manual_let_else
+    clippy::manual_let_else,
+    clippy::missing_const_for_fn,
+    clippy::doc_markdown
 )]
 
 use proptest::prelude::*;

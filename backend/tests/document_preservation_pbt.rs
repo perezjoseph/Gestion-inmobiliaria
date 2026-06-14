@@ -1,3 +1,4 @@
+#![allow(clippy::map_unwrap_or, clippy::uninlined_format_args)]
 // Feature: e2e-exploratory-bugfixes, Property 16: Preservation
 // **Validates: Requirements 3.10**
 //

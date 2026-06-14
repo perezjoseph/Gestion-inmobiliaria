@@ -2186,7 +2186,7 @@ fn pending_only_transitions_to_confirmed_or_rejected() {
 use crate::services::ai_module::{ChatbotPersona, TenantContext, compose_system_prompt};
 
 fn arb_nonempty_string() -> impl Strategy<Value = String> {
-    "[A-Za-z0-9 Ã¡Ã©Ã­Ã³ÃºÃ±]{1,80}"
+    "[A-Za-z0-9 \u{e1}\u{e9}\u{ed}\u{f3}\u{fa}\u{f1}]{1,80}"
 }
 
 fn arb_faq_list() -> impl Strategy<Value = Vec<FaqEntry>> {
@@ -3229,7 +3229,7 @@ fn arb_message_type() -> impl Strategy<Value = String> {
 }
 
 fn arb_message_content() -> impl Strategy<Value = String> {
-    "[A-Za-z0-9 .,!?Ã¡Ã©Ã­Ã³ÃºÃ±]{1,500}"
+    "[A-Za-z0-9 .,!?\u{e1}\u{e9}\u{ed}\u{f3}\u{fa}\u{f1}]{1,500}"
 }
 
 #[test]

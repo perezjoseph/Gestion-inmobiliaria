@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use proptest::prelude::*;
 use proptest::test_runner::{Config as ProptestConfig, TestRunner};
 
@@ -64,7 +66,7 @@ fn agent_config_resolve_max_turns_always_in_range() {
             );
             Ok(())
         })
-        .unwrap();
+        .expect("max_turns property violated");
 }
 
 #[test]
@@ -89,7 +91,7 @@ fn agent_config_resolve_max_turns_defaults_to_5() {
             );
             Ok(())
         })
-        .unwrap();
+        .expect("max_turns default property violated");
 }
 
 #[test]
@@ -102,17 +104,16 @@ fn agent_config_resolve_temperature_always_valid_or_none() {
     runner
         .run(&arb_agent_config(), |config| {
             let resolved = config.resolve();
-            match resolved.temperature {
-                Some(t) => prop_assert!(
+            if let Some(t) = resolved.temperature {
+                prop_assert!(
                     (0.0..=2.0).contains(&t),
                     "temperature {} is outside range 0.0–2.0",
                     t
-                ),
-                None => {}
+                );
             }
             Ok(())
         })
-        .unwrap();
+        .expect("temperature range property violated");
 }
 
 #[test]
@@ -145,7 +146,7 @@ fn agent_config_resolve_temperature_outside_range_becomes_none() {
             );
             Ok(())
         })
-        .unwrap();
+        .expect("temperature out-of-range property violated");
 }
 
 #[test]
@@ -158,17 +159,16 @@ fn agent_config_resolve_max_tokens_always_valid_or_none() {
     runner
         .run(&arb_agent_config(), |config| {
             let resolved = config.resolve();
-            match resolved.max_tokens {
-                Some(t) => prop_assert!(
+            if let Some(t) = resolved.max_tokens {
+                prop_assert!(
                     (1..=4096).contains(&t),
                     "max_tokens {} is outside range 1–4096",
                     t
-                ),
-                None => {}
+                );
             }
             Ok(())
         })
-        .unwrap();
+        .expect("max_tokens range property violated");
 }
 
 #[test]
@@ -197,7 +197,7 @@ fn agent_config_resolve_max_tokens_outside_range_becomes_none() {
             );
             Ok(())
         })
-        .unwrap();
+        .expect("max_tokens out-of-range property violated");
 }
 
 #[test]
@@ -222,5 +222,5 @@ fn agent_config_resolve_tool_registration_defaults_to_selective() {
             );
             Ok(())
         })
-        .unwrap();
+        .expect("tool_registration default property violated");
 }

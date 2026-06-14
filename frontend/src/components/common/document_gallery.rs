@@ -16,7 +16,7 @@ const ALLOWED_TYPES: &[&str] = &[
 ];
 
 pub const TIPOS_INQUILINO: &[(&str, &str)] = &[
-    ("cedula", "CÃ©dula"),
+    ("cedula", "Cédula"),
     ("comprobante_ingresos", "Comprobante de ingresos"),
     ("carta_referencia", "Carta de referencia"),
     ("contrato_trabajo", "Contrato de trabajo"),
@@ -24,11 +24,11 @@ pub const TIPOS_INQUILINO: &[(&str, &str)] = &[
 ];
 
 pub const TIPOS_PROPIEDAD: &[(&str, &str)] = &[
-    ("titulo_propiedad", "TÃtulo de propiedad"),
-    ("certificacion_no_gravamen", "CertificaciÃ³n de no gravamen"),
+    ("titulo_propiedad", "Título de propiedad"),
+    ("certificacion_no_gravamen", "Certificación de no gravamen"),
     ("plano_catastral", "Plano catastral"),
-    ("certificacion_uso_suelo", "CertificaciÃ³n de uso de suelo"),
-    ("poliza_seguro", "PÃ³liza de seguro"),
+    ("certificacion_uso_suelo", "Certificación de uso de suelo"),
+    ("poliza_seguro", "Póliza de seguro"),
 ];
 
 pub const TIPOS_CONTRATO: &[(&str, &str)] = &[
@@ -174,7 +174,7 @@ pub fn DocumentGallery(props: &DocumentGalleryProps) -> Html {
             let size = file.size() as u64;
             if size > MAX_FILE_SIZE {
                 error.set(Some(format!(
-                    "El archivo excede el tamaÃ±o mÃ¡ximo de {} MB.",
+                    "El archivo excede el tamaño máximo de {} MB.",
                     MAX_FILE_SIZE / (1024 * 1024)
                 )));
                 input.set_value("");
@@ -451,7 +451,7 @@ fn UploadForm(props: &UploadFormProps) -> Html {
             </div>
             if show_numero {
                 <div>
-                    <label class="gi-label" style="font-size: var(--text-xs);">{"NÃºmero NCF"}</label>
+                    <label class="gi-label" style="font-size: var(--text-xs);">{"Número NCF"}</label>
                     <input
                         type="text"
                         class="gi-input"
@@ -697,7 +697,7 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
                         style="font-size: var(--text-xs);"
                         onclick={on_confirm_delete}
                     >
-                        {"SÃ"}
+                        {"Sí"}
                     </button>
                     <button
                         class="gi-btn gi-btn-sm gi-btn-secondary"
@@ -811,7 +811,7 @@ async fn upload_document(
     if !numero_documento.is_empty() {
         form_data
             .append_with_str("numero_documento", numero_documento)
-            .map_err(|_| "Error al agregar nÃºmero de documento".to_string())?;
+            .map_err(|_| "Error al agregar número de documento".to_string())?;
     }
 
     let url = format!("{BASE_URL}/documentos/{entity_type}/{entity_id}");

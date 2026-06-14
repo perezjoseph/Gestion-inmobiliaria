@@ -60,7 +60,7 @@ fn handle_response_current(has_token: bool, status: u16) -> HandleResponseOutcom
         // Current code: unconditionally clears and redirects on ANY 401
         return HandleResponseOutcome::ClearedAndRedirected;
     }
-    if status >= 200 && status < 300 {
+    if (200..300).contains(&status) {
         return HandleResponseOutcome::Success;
     }
     // Any other non-ok status

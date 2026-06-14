@@ -212,10 +212,10 @@ fn test_selective_tool_registration_completeness() {
         .run(&arb_capabilities(), |caps| {
             let tools = get_enabled_tools(&caps);
 
-            let expected_count = caps.receipt_ocr as usize
-                + caps.balance_queries as usize * 2
-                + caps.maintenance_requests as usize
-                + caps.human_handoff as usize;
+            let expected_count = usize::from(caps.receipt_ocr)
+                + usize::from(caps.balance_queries) * 2
+                + usize::from(caps.maintenance_requests)
+                + usize::from(caps.human_handoff);
 
             prop_assert_eq!(
                 tools.len(),

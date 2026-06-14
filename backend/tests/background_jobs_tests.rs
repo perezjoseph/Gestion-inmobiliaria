@@ -1,3 +1,4 @@
+#![allow(clippy::used_underscore_binding)]
 use chrono::Utc;
 use realestate_backend::app::create_app;
 use realestate_backend::config::AppConfig;

@@ -1,4 +1,10 @@
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::cast_lossless,
+    clippy::cast_possible_wrap,
+    clippy::inconsistent_digit_grouping
+)]
 
 use proptest::prelude::*;
 use rust_decimal::Decimal;
@@ -37,7 +43,7 @@ fn coowner_percentages() -> impl Strategy<Value = Vec<Decimal>> {
 }
 
 fn positive_ipi_total() -> impl Strategy<Value = Decimal> {
-    (1i64..1_000_000_00i64).prop_map(|cents| Decimal::new(cents, 2))
+    (1i64..100_000_000_i64).prop_map(|cents| Decimal::new(cents, 2))
 }
 
 fn valid_percentage() -> impl Strategy<Value = Decimal> {

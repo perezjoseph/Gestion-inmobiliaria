@@ -46,12 +46,7 @@ fn informal_org_name() -> impl Strategy<Value = String> {
 /// Models whether the read path (listar_secuencias) calls the fiscal gate.
 /// After the fix: it does NOT. The read path succeeds regardless of tipo_fiscal.
 /// Returns Ok(()) to indicate the read path allows access.
-fn read_path_allows_access(_tipo_fiscal: &str) -> Result<(), String> {
-    // After the fix, listar_secuencias does NOT call verificar_acceso_fiscal.
-    // The read path is: AdminOnly RBAC check (handler layer) → query sequences by org_id.
-    // No fiscal gate on reads. Any tipo_fiscal is allowed.
-    Ok(())
-}
+const fn read_path_allows_access(_tipo_fiscal: &str) {}
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -114,14 +109,7 @@ fn property_9_admin_informal_org_can_read_ncf_sequences() {
             |(org_name, tipo_fiscal)| {
                 // Model the fixed read path: does NOT invoke verificar_acceso_fiscal.
                 // The read path should succeed regardless of tipo_fiscal.
-                let read_result = read_path_allows_access(&tipo_fiscal);
-                prop_assert!(
-                    read_result.is_ok(),
-                    "Read path (listar_secuencias) should allow access for any org, \
-                     but was blocked for tipo_fiscal='{}', org='{}'",
-                    tipo_fiscal,
-                    org_name
-                );
+                read_path_allows_access(&tipo_fiscal);
 
                 // Verify the fiscal gate itself still works for write paths:
                 // informal orgs are still blocked by verificar_acceso_fiscal.

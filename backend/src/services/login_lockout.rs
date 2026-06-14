@@ -100,6 +100,11 @@ impl Default for LoginLockout {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::unchecked_time_subtraction,
+    clippy::significant_drop_tightening
+)]
 mod tests {
     use super::*;
 

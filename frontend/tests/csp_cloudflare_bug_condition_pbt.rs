@@ -4,7 +4,12 @@
     clippy::panic,
     clippy::if_not_else,
     clippy::doc_markdown,
-    unused_doc_comments
+    unused_doc_comments,
+    clippy::redundant_closure_for_method_calls,
+    clippy::option_if_let_else,
+    clippy::uninlined_format_args,
+    clippy::manual_contains,
+    clippy::trim_split_whitespace
 )]
 //! Property 17: Bug Condition — CSP no longer blocks Cloudflare Insights
 //!

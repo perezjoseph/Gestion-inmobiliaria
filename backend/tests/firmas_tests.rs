@@ -1,4 +1,4 @@
-#![allow(clippy::needless_return)]
+#![allow(clippy::needless_return, clippy::invisible_characters)]
 use actix_web::http::StatusCode;
 use actix_web::web;
 use chrono::{Duration, Utc};
@@ -1123,7 +1123,7 @@ fn test_template_crud_soft_delete() {
         let templates = body.as_array().unwrap();
         let found = templates
             .iter()
-            .any(|t| t["id"].as_str() == Some(&plantilla_id));
+            .any(|t| t["id"].as_str() == Some(plantilla_id.as_str()));
         assert!(
             !found,
             "Soft-deleted template should not appear in active list"

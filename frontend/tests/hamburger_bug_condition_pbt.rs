@@ -171,9 +171,9 @@ fn right_group_overlaps_hamburger(layout: &NavbarFlexLayout) -> bool {
 /// Models the pointer hit-test behavior based on CSS stacking and paint order.
 ///
 /// In CSS, when elements overlap without explicit stacking contexts (no z-index
-/// + position), later DOM elements paint on top. `.gi-navbar-right` is after
-/// `.gi-navbar-left` in DOM order, so its content receives pointer events in
-/// the overlap region.
+///   + position), later DOM elements paint on top. `.gi-navbar-right` is after
+///     `.gi-navbar-left` in DOM order, so its content receives pointer events in
+///     the overlap region.
 ///
 /// Only if the hamburger has `position: relative` AND `z-index > 0` will it
 /// create a stacking context that elevates it above the later-DOM-order sibling.

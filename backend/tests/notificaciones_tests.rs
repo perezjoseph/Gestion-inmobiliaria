@@ -1,3 +1,4 @@
+#![allow(clippy::invisible_characters)]
 use chrono::Utc;
 use realestate_backend::app::create_app;
 use realestate_backend::config::AppConfig;

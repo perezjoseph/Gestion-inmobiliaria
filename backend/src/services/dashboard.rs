@@ -994,6 +994,7 @@ fn months_between(start: NaiveDate, end: NaiveDate, frecuencia: &str) -> Decimal
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

@@ -1,3 +1,4 @@
+#![allow(clippy::invisible_characters)]
 use chrono::Utc;
 use realestate_backend::app::create_app;
 use realestate_backend::config::AppConfig;
@@ -192,7 +193,7 @@ fn test_crud_cycle() {
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
-                "titulo": "Reparar tuberÃ­a",
+                "titulo": "Reparar tubería",
                 "descripcion": "Fuga en el baÃ±o",
                 "prioridad": "alta",
                 "costoMonto": "150.00",
@@ -206,7 +207,7 @@ fn test_crud_cycle() {
         let solicitud_uuid: Uuid = solicitud_id.parse().unwrap();
         assert_eq!(body["estado"], "pendiente");
         assert_eq!(body["prioridad"], "alta");
-        assert_eq!(body["titulo"], "Reparar tuberÃ­a");
+        assert_eq!(body["titulo"], "Reparar tubería");
         assert_eq!(body["propiedadId"], propiedad_id.to_string());
 
         let req = actix_web::test::TestRequest::get()
@@ -216,21 +217,21 @@ fn test_crud_cycle() {
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
         let body: Value = actix_web::test::read_body_json(resp).await;
-        assert_eq!(body["titulo"], "Reparar tuberÃ­a");
+        assert_eq!(body["titulo"], "Reparar tubería");
         assert!(body["notas"].is_array());
 
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/mantenimiento/{solicitud_id}"))
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
-                "titulo": "Reparar tuberÃ­a urgente",
+                "titulo": "Reparar tubería urgente",
                 "prioridad": "urgente"
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
         let body: Value = actix_web::test::read_body_json(resp).await;
-        assert_eq!(body["titulo"], "Reparar tuberÃ­a urgente");
+        assert_eq!(body["titulo"], "Reparar tubería urgente");
         assert_eq!(body["prioridad"], "urgente");
 
         let req = actix_web::test::TestRequest::get()
@@ -593,7 +594,7 @@ fn test_access_control() {
             .insert_header(("Authorization", format!("Bearer {viewer_token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
-                "titulo": "No deberÃ­a crearse"
+                "titulo": "No debería crearse"
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -631,7 +632,7 @@ fn test_access_control() {
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/mantenimiento/{solicitud_id}/notas"))
             .insert_header(("Authorization", format!("Bearer {viewer_token}")))
-            .set_json(json!({ "contenido": "No deberÃ­a crearse" }))
+            .set_json(json!({ "contenido": "No debería crearse" }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 403);
@@ -799,7 +800,7 @@ fn test_validations() {
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
-                "titulo": "Para nota vacÃ­a"
+                "titulo": "Para nota vacía"
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -850,7 +851,7 @@ fn test_auditoria_entries() {
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "propiedadId": propiedad_id,
-                "titulo": "AuditorÃ­a test"
+                "titulo": "Auditoría test"
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -874,7 +875,7 @@ fn test_auditoria_entries() {
         let req = actix_web::test::TestRequest::put()
             .uri(&format!("/api/v1/mantenimiento/{solicitud_id}"))
             .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(json!({ "titulo": "AuditorÃ­a test actualizado" }))
+            .set_json(json!({ "titulo": "Auditoría test actualizado" }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
@@ -890,7 +891,7 @@ fn test_auditoria_entries() {
         let req = actix_web::test::TestRequest::post()
             .uri(&format!("/api/v1/mantenimiento/{solicitud_id}/notas"))
             .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(json!({ "contenido": "Nota de auditorÃ­a" }))
+            .set_json(json!({ "contenido": "Nota de auditoría" }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), 201);
