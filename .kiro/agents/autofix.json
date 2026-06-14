@@ -18,7 +18,8 @@
     "glob",
     "introspect",
     "thinking",
-    "@context7"
+    "@context7",
+    "knowledge"
   ],
   "allowedTools": [
     "read",
@@ -29,7 +30,8 @@
     "glob",
     "introspect",
     "thinking",
-    "@context7"
+    "@context7",
+    "knowledge"
   ],
   "toolsSettings": {
     "write": {

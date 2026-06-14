@@ -86,7 +86,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Read thresholds from `KIRO_DIFF_SOFT` (default 8) and `KIRO_DIFF_HARD` (default 15); block no write and gate no exit
     - _Requirements: 8.1, 8.2, 8.3, 8.4_
 
-  - [~] 6.2 Write unit tests for the diff-budget thresholds
+  - [-] 6.2 Write unit tests for the diff-budget thresholds
     - Assert no annotation below soft, `::notice::` at soft, `::warning::` at hard, and that exit code is always 0 (advisory only)
     - _Requirements: 8.1, 8.2, 8.3, 8.4_
 
@@ -128,7 +128,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - _Requirements: 2.1, 2.2, 2.3, 3.1_
 
 - [ ] 11. F10 validation spike — HARD GATE
-  - [~] 11.1 Grant the `knowledge` tool in `autofix.json`
+  - [x] 11.1 Grant the `knowledge` tool in `autofix.json`
     - Add `"knowledge"` to BOTH the `tools` and `allowedTools` arrays so the headless `--no-interactive` agent can use it
     - _Requirements: 10.3_
 
