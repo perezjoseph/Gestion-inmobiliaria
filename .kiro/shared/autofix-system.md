@@ -84,6 +84,25 @@ Run only the sensors relevant to your modified files. Stop at the first failure 
 
 You own the loop. Do not rely on the workflow to re-invoke you.
 
+### 5. Handoff on Compaction
+
+When your context approaches the limit mid-fix, write a structured handoff block so the next turn can resume without re-diagnosing:
+
+```
+## Handoff
+GOAL: <what you are trying to fix>
+CONSTRAINTS: <key constraints affecting the approach>
+PROGRESS:
+  DONE: <completed steps>
+  IN_PROGRESS: <current step>
+  BLOCKED: <blockers if any>
+DECISIONS: <key decisions made during this session>
+NEXT_STEPS: <what to do next>
+FILES: <cumulative modified files from $RUNNER_TEMP/autofix-modified-files.txt>
+```
+
+Populate the FILES field from the existing `Modified_Files_State` side-channel (`$RUNNER_TEMP/autofix-modified-files.txt`). Write the handoff before the context compacts — the next session reads it to pick up where you left off.
+
 ## Priority Ordering
 
 When multiple sensors fail simultaneously:

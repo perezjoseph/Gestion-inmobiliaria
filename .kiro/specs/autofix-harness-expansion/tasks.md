@@ -24,7 +24,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Expose it as the single source of truth referenced by both the `postToolUse` sensor-ran tracker and the `stop` gate
     - _Requirements: 4.1, 4.2, 4.3_
 
-  - [~] 1.2 Write property test for the stack classifier
+  - [-] 1.2 Write property test for the stack classifier
     - **Property (Classifier totality): `classify_stack(f)` returns exactly one stack for any path, and `none` only for paths with no sensor suite**
     - Use a table-driven `hypothesis` generator under `ocr-service/` (or a shell corpus) over representative and adversarial paths
     - **Validates: Requirements 4.1, 4.2**
@@ -40,7 +40,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - _Requirements: 1.3_
 
 - [ ] 3. Per-stack sensor-ran tracking and stop gate (F3)
-  - [~] 3.1 Replace the sensor-ran tracker, stop gate, and formatter in `autofix.json`
+  - [x] 3.1 Replace the sensor-ran tracker, stop gate, and formatter in `autofix.json`
     - Replace the `postToolUse` sensor-ran tracker so each sensor command touches a per-stack marker under `$RUNNER_TEMP/autofix-sensors-ran.d/` (rust/ts/kotlin/python/docker/k8s/shell)
     - Replace the `stop` gate to source the classifier and block exit when any modified file's stack has no matching marker, naming each missing stack; allow exit when all modified files are `none` or have markers, when `Modified_Files_State` is empty, or after 2 blocks; on clean exit remove `autofix-modified-files.txt`, `autofix-sensors-ran.d/`, and the block-count file
     - Extend the `postToolUse` formatter with the `*/ocr-service/*.py) ruff format` case
@@ -104,7 +104,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - **Validates: Requirements 5.1, 5.2, 5.3, 5.4**
 
 - [ ] 9. Structured compaction handoff (F5)
-  - [~] 9.1 Add the "Handoff on Compaction" section to `autofix-system.md`
+  - [-] 9.1 Add the "Handoff on Compaction" section to `autofix-system.md`
     - Instruct the agent to write a handoff block (goal, constraints, progress done/in-progress/blocked, decisions, next steps, cumulative modified files) when context approaches the limit
     - Populate the FILES field from the existing `Modified_Files_State` side-channel
     - _Requirements: 6.1, 6.2, 6.3_
@@ -115,7 +115,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - State they do not authorize writes to `infra/**`, which remains write-denied; if a required tool is absent from PATH after the retry-wrapped install, the stack is treated as un-verified so the stop gate blocks
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-  - [~] 10.2 Add the non-code validator row to the `verify-fix-loop` SKILL table
+  - [-] 10.2 Add the non-code validator row to the `verify-fix-loop` SKILL table
     - Mirror the three validators and their stacks
     - _Requirements: 2.1, 2.2, 2.3_
 

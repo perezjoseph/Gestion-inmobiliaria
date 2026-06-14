@@ -55,32 +55,32 @@
   "hooks": {
     "agentSpawn": [
       {
-        "command": "bash -c 'rm -f \"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\" \"${RUNNER_TEMP:-/tmp}/autofix-sensors-ran.txt\" \"${RUNNER_TEMP:-/tmp}/autofix-stop-blocks.txt\" 2>/dev/null; echo \"Autofix session initialized \u2014 stale verification state cleared.\"'"
+        "command": "bash -c 'rm -rf \"${RUNNER_TEMP:-/tmp}/autofix-sensors-ran.d\" 2>/dev/null; rm -f \"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\" \"${RUNNER_TEMP:-/tmp}/autofix-stop-blocks.txt\" 2>/dev/null; echo \"Autofix session initialized — stale verification state cleared.\"'"
       }
     ],
     "preToolUse": [
       {
         "matcher": "execute_bash",
-        "command": "bash -c 'CMD=$(cat | jq -r .tool_input.command 2>/dev/null); if echo \"$CMD\" | grep -qE \"(^|[;&|]\\s*|\\bsh\\s+-c\\s+|\\bbash\\s+-c\\s+)git\\s+(-[a-zA-Z]\\s+)*(commit|push|checkout|reset|rebase|merge|stash|branch\\s+-[dD]|clean|tag\\s+-d)\"; then echo \"BLOCKED: git operation not allowed \u2014 the workflow handles git.\" >&2; exit 2; fi'"
+        "command": "bash -c 'CMD=$(cat | jq -r .tool_input.command 2>/dev/null); if echo \"$CMD\" | grep -qE \"(^|[;&|]\\s*|\\bsh\\s+-c\\s+|\\bbash\\s+-c\\s+)git\\s+(-[a-zA-Z]\\s+)*(commit|push|checkout|reset|rebase|merge|stash|branch\\s+-[dD]|clean|tag\\s+-d)\"; then echo \"BLOCKED: git operation not allowed — the workflow handles git.\" >&2; exit 2; fi'"
       }
     ],
     "postToolUse": [
       {
         "matcher": "fs_write",
-        "command": "bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \"$FILE\" in *.rs) cargo fmt -- \"$FILE\" 2>/dev/null || true ;; */baileys-service/*.ts|*/baileys-service/*.tsx) cd baileys-service && npx eslint --fix \"$FILE\" 2>/dev/null || true ;; */android/*.kt) cd android && ./gradlew spotlessApply -PspotlessFiles=\"$FILE\" 2>/dev/null || true ;; esac; echo \"$FILE\" >> \"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\"'"
+        "command": "bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \"$FILE\" in *.rs) cargo fmt -- \"$FILE\" 2>/dev/null || true ;; */baileys-service/*.ts|*/baileys-service/*.tsx) cd baileys-service && npx eslint --fix \"$FILE\" 2>/dev/null || true ;; */android/*.kt) cd android && ./gradlew spotlessApply -PspotlessFiles=\"$FILE\" 2>/dev/null || true ;; */ocr-service/*.py) cd ocr-service && ruff format \"$FILE\" 2>/dev/null || true ;; esac; echo \"$FILE\" >> \"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\"'"
       },
       {
         "matcher": "str_replace",
-        "command": "bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \"$FILE\" in *.rs) cargo fmt -- \"$FILE\" 2>/dev/null || true ;; */baileys-service/*.ts|*/baileys-service/*.tsx) cd baileys-service && npx eslint --fix \"$FILE\" 2>/dev/null || true ;; */android/*.kt) cd android && ./gradlew spotlessApply -PspotlessFiles=\"$FILE\" 2>/dev/null || true ;; esac; echo \"$FILE\" >> \"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\"'"
+        "command": "bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \"$FILE\" in *.rs) cargo fmt -- \"$FILE\" 2>/dev/null || true ;; */baileys-service/*.ts|*/baileys-service/*.tsx) cd baileys-service && npx eslint --fix \"$FILE\" 2>/dev/null || true ;; */android/*.kt) cd android && ./gradlew spotlessApply -PspotlessFiles=\"$FILE\" 2>/dev/null || true ;; */ocr-service/*.py) cd ocr-service && ruff format \"$FILE\" 2>/dev/null || true ;; esac; echo \"$FILE\" >> \"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\"'"
       },
       {
         "matcher": "execute_bash",
-        "command": "bash -c 'CMD=$(cat | jq -r .tool_input.command 2>/dev/null); if echo \"$CMD\" | grep -qE \"cargo (clippy|test|fmt)|npm (run build|test)|npx eslint|gradlew build\"; then touch \"${RUNNER_TEMP:-/tmp}/autofix-sensors-ran.txt\"; fi'"
+        "command": "bash -c 'CMD=$(cat | jq -r .tool_input.command 2>/dev/null); DIR=\"${RUNNER_TEMP:-/tmp}/autofix-sensors-ran.d\"; mkdir -p \"$DIR\"; case \"$CMD\" in *\"cargo clippy\"*|*\"cargo test\"*|*\"cargo fmt\"*) touch \"$DIR/rust\" ;; *\"npm run build\"*|*\"npm test\"*|*\"npx eslint\"*) touch \"$DIR/ts\" ;; *\"gradlew build\"*|*\"gradlew test\"*) touch \"$DIR/kotlin\" ;; *\"pytest\"*|*\"ruff check\"*|*\"ruff format\"*) touch \"$DIR/python\" ;; *hadolint*) touch \"$DIR/docker\" ;; *kubeconform*) touch \"$DIR/k8s\" ;; *shellcheck*) touch \"$DIR/shell\" ;; esac'"
       }
     ],
     "stop": [
       {
-        "command": "bash -c 'SENSOR_FLAG=\"${RUNNER_TEMP:-/tmp}/autofix-sensors-ran.txt\"; MODIFIED=\"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\"; BLOCKS=\"${RUNNER_TEMP:-/tmp}/autofix-stop-blocks.txt\"; COUNT=$(cat \"$BLOCKS\" 2>/dev/null || echo 0); if [ \"$COUNT\" -ge 2 ]; then rm -f \"$SENSOR_FLAG\" \"$MODIFIED\" \"$BLOCKS\" 2>/dev/null; exit 0; fi; if [ -s \"$MODIFIED\" ] && [ ! -f \"$SENSOR_FLAG\" ]; then echo $((COUNT + 1)) > \"$BLOCKS\"; echo \"{\\\"decision\\\": \\\"block\\\", \\\"reason\\\": \\\"You modified files but did not run verification sensors. Run the appropriate sensors (cargo clippy, cargo test, npm run build, etc.) for your modified files before stopping.\\\"}\"; else rm -f \"$SENSOR_FLAG\" \"$MODIFIED\" \"$BLOCKS\" 2>/dev/null; fi'"
+        "command": "bash -c 'TMP=\"${RUNNER_TEMP:-/tmp}\"; MODIFIED=\"$TMP/autofix-modified-files.txt\"; SENSOR_DIR=\"$TMP/autofix-sensors-ran.d\"; BLOCKS=\"$TMP/autofix-stop-blocks.txt\"; COUNT=$(cat \"$BLOCKS\" 2>/dev/null || echo 0); cleanup() { rm -rf \"$MODIFIED\" \"$SENSOR_DIR\" \"$BLOCKS\" 2>/dev/null; }; if [ \"$COUNT\" -ge 2 ]; then cleanup; exit 0; fi; if [ ! -s \"$MODIFIED\" ]; then cleanup; exit 0; fi; classify() { case \"$1\" in *.rs) echo rust ;; */baileys-service/*.ts|*/baileys-service/*.tsx) echo ts ;; */android/*.kt|*/android/*.kts) echo kotlin ;; */ocr-service/*.py) echo python ;; *Dockerfile|*.Dockerfile) echo docker ;; */infra/k8s/*.yml|*/infra/k8s/*.yaml) echo k8s ;; *.sh) echo shell ;; *) echo none ;; esac; }; MISSING=\"\"; while IFS= read -r f; do [ -z \"$f\" ] && continue; stack=$(classify \"$f\"); [ \"$stack\" = none ] && continue; if [ ! -f \"$SENSOR_DIR/$stack\" ]; then case \"$MISSING\" in *\"$stack\"*) ;; *) MISSING=\"$MISSING $stack\" ;; esac; fi; done < \"$MODIFIED\"; if [ -n \"$MISSING\" ]; then echo $((COUNT + 1)) > \"$BLOCKS\"; printf \"{\\\"decision\\\": \\\"block\\\", \\\"reason\\\": \\\"You modified files in stack(s):%s but did not run their verification sensors. Run the sensors for each modified stack (Rust: cargo clippy/test; Python: ruff check + pytest; TS: npm run build + eslint; Kotlin: gradlew build) before stopping.\\\"}\" \"$MISSING\"; else cleanup; fi'"
       }
     ]
   }
