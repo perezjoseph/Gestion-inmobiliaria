@@ -193,7 +193,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - **Property 6: No regression — every pre-existing `deniedPaths` entry, the git-block guard, the auto-format behavior, and the max-2-block escape hatch are preserved unchanged**
     - **Validates: Requirements 14.1**
 
-- [~] 16. Final checkpoint — Ensure all tests pass
+- [x] 16. Final checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
