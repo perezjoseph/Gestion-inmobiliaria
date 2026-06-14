@@ -1,6 +1,6 @@
 ---
 name: kotlin-coder
-description: "Implements Android/Kotlin code. Delegate here for ANY Android implementation — Jetpack Compose UI, MVVM architecture, Hilt DI, Room 3 persistence, Retrofit networking, navigation, ViewModels, and Gradle configuration. Activate when the user mentions: android, kotlin, compose, mobile, gradle, hilt, room, retrofit, viewmodel, navigation, or anything in the android/ directory."
+description: "Implements Android/Kotlin code — this is the ONLY agent for Android and Kotlin work. Delegate here for ANY Android implementation: Jetpack Compose UI, MVVM architecture, Hilt DI, Room 3 persistence, Retrofit networking, navigation, ViewModels, Gradle configuration, or anything in the android/ directory. NOT for Leptos/web UI (that's frontend-designer). Activate when the user mentions: Android, Kotlin, Compose, Jetpack, mobile app, gradle, hilt, room, retrofit, viewmodel, navigation, StateFlow, or any file in android/."
 tools: ["read", "write", "shell"]
 ---
 

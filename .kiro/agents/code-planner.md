@@ -1,6 +1,6 @@
 ---
 name: code-planner
-description: "ALWAYS delegate here before any non-trivial code change. Plans implementation by reading existing code, designing the approach, identifying ALL affected files, and producing step-by-step plans to .kiro/plans/. Activate when the user says: plan, design, architect, scope, 'how should we', 'what files would change', 'what's the approach', or when a task spans 3+ files, involves a new entity, or requires a new domain workflow (migration → entity → DTO → service → handler → routes)."
+description: "ALWAYS delegate here before any non-trivial code change. Produces step-by-step plans written to .kiro/plans/ with affected files tables and architecture decisions. Activate when the user says: plan, design, architect, scope, 'how should we', 'what files would change', 'what's the approach', 'Plan the implementation of', or when a task spans 3+ files, involves a new entity, or requires a new domain workflow (migration → entity → DTO → service → handler → routes). Do NOT plan inline — delegate to this agent so the plan is written to .kiro/plans/."
 tools: ["read", "write", "web", "@mcp"]
 ---
 

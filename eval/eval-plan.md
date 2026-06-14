@@ -132,6 +132,7 @@ pyyaml
 | 2026-06-13 18:50    | `/evalkit.data` | Generate test cases                                                                     |
 | 2026-06-13 19:04    | `/evalkit.trace` | Revised: external OTel tracing, 2-3 prompts per domain, routing/quality/faithfulness metrics |
 | 2026-06-13 21:03    | `/evalkit.report` | Generate evaluation report with recommendations                                              |
+| 2026-06-13 22:45    | `/evalkit.data` | Added 6 targeted cases for weak domains (cr, fd, cp, kt) → 31 total                          |
 
 ### 6.2 Evaluation Progress
 
@@ -145,3 +146,5 @@ pyyaml
 | 2026-06-13 20:33    | Evaluation Run         | Completed     | Routing: 0.732 PASS, Quality: 0.628 FAIL, Faithfulness: 0.712 PASS  |
 | 2026-06-13 20:33    | Documentation          | Completed     | `eval/README.md` with usage instructions                            |
 | 2026-06-13 21:03    | Evaluation Report      | Completed     | `eval/eval-report.md` — 5 prioritized action items                  |
+| 2026-06-13 22:04    | Eval Run 2 (kiro-cli)  | Completed     | 50 traces: R=0.744, Q=0.800, F=0.828 — ALL PASS                    |
+| 2026-06-13 22:41    | Report v2              | Completed     | Updated report with kiro-cli judge results                          |

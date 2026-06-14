@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: "Quality gate — ALWAYS delegate here after code changes need verification. Reviews code for correctness, security, performance, and project conventions. Returns PASS or FAIL with specific file:line issues. Activate when the user says: review, verify, check, approve, 'is this correct', 'look at my changes', 'did I break anything', quality gate, or after any implementation is complete."
+description: "Quality gate — ALWAYS delegate here after code changes need verification. Produces PASS/FAIL verdicts with P0-P3 severity issues at specific file:line locations. Runs cargo fmt, clippy, and tests as verification sensors. Activate when the user says: review, verify, check, approve, 'is this correct', 'look at my changes', 'did I break anything', 'run the tests', quality gate, PASS/FAIL, or after any implementation is complete. Do NOT review code yourself — delegate to this agent."
 tools: ["read", "write", "shell"]
 ---
 
