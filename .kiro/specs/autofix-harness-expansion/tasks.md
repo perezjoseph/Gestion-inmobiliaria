@@ -30,7 +30,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - **Validates: Requirements 4.1, 4.2**
 
 - [ ] 2. Python sensor suite for ocr-service (F1)
-  - [-] 2.1 Document the Python sensor suite in `autofix-system.md`
+  - [x] 2.1 Document the Python sensor suite in `autofix-system.md`
     - Add the Verify-section commands run from `ocr-service/`: `ruff format --check`, then `ruff check`, then `python -m pytest`, in Keep-Quality-Left order
     - State reuse of existing `.trunk/configs/ruff.toml` and the existing `pytest`/`hypothesis` tests; introduce no new runtime dependency
     - _Requirements: 1.1, 1.2, 1.4_
