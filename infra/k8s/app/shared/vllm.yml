@@ -58,7 +58,7 @@ spec:
                 --enable-chunked-prefill \
                 --enable-auto-tool-choice \
                 --tool-call-parser qwen3_coder \
-                --speculative-config '{"method": "ngram", "num_speculative_tokens": 5, "prompt_lookup_max": 4, "prompt_lookup_min": 8}' \
+                --speculative-config '{"method": "ngram", "num_speculative_tokens": 5, "prompt_lookup_max": 10, "prompt_lookup_min": 8}' \
                 -tp=1 \
                 ${VLLM_API_KEY:+--api-key $VLLM_API_KEY}
           ports:
@@ -161,7 +161,7 @@ metadata:
   name: vllm-inference
   namespace: realestate
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     app.kubernetes.io/name: vllm
   ports:

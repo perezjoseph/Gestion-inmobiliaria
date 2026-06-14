@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "SkillSpector Security Scan",
+  "description": "Automatically runs SkillSpector security scan (static analysis, no LLM) on any skill when a SKILL.md file is created, and reports findings to the agent for review.",
+  "version": "1",
+  "when": {
+    "type": "fileCreated",
+    "patterns": [
+      "**/SKILL.md"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A new skill file was just created. Run SkillSpector to scan it for security vulnerabilities using: d:\\realestate\\.venv\\Scripts\\skillspector.exe scan {parentDirectory} --no-llm. Report the risk score and any findings. If HIGH or CRITICAL severity, warn the user not to use the skill."
+  }
+}

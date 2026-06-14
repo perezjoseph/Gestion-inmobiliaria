@@ -146,14 +146,15 @@ runs:
         fi
 
         # Match job by name (partial match — job names often have matrix suffixes).
-        # Try exact match first, then substring match.
+        # Guard against null/non-string .name fields and jq parse failures.
         JOB_ID=$(echo "$JOBS_JSON" | jq -r \
           --arg name "$JOB_NAME" \
-          '[.jobs[] | select(.name == $name or (.name | contains($name)) or ($name | contains(.name)))] | sort_by(.name | length) | .[0].id // empty')
+          '[.jobs[] | select(.name != null and (.name | type) == "string") | select(.name == $name or (.name | contains($name)) or ($name | contains(.name)))] | sort_by(.name | length) | .[0].id // empty' \
+          2>/dev/null || echo "")
 
         if [ -z "$JOB_ID" ]; then
           echo "::warning::Could not find job '${JOB_NAME}' in run. Available jobs:"
-          echo "$JOBS_JSON" | jq -r '.jobs[].name' 2>/dev/null || true
+          echo "$JOBS_JSON" | jq -r '.jobs[]? | select(.name != null) | .name' 2>/dev/null || true
           {
             echo ""
             echo "=== FALLBACK: JOB NOT FOUND ==="
@@ -162,7 +163,7 @@ runs:
             echo ""
             echo "=== FAILED STEPS (from API) ==="
             echo "$JOBS_JSON" | jq -r \
-              '.jobs[] | .steps[]? | select(.conclusion == "failure") | "FAILED: \(.name) (started: \(.started_at // "unknown"))"' \
+              '.jobs[]? | .steps[]? | select(.conclusion == "failure") | "FAILED: \(.name // "unknown") (started: \(.started_at // "unknown"))"' \
               2>/dev/null || echo "Could not extract step details"
           } >> "$OUT"
           exit 0
@@ -177,7 +178,7 @@ runs:
           echo "=== FAILED STEPS (from API) ==="
           echo "$JOBS_JSON" | jq -r \
             --argjson id "$JOB_ID" \
-            '.jobs[] | select(.id == $id) | .steps[] | select(.conclusion == "failure") | "FAILED STEP: \(.name)\n  Number: \(.number)\n  Started: \(.started_at // "unknown")\n  Completed: \(.completed_at // "unknown")\n"' \
+            '.jobs[]? | select(.id == $id) | .steps[]? | select(.conclusion == "failure") | "FAILED STEP: \(.name // "unknown")\n  Number: \(.number // "?")\n  Started: \(.started_at // "unknown")\n  Completed: \(.completed_at // "unknown")\n"' \
             2>/dev/null || echo "Could not extract step details"
         } >> "$OUT"
 
