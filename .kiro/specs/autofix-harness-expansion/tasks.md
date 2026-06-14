@@ -80,13 +80,13 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Cover both `str_replace` (newStr vs oldStr) and `fs_write` (text vs on-disk file) paths, including the count-neutral relocate case
     - **Validates: Requirements 7.1, 7.2, 7.3**
 
-- [ ] 6. Diff-budget guard (F7, advisory)
+- [x] 6. Diff-budget guard (F7, advisory)
   - [x] 6.1 Add the advisory `postToolUse` diff-budget guard to `autofix.json`
     - Count distinct files in `Modified_Files_State`; emit `::notice::` at the soft threshold and `::warning::` at the hard threshold instructing the agent to narrow scope or exit `Status: PARTIAL`
     - Read thresholds from `KIRO_DIFF_SOFT` (default 8) and `KIRO_DIFF_HARD` (default 15); block no write and gate no exit
     - _Requirements: 8.1, 8.2, 8.3, 8.4_
 
-  - [-] 6.2 Write unit tests for the diff-budget thresholds
+  - [x] 6.2 Write unit tests for the diff-budget thresholds
     - Assert no annotation below soft, `::notice::` at soft, `::warning::` at hard, and that exit code is always 0 (advisory only)
     - _Requirements: 8.1, 8.2, 8.3, 8.4_
 
