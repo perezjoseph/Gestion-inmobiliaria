@@ -35,20 +35,43 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      actions: read
     outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-      frontend: ${{ steps.filter.outputs.frontend }}
-      android: ${{ steps.filter.outputs.android }}
-      ocr-service: ${{ steps.filter.outputs.ocr-service }}
-      baileys-service: ${{ steps.filter.outputs.baileys-service }}
-      ci: ${{ steps.filter.outputs.ci }}
-      infra: ${{ steps.filter.outputs.infra }}
+      backend: ${{ steps.combine.outputs.backend }}
+      frontend: ${{ steps.combine.outputs.frontend }}
+      android: ${{ steps.combine.outputs.android }}
+      ocr-service: ${{ steps.combine.outputs.ocr-service }}
+      baileys-service: ${{ steps.combine.outputs.baileys-service }}
+      ci: ${{ steps.combine.outputs.ci }}
+      infra: ${{ steps.combine.outputs.infra }}
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
           fetch-depth: 2
+
+      - name: Check last CI run conclusion
+        id: last-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # If the previous CI run on this branch failed, force all jobs to run
+          # so that fixes are validated even when paths-filter sees no changes.
+          LAST_CONCLUSION=$(gh run list \
+            --workflow=ci.yml \
+            --branch="${{ github.ref_name }}" \
+            --status=completed \
+            --limit=1 \
+            --json conclusion \
+            --jq '.[0].conclusion // "none"' 2>/dev/null || echo "none")
+          echo "conclusion=${LAST_CONCLUSION}" >> "$GITHUB_OUTPUT"
+          if [ "$LAST_CONCLUSION" != "success" ] && [ "$LAST_CONCLUSION" != "none" ]; then
+            echo "force-all=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Last CI run concluded with '${LAST_CONCLUSION}' — forcing all jobs to run"
+          else
+            echo "force-all=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Detect changed paths
         uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
@@ -79,6 +102,28 @@ jobs:
               - '.github/workflows/security.yml'
             infra:
               - 'infra/**'
+
+      - name: Combine path changes with forced rebuild
+        id: combine
+        run: |
+          FORCE="${{ steps.last-run.outputs.force-all }}"
+          if [ "$FORCE" = "true" ]; then
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+            echo "android=true" >> "$GITHUB_OUTPUT"
+            echo "ocr-service=true" >> "$GITHUB_OUTPUT"
+            echo "baileys-service=true" >> "$GITHUB_OUTPUT"
+            echo "ci=true" >> "$GITHUB_OUTPUT"
+            echo "infra=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "backend=${{ steps.filter.outputs.backend }}" >> "$GITHUB_OUTPUT"
+            echo "frontend=${{ steps.filter.outputs.frontend }}" >> "$GITHUB_OUTPUT"
+            echo "android=${{ steps.filter.outputs.android }}" >> "$GITHUB_OUTPUT"
+            echo "ocr-service=${{ steps.filter.outputs.ocr-service }}" >> "$GITHUB_OUTPUT"
+            echo "baileys-service=${{ steps.filter.outputs.baileys-service }}" >> "$GITHUB_OUTPUT"
+            echo "ci=${{ steps.filter.outputs.ci }}" >> "$GITHUB_OUTPUT"
+            echo "infra=${{ steps.filter.outputs.infra }}" >> "$GITHUB_OUTPUT"
+          fi
 
   # ── Stage 1: All quality checks in parallel ──
 

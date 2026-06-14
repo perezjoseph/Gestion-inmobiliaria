@@ -1,6 +1,6 @@
 ---
 name: frontend-designer
-description: "Frontend UI/UX specialist for Leptos + Tailwind CSS. Delegate here IMMEDIATELY for any visual, layout, styling, or accessibility work. This includes: UI design critique, responsive layout fixes, Tailwind class optimization, ARIA/a11y compliance, component architecture, color/typography/spacing adjustments, mobile-first design, and visual polish. Activate when the user mentions: UI, UX, design, CSS, Tailwind, layout, responsive, mobile, accessibility, a11y, WCAG, component, style, color, spacing, font, visual, polish, 'looks wrong', 'looks off', dark mode, or any Leptos view/component work."
+description: "Frontend UI/UX specialist for Leptos + Tailwind CSS — even though Leptos is Rust, any UI component design, layout, visual design, or Tailwind styling task belongs here, NOT with rust-coder. Delegate here IMMEDIATELY for: responsive layout fixes, Tailwind class optimization, ARIA/a11y compliance, component architecture, color/typography/spacing, mobile-first design, visual polish, redesign, UX critique, card grids, page layouts. Activate when the user mentions: UI, UX, design, redesign, layout, responsive, mobile, accessibility, a11y, WCAG, component, style, color, spacing, font, visual, polish, 'looks wrong', 'looks off', dark mode, Tailwind, CSS, card, grid, or any Leptos view/component work."
 tools: ["read", "write", "shell"]
 ---
 
