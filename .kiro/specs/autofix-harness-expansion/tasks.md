@@ -185,7 +185,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Surface `Sensor_Ran_State` so the observability pipeline can compute `verification_gap` per stack; delegate all trace/metric/eval persistence to `.kiro/plans/harness-observability.md` and add no new trace design; do not recreate a git-tracked learnings JSONL
     - _Requirements: 13.1, 13.2, 13.3_
 
-  - [-] 15.2 Verify security posture of all new hooks and denials
+  - [x] 15.2 Verify security posture of all new hooks and denials
     - Confirm every hook parses input with safe `jq` extraction and quoted expansions and executes no agent-provided strings; confirm scratch/KB entries record only safe metadata; confirm `infra/`, `.github/workflows/`, and `.github/actions/` remain write-denied and CODEOWNERS-gated
     - _Requirements: 14.2, 14.3, 14.4_
 
