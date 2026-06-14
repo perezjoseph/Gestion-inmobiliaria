@@ -23,7 +23,7 @@ Current model: **`Qwen/Qwen3-Coder-30B-A3B-Instruct`** (MoE, 30B total / 3B acti
 - Resource requests must include `gpu.intel.com/xe: "1"` for GPU scheduling.
 - Model files live on the `vllm-models-pvc` PVC mounted at `/models`; set `HF_HUB_OFFLINE=1` so vLLM never attempts downloads at runtime.
 - Quantization uses `sym_int4` via the bundled `vllm_int4_for_multi_arc.so` library.
-- Context window: `--max-model-len 8192` (balances model memory vs KV cache on 32GB GPU).
+- Context window: `--max-model-len 32768` (B70 Pro 32GB fits 32K easily with MoE's small KV footprint — blog confirms >50K viable on B-series).
 
 ## When Upgrading
 
