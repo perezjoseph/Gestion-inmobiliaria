@@ -226,4 +226,55 @@ RUN apt-get update -qq \
     && pip3 install --no-cache-dir --break-system-packages pyrefly \
     && rm -rf /var/lib/apt/lists/*
 
+# ── Non-code validators (autofix verification sensors) ──────────
+
+# hadolint — Dockerfile linter
+ARG HADOLINT_VERSION=2.14.0
+ARG HADOLINT_SHA256=6bf226944684f56c84dd014e8b979d27425c0148f61b3bd99bcc6f39e9dc5a47
+RUN BIN="/tmp/hadolint" \
+    && curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors \
+       --connect-timeout 15 --max-time 120 -o "$BIN" \
+       "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-x86_64" \
+    && echo "${HADOLINT_SHA256}  ${BIN}" | sha256sum -c - \
+    && install -m 755 "$BIN" /usr/local/bin/hadolint \
+    && rm -f "$BIN"
+
+# kubeconform — Kubernetes manifest validator
+ARG KUBECONFORM_VERSION=0.8.0
+ARG KUBECONFORM_SHA256=9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
+RUN ARCHIVE="/tmp/kubeconform.tar.gz" \
+    && curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors \
+       --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+       "https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+    && echo "${KUBECONFORM_SHA256}  ${ARCHIVE}" | sha256sum -c - \
+    && tar xzf "$ARCHIVE" --no-same-owner -C /usr/local/bin kubeconform \
+    && chmod +x /usr/local/bin/kubeconform \
+    && rm -f "$ARCHIVE"
+
+# shellcheck — shell script static analysis
+ARG SHELLCHECK_VERSION=0.11.0
+ARG SHELLCHECK_SHA256=8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+RUN ARCHIVE="/tmp/shellcheck.tar.xz" \
+    && curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors \
+       --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+       "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
+    && echo "${SHELLCHECK_SHA256}  ${ARCHIVE}" | sha256sum -c - \
+    && tar xJf "$ARCHIVE" --no-same-owner --strip-components=1 -C /usr/local/bin \
+       "shellcheck-v${SHELLCHECK_VERSION}/shellcheck" \
+    && chmod +x /usr/local/bin/shellcheck \
+    && rm -f "$ARCHIVE"
+
+# ruff — Python linter/formatter (ocr-service verification sensor)
+ARG RUFF_VERSION=0.15.17
+ARG RUFF_SHA256=cbf85fc152b7fc25cb27f0233b325e9c72cb26965152050164e7608b72515189
+RUN ARCHIVE="/tmp/ruff.tar.gz" \
+    && curl -sSfL --proto =https --retry 5 --retry-delay 5 --retry-all-errors \
+       --connect-timeout 15 --max-time 120 -o "$ARCHIVE" \
+       "https://github.com/astral-sh/ruff/releases/download/${RUFF_VERSION}/ruff-x86_64-unknown-linux-musl.tar.gz" \
+    && echo "${RUFF_SHA256}  ${ARCHIVE}" | sha256sum -c - \
+    && tar xzf "$ARCHIVE" --no-same-owner --strip-components=1 -C /usr/local/bin \
+       "ruff-x86_64-unknown-linux-musl/ruff" \
+    && chmod +x /usr/local/bin/ruff \
+    && rm -f "$ARCHIVE"
+
 USER runner

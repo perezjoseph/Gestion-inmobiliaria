@@ -47,18 +47,18 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Retain each hook's `matcher` field (`execute_bash` for the tracker, `fs_write`/`str_replace` for the formatter) so hooks bind correctly
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 4.3_
 
-  - [~] 3.2 Write property tests for the stop gate
+  - [x] 3.2 Write property tests for the stop gate
     - **Property 1: Sensor coverage completeness — exit allowed implies `sensor-ran[s]` set for every modified stack `s` (or block count = 2)**
     - **Property 2: No silent stack — a modified Python file with only a Rust sensor run implies the gate blocks**
     - Pipe crafted `Modified_Files_State` + marker-dir states into the hook and assert `{"decision":"block"}` vs clean exit and cleanup
     - **Validates: Requirements 3.2, 3.3, 3.4, 3.5, 3.6**
 
-  - [~] 3.3 Write unit tests for the sensor-ran tracker
+  - [-] 3.3 Write unit tests for the sensor-ran tracker
     - Pipe representative `tool_input.command` JSON (cargo, npm, gradlew, pytest/ruff, hadolint, kubeconform, shellcheck) and assert the correct per-stack marker is created
     - _Requirements: 3.1_
 
 - [ ] 4. Expanded write denials for lockfiles and dependency manifests (F8)
-  - [~] 4.1 Add the new `deniedPaths` entries to `autofix.json`
+  - [-] 4.1 Add the new `deniedPaths` entries to `autofix.json`
     - Append `baileys-service/package-lock.json`, `ocr-service/requirements.txt`, `android/gradle/libs.versions.toml`, and the forward-looking `android/**/*.lockfile`
     - Retain every pre-existing `deniedPaths` entry unchanged
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.6, 14.1_
@@ -110,7 +110,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - _Requirements: 6.1, 6.2, 6.3_
 
 - [ ] 10. Non-code validators (F2)
-  - [~] 10.1 Add the non-code validator tier to `autofix-system.md`
+  - [-] 10.1 Add the non-code validator tier to `autofix-system.md`
     - Document `hadolint` (docker), `kubeconform -strict -ignore-missing-schemas` (k8s), `shellcheck` (shell) as validation-only sensors
     - State they do not authorize writes to `infra/**`, which remains write-denied; if a required tool is absent from PATH after the retry-wrapped install, the stack is treated as un-verified so the stop gate blocks
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
@@ -119,7 +119,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Mirror the three validators and their stacks
     - _Requirements: 2.1, 2.2, 2.3_
 
-  - [~] 10.3 Add validator tools to the runner image with pinned versions
+  - [-] 10.3 Add validator tools to the runner image with pinned versions
     - Add `hadolint`, `kubeconform`, and `shellcheck` to `ghcr.io/perezjoseph/realestate-runner` (pin exact versions; ensure `ruff` is also on PATH), fetched via the retry-wrapped install pattern
     - _Requirements: 2.5, 1.4_
 

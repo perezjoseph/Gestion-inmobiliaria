@@ -71,7 +71,18 @@ Run only the sensors relevant to your modified files. Stop at the first failure 
 2. `cd ocr-service && ruff check .`
 3. `cd ocr-service && python -m pytest -q`
 
-**Non-code** (YAML, Markdown, Dockerfile, K8s manifests): No sensors. Mark clean.
+**Docker** (`**/Dockerfile`, `*.Dockerfile`):
+1. `hadolint <path>`
+
+**Kubernetes** (`infra/k8s/**/*.{yml,yaml}`):
+1. `kubeconform -strict -ignore-missing-schemas <path>`
+
+**Shell** (`*.sh`):
+1. `shellcheck <path>`
+
+Non-code validators are validation-only — they do not authorize writes to `infra/**`, which remains write-denied. If a validator tool is absent from PATH, the stack is treated as un-verified and the stop gate blocks exit.
+
+**Other non-code** (YAML outside k8s, Markdown, config): No sensors. Mark clean.
 
 **Mixed changes:** Run sensors for all affected stacks.
 

@@ -43,7 +43,11 @@
         "Cargo.toml",
         "backend/Cargo.toml",
         "frontend/Cargo.toml",
-        "Cargo.lock"
+        "Cargo.lock",
+        "baileys-service/package-lock.json",
+        "ocr-service/requirements.txt",
+        "android/gradle/libs.versions.toml",
+        "android/**/*.lockfile"
       ]
     }
   },
