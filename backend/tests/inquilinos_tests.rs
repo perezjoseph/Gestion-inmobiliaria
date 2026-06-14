@@ -360,7 +360,7 @@ mod db_async {
             ))
             .await;
 
-            let cedula = format!("DUP-{}", Uuid::new_v4().as_simple());
+            let cedula = format!("DUP-{}", &Uuid::new_v4().as_simple().to_string()[..16]);
 
             // First create succeeds
             let req = test::TestRequest::post()
@@ -401,8 +401,8 @@ mod db_async {
             ))
             .await;
 
-            let cedula_a = format!("UPD-A-{}", Uuid::new_v4().as_simple());
-            let cedula_b = format!("UPD-B-{}", Uuid::new_v4().as_simple());
+            let cedula_a = format!("UA-{}", &Uuid::new_v4().as_simple().to_string()[..17]);
+            let cedula_b = format!("UB-{}", &Uuid::new_v4().as_simple().to_string()[..17]);
 
             // Create two inquilinos with different cedulas
             let req = test::TestRequest::post()
@@ -452,7 +452,7 @@ mod db_async {
             ))
             .await;
 
-            let cedula = format!("SELF-{}", Uuid::new_v4().as_simple());
+            let cedula = format!("SLF-{}", &Uuid::new_v4().as_simple().to_string()[..16]);
 
             let req = test::TestRequest::post()
                 .uri(base_uri())
