@@ -23,24 +23,11 @@ invoke_sub_agent:
   contextFiles: <context_files from the case, with full paths>
 ```
 
-Save the response to `runs/<timestamp>/<agent>-<eval-id>/specialist/output.md`
+Save the response to `runs/<timestamp>/<agent>-<eval-id>/output.md`
 
-### 3b. Run the Baseline
+### 3b. Grade the Output
 
-Invoke `general-task-execution` with the exact same prompt:
-
-```
-invoke_sub_agent:
-  name: general-task-execution
-  prompt: <same eval prompt>
-  contextFiles: <same context_files>
-```
-
-Save the response to `runs/<timestamp>/<agent>-<eval-id>/baseline/output.md`
-
-### 3c. Grade Both Outputs
-
-For each variant (specialist + baseline), construct a grading prompt and invoke `general-task-execution` as a judge:
+Construct a grading prompt and grade the output (inline or via general-task-execution):
 
 ```
 You are an evaluation judge. Grade this agent output against the assertions below.
@@ -63,7 +50,7 @@ AGENT OUTPUT:
 <the agent's response>
 ```
 
-### 3d. Save Grading
+### 3c. Save Grading
 
 Write `runs/<timestamp>/<agent>-<eval-id>/grading.json`:
 
@@ -72,10 +59,9 @@ Write `runs/<timestamp>/<agent>-<eval-id>/grading.json`:
   "eval_id": "<id>",
   "eval_name": "<name>",
   "agent": "<agent>",
-  "variants": [
-    { "variant": "specialist", "score": 0.85, "assertions": [...], "contamination": [] },
-    { "variant": "baseline", "score": 0.60, "assertions": [...], "contamination": [] }
-  ]
+  "score": 0.85,
+  "assertions": [...],
+  "contamination": []
 }
 ```
 
@@ -91,7 +77,7 @@ Read and present the report to the user.
 
 ## Notes
 
-- Run specialist and baseline calls in parallel when possible (they're independent)
-- If an agent errors out, record score 0.0 for that variant with evidence "agent error: <message>"
+- Run multiple eval cases in parallel when possible (they're independent)
+- If an agent errors out, record score 0.0 with evidence "agent error: <message>"
 - The grading prompt must be self-contained — the judge has no access to the codebase
 - Weight handling: score = sum(passed * weight) / sum(all weights)

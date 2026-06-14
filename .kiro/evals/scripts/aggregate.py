@@ -15,34 +15,30 @@ def load_gradings(run_dir: Path) -> list[dict]:
 
 
 def compute_scores(gradings: list[dict]) -> dict:
-    specialist_scores = []
-    baseline_scores = []
+    scores = [g["score"] for g in gradings if "score" in g]
 
+    if not scores:
+        return {"mean": 0, "stdev": 0, "n": 0}
+
+    m = mean(scores)
+    s = stdev(scores) if len(scores) > 1 else 0
+    return {"mean": round(m, 3), "stdev": round(s, 3), "n": len(scores)}
+
+
+def compute_per_agent(gradings: list[dict]) -> dict:
+    by_agent = {}
     for g in gradings:
-        for variant in g.get("variants", []):
-            score = variant["score"]
-            if variant["variant"] == "specialist":
-                specialist_scores.append(score)
-            elif variant["variant"] == "baseline":
-                baseline_scores.append(score)
+        agent = g.get("agent", "unknown")
+        if agent not in by_agent:
+            by_agent[agent] = []
+        by_agent[agent].append(g["score"])
 
-    def stats(scores):
-        if not scores:
-            return {"mean": 0, "stdev": 0, "n": 0}
+    result = {}
+    for agent, scores in by_agent.items():
         m = mean(scores)
         s = stdev(scores) if len(scores) > 1 else 0
-        return {"mean": round(m, 3), "stdev": round(s, 3), "n": len(scores)}
-
-    spec_stats = stats(specialist_scores)
-    base_stats = stats(baseline_scores)
-    delta = round(spec_stats["mean"] - base_stats["mean"], 3)
-
-    return {
-        "specialist": spec_stats,
-        "baseline": base_stats,
-        "delta": delta,
-        "verdict": "SPECIALIST_WINS" if delta > 0.1 else "NO_DIFFERENCE" if abs(delta) <= 0.1 else "BASELINE_WINS"
-    }
+        result[agent] = {"mean": round(m, 3), "stdev": round(s, 3), "n": len(scores)}
+    return result
 
 
 def aggregate(run_dir: str) -> None:
@@ -56,31 +52,30 @@ def aggregate(run_dir: str) -> None:
         print(f"No grading.json files found in {run_dir}")
         sys.exit(1)
 
+    scores = compute_scores(gradings)
+    per_agent = compute_per_agent(gradings)
+
+    contaminated = [g for g in gradings if g.get("contamination")]
+
     benchmark = {
         "run_dir": str(run_path),
         "total_evals": len(gradings),
-        "scores": compute_scores(gradings),
-        "per_eval": []
+        "overall": scores,
+        "per_agent": per_agent,
+        "contamination_count": len(contaminated),
+        "per_eval": gradings
     }
-
-    for g in gradings:
-        eval_entry = {
-            "eval_id": g.get("eval_id"),
-            "eval_name": g.get("eval_name"),
-            "agent": g.get("agent"),
-            "variants": g.get("variants", [])
-        }
-        benchmark["per_eval"].append(eval_entry)
 
     out_path = run_path / "benchmark.json"
     with open(out_path, "w") as f:
         json.dump(benchmark, f, indent=2)
 
     print(f"Benchmark written to {out_path}")
-    print(f"  Specialist: {benchmark['scores']['specialist']['mean']:.1%} (n={benchmark['scores']['specialist']['n']})")
-    print(f"  Baseline:   {benchmark['scores']['baseline']['mean']:.1%} (n={benchmark['scores']['baseline']['n']})")
-    print(f"  Delta:      {benchmark['scores']['delta']:+.1%}")
-    print(f"  Verdict:    {benchmark['scores']['verdict']}")
+    print(f"  Overall: {scores['mean']:.1%} ± {scores['stdev']:.1%} (n={scores['n']})")
+    print(f"  Contamination: {len(contaminated)}/{len(gradings)} evals")
+    print()
+    for agent, stats in per_agent.items():
+        print(f"  {agent}: {stats['mean']:.1%} (n={stats['n']})")
 
 
 if __name__ == "__main__":

@@ -394,6 +394,7 @@ jobs:
     permissions:
       contents: read
       packages: read
+      actions: read
     uses: ./.github/workflows/deploy.yml
     with:
       backend-digest: ${{ needs.resolve-digests.outputs.backend-digest }}

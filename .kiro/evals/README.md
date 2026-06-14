@@ -1,22 +1,19 @@
 # Agent Evals
 
-Structured evaluation framework for Kiro IDE sub-agents. Measures whether specialist agents outperform a general-purpose agent on domain-specific tasks.
+Structured evaluation framework for Kiro IDE sub-agents. The agents exist to **isolate context** from the main orchestrator — each specialist handles domain work in its own context window so the orchestrator stays lean. These evals verify that specialists produce correct output given their isolated context.
+
+## What We're Testing
+
+1. **Correctness** — Does the specialist produce domain-correct output given its system prompt + steering + skills?
+2. **Convention adherence** — Does it follow project patterns (snake_case, SeaORM, AppError, etc.) without hallucinating?
+3. **Contamination** — Does it stay in its lane (no infra references from rust-coder, no SeaORM from infra-ops)?
 
 ## How It Works
 
 1. **Test cases** in `cases/` define prompts + expected signals per agent
-2. **Runner** spawns each case through the **specialist agent** AND the **general-task-execution** baseline
-3. **Grader** (eval-judge) scores each output against assertions
-4. **Aggregator** computes pass rates and deltas (specialist vs general)
-
-## Comparison Model
-
-| Variant | What it is | invoke_sub_agent name |
-|---------|-----------|------------------------|
-| **specialist** | Domain agent with system prompt, tools, steering, and skills | e.g. `rust-coder`, `infra-ops`, `frontend-designer` |
-| **baseline** | Generic agent with all tools but no domain specialization | `general-task-execution` |
-
-Both are invoked via `invoke_sub_agent` with the same prompt. The eval answers: "Does the specialist agent produce better results than a generic agent on domain tasks?"
+2. **Runner** invokes the specialist agent with the prompt and context files
+3. **Grader** scores output against assertions and checks for contamination
+4. **Aggregator** computes per-agent pass rates
 
 ## Directory Structure
 
@@ -35,10 +32,8 @@ evals/
 └── runs/                   # gitignored — ephemeral eval outputs
     └── <timestamp>/
         ├── <agent>-<eval-id>/
-        │   ├── specialist/output.md
-        │   ├── baseline/output.md
-        │   ├── grading.json
-        │   └── metadata.json
+        │   ├── output.md
+        │   └── grading.json
         └── benchmark.json
 ```
 
@@ -50,11 +45,10 @@ In Kiro chat, say:
 
 The orchestrator will:
 1. Read the test cases from `cases/<agent>.json`
-2. For each case, invoke the specialist agent with the prompt
-3. Invoke `general-task-execution` with the same prompt (baseline)
-4. Grade both outputs using eval-judge
-5. Aggregate into `runs/<timestamp>/benchmark.json`
-6. Generate a markdown report
+2. For each case, invoke the specialist agent with the prompt and context files
+3. Grade the output against assertions and check for contamination
+4. Aggregate into `runs/<timestamp>/benchmark.json`
+5. Generate a markdown report
 
 ## Test Case Format
 
@@ -85,7 +79,7 @@ Each assertion is graded pass/fail with evidence:
 ```json
 {
   "eval_id": "rc-01",
-  "variant": "specialist",
+  "agent": "rust-coder",
   "assertions": [
     { "text": "Uses AppError or maps to specific error variants", "passed": true, "evidence": "Response shows AppError::NotFound and AppError::Validation usage" },
     { "text": "Does not introduce unwrap()", "passed": true, "evidence": "No unwrap() calls in proposed code" }
@@ -97,8 +91,7 @@ Each assertion is graded pass/fail with evidence:
 
 ## Interpreting Results
 
-- **pass_rate delta** (specialist - baseline) > 0.1 means the specialist adds clear value
-- **pass_rate delta** ≈ 0 means the specialist isn't outperforming a generic agent (skills/steering may not be activating)
-- **pass_rate delta** < 0 means the specialist is worse — investigate system prompt or skill conflicts
-- **contamination > 0** means the agent mentioned domains it shouldn't know about
-- **Individual assertion failures** point to specific skill or steering gaps
+- **pass_rate > 0.9** — agent is working well for this task type
+- **pass_rate < 0.7** — system prompt or steering may need tuning
+- **contamination > 0** — agent is leaking knowledge from outside its domain (skills loading wrong context?)
+- **Specific assertion failures** point to gaps in steering or system prompt instructions

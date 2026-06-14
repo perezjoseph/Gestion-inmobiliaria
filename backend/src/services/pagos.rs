@@ -1,15 +1,15 @@
 use chrono::Utc;
 use rust_decimal::Decimal;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set,
 };
 use tracing::warn;
 use uuid::Uuid;
 
 use crate::entities::{contrato, cuota_condominio, inquilino, organizacion, pago, propiedad};
 use crate::errors::AppError;
-use crate::models::PaginatedResponse;
+use crate::models::CursorPaginatedResponse;
 use crate::models::fiscal::TipoFiscal;
 use crate::models::ncf::TipoNCF;
 use crate::models::pago::{CreatePagoRequest, PagoListQuery, PagoResponse, UpdatePagoRequest};
@@ -262,9 +262,8 @@ pub async fn list(
     db: &DatabaseConnection,
     org_id: Uuid,
     query: PagoListQuery,
-) -> Result<PaginatedResponse<PagoResponse>, AppError> {
-    let page = query.page.unwrap_or(1).max(1);
-    let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
+) -> Result<CursorPaginatedResponse<PagoResponse>, AppError> {
+    let limit = query.limit.unwrap_or(20).clamp(1, 100);
 
     let mut select = pago::Entity::find().filter(pago::Column::OrganizacionId.eq(org_id));
 
@@ -280,19 +279,41 @@ pub async fn list(
     if let Some(fecha_hasta) = query.fecha_hasta {
         select = select.filter(pago::Column::FechaVencimiento.lte(fecha_hasta));
     }
+    if let Some(cursor_id) = query.cursor {
+        let cursor_record = pago::Entity::find_by_id(cursor_id)
+            .filter(pago::Column::OrganizacionId.eq(org_id))
+            .one(db)
+            .await?
+            .ok_or_else(|| AppError::Validation("Cursor inválido".to_string()))?;
 
-    let paginator = select
+        select = select.filter(
+            pago::Column::FechaVencimiento
+                .lt(cursor_record.fecha_vencimiento)
+                .or(pago::Column::FechaVencimiento
+                    .eq(cursor_record.fecha_vencimiento)
+                    .and(pago::Column::Id.gt(cursor_id))),
+        );
+    }
+
+    let records = select
         .order_by_desc(pago::Column::FechaVencimiento)
-        .paginate(db, per_page);
+        .order_by_asc(pago::Column::Id)
+        .limit(limit + 1)
+        .all(db)
+        .await?;
 
-    let total = paginator.num_items().await?;
-    let records = paginator.fetch_page(page - 1).await?;
+    let has_more = records.len() as u64 > limit;
+    let items: Vec<pago::Model> = records.into_iter().take(limit as usize).collect();
 
-    Ok(PaginatedResponse {
-        data: records.into_iter().map(PagoResponse::from).collect(),
-        total,
-        page,
-        per_page,
+    let next_cursor = if has_more {
+        items.last().map(|p| p.id.to_string())
+    } else {
+        None
+    };
+
+    Ok(CursorPaginatedResponse {
+        data: items.into_iter().map(PagoResponse::from).collect(),
+        next_cursor,
     })
 }
 

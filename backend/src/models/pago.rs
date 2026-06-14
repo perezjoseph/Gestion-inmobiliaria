@@ -47,8 +47,8 @@ pub struct PagoListQuery {
     pub estado: Option<String>,
     pub fecha_desde: Option<NaiveDate>,
     pub fecha_hasta: Option<NaiveDate>,
-    pub page: Option<u64>,
-    pub per_page: Option<u64>,
+    pub limit: Option<u64>,
+    pub cursor: Option<Uuid>,
 }
 
 #[derive(Debug, Serialize)]
@@ -94,15 +94,13 @@ mod tests {
     fn pago_list_query_without_date_range() {
         let json = serde_json::json!({
             "estado": "pendiente",
-            "page": 1,
-            "perPage": 20
+            "limit": 20
         });
         let query: PagoListQuery = serde_json::from_value(json).unwrap();
         assert!(query.fecha_desde.is_none());
         assert!(query.fecha_hasta.is_none());
         assert_eq!(query.estado.as_deref(), Some("pendiente"));
-        assert_eq!(query.page, Some(1));
-        assert_eq!(query.per_page, Some(20));
+        assert_eq!(query.limit, Some(20));
     }
 
     #[test]

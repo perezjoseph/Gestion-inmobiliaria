@@ -43,7 +43,7 @@
     {
       "type": "kiro",
       "label": "Run Agent Evals",
-      "prompt": "Run agent evals for {{agentName}}. Read the orchestrator instructions from .kiro/evals/scripts/run_eval.md, then load the test cases from .kiro/evals/cases/{{agentName}}.json and execute the full eval loop: invoke the specialist agent and general-task-execution baseline for each case, grade outputs, aggregate, and generate a report.",
+      "prompt": "Run agent evals for {{agentName}}. Read the orchestrator instructions from .kiro/evals/scripts/run_eval.md, then load the test cases from .kiro/evals/cases/{{agentName}}.json and execute the eval loop: invoke the specialist agent for each case, grade outputs against assertions, check for contamination, aggregate, and generate a report.",
       "autonomyMode": "autopilot"
     }
   ],

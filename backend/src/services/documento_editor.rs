@@ -589,9 +589,6 @@ pub fn build_docx(blocks: &[serde_json::Value]) -> Result<Docx, AppError> {
             "heading" => {
                 docx = render_docx_heading(docx, block);
             }
-            "paragraph" => {
-                docx = render_docx_paragraph(docx, block);
-            }
             "list" => {
                 docx = render_docx_list(docx, block);
             }

@@ -45,3 +45,10 @@ pub struct PaginatedResponse<T> {
     pub page: u64,
     pub per_page: u64,
 }
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CursorPaginatedResponse<T> {
+    pub data: Vec<T>,
+    pub next_cursor: Option<String>,
+}
