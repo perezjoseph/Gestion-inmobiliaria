@@ -93,13 +93,13 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
 - [~] 7. Checkpoint — Verification and Scope controls
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 8. Within-run scratch learnings (F4)
+- [x] 8. Within-run scratch learnings (F4)
   - [x] 8.1 Keep the queue-start scratch reset in the autofix trigger workflow
     - Confirm/keep `: > "$LEARNINGS_FILE"` (`$RUNNER_TEMP/autofix-learnings.txt`) at queue start; ensure there is no seed-from-git step and no commit-of-memory step
     - Allow short attempt notes to be appended during the run so later artifacts in the same Queue_Run benefit from earlier ones; record only artifact names, diagnostic signatures, file paths, verdicts, and short summaries
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 13.3, 14.3_
 
-  - [-] 8.2 Write test for within-run scratch behavior
+  - [x] 8.2 Write test for within-run scratch behavior
     - **Property 5: Within-run memory — notes appended while processing earlier artifacts are visible when processing a later artifact in the same run; the file is ephemeral and never git-seeded**
     - **Validates: Requirements 5.1, 5.2, 5.3, 5.4**
 
