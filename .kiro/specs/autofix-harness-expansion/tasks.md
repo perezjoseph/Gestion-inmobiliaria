@@ -141,7 +141,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
 - [~] 12. Checkpoint — F10 spike gate
   - Ensure all tests pass, ask the user if questions arise. Do not start tasks 13–14 unless the spike (11.2) confirmed the knowledge tool functions headless and the real KB path is known.
 
-- [ ] 13. Persistent memory — agent, settings, and workflow (F10)
+- [x] 13. Persistent memory — agent, settings, and workflow (F10)
   - [x] 13.1 Update the `agentSpawn` hook in `autofix.json`
     - Clear stale verification state (the F3 per-stack `autofix-sensors-ran.d/` dir and the block-count file) and reset the within-run scratch to empty
     - Announce memory available + already indexed when the NFS KB dir is present; announce proceeding WITHOUT memory (soft degradation) when absent; never rebuild or re-index from source
@@ -161,17 +161,17 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Specify `diag_sig` normalization (lint name, error code, test name, ruff/hadolint rule, or hash of first error line) and that entries record only safe metadata, never file contents/tokens/env values
     - _Requirements: 10.6, 10.7, 10.8, 10.9, 14.3_
 
-  - [~] 13.5 Write test for graceful degradation
+  - [x] 13.5 Write test for graceful degradation
     - **Property 12: Graceful degradation — when the NFS KB dir is absent, `agentSpawn` announces no-memory and the run continues (soft, not hard, failure); state is still cleared**
     - **Validates: Requirements 12.1, 12.3**
 
 - [ ] 14. Persistent memory — infrastructure delta (F10, human-applied / CODEOWNERS)
-  - [~] 14.1 Author the proposed NFS-volume delta to `runner-scale-set-values.yml`
+  - [-] 14.1 Author the proposed NFS-volume delta to `runner-scale-set-values.yml`
     - Add the `kiro-memory` NFS volume (server `192.168.88.22`, path under `/volume1/docker/k3s-cache/`), mount it in the `runner` container at the kiro-cli data dir, and extend the `init-nfs-permissions` initContainer to make the mount writable, reusing the existing cargo-cache pattern
     - Mark as human-applied and CODEOWNERS-reviewed; `infra/**` is write-denied to the autofix agent and the `helm upgrade` application is performed by a human
     - _Requirements: 10.1, 10.2, 11.4, 11.5_
 
-  - [~] 14.2 Author the GC CronJob manifest
+  - [-] 14.2 Author the GC CronJob manifest
     - Create a Kubernetes CronJob that mounts the same `kiro-memory` NFS path and trims the store by an age cap and a size cap (oldest-first eviction); human-applied/CODEOWNERS
     - _Requirements: 10.12_
 

@@ -47,7 +47,7 @@ template:
           [
             "sh",
             "-c",
-            'for d in /mnt/registry /mnt/git /mnt/sccache /mnt/target; do chmod 777 "$d" 2>/dev/null || true; done',
+            'for d in /mnt/registry /mnt/git /mnt/sccache /mnt/target /mnt/kiro-memory; do chmod 777 "$d" 2>/dev/null || true; done',
           ]
         securityContext:
           runAsUser: 0
@@ -60,6 +60,8 @@ template:
             mountPath: /mnt/sccache
           - name: cargo-target
             mountPath: /mnt/target
+          - name: kiro-memory
+            mountPath: /mnt/kiro-memory
       - name: dind
         image: docker:dind
         imagePullPolicy: IfNotPresent
@@ -124,6 +126,8 @@ template:
             mountPath: /home/runner/.sccache
           - name: cargo-target
             mountPath: /home/runner/_work/_target
+          - name: kiro-memory
+            mountPath: /home/runner/.local/share/kiro-cli
     restartPolicy: Never
     dnsPolicy: "None"
     dnsConfig:
@@ -182,3 +186,7 @@ template:
         nfs:
           server: 192.168.88.22
           path: /volume1/docker/k3s-cache/cargo-target
+      - name: kiro-memory
+        nfs:
+          server: 192.168.88.22
+          path: /volume1/docker/k3s-cache/kiro-memory

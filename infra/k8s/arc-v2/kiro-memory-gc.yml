@@ -1,0 +1,89 @@
+# Garbage-collection CronJob for the kiro-memory NFS store.
+# Trims the Persistent_KB by age cap then size cap (oldest-first eviction).
+#
+# Human-applied, CODEOWNERS-reviewed — infra/** is write-denied to the autofix agent.
+#
+# Apply with:
+#   kubectl apply -f infra/k8s/arc-v2/kiro-memory-gc.yml
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kiro-memory-gc
+  namespace: arc-runners-v2
+spec:
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: gc
+              image: alpine:3.21
+              command:
+                - sh
+                - -c
+                - |
+                  AGE_DAYS="${KIRO_GC_AGE_DAYS:-30}"
+                  MAX_SIZE_MB="${KIRO_GC_MAX_SIZE_MB:-500}"
+                  KB_PATH="/mnt/kiro-memory/knowledge_bases"
+
+                  if [ ! -d "$KB_PATH" ]; then
+                    echo "KB path not found: $KB_PATH — nothing to GC"
+                    exit 0
+                  fi
+
+                  echo "=== Kiro Memory GC ==="
+                  echo "Age cap: ${AGE_DAYS} days"
+                  echo "Size cap: ${MAX_SIZE_MB} MB"
+
+                  # Phase 1: Remove files older than age cap
+                  DELETED=$(find "$KB_PATH" -type f -mtime "+${AGE_DAYS}" -delete -print | wc -l)
+                  echo "Removed ${DELETED} files older than ${AGE_DAYS} days"
+
+                  # Phase 2: If still over size cap, remove oldest first
+                  CURRENT_SIZE_KB=$(du -sk "$KB_PATH" 2>/dev/null | cut -f1)
+                  MAX_SIZE_KB=$((MAX_SIZE_MB * 1024))
+                  if [ "$CURRENT_SIZE_KB" -gt "$MAX_SIZE_KB" ]; then
+                    echo "Store size ${CURRENT_SIZE_KB}KB exceeds cap ${MAX_SIZE_KB}KB — evicting oldest"
+                    find "$KB_PATH" -type f -printf '%T+ %p\n' | sort | while IFS= read -r line; do
+                      FILE=$(echo "$line" | cut -d' ' -f2-)
+                      rm -f "$FILE"
+                      CURRENT_SIZE_KB=$(du -sk "$KB_PATH" 2>/dev/null | cut -f1)
+                      if [ "$CURRENT_SIZE_KB" -le "$MAX_SIZE_KB" ]; then
+                        break
+                      fi
+                    done
+                    FINAL_SIZE_KB=$(du -sk "$KB_PATH" 2>/dev/null | cut -f1)
+                    echo "Final store size: ${FINAL_SIZE_KB}KB"
+                  else
+                    echo "Store size ${CURRENT_SIZE_KB}KB within cap — no eviction needed"
+                  fi
+
+                  # Cleanup empty directories
+                  find "$KB_PATH" -type d -empty -delete 2>/dev/null || true
+                  echo "GC complete"
+              env:
+                - name: KIRO_GC_AGE_DAYS
+                  value: "30"
+                - name: KIRO_GC_MAX_SIZE_MB
+                  value: "500"
+              resources:
+                requests:
+                  cpu: "50m"
+                  memory: 64Mi
+                limits:
+                  cpu: "200m"
+                  memory: 128Mi
+              volumeMounts:
+                - name: kiro-memory
+                  mountPath: /mnt/kiro-memory
+          volumes:
+            - name: kiro-memory
+              nfs:
+                server: 192.168.88.22
+                path: /volume1/docker/k3s-cache/kiro-memory
