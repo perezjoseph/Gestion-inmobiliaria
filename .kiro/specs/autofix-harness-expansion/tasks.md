@@ -39,7 +39,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Mirror the same three commands and ordering so the skill and system prompt agree
     - _Requirements: 1.3_
 
-- [ ] 3. Per-stack sensor-ran tracking and stop gate (F3)
+- [x] 3. Per-stack sensor-ran tracking and stop gate (F3)
   - [x] 3.1 Replace the sensor-ran tracker, stop gate, and formatter in `autofix.json`
     - Replace the `postToolUse` sensor-ran tracker so each sensor command touches a per-stack marker under `$RUNNER_TEMP/autofix-sensors-ran.d/` (rust/ts/kotlin/python/docker/k8s/shell)
     - Replace the `stop` gate to source the classifier and block exit when any modified file's stack has no matching marker, naming each missing stack; allow exit when all modified files are `none` or have markers, when `Modified_Files_State` is empty, or after 2 blocks; on clean exit remove `autofix-modified-files.txt`, `autofix-sensors-ran.d/`, and the block-count file
@@ -53,7 +53,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Pipe crafted `Modified_Files_State` + marker-dir states into the hook and assert `{"decision":"block"}` vs clean exit and cleanup
     - **Validates: Requirements 3.2, 3.3, 3.4, 3.5, 3.6**
 
-  - [-] 3.3 Write unit tests for the sensor-ran tracker
+  - [x] 3.3 Write unit tests for the sensor-ran tracker
     - Pipe representative `tool_input.command` JSON (cargo, npm, gradlew, pytest/ruff, hadolint, kubeconform, shellcheck) and assert the correct per-stack marker is created
     - _Requirements: 3.1_
 
