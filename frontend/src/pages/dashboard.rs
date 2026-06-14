@@ -236,18 +236,18 @@ fn StatsHeader(props: &StatsHeaderProps) -> Html {
                     <div class="gi-overdue-age">
                         <span class="gi-overdue-age-item">
                             <span class="gi-overdue-age-dot gi-overdue-age-dot-recent" />
-                            {"< 15 dÃ­as"}
+                            {"< 15 dÃas"}
                         </span>
                         <span class="gi-overdue-age-item">
                             <span class="gi-overdue-age-dot gi-overdue-age-dot-old" />
-                            {"> 30 dÃ­as"}
+                            {"> 30 dÃas"}
                         </span>
                     </div>
                     <span class="gi-mt-1">
                         <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-xs">{"Ver detalles â†’"}</Link<Route>>
                     </span>
                 } else {
-                    <p class="gi-text-xs gi-text-tertiary gi-mt-1">{"Todo al dÃ­a"}</p>
+                    <p class="gi-text-xs gi-text-tertiary gi-mt-1">{"Todo al dÃa"}</p>
                 }
             </div>
             if let Some(ref comp) = props.ingreso_comp {
@@ -289,7 +289,7 @@ fn AttentionSection(props: &AttentionSectionProps) -> Html {
             <div class="gi-card-section gi-attention-clear">
                 <p class="gi-text-sm" style="color: var(--color-success-dark); display: flex; align-items: center; gap: var(--space-2);">
                     <span>{"âœ“"}</span>
-                    {"Todo al dÃ­a. Sin asuntos pendientes."}
+                    {"Todo al dÃa. Sin asuntos pendientes."}
                 </p>
             </div>
         };
@@ -320,7 +320,7 @@ fn AttentionSection(props: &AttentionSectionProps) -> Html {
                                         {format!("{} {} â€” ", p.inquilino_nombre, p.inquilino_apellido)}<CurrencyDisplay monto={p.monto} moneda={p.moneda.clone()} />
                                     </div>
                                 </div>
-                                <span class="gi-badge gi-badge-error">{format!("{} dÃ­as", p.dias_vencido)}</span>
+                                <span class="gi-badge gi-badge-error">{format!("{} dÃas", p.dias_vencido)}</span>
                             </div>
                         })}
                         if overdue_count > 3 {
@@ -444,7 +444,7 @@ fn UpcomingPaymentsWidget() -> Html {
                 <Link<Route> to={Route::Pagos} classes="gi-btn-text gi-text-xs">{"Ver todos â†’"}</Link<Route>>
             </div>
             if pagos.is_empty() {
-                <p class="gi-text-sm gi-text-tertiary gi-py-3">{"Sin pagos pendientes en los prÃ³ximos 30 dÃ­as."}</p>
+                <p class="gi-text-sm gi-text-tertiary gi-py-3">{"Sin pagos pendientes en los prÃ³ximos 30 dÃas."}</p>
             } else {
                 <div class="gi-flex-col gi-gap-2">
                     { for pagos.iter().map(|p| html! {
@@ -565,9 +565,9 @@ fn ContratosPorVencerWidget() -> Html {
                 <h2 class="gi-section-header-title">{"Contratos por vencer"}</h2>
                 <Link<Route> to={Route::Contratos} classes="gi-btn-text gi-text-xs">{"Ver todos â†’"}</Link<Route>>
             </div>
-            <ContratosBucket label="PrÃ³ximos 30 dÃ­as" contratos={(*contratos_30).clone()} />
-            <ContratosBucket label="PrÃ³ximos 60 dÃ­as" contratos={(*contratos_60).clone()} />
-            <ContratosBucket label="PrÃ³ximos 90 dÃ­as" contratos={(*contratos_90).clone()} />
+            <ContratosBucket label="PrÃ³ximos 30 dÃas" contratos={(*contratos_30).clone()} />
+            <ContratosBucket label="PrÃ³ximos 60 dÃas" contratos={(*contratos_60).clone()} />
+            <ContratosBucket label="PrÃ³ximos 90 dÃas" contratos={(*contratos_90).clone()} />
         </div>
     }
 }
@@ -586,7 +586,7 @@ fn ContratosBucket(props: &ContratosBucketProps) -> Html {
                 {&props.label}{format!(" ({})", props.contratos.len())}
             </p>
             if props.contratos.is_empty() {
-                <p class="gi-text-sm gi-text-tertiary">{"Sin contratos en este perÃ­odo."}</p>
+                <p class="gi-text-sm gi-text-tertiary">{"Sin contratos en este perÃodo."}</p>
             } else {
                 <div class="gi-flex-col gi-gap-1">
                     { for props.contratos.iter().map(|c| html! {

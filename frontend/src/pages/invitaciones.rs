@@ -107,7 +107,7 @@ pub fn Invitaciones() -> Html {
             if (*items).is_empty() {
                 <div class="gi-empty-state">
                     <div class="gi-empty-state-title">{"Sin invitaciones"}</div>
-                    <p class="gi-empty-state-text">{"Las invitaciones enviadas aparecerÃ¡n aquÃ­."}</p>
+                    <p class="gi-empty-state-text">{"Las invitaciones enviadas aparecerÃ¡n aquÃ."}</p>
                 </div>
             } else {
                 <DataTable headers={headers}>

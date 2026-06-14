@@ -69,7 +69,7 @@ pub fn OrganizacionPage() -> Html {
             {(*org).as_ref().map_or_else(|| html! {
                 <div class="gi-empty-state">
                     <div class="gi-empty-state-title">{"Sin datos de organizaciÃ³n"}</div>
-                    <p class="gi-empty-state-text">{"La informaciÃ³n de la organizaciÃ³n aparecerÃ¡ aquÃ­."}</p>
+                    <p class="gi-empty-state-text">{"La informaciÃ³n de la organizaciÃ³n aparecerÃ¡ aquÃ."}</p>
                 </div>
             }, |data| html! {
                 <div class="gi-card" style="padding: var(--space-6);">

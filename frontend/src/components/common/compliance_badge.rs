@@ -128,7 +128,7 @@ pub fn ComplianceProfile(props: &ComplianceProfileProps) -> Html {
             {render_section("Requeridos", &required, "ðŸ“‹", "var(--text-primary)")}
             {render_section("Presentes", &present, "âœ“", "var(--color-success)")}
             {render_section("Faltantes", &missing, "âœ—", "var(--color-error)")}
-            {render_section("Por vencer (30 dÃ­as)", &expiring, "âš ", "var(--color-warning)")}
+            {render_section("Por vencer (30 dÃas)", &expiring, "âš ", "var(--color-warning)")}
         </div>
     }
 }

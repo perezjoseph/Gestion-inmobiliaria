@@ -202,7 +202,7 @@ fn render_servicios_table(items: &[ResponsabilidadEfectiva]) -> Html {
         <DataTable headers={headers}>
             { for items.iter().map(|item| {
                 let override_badge = if item.es_override_contrato {
-                    html! { <span class="gi-badge gi-badge-warning">{"SÃ­"}</span> }
+                    html! { <span class="gi-badge gi-badge-warning">{"SÃ"}</span> }
                 } else {
                     html! { <span class="gi-badge gi-badge-neutral">{"No"}</span> }
                 };

@@ -112,7 +112,7 @@ pub fn OcrPreview(props: &OcrPreviewProps) -> Html {
                 {"Vista Previa OCR â€” "}{doc_label}
             </h3>
             <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-4);">
-                {"Revise y corrija los datos extraÃ­dos antes de confirmar."}
+                {"Revise y corrija los datos extraÃdos antes de confirmar."}
             </p>
 
             if let Some(err) = (*error).as_ref() {

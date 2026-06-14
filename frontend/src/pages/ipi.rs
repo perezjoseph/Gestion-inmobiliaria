@@ -33,7 +33,6 @@ pub fn Ipi() -> Html {
                 }
                 if let Ok(data) = api_get::<Vec<PropiedadIpiInfo>>("/ipi/propiedades").await {
                     propiedades.set(data);
-                } else {
                 }
                 loading.set(false);
             });
@@ -140,7 +139,7 @@ fn PaymentDeadlineNotice(props: &PaymentDeadlineNoticeProps) -> Html {
                     {"âš ï¸ PrÃ³ximo vencimiento de pago IPI"}
                 </p>
                 <p style="color: var(--text-secondary);">
-                    {format!("El prÃ³ximo pago semestral vence el {}. Faltan {} dÃ­as.",
+                    {format!("El prÃ³ximo pago semestral vence el {}. Faltan {} dÃas.",
                         format_date(&props.proxima_fecha), days_until)}
                 </p>
             </div>

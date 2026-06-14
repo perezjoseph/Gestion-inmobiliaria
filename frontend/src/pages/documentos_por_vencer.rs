@@ -33,7 +33,7 @@ pub fn documentos_por_vencer() -> Html {
         <div>
             <div class="gi-page-header">
                 <h1 class="gi-page-title">{"Documentos por Vencer"}</h1>
-                <p class="gi-page-subtitle">{"Documentos cuya fecha de expiraciÃ³n estÃ¡ prÃ³xima (30 dÃ­as)"}</p>
+                <p class="gi-page-subtitle">{"Documentos cuya fecha de expiraciÃ³n estÃ¡ prÃ³xima (30 dÃas)"}</p>
             </div>
 
             if *loading {
@@ -49,7 +49,7 @@ pub fn documentos_por_vencer() -> Html {
                 <div class="gi-empty-state">
                     <div class="gi-empty-state-icon">{"ðŸ“„"}</div>
                     <div class="gi-empty-state-title">{"Sin documentos por vencer"}</div>
-                    <p class="gi-empty-state-text">{"No hay documentos prÃ³ximos a vencer en los prÃ³ximos 30 dÃ­as."}</p>
+                    <p class="gi-empty-state-text">{"No hay documentos prÃ³ximos a vencer en los prÃ³ximos 30 dÃas."}</p>
                 </div>
             } else {
                 <DocumentosPorVencerTable docs={(*docs).clone()} />

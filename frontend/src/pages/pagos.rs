@@ -274,7 +274,7 @@ fn PagoForm(props: &PagoFormProps) -> Html {
                 </div>
                 <div>
                     <label class="gi-label">{"Fecha de Vencimiento *"}
-                        <HelpTooltip text="Fecha lÃ­mite para recibir el pago sin que se considere atrasado." id="help-fecha-venc" />
+                        <HelpTooltip text="Fecha lÃmite para recibir el pago sin que se considere atrasado." id="help-fecha-venc" />
                     </label>
                     <input type="text" placeholder="DD/MM/AAAA"
                         value={iso_to_display(&props.fecha_vencimiento)}
@@ -499,7 +499,7 @@ fn render_pago_empty_state(user_rol: &str, on_new: &Callback<MouseEvent>) -> Htm
                 </div>
                 <div style="display: flex; align-items: center; gap: var(--space-2);">
                     <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--color-primary-100, #dbeafe); color: var(--color-primary-700, #1d4ed8); font-size: 10px; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; flex-shrink: 0;">{"3"}</span>
-                    <strong>{"Registre pagos aquÃ­"}</strong>
+                    <strong>{"Registre pagos aquÃ"}</strong>
                 </div>
             </div>
             if can_write(user_rol) {

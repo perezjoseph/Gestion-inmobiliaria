@@ -107,14 +107,14 @@ pub fn Tareas() -> Html {
             if (*items).is_empty() {
                 <div class="gi-empty-state">
                     <div class="gi-empty-state-title">{"Sin ejecuciones de tareas"}</div>
-                    <p class="gi-empty-state-text">{"El historial de tareas programadas aparecerÃ¡ aquÃ­."}</p>
+                    <p class="gi-empty-state-text">{"El historial de tareas programadas aparecerÃ¡ aquÃ."}</p>
                 </div>
             } else {
                 <DataTable headers={headers}>
                     { for (*items).iter().map(|item| {
                         let duracion = format!("{:.1}s", item.duracion_ms as f64 / 1000.0);
                         let exitosa_badge = if item.exitosa {
-                            html! { <span class="gi-badge gi-badge-success">{"SÃ­"}</span> }
+                            html! { <span class="gi-badge gi-badge-success">{"SÃ"}</span> }
                         } else {
                             html! { <span class="gi-badge gi-badge-danger">{"No"}</span> }
                         };

@@ -931,9 +931,9 @@ fn persona_summary(cfg: &ChatbotConfigResponse) -> String {
 
 fn knowledge_summary(faq_count: usize, has_policies: bool) -> String {
     let policies_label = if has_policies {
-        "con polÃ­ticas"
+        "con polÃticas"
     } else {
-        "sin polÃ­ticas"
+        "sin polÃticas"
     };
     format!("{faq_count} preguntas Â· {policies_label}")
 }

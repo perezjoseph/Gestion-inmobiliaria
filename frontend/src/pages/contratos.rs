@@ -244,12 +244,12 @@ fn ContratoForm(props: &ContratoFormProps) -> Html {
                     }
                 </div>
                 <div>
-                    <label class="gi-label">{"DÃ­as de Gracia"}</label>
+                    <label class="gi-label">{"DÃas de Gracia"}</label>
                     <input type="number" min="0" step="1"
                         value={(*props.dias_gracia).clone()}
                         oninput={input_cb_conf(&props.dias_gracia, "dias_gracia")}
                         class="gi-input"
-                        placeholder="Sin perÃ­odo de gracia" />
+                        placeholder="Sin perÃodo de gracia" />
                 </div>
                 if props.is_editing {
                     <div>
@@ -491,7 +491,7 @@ fn DepositoSection(props: &DepositoSectionProps) -> Html {
     html! {
         <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
             <h3 class="text-display" style="font-size: var(--text-lg); font-weight: 600; color: var(--text-primary); margin-bottom: var(--space-4);">
-                {"DepÃ³sito de GarantÃ­a"}
+                {"DepÃ³sito de GarantÃa"}
             </h3>
             {info_html}
             {retention_html}
@@ -1612,7 +1612,7 @@ fn render_recargo_detail(c: &Contrato) -> Html {
     );
     let gracia_text = c.dias_gracia.map_or_else(
         || html! { <span style="color: var(--text-secondary);">{"No definido"}</span> },
-        |v| html! { <span class="tabular-nums" style="font-weight: 500;">{format!("{v} dÃ­as")}</span> },
+        |v| html! { <span class="tabular-nums" style="font-weight: 500;">{format!("{v} dÃas")}</span> },
     );
     html! {
         <div class="gi-card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
@@ -1625,7 +1625,7 @@ fn render_recargo_detail(c: &Contrato) -> Html {
                     {recargo_text}
                 </div>
                 <div>
-                    <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"DÃ­as de Gracia"}</span>
+                    <span class="gi-label" style="display: block; margin-bottom: var(--space-1);">{"DÃas de Gracia"}</span>
                     {gracia_text}
                 </div>
             </div>

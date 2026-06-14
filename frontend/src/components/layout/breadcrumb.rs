@@ -71,7 +71,7 @@ fn breadcrumbs_for_route(route: &Route) -> Vec<Crumb> {
                 route: Some(Route::Gastos),
             },
             Crumb {
-                label: "CategorÃ­as".into(),
+                label: "CategorÃas".into(),
                 route: None,
             },
         ],

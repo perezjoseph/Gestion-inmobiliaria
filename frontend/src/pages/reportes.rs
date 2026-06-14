@@ -587,7 +587,7 @@ fn RentabilidadTable(props: &RentabilidadTableProps) -> Html {
     if props.rows.is_empty() {
         return html! {
             <div class="gi-card" style="padding: var(--space-6); text-align: center; color: var(--text-secondary);">
-                {"No se encontraron datos para el perÃ­odo seleccionado."}
+                {"No se encontraron datos para el perÃodo seleccionado."}
             </div>
         };
     }

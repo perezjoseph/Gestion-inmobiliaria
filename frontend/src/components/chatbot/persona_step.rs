@@ -121,7 +121,7 @@ pub fn PersonaStep(props: &PersonaStepProps) -> Html {
                         oninput={on_name_input}
                     />
                     <p class="text-xs text-[var(--text-tertiary)] mt-1">
-                        {"AsÃ­ se presentarÃ¡ en el primer mensaje."}
+                        {"AsÃ se presentarÃ¡ en el primer mensaje."}
                     </p>
                 </div>
 
@@ -291,7 +291,7 @@ fn PreviewBubble(props: &PreviewBubbleProps) -> Html {
 fn sample_reply_for_tone(tone: &str, name: &str) -> String {
     let t = tone.to_lowercase();
     if t.contains("formal") || t.contains("usted") {
-        "Con gusto le ayudo. SegÃºn nuestro sistema, su saldo pendiente al dÃ­a de hoy es de RD$ 18,500.00. Â¿Desea que le envÃ­e el recibo correspondiente?".to_string()
+        "Con gusto le ayudo. SegÃºn nuestro sistema, su saldo pendiente al dÃa de hoy es de RD$ 18,500.00. Â¿Desea que le envÃe el recibo correspondiente?".to_string()
     } else if t.contains("directo") || t.contains("breve") {
         "Debe RD$ 18,500.00. Vence el 15 de este mes.".to_string()
     } else if t.contains("cercano")
@@ -300,10 +300,10 @@ fn sample_reply_for_tone(tone: &str, name: &str) -> String {
         || t.contains("tÃº")
         || t.contains("tu")
     {
-        "Â¡Hola! Claro, revisÃ© tu cuenta y tienes pendiente RD$ 18,500.00 para este mes. Â¿Te envÃ­o los datos para pagar?".to_string()
+        "Â¡Hola! Claro, revisÃ© tu cuenta y tienes pendiente RD$ 18,500.00 para este mes. Â¿Te envÃo los datos para pagar?".to_string()
     } else {
         format!(
-            "Su saldo pendiente es de RD$ 18,500.00 con vencimiento el 15 de este mes. DÃ­game si necesita los datos bancarios o puedo ayudarle con algo mÃ¡s. {name} a la orden."
+            "Su saldo pendiente es de RD$ 18,500.00 con vencimiento el 15 de este mes. DÃgame si necesita los datos bancarios o puedo ayudarle con algo mÃ¡s. {name} a la orden."
         )
     }
 }

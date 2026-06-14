@@ -199,8 +199,8 @@ fn tipo_fiscal_form(props: &TipoFiscalFormProps) -> Html {
 
     let show_identificador = tipo_fiscal.is_registered();
     let id_label = match *tipo_fiscal {
-        TipoFiscal::PersonaJuridica => "RNC (9 dÃ­gitos)",
-        TipoFiscal::PersonaFisica => "CÃ©dula (11 dÃ­gitos)",
+        TipoFiscal::PersonaJuridica => "RNC (9 dÃgitos)",
+        TipoFiscal::PersonaFisica => "CÃ©dula (11 dÃgitos)",
         TipoFiscal::Informal => "",
     };
     let id_placeholder = match *tipo_fiscal {
@@ -234,11 +234,11 @@ fn tipo_fiscal_form(props: &TipoFiscalFormProps) -> Html {
                             <select class="gi-input" onchange={on_tipo_change}>
                                 <option value="persona_juridica"
                                     selected={*tipo_fiscal == TipoFiscal::PersonaJuridica}>
-                                    {"Persona JurÃ­dica"}
+                                    {"Persona JurÃdica"}
                                 </option>
                                 <option value="persona_fisica"
                                     selected={*tipo_fiscal == TipoFiscal::PersonaFisica}>
-                                    {"Persona FÃ­sica"}
+                                    {"Persona FÃsica"}
                                 </option>
                                 <option value="informal"
                                     selected={*tipo_fiscal == TipoFiscal::Informal}>
@@ -630,10 +630,10 @@ fn validate_identificador(tipo: &TipoFiscal, digits: &str) -> Option<String> {
                 return Some("Debe ingresar el RNC".to_string());
             }
             if digits.len() != 9 {
-                return Some("RNC invÃ¡lido: debe tener 9 dÃ­gitos".to_string());
+                return Some("RNC invÃ¡lido: debe tener 9 dÃgitos".to_string());
             }
             if !validate_rnc_check_digit(digits) {
-                return Some("RNC invÃ¡lido: formato o dÃ­gito verificador incorrecto".to_string());
+                return Some("RNC invÃ¡lido: formato o dÃgito verificador incorrecto".to_string());
             }
             None
         }
@@ -642,7 +642,7 @@ fn validate_identificador(tipo: &TipoFiscal, digits: &str) -> Option<String> {
                 return Some("Debe ingresar la cÃ©dula".to_string());
             }
             if digits.len() != 11 {
-                return Some("CÃ©dula invÃ¡lida: debe tener 11 dÃ­gitos".to_string());
+                return Some("CÃ©dula invÃ¡lida: debe tener 11 dÃgitos".to_string());
             }
             if !validate_cedula_check_digit(digits) {
                 return Some("CÃ©dula invÃ¡lida".to_string());

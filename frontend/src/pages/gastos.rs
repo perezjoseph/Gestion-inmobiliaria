@@ -138,7 +138,7 @@ fn GastoFilterBar(props: &GastoFilterBarProps) -> Html {
                     </select>
                 </div>
                 <div>
-                    <label class="gi-label">{"CategorÃ­a"}</label>
+                    <label class="gi-label">{"CategorÃa"}</label>
                     <select onchange={on_cat_change} class="gi-input">
                         <option value="" selected={props.filter_categoria.is_empty()}>{"Todas"}</option>
                         { for CATEGORIAS.iter().map(|(val, label)| {
@@ -294,10 +294,10 @@ fn GastoForm(props: &GastoFormProps) -> Html {
                     </select>
                 </div>
                 <div>
-                    <label class="gi-label">{"CategorÃ­a *"}</label>
+                    <label class="gi-label">{"CategorÃa *"}</label>
                     <select onchange={select_cb!(props.categoria)}
                         class={input_class(fe.categoria.is_some())}>
-                        <option value="" selected={props.categoria.is_empty()}>{"â€” Seleccionar categorÃ­a â€”"}</option>
+                        <option value="" selected={props.categoria.is_empty()}>{"â€” Seleccionar categorÃa â€”"}</option>
                         { for CATEGORIAS.iter().map(|(val, label)| {
                             let sel = *props.categoria == *val;
                             html! { <option value={*val} selected={sel}>{*label}</option> }
@@ -528,7 +528,7 @@ fn validate_gasto_fields(
         errs.propiedad_id = Some("Debe seleccionar una propiedad".into());
     }
     if categoria.is_empty() {
-        errs.categoria = Some("Debe seleccionar una categorÃ­a".into());
+        errs.categoria = Some("Debe seleccionar una categorÃa".into());
     }
     if descripcion.trim().is_empty() {
         errs.descripcion = Some("La descripciÃ³n es obligatoria".into());
@@ -1272,7 +1272,7 @@ fn render_gastos_view(
     };
     let headers: Vec<String> = vec![
         "Propiedad".into(),
-        "CategorÃ­a".into(),
+        "CategorÃa".into(),
         "Monto".into(),
         "Fecha".into(),
         "Proveedor".into(),

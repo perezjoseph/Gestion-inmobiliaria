@@ -122,7 +122,7 @@ pub fn CategoriasGastos() -> Html {
     html! {
         <div>
             <div class="gi-page-header">
-                <h1 class="gi-page-title">{"Resumen por CategorÃ­a de Gastos"}</h1>
+                <h1 class="gi-page-title">{"Resumen por CategorÃa de Gastos"}</h1>
             </div>
 
             if let Some(err) = (*error).as_ref() {
@@ -145,7 +145,7 @@ pub fn CategoriasGastos() -> Html {
                                 <tr>
                                     <th style="padding: var(--space-3) var(--space-4); cursor: pointer;"
                                         onclick={make_sort_handler(SortColumn::Categoria)}>
-                                        {format!("CategorÃ­a{}", sort_indicator(SortColumn::Categoria))}
+                                        {format!("CategorÃa{}", sort_indicator(SortColumn::Categoria))}
                                     </th>
                                     <th style="padding: var(--space-3) var(--space-4); cursor: pointer; text-align: right;"
                                         onclick={make_sort_handler(SortColumn::Total)}>

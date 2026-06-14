@@ -247,7 +247,7 @@ fn QrScanPanel(props: &QrScanPanelProps) -> Html {
                 <StepInstruction
                     step={1}
                     title="Abra WhatsApp"
-                    body="Preferiblemente un nÃºmero dedicado al negocio, no su lÃ­nea personal."
+                    body="Preferiblemente un nÃºmero dedicado al negocio, no su lÃnea personal."
                 />
                 <StepInstruction
                     step={2}

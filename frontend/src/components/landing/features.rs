@@ -21,7 +21,7 @@ const BLOCKS: &[FeatureBlock] = &[
         title: "Pagos, gastos y reportes",
         points: &[
             "Cobros en DOP o USD con seguimiento de atrasos.",
-            "Gastos por categorÃ­a vinculados a cada propiedad.",
+            "Gastos por categorÃa vinculados a cada propiedad.",
             "Reportes de ocupaciÃ³n, ingresos y cumplimiento fiscal.",
         ],
     },

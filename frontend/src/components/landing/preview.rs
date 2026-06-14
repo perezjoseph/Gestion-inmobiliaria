@@ -9,7 +9,7 @@ pub fn LandingPreview() -> Html {
         <section class="gi-l-preview">
             <div class="gi-l-container">
                 <div class="gi-l-section-head">
-                    <h2 class="gi-l-section-title">{"AsÃ­ se ve por dentro"}</h2>
+                    <h2 class="gi-l-section-title">{"AsÃ se ve por dentro"}</h2>
                 </div>
                 <div class="gi-l-preview-frame" aria-hidden="true">
                     <div class="gi-l-preview-bar">

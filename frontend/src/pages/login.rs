@@ -57,7 +57,7 @@ pub fn Login() -> Html {
                     <LoginForm on_success={on_success} />
                     <p class="gi-login-footer">
                         <Link<Route> to={Route::Registro} classes="gi-btn-text">
-                            {"Â¿No tiene cuenta? RegÃ­strese"}
+                            {"Â¿No tiene cuenta? RegÃstrese"}
                         </Link<Route>>
                     </p>
                 </div>

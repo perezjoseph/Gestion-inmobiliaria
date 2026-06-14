@@ -84,8 +84,8 @@ fn NotificacionFilterBar(props: &NotificacionFilterBarProps) -> Html {
                     <label class="gi-label">{"Estado"}</label>
                     <select onchange={on_leida_change} class="gi-input">
                         <option value="" selected={props.filter_leida.is_empty()}>{"Todas"}</option>
-                        <option value="false" selected={*props.filter_leida == "false"}>{"No leÃ­das"}</option>
-                        <option value="true" selected={*props.filter_leida == "true"}>{"LeÃ­das"}</option>
+                        <option value="false" selected={*props.filter_leida == "false"}>{"No leÃdas"}</option>
+                        <option value="true" selected={*props.filter_leida == "true"}>{"LeÃdas"}</option>
                     </select>
                 </div>
                 <div style="display: flex; gap: var(--space-2);">
@@ -115,11 +115,11 @@ fn render_notificacion_row(n: &Notificacion, on_mark_read: &Callback<String>) ->
         html! {
             <button onclick={Callback::from(move |_: MouseEvent| cb.emit(id.clone()))}
                 class="gi-btn-text" style="font-size: var(--text-xs);">
-                {"Marcar leÃ­da"}
+                {"Marcar leÃda"}
             </button>
         }
     } else {
-        html! { <span style="font-size: var(--text-xs); color: var(--text-tertiary);">{"âœ“ LeÃ­da"}</span> }
+        html! { <span style="font-size: var(--text-xs); color: var(--text-tertiary);">{"âœ“ LeÃda"}</span> }
     };
 
     html! {
@@ -297,7 +297,7 @@ pub fn Notificaciones() -> Html {
                         reload.set(*reload + 1);
                         push_toast(
                             toasts.as_ref(),
-                            "NotificaciÃ³n marcada como leÃ­da",
+                            "NotificaciÃ³n marcada como leÃda",
                             ToastKind::Success,
                         );
                     }
@@ -320,7 +320,7 @@ pub fn Notificaciones() -> Html {
                     Ok(resp) => {
                         reload.set(*reload + 1);
                         let msg =
-                            format!("{} notificaciones marcadas como leÃ­das", resp.actualizadas);
+                            format!("{} notificaciones marcadas como leÃdas", resp.actualizadas);
                         push_toast(toasts.as_ref(), &msg, ToastKind::Success);
                     }
                     Err(err) => error.set(Some(err)),
@@ -355,7 +355,7 @@ pub fn Notificaciones() -> Html {
 
     let headers = vec![
         "Tipo".into(),
-        "TÃ­tulo".into(),
+        "TÃtulo".into(),
         "Mensaje".into(),
         "Estado".into(),
         "Fecha".into(),
@@ -366,7 +366,7 @@ pub fn Notificaciones() -> Html {
             <div class="gi-page-header">
                 <h1 class="gi-page-title">{"Notificaciones"}</h1>
                 <button onclick={on_mark_all_read} class="gi-btn gi-btn-primary">
-                    {"Marcar todas como leÃ­das"}
+                    {"Marcar todas como leÃdas"}
                 </button>
             </div>
 

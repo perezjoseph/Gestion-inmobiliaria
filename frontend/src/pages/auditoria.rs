@@ -116,7 +116,7 @@ pub fn Auditoria() -> Html {
     html! {
         <div>
             <div class="gi-page-header">
-                <h1 class="gi-page-title">{"Registro de AuditorÃ­a"}</h1>
+                <h1 class="gi-page-title">{"Registro de AuditorÃa"}</h1>
             </div>
 
             if let Some(err) = (*error).as_ref() {
@@ -142,8 +142,8 @@ pub fn Auditoria() -> Html {
 
             if (*items).is_empty() {
                 <div class="gi-empty-state">
-                    <div class="gi-empty-state-title">{"Sin registros de auditorÃ­a"}</div>
-                    <p class="gi-empty-state-text">{"Las acciones realizadas en el sistema se registrarÃ¡n aquÃ­."}</p>
+                    <div class="gi-empty-state-title">{"Sin registros de auditorÃa"}</div>
+                    <p class="gi-empty-state-text">{"Las acciones realizadas en el sistema se registrarÃ¡n aquÃ."}</p>
                 </div>
             } else {
                 <DataTable headers={headers}>

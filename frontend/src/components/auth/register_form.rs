@@ -385,8 +385,8 @@ pub fn RegisterForm(props: &RegisterFormProps) -> Html {
             <div>
                 <label class="gi-label">{"Tipo de persona"}</label>
                 <select class="gi-input" onchange={on_tipo_change} value={(*tipo).clone()}>
-                    <option value="persona_fisica" selected={is_fisica}>{"Persona FÃ­sica"}</option>
-                    <option value="persona_juridica" selected={!is_fisica}>{"Persona JurÃ­dica"}</option>
+                    <option value="persona_fisica" selected={is_fisica}>{"Persona FÃsica"}</option>
+                    <option value="persona_juridica" selected={!is_fisica}>{"Persona JurÃdica"}</option>
                 </select>
             </div>
             if is_fisica {

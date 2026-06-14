@@ -225,7 +225,7 @@ fn PropiedadForm(props: &PropiedadFormProps) -> Html {
                 {if props.is_editing { "Editar Propiedad" } else { "Nueva Propiedad" }}</h2>
             <form onsubmit={props.on_submit.clone()} style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
                 <div>
-                    <label class="gi-label">{"TÃ­tulo *"}</label>
+                    <label class="gi-label">{"TÃtulo *"}</label>
                     <input type="text" value={(*props.titulo).clone()} oninput={input_cb!(props.titulo)}
                         class={input_class(fe.titulo.is_some())} />
                     {field_error(&fe.titulo)}
@@ -588,7 +588,7 @@ fn validate_propiedad_fields(
     let mut errs = FormErrors::default();
     if titulo.trim().is_empty() {
         errs.titulo = Some(
-            "Ingrese un tÃ­tulo para identificar la propiedad, ej: \"Apartamento Naco 3B\"".into(),
+            "Ingrese un tÃtulo para identificar la propiedad, ej: \"Apartamento Naco 3B\"".into(),
         );
     }
     if direccion.trim().is_empty() {

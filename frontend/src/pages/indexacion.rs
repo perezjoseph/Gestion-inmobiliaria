@@ -78,7 +78,7 @@ pub fn indexacion() -> Html {
         <div>
             <div class="gi-page-header">
                 <h1 class="gi-page-title">{"IndexaciÃ³n de Contratos"}</h1>
-                <p class="gi-page-subtitle">{"Contratos prÃ³ximos a vencer (60 dÃ­as) â€” propuestas de ajuste basadas en IPC y Ley 85-25"}</p>
+                <p class="gi-page-subtitle">{"Contratos prÃ³ximos a vencer (60 dÃas) â€” propuestas de ajuste basadas en IPC y Ley 85-25"}</p>
             </div>
 
             if *loading {
@@ -89,7 +89,7 @@ pub fn indexacion() -> Html {
                 <div class="gi-empty-state">
                     <div class="gi-empty-state-icon">{"ðŸ“‹"}</div>
                     <div class="gi-empty-state-title">{"Sin contratos por renovar"}</div>
-                    <p class="gi-empty-state-text">{"No hay contratos con vencimiento en los prÃ³ximos 60 dÃ­as."}</p>
+                    <p class="gi-empty-state-text">{"No hay contratos con vencimiento en los prÃ³ximos 60 dÃas."}</p>
                 </div>
             } else {
                 <ContratosProximosTable
@@ -128,7 +128,7 @@ fn contratos_proximos_table(props: &ContratosProximosTableProps) -> Html {
                             <th>{"Propiedad"}</th>
                             <th>{"Inquilino"}</th>
                             <th>{"Fecha Fin"}</th>
-                            <th>{"DÃ­as Restantes"}</th>
+                            <th>{"DÃas Restantes"}</th>
                             <th>{"Monto Actual"}</th>
                             <th>{"Acciones"}</th>
                         </tr>
@@ -170,7 +170,7 @@ fn render_contrato_row(
             <td class="tabular-nums">{format_date_display(&contrato.fecha_fin)}</td>
             <td>
                 <span class={urgency_class}>
-                    {format!("{} dÃ­as", contrato.dias_restantes)}
+                    {format!("{} dÃas", contrato.dias_restantes)}
                 </span>
             </td>
             <td class="tabular-nums">{format_currency(&contrato.moneda, contrato.monto_actual)}</td>
@@ -404,13 +404,13 @@ fn propuesta_detail(props: &PropuestaDetailProps) -> Html {
         <>
             if p.datos_stale {
                 <div class="gi-alert gi-alert-warning" style="margin-bottom: var(--space-4);">
-                    {"âš ï¸ Los datos de IPC estÃ¡n desactualizados (mÃ¡s de 90 dÃ­as). La propuesta se basa en datos en cachÃ©."}
+                    {"âš ï¸ Los datos de IPC estÃ¡n desactualizados (mÃ¡s de 90 dÃas). La propuesta se basa en datos en cachÃ©."}
                 </div>
             }
 
             <div style="padding: var(--space-4); background: var(--bg-subtle); border-radius: var(--radius-md); margin-bottom: var(--space-4);">
                 <h4 style="font-weight: 600; margin-bottom: var(--space-3); color: var(--text-primary);">
-                    {"InformaciÃ³n de AuditorÃ­a"}
+                    {"InformaciÃ³n de AuditorÃa"}
                 </h4>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
                     <div>

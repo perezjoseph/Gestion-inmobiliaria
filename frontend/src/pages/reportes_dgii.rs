@@ -388,7 +388,7 @@ fn ReporteStatusCard(props: &ReporteStatusCardProps) -> Html {
             <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3);">
                 <div>
                     <p style="font-weight: 600; margin-bottom: var(--space-1);">
-                        {format!("Reporte {} â€” PerÃ­odo {}", p.tipo_reporte, p.periodo)}
+                        {format!("Reporte {} â€” PerÃodo {}", p.tipo_reporte, p.periodo)}
                     </p>
                     <p style="font-size: var(--text-sm); color: var(--text-secondary);">
                         {format!("Registros: {} | Total: RD$ {:.2} | ITBIS: RD$ {:.2}",

@@ -655,7 +655,7 @@ pub fn Sidebar(props: &SidebarProps) -> Html {
                                 </li>
                                 <li onclick={make_click(on_nav_click.clone())} title="Registro de cambios â€” Historial de todas las modificaciones del sistema">
                                     <Link<Route> to={Route::AuditoriaPage} classes={classes!(link_class(&Route::AuditoriaPage))}>
-                                        {icon_audit()}{"AuditorÃ­a"}
+                                        {icon_audit()}{"AuditorÃa"}
                                     </Link<Route>>
                                 </li>
                                 <li onclick={make_click(on_nav_click.clone())} title="NÃºmeros de Comprobantes Fiscales â€” Secuencias de facturaciÃ³n requeridas por la DGII">

@@ -24,7 +24,7 @@ pub const TIPOS_INQUILINO: &[(&str, &str)] = &[
 ];
 
 pub const TIPOS_PROPIEDAD: &[(&str, &str)] = &[
-    ("titulo_propiedad", "TÃ­tulo de propiedad"),
+    ("titulo_propiedad", "TÃtulo de propiedad"),
     ("certificacion_no_gravamen", "CertificaciÃ³n de no gravamen"),
     ("plano_catastral", "Plano catastral"),
     ("certificacion_uso_suelo", "CertificaciÃ³n de uso de suelo"),
@@ -697,7 +697,7 @@ fn DocumentCard(props: &DocumentCardProps) -> Html {
                         style="font-size: var(--text-xs);"
                         onclick={on_confirm_delete}
                     >
-                        {"SÃ­"}
+                        {"SÃ"}
                     </button>
                     <button
                         class="gi-btn gi-btn-sm gi-btn-secondary"

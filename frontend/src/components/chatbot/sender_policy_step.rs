@@ -182,7 +182,7 @@ fn AllowlistEditor(props: &AllowlistEditorProps) -> Html {
 
             if props.allowlist.is_empty() {
                 <p class="text-xs text-[var(--text-tertiary)]">
-                    {"AÃºn no hay nÃºmeros en la lista. Agregue al menos uno para activar esta polÃ­tica."}
+                    {"AÃºn no hay nÃºmeros en la lista. Agregue al menos uno para activar esta polÃtica."}
                 </p>
             } else {
                 <div class="flex flex-wrap gap-2">

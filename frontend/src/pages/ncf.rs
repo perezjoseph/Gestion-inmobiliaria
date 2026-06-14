@@ -78,13 +78,13 @@ pub fn Ncf() -> Html {
             if (*items).is_empty() {
                 <div class="gi-empty-state">
                     <div class="gi-empty-state-title">{"Sin secuencias NCF configuradas"}</div>
-                    <p class="gi-empty-state-text">{"Configure los rangos de comprobantes fiscales aquÃ­."}</p>
+                    <p class="gi-empty-state-text">{"Configure los rangos de comprobantes fiscales aquÃ."}</p>
                 </div>
             } else {
                 <DataTable headers={headers}>
                     { for (*items).iter().map(|item| {
                         let activo_badge = if item.is_active {
-                            html! { <span class="gi-badge gi-badge-success">{"SÃ­"}</span> }
+                            html! { <span class="gi-badge gi-badge-success">{"SÃ"}</span> }
                         } else {
                             html! { <span class="gi-badge gi-badge-neutral">{"No"}</span> }
                         };

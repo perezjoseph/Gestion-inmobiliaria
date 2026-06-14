@@ -170,7 +170,7 @@ fn MantenimientoForm(props: &MantenimientoFormProps) -> Html {
                         </select>
                     </div>
                     <div>
-                        <label class="gi-label">{"TÃ­tulo *"}</label>
+                        <label class="gi-label">{"TÃtulo *"}</label>
                         <input type="text" value={(*props.f_titulo).clone()} oninput={input_cb!(props.f_titulo)}
                             class={titulo_class} placeholder="DescripciÃ³n breve del problema" />
                         {titulo_error_html}
@@ -591,7 +591,7 @@ fn make_mantenimiento_edit_cb(
 fn validate_mantenimiento_fields(titulo: &str, propiedad_id: &str) -> FormErrors {
     let mut errs = FormErrors::default();
     if titulo.trim().is_empty() {
-        errs.titulo = Some("El tÃ­tulo es obligatorio".into());
+        errs.titulo = Some("El tÃtulo es obligatorio".into());
     }
     if propiedad_id.is_empty() {
         errs.propiedad_id = Some("Debe seleccionar una propiedad".into());
@@ -1096,7 +1096,7 @@ fn render_mantenimiento_list_view(
     };
     let headers = vec![
         "Propiedad".into(),
-        "TÃ­tulo".into(),
+        "TÃtulo".into(),
         "Prioridad".into(),
         "Estado".into(),
         "Proveedor".into(),

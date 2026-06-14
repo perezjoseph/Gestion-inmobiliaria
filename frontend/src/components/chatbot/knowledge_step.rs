@@ -166,7 +166,7 @@ pub fn KnowledgeStep(props: &KnowledgeStepProps) -> Html {
 
             <div>
                 <label for="knowledge-policies" class="gi-label">
-                    {"PolÃ­ticas y reglas"}
+                    {"PolÃticas y reglas"}
                 </label>
                 <p class="text-xs text-[var(--text-tertiary)] mb-2">
                     {"Instrucciones que el bot seguirÃ¡ siempre (ej. no dar informaciÃ³n financiera sin verificar)."}
@@ -271,7 +271,7 @@ fn FaqItem(props: &FaqItemProps) -> Html {
                             style="padding: 2px 8px;"
                             onclick={on_confirm_remove}
                         >
-                            {"SÃ­"}
+                            {"SÃ"}
                         </button>
                         <button
                             type="button"

@@ -48,7 +48,7 @@ pub fn CapabilitiesStep(props: &CapabilitiesStepProps) -> Html {
                 />
                 <CapabilityRow
                     label="Recibos de pago (OCR)"
-                    description="El inquilino envÃ­a una foto del recibo, el bot extrae monto y referencia."
+                    description="El inquilino envÃa una foto del recibo, el bot extrae monto y referencia."
                     icon={receipt_icon()}
                     checked={caps.receipt_ocr}
                     on_toggle={make_toggle("receipt_ocr")}
@@ -71,11 +71,11 @@ pub fn CapabilitiesStep(props: &CapabilitiesStepProps) -> Html {
 
             <CapabilityGroup
                 title="Por iniciativa del bot"
-                subtitle="Mensajes que el bot envÃ­a sin que el inquilino escriba primero."
+                subtitle="Mensajes que el bot envÃa sin que el inquilino escriba primero."
             >
                 <CapabilityRow
                     label="Recordatorios de pago"
-                    description="Aviso automÃ¡tico tres dÃ­as antes del vencimiento."
+                    description="Aviso automÃ¡tico tres dÃas antes del vencimiento."
                     icon={bell_icon()}
                     checked={caps.payment_reminders}
                     on_toggle={make_toggle("payment_reminders")}

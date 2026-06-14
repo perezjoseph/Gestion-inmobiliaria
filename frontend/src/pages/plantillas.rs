@@ -511,13 +511,13 @@ fn PlantillaFormModal(props: &PlantillaFormModalProps) -> Html {
                     <div class="gi-form-group">
                         <label class="gi-label">{"Contenido"}</label>
                         <p style="font-size: var(--text-xs); color: var(--text-tertiary); margin-bottom: var(--space-1);">
-                            {"Use # para tÃ­tulos, - para listas, --- para saltos de pÃ¡gina. Placeholders: {{entidad.campo}}"}
+                            {"Use # para tÃtulos, - para listas, --- para saltos de pÃ¡gina. Placeholders: {{entidad.campo}}"}
                         </p>
                         <textarea
                             class="gi-input"
                             rows="10"
                             style="font-family: monospace; resize: vertical; min-height: 160px;"
-                            placeholder={"# TÃ­tulo del documento\n\nContenido del documento con {{contrato.fecha_inicio}}..."}
+                            placeholder={"# TÃtulo del documento\n\nContenido del documento con {{contrato.fecha_inicio}}..."}
                             value={(*form_contenido).clone()}
                             oninput={let fc = form_contenido.clone(); Callback::from(move |e: InputEvent| {
                                 let input: web_sys::HtmlTextAreaElement = e.target_unchecked_into();

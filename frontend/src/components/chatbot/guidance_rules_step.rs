@@ -18,7 +18,7 @@ fn category_entries() -> Vec<(GuidanceCategory, &'static str)> {
             "Contexto y clarificaciÃ³n",
         ),
         (GuidanceCategory::Escalamiento, "Escalamiento"),
-        (GuidanceCategory::Politicas, "PolÃ­ticas"),
+        (GuidanceCategory::Politicas, "PolÃticas"),
     ]
 }
 
