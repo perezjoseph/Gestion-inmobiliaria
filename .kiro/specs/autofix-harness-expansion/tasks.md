@@ -166,7 +166,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - **Validates: Requirements 12.1, 12.3**
 
 - [ ] 14. Persistent memory — infrastructure delta (F10, human-applied / CODEOWNERS)
-  - [-] 14.1 Author the proposed NFS-volume delta to `runner-scale-set-values.yml`
+  - [x] 14.1 Author the proposed NFS-volume delta to `runner-scale-set-values.yml`
     - Add the `kiro-memory` NFS volume (server `192.168.88.22`, path under `/volume1/docker/k3s-cache/`), mount it in the `runner` container at the kiro-cli data dir, and extend the `init-nfs-permissions` initContainer to make the mount writable, reusing the existing cargo-cache pattern
     - Mark as human-applied and CODEOWNERS-reviewed; `infra/**` is write-denied to the autofix agent and the `helm upgrade` application is performed by a human
     - _Requirements: 10.1, 10.2, 11.4, 11.5_
