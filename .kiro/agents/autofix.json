@@ -61,7 +61,7 @@
   "hooks": {
     "agentSpawn": [
       {
-        "command": "bash -c 'rm -rf \"${RUNNER_TEMP:-/tmp}/autofix-sensors-ran.d\" 2>/dev/null; rm -f \"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\" \"${RUNNER_TEMP:-/tmp}/autofix-stop-blocks.txt\" 2>/dev/null; echo \"Autofix session initialized — stale verification state cleared.\"'"
+        "command": "bash -c 'TMP=\"${RUNNER_TEMP:-/tmp}\"; rm -rf \"$TMP/autofix-sensors-ran.d\" 2>/dev/null; rm -f \"$TMP/autofix-modified-files.txt\" \"$TMP/autofix-stop-blocks.txt\" 2>/dev/null; : > \"${KIRO_LEARNINGS_FILE:-$TMP/autofix-learnings.txt}\"; KB_DIR=\"${XDG_DATA_HOME:-$HOME/.local/share}/kiro-cli/knowledge_bases\"; if [ -d \"$KB_DIR\" ]; then echo \"Autofix session initialized — stale verification state cleared. Persistent memory available and indexed.\"; else echo \"Autofix session initialized — stale verification state cleared. Proceeding WITHOUT persistent memory (NFS volume not mounted).\"; fi'"
       }
     ],
     "preToolUse": [

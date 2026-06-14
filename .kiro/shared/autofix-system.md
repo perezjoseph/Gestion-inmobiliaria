@@ -34,6 +34,24 @@ Before making changes:
 3. Read `$KIRO_LEARNINGS_FILE` (if it exists and is non-empty) — apply learnings from earlier queue items to avoid repeating failed approaches.
 4. Consult `code-style.md` and `testing.md` when modifying code.
 
+### 1.1. Check Memory (if available)
+
+If persistent memory is available (announced at session start):
+
+1. Derive the Memory_Key: `(artifact_name, diag_sig)` where `diag_sig` is:
+   - Clippy lint name (e.g. `clippy::needless_return`)
+   - Rust error code (e.g. `E0277`)
+   - Failing test name
+   - Ruff rule code (e.g. `E501`)
+   - Hadolint rule (e.g. `DL3008`)
+   - Hash of the first error line when no code is present
+2. Search the knowledge base: `knowledge search "<artifact> <diag_sig>"`
+3. If a prior entry records an approach as `failed`, avoid re-attempting that approach.
+4. After the stop gate confirms a verified outcome, store a lesson:
+   `knowledge store "[artifact: <name>] [diag_sig: <sig>] <outcome and approach summary>"`
+
+Entries record only: artifact names, diagnostic signatures, file paths, verdicts, and short approach summaries. Never store file contents, tokens, or environment values.
+
 ### 1.5. Research (if needed)
 
 If the error involves an unfamiliar API, a version-specific breaking change, or a library whose correct usage you're uncertain about:

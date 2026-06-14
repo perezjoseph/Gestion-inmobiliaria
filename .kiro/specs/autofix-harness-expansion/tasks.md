@@ -142,21 +142,21 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
   - Ensure all tests pass, ask the user if questions arise. Do not start tasks 13–14 unless the spike (11.2) confirmed the knowledge tool functions headless and the real KB path is known.
 
 - [ ] 13. Persistent memory — agent, settings, and workflow (F10)
-  - [~] 13.1 Update the `agentSpawn` hook in `autofix.json`
+  - [x] 13.1 Update the `agentSpawn` hook in `autofix.json`
     - Clear stale verification state (the F3 per-stack `autofix-sensors-ran.d/` dir and the block-count file) and reset the within-run scratch to empty
     - Announce memory available + already indexed when the NFS KB dir is present; announce proceeding WITHOUT memory (soft degradation) when absent; never rebuild or re-index from source
     - _Requirements: 12.1, 12.2, 12.3, 12.4_
 
-  - [~] 13.2 Add the per-branch KB export step to the autofix workflows
+  - [-] 13.2 Add the per-branch KB export step to the autofix workflows
     - Export a sanitized branch segment from `github.event.workflow_run.head_branch` (replace `/` and any non-`[A-Za-z0-9._-]` char with `_`) so the KB points at `knowledge_bases/<branch>/`
     - Reuse the existing `kiro-autofix-${{ head_branch }}` concurrency group; add no new concurrency group
     - _Requirements: 10.10, 10.11_
 
-  - [~] 13.3 Persist knowledge settings on the runner image
+  - [-] 13.3 Persist knowledge settings on the runner image
     - Bake `chat.enableKnowledge true` and `knowledge.indexType Fast` into the runner image (or set them idempotently at job start)
     - _Requirements: 10.4, 10.5_
 
-  - [~] 13.4 Add the F10 KB advisory to `autofix-system.md`
+  - [-] 13.4 Add the F10 KB advisory to `autofix-system.md`
     - Instruct the agent to search the Persistent_KB via the `knowledge` tool for the current `(artifact, diag_sig)` Memory_Key before a fix, avoid approaches recorded as `failed`, and store a lesson keyed by the Memory_Key after the stop gate confirms a verified outcome
     - Specify `diag_sig` normalization (lint name, error code, test name, ruff/hadolint rule, or hash of first error line) and that entries record only safe metadata, never file contents/tokens/env values
     - _Requirements: 10.6, 10.7, 10.8, 10.9, 14.3_

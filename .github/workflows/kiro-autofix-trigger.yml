@@ -400,6 +400,13 @@ jobs:
           git config user.name "kiro-bot"
           git config user.email "kiro-bot@users.noreply.github.com"
 
+      - name: Export sanitized branch for KB keying
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0' && steps.baseline.outputs.still_failing != 'false'
+        run: |
+          SANITIZED=$(echo "${BRANCH}" | sed 's/[^A-Za-z0-9._-]/_/g')
+          echo "KIRO_KB_BRANCH=${SANITIZED}" >> "$GITHUB_ENV"
+          echo "Per-branch KB segment: ${SANITIZED}"
+
       - name: Process queue (one Kiro run + one commit per artifact)
         id: queue
         if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0' && steps.baseline.outputs.still_failing != 'false'
