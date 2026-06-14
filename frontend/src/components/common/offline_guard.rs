@@ -17,7 +17,7 @@ pub fn OfflineGuard(props: &OfflineGuardProps) -> Html {
         html! {
             <span
                 style="position: relative; display: inline-block; cursor: not-allowed;"
-                title="Sin conexiÃ³n"
+                title="Sin conexión"
             >
                 <span style="pointer-events: none; opacity: 0.5;">
                     { for props.children.iter() }

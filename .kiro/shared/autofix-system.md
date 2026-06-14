@@ -66,6 +66,11 @@ Run only the sensors relevant to your modified files. Stop at the first failure 
 **Kotlin** (`android/**/*.{kt,kts}`):
 1. `cd android && ./gradlew build` (scope to affected module when possible)
 
+**Python** (`ocr-service/**/*.py`):
+1. `cd ocr-service && ruff format --check .`
+2. `cd ocr-service && ruff check .`
+3. `cd ocr-service && python -m pytest -q`
+
 **Non-code** (YAML, Markdown, Dockerfile, K8s manifests): No sensors. Mark clean.
 
 **Mixed changes:** Run sensors for all affected stacks.
