@@ -42,6 +42,7 @@ jobs:
     permissions:
       contents: read
       packages: read
+      actions: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -75,7 +76,8 @@ jobs:
           KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_DATA }}
         with:
           timeout_minutes: 5
-          max_attempts: 2
+          max_attempts: 3
+          retry_wait_seconds: 10
           command: |
             umask 077
             mkdir -p "${HOME}/.kube"
@@ -87,6 +89,9 @@ jobs:
             echo "Waiting for a Ready backend pod..."
             kubectl wait --for=condition=Ready pod \
               -l app.kubernetes.io/name=backend -n ${NS} --timeout=60s
+
+            # Brief settle time after readiness before exec'ing into the pod
+            sleep 5
 
             BACKEND_POD=$(kubectl get pods -n ${NS} -l app.kubernetes.io/name=backend \
               -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\n"}{end}' \
@@ -144,6 +149,7 @@ jobs:
         with:
           job-name: "deploy / deploy-dev / smoke-tests"
           artifact-suffix: deploy-dev-smoke
+          github-token: ${{ github.token }}
           step-outcomes: |
             smoke-tests=${{ steps.smoke-tests.outcome }}
           extra-context: |
