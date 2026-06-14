@@ -58,7 +58,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - _Requirements: 3.1_
 
 - [ ] 4. Expanded write denials for lockfiles and dependency manifests (F8)
-  - [-] 4.1 Add the new `deniedPaths` entries to `autofix.json`
+  - [x] 4.1 Add the new `deniedPaths` entries to `autofix.json`
     - Append `baileys-service/package-lock.json`, `ocr-service/requirements.txt`, `android/gradle/libs.versions.toml`, and the forward-looking `android/**/*.lockfile`
     - Retain every pre-existing `deniedPaths` entry unchanged
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.6, 14.1_
