@@ -1,0 +1,24 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: ocr-service-scaledobject
+  namespace: realestate
+spec:
+  scaleTargetRef:
+    name: ocr-service
+  minReplicaCount: 0
+  maxReplicaCount: 1
+  idleReplicaCount: 0
+  cooldownPeriod: 300
+  pollingInterval: 30
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus.monitoring.svc.cluster.local:9090
+        query: sum(increase(http_request_duration_seconds_count{job="ocr-service"}[5m])) OR vector(0)
+        threshold: "1"
+        activationThreshold: "0.5"
+      metricType: AverageValue
+  fallback:
+    failureThreshold: 5
+    replicas: 0

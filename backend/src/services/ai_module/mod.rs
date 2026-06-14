@@ -246,6 +246,8 @@ impl AiModule {
 
         let timeout_duration = Duration::from_secs(self.timeout_secs);
 
+        crate::metrics::AI_REQUEST_ATTEMPTS.inc();
+
         let result = tokio::time::timeout(timeout_duration, async {
             PromptRequest::from_agent(&agent, user_prompt)
                 .with_history(chat_history)
@@ -283,6 +285,19 @@ impl AiModule {
             }
             Ok(Err(e)) => {
                 let error_msg = e.to_string();
+
+                if error_msg.contains("INFERENCE_COLD_START") {
+                    tracing::info!(
+                        organizacion_id = %ctx.organizacion_id,
+                        "vLLM en cold-start, devolviendo mensaje de espera"
+                    );
+                    return Ok(AgentResponse {
+                        reply: "El asistente se está iniciando. Por favor, intente de nuevo en 1-2 minutos."
+                            .to_string(),
+                        tools_invoked: vec![],
+                        extracted_receipt: None,
+                    });
+                }
 
                 if error_msg.contains("Response blocked by safety filter") {
                     tracing::warn!(

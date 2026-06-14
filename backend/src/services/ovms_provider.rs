@@ -172,7 +172,13 @@ impl completion::CompletionModel for OvmsCompletionModel {
             .json(&ovms_request)
             .send()
             .await
-            .map_err(|e| CompletionError::ProviderError(format!("Error conectando a OVMS: {e}")))?;
+            .map_err(|e| {
+                if e.is_connect() {
+                    CompletionError::ProviderError("INFERENCE_COLD_START".to_string())
+                } else {
+                    CompletionError::ProviderError(format!("Error conectando a OVMS: {e}"))
+                }
+            })?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -212,7 +218,11 @@ impl completion::CompletionModel for OvmsCompletionModel {
             .send()
             .await
             .map_err(|e| {
-                CompletionError::ProviderError(format!("Error conectando a OVMS stream: {e}"))
+                if e.is_connect() {
+                    CompletionError::ProviderError("INFERENCE_COLD_START".to_string())
+                } else {
+                    CompletionError::ProviderError(format!("Error conectando a OVMS stream: {e}"))
+                }
             })?;
 
         if !response.status().is_success() {

@@ -280,7 +280,7 @@ RUN ARCHIVE="/tmp/ruff.tar.gz" \
 # ── kiro-cli knowledge settings (F10) ──────────────────────────
 # Persist settings so the headless autofix agent can use the
 # knowledge tool without runtime configuration on each spawn.
-RUN HOME=/home/runner kiro-cli settings chat.enableKnowledge true --global \
-    && HOME=/home/runner kiro-cli settings knowledge.indexType Fast --global
-
+# Run as runner user so the resulting database files are writable at runtime.
 USER runner
+RUN kiro-cli settings chat.enableKnowledge true --global \
+    && kiro-cli settings knowledge.indexType Fast --global

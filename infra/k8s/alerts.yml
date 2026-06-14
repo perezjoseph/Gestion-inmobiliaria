@@ -237,3 +237,14 @@ data:
             annotations:
               summary: "GPU temperature critical"
               description: "GPU temperature on {{ $labels.pci_bdf }} exceeds 85°C ({{ $value }}°C)"
+
+          - alert: VllmScaleUpFailed
+            expr: |
+              kube_deployment_spec_replicas{deployment="vllm", namespace="realestate"} > 0
+              and kube_deployment_status_ready_replicas{deployment="vllm", namespace="realestate"} == 0
+            for: 3m
+            labels:
+              severity: warning
+            annotations:
+              summary: "vLLM solicitado pero no listo después de 3 minutos"
+              description: "KEDA escaló vLLM a 1 réplica pero el pod no se ha iniciado correctamente"

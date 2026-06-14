@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/component: ocr
     app.kubernetes.io/part-of: realestate
 spec:
-  replicas: 1
+  replicas: 0
   revisionHistoryLimit: 3
   strategy:
     type: Recreate

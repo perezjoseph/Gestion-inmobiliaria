@@ -600,13 +600,25 @@ pub async fn test_chat_stream(
         chatbot_env.vllm_api_key.clone(),
     );
 
-    let mut streaming_response =
-        rig::completion::CompletionModel::stream(&model, completion_request)
-            .await
-            .map_err(|e| {
-                tracing::error!(organizacion_id = %org_id, error = %e, "Error en OVMS stream");
-                AppError::Internal(anyhow::anyhow!("Error conectando al servicio AI: {e}"))
-            })?;
+    crate::metrics::AI_REQUEST_ATTEMPTS.inc();
+
+    let mut streaming_response = rig::completion::CompletionModel::stream(
+        &model,
+        completion_request,
+    )
+    .await
+    .map_err(|e| {
+        let error_msg = e.to_string();
+        if error_msg.contains("INFERENCE_COLD_START") {
+            tracing::info!(organizacion_id = %org_id, "vLLM en cold-start (stream)");
+            AppError::Internal(anyhow::anyhow!(
+                "El asistente se está iniciando. Por favor, intente de nuevo en 1-2 minutos."
+            ))
+        } else {
+            tracing::error!(organizacion_id = %org_id, error = %e, "Error en OVMS stream");
+            AppError::Internal(anyhow::anyhow!("Error conectando al servicio AI: {e}"))
+        }
+    })?;
 
     let sse_stream = async_stream::stream! {
         while let Some(chunk) = streaming_response.next().await {

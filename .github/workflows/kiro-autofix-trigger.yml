@@ -425,7 +425,13 @@ jobs:
           umask 077
           DATA_HOME="${RUNNER_TEMP}/kiro-data"
           mkdir -p "${DATA_HOME}/kiro-cli" "${HOME}/.local/share/kiro-cli"
+          # Fix ownership on kiro-cli data paths — the runner image creates
+          # settings files as root during docker build (after USER runner),
+          # leaving them unwritable by the runner user at runtime.
+          chown -R "$(id -u):$(id -g)" "${HOME}/.local/share/kiro-cli" 2>/dev/null || true
+          chown -R "$(id -u):$(id -g)" "${HOME}/.local" 2>/dev/null || true
           chmod -R u+rwX "${DATA_HOME}"
+          chmod -R u+rwX "${HOME}/.local/share/kiro-cli" 2>/dev/null || true
           echo "XDG_DATA_HOME=${DATA_HOME}" >> "$GITHUB_ENV"
           echo "kiro-cli data dir ready: ${DATA_HOME}/kiro-cli"
 

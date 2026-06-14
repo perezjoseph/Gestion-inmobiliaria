@@ -128,6 +128,16 @@ pub static AI_REQUESTS: LazyLock<IntCounterVec> = LazyLock::new(|| {
     )
 });
 
+pub static AI_REQUEST_ATTEMPTS: LazyLock<IntCounter> = LazyLock::new(|| {
+    unwrap_metric(
+        register_int_counter!(Opts::new(
+            "ai_request_attempts_total",
+            "Intentos de solicitud al servicio de inferencia (incluye cuando vLLM no está disponible)"
+        )),
+        "ai_request_attempts_total",
+    )
+});
+
 pub static NOTIFICACIONES_ENVIADAS: LazyLock<IntCounterVec> = LazyLock::new(|| {
     unwrap_metric(
         register_int_counter_vec!(
@@ -179,6 +189,7 @@ pub fn init() {
     let _ = &*DB_QUERY_DURATION;
     let _ = &*AI_INFERENCE_DURATION;
     let _ = &*AI_REQUESTS;
+    let _ = &*AI_REQUEST_ATTEMPTS;
     let _ = &*NOTIFICACIONES_ENVIADAS;
     let _ = &*GASTOS_REGISTRADOS;
     let _ = &*USUARIOS_ACTIVOS;
