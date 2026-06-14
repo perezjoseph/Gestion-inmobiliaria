@@ -68,7 +68,7 @@ android/local.properties
 .playwright/
 .playwright-cli/
 .worktrees/
-tools/
+/tools/
 
 # Kiro / skills / state
 .kiro/skills/*
