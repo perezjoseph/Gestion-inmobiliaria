@@ -171,7 +171,7 @@ Constraints respected throughout: reuse existing tooling (`ruff` at `.trunk/conf
     - Mark as human-applied and CODEOWNERS-reviewed; `infra/**` is write-denied to the autofix agent and the `helm upgrade` application is performed by a human
     - _Requirements: 10.1, 10.2, 11.4, 11.5_
 
-  - [-] 14.2 Author the GC CronJob manifest
+  - [x] 14.2 Author the GC CronJob manifest
     - Create a Kubernetes CronJob that mounts the same `kiro-memory` NFS path and trims the store by an age cap and a size cap (oldest-first eviction); human-applied/CODEOWNERS
     - _Requirements: 10.12_
 
