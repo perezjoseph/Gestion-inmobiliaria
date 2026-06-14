@@ -460,6 +460,9 @@ runs:
         elif grep -qF "password authentication failed" "$OUT"; then
           echo "::warning::Database credential mismatch (28P01) — skipping diagnostics artifact upload (not actionable by autofix)"
           echo "actionable=false" >> "$GITHUB_OUTPUT"
+        elif grep -qF "Permission denied (os error 13)" "$OUT"; then
+          echo "::warning::Pod filesystem permission denied — skipping diagnostics artifact upload (not actionable by autofix)"
+          echo "actionable=false" >> "$GITHUB_OUTPUT"
         else
           echo "actionable=true" >> "$GITHUB_OUTPUT"
         fi

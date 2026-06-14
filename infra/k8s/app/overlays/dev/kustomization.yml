@@ -41,6 +41,16 @@ patches:
       kind: PersistentVolumeClaim
       metadata:
         name: realestate-db-pvc
+  # Remove the HPA — dev runs a single fixed replica (minReplicas:2 would override the replicas:1 patch below)
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: backend
+    patch: |
+      $patch: delete
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: backend
   # Single replica for dev backend
   - target:
       kind: Deployment

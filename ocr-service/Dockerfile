@@ -32,11 +32,17 @@ ENV PADDLE_PDX_MODEL_SOURCE=BOS
 
 COPY convert_models.py .
 RUN for i in 1 2 3; do \
-    timeout 300 python convert_models.py \
-    && break \
-    || { echo "Attempt $i failed, retrying in 15s..."; sleep 15; }; \
-    done \
-    && ls -la /app/.paddleocr/official_models/
+    timeout 300 python convert_models.py && break; \
+    echo "Attempt $i failed, retrying in 15s..."; \
+    sleep 15; \
+    done; \
+    ls -la /app/.paddleocr/official_models/ || true; \
+    det=$(find /app/.paddleocr/official_models -path '*det*/inference.xml' -print -quit 2>/dev/null); \
+    rec=$(find /app/.paddleocr/official_models -path '*rec*/inference.xml' -print -quit 2>/dev/null); \
+    if [ -z "$det" ] || [ -z "$rec" ]; then \
+    echo "ERROR: OCR model conversion failed (det='$det' rec='$rec'); refusing to build a model-less image"; \
+    exit 1; \
+    fi
 
 COPY main.py ocr_engine.py ./
 

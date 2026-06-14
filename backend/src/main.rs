@@ -26,17 +26,31 @@ async fn main() -> std::io::Result<()> {
     {
         use sea_orm::ConnectionTrait;
         const MIGRATION_LOCK_ID: i64 = 0x5245_4D49_4752;
-        db.execute_unprepared(&format!("SELECT pg_advisory_lock({MIGRATION_LOCK_ID})"))
+
+        let mut lock_options = config.connect_options();
+        lock_options.max_connections(1).min_connections(1);
+        let lock_db = Database::connect(lock_options)
+            .await
+            .expect("Error conectando para lock de migraciones");
+
+        lock_db
+            .execute_unprepared(&format!("SELECT pg_advisory_lock({MIGRATION_LOCK_ID})"))
             .await
             .expect("Error adquiriendo lock de migraciones");
 
-        migrations::Migrator::up(&db, None)
-            .await
-            .expect("Error ejecutando migraciones");
+        let migration_result = migrations::Migrator::up(&db, None).await;
 
-        db.execute_unprepared(&format!("SELECT pg_advisory_unlock({MIGRATION_LOCK_ID})"))
+        lock_db
+            .execute_unprepared(&format!("SELECT pg_advisory_unlock({MIGRATION_LOCK_ID})"))
             .await
             .expect("Error liberando lock de migraciones");
+
+        lock_db
+            .close()
+            .await
+            .expect("Error cerrando conexión de lock de migraciones");
+
+        migration_result.expect("Error ejecutando migraciones");
     }
 
     let port = config.server_port;

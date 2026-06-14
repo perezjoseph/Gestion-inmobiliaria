@@ -9,7 +9,7 @@
                 "GRAFANA_URL": "http://grafana.local",
                 "GRAFANA_SERVICE_ACCOUNT_TOKEN": ""
             },
-            "disabled": false,
+            "disabled": true,
             "autoApprove": [
                 "search_dashboards",
                 "get_dashboard_by_uid",

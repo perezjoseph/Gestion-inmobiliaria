@@ -24,12 +24,30 @@ impl MigrationTrait for Migration {
 
         manager
             .get_connection()
-            .execute_unprepared("GRANT pg_monitor TO metrics_exporter;")
+            .execute_unprepared(
+                "DO $$ BEGIN
+                    IF NOT pg_has_role('metrics_exporter', 'pg_monitor', 'MEMBER') THEN
+                        BEGIN
+                            GRANT pg_monitor TO metrics_exporter;
+                        EXCEPTION WHEN insufficient_privilege THEN
+                            RAISE NOTICE 'skipping GRANT pg_monitor: migrating role lacks ADMIN on pg_monitor (already granted cluster-wide by the privileged environment)';
+                        END;
+                    END IF;
+                END $$;",
+            )
             .await?;
 
         manager
             .get_connection()
-            .execute_unprepared("GRANT CONNECT ON DATABASE realestate TO metrics_exporter;")
+            .execute_unprepared(
+                "DO $$ BEGIN
+                    BEGIN
+                        EXECUTE format('GRANT CONNECT ON DATABASE %I TO metrics_exporter', current_database());
+                    EXCEPTION WHEN insufficient_privilege THEN
+                        RAISE NOTICE 'skipping GRANT CONNECT: migrating role is not the owner of %', current_database();
+                    END;
+                END $$;",
+            )
             .await?;
 
         Ok(())
@@ -38,17 +56,28 @@ impl MigrationTrait for Migration {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .get_connection()
-            .execute_unprepared("REVOKE CONNECT ON DATABASE realestate FROM metrics_exporter;")
+            .execute_unprepared(
+                "DO $$ BEGIN
+                    BEGIN
+                        EXECUTE format('REVOKE CONNECT ON DATABASE %I FROM metrics_exporter', current_database());
+                    EXCEPTION WHEN insufficient_privilege THEN
+                        RAISE NOTICE 'skipping REVOKE CONNECT: migrating role is not the owner of %', current_database();
+                    END;
+                END $$;",
+            )
             .await?;
 
         manager
             .get_connection()
-            .execute_unprepared("REVOKE pg_monitor FROM metrics_exporter;")
-            .await?;
-
-        manager
-            .get_connection()
-            .execute_unprepared("DROP ROLE IF EXISTS metrics_exporter;")
+            .execute_unprepared(
+                "DO $$ BEGIN
+                    BEGIN
+                        REVOKE pg_monitor FROM metrics_exporter;
+                    EXCEPTION WHEN insufficient_privilege THEN
+                        RAISE NOTICE 'skipping REVOKE pg_monitor: migrating role lacks ADMIN on pg_monitor';
+                    END;
+                END $$;",
+            )
             .await?;
 
         Ok(())

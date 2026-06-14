@@ -1,1064 +1,2044 @@
 {
-
-    "annotations":  {
-                        "list":  [
-                                     {
-                                         "builtIn":  1,
-                                         "datasource":  {
-                                                            "type":  "datasource",
-                                                            "uid":  "grafana"
-                                                        },
-                                         "enable":  true,
-                                         "hide":  true,
-                                         "iconColor":  "rgba(0, 211, 255, 1)",
-                                         "name":  "Annotations \u0026 Alerts",
-                                         "target":  {
-                                                        "limit":  100,
-                                                        "matchAny":  false,
-                                                        "tags":  [
-
-                                                                 ],
-                                                        "type":  "dashboard"
-                                                    },
-                                         "type":  "dashboard"
-                                     }
-                                 ]
+    "annotations": {
+        "list": [
+            {
+                "builtIn": 1,
+                "datasource": {
+                    "type": "datasource",
+                    "uid": "grafana"
+                },
+                "enable": true,
+                "hide": true,
+                "iconColor": "rgba(0, 211, 255, 1)",
+                "name": "Annotations & Alerts",
+                "target": {
+                    "limit": 100,
+                    "matchAny": false,
+                    "tags": [],
+                    "type": "dashboard"
+                },
+                "type": "dashboard"
+            }
+        ]
+    },
+    "editable": true,
+    "graphTooltip": 1,
+    "id": null,
+    "links": [],
+    "panels": [
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
                     },
-    "editable":  true,
-    "gnetId":  null,
-    "graphTooltip":  1,
-    "id":  null,
-    "links":  [
-
-              ],
-    "panels":  [
-                   {
-                       "datasource":  {
-                                          "type":  "prometheus",
-                                          "uid":  "${datasource}"
-                                      },
-                       "fieldConfig":  {
-                                           "defaults":  {
-                                                            "color":  {
-                                                                          "mode":  "palette-classic"
-                                                                      },
-                                                            "custom":  {
-                                                                           "axisLabel":  "",
-                                                                           "axisPlacement":  "auto",
-                                                                           "drawStyle":  "line",
-                                                                           "fillOpacity":  10,
-                                                                           "gradientMode":  "none",
-                                                                           "lineInterpolation":  "smooth",
-                                                                           "lineWidth":  2,
-                                                                           "pointSize":  5,
-                                                                           "showPoints":  "never",
-                                                                           "spanNulls":  false,
-                                                                           "stacking":  {
-                                                                                            "group":  "A",
-                                                                                            "mode":  "none"
-                                                                                        },
-                                                                           "thresholdsStyle":  {
-                                                                                                   "mode":  "off"
-                                                                                               }
-                                                                       },
-                                                            "mappings":  [
-
-                                                                         ],
-                                                            "thresholds":  {
-                                                                               "mode":  "absolute",
-                                                                               "steps":  [
-                                                                                             {
-                                                                                                 "color":  "green",
-                                                                                                 "value":  null
-                                                                                             },
-                                                                                             {
-                                                                                                 "color":  "red",
-                                                                                                 "value":  80
-                                                                                             }
-                                                                                         ]
-                                                                           },
-                                                            "unit":  "percent"
-                                                        },
-                                           "overrides":  [
-
-                                                         ]
-                                       },
-                       "gridPos":  {
-                                       "h":  8,
-                                       "w":  12,
-                                       "x":  0,
-                                       "y":  0
-                                   },
-                       "id":  1,
-                       "interval":  "15s",
-                       "options":  {
-                                       "legend":  {
-                                                      "calcs":  [
-                                                                    "mean",
-                                                                    "lastNotNull"
-                                                                ],
-                                                      "displayMode":  "table",
-                                                      "placement":  "bottom"
-                                                  },
-                                       "tooltip":  {
-                                                       "mode":  "single"
-                                                   }
-                                   },
-                       "targets":  [
-                                       {
-                                           "expr":  "qmmd_gpu_engine_utilization_ratio{device=\"$Device\", engine=\"ccs\"} * 100",
-                                           "legendFormat":  "Compute (ccs)",
-                                           "refId":  "A"
-                                       },
-                                       {
-                                           "expr":  "qmmd_gpu_engine_utilization_ratio{device=\"$Device\", engine=\"rcs\"} * 100",
-                                           "legendFormat":  "Render (rcs)",
-                                           "refId":  "B"
-                                       }
-                                   ],
-                       "title":  "GPU Engine Utilization",
-                       "type":  "timeseries"
-                   },
-                   {
-                       "datasource":  {
-                                          "type":  "prometheus",
-                                          "uid":  "${datasource}"
-                                      },
-                       "fieldConfig":  {
-                                           "defaults":  {
-                                                            "color":  {
-                                                                          "mode":  "thresholds"
-                                                                      },
-                                                            "mappings":  [
-
-                                                                         ],
-                                                            "max":  100,
-                                                            "min":  0,
-                                                            "thresholds":  {
-                                                                               "mode":  "absolute",
-                                                                               "steps":  [
-                                                                                             {
-                                                                                                 "color":  "green",
-                                                                                                 "value":  null
-                                                                                             },
-                                                                                             {
-                                                                                                 "color":  "yellow",
-                                                                                                 "value":  50
-                                                                                             },
-                                                                                             {
-                                                                                                 "color":  "red",
-                                                                                                 "value":  80
-                                                                                             }
-                                                                                         ]
-                                                                           },
-                                                            "unit":  "percent"
-                                                        },
-                                           "overrides":  [
-
-                                                         ]
-                                       },
-                       "gridPos":  {
-                                       "h":  8,
-                                       "w":  4,
-                                       "x":  12,
-                                       "y":  0
-                                   },
-                       "id":  2,
-                       "interval":  "15s",
-                       "options":  {
-                                       "reduceOptions":  {
-                                                             "calcs":  [
-                                                                           "lastNotNull"
-                                                                       ],
-                                                             "fields":  "",
-                                                             "values":  false
-                                                         },
-                                       "showThresholdLabels":  false,
-                                       "showThresholdMarkers":  true
-                                   },
-                       "targets":  [
-                                       {
-                                           "legendFormat":  "Render",
-                                           "expr":  "gpu_engine_usage_usage{job=\"xpumanager\", engine=\"rcs\"}",
-                                           "refId":  "A"
-                                       },
-                                       {
-                                           "legendFormat":  "Compute",
-                                           "expr":  "gpu_engine_usage_usage{job=\"xpumanager\", engine=\"ccs\"}",
-                                           "refId":  "B"
-                                       }
-                                   ],
-                       "title":  "GPU Utilization",
-                       "type":  "gauge"
-                   },
-                   {
-                       "datasource":  {
-                                          "type":  "prometheus",
-                                          "uid":  "${datasource}"
-                                      },
-                       "fieldConfig":  {
-                                           "defaults":  {
-                                                            "color":  {
-                                                                          "mode":  "palette-classic"
-                                                                      },
-                                                            "custom":  {
-                                                                           "axisLabel":  "GHz",
-                                                                           "axisPlacement":  "auto",
-                                                                           "drawStyle":  "line",
-                                                                           "fillOpacity":  10,
-                                                                           "gradientMode":  "none",
-                                                                           "lineInterpolation":  "smooth",
-                                                                           "lineWidth":  2,
-                                                                           "pointSize":  5,
-                                                                           "showPoints":  "never",
-                                                                           "spanNulls":  false,
-                                                                           "stacking":  {
-                                                                                            "group":  "A",
-                                                                                            "mode":  "none"
-                                                                                        },
-                                                                           "thresholdsStyle":  {
-                                                                                                   "mode":  "off"
-                                                                                               }
-                                                                       },
-                                                            "mappings":  [
-
-                                                                         ],
-                                                            "thresholds":  {
-                                                                               "mode":  "absolute",
-                                                                               "steps":  [
-                                                                                             {
-                                                                                                 "color":  "green",
-                                                                                                 "value":  null
-                                                                                             },
-                                                                                             {
-                                                                                                 "color":  "red",
-                                                                                                 "value":  80
-                                                                                             }
-                                                                                         ]
-                                                                           },
-                                                            "unit":  "hertz"
-                                                        },
-                                           "overrides":  [
-
-                                                         ]
-                                       },
-                       "gridPos":  {
-                                       "h":  8,
-                                       "w":  8,
-                                       "x":  16,
-                                       "y":  0
-                                   },
-                       "id":  3,
-                       "interval":  "5s",
-                       "options":  {
-                                       "legend":  {
-                                                      "calcs":  [
-                                                                    "mean",
-                                                                    "lastNotNull"
-                                                                ],
-                                                      "displayMode":  "table",
-                                                      "placement":  "bottom"
-                                                  },
-                                       "tooltip":  {
-                                                       "mode":  "single"
-                                                   }
-                                   },
-                       "targets":  [
-                                       {
-                                           "expr":  "qmmd_gpu_actual_frequency_hertz{device=\"$Device\"}",
-                                           "legendFormat":  "{{freq_id}} actual",
-                                           "refId":  "A"
-                                       },
-                                       {
-                                           "expr":  "qmmd_gpu_maximum_frequency_hertz{device=\"$Device\"}",
-                                           "legendFormat":  "{{freq_id}} max",
-                                           "refId":  "B"
-                                       }
-                                   ],
-                       "title":  "GPU Frequency",
-                       "type":  "timeseries"
-                   },
-                   {
-                       "datasource":  {
-                                          "type":  "prometheus",
-                                          "uid":  "${datasource}"
-                                      },
-                       "fieldConfig":  {
-                                           "defaults":  {
-                                                            "color":  {
-                                                                          "mode":  "palette-classic"
-                                                                      },
-                                                            "custom":  {
-                                                                           "axisLabel":  "",
-                                                                           "axisPlacement":  "auto",
-                                                                           "drawStyle":  "line",
-                                                                           "fillOpacity":  10,
-                                                                           "gradientMode":  "none",
-                                                                           "lineInterpolation":  "smooth",
-                                                                           "lineWidth":  2,
-                                                                           "pointSize":  5,
-                                                                           "showPoints":  "never",
-                                                                           "spanNulls":  false,
-                                                                           "stacking":  {
-                                                                                            "group":  "A",
-                                                                                            "mode":  "none"
-                                                                                        },
-                                                                           "thresholdsStyle":  {
-                                                                                                   "mode":  "off"
-                                                                                               }
-                                                                       },
-                                                            "mappings":  [
-
-                                                                         ],
-                                                            "thresholds":  {
-                                                                               "mode":  "absolute",
-                                                                               "steps":  [
-                                                                                             {
-                                                                                                 "color":  "green",
-                                                                                                 "value":  null
-                                                                                             },
-                                                                                             {
-                                                                                                 "color":  "orange",
-                                                                                                 "value":  75
-                                                                                             },
-                                                                                             {
-                                                                                                 "color":  "red",
-                                                                                                 "value":  90
-                                                                                             }
-                                                                                         ]
-                                                                           },
-                                                            "unit":  "celsius"
-                                                        },
-                                           "overrides":  [
-
-                                                         ]
-                                       },
-                       "gridPos":  {
-                                       "h":  8,
-                                       "w":  12,
-                                       "x":  0,
-                                       "y":  8
-                                   },
-                       "id":  4,
-                       "interval":  "5s",
-                       "options":  {
-                                       "legend":  {
-                                                      "calcs":  [
-                                                                    "mean",
-                                                                    "max"
-                                                                ],
-                                                      "displayMode":  "table",
-                                                      "placement":  "bottom"
-                                                  },
-                                       "tooltip":  {
-                                                       "mode":  "single"
-                                                   }
-                                   },
-                       "targets":  [
-                                       {
-                                           "expr":  "qmmd_gpu_temperature_celsius{device=\"$Device\", sensor=\"pkg\"}",
-                                           "legendFormat":  "GPU Package",
-                                           "refId":  "A"
-                                       },
-                                       {
-                                           "expr":  "qmmd_gpu_temperature_celsius{device=\"$Device\", sensor=\"vram\"}",
-                                           "legendFormat":  "VRAM",
-                                           "refId":  "B"
-                                       },
-                                       {
-                                           "expr":  "qmmd_gpu_temperature_celsius{device=\"$Device\", sensor=\"mctrl\"}",
-                                           "legendFormat":  "Memory Controller",
-                                           "refId":  "C"
-                                       },
-                                       {
-                                           "expr":  "qmmd_gpu_temperature_celsius{device=\"$Device\", sensor=\"pcie\"}",
-                                           "legendFormat":  "PCIe",
-                                           "refId":  "D"
-                                       }
-                                   ],
-                       "title":  "GPU Temperature",
-                       "type":  "timeseries"
-                   },
-                   {
-                       "datasource":  {
-                                          "type":  "prometheus",
-                                          "uid":  "${datasource}"
-                                      },
-                       "fieldConfig":  {
-                                           "defaults":  {
-                                                            "color":  {
-                                                                          "mode":  "thresholds"
-                                                                      },
-                                                            "mappings":  [
-
-                                                                         ],
-                                                            "thresholds":  {
-                                                                               "mode":  "absolute",
-                                                                               "steps":  [
-                                                                                             {
-                                                                                                 "color":  "green",
-                                                                                                 "value":  null
-                                                                                             },
-                                                                                             {
-                                                                                                 "color":  "orange",
-                                                                                                 "value":  75
-                                                                                             },
-                                                                                             {
-                                                                                                 "color":  "red",
-                                                                                                 "value":  90
-                                                                                             }
-                                                                                         ]
-                                                                           },
-                                                            "unit":  "celsius"
-                                                        },
-                                           "overrides":  [
-
-                                                         ]
-                                       },
-                       "gridPos":  {
-                                       "h":  8,
-                                       "w":  4,
-                                       "x":  12,
-                                       "y":  8
-                                   },
-                       "id":  5,
-                       "interval":  "5s",
-                       "options":  {
-                                       "reduceOptions":  {
-                                                             "calcs":  [
-                                                                           "lastNotNull"
-                                                                       ],
-                                                             "fields":  "",
-                                                             "values":  false
-                                                         },
-                                       "showThresholdLabels":  false,
-                                       "showThresholdMarkers":  true
-                                   },
-                       "targets":  [
-                                       {
-                                           "legendFormat":  "GPU",
-                                           "expr":  "gpu_power{job=\"xpumanager\", type=\"gpu_cur_power\"}",
-                                           "refId":  "A"
-                                       },
-                                       {
-                                           "legendFormat":  "Package",
-                                           "expr":  "gpu_power{job=\"xpumanager\", type=\"pkg_cur_power\"}",
-                                           "refId":  "B"
-                                       }
-                                   ],
-                       "title":  "Temperature",
-                       "type":  "gauge"
-                   },
-                   {
-                       "datasource":  {
-                                          "type":  "prometheus",
-                                          "uid":  "${datasource}"
-                                      },
-                       "fieldConfig":  {
-                                           "defaults":  {
-                                                            "color":  {
-                                                                          "mode":  "palette-classic"
-                                                                      },
-                                                            "custom":  {
-                                                                           "axisLabel":  "",
-                                                                           "axisPlacement":  "auto",
-                                                                           "drawStyle":  "line",
-                                                                           "fillOpacity":  10,
-                                                                           "gradientMode":  "none",
-                                                                           "lineInterpolation":  "smooth",
-                                                                           "lineWidth":  2,
-                                                                           "pointSize":  5,
-                                                                           "showPoints":  "never",
-                                                                           "spanNulls":  false,
-                                                                           "stacking":  {
-                                                                                            "group":  "A",
-                                                                                            "mode":  "none"
-                                                                                        },
-                                                                           "thresholdsStyle":  {
-                                                                                                   "mode":  "off"
-                                                                                               }
-                                                                       },
-                                                            "mappings":  [
-
-                                                                         ],
-                                                            "thresholds":  {
-                                                                               "mode":  "absolute",
-                                                                               "steps":  [
-                                                                                             {
-                                                                                                 "color":  "green",
-                                                                                                 "value":  null
-                                                                                             },
-                                                                                             {
-                                                                                                 "color":  "orange",
-                                                                                                 "value":  75
-                                                                                             },
-                                                                                             {
-                                                                                                 "color":  "red",
-                                                                                                 "value":  90
-                                                                                             }
-                                                                                         ]
-                                                                           },
-                                                            "unit":  "celsius"
-                                                        },
-                                           "overrides":  [
-
-                                                         ]
-                                       },
-                       "gridPos":  {
-                                       "h":  8,
-                                       "w":  8,
-                                       "x":  16,
-                                       "y":  8
-                                   },
-                       "id":  6,
-                       "interval":  "5s",
-                       "options":  {
-                                       "legend":  {
-                                                      "calcs":  [
-                                                                    "mean",
-                                                                    "max"
-                                                                ],
-                                                      "displayMode":  "table",
-                                                      "placement":  "bottom"
-                                                  },
-                                       "tooltip":  {
-                                                       "mode":  "single"
-                                                   }
-                                   },
-                       "targets":  [
-                                       {
-                                           "legendFormat":  "Frequency",
-                                           "expr":  "gpu_frequency{job=\"xpumanager\", type=\"cur_freq\"}",
-                                           "refId":  "A"
-                                       }
-                                   ],
-                       "title":  "VRAM Channel Temperatures",
-                       "type":  "timeseries"
-                   },
-                   {
-                       "datasource":  {
-                                          "type":  "prometheus",
-                                          "uid":  "${datasource}"
-                                      },
-                       "fieldConfig":  {
-                                           "defaults":  {
-                                                            "color":  {
-                                                                          "mode":  "palette-classic"
-                                                                      },
-                                                            "custom":  {
-                                                                           "axisLabel":  "",
-                                                                           "axisPlacement":  "auto",
-                                                                           "drawStyle":  "line",
-                                                                           "fillOpacity":  10,
-                                                                           "gradientMode":  "none",
-                                                                           "lineInterpolation":  "smooth",
-                                                                           "lineWidth":  2,
-                                                                           "pointSize":  5,
-                                                                           "showPoints":  "never",
-                                                                           "spanNulls":  false,
-                                                                           "stacking":  {
-                                                                                            "group":  "A",
-                                                                                            "mode":  "none"
-                                                                                        },
-                                                                           "thresholdsStyle":  {
-                                                                                                   "mode":  "off"
-                                                                                               }
-                                                                       },
-                                                            "mappings":  [
-
-                                                                         ],
-                                                            "thresholds":  {
-                                                                               "mode":  "absolute",
-                                                                               "steps":  [
-                                                                                             {
-                                                                                                 "color":  "green",
-                                                                                                 "value":  null
-                                                                                             },
-                                                                                             {
-                                                                                                 "color":  "red",
-                                                                                                 "value":  200
-                                                                                             }
-                                                                                         ]
-                                                                           },
-                                                            "unit":  "watt"
-                                                        },
-                                           "overrides":  [
-
-                                                         ]
-                                       },
-                       "gridPos":  {
-                                       "h":  8,
-                                       "w":  12,
-                                       "x":  0,
-                                       "y":  16
-                                   },
-                       "id":  7,
-                       "interval":  "5s",
-                       "options":  {
-                                       "legend":  {
-                                                      "calcs":  [
-                                                                    "mean",
-                                                                    "max"
-                                                                ],
-                                                      "displayMode":  "table",
-                                                      "placement":  "bottom"
-                                                  },
-                                       "tooltip":  {
-                                                       "mode":  "single"
-                                                   }
-                                   },
-                       "targets":  [
-                                       {
-                                           "expr":  "qmmd_gpu_power_watts{device=\"$Device\", domain=\"gpu\"}",
-                                           "legendFormat":  "GPU Power",
-                                           "refId":  "A"
-                                       },
-                                       {
-                                           "expr":  "qmmd_gpu_power_watts{device=\"$Device\", domain=\"package\"}",
-                                           "legendFormat":  "Package Power",
-                                           "refId":  "B"
-                                       }
-                                   ],
-                       "title":  "Power",
-                       "type":  "timeseries"
-                   },
-                   {
-                       "datasource":  {
-                                          "type":  "prometheus",
-                                          "uid":  "${datasource}"
-                                      },
-                       "fieldConfig":  {
-                                           "defaults":  {
-                                                            "color":  {
-                                                                          "mode":  "thresholds"
-                                                                      },
-                                                            "mappings":  [
-
-                                                                         ],
-                                                            "thresholds":  {
-                                                                               "mode":  "absolute",
-                                                                               "steps":  [
-                                                                                             {
-                                                                                                 "color":  "green",
-                                                                                                 "value":  null
-                                                                                             },
-                                                                                             {
-                                                                                                 "color":  "orange",
-                                                                                                 "value":  150
-                                                                                             },
-                                                                                             {
-                                                                                                 "color":  "red",
-                                                                                                 "value":  200
-                                                                                             }
-                                                                                         ]
-                                                                           },
-                                                            "unit":  "watt"
-                                                        },
-                                           "overrides":  [
-
-                                                         ]
-                                       },
-                       "gridPos":  {
-                                       "h":  8,
-                                       "w":  4,
-                                       "x":  12,
-                                       "y":  16
-                                   },
-                       "id":  8,
-                       "interval":  "5s",
-                       "options":  {
-                                       "reduceOptions":  {
-                                                             "calcs":  [
-                                                                           "lastNotNull"
-                                                                       ],
-                                                             "fields":  "",
-                                                             "values":  false
-                                                         },
-                                       "showThresholdLabels":  false,
-                                       "showThresholdMarkers":  true
-                                   },
-                       "targets":  [
-                                       {
-                                           "expr":  "qmmd_gpu_power_watts{device=\"$Device\", domain=\"package\"}",
-                                           "legendFormat":  "Power",
-                                           "refId":  "A"
-                                       }
-                                   ],
-                       "title":  "Power",
-                       "type":  "gauge"
-                   },
-                   {
-                       "datasource":  {
-                                          "type":  "prometheus",
-                                          "uid":  "${datasource}"
-                                      },
-                       "fieldConfig":  {
-                                           "defaults":  {
-                                                            "color":  {
-                                                                          "mode":  "palette-classic"
-                                                                      },
-                                                            "custom":  {
-                                                                           "axisLabel":  "",
-                                                                           "axisPlacement":  "auto",
-                                                                           "drawStyle":  "line",
-                                                                           "fillOpacity":  10,
-                                                                           "gradientMode":  "none",
-                                                                           "lineInterpolation":  "smooth",
-                                                                           "lineWidth":  2,
-                                                                           "pointSize":  5,
-                                                                           "showPoints":  "never",
-                                                                           "spanNulls":  false,
-                                                                           "stacking":  {
-                                                                                            "group":  "A",
-                                                                                            "mode":  "none"
-                                                                                        },
-                                                                           "thresholdsStyle":  {
-                                                                                                   "mode":  "off"
-                                                                                               }
-                                                                       },
-                                                            "mappings":  [
-
-                                                                         ],
-                                                            "thresholds":  {
-                                                                               "mode":  "absolute",
-                                                                               "steps":  [
-                                                                                             {
-                                                                                                 "color":  "green",
-                                                                                                 "value":  null
-                                                                                             },
-                                                                                             {
-                                                                                                 "color":  "red",
-                                                                                                 "value":  80
-                                                                                             }
-                                                                                         ]
-                                                                           },
-                                                            "unit":  "bytes"
-                                                        },
-                                           "overrides":  [
-
-                                                         ]
-                                       },
-                       "gridPos":  {
-                                       "h":  8,
-                                       "w":  8,
-                                       "x":  16,
-                                       "y":  16
-                                   },
-                       "id":  9,
-                       "interval":  "5s",
-                       "options":  {
-                                       "legend":  {
-                                                      "calcs":  [
-                                                                    "lastNotNull"
-                                                                ],
-                                                      "displayMode":  "table",
-                                                      "placement":  "bottom"
-                                                  },
-                                       "tooltip":  {
-                                                       "mode":  "single"
-                                                   }
-                                   },
-                       "targets":  [
-                                       {
-                                           "expr":  "qmmd_gpu_memory_used_bytes{device=\"$Device\", mem_type=\"vram\"}",
-                                           "legendFormat":  "VRAM Used",
-                                           "refId":  "A"
-                                       },
-                                       {
-                                           "expr":  "qmmd_gpu_memory_total_bytes{device=\"$Device\", mem_type=\"vram\"}",
-                                           "legendFormat":  "VRAM Total",
-                                           "refId":  "B"
-                                       }
-                                   ],
-                       "title":  "VRAM Usage",
-                       "type":  "timeseries"
-                   },
-                   {
-                       "datasource":  {
-                                          "type":  "prometheus",
-                                          "uid":  "${datasource}"
-                                      },
-                       "fieldConfig":  {
-                                           "defaults":  {
-                                                            "color":  {
-                                                                          "mode":  "thresholds"
-                                                                      },
-                                                            "mappings":  [
-
-                                                                         ],
-                                                            "thresholds":  {
-                                                                               "mode":  "absolute",
-                                                                               "steps":  [
-                                                                                             {
-                                                                                                 "color":  "green",
-                                                                                                 "value":  null
-                                                                                             },
-                                                                                             {
-                                                                                                 "color":  "orange",
-                                                                                                 "value":  1500
-                                                                                             },
-                                                                                             {
-                                                                                                 "color":  "red",
-                                                                                                 "value":  2000
-                                                                                             }
-                                                                                         ]
-                                                                           },
-                                                            "unit":  "rpm"
-                                                        },
-                                           "overrides":  [
-
-                                                         ]
-                                       },
-                       "gridPos":  {
-                                       "h":  8,
-                                       "w":  4,
-                                       "x":  0,
-                                       "y":  24
-                                   },
-                       "id":  10,
-                       "interval":  "5s",
-                       "options":  {
-                                       "colorMode":  "value",
-                                       "graphMode":  "area",
-                                       "justifyMode":  "auto",
-                                       "orientation":  "auto",
-                                       "reduceOptions":  {
-                                                             "calcs":  [
-                                                                           "lastNotNull"
-                                                                       ],
-                                                             "fields":  "",
-                                                             "values":  false
-                                                         },
-                                       "textMode":  "auto"
-                                   },
-                       "targets":  [
-                                       {
-                                           "legendFormat":  "VRAM Used %",
-                                           "expr":  "scalar(gpu_memory{job=\"xpumanager\", type=\"vram_used\"}) / scalar(gpu_memory{job=\"xpumanager\", type=\"vram_total\"}) * 100",
-                                           "refId":  "A"
-                                       }
-                                   ],
-                       "title":  "Fan Speed",
-                       "type":  "stat"
-                   },
-                   {
-                       "datasource":  {
-                                          "type":  "prometheus",
-                                          "uid":  "${datasource}"
-                                      },
-                       "fieldConfig":  {
-                                           "defaults":  {
-                                                            "color":  {
-                                                                          "mode":  "thresholds"
-                                                                      },
-                                                            "mappings":  [
-
-                                                                         ],
-                                                            "thresholds":  {
-                                                                               "mode":  "absolute",
-                                                                               "steps":  [
-                                                                                             {
-                                                                                                 "color":  "green",
-                                                                                                 "value":  null
-                                                                                             }
-                                                                                         ]
-                                                                           },
-                                                            "unit":  "hertz"
-                                                        },
-                                           "overrides":  [
-
-                                                         ]
-                                       },
-                       "gridPos":  {
-                                       "h":  8,
-                                       "w":  4,
-                                       "x":  4,
-                                       "y":  24
-                                   },
-                       "id":  11,
-                       "interval":  "5s",
-                       "options":  {
-                                       "colorMode":  "value",
-                                       "graphMode":  "area",
-                                       "justifyMode":  "auto",
-                                       "orientation":  "auto",
-                                       "reduceOptions":  {
-                                                             "calcs":  [
-                                                                           "lastNotNull"
-                                                                       ],
-                                                             "fields":  "",
-                                                             "values":  false
-                                                         },
-                                       "textMode":  "auto"
-                                   },
-                       "targets":  [
-                                       {
-                                           "expr":  "qmmd_gpu_actual_frequency_hertz{device=\"$Device\", freq_id=\"gt0\"}",
-                                           "legendFormat":  "Render (gt0)",
-                                           "refId":  "A"
-                                       },
-                                       {
-                                           "expr":  "qmmd_gpu_actual_frequency_hertz{device=\"$Device\", freq_id=\"gt1\"}",
-                                           "legendFormat":  "Media (gt1)",
-                                           "refId":  "B"
-                                       }
-                                   ],
-                       "title":  "Current Frequency",
-                       "type":  "stat"
-                   },
-                   {
-                       "datasource":  {
-                                          "type":  "prometheus",
-                                          "uid":  "${datasource}"
-                                      },
-                       "fieldConfig":  {
-                                           "defaults":  {
-                                                            "color":  {
-                                                                          "mode":  "palette-classic"
-                                                                      },
-                                                            "custom":  {
-                                                                           "axisLabel":  "",
-                                                                           "axisPlacement":  "auto",
-                                                                           "drawStyle":  "line",
-                                                                           "fillOpacity":  10,
-                                                                           "gradientMode":  "none",
-                                                                           "lineInterpolation":  "smooth",
-                                                                           "lineWidth":  2,
-                                                                           "pointSize":  5,
-                                                                           "showPoints":  "never",
-                                                                           "spanNulls":  false,
-                                                                           "stacking":  {
-                                                                                            "group":  "A",
-                                                                                            "mode":  "none"
-                                                                                        },
-                                                                           "thresholdsStyle":  {
-                                                                                                   "mode":  "off"
-                                                                                               }
-                                                                       },
-                                                            "mappings":  [
-
-                                                                         ],
-                                                            "thresholds":  {
-                                                                               "mode":  "absolute",
-                                                                               "steps":  [
-                                                                                             {
-                                                                                                 "color":  "green",
-                                                                                                 "value":  null
-                                                                                             }
-                                                                                         ]
-                                                                           },
-                                                            "unit":  "rpm"
-                                                        },
-                                           "overrides":  [
-
-                                                         ]
-                                       },
-                       "gridPos":  {
-                                       "h":  8,
-                                       "w":  16,
-                                       "x":  8,
-                                       "y":  24
-                                   },
-                       "id":  12,
-                       "interval":  "5s",
-                       "options":  {
-                                       "legend":  {
-                                                      "calcs":  [
-                                                                    "mean",
-                                                                    "max"
-                                                                ],
-                                                      "displayMode":  "table",
-                                                      "placement":  "bottom"
-                                                  },
-                                       "tooltip":  {
-                                                       "mode":  "single"
-                                                   }
-                                   },
-                       "targets":  [
-                                       {
-                                           "expr":  "qmmd_gpu_fan_speed_rpm{device=\"$Device\"}",
-                                           "legendFormat":  "Fan {{fan_id}}",
-                                           "refId":  "A"
-                                       }
-                                   ],
-                       "title":  "Fan Speed",
-                       "type":  "timeseries"
-                   }
-               ],
-    "refresh":  "5s",
-    "schemaVersion":  37,
-    "style":  "dark",
-    "tags":  [
-                 "gpu",
-                 "intel",
-                 "qmassa"
-             ],
-    "templating":  {
-                       "list":  [
-                                    {
-                                        "current":  {
-                                                        "selected":  true,
-                                                        "text":  "Prometheus",
-                                                        "value":  "Prometheus"
-                                                    },
-                                        "hide":  0,
-                                        "includeAll":  false,
-                                        "label":  "Datasource",
-                                        "multi":  false,
-                                        "name":  "datasource",
-                                        "options":  [
-
-                                                    ],
-                                        "query":  "prometheus",
-                                        "queryValue":  "",
-                                        "refresh":  1,
-                                        "regex":  "",
-                                        "skipUrlSync":  false,
-                                        "type":  "datasource"
-                                    },
-                                    {
-                                        "allValue":  null,
-                                        "current":  {
-                                                        "selected":  false,
-                                                        "text":  "0000:04:00.0",
-                                                        "value":  "0000:04:00.0"
-                                                    },
-                                        "datasource":  {
-                                                           "type":  "prometheus",
-                                                           "uid":  "${datasource}"
-                                                       },
-                                        "definition":  "label_values(qmmd_gpu_power_watts, device)",
-                                        "description":  null,
-                                        "error":  null,
-                                        "hide":  0,
-                                        "includeAll":  false,
-                                        "label":  "Device",
-                                        "multi":  false,
-                                        "name":  "Device",
-                                        "options":  [
-
-                                                    ],
-                                        "query":  {
-                                                      "query":  "label_values(qmmd_gpu_power_watts, device)",
-                                                      "refId":  "StandardVariableQuery"
-                                                  },
-                                        "refresh":  1,
-                                        "regex":  "",
-                                        "skipUrlSync":  false,
-                                        "sort":  0,
-                                        "type":  "query"
-                                    }
-                                ]
-                   },
-    "time":  {
-                 "from":  "now-15m",
-                 "to":  "now"
-             },
-    "timepicker":  {
-
-                   },
-    "timezone":  "",
-    "title":  "Intel GPU Metrics (qmassa)",
-    "uid":  "9VxbZDPnk",
-    "version":  5
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisPlacement": "auto",
+                        "drawStyle": "line",
+                        "fillOpacity": 10,
+                        "gradientMode": "none",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 0.8
+                            }
+                        ]
+                    },
+                    "unit": "percentunit"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 0,
+                "y": 0
+            },
+            "id": 1,
+            "interval": "5s",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "lastNotNull"
+                    ],
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "avg by (pci_bdf) (hw_gpu_utilization_ratio{job=\"xpumanager\"})",
+                    "legendFormat": "{{pci_bdf}}",
+                    "refId": "A"
+                }
+            ],
+            "title": "GPU Utilization",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "max": 1,
+                    "min": 0,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 0.5
+                            },
+                            {
+                                "color": "red",
+                                "value": 0.8
+                            }
+                        ]
+                    },
+                    "unit": "percentunit"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 4,
+                "x": 8,
+                "y": 0
+            },
+            "id": 2,
+            "interval": "5s",
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "avg by (pci_bdf) (hw_gpu_utilization_ratio{job=\"xpumanager\"})",
+                    "legendFormat": "{{pci_bdf}}",
+                    "refId": "A"
+                }
+            ],
+            "title": "GPU Utilization",
+            "type": "gauge"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisPlacement": "auto",
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "rothz"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 12,
+                "y": 0
+            },
+            "id": 3,
+            "interval": "5s",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "lastNotNull"
+                    ],
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_frequency_hertz{aggregation=\"avg\", job=\"xpumanager\"}",
+                    "legendFormat": "{{hw_frequency_domain}}",
+                    "refId": "A"
+                }
+            ],
+            "title": "GPU Frequency",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "rothz"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 4,
+                "x": 20,
+                "y": 0
+            },
+            "id": 4,
+            "interval": "5s",
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_frequency_hertz{aggregation=\"avg\", job=\"xpumanager\"}",
+                    "legendFormat": "{{hw_frequency_domain}}",
+                    "refId": "A"
+                }
+            ],
+            "title": "GPU Frequency",
+            "type": "gauge"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisPlacement": "auto",
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "orange",
+                                "value": 75
+                            },
+                            {
+                                "color": "red",
+                                "value": 90
+                            }
+                        ]
+                    },
+                    "unit": "celsius"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 0,
+                "y": 8
+            },
+            "id": 5,
+            "interval": "5s",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "max"
+                    ],
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_temperature_celsius{statistic=\"min\", job=\"xpumanager\", hw_sensor_location=\"gpu\"}",
+                    "legendFormat": "min: GPU",
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_temperature_celsius{statistic=\"max\", job=\"xpumanager\", hw_sensor_location=\"gpu\"}",
+                    "legendFormat": "max: GPU",
+                    "refId": "B"
+                }
+            ],
+            "title": "GPU Temperature",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "orange",
+                                "value": 75
+                            },
+                            {
+                                "color": "red",
+                                "value": 90
+                            }
+                        ]
+                    },
+                    "unit": "celsius"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 4,
+                "x": 8,
+                "y": 8
+            },
+            "id": 6,
+            "interval": "5s",
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_temperature_celsius{statistic=\"max\", job=\"xpumanager\", hw_sensor_location=\"gpu\"}",
+                    "legendFormat": "GPU",
+                    "refId": "A"
+                }
+            ],
+            "title": "GPU Temperature",
+            "type": "gauge"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisPlacement": "auto",
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "orange",
+                                "value": 75
+                            },
+                            {
+                                "color": "red",
+                                "value": 90
+                            }
+                        ]
+                    },
+                    "unit": "celsius"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 12,
+                "y": 8
+            },
+            "id": 7,
+            "interval": "5s",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "max"
+                    ],
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_temperature_celsius{statistic=\"min\", job=\"xpumanager\", hw_sensor_location=\"memory\"}",
+                    "legendFormat": "min: Memory",
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_temperature_celsius{statistic=\"max\", job=\"xpumanager\", hw_sensor_location=\"memory\"}",
+                    "legendFormat": "max: Memory",
+                    "refId": "B"
+                }
+            ],
+            "title": "Memory Temperature",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "orange",
+                                "value": 75
+                            },
+                            {
+                                "color": "red",
+                                "value": 90
+                            }
+                        ]
+                    },
+                    "unit": "celsius"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 4,
+                "x": 20,
+                "y": 8
+            },
+            "id": 8,
+            "interval": "5s",
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_temperature_celsius{statistic=\"max\", job=\"xpumanager\", hw_sensor_location=\"memory\"}",
+                    "legendFormat": "Memory",
+                    "refId": "A"
+                }
+            ],
+            "title": "Memory Temperature",
+            "type": "gauge"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisPlacement": "auto",
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 200
+                            }
+                        ]
+                    },
+                    "unit": "watt"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 0,
+                "y": 16
+            },
+            "id": 9,
+            "interval": "5s",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "max"
+                    ],
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_power_watts{job=\"xpumanager\"}",
+                    "legendFormat": "{{hw_sensor_location}}",
+                    "refId": "A"
+                }
+            ],
+            "title": "Power",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "orange",
+                                "value": 150
+                            },
+                            {
+                                "color": "red",
+                                "value": 200
+                            }
+                        ]
+                    },
+                    "unit": "watt"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 4,
+                "x": 8,
+                "y": 16
+            },
+            "id": 10,
+            "interval": "5s",
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_power_watts{job=\"xpumanager\"}",
+                    "legendFormat": "{{hw_sensor_location}}",
+                    "refId": "A"
+                }
+            ],
+            "title": "Power",
+            "type": "gauge"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisPlacement": "auto",
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "joule"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 12,
+                "y": 16
+            },
+            "id": 11,
+            "interval": "5s",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_energy_joules_total{job=\"xpumanager\"}",
+                    "legendFormat": "{{hw_sensor_location}}",
+                    "refId": "A"
+                }
+            ],
+            "title": "Energy",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "joule"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 4,
+                "x": 20,
+                "y": 16
+            },
+            "id": 12,
+            "interval": "5s",
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "auto"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_energy_joules_total{job=\"xpumanager\"}",
+                    "legendFormat": "{{hw_sensor_location}}",
+                    "refId": "A"
+                }
+            ],
+            "title": "Energy",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisPlacement": "auto",
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "lineInterpolation": "linear",
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "bytes"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 0,
+                "y": 24
+            },
+            "id": 13,
+            "interval": "5s",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_memory_usage_bytes{job=\"xpumanager\"}",
+                    "legendFormat": "Used",
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_memory_size_bytes{job=\"xpumanager\"}",
+                    "legendFormat": "Total",
+                    "refId": "B"
+                }
+            ],
+            "title": "Memory Used",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisPlacement": "auto",
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "bytes"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 6,
+                "y": 24
+            },
+            "id": 14,
+            "interval": "5s",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_memory_io_bytes_total{network_io_direction=\"receive\", job=\"xpumanager\"}",
+                    "legendFormat": "Read",
+                    "refId": "A"
+                }
+            ],
+            "title": "Memory Read",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "binBps"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 3,
+                "x": 12,
+                "y": 24
+            },
+            "id": 15,
+            "interval": "5s",
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "auto"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "rate(hw_memory_io_bytes_total{network_io_direction=\"receive\", job=\"xpumanager\"}[10s])",
+                    "legendFormat": "Read",
+                    "refId": "A"
+                }
+            ],
+            "title": "Mem Read Rate",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisPlacement": "auto",
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "bytes"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 15,
+                "y": 24
+            },
+            "id": 16,
+            "interval": "5s",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_memory_io_bytes_total{network_io_direction=\"transmit\", job=\"xpumanager\"}",
+                    "legendFormat": "Write",
+                    "refId": "A"
+                }
+            ],
+            "title": "Memory Write",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "binBps"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 3,
+                "x": 21,
+                "y": 24
+            },
+            "id": 17,
+            "interval": "5s",
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "auto"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "rate(hw_memory_io_bytes_total{network_io_direction=\"transmit\", job=\"xpumanager\"}[10s])",
+                    "legendFormat": "Write",
+                    "refId": "A"
+                }
+            ],
+            "title": "Mem Write Rate",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisPlacement": "auto",
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "percentunit"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 0,
+                "y": 32
+            },
+            "id": 18,
+            "interval": "5s",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "lastNotNull"
+                    ],
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_memory_usage_bytes{job=\"xpumanager\"} / hw_memory_size_bytes{job=\"xpumanager\"}",
+                    "legendFormat": "VRAM %",
+                    "refId": "A"
+                }
+            ],
+            "title": "Memory Utilization",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisPlacement": "auto",
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "percentunit"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 6,
+                "y": 32
+            },
+            "id": 19,
+            "interval": "5s",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "lastNotNull"
+                    ],
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_memory_bandwidth_utilization_ratio{job=\"xpumanager\"}",
+                    "legendFormat": "Mem BW",
+                    "refId": "A"
+                }
+            ],
+            "title": "Memory Bandwidth",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisPlacement": "auto",
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "percentunit"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 12,
+                "y": 32
+            },
+            "id": 20,
+            "interval": "5s",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "lastNotNull"
+                    ],
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "avg by (pci_bdf, hw_gpu_task) (hw_gpu_utilization_ratio{job=\"xpumanager\"})",
+                    "legendFormat": "{{hw_gpu_task}}",
+                    "refId": "A"
+                }
+            ],
+            "title": "Engine Group Utilization",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisPlacement": "auto",
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "percentunit"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 18,
+                "y": 32
+            },
+            "id": 21,
+            "interval": "5s",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "lastNotNull"
+                    ],
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_gpu_utilization_ratio{job=\"xpumanager\"}",
+                    "legendFormat": "{{hw_name}}",
+                    "refId": "A"
+                }
+            ],
+            "title": "Per Engine Utilization",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisPlacement": "auto",
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "bytes"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 0,
+                "y": 40
+            },
+            "id": 22,
+            "interval": "5s",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_gpu_io_bytes_total{network_io_direction=\"receive\", job=\"xpumanager\"}",
+                    "legendFormat": "PCIe Read",
+                    "refId": "A"
+                }
+            ],
+            "title": "PCIe Read",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "binBps"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 3,
+                "x": 6,
+                "y": 40
+            },
+            "id": 23,
+            "interval": "5s",
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "auto"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "rate(hw_gpu_io_bytes_total{network_io_direction=\"receive\", job=\"xpumanager\"}[10s])",
+                    "legendFormat": "Read",
+                    "refId": "A"
+                }
+            ],
+            "title": "PCIe Read Rate",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisPlacement": "auto",
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "bytes"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 9,
+                "y": 40
+            },
+            "id": 24,
+            "interval": "5s",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_gpu_io_bytes_total{network_io_direction=\"transmit\", job=\"xpumanager\"}",
+                    "legendFormat": "PCIe Write",
+                    "refId": "A"
+                }
+            ],
+            "title": "PCIe Write",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "binBps"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 3,
+                "x": 15,
+                "y": 40
+            },
+            "id": 25,
+            "interval": "5s",
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "auto"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "rate(hw_gpu_io_bytes_total{network_io_direction=\"transmit\", job=\"xpumanager\"}[10s])",
+                    "legendFormat": "Write",
+                    "refId": "A"
+                }
+            ],
+            "title": "PCIe Write Rate",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    },
+                    "unit": "none"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 18,
+                "y": 40
+            },
+            "id": 26,
+            "interval": "30s",
+            "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "horizontal",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^hw_model$/",
+                    "values": false
+                },
+                "textMode": "name"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "hw_gpu_info{job=\"xpumanager\"}",
+                    "format": "table",
+                    "instant": true,
+                    "legendFormat": "{{hw_model}}",
+                    "refId": "A"
+                }
+            ],
+            "title": "GPU Info",
+            "type": "stat"
+        }
+    ],
+    "refresh": "5s",
+    "schemaVersion": 39,
+    "tags": [
+        "xpum",
+        "gpu",
+        "intel"
+    ],
+    "templating": {
+        "list": [
+            {
+                "current": {
+                    "text": "Prometheus",
+                    "value": "prometheus"
+                },
+                "hide": 0,
+                "includeAll": false,
+                "label": "Datasource",
+                "multi": false,
+                "name": "datasource",
+                "options": [],
+                "query": "prometheus",
+                "refresh": 1,
+                "type": "datasource"
+            }
+        ]
+    },
+    "time": {
+        "from": "now-15m",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "Intel XPU Manager v2",
+    "uid": "xpumd-v2",
+    "version": 1
 }

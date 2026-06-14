@@ -230,10 +230,10 @@ data:
               description: "{{ $labels.job }}/{{ $labels.instance }} is unreachable"
 
           - alert: GpuOverheating
-            expr: xpum_gpu_temperature > 85
+            expr: hw_temperature_celsius{hw_sensor_location="gpu", statistic="max"} > 85
             for: 5m
             labels:
               severity: critical
             annotations:
               summary: "GPU temperature critical"
-              description: "GPU temperature on {{ $labels.instance }} exceeds 85°C"
+              description: "GPU temperature on {{ $labels.pci_bdf }} exceeds 85°C ({{ $value }}°C)"

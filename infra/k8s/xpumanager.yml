@@ -1,3 +1,73 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: xpumd-config
+  namespace: default
+data:
+  config.yaml: |
+    receivers:
+      intelxpu:
+        collection_interval: 5s
+        initial_delay: 1s
+        timeout: 0
+        sampling_interval: 1s
+
+    processors:
+      intelxpustatus:
+        rules:
+          - name: "Intel GPU core temperature health"
+            source_metric: "hw.temperature"
+            parent_metric: "hw.gpu.info"
+            parent_ref_attribute: "hw.id"
+            parent_filters:
+              - key: "pci.vendor_id"
+                values: ["8086"]
+            component_filters:
+              - key: "hw.sensor_location"
+                values: ["gpu"]
+            copy_attributes: ["hw.id", "hw.name", "pci.bdf", "hw.sensor_location", "com.intel.subdevice_id"]
+            add_attributes:
+              hw.type: "temperature"
+            states:
+              - state_name: "ok"
+              - state_name: "warning"
+                conditions:
+                  - value: 85.0
+          - name: "Intel GPU memory temperature health"
+            source_metric: "hw.temperature"
+            parent_metric: "hw.gpu.info"
+            parent_ref_attribute: "hw.id"
+            parent_filters:
+              - key: "pci.vendor_id"
+                values: ["8086"]
+            component_filters:
+              - key: "hw.sensor_location"
+                values: ["memory"]
+            copy_attributes: ["hw.id", "hw.name", "pci.bdf", "hw.sensor_location", "com.intel.subdevice_id"]
+            add_attributes:
+              hw.type: "temperature"
+            states:
+              - state_name: "ok"
+              - state_name: "warning"
+                conditions:
+                  - value: 85.0
+
+    exporters:
+      prometheus:
+        endpoint: "0.0.0.0:9273"
+
+    extensions:
+
+    service:
+      telemetry:
+        logs:
+          level: info
+      pipelines:
+        metrics:
+          receivers: [intelxpu]
+          processors: [intelxpustatus]
+          exporters: [prometheus]
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -15,45 +85,43 @@ spec:
         app: xpumanager
     spec:
       automountServiceAccountToken: false
-      hostPID: true
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       nodeSelector:
         kubernetes.io/hostname: inference
       containers:
-        - name: qmmd
-          image: intel/metrics-manager:2026.1.0-rc2
-          command: ["sh", "-c"]
+        - name: xpumd
+          image: ghcr.io/intel/xpumanager/xpumd:v2.0.0
           args:
-            - |
-              if command -v qmmd >/dev/null 2>&1; then
-                exec qmmd -d 0000:04:00.0 -p 9273 -i 0.0.0.0
-              else
-                # Fallback: patch supervisord to pass device to qmassa, then start
-                sed -i 's|command=qmassa|command=qmassa -d 0000:04:00.0|' /etc/supervisor/supervisord.conf
-                exec /usr/local/bin/supervisord -c /etc/supervisor/supervisord.conf
-              fi
+            - "--config"
+            - "/etc/xpumd/config.yaml"
           ports:
             - containerPort: 9273
               name: metrics
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            runAsUser: 0
+            capabilities:
+              drop: ["ALL"]
+              add: ["SYS_ADMIN"]
           volumeMounts:
+            - name: config
+              mountPath: /etc/xpumd
+              readOnly: true
             - name: sys
               mountPath: /sys
               readOnly: true
-            - name: run
-              mountPath: /run
-              readOnly: true
-            - name: devdri
-              mountPath: /dev/dri
-          securityContext:
-            privileged: true
+            - name: rundir
+              mountPath: /run/xpumd
           resources:
             requests:
-              cpu: 50m
+              cpu: 10m
               memory: 128Mi
-              ephemeral-storage: 32Mi
             limits:
-              cpu: 200m
-              memory: 256Mi
-              ephemeral-storage: 64Mi
+              gpu.intel.com/xe: 1
+              memory: 2Gi
           startupProbe:
             httpGet:
               path: /metrics
@@ -75,15 +143,14 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
       volumes:
+        - name: config
+          configMap:
+            name: xpumd-config
         - name: sys
           hostPath:
             path: /sys
-        - name: run
-          hostPath:
-            path: /run
-        - name: devdri
-          hostPath:
-            path: /dev/dri
+        - name: rundir
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -99,7 +166,6 @@ spec:
       targetPort: 9273
       name: metrics
 ---
-# Expose via Traefik at xpumanager.local
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:

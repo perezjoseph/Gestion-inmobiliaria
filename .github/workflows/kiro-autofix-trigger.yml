@@ -315,6 +315,10 @@ jobs:
           find "${RUNNER_TEMP}/all-diag" -type f -exec ls -la {} \; 2>/dev/null || echo "No files found"
           echo ""
 
+          # Ensure all downloaded files are readable (DinD runners may have
+          # mismatched uid between the download action and kiro-cli).
+          chmod -R u+rw "${RUNNER_TEMP}/all-diag"
+
           # Fix flat downloads: when only 1 artifact matches the pattern,
           # download-artifact may place files directly in the path dir
           # instead of a subdirectory. Detect and reorganize.
@@ -421,6 +425,7 @@ jobs:
           umask 077
           DATA_HOME="${RUNNER_TEMP}/kiro-data"
           mkdir -p "${DATA_HOME}/kiro-cli" "${HOME}/.local/share/kiro-cli"
+          chmod -R u+rwX "${DATA_HOME}"
           echo "XDG_DATA_HOME=${DATA_HOME}" >> "$GITHUB_ENV"
           echo "kiro-cli data dir ready: ${DATA_HOME}/kiro-cli"
 
@@ -514,6 +519,15 @@ jobs:
               continue
             fi
 
+            # Skip deploy artifacts where pods crash due to filesystem permission denied.
+            # This is a container/volume/secret mount issue, not a code issue.
+            if [[ "$artifact" == diag-deploy-* ]] && grep -qF "Permission denied (os error 13)" "$EFFECTIVE_CTX"; then
+              echo "::notice::Skipping ${artifact}: filesystem permission denied in pod (check volume mounts, secret permissions, or container securityContext)"
+              printf '[%s] SKIPPED: Permission denied (os error 13) — check volume/secret mounts and securityContext in K8s manifests\n' "$artifact" >> "$LEARNINGS_FILE"
+              echo "::endgroup::"
+              continue
+            fi
+
             # Skip artifacts whose errors reference only files already fixed by prior queue items.
             if [ -n "$FIXED_FILES" ]; then
               DIAG_FILES=$(grep -oP '(?:^|\s)(\S+\.(?:rs|ts|tsx|kt|kts))' "$EFFECTIVE_CTX" | sort -u || true)
@@ -593,6 +607,13 @@ jobs:
               echo "No changes produced by Kiro for ${artifact}, skipping commit"
               printf '[%s] NO CHANGES: agent exit=%d, no files modified\n' "$artifact" "$AGENT_EXIT" >> "$LEARNINGS_FILE"
               if [ "$AGENT_EXIT" -ne 0 ]; then
+                # Deploy artifacts often represent infrastructure issues that
+                # no code change can fix. Don't stop the whole queue for them.
+                if [[ "$artifact" == diag-deploy-* ]]; then
+                  echo "::warning::Agent exited ${AGENT_EXIT} with no changes for ${artifact} (deploy artifact — continuing queue)."
+                  echo "::endgroup::"
+                  continue
+                fi
                 echo "::warning::Agent exited ${AGENT_EXIT} with no changes for ${artifact}; stopping queue."
                 echo "::endgroup::"
                 break
