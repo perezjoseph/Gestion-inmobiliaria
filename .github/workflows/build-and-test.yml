@@ -221,8 +221,8 @@ jobs:
             mkdir -p coverage
             COV_TARGET="${CARGO_TARGET_DIR:-target}/llvm-cov-target"
             mkdir -p "$COV_TARGET"
+            export CARGO_TARGET_DIR="$COV_TARGET"
             cargo llvm-cov test --locked -p realestate-backend \
-              --target-dir "$COV_TARGET" \
               --lcov --output-path coverage/lcov.info 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
             exit ${PIPESTATUS[0]}
 
