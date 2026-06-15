@@ -118,7 +118,7 @@ jobs:
   backend-test:
     name: Backend Test
     runs-on: arc-runner-dind
-    timeout-minutes: 30
+    timeout-minutes: 45
     if: ${{ !inputs.is-fork-pr && !inputs.skip-backend }}
     permissions:
       actions: read
@@ -203,6 +203,7 @@ jobs:
           if [ -d "$COV_TARGET" ]; then
             echo "Removing stale profraw files (keeping compiled artifacts)"
             find "$COV_TARGET" -name '*.profraw' -delete 2>/dev/null || true
+            find "$COV_TARGET" -name '*.profdata' -delete 2>/dev/null || true
           fi
 
       - name: Run tests with coverage (llvm-cov)
@@ -218,7 +219,10 @@ jobs:
           max_attempts: 2
           command: |
             mkdir -p coverage
+            COV_TARGET="${CARGO_TARGET_DIR:-target}/llvm-cov-target"
+            mkdir -p "$COV_TARGET"
             cargo llvm-cov test --locked -p realestate-backend \
+              --target-dir "$COV_TARGET" \
               --lcov --output-path coverage/lcov.info 2>&1 | tee "${RUNNER_TEMP}/test-backend-output.txt"
             exit ${PIPESTATUS[0]}
 
