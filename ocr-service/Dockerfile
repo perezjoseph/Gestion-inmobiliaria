@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir --upgrade "pip>=26.1" \
     && pip install --no-cache-dir -r requirements.txt
 
 # Download PaddleOCR models and convert to OpenVINO IR format
-RUN pip install --no-cache-dir paddleocr==3.5.0 paddlepaddle==3.2.2
+RUN pip install --no-cache-dir paddleocr==3.5.0 paddlepaddle==3.2.2 paddle2onnx==2.0.1
 
 ENV PADDLE_PDX_CACHE_HOME=/app/.paddleocr
 ENV PADDLE_PDX_MODEL_SOURCE=BOS
