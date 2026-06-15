@@ -33,7 +33,7 @@ template:
       runAsNonRoot: false
     initContainers:
       - name: init-dind-externals
-        image: ghcr.io/perezjoseph/realestate-runner:4f8230c8f0353e83b414e8418cb7ae0d38f8640c
+        image: ghcr.io/perezjoseph/realestate-runner:1bcbdf2f4296b116eed11c274fa04a13bf046deb
         imagePullPolicy: IfNotPresent
         command:
           ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
@@ -41,7 +41,7 @@ template:
           - name: dind-externals
             mountPath: /home/runner/tmpDir
       - name: init-nfs-permissions
-        image: ghcr.io/perezjoseph/realestate-runner:4f8230c8f0353e83b414e8418cb7ae0d38f8640c
+        image: ghcr.io/perezjoseph/realestate-runner:1bcbdf2f4296b116eed11c274fa04a13bf046deb
         imagePullPolicy: IfNotPresent
         command:
           [
@@ -98,7 +98,7 @@ template:
             mountPath: /home/runner/externals
     containers:
       - name: runner
-        image: ghcr.io/perezjoseph/realestate-runner:4f8230c8f0353e83b414e8418cb7ae0d38f8640c
+        image: ghcr.io/perezjoseph/realestate-runner:1bcbdf2f4296b116eed11c274fa04a13bf046deb
         imagePullPolicy: IfNotPresent
         command: ["/home/runner/run.sh"]
         env:
