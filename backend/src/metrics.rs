@@ -178,6 +178,29 @@ pub static AUTH_REJECTIONS: LazyLock<IntCounter> = LazyLock::new(|| {
     )
 });
 
+pub static COLD_START_RETRIES: LazyLock<IntCounter> = LazyLock::new(|| {
+    unwrap_metric(
+        register_int_counter!(Opts::new(
+            "cold_start_retries_total",
+            "Reintentos de AI durante cold-start de vLLM"
+        )),
+        "cold_start_retries_total",
+    )
+});
+
+pub static COLD_START_OUTCOMES: LazyLock<IntCounterVec> = LazyLock::new(|| {
+    unwrap_metric(
+        register_int_counter_vec!(
+            Opts::new(
+                "cold_start_outcomes_total",
+                "Resultados de reintentos cold-start (success/failure)"
+            ),
+            &["result"]
+        ),
+        "cold_start_outcomes_total",
+    )
+});
+
 pub fn init() {
     let _ = &*AUTH_LOGIN_ATTEMPTS;
     let _ = &*PAGOS_PROCESADOS;
@@ -194,4 +217,6 @@ pub fn init() {
     let _ = &*GASTOS_REGISTRADOS;
     let _ = &*USUARIOS_ACTIVOS;
     let _ = &*AUTH_REJECTIONS;
+    let _ = &*COLD_START_RETRIES;
+    let _ = &*COLD_START_OUTCOMES;
 }

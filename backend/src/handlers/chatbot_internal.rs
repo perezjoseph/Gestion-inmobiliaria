@@ -1,5 +1,6 @@
 use actix_web::{HttpRequest, HttpResponse, web};
 use sea_orm::DatabaseConnection;
+use std::time::Duration;
 
 use crate::config::AppConfig;
 use crate::errors::AppError;
@@ -246,6 +247,170 @@ pub async fn incoming_webhook(
             }
 
             response.reply
+        }
+        Err(AppError::ServiceUnavailable(_reason)) => {
+            chatbot::persist_message(
+                db.get_ref(),
+                org_id,
+                &payload.sender_phone,
+                inquilino_id,
+                "user",
+                &payload.content,
+                &payload.message_type,
+                None,
+            )
+            .await?;
+
+            let wakeup_msg =
+                "Dame un momento, estoy despertando... ☕ Te respondo en unos minutos.";
+
+            if let Some(ref client) = baileys {
+                let _ = client
+                    .send_message(org_id, &payload.sender_phone, wakeup_msg)
+                    .await;
+            }
+
+            let _ = chatbot::persist_message(
+                db.get_ref(),
+                org_id,
+                &payload.sender_phone,
+                inquilino_id,
+                "assistant",
+                wakeup_msg,
+                "text",
+                None,
+            )
+            .await;
+
+            let ai_module_clone = ai_module.clone();
+            let db_clone = db.clone();
+            let baileys_clone = baileys.clone();
+            let phone = payload.sender_phone.clone();
+            let persona_clone = persona.clone();
+            let faqs_clone = faqs.clone();
+            let policies_clone = cfg.policies.clone();
+            let handoff_keywords_clone = handoff_keywords.clone();
+            let capabilities_clone = capabilities.clone();
+            let history_clone = history.clone();
+            let user_message_clone = user_message.clone();
+            let guidance_rules_clone = guidance_rules.clone();
+            let sender_policy_clone = cfg.sender_policy.clone();
+            let tenant_context_clone = tenant_context.clone();
+
+            tokio::spawn(async move {
+                let delays = [30u64, 60, 90, 120, 150, 180];
+                let mut success = false;
+
+                for (attempt, delay_secs) in delays.iter().enumerate() {
+                    tokio::time::sleep(Duration::from_secs(*delay_secs)).await;
+                    crate::metrics::COLD_START_RETRIES.inc();
+
+                    let retry_ctx = ProcessMessageContext {
+                        config: &persona_clone,
+                        tenant_context: tenant_context_clone.as_ref(),
+                        faqs: &faqs_clone,
+                        policies: policies_clone.as_deref(),
+                        handoff_keywords: &handoff_keywords_clone,
+                        capabilities: &capabilities_clone,
+                        history: &history_clone,
+                        user_message: &user_message_clone,
+                        db: db_clone.get_ref(),
+                        organizacion_id: org_id,
+                        sender_phone: &phone,
+                        guidance_rules: &guidance_rules_clone,
+                        sender_policy: &sender_policy_clone,
+                    };
+
+                    match ai_module_clone.process_message(&retry_ctx).await {
+                        Ok(response) => {
+                            let _ = chatbot::persist_message(
+                                db_clone.get_ref(),
+                                org_id,
+                                &phone,
+                                inquilino_id,
+                                "assistant",
+                                &response.reply,
+                                "text",
+                                None,
+                            )
+                            .await;
+
+                            if let Some(ref client) = baileys_clone {
+                                let _ = client.send_message(org_id, &phone, &response.reply).await;
+                            }
+
+                            if response
+                                .tools_invoked
+                                .contains(&"extract_receipt".to_string())
+                            {
+                                if let Some(ref receipt) = response.extracted_receipt {
+                                    let _ = chatbot::record_extraction_from_agent(
+                                        db_clone.get_ref(),
+                                        receipt,
+                                        org_id,
+                                        inquilino_id,
+                                    )
+                                    .await;
+                                }
+                            }
+
+                            crate::metrics::COLD_START_OUTCOMES
+                                .with_label_values(&["success"])
+                                .inc();
+                            success = true;
+
+                            tracing::info!(
+                                organizacion_id = %org_id,
+                                attempt = attempt + 1,
+                                "Cold-start retry exitoso"
+                            );
+                            break;
+                        }
+                        Err(AppError::ServiceUnavailable(_)) => {
+                            tracing::debug!(
+                                organizacion_id = %org_id,
+                                attempt = attempt + 1,
+                                delay_secs = delay_secs,
+                                "Cold-start retry: vLLM aún no disponible"
+                            );
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                organizacion_id = %org_id,
+                                error = %e,
+                                "Cold-start retry falló con error no recuperable"
+                            );
+                            break;
+                        }
+                    }
+                }
+
+                if !success {
+                    let failure_msg = "Lo siento, no pude procesar tu mensaje. Intente más tarde.";
+
+                    let _ = chatbot::persist_message(
+                        db_clone.get_ref(),
+                        org_id,
+                        &phone,
+                        inquilino_id,
+                        "assistant",
+                        failure_msg,
+                        "text",
+                        None,
+                    )
+                    .await;
+
+                    if let Some(ref client) = baileys_clone {
+                        let _ = client.send_message(org_id, &phone, failure_msg).await;
+                    }
+
+                    crate::metrics::COLD_START_OUTCOMES
+                        .with_label_values(&["failure"])
+                        .inc();
+                }
+            });
+
+            return Ok(HttpResponse::Ok().json(serde_json::json!({"status": "deferred"})));
         }
         Err(e) => {
             tracing::error!(

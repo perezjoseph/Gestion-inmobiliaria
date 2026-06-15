@@ -25,6 +25,8 @@ pub enum AppError {
     Gone(String),
     #[error("Bad Gateway: {0}")]
     BadGateway(String),
+    #[error("Servicio no disponible: {0}")]
+    ServiceUnavailable(String),
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
@@ -42,6 +44,7 @@ impl actix_web::error::ResponseError for AppError {
             Self::Conflict(_) => StatusCode::CONFLICT,
             Self::Gone(_) => StatusCode::GONE,
             Self::BadGateway(_) => StatusCode::BAD_GATEWAY,
+            Self::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -68,6 +71,7 @@ impl actix_web::error::ResponseError for AppError {
                 Self::Conflict(msg) => ("conflict", msg.clone()),
                 Self::Gone(msg) => ("gone", msg.clone()),
                 Self::BadGateway(msg) => ("bad_gateway", msg.clone()),
+                Self::ServiceUnavailable(msg) => ("service_unavailable", msg.clone()),
                 Self::Internal(_) => ("internal", "Error interno del servidor".to_string()),
                 Self::ValidationWithFields { .. } => unreachable!(),
             };

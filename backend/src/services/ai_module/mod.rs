@@ -125,6 +125,7 @@ pub struct TenantContext {
     pub name: String,
 }
 
+#[derive(Clone)]
 pub struct AiModule {
     pub(crate) model: OvmsCompletionModel,
     pub(crate) timeout_secs: u64,
@@ -289,14 +290,11 @@ impl AiModule {
                 if error_msg.contains("INFERENCE_COLD_START") {
                     tracing::info!(
                         organizacion_id = %ctx.organizacion_id,
-                        "vLLM en cold-start, devolviendo mensaje de espera"
+                        "vLLM en cold-start, retornando ServiceUnavailable"
                     );
-                    return Ok(AgentResponse {
-                        reply: "El asistente se está iniciando. Por favor, intente de nuevo en 1-2 minutos."
-                            .to_string(),
-                        tools_invoked: vec![],
-                        extracted_receipt: None,
-                    });
+                    return Err(AppError::ServiceUnavailable(
+                        "vLLM en cold-start".to_string(),
+                    ));
                 }
 
                 if error_msg.contains("Response blocked by safety filter") {
@@ -316,6 +314,19 @@ impl AiModule {
                     });
                 }
 
+                if error_msg.contains("Connection refused")
+                    || error_msg.contains("connection refused")
+                    || error_msg.contains("ConnectError")
+                {
+                    tracing::info!(
+                        organizacion_id = %ctx.organizacion_id,
+                        "vLLM connection refused — probable cold-start"
+                    );
+                    return Err(AppError::ServiceUnavailable(
+                        "Connection refused a vLLM".to_string(),
+                    ));
+                }
+
                 tracing::error!(
                     organizacion_id = %ctx.organizacion_id,
                     error = %e,
@@ -329,15 +340,11 @@ impl AiModule {
                 tracing::warn!(
                     organizacion_id = %ctx.organizacion_id,
                     timeout_secs = self.timeout_secs,
-                    "Timeout en la solicitud al modelo OVMS"
+                    "Timeout en solicitud al modelo — probable cold-start"
                 );
-                Ok(AgentResponse {
-                    reply: "Lo siento, el servicio está temporalmente no disponible. \
-                        Por favor, intente de nuevo en unos momentos."
-                        .to_string(),
-                    tools_invoked: vec![],
-                    extracted_receipt: None,
-                })
+                Err(AppError::ServiceUnavailable(
+                    "Timeout conectando a vLLM".to_string(),
+                ))
             }
         }
     }
