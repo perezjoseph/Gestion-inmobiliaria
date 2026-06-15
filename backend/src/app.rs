@@ -124,15 +124,10 @@ fn build_cors(config: &AppConfig) -> Cors {
     config.cors_origin.as_deref().map_or_else(
         || {
             tracing::warn!(
-                "CORS_ORIGIN no configurado — usando orígenes localhost para desarrollo. \
+                "CORS_ORIGIN no configurado — usando Cors::permissive() para desarrollo. \
                  Configure CORS_ORIGIN para producción."
             );
-            Cors::default()
-                .allowed_origin("http://localhost:1420")
-                .allowed_origin("http://localhost:8080")
-                .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
-                .allowed_headers(vec![header::AUTHORIZATION, header::CONTENT_TYPE])
-                .max_age(3600)
+            Cors::permissive()
         },
         |origin| {
             Cors::default()
