@@ -1,13 +1,9 @@
 FROM python:3.12-slim AS builder
 
-# Force rebuild to pick up latest Debian security patches.
-# Bump this date when OS-level CVEs have no pinnable fix version.
-ARG SECURITY_PATCH_DATE=2026-06-09
+ARG SECURITY_PATCH_DATE=2026-06-15
 
 WORKDIR /app
 
-# Upgrade base packages to pick up latest Debian security patches before
-# installing our own dependencies.
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
@@ -20,11 +16,9 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-# Upgrade pip before installing to pick up CVE fixes (CVE-2025-8869, CVE-2026-6357, CVE-2026-3219)
 RUN pip install --no-cache-dir --upgrade "pip>=26.1" \
     && pip install --no-cache-dir -r requirements.txt
 
-# Download PaddleOCR models and convert to OpenVINO IR format
 RUN pip install --no-cache-dir paddleocr==3.5.0 paddlepaddle==3.2.2 paddle2onnx==2.0.1
 
 ENV PADDLE_PDX_CACHE_HOME=/app/.paddleocr
@@ -48,17 +42,10 @@ COPY main.py ocr_engine.py ./
 
 FROM python:3.12-slim
 
-# Force rebuild to pick up latest Debian security patches.
-ARG SECURITY_PATCH_DATE=2026-06-09
+ARG SECURITY_PATCH_DATE=2026-06-15
 
 WORKDIR /app
 
-# Install system deps, Intel compute runtime (OpenCL for all Intel GPUs: HD 530+, UHD,
-# Iris Xe, Arc) from GitHub releases, and create non-root user with GPU access.
-# compute-runtime 26.09+ bundles legacy platform support (Gen9) in the main package.
-# apt-get upgrade pulls the latest Debian security patches for the base image
-# (libgnutls30t64, libssh2-1t64, libcurl4t64, libxml2, libc6, krb5, util-linux,
-# sed, etc.) so Trivy image scans don't flag the base OS packages.
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
