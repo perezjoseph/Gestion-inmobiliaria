@@ -11,7 +11,7 @@ WORKDIR /app/frontend
 RUN trunk build --release
 RUN cp -r /app/frontend/dist /app/dist
 
-FROM alpine:3.23 AS prebuilt
+FROM alpine:3.24 AS prebuilt
 WORKDIR /app
 COPY dist/ /app/dist/
 
@@ -32,7 +32,7 @@ RUN BUILDENV=$(ls -d /tmp/buildenv_*) && \
     go -C "$BUILDENV" mod tidy && \
     go -C "$BUILDENV" build -o /usr/bin/caddy -ldflags "-w -s" -trimpath -tags nobadger,nomysql,nopgx
 
-FROM alpine:3.23
+FROM alpine:3.24
 
 RUN apk upgrade --no-cache && \
     apk add --no-cache ca-certificates mailcap wget && \
