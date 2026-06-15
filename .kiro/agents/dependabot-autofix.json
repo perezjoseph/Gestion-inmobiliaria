@@ -1,0 +1,91 @@
+{
+    "name": "dependabot-autofix",
+    "description": "Dependency update autofix agent: adapts code to new package versions using Context7 and opensrc for research.",
+    "prompt": "file://../shared/dependabot-autofix-system.md",
+    "includeMcpJson": false,
+    "mcpServers": {
+        "context7": {
+            "type": "http",
+            "url": "https://mcp.context7.com/mcp"
+        }
+    },
+    "tools": [
+        "read",
+        "write",
+        "shell",
+        "code",
+        "grep",
+        "glob",
+        "introspect",
+        "thinking",
+        "@context7",
+        "knowledge"
+    ],
+    "allowedTools": [
+        "read",
+        "write",
+        "shell",
+        "code",
+        "grep",
+        "glob",
+        "introspect",
+        "thinking",
+        "@context7",
+        "knowledge"
+    ],
+    "toolsSettings": {
+        "write": {
+            "deniedPaths": [
+                ".kiro/agents/**",
+                ".kiro/steering/**",
+                ".kiro/skills/**"
+            ]
+        }
+    },
+    "resources": [
+        "file://../../AGENTS.md",
+        "file://../../.kiro/steering/**/*.md",
+        "skill://../../.kiro/skills/verify-fix-loop/SKILL.md",
+        "skill://../../.kiro/skills/opensrc-inspect/SKILL.md"
+    ],
+    "hooks": {
+        "agentSpawn": [
+            {
+                "command": "bash -c 'TMP=\"${RUNNER_TEMP:-/tmp}\"; rm -rf \"$TMP/autofix-sensors-ran.d\" 2>/dev/null; rm -f \"$TMP/autofix-modified-files.txt\" \"$TMP/autofix-stop-blocks.txt\" 2>/dev/null; echo \"Dependabot autofix session initialized. Research-first approach active: use Context7 for docs, opensrc for source truth.\"'"
+            }
+        ],
+        "preToolUse": [
+            {
+                "matcher": "execute_bash",
+                "command": "bash -c 'CMD=$(cat | jq -r .tool_input.command 2>/dev/null); if echo \"$CMD\" | grep -qE \"(^|[;&|]\\s*|\\bsh\\s+-c\\s+|\\bbash\\s+-c\\s+)git\\s+(-[a-zA-Z]\\s+)*(commit|push|checkout|reset|rebase|merge|stash|branch\\s+-[dD]|clean|tag\\s+-d)\"; then echo \"BLOCKED: git operation not allowed — the workflow handles git.\" >&2; exit 2; fi'"
+            },
+            {
+                "matcher": "str_replace",
+                "command": "bash -c 'INPUT=$(cat); RE=\"#\\[allow\\(|@ts-ignore|@ts-nocheck|eslint-disable|@Suppress|# type: ignore|# noqa\"; NEW=$(echo \"$INPUT\" | jq -r \".tool_input.newStr // empty\" 2>/dev/null); OLD=$(echo \"$INPUT\" | jq -r \".tool_input.oldStr // empty\" 2>/dev/null); NEW_N=$(printf \"%s\" \"$NEW\" | grep -oE \"$RE\" | wc -l | tr -d \" \"); OLD_N=$(printf \"%s\" \"$OLD\" | grep -oE \"$RE\" | wc -l | tr -d \" \"); if [ \"$NEW_N\" -gt \"$OLD_N\" ]; then echo \"BLOCKED: this edit adds a NET-NEW suppression directive ($OLD_N -> $NEW_N). Fix the root cause instead of silencing the warning.\" >&2; exit 2; fi'"
+            },
+            {
+                "matcher": "fs_write",
+                "command": "bash -c 'INPUT=$(cat); RE=\"#\\[allow\\(|@ts-ignore|@ts-nocheck|eslint-disable|@Suppress|# type: ignore|# noqa\"; PATH_=$(echo \"$INPUT\" | jq -r \".tool_input.path // empty\" 2>/dev/null); NEW=$(echo \"$INPUT\" | jq -r \".tool_input.text // empty\" 2>/dev/null); NEW_N=$(printf \"%s\" \"$NEW\" | grep -oE \"$RE\" | wc -l | tr -d \" \"); OLD_N=0; if [ -f \"$PATH_\" ]; then OLD_N=$(grep -oE \"$RE\" \"$PATH_\" | wc -l | tr -d \" \"); fi; if [ \"$NEW_N\" -gt \"$OLD_N\" ]; then echo \"BLOCKED: this write adds a NET-NEW suppression directive ($OLD_N -> $NEW_N). Fix the root cause instead of silencing the warning.\" >&2; exit 2; fi'"
+            }
+        ],
+        "postToolUse": [
+            {
+                "matcher": "fs_write",
+                "command": "bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \"$FILE\" in *.rs) cargo fmt -- \"$FILE\" 2>/dev/null || true ;; */baileys-service/*.ts|*/baileys-service/*.tsx) cd baileys-service && npx eslint --fix \"$FILE\" 2>/dev/null || true ;; */android/*.kt) cd android && ./gradlew spotlessApply -PspotlessFiles=\"$FILE\" 2>/dev/null || true ;; */ocr-service/*.py) cd ocr-service && ruff format \"$FILE\" 2>/dev/null || true ;; esac; echo \"$FILE\" >> \"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\"'"
+            },
+            {
+                "matcher": "str_replace",
+                "command": "bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \"$FILE\" in *.rs) cargo fmt -- \"$FILE\" 2>/dev/null || true ;; */baileys-service/*.ts|*/baileys-service/*.tsx) cd baileys-service && npx eslint --fix \"$FILE\" 2>/dev/null || true ;; */android/*.kt) cd android && ./gradlew spotlessApply -PspotlessFiles=\"$FILE\" 2>/dev/null || true ;; */ocr-service/*.py) cd ocr-service && ruff format \"$FILE\" 2>/dev/null || true ;; esac; echo \"$FILE\" >> \"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\"'"
+            },
+            {
+                "matcher": "execute_bash",
+                "command": "bash -c 'CMD=$(cat | jq -r .tool_input.command 2>/dev/null); DIR=\"${RUNNER_TEMP:-/tmp}/autofix-sensors-ran.d\"; mkdir -p \"$DIR\"; case \"$CMD\" in *\"cargo clippy\"*|*\"cargo test\"*|*\"cargo fmt\"*) touch \"$DIR/rust\" ;; *\"npm run build\"*|*\"npm test\"*|*\"npx eslint\"*) touch \"$DIR/ts\" ;; *\"gradlew build\"*|*\"gradlew test\"*) touch \"$DIR/kotlin\" ;; *\"pytest\"*|*\"ruff check\"*|*\"ruff format\"*) touch \"$DIR/python\" ;; *hadolint*) touch \"$DIR/docker\" ;; *kubeconform*) touch \"$DIR/k8s\" ;; *shellcheck*) touch \"$DIR/shell\" ;; esac'"
+            }
+        ],
+        "stop": [
+            {
+                "command": "bash -c 'TMP=\"${RUNNER_TEMP:-/tmp}\"; MODIFIED=\"$TMP/autofix-modified-files.txt\"; SENSOR_DIR=\"$TMP/autofix-sensors-ran.d\"; BLOCKS=\"$TMP/autofix-stop-blocks.txt\"; COUNT=$(cat \"$BLOCKS\" 2>/dev/null || echo 0); cleanup() { rm -rf \"$MODIFIED\" \"$SENSOR_DIR\" \"$BLOCKS\" 2>/dev/null; }; if [ \"$COUNT\" -ge 2 ]; then cleanup; exit 0; fi; if [ ! -s \"$MODIFIED\" ]; then cleanup; exit 0; fi; classify() { case \"$1\" in *.rs) echo rust ;; */baileys-service/*.ts|*/baileys-service/*.tsx) echo ts ;; */android/*.kt|*/android/*.kts) echo kotlin ;; */ocr-service/*.py) echo python ;; *Dockerfile|*.Dockerfile) echo docker ;; */infra/k8s/*.yml|*/infra/k8s/*.yaml) echo k8s ;; *.sh) echo shell ;; *) echo none ;; esac; }; MISSING=\"\"; while IFS= read -r f; do [ -z \"$f\" ] && continue; stack=$(classify \"$f\"); [ \"$stack\" = none ] && continue; if [ ! -f \"$SENSOR_DIR/$stack\" ]; then case \"$MISSING\" in *\"$stack\"*) ;; *) MISSING=\"$MISSING $stack\" ;; esac; fi; done < \"$MODIFIED\"; if [ -n \"$MISSING\" ]; then echo $((COUNT + 1)) > \"$BLOCKS\"; printf \"{\\\"decision\\\": \\\"block\\\", \\\"reason\\\": \\\"You modified files in stack(s):%s but did not run their verification sensors. Run the sensors before stopping.\\\"}\" \"$MISSING\"; else cleanup; fi'"
+            }
+        ]
+    }
+}

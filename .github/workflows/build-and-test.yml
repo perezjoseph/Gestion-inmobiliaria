@@ -196,13 +196,13 @@ jobs:
             exit 1
           fi
 
-      - name: Clean stale llvm-cov target artifacts
+      - name: Clean stale llvm-cov profraw files
         if: inputs.is-production
         run: |
           COV_TARGET="${CARGO_TARGET_DIR:-target}/llvm-cov-target"
           if [ -d "$COV_TARGET" ]; then
-            echo "Removing stale llvm-cov-target: $COV_TARGET"
-            rm -rf "$COV_TARGET"
+            echo "Removing stale profraw files (keeping compiled artifacts)"
+            find "$COV_TARGET" -name '*.profraw' -delete 2>/dev/null || true
           fi
 
       - name: Run tests with coverage (llvm-cov)
@@ -211,6 +211,7 @@ jobs:
         env:
           PROPTEST_CASES: "10"
           RUSTC_WRAPPER: ""
+          CMAKE_BUILD_PARALLEL_LEVEL: "2"
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 30

@@ -52,8 +52,10 @@ jobs:
     # directly to main (kiro-bot has commit access). On non-main branches,
     # fixes are pushed to the same branch the CI ran on. Fork PRs are
     # excluded — we never run autofix against untrusted contributor code.
+    # Dependabot branches are excluded — they have their own autofix workflow.
     if: >-
       github.event.workflow_run.conclusion == 'failure' &&
+      !startsWith(github.event.workflow_run.head_branch, 'dependabot/') &&
       (github.event.workflow_run.event != 'pull_request' ||
        github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: arc-runner-dind

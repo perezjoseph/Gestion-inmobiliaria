@@ -1,0 +1,437 @@
+# Dependabot Autofix + Auto-Merge
+#
+# Triggered AFTER CI completes on a Dependabot PR. If CI passed, auto-merges.
+# If CI failed, runs kiro-cli with the dependabot-autofix agent to adapt the
+# codebase to the new dependency version, then pushes the fix. The next CI run
+# (triggered by the push) will re-evaluate — if it passes, the existing
+# dependabot-auto-merge.yml workflow handles approval and merge.
+#
+# The agent has access to Context7 (documentation) and opensrc (library source)
+# to intelligently research breaking changes before attempting fixes.
+#
+# REQUIRED SECRETS:
+#   KIRO_API         — kiro-cli API key
+#   KIRO_GITHUB_TOKEN — fine-grained PAT scoped to THIS repo with:
+#                       contents: read+write (push commits)
+#                       pull-requests: read+write (comment on PRs)
+#                       actions: read (cross-run artifact download)
+#                       metadata: read (default)
+#
+# OPT-OUT:
+#   - Add the [skip-autofix] label to the PR
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: dependabot-autofix-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+env:
+  MAX_ATTEMPTS: "3"
+  MAX_CONTEXT_BYTES: "60000"
+
+jobs:
+  dependabot-autofix:
+    name: "Dependabot Autofix"
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' &&
+      startsWith(github.event.workflow_run.head_branch, 'dependabot/') &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: arc-runner-dind
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+    env:
+      RUN_URL: ${{ github.event.workflow_run.html_url }}
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
+      CI_RUN_ID: ${{ github.event.workflow_run.id }}
+    steps:
+      - name: Validate required secrets
+        env:
+          KIRO_GITHUB_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+          KIRO_API: ${{ secrets.KIRO_API }}
+        run: |
+          umask 077
+          missing=()
+          [ -z "${KIRO_GITHUB_TOKEN}" ] && missing+=("KIRO_GITHUB_TOKEN")
+          [ -z "${KIRO_API}" ] && missing+=("KIRO_API")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing secret(s): ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Checkout branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ env.BRANCH }}
+          fetch-depth: 0
+          token: ${{ secrets.KIRO_GITHUB_TOKEN }}
+          persist-credentials: true
+
+      - name: Check opt-out (skip-autofix label)
+        id: optout
+        env:
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+        run: |
+          umask 077
+          pr_labels=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --head "${BRANCH}" \
+            --state open \
+            --json labels \
+            --jq '[.[].labels[].name] | join(",")' 2>/dev/null || echo "")
+          if echo "$pr_labels" | grep -qF 'skip-autofix'; then
+            echo "::notice::Autofix skipped: skip-autofix label on PR"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Count prior autofix attempts
+        id: attempts
+        if: steps.optout.outputs.skip == 'false'
+        run: |
+          umask 077
+          count=0
+          while [ "$count" -lt 50 ]; do
+            email=$(git log --format='%ae' -n 1 "HEAD~$count" 2>/dev/null || true)
+            if [ -z "$email" ]; then break; fi
+            case "$email" in
+              kiro-bot@*) count=$((count + 1)) ;;
+              *) break ;;
+            esac
+          done
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          if [ "$count" -ge "${MAX_ATTEMPTS}" ]; then
+            echo "exceeded=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Dependabot autofix limit reached: $count attempts."
+          else
+            echo "exceeded=false" >> "$GITHUB_OUTPUT"
+            echo "Attempt $((count + 1)) of ${MAX_ATTEMPTS}"
+          fi
+
+      - name: Notify human (max attempts reached)
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+        run: |
+          umask 077
+          pr_number=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --head "${BRANCH}" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+          if [ -n "$pr_number" ]; then
+            MARKER="<!-- dependabot-autofix-gave-up -->"
+            BODY="${MARKER}
+          🤖 **Dependabot Autofix gave up.**
+
+          Attempted ${MAX_ATTEMPTS} consecutive fixes to adapt the codebase to this dependency update without success. Manual intervention is required.
+
+          - Latest failed run: ${RUN_URL}
+          - Branch: \`${BRANCH}\`
+
+          The dependency update likely requires manual migration. Check the package changelog for breaking changes."
+
+            existing=$(gh api \
+              "repos/${{ github.repository }}/issues/${pr_number}/comments?per_page=100" \
+              --jq ".[] | select(.body | contains(\"${MARKER}\")) | .id" \
+              | head -1)
+
+            if [ -n "$existing" ]; then
+              gh api -X PATCH "repos/${{ github.repository }}/issues/comments/${existing}" \
+                -f body="$BODY"
+            else
+              gh pr comment "$pr_number" \
+                --repo "${{ github.repository }}" \
+                --body "$BODY"
+            fi
+          fi
+          exit 1
+
+      - name: Extract Dependabot metadata from PR
+        id: metadata
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+        run: |
+          umask 077
+          METADATA_FILE="${RUNNER_TEMP}/dependabot-metadata.txt"
+
+          # Extract from branch name: dependabot/<ecosystem>/<package>-<version>
+          ECOSYSTEM=$(echo "${BRANCH}" | cut -d'/' -f2)
+          PACKAGE_INFO=$(echo "${BRANCH}" | cut -d'/' -f3-)
+
+          # Get PR body which contains Dependabot's version info
+          PR_JSON=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --head "${BRANCH}" \
+            --state open \
+            --json title,body,number \
+            --jq '.[0]' 2>/dev/null || echo "{}")
+
+          PR_TITLE=$(echo "$PR_JSON" | jq -r '.title // empty')
+          PR_NUMBER=$(echo "$PR_JSON" | jq -r '.number // empty')
+          PR_BODY=$(echo "$PR_JSON" | jq -r '.body // empty')
+
+          {
+            echo "=== DEPENDABOT UPDATE ==="
+            echo "Ecosystem: ${ECOSYSTEM}"
+            echo "Branch: ${BRANCH}"
+            echo "PR Title: ${PR_TITLE}"
+            echo "PR Number: ${PR_NUMBER}"
+            echo ""
+            echo "=== PR BODY (version details) ==="
+            echo "$PR_BODY" | head -100
+            echo ""
+            echo "=== COMMIT LOG (Dependabot's changes) ==="
+            # Show what dependabot actually changed
+            git log --format='%s%n%b%n---' --no-walk HEAD
+          } > "$METADATA_FILE"
+
+          echo "metadata_file=$METADATA_FILE" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "ecosystem=$ECOSYSTEM" >> "$GITHUB_OUTPUT"
+          echo "Extracted metadata for ${ECOSYSTEM} update: ${PR_TITLE}"
+
+      - name: Download CI diagnostics artifacts
+        id: diag
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+        run: |
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/diag"
+
+          # Try downloading diag-* artifacts from the failed CI run
+          ARTIFACTS=$(gh api \
+            "repos/${{ github.repository }}/actions/runs/${CI_RUN_ID}/artifacts?per_page=100" \
+            --jq '[.artifacts[] | select(.name | startswith("diag-")) | .name]' 2>/dev/null || echo "[]")
+
+          if [ "$ARTIFACTS" != "[]" ] && [ -n "$ARTIFACTS" ]; then
+            echo "Found diagnostics artifacts: $ARTIFACTS"
+            echo "has_artifacts=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No diag-* artifacts found. Will reconstruct from local build."
+            echo "has_artifacts=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download diagnostics (if available)
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.diag.outputs.has_artifacts == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: diag-*
+          path: ${{ runner.temp }}/diag
+          merge-multiple: true
+          run-id: ${{ env.CI_RUN_ID }}
+          github-token: ${{ secrets.KIRO_GITHUB_TOKEN }}
+
+      - name: Rust setup
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false'
+        uses: ./.github/actions/rust-setup
+        with:
+          components: rustfmt,clippy
+          targets: x86_64-unknown-linux-musl,wasm32-unknown-unknown
+
+      - name: Build diagnostics context
+        id: context
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false'
+        env:
+          ECOSYSTEM: ${{ steps.metadata.outputs.ecosystem }}
+          HAS_ARTIFACTS: ${{ steps.diag.outputs.has_artifacts }}
+        run: |
+          umask 077
+          CONTEXT_FILE="${RUNNER_TEMP}/context.txt"
+
+          # Start with any downloaded diagnostics
+          if [ "$HAS_ARTIFACTS" = "true" ]; then
+            find "${RUNNER_TEMP}/diag" -name "context.txt" -exec cat {} \; > "$CONTEXT_FILE" 2>/dev/null || true
+          fi
+
+          # If no artifact diagnostics or they're empty, reproduce locally
+          if [ ! -s "$CONTEXT_FILE" ]; then
+            echo "=== REPRODUCING FAILURE LOCALLY ===" > "$CONTEXT_FILE"
+            echo "" >> "$CONTEXT_FILE"
+
+            case "$ECOSYSTEM" in
+              cargo)
+                echo "--- cargo clippy (backend) ---" >> "$CONTEXT_FILE"
+                cargo clippy --locked -p realestate-backend --target x86_64-unknown-linux-musl -- -D warnings 2>&1 \
+                  | tail -c "${MAX_CONTEXT_BYTES}" >> "$CONTEXT_FILE" || true
+                echo "" >> "$CONTEXT_FILE"
+                echo "--- cargo clippy (frontend) ---" >> "$CONTEXT_FILE"
+                cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings 2>&1 \
+                  | tail -c "${MAX_CONTEXT_BYTES}" >> "$CONTEXT_FILE" || true
+                echo "" >> "$CONTEXT_FILE"
+                echo "--- cargo test (backend) ---" >> "$CONTEXT_FILE"
+                cargo test --locked -p realestate-backend --no-fail-fast 2>&1 \
+                  | tail -c "${MAX_CONTEXT_BYTES}" >> "$CONTEXT_FILE" || true
+                ;;
+              npm)
+                echo "--- npm build (baileys-service) ---" >> "$CONTEXT_FILE"
+                (cd baileys-service && npm run build 2>&1) \
+                  | tail -c "${MAX_CONTEXT_BYTES}" >> "$CONTEXT_FILE" || true
+                echo "" >> "$CONTEXT_FILE"
+                echo "--- npm test (baileys-service) ---" >> "$CONTEXT_FILE"
+                (cd baileys-service && npm test 2>&1) \
+                  | tail -c "${MAX_CONTEXT_BYTES}" >> "$CONTEXT_FILE" || true
+                ;;
+              gradle)
+                echo "--- gradle build (android) ---" >> "$CONTEXT_FILE"
+                (cd android && ./gradlew build 2>&1) \
+                  | tail -c "${MAX_CONTEXT_BYTES}" >> "$CONTEXT_FILE" || true
+                ;;
+              github_actions)
+                echo "--- workflow validation ---" >> "$CONTEXT_FILE"
+                echo "GitHub Actions update — check the CI run for errors: ${RUN_URL}" >> "$CONTEXT_FILE"
+                # Show what changed in the workflow files
+                git diff HEAD~1 -- .github/ >> "$CONTEXT_FILE" 2>/dev/null || true
+                ;;
+              docker)
+                echo "--- Dockerfile changes ---" >> "$CONTEXT_FILE"
+                git diff HEAD~1 -- '**/Dockerfile' '**/*.Dockerfile' >> "$CONTEXT_FILE" 2>/dev/null || true
+                ;;
+              *)
+                echo "Unknown ecosystem: ${ECOSYSTEM}" >> "$CONTEXT_FILE"
+                echo "CI run: ${RUN_URL}" >> "$CONTEXT_FILE"
+                ;;
+            esac
+          fi
+
+          # Truncate if oversized
+          CTX_BYTES=$(wc -c < "$CONTEXT_FILE")
+          if [ "$CTX_BYTES" -gt "${MAX_CONTEXT_BYTES}" ]; then
+            tail -c "${MAX_CONTEXT_BYTES}" "$CONTEXT_FILE" > "${CONTEXT_FILE}.truncated"
+            mv "${CONTEXT_FILE}.truncated" "$CONTEXT_FILE"
+          fi
+
+          echo "context_file=$CONTEXT_FILE" >> "$GITHUB_OUTPUT"
+          echo "Context file ready: $(wc -c < "$CONTEXT_FILE") bytes"
+
+      - name: Build git history
+        id: history
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false'
+        run: |
+          umask 077
+          HISTORY_FILE="${RUNNER_TEMP}/git-history.txt"
+          {
+            echo "=== RECENT COMMITS (last 10) ==="
+            git log --format='%h %ae %s%n%b%n---' -n 10
+            echo ""
+            echo "=== DIFF INTRODUCED BY DEPENDABOT ==="
+            git diff HEAD~1 --stat
+            echo ""
+            git diff HEAD~1 -- '*.toml' '*.lock' '*.json' 'gradle/**' | head -200
+          } > "$HISTORY_FILE"
+          echo "history_file=$HISTORY_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Configure git identity
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false'
+        run: |
+          git config user.name "kiro-bot"
+          git config user.email "kiro-bot@users.noreply.github.com"
+
+      - name: Prepare kiro-cli data directory
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false'
+        run: |
+          umask 077
+          DATA_HOME="${RUNNER_TEMP}/kiro-data"
+          mkdir -p "${DATA_HOME}/kiro-cli" "${HOME}/.local/share/kiro-cli"
+          echo "XDG_DATA_HOME=${DATA_HOME}" >> "$GITHUB_ENV"
+
+      - name: Run Kiro CLI (dependabot-autofix agent)
+        id: kiro
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false'
+        env:
+          KIRO_API_KEY: ${{ secrets.KIRO_API }}
+          KIRO_DIAGNOSTICS_FILE: ${{ steps.context.outputs.context_file }}
+          KIRO_GIT_HISTORY_FILE: ${{ steps.history.outputs.history_file }}
+          KIRO_DEPENDABOT_METADATA: ${{ steps.metadata.outputs.metadata_file }}
+          KIRO_COMMIT_MSG_FILE: ${{ runner.temp }}/kiro-commit-message.txt
+          KIRO_MAX_FIX_ITERATIONS: "3"
+        run: |
+          umask 077
+          PROMPT="A Dependabot dependency update broke CI. Read \$KIRO_DEPENDABOT_METADATA for the package and version info. Read \$KIRO_DIAGNOSTICS_FILE for the CI errors. Research the breaking changes using Context7 and opensrc, then adapt the codebase to work with the new version. Write your commit message to \$KIRO_COMMIT_MSG_FILE."
+
+          set +e
+          kiro-cli chat --agent dependabot-autofix --model claude-opus-4.6 --effort max \
+            --no-interactive --trust-all-tools "$PROMPT"
+          AGENT_EXIT=$?
+          set -e
+
+          echo "agent_exit=${AGENT_EXIT}" >> "$GITHUB_OUTPUT"
+          if [ "$AGENT_EXIT" -ne 0 ]; then
+            echo "::warning::Kiro agent exited with code ${AGENT_EXIT}"
+          fi
+
+      - name: Check for changes
+        id: changes
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false'
+        run: |
+          git add -A
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No changes produced"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push fixes
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.changes.outputs.has_changes == 'true'
+        env:
+          KIRO_COMMIT_MSG_FILE: ${{ runner.temp }}/kiro-commit-message.txt
+        run: |
+          umask 077
+          if [ -s "${KIRO_COMMIT_MSG_FILE}" ]; then
+            if ! grep -qF "Workflow run:" "${KIRO_COMMIT_MSG_FILE}"; then
+              printf '\nWorkflow run: %s\n' "$RUN_URL" >> "${KIRO_COMMIT_MSG_FILE}"
+            fi
+            git commit -F "${KIRO_COMMIT_MSG_FILE}"
+          else
+            git commit -m "fix(deps): adapt codebase to dependency update" \
+              -m "Workflow run: ${RUN_URL}"
+          fi
+
+      - name: Push fixes
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.changes.outputs.has_changes == 'true'
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            git fetch origin "${BRANCH}"
+            if ! git merge-base --is-ancestor "origin/${BRANCH}" HEAD; then
+              git rebase "origin/${BRANCH}" || { git rebase --abort; exit 1; }
+            fi
+            git push origin "${BRANCH}"
+
+      - name: Comment on PR (fix pushed)
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.changes.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.metadata.outputs.pr_number }}
+        run: |
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr comment "$PR_NUMBER" \
+              --repo "${{ github.repository }}" \
+              --body "🤖 **Dependabot Autofix pushed a compatibility fix.**
+
+          The dependency update broke CI. Kiro researched the breaking changes and adapted the codebase. CI will re-run automatically — if it passes, auto-merge will proceed.
+
+          Fix run: ${RUN_URL}"
+          fi
+
+      - name: Fail if no fix produced
+        if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.changes.outputs.has_changes == 'false'
+        run: |
+          echo "::error::Kiro agent did not produce any changes."
+          exit 1
