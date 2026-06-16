@@ -78,7 +78,7 @@ Fix four Ley 4314 → Ley 85-25 compliance violations in the backend: deposit ca
     - _Preservation: deposits ≤ 2× continue accepted, error structure unchanged for over-cap_
     - _Requirements: 2.1, 3.1_
 
-  - [~] 3.2 Enforce IPC fallback 10% cap in `contratos::renovar`
+  - [x] 3.2 Enforce IPC fallback 10% cap in `contratos::renovar`
     - Replace `None =>` branch (currently logs warning + skips) with hard 10% cap check
     - Compute `max_allowed = original.monto_mensual * Decimal::from_str("1.10")`
     - If `input.monto_mensual > max_allowed`, return `ValidationWithFields` error matching existing IPC branch structure

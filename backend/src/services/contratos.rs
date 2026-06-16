@@ -758,7 +758,17 @@ pub async fn renovar(
             }
         }
         None => {
-            tracing::warn!("IPC no configurado, omitiendo validación de tope de renta");
+            let max_allowed = original.monto_mensual * Decimal::new(110, 2);
+            if input.monto_mensual > max_allowed {
+                return Err(AppError::ValidationWithFields {
+                    message: format!(
+                        "El monto mensual excede el máximo permitido (10% sin IPC): {max_allowed}"
+                    ),
+                    fields: serde_json::json!({
+                        "maxAllowed": max_allowed.to_string()
+                    }),
+                });
+            }
         }
     }
 
