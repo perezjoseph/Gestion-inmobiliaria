@@ -106,7 +106,7 @@ Fix four Ley 4314 → Ley 85-25 compliance violations in the backend: deposit ca
     - _Preservation: transitions with sufficient elapsed time continue working, creation unchanged_
     - _Requirements: 2.4, 3.5, 3.6_
 
-  - [~] 3.5 Verify bug condition exploration tests now pass
+  - [x] 3.5 Verify bug condition exploration tests now pass
     - **Property 1: Expected Behavior** - Ley 85-25 Compliance Satisfied
     - **IMPORTANT**: Re-run the SAME tests from task 1 — do NOT write new tests
     - The tests from task 1 encode the expected behavior per design
