@@ -110,7 +110,7 @@ Fix IDOR vulnerability: six endpoints in `indexacion`, `ipi`, `chatbot` modules 
     - _Preservation: same-org propuesta/aprobar unchanged_
     - _Requirements: 2.1, 2.2, 3.1_
 
-  - [~] 3.4 Add org ownership check to IPI service
+  - [x] 3.4 Add org ownership check to IPI service
     - Add `org_id: Uuid` parameter to `obtener_copropietarios` and copropietario creation
     - Fetch propiedad by id, verify `propiedad.organizacion_id == org_id`
     - Return `AppError::NotFound` if mismatch

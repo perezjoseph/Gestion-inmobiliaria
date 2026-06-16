@@ -66,7 +66,16 @@ pub fn calcular_ipi_monto(valor_total: Decimal, umbral: Decimal) -> Decimal {
 pub async fn obtener_copropietarios(
     db: &DatabaseConnection,
     propiedad_id: Uuid,
+    org_id: Uuid,
 ) -> Result<Vec<CopropietarioResponse>, AppError> {
+    let prop = propiedad::Entity::find_by_id(propiedad_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Propiedad no encontrada".to_string()))?;
+    if prop.organizacion_id != org_id {
+        return Err(AppError::NotFound("Propiedad no encontrada".to_string()));
+    }
+
     let copropietarios = copropietario::Entity::find()
         .filter(copropietario::Column::PropiedadId.eq(propiedad_id))
         .all(db)
@@ -194,6 +203,14 @@ pub async fn crear_copropietario(
     cedula_rnc: String,
     porcentaje_propiedad: Decimal,
 ) -> Result<copropietario::Model, AppError> {
+    let prop = propiedad::Entity::find_by_id(propiedad_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Propiedad no encontrada".to_string()))?;
+    if prop.organizacion_id != org_id {
+        return Err(AppError::NotFound("Propiedad no encontrada".to_string()));
+    }
+
     if nombre.trim().is_empty() {
         return Err(AppError::Validation(
             "El nombre no puede estar vacío".to_string(),

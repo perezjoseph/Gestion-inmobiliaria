@@ -348,7 +348,7 @@ fn preservation_3_2_same_org_copropietarios_list() {
         .await
         .expect("copropietario insert");
 
-        let result = ipi::obtener_copropietarios(&db, propiedad_id).await;
+        let result = ipi::obtener_copropietarios(&db, propiedad_id, org).await;
 
         assert!(
             result.is_ok(),
@@ -710,7 +710,7 @@ fn preservation_pbt_same_org_access_all_endpoints() {
                             "Same-org crear_copropietario failed for org={org}"
                         );
 
-                        let list_result = ipi::obtener_copropietarios(&db, propiedad_id).await;
+                        let list_result = ipi::obtener_copropietarios(&db, propiedad_id, org).await;
                         prop_assert!(
                             list_result.is_ok(),
                             "Same-org copropietarios list failed for org={org}"

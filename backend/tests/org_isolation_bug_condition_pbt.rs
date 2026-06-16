@@ -369,7 +369,7 @@ fn bug_condition_1_3_cross_org_copropietarios_list() {
         .expect("copropietario insert");
 
         // Org A lists copropietarios for Org B's propiedad — should be 404
-        let result = ipi::obtener_copropietarios(&db, propiedad_id).await;
+        let result = ipi::obtener_copropietarios(&db, propiedad_id, org_a).await;
 
         // EXPECTED: NotFound because caller (Org A) ≠ propiedad owner (Org B)
         // BUG: returns Ok with Org B's data
@@ -855,7 +855,7 @@ fn property_1_pbt_cross_org_access_denied() {
                 // knowledge of the caller's org.
                 let has_org_param_propuesta = true; // org_id param added
                 let has_org_param_aprobar = true; // org_id param added
-                let has_org_check_copropietarios = false; // obtener_copropietarios: (db, propiedad_id)
+                let has_org_check_copropietarios = true; // obtener_copropietarios: (db, propiedad_id, org_id)
                 let has_org_check_confirm = false; // confirm_receipt: (db, extraction_id, user_id)
                 let has_org_check_reject = false; // reject_receipt: (db, extraction_id, user_id, reason)
 

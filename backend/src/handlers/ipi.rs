@@ -39,11 +39,12 @@ pub async fn actualizar_umbral(
 
 pub async fn listar_copropietarios(
     db: web::Data<DatabaseConnection>,
-    _user: WriteAccess,
+    user: WriteAccess,
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
+    let org_id = user.0.organizacion_id;
     let propiedad_id = path.into_inner();
-    let result = ipi::obtener_copropietarios(db.get_ref(), propiedad_id).await?;
+    let result = ipi::obtener_copropietarios(db.get_ref(), propiedad_id, org_id).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
