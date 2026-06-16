@@ -123,7 +123,7 @@ Fix four Ley 4314 → Ley 85-25 compliance violations in the backend: deposit ca
     - Confirm all preservation tests still pass after fix
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
 
-- [~] 4. Checkpoint - Ensure all tests pass
+- [x] 4. Checkpoint - Ensure all tests pass
   - Run full test suite (`cargo test` in backend)
   - Ensure all bug condition tests pass (fix verified)
   - Ensure all preservation tests pass (no regressions)

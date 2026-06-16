@@ -9,7 +9,7 @@ spec:
   minReplicaCount: 0
   maxReplicaCount: 1
   idleReplicaCount: 0
-  cooldownPeriod: 600
+  cooldownPeriod: 3600
   pollingInterval: 30
   triggers:
     - type: prometheus
