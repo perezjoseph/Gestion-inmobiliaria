@@ -105,6 +105,7 @@ mod ley85_bug_condition_pbt;
 mod ley85_preservation_pbt;
 
 mod org_isolation_bug_condition_pbt;
+mod org_isolation_preservation_pbt;
 
 #[cfg(feature = "evals")]
 mod chatbot_evals_tests;
