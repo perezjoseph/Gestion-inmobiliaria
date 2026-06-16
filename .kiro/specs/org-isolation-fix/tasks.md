@@ -78,7 +78,7 @@ Fix IDOR vulnerability: six endpoints in `indexacion`, `ipi`, `chatbot` modules 
 
 - [ ] 3. Fix org isolation IDOR vulnerability
 
-  - [~] 3.1 Create migration: add organizacion_id to configuracion table
+  - [x] 3.1 Create migration: add organizacion_id to configuracion table
     - Add `organizacion_id UUID NOT NULL` column to `configuracion`
     - Drop existing PK on `clave`
     - Create composite PK `(clave, organizacion_id)`
