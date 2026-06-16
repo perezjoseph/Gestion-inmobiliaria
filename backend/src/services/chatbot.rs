@@ -918,6 +918,7 @@ pub async fn confirm_receipt<C: ConnectionTrait>(
     db: &C,
     extraction_id: Uuid,
     user_id: Uuid,
+    org_id: Uuid,
 ) -> Result<chatbot_receipt_extraction::Model, AppError> {
     let extraction = chatbot_receipt_extraction::Entity::find_by_id(extraction_id)
         .one(db)
@@ -927,6 +928,12 @@ pub async fn confirm_receipt<C: ConnectionTrait>(
                 "Extracción de recibo no encontrada: {extraction_id}"
             ))
         })?;
+
+    if extraction.organizacion_id != org_id {
+        return Err(AppError::NotFound(format!(
+            "Extracción de recibo no encontrada: {extraction_id}"
+        )));
+    }
 
     if extraction.status != "pending_confirmation" {
         return Err(AppError::Conflict(
@@ -1008,6 +1015,7 @@ pub async fn reject_receipt<C: ConnectionTrait>(
     extraction_id: Uuid,
     user_id: Uuid,
     reason: Option<&str>,
+    org_id: Uuid,
 ) -> Result<chatbot_receipt_extraction::Model, AppError> {
     let extraction = chatbot_receipt_extraction::Entity::find_by_id(extraction_id)
         .one(db)
@@ -1017,6 +1025,12 @@ pub async fn reject_receipt<C: ConnectionTrait>(
                 "Extracción de recibo no encontrada: {extraction_id}"
             ))
         })?;
+
+    if extraction.organizacion_id != org_id {
+        return Err(AppError::NotFound(format!(
+            "Extracción de recibo no encontrada: {extraction_id}"
+        )));
+    }
 
     if extraction.status != "pending_confirmation" {
         return Err(AppError::Conflict(

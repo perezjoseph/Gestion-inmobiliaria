@@ -573,7 +573,7 @@ fn bug_condition_1_5_cross_org_confirm_receipt() {
             .len();
 
         // Org A user confirms Org B's extraction — should be 404
-        let result = chatbot::confirm_receipt(&db, extraction_id, user_a).await;
+        let result = chatbot::confirm_receipt(&db, extraction_id, user_a, org_a).await;
 
         // EXPECTED: NotFound — extraction belongs to org_b, caller is org_a
         // BUG: confirms the extraction and creates a pago
@@ -705,7 +705,8 @@ fn bug_condition_1_6_cross_org_reject_receipt() {
         .expect("extraction insert");
 
         // Org A user rejects Org B's extraction — should be 404
-        let result = chatbot::reject_receipt(&db, extraction_id, user_a, Some("wrong org")).await;
+        let result =
+            chatbot::reject_receipt(&db, extraction_id, user_a, Some("wrong org"), org_a).await;
 
         // EXPECTED: NotFound — extraction belongs to org_b
         // BUG: rejects Org B's extraction
@@ -856,8 +857,8 @@ fn property_1_pbt_cross_org_access_denied() {
                 let has_org_param_propuesta = true; // org_id param added
                 let has_org_param_aprobar = true; // org_id param added
                 let has_org_check_copropietarios = true; // obtener_copropietarios: (db, propiedad_id, org_id)
-                let has_org_check_confirm = false; // confirm_receipt: (db, extraction_id, user_id)
-                let has_org_check_reject = false; // reject_receipt: (db, extraction_id, user_id, reason)
+                let has_org_check_confirm = true; // confirm_receipt: (db, extraction_id, user_id, org_id)
+                let has_org_check_reject = true; // reject_receipt: (db, extraction_id, user_id, reason, org_id)
 
                 // EXPECTED: all should have org checks
                 prop_assert!(

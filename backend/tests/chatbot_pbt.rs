@@ -473,7 +473,7 @@ fn test_record_extraction_post_loop_persists_pago() {
             .expect("Failed to update extraction with contrato_id");
 
         // Step 4: Confirm the extraction â€” this creates the Pago row
-        let confirmed = confirm_receipt(&db, updated_extraction.id, user_id)
+        let confirmed = confirm_receipt(&db, updated_extraction.id, user_id, org_id)
             .await
             .expect("confirm_receipt should succeed");
 

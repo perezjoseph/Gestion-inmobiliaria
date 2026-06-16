@@ -473,7 +473,7 @@ fn preservation_3_4a_same_org_confirm_receipt() {
             .unwrap()
             .len();
 
-        let result = chatbot::confirm_receipt(&db, extraction_id, user_id).await;
+        let result = chatbot::confirm_receipt(&db, extraction_id, user_id, org).await;
 
         assert!(
             result.is_ok(),
@@ -563,7 +563,8 @@ fn preservation_3_4b_same_org_reject_receipt() {
         .expect("extraction insert");
 
         let result =
-            chatbot::reject_receipt(&db, extraction_id, user_id, Some("monto incorrecto")).await;
+            chatbot::reject_receipt(&db, extraction_id, user_id, Some("monto incorrecto"), org)
+                .await;
 
         assert!(
             result.is_ok(),

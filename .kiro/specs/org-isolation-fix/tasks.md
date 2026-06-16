@@ -120,7 +120,7 @@ Fix IDOR vulnerability: six endpoints in `indexacion`, `ipi`, `chatbot` modules 
     - _Preservation: same-org copropietarios list/create unchanged_
     - _Requirements: 2.3, 2.4, 3.2, 3.3_
 
-  - [~] 3.5 Add org ownership check to chatbot service
+  - [x] 3.5 Add org ownership check to chatbot service
     - Add `org_id: Uuid` parameter to `confirm_receipt` and `reject_receipt`
     - After fetching extraction by id, verify `extraction.organizacion_id == org_id`
     - Return `AppError::NotFound` if mismatch

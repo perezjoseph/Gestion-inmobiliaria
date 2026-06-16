@@ -191,8 +191,9 @@ pub async fn confirm_receipt(
 ) -> Result<HttpResponse, AppError> {
     let extraction_id = path.into_inner();
     let user_id = claims.0.sub;
+    let org_id = claims.0.organizacion_id;
 
-    let updated = chatbot::confirm_receipt(db.get_ref(), extraction_id, user_id).await?;
+    let updated = chatbot::confirm_receipt(db.get_ref(), extraction_id, user_id, org_id).await?;
     Ok(HttpResponse::Ok().json(extraction_to_response(updated)))
 }
 
@@ -204,9 +205,11 @@ pub async fn reject_receipt(
 ) -> Result<HttpResponse, AppError> {
     let extraction_id = path.into_inner();
     let user_id = claims.0.sub;
+    let org_id = claims.0.organizacion_id;
     let reason = body.rejection_reason.as_deref();
 
-    let updated = chatbot::reject_receipt(db.get_ref(), extraction_id, user_id, reason).await?;
+    let updated =
+        chatbot::reject_receipt(db.get_ref(), extraction_id, user_id, reason, org_id).await?;
     Ok(HttpResponse::Ok().json(extraction_to_response(updated)))
 }
 
