@@ -289,9 +289,9 @@ pub async fn create(
     }
 
     if let Some(deposito) = input.deposito {
-        if deposito > input.monto_mensual {
+        if deposito > input.monto_mensual * Decimal::from(2) {
             return Err(AppError::Validation(
-                "El depósito no puede exceder un mes de renta (Ley 4314)".to_string(),
+                "El depósito no puede exceder dos meses de renta (Ley 85-25)".to_string(),
             ));
         }
     }

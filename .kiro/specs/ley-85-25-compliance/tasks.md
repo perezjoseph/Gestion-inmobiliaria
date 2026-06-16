@@ -70,7 +70,7 @@ Fix four Ley 4314 → Ley 85-25 compliance violations in the backend: deposit ca
 
 - [ ] 3. Fix for Ley 85-25 compliance violations
 
-  - [~] 3.1 Update deposit cap in `contratos::create`
+  - [x] 3.1 Update deposit cap in `contratos::create`
     - Change comparison from `deposito > input.monto_mensual` to `deposito > input.monto_mensual * Decimal::from(2)`
     - Update error message from "Ley 4314" reference to Ley 85-25 with 2-month cap
     - _Bug_Condition: input.deposito > input.monto_mensual AND input.deposito <= 2 * input.monto_mensual_
