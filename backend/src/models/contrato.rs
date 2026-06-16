@@ -79,6 +79,8 @@ pub struct ContratoResponse {
     pub motivo_retencion: Option<String>,
     pub recargo_porcentaje: Option<Decimal>,
     pub dias_gracia: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custodia_vencida: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -165,6 +167,7 @@ mod tests {
             motivo_retencion: None,
             recargo_porcentaje: None,
             dias_gracia: None,
+            custodia_vencida: None,
         };
 
         let json = serde_json::to_value(&resp).unwrap();
@@ -227,6 +230,7 @@ mod tests {
             motivo_retencion: Some("Daños en la propiedad".to_string()),
             recargo_porcentaje: None,
             dias_gracia: None,
+            custodia_vencida: None,
         };
 
         let json = serde_json::to_value(&resp).unwrap();

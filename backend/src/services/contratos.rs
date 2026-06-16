@@ -100,6 +100,14 @@ pub fn validar_transicion_deposito(
 
 impl From<contrato::Model> for ContratoResponse {
     fn from(m: contrato::Model) -> Self {
+        let custodia_vencida = match (&m.estado_deposito, &m.fecha_cobro_deposito) {
+            (Some(estado), Some(fecha_cobro)) if estado == "cobrado" => {
+                let elapsed = Utc::now() - fecha_cobro.with_timezone(&Utc);
+                Some(elapsed.num_days() > 15)
+            }
+            _ => None,
+        };
+
         Self {
             id: m.id,
             propiedad_id: m.propiedad_id,
@@ -120,6 +128,7 @@ impl From<contrato::Model> for ContratoResponse {
             motivo_retencion: m.motivo_retencion,
             recargo_porcentaje: m.recargo_porcentaje,
             dias_gracia: m.dias_gracia,
+            custodia_vencida,
         }
     }
 }

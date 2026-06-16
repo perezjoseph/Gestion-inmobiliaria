@@ -524,6 +524,7 @@ fn bug_condition_1d_custodia_vencida_exposed_after_15_days() {
         motivo_retencion: None,
         recargo_porcentaje: None,
         dias_gracia: None,
+        custodia_vencida: Some(true),
     };
 
     let json = serde_json::to_value(&resp).expect("serialize ContratoResponse");

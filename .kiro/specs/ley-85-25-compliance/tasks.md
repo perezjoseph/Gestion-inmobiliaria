@@ -87,7 +87,7 @@ Fix four Ley 4314 → Ley 85-25 compliance violations in the backend: deposit ca
     - _Preservation: IPC-configured path unchanged, renewals within 10% when IPC=None accepted_
     - _Requirements: 2.3, 3.3, 3.4_
 
-  - [~] 3.3 Add custody tracking warning in `contratos::cambiar_estado_deposito` and response DTO
+  - [x] 3.3 Add custody tracking warning in `contratos::cambiar_estado_deposito` and response DTO
     - Add `custodia_vencida: Option<bool>` field to `ContratoResponse` in `backend/src/models/contrato.rs`
     - Compute `custodia_vencida = true` when `estado_deposito == "cobrado"` AND `fecha_cobro_deposito + 15 days < now` without custody confirmation
     - Populate field in service layer before returning response
