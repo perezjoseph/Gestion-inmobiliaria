@@ -52,7 +52,7 @@ Fix four Ley 4314 → Ley 85-25 compliance violations in the backend: deposit ca
   - Mark task complete when tests are written, run, and failures documented
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [~] 2. Write preservation property tests (BEFORE implementing fix)
+- [x] 2. Write preservation property tests (BEFORE implementing fix)
   - **Property 2: Preservation** - Existing Valid Operations Unchanged
   - **IMPORTANT**: Follow observation-first methodology
   - Observe on UNFIXED code: deposits ≤ 1× monto_mensual accepted, IPC-configured renewals within cap accepted, IPC-configured renewals exceeding cap rejected with `maxAllowed`, valid deposit state transitions work, desahucio creation initializes correctly
