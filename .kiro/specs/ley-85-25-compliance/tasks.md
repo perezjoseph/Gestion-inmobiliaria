@@ -68,7 +68,7 @@ Fix four Ley 4314 → Ley 85-25 compliance violations in the backend: deposit ca
   - Mark task complete when tests are written, run, and passing on unfixed code
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
 
-- [ ] 3. Fix for Ley 85-25 compliance violations
+- [x] 3. Fix for Ley 85-25 compliance violations
 
   - [x] 3.1 Update deposit cap in `contratos::create`
     - Change comparison from `deposito > input.monto_mensual` to `deposito > input.monto_mensual * Decimal::from(2)`
@@ -115,7 +115,7 @@ Fix four Ley 4314 → Ley 85-25 compliance violations in the backend: deposit ca
     - **EXPECTED OUTCOME**: All four tests PASS (confirms bugs are fixed)
     - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-  - [~] 3.6 Verify preservation tests still pass
+  - [x] 3.6 Verify preservation tests still pass
     - **Property 2: Preservation** - Existing Valid Operations Still Unchanged
     - **IMPORTANT**: Re-run the SAME tests from task 2 — do NOT write new tests
     - Run preservation property tests from step 2
