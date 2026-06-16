@@ -101,6 +101,7 @@ pub async fn update(
 
     if let Some(ref new_estado) = input.estado {
         validate_estado_transition(&existing.estado, new_estado)?;
+        validate_time_gap(&existing.estado, new_estado, existing.updated_at, now)?;
 
         if new_estado == "completado" && input.fecha_resolucion.is_none() {
             return Err(AppError::Validation(
@@ -173,6 +174,29 @@ pub async fn list(
         page,
         per_page,
     })
+}
+
+pub fn validate_time_gap(
+    from: &str,
+    to: &str,
+    updated_at: chrono::DateTime<chrono::FixedOffset>,
+    now: chrono::DateTime<Utc>,
+) -> Result<(), AppError> {
+    let required_days: i64 = match (from, to) {
+        ("iniciado", "en_progreso") => 30,
+        ("iniciado", "completado") | ("en_progreso", "completado") => 90,
+        _ => return Ok(()),
+    };
+
+    let elapsed_days = (now - updated_at.to_utc()).num_days();
+    if elapsed_days < required_days {
+        let remaining = required_days - elapsed_days;
+        return Err(AppError::Validation(format!(
+            "Deben transcurrir al menos {required_days} días para la transición '{from}' → '{to}'. Faltan {remaining} días."
+        )));
+    }
+
+    Ok(())
 }
 
 pub fn validate_estado_transition(from: &str, to: &str) -> Result<(), AppError> {

@@ -96,7 +96,7 @@ Fix four Ley 4314 → Ley 85-25 compliance violations in the backend: deposit ca
     - _Preservation: deposit state transitions continue working, no schema migration needed_
     - _Requirements: 2.2, 3.2_
 
-  - [~] 3.4 Enforce eviction time gaps in `desahucios::update`
+  - [x] 3.4 Enforce eviction time gaps in `desahucios::update`
     - After `validate_estado_transition` succeeds, add elapsed-time validation
     - For `iniciado → en_progreso`: require `(now - existing.updated_at) >= 30 days`
     - For `en_progreso → completado`: require `(now - existing.updated_at) >= 90 days`
