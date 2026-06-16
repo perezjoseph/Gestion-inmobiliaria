@@ -76,7 +76,7 @@ Fix IDOR vulnerability: six endpoints in `indexacion`, `ipi`, `chatbot` modules 
   - Mark task complete when tests are written, run, and passing on unfixed code
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
 
-- [ ] 3. Fix org isolation IDOR vulnerability
+- [x] 3. Fix org isolation IDOR vulnerability
 
   - [x] 3.1 Create migration: add organizacion_id to configuracion table
     - Add `organizacion_id UUID NOT NULL` column to `configuracion`
@@ -139,7 +139,7 @@ Fix IDOR vulnerability: six endpoints in `indexacion`, `ipi`, `chatbot` modules 
     - **EXPECTED OUTCOME**: Test PASSES (confirms IDOR is fixed)
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8_
 
-  - [~] 3.7 Verify preservation tests still pass
+  - [x] 3.7 Verify preservation tests still pass
     - **Property 2: Preservation** - Same-Org Access Unchanged
     - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
     - Run preservation property tests from step 2
