@@ -1,0 +1,53 @@
+{
+    "expectations": [
+        {
+            "text": "Sensors are ordered by cost: format first, then lint, then compile/typecheck, then tests",
+            "passed": true,
+            "evidence": "Rust: fmt -> clippy -> test; TS: build -> eslint -> test. Format first, tests last."
+        },
+        {
+            "text": "Selective activation: Rust sensors only for .rs files, TypeScript sensors only for baileys-service files",
+            "passed": true,
+            "evidence": "Detection table maps paths to rust-backend / rust-frontend / ts-baileys; only touched stacks run."
+        },
+        {
+            "text": "Correct Rust sensor commands",
+            "passed": true,
+            "evidence": "Used cargo fmt --all -- --check, clippy --locked -p realestate-backend -- -D warnings, clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings."
+        },
+        {
+            "text": "Includes eslint as a separate TypeScript sensor: npx eslint . --max-warnings 0",
+            "passed": true,
+            "evidence": "'npx eslint . --max-warnings 0' placed between build and test."
+        },
+        {
+            "text": "Specifies npm run build and npm test as separate TypeScript sensors",
+            "passed": true,
+            "evidence": "'npm run build' (tsc) and 'npm test' (vitest) separate."
+        },
+        {
+            "text": "Defines three distinct exit codes (0=clean, 1=partial, 2=no progress)",
+            "passed": true,
+            "evidence": "Exit-code table: 0 clean / 1 partial / 2 no progress."
+        },
+        {
+            "text": "Instructs the agent to try a fundamentally different approach after 2 consecutive identical failures",
+            "passed": false,
+            "evidence": "Baseline says 'If an iteration ends with the same failures it started with, you are stuck — stop and report rather than burning the remaining budget.' It stops/reports but does NOT instruct trying a fundamentally different approach."
+        },
+        {
+            "text": "Iteration cap configurable via KIRO_MAX_FIX_ITERATIONS with default 3",
+            "passed": true,
+            "evidence": "'Iterate at most KIRO_MAX_FIX_ITERATIONS times (default 3).'"
+        }
+    ],
+    "summary": {
+        "passed": 7,
+        "failed": 1,
+        "total": 8,
+        "pass_rate": 0.875
+    },
+    "notes": [
+        "CONFOUND: baseline transcript states it read .kiro/skills/harness-engineering/references/sensor-commands.md directly (the skill's own reference file), which supplied the exact commands. Only the 'try a different approach' behavior was missed."
+    ]
+}

@@ -1,0 +1,32 @@
+{
+    "name": "autofix",
+    "description": "CI autofix agent: diagnoses build/lint/test failures and applies minimal, verified fixes.",
+    "model": "claude-sonnet-4",
+    "prompt": "file://../prompts/autofix-system.md",
+    "tools": [
+        "read",
+        "write",
+        "shell"
+    ],
+    "allowedTools": [
+        "read",
+        "write",
+        "shell"
+    ],
+    "resources": [
+        "file://../../AGENTS.md",
+        "file://../../.kiro/steering/**/*.md"
+    ],
+    "hooks": {
+        "postToolUse": [
+            {
+                "matcher": "fs_write",
+                "command": "bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \"$FILE\" in *.rs) cargo fmt -- \"$FILE\" 2>/dev/null || true ;; esac'"
+            },
+            {
+                "matcher": "str_replace",
+                "command": "bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \"$FILE\" in *.rs) cargo fmt -- \"$FILE\" 2>/dev/null || true ;; esac'"
+            }
+        ]
+    }
+}

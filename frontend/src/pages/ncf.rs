@@ -1,7 +1,9 @@
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use crate::app::AuthContext;
+use yew_router::prelude::*;
+
+use crate::app::{AuthContext, Route};
 use crate::components::common::data_table::DataTable;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::skeleton::TableSkeleton;
@@ -66,7 +68,9 @@ pub fn Ncf() -> Html {
         <div>
             <div class="gi-page-header">
                 <h1 class="gi-page-title">{"Secuencias NCF"}</h1>
-                <button class="gi-btn gi-btn-primary">{"Configurar Rango"}</button>
+                <Link<Route> to={Route::ConfiguracionFiscal} classes="gi-btn gi-btn-primary">
+                    {"Configurar Rango"}
+                </Link<Route>>
             </div>
 
             if let Some(err) = (*error).as_ref() {

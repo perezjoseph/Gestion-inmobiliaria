@@ -1,0 +1,53 @@
+{
+    "expectations": [
+        {
+            "text": "The output is a valid JSON file (parses as JSON)",
+            "passed": true,
+            "evidence": "autofix.json parses cleanly."
+        },
+        {
+            "text": "The prompt field uses a file:// URI that resolves relative to the config file location (.kiro/agents/), not workspace root",
+            "passed": true,
+            "evidence": "prompt = 'file://../prompts/autofix-system.md' — correct relative-to-config form."
+        },
+        {
+            "text": "The resources array uses glob patterns for steering files rather than listing each file individually",
+            "passed": true,
+            "evidence": "resources includes 'file://../../.kiro/steering/**/*.md'."
+        },
+        {
+            "text": "The hooks object uses 'postToolUse' as the trigger key",
+            "passed": true,
+            "evidence": "hooks.postToolUse present (two entries: fs_write, str_replace)."
+        },
+        {
+            "text": "The hook uses the field name 'matcher' with the internal tool name 'fs_write'",
+            "passed": true,
+            "evidence": "matcher 'fs_write' running cargo fmt on *.rs."
+        },
+        {
+            "text": "The allowedTools field is present and does NOT use '*' wildcard",
+            "passed": true,
+            "evidence": "allowedTools = ['read','write','shell']."
+        },
+        {
+            "text": "The config passes validation via scripts/validate-kiro-agent.js (exit 0)",
+            "passed": false,
+            "evidence": "Validator exit 1: prompt file not found at without_skill/prompts/autofix-system.md. The baseline never ran the validator and did not place a resolution copy, so validation fails even though the URI form is correct."
+        },
+        {
+            "text": "A companion system prompt markdown file is produced alongside the config",
+            "passed": true,
+            "evidence": "outputs/autofix-system.md produced."
+        }
+    ],
+    "summary": {
+        "passed": 7,
+        "failed": 1,
+        "total": 8,
+        "pass_rate": 0.875
+    },
+    "notes": [
+        "CONFOUND: baseline read the existing real .kiro/agents/autofix.json as a template (stated in its transcript), inheriting correct field names/conventions. The only miss is the validation step, which the skill explicitly drives."
+    ]
+}

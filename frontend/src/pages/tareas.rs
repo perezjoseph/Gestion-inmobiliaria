@@ -1,4 +1,5 @@
 use wasm_bindgen_futures::spawn_local;
+use web_sys::HtmlSelectElement;
 use yew::prelude::*;
 
 use crate::app::AuthContext;
@@ -6,10 +7,27 @@ use crate::components::common::data_table::DataTable;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::components::common::pagination::Pagination;
 use crate::components::common::skeleton::TableSkeleton;
-use crate::services::api::api_get;
+use crate::services::api::{api_get, api_post};
 use crate::types::PaginatedResponse;
 use crate::types::tarea::EjecucionTarea;
 use crate::utils::format_date_display;
+
+const TAREAS_DISPONIBLES: &[(&str, &str)] = &[
+    ("marcar_pagos_atrasados", "Marcar pagos atrasados"),
+    ("marcar_contratos_vencidos", "Marcar contratos vencidos"),
+    ("marcar_documentos_vencidos", "Marcar documentos vencidos"),
+    ("generar_notificaciones", "Generar notificaciones"),
+    (
+        "limpiar_conversaciones_chatbot",
+        "Limpiar conversaciones chatbot",
+    ),
+    ("actualizar_ipc", "Actualizar IPC"),
+    ("generar_gastos_recurrentes", "Generar gastos recurrentes"),
+    (
+        "generar_mantenimiento_programado",
+        "Generar mantenimiento programado",
+    ),
+];
 
 #[component]
 pub fn Tareas() -> Html {
@@ -20,6 +38,8 @@ pub fn Tareas() -> Html {
     let error = use_state(|| Option::<String>::None);
     let loading = use_state(|| true);
     let reload = use_state(|| 0u32);
+    let selected_tarea = use_state(|| String::from("marcar_pagos_atrasados"));
+    let executing = use_state(|| false);
 
     let auth = use_context::<AuthContext>();
     let user_rol = auth
@@ -72,10 +92,41 @@ pub fn Tareas() -> Html {
     let on_per_page_change = {
         let per_page = per_page.clone();
         let page = page.clone();
+        let reload = reload.clone();
         Callback::from(move |pp: u64| {
             per_page.set(pp);
             page.set(1);
             reload.set(*reload + 1);
+        })
+    };
+
+    let on_tarea_change = {
+        let selected_tarea = selected_tarea.clone();
+        Callback::from(move |e: Event| {
+            let target: HtmlSelectElement = e.target_unchecked_into();
+            selected_tarea.set(target.value());
+        })
+    };
+
+    let on_ejecutar = {
+        let selected_tarea = selected_tarea.clone();
+        let error = error.clone();
+        let reload = reload.clone();
+        let executing = executing.clone();
+        Callback::from(move |_: MouseEvent| {
+            let nombre = (*selected_tarea).clone();
+            let error = error.clone();
+            let reload = reload.clone();
+            let executing = executing.clone();
+            spawn_local(async move {
+                executing.set(true);
+                let url = format!("/tareas/{nombre}/ejecutar");
+                match api_post::<serde_json::Value, _>(&url, &()).await {
+                    Ok(_) => reload.set(*reload + 1),
+                    Err(err) => error.set(Some(err)),
+                }
+                executing.set(false);
+            });
         })
     };
 
@@ -95,7 +146,20 @@ pub fn Tareas() -> Html {
         <div>
             <div class="gi-page-header">
                 <h1 class="gi-page-title">{"Historial de Tareas"}</h1>
-                <button class="gi-btn gi-btn-primary">{"Ejecutar"}</button>
+                <div style="display: flex; gap: var(--space-3); align-items: center;">
+                    <select onchange={on_tarea_change} class="gi-input" style="min-width: 220px;">
+                        { for TAREAS_DISPONIBLES.iter().map(|(val, label)| {
+                            html! { <option value={*val} selected={*selected_tarea == *val}>{*label}</option> }
+                        })}
+                    </select>
+                    <button
+                        class="gi-btn gi-btn-primary"
+                        onclick={on_ejecutar}
+                        disabled={*executing}
+                    >
+                        { if *executing { "Ejecutando..." } else { "Ejecutar" } }
+                    </button>
+                </div>
             </div>
 
             if let Some(err) = (*error).as_ref() {

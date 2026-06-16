@@ -8,10 +8,8 @@ pub fn LandingPreview() -> Html {
     html! {
         <section class="gi-l-preview">
             <div class="gi-l-container">
-                <div class="gi-l-section-head">
                     <h2 class="gi-l-section-title">{"Así se ve por dentro"}</h2>
                     <p class="gi-l-section-sub">{"Un panel claro con tus propiedades, contratos y pagos al día."}</p>
-                </div>
                 <div class="gi-l-preview-frame" aria-hidden="true">
                     <div class="gi-l-preview-bar">
                         <span class="gi-l-preview-dot"></span>

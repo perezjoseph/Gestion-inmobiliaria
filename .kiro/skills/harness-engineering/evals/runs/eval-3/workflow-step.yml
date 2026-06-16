@@ -1,0 +1,84 @@
+- name: Process queue (one Kiro run + one commit per artifact)
+  id: queue
+  if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0' && steps.baseline.outputs.still_failing != 'false'
+  env:
+    KIRO_API_KEY: ${{ secrets.KIRO_API }}
+    KIRO_MAX_FIX_ITERATIONS: "3"
+    ARTIFACTS_JSON: ${{ steps.list.outputs.artifacts }}
+    GIT_HISTORY_FILE: ${{ steps.history.outputs.history_log }}
+    QUEUE_RUNS: ${{ steps.attempts.outputs.queue_runs }}
+  run: |
+    umask 077
+    ATTEMPT_DISPLAY=$((QUEUE_RUNS + 1))
+    COMMITS_MADE=0
+    TOTAL=$(echo "$ARTIFACTS_JSON" | jq 'length')
+    POS=0
+
+    # Iterate through artifacts in priority order
+    while IFS= read -r artifact; do
+      [ -z "$artifact" ] && continue
+      POS=$((POS + 1))
+      CONTEXT_PATH="${RUNNER_TEMP}/all-diag/${artifact}/context.txt"
+
+      if [ ! -s "$CONTEXT_PATH" ]; then
+        echo "::warning::${artifact} has no usable diagnostics content — skipping"
+        continue
+      fi
+
+      echo "::group::Processing ${artifact}"
+
+      # Truncate diagnostics if oversized to protect context window.
+      CTX_BYTES=$(wc -c < "$CONTEXT_PATH")
+      TRUNCATED_CTX="${RUNNER_TEMP}/all-diag/${artifact}/context-truncated.txt"
+      if [ "$CTX_BYTES" -gt "${MAX_CONTEXT_BYTES}" ]; then
+        echo "::warning::context.txt for ${artifact} is ${CTX_BYTES} bytes; truncating to last ${MAX_CONTEXT_BYTES}"
+        tail -c "${MAX_CONTEXT_BYTES}" "$CONTEXT_PATH" > "$TRUNCATED_CTX"
+        echo "[NOTE: Earlier diagnostic output was truncated; only the last ${MAX_CONTEXT_BYTES} bytes are shown above.]" >> "$TRUNCATED_CTX"
+        EFFECTIVE_CTX="$TRUNCATED_CTX"
+      else
+        EFFECTIVE_CTX="$CONTEXT_PATH"
+      fi
+
+      # Pass diagnostics + commit message path via environment, NOT the prompt.
+      # The agent's system prompt documents these variables.
+      export KIRO_DIAGNOSTICS_FILE="$EFFECTIVE_CTX"
+      export KIRO_COMMIT_MSG_FILE="${RUNNER_TEMP}/kiro-commit-message-${artifact}.txt"
+
+      # Minimal positional prompt — artifact name and queue position only.
+      # All diagnostic context lives in KIRO_DIAGNOSTICS_FILE.
+      AGENT_EXIT=0
+      kiro-cli --agent autofix chat --no-interactive --trust-all-tools \
+          "Fix CI failure from artifact '${artifact}' (queue position ${POS}/${TOTAL})." \
+        || AGENT_EXIT=$?
+
+      # Detect ANY change in working tree (tracked, staged, OR untracked).
+      git add -A
+      if [ -z "$(git status --porcelain)" ]; then
+        echo "No changes produced by Kiro for ${artifact}, skipping commit"
+        if [ "$AGENT_EXIT" -ne 0 ]; then
+          echo "::warning::Agent exited ${AGENT_EXIT} with no changes for ${artifact}; stopping queue."
+          echo "::endgroup::"
+          break
+        fi
+        echo "::endgroup::"
+        continue
+      fi
+
+      # Commit locally — no push yet (push happens once at end of queue).
+      # Ensure every queued commit ends with the Workflow run trailer.
+      if [ -s "$KIRO_COMMIT_MSG_FILE" ]; then
+        if ! grep -qF "Workflow run: ${RUN_URL}" "$KIRO_COMMIT_MSG_FILE"; then
+          printf '\nWorkflow run: %s\n' "$RUN_URL" >> "$KIRO_COMMIT_MSG_FILE"
+        fi
+        git commit -F "$KIRO_COMMIT_MSG_FILE"
+      else
+        echo "::warning::Kiro did not produce a commit message for ${artifact}; using fallback."
+        git commit -m "fix(autofix): resolve ${artifact}
+
+    Workflow run: ${RUN_URL}"
+      fi
+      COMMITS_MADE=$((COMMITS_MADE + 1))
+      echo "::endgroup::"
+    done < <(echo "$ARTIFACTS_JSON" | jq -r '.[]')
+
+    echo "commits_made=${COMMITS_MADE}" >> "$GITHUB_OUTPUT"

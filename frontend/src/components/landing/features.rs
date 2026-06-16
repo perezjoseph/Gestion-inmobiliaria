@@ -1,38 +1,30 @@
 use yew::prelude::*;
 
 struct FeatureBlock {
-    number: &'static str,
     title: &'static str,
-    points: &'static [&'static str],
+    description: &'static str,
 }
 
 const BLOCKS: &[FeatureBlock] = &[
     FeatureBlock {
-        number: "01",
-        title: "Propiedades, inquilinos y contratos",
-        points: &[
-            "Registra inmuebles con unidades, precios y estado.",
-            "Asocia inquilinos con cédula y datos de contacto.",
-            "Contratos con fechas, montos y renovación automática.",
-        ],
+        title: "Propiedades y unidades",
+        description: "Registra inmuebles con dirección, unidades individuales, precios en DOP o USD, y estado de ocupación. Todo visible de un vistazo.",
     },
     FeatureBlock {
-        number: "02",
-        title: "Pagos, gastos y reportes",
-        points: &[
-            "Cobros en DOP o USD con seguimiento de atrasos.",
-            "Gastos por categoría vinculados a cada propiedad.",
-            "Reportes de ocupación, ingresos y cumplimiento fiscal.",
-        ],
+        title: "Contratos e inquilinos",
+        description: "Asocia inquilinos con cédula verificada. Contratos con fechas claras, montos, y renovación controlada. Sin sorpresas.",
     },
     FeatureBlock {
-        number: "03",
-        title: "Mantenimiento y operaciones",
-        points: &[
-            "Solicitudes de reparación con prioridad y seguimiento.",
-            "Dashboard en tiempo real con alertas de vencimiento.",
-            "Documentos, plantillas y comprobantes fiscales (NCF).",
-        ],
+        title: "Pagos y cobros",
+        description: "Seguimiento de cada pago: pendiente, al día, o atrasado. Alertas automáticas cuando algo se vence.",
+    },
+    FeatureBlock {
+        title: "Gastos y mantenimiento",
+        description: "Registra gastos por propiedad o unidad. Solicitudes de reparación con prioridad, notas, y costos asociados.",
+    },
+    FeatureBlock {
+        title: "Reportes y comprobantes",
+        description: "Ocupación, ingresos mensuales, cumplimiento fiscal. Genera comprobantes NCF para la DGII directamente.",
     },
 ];
 
@@ -41,21 +33,13 @@ pub fn LandingFeatures() -> Html {
     html! {
         <section class="gi-l-features">
             <div class="gi-l-container">
-                <div class="gi-l-section-head">
-                    <h2 class="gi-l-section-title">{"Todo lo que necesitas para administrar"}</h2>
-                </div>
-                <div class="gi-l-feature-blocks">
+                <h2 class="gi-l-section-title">{"Todo lo que necesitas"}</h2>
+                <p class="gi-l-section-sub">{"Un sistema completo para administradores que manejan varias propiedades."}</p>
+                <div class="gi-l-feature-list">
                     { for BLOCKS.iter().map(|block| html! {
-                        <div class="gi-l-feature-block">
-                            <span class="gi-l-feature-block-num">{ block.number }</span>
-                            <div class="gi-l-feature-block-content">
-                                <h3 class="gi-l-feature-block-title">{ block.title }</h3>
-                                <ul class="gi-l-feature-block-list">
-                                    { for block.points.iter().map(|point| html! {
-                                        <li class="gi-l-feature-block-item">{ *point }</li>
-                                    })}
-                                </ul>
-                            </div>
+                        <div class="gi-l-feature-item">
+                            <h3 class="gi-l-feature-item-title">{ block.title }</h3>
+                            <p class="gi-l-feature-item-desc">{ block.description }</p>
                         </div>
                     })}
                 </div>

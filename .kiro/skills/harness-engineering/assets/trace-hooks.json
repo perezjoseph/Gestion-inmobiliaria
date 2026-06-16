@@ -1,0 +1,32 @@
+{
+    "_comment": "Enforcement + run-span hooks. Scope: capture the sensor-ran flag and emit ONE run-level OTLp span at stop. It does NOT reconstruct per-tool spans — kiro-cli has no native OTLP (verified), so the rich tool-level trace comes from a post-run converter that reads the session .jsonl and builds the span tree. Hooks stay minimal; the JSONL converter does trace reconstruction. Requires otel-cli on PATH and OTEL_EXPORTER_OTLP_ENDPOINT (e.g. http://tempo.monitoring.svc.cluster.local:4317). See measuring-harness-quality.md 'Adapter design'.",
+    "_attributes_note": "Use OTel GenAI semconv for the OBTAINABLE model/tool layer (gen_ai.operation.name, gen_ai.agent.name, gen_ai.tool.name) + a harness.* namespace for CI-only signals. RUN_ID correlates the span set to the eval trace file. BLOCKED today (kiro issue #6319, no native OTLP): token usage, per-call latency, error rate are runtime-internal and not exposed to hooks or the session JSONL — do NOT emit gen_ai.usage.* or latency.",
+    "hooks": {
+        "agentSpawn": [
+            {
+                "_why": "Open the run span. gen_ai.operation.name=invoke_agent, gen_ai.agent.name, gen_ai.request.model.",
+                "command": "bash -c 'RID=\"${RUN_ID:-$(date +%s)-$RANDOM}\"; echo \"$RID\" > \"${RUNNER_TEMP:-/tmp}/trace-run-id.txt\"; echo \"$(date +%s%N)\" > \"${RUNNER_TEMP:-/tmp}/trace-start.txt\"; echo \"run_start $RID\"'"
+            }
+        ],
+        "preToolUse": [
+            {
+                "_why": "Record a tool_call event (gen_ai.operation.name=execute_tool, gen_ai.tool.name).",
+                "matcher": "execute_bash",
+                "command": "bash -c 'RID=$(cat \"${RUNNER_TEMP:-/tmp}/trace-run-id.txt\" 2>/dev/null); printf \"{\\\"ev\\\":\\\"tool_call\\\",\\\"run\\\":\\\"%s\\\",\\\"tool\\\":\\\"shell\\\",\\\"ts\\\":%s}\\n\" \"$RID\" \"$(date +%s%N)\" >> \"${RUNNER_TEMP:-/tmp}/trace-events.jsonl\"'"
+            }
+        ],
+        "postToolUse": [
+            {
+                "_why": "Record tool_result + sensor-ran flag for harness.sensors_ran.",
+                "matcher": "execute_bash",
+                "command": "bash -c 'RID=$(cat \"${RUNNER_TEMP:-/tmp}/trace-run-id.txt\" 2>/dev/null); CMD=$(cat | jq -r .tool_input.command 2>/dev/null); echo \"$CMD\" | grep -qE \"cargo (clippy|test)|npm (run build|test)\" && touch \"${RUNNER_TEMP:-/tmp}/trace-sensors.txt\"; printf \"{\\\"ev\\\":\\\"tool_result\\\",\\\"run\\\":\\\"%s\\\",\\\"ts\\\":%s}\\n\" \"$RID\" \"$(date +%s%N)\" >> \"${RUNNER_TEMP:-/tmp}/trace-events.jsonl\"'"
+            }
+        ],
+        "stop": [
+            {
+                "_why": "Close the run span and emit OTLP to Tempo. harness.verdict / iterations / sensors_ran / verification_gap. Replace verdict/iterations parsing with your output-contract reader.",
+                "command": "bash -c 'RID=$(cat \"${RUNNER_TEMP:-/tmp}/trace-run-id.txt\" 2>/dev/null); SENSORS=$([ -f \"${RUNNER_TEMP:-/tmp}/trace-sensors.txt\" ] && echo true || echo false); if command -v otel-cli >/dev/null 2>&1; then otel-cli span --service harness --name \"agent.run\" --attrs \"gen_ai.operation.name=invoke_agent,gen_ai.agent.name=${AGENT_NAME:-unknown},harness.sensors_ran=${SENSORS},harness.run_id=${RID}\" 2>/dev/null || true; fi; rm -f \"${RUNNER_TEMP:-/tmp}/trace-sensors.txt\" 2>/dev/null'"
+            }
+        ]
+    }
+}

@@ -1,0 +1,58 @@
+{
+    "expectations": [
+        {
+            "text": "The refactored step uses 'kiro-cli --agent autofix chat --no-interactive --trust-all-tools' syntax",
+            "passed": true,
+            "evidence": "workflow-step.yml: 'kiro-cli --agent autofix chat --no-interactive --trust-all-tools \"$PROMPT\"'."
+        },
+        {
+            "text": "Diagnostics context passed via KIRO_DIAGNOSTICS_FILE (not inlined)",
+            "passed": true,
+            "evidence": "export KIRO_DIAGNOSTICS_FILE=\"$EFFECTIVE_CTX\"; not inlined."
+        },
+        {
+            "text": "The positional prompt is minimal: references artifact name and queue position only",
+            "passed": true,
+            "evidence": "Prompt = \"Fix the CI failure for artifact '${artifact}' (queue position ${POS}/${TOTAL}).\" — exactly artifact name + queue position."
+        },
+        {
+            "text": "Commit logic preserved (git add -A, status check, commit with message file or fallback)",
+            "passed": true,
+            "evidence": "git add -A; git status --porcelain; commit -F message file with trailer or fallback commit -m."
+        },
+        {
+            "text": "KIRO_COMMIT_MSG_FILE environment variable still set for each artifact",
+            "passed": true,
+            "evidence": "export KIRO_COMMIT_MSG_FILE per artifact."
+        },
+        {
+            "text": "The queue loop structure (while read artifact) is preserved",
+            "passed": true,
+            "evidence": "while IFS= read -r artifact ... done < <(jq -r '.[]')."
+        },
+        {
+            "text": "Truncation logic for oversized diagnostics is preserved",
+            "passed": true,
+            "evidence": "MAX_CONTEXT_BYTES + tail -c + truncation note preserved."
+        },
+        {
+            "text": "A companion agent config JSON file is produced with correct matcher: fs_write hook",
+            "passed": true,
+            "evidence": "autofix.json postToolUse matcher 'fs_write'. (Config itself fails validator: tools include code/introspect/thinking and HTTP mcpServers.context7 lacks command — but the fs_write hook assertion holds.)"
+        },
+        {
+            "text": "A companion system prompt markdown documents env vars",
+            "passed": true,
+            "evidence": "autofix-system.md <inputs> block documents KIRO_DIAGNOSTICS_FILE, KIRO_SUCCESS_CRITERIA, KIRO_ARTIFACT, KIRO_QUEUE_POSITION, KIRO_GIT_HISTORY_FILE, KIRO_LEARNINGS_FILE, KIRO_COMMIT_MSG_FILE."
+        }
+    ],
+    "summary": {
+        "passed": 9,
+        "failed": 0,
+        "total": 9,
+        "pass_rate": 1.0
+    },
+    "notes": [
+        "CONFOUND: baseline read the existing real .kiro/agents/autofix.json and the full real workflow as templates, reproducing the mature structure. Baseline's minimal prompt matched assertion #3 more literally than with_skill did."
+    ]
+}

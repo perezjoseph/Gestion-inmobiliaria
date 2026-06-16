@@ -150,9 +150,12 @@ const STALE_DEPLOYED_CSP: &str = "default-src 'self'; script-src 'self' 'wasm-un
 /// The corrected deployed CSP that includes Cloudflare Insights allowances.
 /// After bug fix 27.1, the deployed ConfigMap matches the repo Caddyfile CSP.
 const CORRECTED_DEPLOYED_CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' \
-    https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; \
+    https://static.cloudflareinsights.com \
+    'sha256-d29CC4ACA1zpL0QdCAyqwggUF64UA4rHb/3y9ylQI5Y='; \
+    style-src 'self' 'unsafe-inline'; \
     img-src 'self' data: blob:; font-src 'self'; \
-    connect-src 'self' https://cloudflareinsights.com; frame-ancestors 'none'";
+    connect-src 'self' https://cloudflareinsights.com \
+    https://static.cloudflareinsights.com; frame-ancestors 'none'";
 
 // ── Source file reading ────────────────────────────────────────────────────
 

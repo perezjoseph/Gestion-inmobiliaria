@@ -182,6 +182,11 @@ impl completion::CompletionModel for OvmsCompletionModel {
 
         if !response.status().is_success() {
             let status = response.status();
+            if status == reqwest::StatusCode::SERVICE_UNAVAILABLE {
+                return Err(CompletionError::ProviderError(
+                    "INFERENCE_COLD_START".to_string(),
+                ));
+            }
             let body = response.text().await.unwrap_or_default();
             return Err(CompletionError::ProviderError(format!(
                 "OVMS respondió con estado {status}: {body}"
@@ -227,6 +232,11 @@ impl completion::CompletionModel for OvmsCompletionModel {
 
         if !response.status().is_success() {
             let status = response.status();
+            if status == reqwest::StatusCode::SERVICE_UNAVAILABLE {
+                return Err(CompletionError::ProviderError(
+                    "INFERENCE_COLD_START".to_string(),
+                ));
+            }
             let body = response.text().await.unwrap_or_default();
             return Err(CompletionError::ProviderError(format!(
                 "OVMS stream respondió con estado {status}: {body}"

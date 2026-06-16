@@ -1,0 +1,30 @@
+{
+    "name": "autofix",
+    "description": "CI autofix agent: diagnoses build, lint, and deploy failures and applies minimal, sensor-verified fixes.",
+    "prompt": "file://../prompts/autofix-system.md",
+    "model": "claude-sonnet-4",
+    "tools": [
+        "read",
+        "write",
+        "shell"
+    ],
+    "allowedTools": [
+        "read",
+        "grep",
+        "glob",
+        "fs_write",
+        "execute_bash"
+    ],
+    "resources": [
+        "file://../../AGENTS.md",
+        "file://../../.kiro/steering/**/*.md"
+    ],
+    "hooks": {
+        "postToolUse": [
+            {
+                "matcher": "fs_write",
+                "command": "cargo fmt --all"
+            }
+        ]
+    }
+}

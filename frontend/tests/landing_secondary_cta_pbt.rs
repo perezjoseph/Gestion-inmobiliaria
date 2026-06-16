@@ -9,7 +9,7 @@
 //! Property 3: CTA styling consistency
 //!
 //! Every action button on the landing page uses one of two styles:
-//! - Primary CTAs ("Registrarse gratis", "Crear cuenta gratis") use the filled
+//! - Primary CTAs ("Empezar gratis", "Crear cuenta gratis") use the filled
 //!   `gi-l-btn-primary` class.
 //! - Every other CTA uses the outlined `gi-l-btn-secondary` class and SHALL NOT
 //!   use the primary class.
@@ -32,14 +32,14 @@ const TRANSPARENCY_SOURCE: &str = include_str!("../src/components/landing/transp
 
 /// All CTA labels on the landing page.
 const ALL_CTA_LABELS: [&str; 4] = [
-    "Registrarse gratis",
+    "Empezar gratis",
     "Crear cuenta gratis",
     "Ya tengo cuenta",
-    "Ver código en GitHub",
+    "Ver en GitHub",
 ];
 
 /// The primary CTA labels — the only ones allowed to use the filled primary class.
-const PRIMARY_CTA_LABELS: [&str; 2] = ["Registrarse gratis", "Crear cuenta gratis"];
+const PRIMARY_CTA_LABELS: [&str; 2] = ["Empezar gratis", "Crear cuenta gratis"];
 
 /// Whether a label is a primary CTA.
 fn is_primary_cta(label: &str) -> bool {
@@ -49,9 +49,9 @@ fn is_primary_cta(label: &str) -> bool {
 /// Returns the source file content containing the given CTA label.
 fn source_for_cta(label: &str) -> &'static str {
     match label {
-        "Registrarse gratis" | "Ya tengo cuenta" => HERO_SOURCE,
+        "Empezar gratis" | "Ya tengo cuenta" => HERO_SOURCE,
         "Crear cuenta gratis" => PREVIEW_SOURCE,
-        "Ver código en GitHub" => TRANSPARENCY_SOURCE,
+        "Ver en GitHub" => TRANSPARENCY_SOURCE,
         _ => "",
     }
 }
@@ -107,32 +107,32 @@ fn test_ya_tengo_cuenta_uses_secondary_styling() {
 /// **Validates: Requirements 9.1, 9.3**
 #[test]
 fn test_ver_codigo_uses_secondary_styling() {
-    let context = extract_cta_context(TRANSPARENCY_SOURCE, "Ver código en GitHub");
+    let context = extract_cta_context(TRANSPARENCY_SOURCE, "Ver en GitHub");
     assert!(
         !context.is_empty(),
-        "\"Ver código en GitHub\" CTA must exist in transparency.rs"
+        "\"Ver en GitHub\" CTA must exist in transparency.rs"
     );
     assert!(
         !has_primary_styling(&context),
-        "\"Ver código en GitHub\" must NOT use the gi-l-btn-primary class. Context: {context}"
+        "\"Ver en GitHub\" must NOT use the gi-l-btn-primary class. Context: {context}"
     );
     assert!(
         has_secondary_styling(&context),
-        "\"Ver código en GitHub\" must use secondary styling (gi-l-btn-secondary). Context: {context}"
+        "\"Ver en GitHub\" must use secondary styling (gi-l-btn-secondary). Context: {context}"
     );
 }
 
 /// **Validates: Requirements 9.1**
 #[test]
 fn test_registrarse_gratis_uses_primary_styling() {
-    let context = extract_cta_context(HERO_SOURCE, "Registrarse gratis");
+    let context = extract_cta_context(HERO_SOURCE, "Empezar gratis");
     assert!(
         !context.is_empty(),
-        "\"Registrarse gratis\" CTA must exist in hero.rs"
+        "\"Empezar gratis\" CTA must exist in hero.rs"
     );
     assert!(
         has_primary_styling(&context),
-        "\"Registrarse gratis\" must use the gi-l-btn-primary class. Context: {context}"
+        "\"Empezar gratis\" must use the gi-l-btn-primary class. Context: {context}"
     );
 }
 

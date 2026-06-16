@@ -203,12 +203,22 @@ async fn try_stale_cache_or_error(
 }
 
 pub async fn consultar_nombre(buscar: &str) -> Result<DgiiNombreResponse, AppError> {
+    let trimmed = buscar.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::Validation(
+            "El campo de búsqueda no puede estar vacío".to_string(),
+        ));
+    }
+
     let base_url = get_base_url();
     let client = build_client()?;
-    let url = format!("{base_url}/api/rnc?name={buscar}");
+
+    let mut url = reqwest::Url::parse(&format!("{base_url}/api/rnc"))
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("URL inválida: {e}")))?;
+    url.query_pairs_mut().append_pair("name", trimmed);
 
     let response =
-        client.get(&url).send().await.map_err(|e| {
+        client.get(url).send().await.map_err(|e| {
             AppError::Internal(anyhow::anyhow!("Error conectando con DGII API: {e}"))
         })?;
 

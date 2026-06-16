@@ -101,5 +101,7 @@ mod ncf_preservation_pbt;
 mod security_audit_pbt;
 mod security_preservation_pbt;
 
+mod ley85_bug_condition_pbt;
+
 #[cfg(feature = "evals")]
 mod chatbot_evals_tests;

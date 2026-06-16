@@ -1,0 +1,78 @@
+{
+    "name": "autofix",
+    "description": "CI autofix agent: diagnoses build/lint/test/security failures and applies minimal, verified fixes. Reads all context from KIRO_* env vars; never runs git.",
+    "prompt": "file://../shared/autofix-system.md",
+    "model": "claude-opus-4.6",
+    "includeMcpJson": false,
+    "mcpServers": {
+        "context7": {
+            "type": "http",
+            "url": "https://mcp.context7.com/mcp"
+        }
+    },
+    "tools": [
+        "@builtin",
+        "@context7"
+    ],
+    "allowedTools": [
+        "read",
+        "write",
+        "shell",
+        "grep",
+        "glob",
+        "@context7"
+    ],
+    "toolsSettings": {
+        "write": {
+            "deniedPaths": [
+                ".github/workflows/**",
+                ".github/actions/**",
+                ".kiro/agents/**",
+                ".kiro/steering/**",
+                ".kiro/skills/**",
+                "infra/**",
+                "Cargo.toml",
+                "backend/Cargo.toml",
+                "frontend/Cargo.toml",
+                "Cargo.lock"
+            ]
+        }
+    },
+    "resources": [
+        "file://../../AGENTS.md",
+        "file://../../.kiro/steering/**/*.md",
+        "skill://../../.kiro/skills/verify-fix-loop/SKILL.md"
+    ],
+    "hooks": {
+        "agentSpawn": [
+            {
+                "command": "bash -c 'rm -f \"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\" \"${RUNNER_TEMP:-/tmp}/autofix-sensors-ran.txt\" \"${RUNNER_TEMP:-/tmp}/autofix-stop-blocks.txt\" 2>/dev/null; echo \"Autofix session initialized \u2014 stale verification state cleared.\"'"
+            }
+        ],
+        "preToolUse": [
+            {
+                "matcher": "execute_bash",
+                "command": "bash -c 'CMD=$(cat | jq -r .tool_input.command 2>/dev/null); if echo \"$CMD\" | grep -qE \"(^|[;&|]\\s*|\\bsh\\s+-c\\s+|\\bbash\\s+-c\\s+)git\\s+(-[a-zA-Z]\\s+)*(commit|push|checkout|reset|rebase|merge|stash|branch\\s+-[dD]|clean|tag\\s+-d)\"; then echo \"BLOCKED: git operation not allowed \u2014 the workflow handles git.\" >&2; exit 2; fi'"
+            }
+        ],
+        "postToolUse": [
+            {
+                "matcher": "fs_write",
+                "command": "bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \"$FILE\" in *.rs) cargo fmt -- \"$FILE\" 2>/dev/null || true ;; */baileys-service/*.ts|*/baileys-service/*.tsx) cd baileys-service && npx eslint --fix \"$FILE\" 2>/dev/null || true ;; */android/*.kt) cd android && ./gradlew spotlessApply -PspotlessFiles=\"$FILE\" 2>/dev/null || true ;; esac; echo \"$FILE\" >> \"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\"'"
+            },
+            {
+                "matcher": "str_replace",
+                "command": "bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \"$FILE\" in *.rs) cargo fmt -- \"$FILE\" 2>/dev/null || true ;; */baileys-service/*.ts|*/baileys-service/*.tsx) cd baileys-service && npx eslint --fix \"$FILE\" 2>/dev/null || true ;; */android/*.kt) cd android && ./gradlew spotlessApply -PspotlessFiles=\"$FILE\" 2>/dev/null || true ;; esac; echo \"$FILE\" >> \"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\"'"
+            },
+            {
+                "matcher": "execute_bash",
+                "command": "bash -c 'CMD=$(cat | jq -r .tool_input.command 2>/dev/null); if echo \"$CMD\" | grep -qE \"cargo (clippy|test|fmt)|npm (run build|test)|npx eslint|gradlew build\"; then touch \"${RUNNER_TEMP:-/tmp}/autofix-sensors-ran.txt\"; fi'"
+            }
+        ],
+        "stop": [
+            {
+                "command": "bash -c 'SENSOR_FLAG=\"${RUNNER_TEMP:-/tmp}/autofix-sensors-ran.txt\"; MODIFIED=\"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\"; BLOCKS=\"${RUNNER_TEMP:-/tmp}/autofix-stop-blocks.txt\"; COUNT=$(cat \"$BLOCKS\" 2>/dev/null || echo 0); if [ \"$COUNT\" -ge 2 ]; then rm -f \"$SENSOR_FLAG\" \"$MODIFIED\" \"$BLOCKS\" 2>/dev/null; exit 0; fi; if [ -s \"$MODIFIED\" ] && [ ! -f \"$SENSOR_FLAG\" ]; then echo $((COUNT + 1)) > \"$BLOCKS\"; echo \"{\\\"decision\\\": \\\"block\\\", \\\"reason\\\": \\\"You modified files but did not run verification sensors. Run the appropriate sensors (cargo clippy, cargo test, npm run build, etc.) for your modified files before stopping.\\\"}\"; else rm -f \"$SENSOR_FLAG\" \"$MODIFIED\" \"$BLOCKS\" 2>/dev/null; fi'"
+            }
+        ]
+    }
+}

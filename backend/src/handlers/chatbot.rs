@@ -602,23 +602,50 @@ pub async fn test_chat_stream(
 
     crate::metrics::AI_REQUEST_ATTEMPTS.inc();
 
-    let mut streaming_response = rig::completion::CompletionModel::stream(
-        &model,
-        completion_request,
-    )
-    .await
-    .map_err(|e| {
-        let error_msg = e.to_string();
-        if error_msg.contains("INFERENCE_COLD_START") {
-            tracing::info!(organizacion_id = %org_id, "vLLM en cold-start (stream)");
-            AppError::Internal(anyhow::anyhow!(
-                "El asistente se está iniciando. Por favor, intente de nuevo en 1-2 minutos."
-            ))
-        } else {
-            tracing::error!(organizacion_id = %org_id, error = %e, "Error en OVMS stream");
-            AppError::Internal(anyhow::anyhow!("Error conectando al servicio AI: {e}"))
+    let max_cold_start_retries = 12u32;
+    let retry_delay = std::time::Duration::from_secs(8);
+    let mut streaming_response = None;
+
+    for attempt in 0..=max_cold_start_retries {
+        match rig::completion::CompletionModel::stream(&model, completion_request.clone()).await {
+            Ok(resp) => {
+                streaming_response = Some(resp);
+                break;
+            }
+            Err(e) => {
+                let error_msg = e.to_string();
+                let is_cold_start = error_msg.contains("INFERENCE_COLD_START")
+                    || error_msg.contains("Connection refused")
+                    || error_msg.contains("connection refused")
+                    || error_msg.contains("ConnectError");
+
+                if is_cold_start && attempt < max_cold_start_retries {
+                    tracing::info!(
+                        organizacion_id = %org_id,
+                        attempt = attempt + 1,
+                        "vLLM cold-start (stream), reintentando"
+                    );
+                    tokio::time::sleep(retry_delay).await;
+                    continue;
+                }
+
+                if is_cold_start {
+                    tracing::warn!(organizacion_id = %org_id, "vLLM cold-start agotó reintentos");
+                    return Err(AppError::ServiceUnavailable(
+                        "El asistente no pudo iniciar. Intente de nuevo en unos minutos."
+                            .to_string(),
+                    ));
+                }
+
+                tracing::error!(organizacion_id = %org_id, error = %e, "Error en OVMS stream");
+                return Err(AppError::Internal(anyhow::anyhow!(
+                    "Error conectando al servicio AI: {e}"
+                )));
+            }
         }
-    })?;
+    }
+
+    let mut streaming_response = streaming_response.unwrap();
 
     let sse_stream = async_stream::stream! {
         while let Some(chunk) = streaming_response.next().await {

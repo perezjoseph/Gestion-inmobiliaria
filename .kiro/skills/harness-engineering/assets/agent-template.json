@@ -1,0 +1,76 @@
+{
+    "_comment": "Specialized kiro-cli agent skeleton. Maps to the 7-pattern recipe in SKILL.md. Filled-in example: .kiro/agents/autofix.json + .kiro/shared/autofix-system.md. Delete _comment fields before use.",
+    "name": "REPLACE-agent-name",
+    "description": "REPLACE — one sentence: what this agent does and the single job it owns.",
+    "_pattern_1_role": "ROLE — the prompt file declares what it does AND what it must NOT do. Keep it surgical.",
+    "prompt": "file://../shared/REPLACE-agent-system.md",
+    "_pattern_3_tools": "TOOLS — minimum viable set. Prefer few atomic-outcome tools. Do not use '*' unless the agent genuinely needs everything.",
+    "tools": [
+        "read",
+        "write",
+        "shell",
+        "grep",
+        "glob",
+        "thinking"
+    ],
+    "allowedTools": [
+        "read",
+        "write",
+        "shell",
+        "grep",
+        "glob",
+        "thinking"
+    ],
+    "_pattern_3_denied": "TOOLS — denylist dangerous paths mechanically. The agent cannot edit what it should not touch. Tune to this agent's blast radius.",
+    "toolsSettings": {
+        "write": {
+            "deniedPaths": [
+                ".github/workflows/**",
+                ".github/actions/**",
+                ".kiro/agents/**",
+                ".kiro/steering/**",
+                "infra/**"
+            ]
+        }
+    },
+    "_pattern_2_input": "INPUT — resources load steering + AGENTS.md (progressive disclosure). Structured task context comes via env vars documented in the system prompt, not inline here.",
+    "resources": [
+        "file://../../AGENTS.md",
+        "file://../../.kiro/steering/**/*.md"
+    ],
+    "_pattern_4_hooks": "HOOKS — enforce mechanically what the agent must never skip. matcher uses INTERNAL tool names: fs_write, fs_read, execute_bash, str_replace (NOT write/read/shell). See references/kiro-config-guide.md gotcha #1.",
+    "hooks": {
+        "agentSpawn": [
+            {
+                "_why": "LIFECYCLE — clear stale verification state at session start.",
+                "command": "bash -c 'rm -f \"${RUNNER_TEMP:-/tmp}\"/AGENT-*.txt 2>/dev/null; echo init'"
+            }
+        ],
+        "preToolUse": [
+            {
+                "_why": "SCOPE — block dangerous ops the denylist cannot express (e.g. git mutations).",
+                "matcher": "execute_bash",
+                "command": "bash -c 'CMD=$(cat | jq -r .tool_input.command 2>/dev/null); echo \"$CMD\" | grep -qE \"git +(commit|push|reset|rebase)\" && { echo BLOCKED >&2; exit 2; } || exit 0'"
+            }
+        ],
+        "postToolUse": [
+            {
+                "_why": "VERIFICATION feedforward — auto-format on write so the agent never spends tokens on whitespace; record modified files.",
+                "matcher": "fs_write",
+                "command": "bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \"$FILE\" in *.rs) cargo fmt -- \"$FILE\" 2>/dev/null||true;; esac; echo \"$FILE\" >> \"${RUNNER_TEMP:-/tmp}/AGENT-modified.txt\"'"
+            },
+            {
+                "_why": "VERIFICATION — flag that sensors ran, for the stop gate.",
+                "matcher": "execute_bash",
+                "command": "bash -c 'CMD=$(cat | jq -r .tool_input.command 2>/dev/null); echo \"$CMD\" | grep -qE \"cargo (clippy|test)|npm (run build|test)\" && touch \"${RUNNER_TEMP:-/tmp}/AGENT-sensors.txt\"||true'"
+            }
+        ],
+        "stop": [
+            {
+                "_why": "VERIFICATION gate — refuse to finish if files changed but no sensor ran. This makes 'claim done without verifying' impossible, not improbable.",
+                "command": "bash -c 'M=\"${RUNNER_TEMP:-/tmp}/AGENT-modified.txt\"; S=\"${RUNNER_TEMP:-/tmp}/AGENT-sensors.txt\"; if [ -s \"$M\" ] && [ ! -f \"$S\" ]; then echo \"{\\\"decision\\\":\\\"block\\\",\\\"reason\\\":\\\"Files modified but no verification sensor ran. Run the relevant sensors before stopping.\\\"}\"; else rm -f \"$M\" \"$S\" 2>/dev/null; fi'"
+            }
+        ]
+    },
+    "model": "claude-opus-4.6"
+}

@@ -71,7 +71,7 @@ android/local.properties
 /tools/
 
 # Kiro / skills / state
-.kiro/skills/*
+
 .kiro/settings/
 .kiro/specs/*/.tasks/
 

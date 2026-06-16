@@ -1,0 +1,15 @@
+{
+    "eval_id": 2,
+    "eval_name": "design-verify-fix-loop",
+    "prompt": "Design a verify-fix loop for a CI autofix agent that handles a Rust workspace (backend + WASM frontend) and a TypeScript sidecar (baileys-service). The loop should: detect which file types were modified, run only relevant sensors, iterate up to a configurable max (default 3, controlled by KIRO_MAX_FIX_ITERATIONS env var), and exit with appropriate codes (0=clean, 1=partial, 2=no progress). Order sensors cheapest-first. Include eslint as a separate TypeScript lint sensor between build and test. Write this as a system prompt section.",
+    "assertions": [
+        "Sensors are ordered by cost: format first, then lint, then compile/typecheck, then tests",
+        "Selective activation: Rust sensors only for .rs files, TypeScript sensors only for baileys-service files",
+        "Correct Rust sensor commands: cargo fmt --all -- --check, cargo clippy --locked -p realestate-backend -- -D warnings, cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings",
+        "Includes eslint as a separate TypeScript sensor: npx eslint . --max-warnings 0 (or equivalent) in baileys-service/",
+        "Specifies npm run build and npm test as separate TypeScript sensors in baileys-service/",
+        "Defines three distinct exit codes (0=clean, 1=partial progress, 2=no progress)",
+        "Instructs the agent to try a fundamentally different approach after 2 consecutive identical failures",
+        "Iteration cap is configurable via KIRO_MAX_FIX_ITERATIONS environment variable with default of 3"
+    ]
+}

@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "platform",
+  "owner": "pluginagentmarketplace",
+  "repo": "custom-plugin-android",
+  "path": "skills/platform",
+  "branch": "main",
+  "sha": "33687ba365f52f4678858d1e438ba21a24c67f0e",
+  "source": "manual"
+}

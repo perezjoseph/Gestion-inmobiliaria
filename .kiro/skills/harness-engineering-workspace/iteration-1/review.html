@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval Review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&family=Lora:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg: #faf9f5;
+      --surface: #ffffff;
+      --border: #e8e6dc;
+      --text: #141413;
+      --text-muted: #b0aea5;
+      --accent: #d97757;
+      --accent-hover: #c4613f;
+      --green: #788c5d;
+      --green-bg: #eef2e8;
+      --red: #c44;
+      --red-bg: #fceaea;
+      --header-bg: #141413;
+      --header-text: #faf9f5;
+      --radius: 6px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Lora', Georgia, serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .header h1 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    .header .instructions {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin-top: 0.25rem;
+    }
+    .header .progress {
+      font-size: 0.875rem;
+      opacity: 0.8;
+      text-align: right;
+    }
+
+    /* ---- Main content ---- */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* ---- Sections ---- */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      flex-shrink: 0;
+    }
+    .section-header {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.75rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .section-body {
+      padding: 1rem;
+    }
+
+    /* ---- Config badge ---- */
+    .config-badge {
+      display: inline-block;
+      padding: 0.2rem 0.625rem;
+      border-radius: 9999px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-left: 0.75rem;
+      vertical-align: middle;
+    }
+    .config-badge.config-primary {
+      background: rgba(33, 150, 243, 0.12);
+      color: #1976d2;
+    }
+    .config-badge.config-baseline {
+      background: rgba(255, 193, 7, 0.15);
+      color: #f57f17;
+    }
+
+    /* ---- Prompt ---- */
+    .prompt-text {
+      white-space: pre-wrap;
+      font-size: 0.9375rem;
+      line-height: 1.6;
+    }
+
+    /* ---- Outputs ---- */
+    .output-file {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .output-file + .output-file {
+      margin-top: 1rem;
+    }
+    .output-file-header {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .output-file-header .dl-btn {
+      font-size: 0.7rem;
+      color: var(--accent);
+      text-decoration: none;
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-weight: 500;
+      opacity: 0.8;
+    }
+    .output-file-header .dl-btn:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+    .output-file-content {
+      padding: 0.75rem;
+      overflow-x: auto;
+    }
+    .output-file-content pre {
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+    .output-file-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+    .output-file-content iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+    }
+    .output-file-content table {
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+      width: 100%;
+    }
+    .output-file-content table td,
+    .output-file-content table th {
+      border: 1px solid var(--border);
+      padding: 0.375rem 0.5rem;
+      text-align: left;
+    }
+    .output-file-content table th {
+      background: var(--bg);
+      font-weight: 600;
+    }
+    .output-file-content .download-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .output-file-content .download-link:hover {
+      background: var(--border);
+    }
+    .empty-state {
+      color: var(--text-muted);
+      font-style: italic;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    /* ---- Feedback ---- */
+    .prev-feedback {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.625rem 0.75rem;
+      margin-top: 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .prev-feedback-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.25rem;
+      color: var(--text-muted);
+    }
+    .feedback-textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      line-height: 1.5;
+      resize: vertical;
+      color: var(--text);
+    }
+    .feedback-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    .feedback-status {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+      min-height: 1.1em;
+    }
+
+    /* ---- Grades (collapsible) ---- */
+    .grades-toggle {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .grades-toggle:hover {
+      color: var(--accent);
+    }
+    .grades-toggle .arrow {
+      margin-right: 0.5rem;
+      transition: transform 0.15s;
+      font-size: 0.75rem;
+    }
+    .grades-toggle .arrow.open {
+      transform: rotate(90deg);
+    }
+    .grades-content {
+      display: none;
+      margin-top: 0.75rem;
+    }
+    .grades-content.open {
+      display: block;
+    }
+    .grades-summary {
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .grade-badge {
+      display: inline-block;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .grade-pass { background: var(--green-bg); color: var(--green); }
+    .grade-fail { background: var(--red-bg); color: var(--red); }
+    .assertion-list {
+      list-style: none;
+    }
+    .assertion-item {
+      padding: 0.625rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8125rem;
+    }
+    .assertion-item:last-child { border-bottom: none; }
+    .assertion-status {
+      font-weight: 600;
+      margin-right: 0.5rem;
+    }
+    .assertion-status.pass { color: var(--green); }
+    .assertion-status.fail { color: var(--red); }
+    .assertion-evidence {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+      padding-left: 1.5rem;
+    }
+
+    /* ---- View tabs ---- */
+    .view-tabs {
+      display: flex;
+      gap: 0;
+      padding: 0 2rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .view-tab {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.625rem 1.25rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .view-tab:hover { color: var(--text); }
+    .view-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .view-panel { display: none; }
+    .view-panel.active { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+    /* ---- Benchmark view ---- */
+    .benchmark-view {
+      padding: 1.5rem 2rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .benchmark-table {
+      border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.8125rem;
+      width: 100%;
+      margin-bottom: 1.5rem;
+    }
+    .benchmark-table th, .benchmark-table td {
+      padding: 0.625rem 0.75rem;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+    .benchmark-table th {
+      font-family: 'Poppins', sans-serif;
+      background: var(--header-bg);
+      color: var(--header-text);
+      font-weight: 500;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .benchmark-table tr:hover { background: var(--bg); }
+    .benchmark-table tr.benchmark-row-with { background: rgba(33, 150, 243, 0.06); }
+    .benchmark-table tr.benchmark-row-without { background: rgba(255, 193, 7, 0.06); }
+    .benchmark-table tr.benchmark-row-with:hover { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-without:hover { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-table tr.benchmark-row-avg { font-weight: 600; border-top: 2px solid var(--border); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-with { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-without { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-delta-positive { color: var(--green); font-weight: 600; }
+    .benchmark-delta-negative { color: var(--red); font-weight: 600; }
+    .benchmark-notes {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+    .benchmark-notes h3 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+    }
+    .benchmark-notes ul {
+      list-style: disc;
+      padding-left: 1.25rem;
+    }
+    .benchmark-notes li {
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      margin-bottom: 0.375rem;
+    }
+    .benchmark-empty {
+      color: var(--text-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 3rem;
+    }
+
+    /* ---- Navigation ---- */
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .nav-btn:hover:not(:disabled) {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .nav-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .done-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .done-btn:hover {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .done-btn.ready {
+      border: none;
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+    }
+    .done-btn.ready:hover {
+      background: var(--accent-hover);
+    }
+    /* ---- Done overlay ---- */
+    .done-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .done-overlay.visible {
+      display: flex;
+    }
+    .done-card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 2rem 3rem;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+    }
+    .done-card h2 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .done-card p {
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+    .done-card .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    .done-card button {
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    .done-card button:hover {
+      background: var(--bg);
+    }
+    /* ---- Toast ---- */
+    .toast {
+      position: fixed;
+      bottom: 5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 0.625rem 1.25rem;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 200;
+    }
+    .toast.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="app" style="height:100vh; display:flex; flex-direction:column;">
+    <div class="header">
+      <div>
+        <h1>Eval Review: <span id="skill-name"></span></h1>
+        <div class="instructions">Review each output and leave feedback below. Navigate with arrow keys or buttons. When done, copy feedback and paste into Claude Code.</div>
+      </div>
+      <div class="progress" id="progress"></div>
+    </div>
+
+    <!-- View tabs (only shown when benchmark data exists) -->
+    <div class="view-tabs" id="view-tabs" style="display:none;">
+      <button class="view-tab active" onclick="switchView('outputs')">Outputs</button>
+      <button class="view-tab" onclick="switchView('benchmark')">Benchmark</button>
+    </div>
+
+    <!-- Outputs panel (qualitative review) -->
+    <div class="view-panel active" id="panel-outputs">
+    <div class="main">
+      <!-- Prompt -->
+      <div class="section">
+        <div class="section-header">Prompt <span class="config-badge" id="config-badge" style="display:none;"></span></div>
+        <div class="section-body">
+          <div class="prompt-text" id="prompt-text"></div>
+        </div>
+      </div>
+
+      <!-- Outputs -->
+      <div class="section">
+        <div class="section-header">Output</div>
+        <div class="section-body" id="outputs-body">
+          <div class="empty-state">No output files found</div>
+        </div>
+      </div>
+
+      <!-- Previous Output (collapsible) -->
+      <div class="section" id="prev-outputs-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="togglePrevOutputs()">
+            <span class="arrow" id="prev-outputs-arrow">&#9654;</span>
+            Previous Output
+          </div>
+        </div>
+        <div class="grades-content" id="prev-outputs-content"></div>
+      </div>
+
+      <!-- Grades (collapsible) -->
+      <div class="section" id="grades-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="toggleGrades()">
+            <span class="arrow" id="grades-arrow">&#9654;</span>
+            Formal Grades
+          </div>
+        </div>
+        <div class="grades-content" id="grades-content"></div>
+      </div>
+
+      <!-- Feedback -->
+      <div class="section">
+        <div class="section-header">Your Feedback</div>
+        <div class="section-body">
+          <textarea
+            class="feedback-textarea"
+            id="feedback"
+            placeholder="What do you think of this output? Any issues, suggestions, or things that look great?"
+          ></textarea>
+          <div class="feedback-status" id="feedback-status"></div>
+          <div class="prev-feedback" id="prev-feedback" style="display:none;">
+            <div class="prev-feedback-label">Previous feedback</div>
+            <div id="prev-feedback-text"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav" id="outputs-nav">
+      <button class="nav-btn" id="prev-btn" onclick="navigate(-1)">&#8592; Previous</button>
+      <button class="done-btn" id="done-btn" onclick="showDoneDialog()">Submit All Reviews</button>
+      <button class="nav-btn" id="next-btn" onclick="navigate(1)">Next &#8594;</button>
+    </div>
+    </div><!-- end panel-outputs -->
+
+    <!-- Benchmark panel (quantitative stats) -->
+    <div class="view-panel" id="panel-benchmark">
+      <div class="benchmark-view" id="benchmark-content">
+        <div class="benchmark-empty">No benchmark data available. Run a benchmark to see quantitative results here.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Done overlay -->
+  <div class="done-overlay" id="done-overlay">
+    <div class="done-card">
+      <h2>Review Complete</h2>
+      <p>Your feedback has been saved. Go back to your Claude Code session and tell Claude you're done reviewing.</p>
+      <div class="btn-row">
+        <button onclick="closeDoneDialog()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ---- Embedded data (injected by generate_review.py) ----
+    const EMBEDDED_DATA = {"skill_name": "harness-engineering", "runs": [{"id": "eval-1-create-config-with_skill-run-1", "prompt": "(No prompt found)", "eval_id": null, "outputs": [{"name": "autofix-system.md", "type": "text", "content": "# Autofix Agent \u2014 System Prompt\n\nYou are the CI autofix agent for this Rust 2024 workspace (`backend`, `frontend`) plus an Android/Kotlin app. You run **headless** inside GitHub Actions. A sensor (build, clippy, test, fmt) has already failed. Your job: read the diagnostics, apply the smallest correct fix, and prove the sensor passes again.\n\n## Operating constraints\n\n- Fix only what the failing sensor reports. Do not refactor, rename, or \"improve\" unrelated code.\n- One failure class per run. If diagnostics show several unrelated failures, fix the one tied to the triggering sensor and stop.\n- Security is non-negotiable. Never weaken auth, authorization, or input validation to make a check pass. If the only fix would introduce a vulnerability, stop and report instead.\n- No code comments. Make the code self-explanatory; remove stale comments you touch.\n- All user-facing text stays in Spanish.\n\n## Inputs (environment variables)\n\nThe CI workflow passes context through env vars. Read them; do not invent paths.\n\n| Variable | Meaning |\n|----------|---------|\n| `KIRO_DIAGNOSTICS_FILE` | Path to the captured sensor output (compiler/clippy/test log). Read this first. |\n| `KIRO_SENSOR` | Which sensor failed: `build`, `clippy`, `test`, or `fmt`. |\n| `KIRO_LEARNINGS_FILE` | Append-only notes carried across autofix runs. Read before starting, append a one-line summary when done. |\n| `KIRO_COMMIT_MSG_FILE` | Write the commit message here for the workflow to consume. |\n\nIf a variable is unset, fall back to running the sensor yourself (see below) rather than guessing.\n\n## Loop\n\n1. Read `KIRO_DIAGNOSTICS_FILE` and `KIRO_LEARNINGS_FILE`.\n2. Locate the offending file(s) and the root cause. Read the code before editing \u2014 code is the source of truth.\n3. Apply the minimal edit.\n4. Re-run the matching sensor (see commands). Iterate until it passes or you have tried twice.\n5. If two attempts fail, stop and report the root cause; do not keep patching.\n6. On success, write a concise commit message to `KIRO_COMMIT_MSG_FILE` and append a one-line learning.\n\n## Sensor commands\n\n| Sensor | Command |\n|--------|---------|\n| build | `cargo build --workspace --all-targets` |\n| clippy | `cargo clippy --workspace --all-targets -- -D warnings` |\n| test | `cargo test --workspace` |\n| fmt | `cargo fmt --all --check` |\n\n## Formatting\n\nA `postToolUse` hook runs `cargo fmt --all` automatically after every file write, so do not run `cargo fmt` by hand to apply formatting \u2014 it is already handled. Use `cargo fmt --all --check` only to verify.\n\n## Output\n\nEnd with: the sensor that was failing, the root cause in one sentence, the files changed, and the final sensor result (pass/fail).\n"}, {"name": "autofix.json", "type": "text", "content": "{\n    \"name\": \"autofix\",\n    \"description\": \"CI autofix agent: reads failing sensor diagnostics, applies the minimal fix, and reformats Rust on every write.\",\n    \"prompt\": \"file://../prompts/autofix-system.md\",\n    \"model\": \"claude-sonnet-4\",\n    \"tools\": [\n        \"read\",\n        \"write\",\n        \"shell\"\n    ],\n    \"allowedTools\": [\n        \"read\",\n        \"write\",\n        \"shell\"\n    ],\n    \"resources\": [\n        \"file://../../AGENTS.md\",\n        \"file://../../.kiro/steering/**/*.md\"\n    ],\n    \"hooks\": {\n        \"postToolUse\": [\n            {\n                \"matcher\": \"fs_write\",\n                \"command\": \"cargo fmt --all\"\n            }\n        ]\n    }\n}"}], "grading": {"expectations": [{"text": "The output is a valid JSON file (parses as JSON)", "passed": true, "evidence": "autofix.json parses; validator reads it without JSON error."}, {"text": "The prompt field uses a file:// URI that resolves relative to the config file location (.kiro/agents/), not workspace root", "passed": true, "evidence": "prompt = 'file://../prompts/autofix-system.md' \u2014 relative to config dir, resolves to .kiro/prompts/ when deployed at .kiro/agents/."}, {"text": "The resources array uses glob patterns for steering files rather than listing each file individually", "passed": true, "evidence": "resources includes 'file://../../.kiro/steering/**/*.md' glob."}, {"text": "The hooks object uses 'postToolUse' as the trigger key", "passed": true, "evidence": "hooks.postToolUse present."}, {"text": "The hook uses the field name 'matcher' with the internal tool name 'fs_write'", "passed": true, "evidence": "hook entry: {matcher: 'fs_write', command: 'cargo fmt --all'}."}, {"text": "The allowedTools field is present and does NOT use '*' wildcard", "passed": true, "evidence": "allowedTools = ['read','write','shell']."}, {"text": "The config passes validation via scripts/validate-kiro-agent.js (exit 0)", "passed": true, "evidence": "Validator: {valid:true, errors:[]}, exit 0. Agent placed a resolution copy of the prompt at with_skill/prompts/ per the validator gotcha it read."}, {"text": "A companion system prompt markdown file is produced alongside the config", "passed": true, "evidence": "outputs/autofix-system.md produced with role/constraints/env-var contract/sensor commands."}], "summary": {"passed": 8, "failed": 0, "total": 8, "pass_rate": 1.0}, "notes": ["Skill drove the agent to read the validator and place a prompt resolution copy so validation passes clean \u2014 the differentiator vs baseline."]}}, {"id": "eval-1-create-config-without_skill-run-1", "prompt": "(No prompt found)", "eval_id": null, "outputs": [{"name": "autofix-system.md", "type": "text", "content": "# Autofix Agent \u2014 System Prompt\n\n## Role\n\nYou are an automated CI remediation agent. Your sole purpose is to make surgical, minimal fixes that resolve build, lint, and test failures detected by CI. You operate inside a verify-fix loop, iterating until all feedback sensors pass or you exhaust your iteration budget.\n\n## Constraints\n\n- Fix only what is broken. Do not add features.\n- Match existing style. Do not reformat, rename, or restructure code beyond what the fix requires.\n- Fix the root cause. Never add `#[allow(...)]`, `// @ts-ignore`, `// eslint-disable`, or `@Suppress`.\n- Make surgical changes only. Every changed line must trace directly to a diagnosed failure.\n- Do not run git operations. The workflow owns commit and push. Your job is to modify files and write the commit message.\n\n## Workflow\n\n1. Read the diagnostics context to identify the failing job, error output, file paths, and line numbers.\n2. Apply the minimal change that resolves the failure(s). Fix imports before usages, type definitions before implementations.\n3. Verify by running only the sensors relevant to your modified files. Stop at the first failure and fix before continuing.\n   - Rust (`*.rs`): `cargo fmt --all -- --check`, then `cargo clippy --locked -- -D warnings`, then `cargo test --locked --no-fail-fast`.\n4. Iterate or finish:\n   - All sensors pass: write the commit message, exit clean.\n   - Sensors fail with iterations remaining: parse the error, fix, return to step 2.\n   - Same error persists across 2 consecutive iterations: try a fundamentally different approach.\n\n## Priority Ordering\n\nWhen multiple sensors fail at once:\n\n1. Compilation errors \u2014 nothing else passes until these are fixed.\n2. Lint warnings \u2014 code runs but violates standards.\n3. Test failures \u2014 code compiles and lints but behaves incorrectly.\n"}, {"name": "autofix.json", "type": "text", "content": "{\n    \"name\": \"autofix\",\n    \"description\": \"CI autofix agent: diagnoses build/lint/test failures and applies minimal, verified fixes.\",\n    \"model\": \"claude-sonnet-4\",\n    \"prompt\": \"file://../prompts/autofix-system.md\",\n    \"tools\": [\n        \"read\",\n        \"write\",\n        \"shell\"\n    ],\n    \"allowedTools\": [\n        \"read\",\n        \"write\",\n        \"shell\"\n    ],\n    \"resources\": [\n        \"file://../../AGENTS.md\",\n        \"file://../../.kiro/steering/**/*.md\"\n    ],\n    \"hooks\": {\n        \"postToolUse\": [\n            {\n                \"matcher\": \"fs_write\",\n                \"command\": \"bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \\\"$FILE\\\" in *.rs) cargo fmt -- \\\"$FILE\\\" 2>/dev/null || true ;; esac'\"\n            },\n            {\n                \"matcher\": \"str_replace\",\n                \"command\": \"bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \\\"$FILE\\\" in *.rs) cargo fmt -- \\\"$FILE\\\" 2>/dev/null || true ;; esac'\"\n            }\n        ]\n    }\n}"}], "grading": {"expectations": [{"text": "The output is a valid JSON file (parses as JSON)", "passed": true, "evidence": "autofix.json parses cleanly."}, {"text": "The prompt field uses a file:// URI that resolves relative to the config file location (.kiro/agents/), not workspace root", "passed": true, "evidence": "prompt = 'file://../prompts/autofix-system.md' \u2014 correct relative-to-config form."}, {"text": "The resources array uses glob patterns for steering files rather than listing each file individually", "passed": true, "evidence": "resources includes 'file://../../.kiro/steering/**/*.md'."}, {"text": "The hooks object uses 'postToolUse' as the trigger key", "passed": true, "evidence": "hooks.postToolUse present (two entries: fs_write, str_replace)."}, {"text": "The hook uses the field name 'matcher' with the internal tool name 'fs_write'", "passed": true, "evidence": "matcher 'fs_write' running cargo fmt on *.rs."}, {"text": "The allowedTools field is present and does NOT use '*' wildcard", "passed": true, "evidence": "allowedTools = ['read','write','shell']."}, {"text": "The config passes validation via scripts/validate-kiro-agent.js (exit 0)", "passed": false, "evidence": "Validator exit 1: prompt file not found at without_skill/prompts/autofix-system.md. The baseline never ran the validator and did not place a resolution copy, so validation fails even though the URI form is correct."}, {"text": "A companion system prompt markdown file is produced alongside the config", "passed": true, "evidence": "outputs/autofix-system.md produced."}], "summary": {"passed": 7, "failed": 1, "total": 8, "pass_rate": 0.875}, "notes": ["CONFOUND: baseline read the existing real .kiro/agents/autofix.json as a template (stated in its transcript), inheriting correct field names/conventions. The only miss is the validation step, which the skill explicitly drives."]}}, {"id": "eval-2-verify-loop-with_skill-run-1", "prompt": "(No prompt found)", "eval_id": null, "outputs": [{"name": "verify-fix-loop.md", "type": "text", "content": "# Verify-Fix Loop \u2014 System Prompt Section\n\n> Drop-in section for the autofix agent system prompt (`.kiro/shared/autofix-system.md`).\n> Implements Generator/Evaluator separation: you generate fixes, computational sensors\n> evaluate them. You never declare success \u2014 only a passing sensor does.\n\n## Verify-Fix Loop\n\nYou operate a bounded verify-fix loop. Each iteration: detect which file types changed,\nrun only the relevant sensors cheapest-first, parse failures, fix, repeat. You own the\nloop \u2014 do not rely on the workflow to re-invoke you.\n\n### Iteration Budget\n\n- Read `KIRO_MAX_FIX_ITERATIONS` (default `3` when unset, empty, or non-numeric).\n- One iteration = one full detect \u2192 verify \u2192 fix pass.\n- Stop the loop when all relevant sensors pass, or when the budget is exhausted, or when\n  you make no progress across two consecutive iterations (see Exit Codes).\n\n### Step 1 \u2014 Detect Modified File Types\n\nDetermine the changed file set for this run from the diagnostics context and the files you\nhave edited. Classify each path into a stack. Only stacks with at least one modified file\nare activated; skip the rest. This narrows the action space so a finite sensor set covers it.\n\n| Stack | Path globs | Activates sensors |\n|-------|-----------|-------------------|\n| Rust backend | `backend/**/*.rs`, root `Cargo.toml`/`Cargo.lock` touching backend | Rust backend group |\n| Rust WASM frontend | `frontend/**/*.rs` | Rust frontend group |\n| TypeScript sidecar | `baileys-service/**/*.{ts,tsx}`, `baileys-service/package.json`, `baileys-service/tsconfig.json` | TypeScript group |\n| Non-code | `**/*.{yml,yaml,md,Dockerfile}`, `infra/**` | none \u2014 mark clean |\n\nA change touching multiple stacks activates every matching group. Run each activated group;\nwithin and across groups, honor the cheapest-first order in Step 2.\n\n### Step 2 \u2014 Run Relevant Sensors (Cheapest-First)\n\nSensors are ordered by cost so a cheap failure never pays for an expensive one (Keep Quality\nLeft): **format \u2192 lint \u2192 compile \u2192 test**. Run in this order. Stop at the first failing\nsensor, fix the root cause, then resume from the cheapest sensor of the affected stack.\n\nSensors are silent on pass and verbose on fail. On failure, capture the full sensor output\n(error codes, file:line, lint IDs, failing test names) as the input to your next fix.\n\n**Rust backend** (`*.rs` in `backend/`):\n\n```bash\ncargo fmt --all -- --check\ncargo clippy --locked -p realestate-backend -- -D warnings\ncargo test --locked -p realestate-backend --no-fail-fast\n```\n\n**Rust WASM frontend** (`*.rs` in `frontend/`):\n\n```bash\ncargo fmt --all -- --check\ncargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings\n```\n\n**TypeScript sidecar** (`baileys-service/**`):\n\n```bash\ncd baileys-service && npm run build          # 1. compile / type-check (tsc)\ncd baileys-service && npx eslint . --max-warnings 0   # 2. lint (separate sensor)\ncd baileys-service && npm test               # 3. test (vitest)\n```\n\nNotes that change correctness:\n\n- `--locked` pins exact `Cargo.lock` versions \u2014 without it cargo may update deps mid-build\n  and make failures non-reproducible.\n- `-p` targets one crate so the failing crate is unambiguous; never run workspace-wide.\n- `--max-warnings 0` makes eslint exit non-zero on warnings \u2014 without it a warning is a\n  false negative.\n- `cargo fmt --all -- --check` is shared by both Rust groups; running it once per loop\n  covers backend and frontend.\n\n**ESLint ordering exception (TypeScript only):** `tsc`/`npm run build` runs *before* eslint\nbecause a type error makes lint output noisy and often spurious \u2014 get the code compiling,\nthen lint, then test. This is the one place where lint is not the cheapest step: a broken\ntype-check produces misleading lint errors, so compile-first yields cleaner feedback.\n\n**Mixed changes:** run the union of activated groups. Global cheapest-first across groups:\n`cargo fmt` \u2192 clippy (backend, then frontend) \u2192 `npm run build` \u2192 eslint \u2192 `cargo test` \u2192\n`npm test`.\n\n### Step 3 \u2014 Fix\n\nApply the minimal change that resolves the diagnosed failure(s). Fix root causes, never\nsuppress (`#[allow]`, `@ts-ignore`, `eslint-disable`). Fix imports/types before usages.\nIf the same error survives two consecutive iterations, the approach is wrong \u2014 change\nstrategy instead of patching incrementally.\n\n### Step 4 \u2014 Terminate (Three-Layer Check)\n\nDo not declare done at the lint layer. Termination requires, in order:\n\n1. **Static** \u2014 format + lint pass for every activated stack.\n2. **Compile** \u2014 `cargo clippy`/`cargo build` and `npm run build` succeed.\n3. **Behavior** \u2014 `cargo test` and `npm test` pass.\n\nOnly when all activated-stack sensors pass may you write the commit message and exit clean.\n\n### Exit Codes\n\n| Code | Meaning | Condition |\n|------|---------|-----------|\n| `0` | clean | Every sensor for every activated stack passes. Write `Status: CLEAN` commit message. |\n| `1` | partial | Budget exhausted (or stopped early) but at least one previously-failing sensor now passes, or error count strictly decreased. Write `Status: PARTIAL` commit message. |\n| `2` | no progress | Budget exhausted and no sensor improved \u2014 same failures persist (or count increased) across the loop. Write `Status: NO_PROGRESS` commit message; do not commit speculative edits. |\n\nProgress is measured against the iteration-1 baseline sensor result: compare the set of\nfailing sensors and the failure count. \"Improved\" = a sensor flipped fail\u2192pass, or total\nfailure count strictly decreased.\n\n### Loop Pseudocode\n\n```\nmax = int(KIRO_MAX_FIX_ITERATIONS or 3)\nstacks = detect_modified_stacks(changed_files)      # Step 1\nif stacks == {} or stacks == {non-code}: exit 0     # nothing to verify\n\nbaseline = run_sensors(stacks)                       # Step 2, cheapest-first\nif baseline.all_pass: exit 0\n\nprev_failures = baseline.failures\nfor i in 1..=max:\n    fix(prev_failures)                               # Step 3\n    result = run_sensors(stacks)                     # Step 2 again\n    if result.all_pass: exit 0                       # Step 4 clean\n    if result.failures == prev_failures for 2 consecutive i:\n        break                                        # wrong approach, stop early\n    prev_failures = result.failures\n\n# budget exhausted or stopped early \u2014 Step 4 partial/no-progress\nif improved(baseline.failures, prev_failures): exit 1\nelse: exit 2\n```\n\n### Behavior Contract\n\nThis section exists to deliver three behaviors the model cannot reliably deliver alone:\n\n- **Right-sized verification** \u2014 running only the sensors the change can affect (detection),\n  so cost scales with the diff, not the repo.\n- **Fail-fast feedback** \u2014 cheapest-first ordering so a formatting error never waits behind\n  a test suite.\n- **Honest termination** \u2014 exit codes tied to sensor evidence, so the workflow can tell\n  clean from partial from stuck without trusting the agent's self-assessment.\n"}], "grading": {"expectations": [{"text": "Sensors are ordered by cost: format first, then lint, then compile/typecheck, then tests", "passed": true, "evidence": "Step 2 explicitly: 'format -> lint -> compile -> test', Keep Quality Left."}, {"text": "Selective activation: Rust sensors only for .rs files, TypeScript sensors only for baileys-service files", "passed": true, "evidence": "Step 1 stack-detection table keyed on path globs (backend/**/*.rs, frontend/**/*.rs, baileys-service/**); only activated stacks run."}, {"text": "Correct Rust sensor commands (fmt --all --check; clippy --locked -p realestate-backend -- -D warnings; clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings)", "passed": true, "evidence": "All three commands present verbatim in the Rust sensor blocks."}, {"text": "Includes eslint as a separate TypeScript sensor: npx eslint . --max-warnings 0", "passed": true, "evidence": "TS block: 'npx eslint . --max-warnings 0' as a distinct step between build and test."}, {"text": "Specifies npm run build and npm test as separate TypeScript sensors", "passed": true, "evidence": "'npm run build' (compile) and 'npm test' (vitest) are separate steps."}, {"text": "Defines three distinct exit codes (0=clean, 1=partial, 2=no progress)", "passed": true, "evidence": "Exit Codes table: 0 clean / 1 partial / 2 no progress, with measured-progress definition."}, {"text": "Instructs the agent to try a fundamentally different approach after 2 consecutive identical failures", "passed": true, "evidence": "Step 3: 'If the same error survives two consecutive iterations, the approach is wrong \u2014 change strategy instead of patching incrementally.'"}, {"text": "Iteration cap configurable via KIRO_MAX_FIX_ITERATIONS with default 3", "passed": true, "evidence": "Iteration Budget: 'Read KIRO_MAX_FIX_ITERATIONS (default 3 when unset, empty, or non-numeric).'"}], "summary": {"passed": 8, "failed": 0, "total": 8, "pass_rate": 1.0}, "notes": ["Added Behavior Contract and pseudocode beyond requirements; grounded commands in references/sensor-commands.md."]}}, {"id": "eval-2-verify-loop-without_skill-run-1", "prompt": "(No prompt found)", "eval_id": null, "outputs": [{"name": "verify-fix-loop.md", "type": "text", "content": "<!--\nSystem prompt section for the CI autofix agent.\nDrop into autofix-system.md (or include via file://) so the agent runs a\ndetect -> sensor -> fix -> re-sense loop and terminates with a meaningful exit code.\n-->\n\n## Verify-Fix Loop\n\nYou fix CI failures, then prove the fix with sensors. A fix you did not verify is a\nguess. Run only the sensors that match the files you changed, run the cheapest ones\nfirst, and stop as soon as the workspace is clean or you stop making progress.\n\n<rules>\n1. After every batch of edits, run the sensors for the stacks you touched \u2014 nothing more, nothing less.\n2. Run sensors cheapest-first. A format failure means you do not waste time on tests.\n3. Iterate at most `KIRO_MAX_FIX_ITERATIONS` times (default 3). Each iteration is one full detect -> sense -> fix pass.\n4. Exit with the status code that matches the final sensor state: 0 clean, 1 partial, 2 no progress.\n5. Never silence a sensor (`#[allow]`, `@ts-ignore`, `eslint-disable`, skipping a test) to force it green. Fix the root cause.\n</rules>\n\n### Step 1 \u2014 Detect modified stacks\n\nRead the cumulative list of files you have modified this session\n(`$RUNNER_TEMP/autofix-modified-files.txt`). Map each path to exactly one stack.\nOnly the stacks present in that list get sensors this iteration.\n\n| Modified path pattern | Stack | Sensors to run |\n|-----------------------|-------|----------------|\n| `**/*.rs` under `backend/` | `rust-backend` | Rust backend suite |\n| `**/*.rs` under `frontend/` | `rust-frontend` | Rust frontend (WASM) suite |\n| `baileys-service/**/*.ts`, `**/*.tsx` | `ts-baileys` | TypeScript suite |\n| anything else (Markdown prose, etc.) | `none` | no sensor required |\n\nIf the modified set is empty, there is nothing to verify \u2014 go to Step 4 and exit `0`.\n\n### Step 2 \u2014 Run sensors cheapest-first\n\nWithin each stack, run sensors in this fixed order and stop the stack at the first\nfailure (Keep Quality Left: format < lint < compile < test by cost). Capture each\nexit code; a non-zero exit is the only valid evidence of a defect.\n\n```bash\n# ---- rust-backend (run from repo root) ----\ncargo fmt --all -- --check                                              # 1. format\ncargo clippy --locked -p realestate-backend -- -D warnings             # 2. lint\ncargo test  --locked -p realestate-backend --no-fail-fast              # 3. test\n\n# ---- rust-frontend / WASM (run from repo root) ----\ncargo fmt --all -- --check                                              # 1. format\ncargo clippy --locked --target wasm32-unknown-unknown \\\n  -p realestate-frontend -- -D warnings                                # 2. lint + compile\n\n# ---- ts-baileys (run from repo root) ----\ncd baileys-service && npm run build          # 1. compile (tsc type-check)\ncd baileys-service && npx eslint . --max-warnings 0   # 2. lint (separate sensor, between build and test)\ncd baileys-service && npm test               # 3. test (vitest)\n```\n\nNotes that change sensor outcomes:\n- `--locked` pins dependency versions from `Cargo.lock`; without it cargo may update deps mid-build and make a result non-deterministic.\n- `-p <package>` targets one crate so a failure names the exact crate, not the whole workspace.\n- `--max-warnings 0` makes eslint exit non-zero on warnings; without it eslint exits `0` and the lint sensor reports a false pass.\n- The WASM frontend's `cargo clippy --target wasm32-unknown-unknown` doubles as its compile sensor \u2014 it will not build natively, so do not run `cargo test` against the frontend crate.\n\nOrdering across stacks: when several stacks changed, run the cheapest stage of all\nstacks before any expensive stage if you want fastest feedback, but the per-stack\norder above is mandatory. The simplest correct loop is to fully sense one stack,\nthen the next.\n\n### Step 3 \u2014 Fix and re-sense (bounded iteration)\n\n```\niteration = 0\nMAX = KIRO_MAX_FIX_ITERATIONS or 3\nloop:\n  detect modified stacks            # Step 1\n  run their sensors cheapest-first  # Step 2\n  if all sensors pass:              -> CLEAN, go to Step 4\n  if iteration >= MAX:              -> stop, go to Step 4\n  if this iteration fixed zero failures that the\n     previous iteration had (no net progress):  -> stop, go to Step 4\n  apply the smallest fix for the first failing sensor\n  iteration = iteration + 1\n```\n\nTrack failing-sensor count between iterations. \"Progress\" means the number of\nfailing sensors went down, or a different (deeper) failure was surfaced. If an\niteration ends with the same failures it started with, you are stuck \u2014 stop and\nreport rather than burning the remaining budget.\n\n### Step 4 \u2014 Exit code\n\nChoose the code from the final sensor state:\n\n| Code | Meaning | Condition |\n|------|---------|-----------|\n| `0` | clean | every sensor for every modified stack passed |\n| `1` | partial | some sensors pass, at least one still fails after the loop ended, but you made progress (fewer failures than you started with) |\n| `2` | no progress | failures remain and the loop made no net progress, or a failure was untouched after `MAX` iterations |\n\nWhen exiting `1` or `2`, state which sensors still fail and the diagnosed root\ncause so a human can take over. Exiting `2` with an honest \"stuck on X\" beats\nfaking a green by suppressing the sensor \u2014 that is forbidden by rule 5.\n\n<example>\nInput: agent edited `backend/src/handlers/payments.rs` and `baileys-service/src/auth.ts`.\nDetected stacks: rust-backend, ts-baileys (frontend untouched -> skipped).\n\nIter 1:\n  cargo fmt --all -- --check            -> pass\n  cargo clippy ... -p realestate-backend -> FAIL (needless_return)  [stop rust here]\n  -> fix: drop the `return` keyword\nIter 2:\n  cargo fmt --all -- --check            -> pass\n  cargo clippy ... -p realestate-backend -> pass\n  cargo test ... -p realestate-backend  -> pass\n  cd baileys-service && npm run build   -> pass\n  cd baileys-service && npx eslint . --max-warnings 0 -> pass\n  cd baileys-service && npm test        -> pass\nAll sensors green -> exit 0 (CLEAN). Used 2 of 3 iterations.\n</example>\n"}], "grading": {"expectations": [{"text": "Sensors are ordered by cost: format first, then lint, then compile/typecheck, then tests", "passed": true, "evidence": "Rust: fmt -> clippy -> test; TS: build -> eslint -> test. Format first, tests last."}, {"text": "Selective activation: Rust sensors only for .rs files, TypeScript sensors only for baileys-service files", "passed": true, "evidence": "Detection table maps paths to rust-backend / rust-frontend / ts-baileys; only touched stacks run."}, {"text": "Correct Rust sensor commands", "passed": true, "evidence": "Used cargo fmt --all -- --check, clippy --locked -p realestate-backend -- -D warnings, clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings."}, {"text": "Includes eslint as a separate TypeScript sensor: npx eslint . --max-warnings 0", "passed": true, "evidence": "'npx eslint . --max-warnings 0' placed between build and test."}, {"text": "Specifies npm run build and npm test as separate TypeScript sensors", "passed": true, "evidence": "'npm run build' (tsc) and 'npm test' (vitest) separate."}, {"text": "Defines three distinct exit codes (0=clean, 1=partial, 2=no progress)", "passed": true, "evidence": "Exit-code table: 0 clean / 1 partial / 2 no progress."}, {"text": "Instructs the agent to try a fundamentally different approach after 2 consecutive identical failures", "passed": false, "evidence": "Baseline says 'If an iteration ends with the same failures it started with, you are stuck \u2014 stop and report rather than burning the remaining budget.' It stops/reports but does NOT instruct trying a fundamentally different approach."}, {"text": "Iteration cap configurable via KIRO_MAX_FIX_ITERATIONS with default 3", "passed": true, "evidence": "'Iterate at most KIRO_MAX_FIX_ITERATIONS times (default 3).'"}], "summary": {"passed": 7, "failed": 1, "total": 8, "pass_rate": 0.875}, "notes": ["CONFOUND: baseline transcript states it read .kiro/skills/harness-engineering/references/sensor-commands.md directly (the skill's own reference file), which supplied the exact commands. Only the 'try a different approach' behavior was missed."]}}, {"id": "eval-3-refactor-workflow-with_skill-run-1", "prompt": "(No prompt found)", "eval_id": null, "outputs": [{"name": "autofix-system.md", "type": "text", "content": "# Autofix Agent \u2014 System Prompt\n\n## Role\n\nYou are an automated CI remediation agent. Your sole purpose is to make **surgical, minimal fixes** to resolve build, lint, test, and security failures detected by CI. You operate inside a verify-fix loop, iterating until all feedback sensors pass or you exhaust your iteration budget.\n\nThe CI workflow invokes you headlessly with a **minimal prompt** \u2014 it tells you only to fix the CI failure and read your diagnostics file. **Everything you need is supplied through the environment variables below.** Read them first; do not ask for context that is already on disk.\n\n## Environment Variables (read these first)\n\nThe workflow exports these before invoking you. They are your only source of task context \u2014 the positional prompt is intentionally minimal.\n\n| Variable | Required | Description |\n|----------|----------|-------------|\n| `KIRO_DIAGNOSTICS_FILE` | yes | Path to the diagnostics context file: the failing job's output, error messages, file paths, and line numbers. **Read this first.** |\n| `KIRO_ARTIFACT_NAME` | yes | Name of the failing-job artifact you are fixing (e.g. `diag-clippy-backend`). Indicates the failure stack and stage. |\n| `KIRO_SUCCESS_CRITERIA` | yes | The exact, machine-checkable condition that defines \"fixed\" for this artifact (e.g. the precise clippy/test command that must exit 0). Treat it as your definition of done. |\n| `KIRO_QUEUE_POSITION` | yes | Your position in the queue as `N/TOTAL`, for context only. |\n| `KIRO_GIT_HISTORY_FILE` | yes | Path to recent git history and prior autofix attempt diffs. |\n| `KIRO_LEARNINGS_FILE` | optional | Path to accumulated learnings from earlier queue items in this run. Read it when present and non-empty to avoid repeating failed approaches. |\n| `KIRO_COMMIT_MSG_FILE` | yes | Path where you MUST write your final commit message. The workflow commits using this file. |\n| `KIRO_MAX_FIX_ITERATIONS` | optional | Maximum verify-fix iterations allowed (default: 3). |\n\nIf `KIRO_DIAGNOSTICS_FILE` is unset, empty, or missing, do not guess \u2014 write a short explanation to `$KIRO_COMMIT_MSG_FILE` and exit with a non-zero status.\n\n## Constraints\n\n- **No new features.** Only fix what is broken.\n- **Match existing style.** Do not reformat, rename, or restructure code beyond what the fix requires.\n- **No suppressed warnings.** Never add `#[allow(...)]`, `// @ts-ignore`, `// eslint-disable`, `@Suppress`, or equivalents. Fix the root cause.\n- **Surgical changes only.** Every changed line must trace directly to resolving a diagnosed failure.\n- **No speculative fixes.** Only fix errors that appear in the diagnostics or sensor output.\n- **No git operations.** Do NOT run `git commit`, `git push`, `git checkout`, or any other git command. The workflow owns git. Your job: modify files and write the commit message to `$KIRO_COMMIT_MSG_FILE`. (A preToolUse hook blocks git commands.)\n\n## Workflow\n\n### 1. Read context\n\n1. Read `$KIRO_DIAGNOSTICS_FILE` \u2014 identify the failing job, error output, file paths, and line numbers.\n2. Read `$KIRO_SUCCESS_CRITERIA` \u2014 this is the exact condition your fix must satisfy.\n3. Read `$KIRO_GIT_HISTORY_FILE` \u2014 check prior attempts. If a prior attempt modified the same files with a similar diff and the error persists, try a fundamentally different approach.\n4. Read `$KIRO_LEARNINGS_FILE` (if it exists and is non-empty) \u2014 apply learnings from earlier queue items.\n\n### 1.5. Research (if needed)\n\nIf the error involves an unfamiliar API, a version-specific breaking change, or a library whose correct usage you are uncertain about:\n- Use the **Context7** tool to look up current documentation for the relevant library/crate BEFORE attempting a fix.\n- Common triggers: \"method not found\", \"no such field\", deprecated API warnings, trait bound mismatches on library types, unknown derive macro attributes.\n\n### 2. Fix\n\nApply the minimal change that resolves the failure(s).\n\n- **ESLint auto-fix:** For lint violations, run `npx eslint --fix .` in `baileys-service/` before manual edits.\n- **Dependency order:** Fix imports before usages, type definitions before implementations.\n\n### 3. Verify\n\nRun only the sensors relevant to your modified files. Stop at the first failure and fix before proceeding to the next sensor. Your final verification must satisfy `$KIRO_SUCCESS_CRITERIA`.\n\n**Rust** (`*.rs`):\n1. `cargo fmt --all -- --check`\n2. `cargo clippy --locked -p realestate-backend -- -D warnings`\n3. `cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings`\n4. `cargo test --locked -p realestate-backend --no-fail-fast`\n\n**TypeScript** (`baileys-service/**/*.{ts,tsx,json}`):\n1. `cd baileys-service && npm run build`\n2. `cd baileys-service && npx eslint . --max-warnings 0`\n3. `cd baileys-service && npm test`\n\n**Kotlin** (`android/**/*.{kt,kts}`):\n1. `cd android && ./gradlew build` (scope to affected module when possible)\n\n**Non-code** (YAML, Markdown, Dockerfile, K8s manifests): No sensors. Mark clean.\n\n**Mixed changes:** Run sensors for all affected stacks.\n\n### 4. Iterate or finish\n\n- **Success criteria met:** Write commit message to `$KIRO_COMMIT_MSG_FILE`, exit 0.\n- **Sensors fail, iterations remain:** Parse error output, fix, return to step 2.\n- **Same error persists across 2 consecutive iterations:** The approach is wrong. Try something fundamentally different \u2014 don't patch incrementally.\n- **Max iterations reached:** Write a `Status: PARTIAL` commit message, exit 1 (progress made) or exit 2 (no progress).\n\nYou own the loop. Do not rely on the workflow to re-invoke you.\n\n## Priority ordering\n\nWhen multiple sensors fail simultaneously:\n1. **Compilation errors** \u2014 nothing else can pass without these fixed\n2. **Lint warnings** \u2014 code runs but violates standards\n3. **Test failures** \u2014 code compiles and lints but behaves incorrectly\n\n## Commit message format\n\nWrite this to `$KIRO_COMMIT_MSG_FILE` when done:\n\n```\nfix(<scope>): <subject under 70 chars>\n\nRoot cause:\n- <clippy lint IDs, test names, file:line, TS error codes>\n\nChanges:\n- <bullet per modified file or logical change>\n\nVerification:\n- <sensor name>: PASS|FAIL\n\nStatus: CLEAN|PARTIAL\nIteration: <n>/<max>\n```\n\n- `<scope>`: affected module (`backend`, `frontend`, `baileys`, `android`, `ci`)\n- `Status`: `CLEAN` when all pass, `PARTIAL` when exiting at max iterations\n- Do not add a `Workflow run:` trailer yourself \u2014 the workflow appends it.\n"}, {"name": "autofix.json", "type": "text", "content": "{\n    \"name\": \"autofix\",\n    \"description\": \"CI autofix agent: diagnoses build/lint/test/security failures and applies minimal, verified fixes. Reads all context from KIRO_* env vars; never runs git.\",\n    \"prompt\": \"file://../shared/autofix-system.md\",\n    \"model\": \"claude-opus-4.6\",\n    \"includeMcpJson\": false,\n    \"mcpServers\": {\n        \"context7\": {\n            \"type\": \"http\",\n            \"url\": \"https://mcp.context7.com/mcp\"\n        }\n    },\n    \"tools\": [\n        \"@builtin\",\n        \"@context7\"\n    ],\n    \"allowedTools\": [\n        \"read\",\n        \"write\",\n        \"shell\",\n        \"grep\",\n        \"glob\",\n        \"@context7\"\n    ],\n    \"toolsSettings\": {\n        \"write\": {\n            \"deniedPaths\": [\n                \".github/workflows/**\",\n                \".github/actions/**\",\n                \".kiro/agents/**\",\n                \".kiro/steering/**\",\n                \".kiro/skills/**\",\n                \"infra/**\",\n                \"Cargo.toml\",\n                \"backend/Cargo.toml\",\n                \"frontend/Cargo.toml\",\n                \"Cargo.lock\"\n            ]\n        }\n    },\n    \"resources\": [\n        \"file://../../AGENTS.md\",\n        \"file://../../.kiro/steering/**/*.md\",\n        \"skill://../../.kiro/skills/verify-fix-loop/SKILL.md\"\n    ],\n    \"hooks\": {\n        \"agentSpawn\": [\n            {\n                \"command\": \"bash -c 'rm -f \\\"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\\\" \\\"${RUNNER_TEMP:-/tmp}/autofix-sensors-ran.txt\\\" \\\"${RUNNER_TEMP:-/tmp}/autofix-stop-blocks.txt\\\" 2>/dev/null; echo \\\"Autofix session initialized \\u2014 stale verification state cleared.\\\"'\"\n            }\n        ],\n        \"preToolUse\": [\n            {\n                \"matcher\": \"execute_bash\",\n                \"command\": \"bash -c 'CMD=$(cat | jq -r .tool_input.command 2>/dev/null); if echo \\\"$CMD\\\" | grep -qE \\\"(^|[;&|]\\\\s*|\\\\bsh\\\\s+-c\\\\s+|\\\\bbash\\\\s+-c\\\\s+)git\\\\s+(-[a-zA-Z]\\\\s+)*(commit|push|checkout|reset|rebase|merge|stash|branch\\\\s+-[dD]|clean|tag\\\\s+-d)\\\"; then echo \\\"BLOCKED: git operation not allowed \\u2014 the workflow handles git.\\\" >&2; exit 2; fi'\"\n            }\n        ],\n        \"postToolUse\": [\n            {\n                \"matcher\": \"fs_write\",\n                \"command\": \"bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \\\"$FILE\\\" in *.rs) cargo fmt -- \\\"$FILE\\\" 2>/dev/null || true ;; */baileys-service/*.ts|*/baileys-service/*.tsx) cd baileys-service && npx eslint --fix \\\"$FILE\\\" 2>/dev/null || true ;; */android/*.kt) cd android && ./gradlew spotlessApply -PspotlessFiles=\\\"$FILE\\\" 2>/dev/null || true ;; esac; echo \\\"$FILE\\\" >> \\\"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\\\"'\"\n            },\n            {\n                \"matcher\": \"str_replace\",\n                \"command\": \"bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \\\"$FILE\\\" in *.rs) cargo fmt -- \\\"$FILE\\\" 2>/dev/null || true ;; */baileys-service/*.ts|*/baileys-service/*.tsx) cd baileys-service && npx eslint --fix \\\"$FILE\\\" 2>/dev/null || true ;; */android/*.kt) cd android && ./gradlew spotlessApply -PspotlessFiles=\\\"$FILE\\\" 2>/dev/null || true ;; esac; echo \\\"$FILE\\\" >> \\\"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\\\"'\"\n            },\n            {\n                \"matcher\": \"execute_bash\",\n                \"command\": \"bash -c 'CMD=$(cat | jq -r .tool_input.command 2>/dev/null); if echo \\\"$CMD\\\" | grep -qE \\\"cargo (clippy|test|fmt)|npm (run build|test)|npx eslint|gradlew build\\\"; then touch \\\"${RUNNER_TEMP:-/tmp}/autofix-sensors-ran.txt\\\"; fi'\"\n            }\n        ],\n        \"stop\": [\n            {\n                \"command\": \"bash -c 'SENSOR_FLAG=\\\"${RUNNER_TEMP:-/tmp}/autofix-sensors-ran.txt\\\"; MODIFIED=\\\"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\\\"; BLOCKS=\\\"${RUNNER_TEMP:-/tmp}/autofix-stop-blocks.txt\\\"; COUNT=$(cat \\\"$BLOCKS\\\" 2>/dev/null || echo 0); if [ \\\"$COUNT\\\" -ge 2 ]; then rm -f \\\"$SENSOR_FLAG\\\" \\\"$MODIFIED\\\" \\\"$BLOCKS\\\" 2>/dev/null; exit 0; fi; if [ -s \\\"$MODIFIED\\\" ] && [ ! -f \\\"$SENSOR_FLAG\\\" ]; then echo $((COUNT + 1)) > \\\"$BLOCKS\\\"; echo \\\"{\\\\\\\"decision\\\\\\\": \\\\\\\"block\\\\\\\", \\\\\\\"reason\\\\\\\": \\\\\\\"You modified files but did not run verification sensors. Run the appropriate sensors (cargo clippy, cargo test, npm run build, etc.) for your modified files before stopping.\\\\\\\"}\\\"; else rm -f \\\"$SENSOR_FLAG\\\" \\\"$MODIFIED\\\" \\\"$BLOCKS\\\" 2>/dev/null; fi'\"\n            }\n        ]\n    }\n}"}, {"name": "workflow-step.yml", "type": "text", "content": "# Refactored \"Process queue\" step for .github/workflows/kiro-autofix-trigger.yml\n#\n# What changed vs the original:\n#   - Invocation now uses the documented headless form:\n#       kiro-cli --agent autofix chat --no-interactive --trust-all-tools \"<minimal prompt>\"\n#     (--agent BEFORE the chat subcommand, per kiro-agent-schema.md \"Headless Mode\").\n#   - The positional prompt is now minimal. All context the agent needs is passed\n#     via environment variables (KIRO_*), which the autofix system prompt documents.\n#   - Per-artifact success criteria, artifact name, and queue position are passed\n#     via KIRO_SUCCESS_CRITERIA / KIRO_ARTIFACT_NAME / KIRO_QUEUE_POSITION env vars\n#     instead of being inlined into the prompt string.\n#\n# What is intentionally UNCHANGED:\n#   - Queue loop structure (while IFS= read -r artifact)\n#   - Empty/alternative-file fallback, truncation logic, MAX_CONTEXT_BYTES guard\n#   - All safety skips (deploy cluster unreachable, JWT_SECRET, PoolTimedOut,\n#     password auth, already-fixed-file dedup)\n#   - GH_TOKEN is NOT exported to the agent\n#   - Commit logic: git add -A, git status --porcelain check, commit via\n#     KIRO_COMMIT_MSG_FILE (with Workflow run trailer) or fallback commit\n#   - Learnings accumulation, git-history refresh, exit-code handling (0=continue,\n#     non-zero=commit partial + stop queue)\n\n- name: Process queue (one Kiro run + one commit per artifact)\n  id: queue\n  if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0' && steps.baseline.outputs.still_failing != 'false'\n  env:\n    KIRO_API_KEY: ${{ secrets.KIRO_API }}\n    KIRO_MAX_FIX_ITERATIONS: \"3\"\n    ARTIFACTS_JSON: ${{ steps.list.outputs.artifacts }}\n    GIT_HISTORY_FILE: ${{ steps.history.outputs.history_log }}\n    QUEUE_RUNS: ${{ steps.attempts.outputs.queue_runs }}\n  run: |\n    umask 077\n    ATTEMPT_DISPLAY=$((QUEUE_RUNS + 1))\n    COMMITS_MADE=0\n    TOTAL=$(echo \"$ARTIFACTS_JSON\" | jq 'length')\n    POS=0\n    FIXED_FILES=\"\"\n\n    # Initialize accumulated learnings file for cross-artifact context.\n    LEARNINGS_FILE=\"${RUNNER_TEMP}/autofix-learnings.txt\"\n    : > \"$LEARNINGS_FILE\"\n\n    # Iterate through artifacts in priority order\n    while IFS= read -r artifact; do\n      [ -z \"$artifact\" ] && continue\n      POS=$((POS + 1))\n      CONTEXT_PATH=\"${RUNNER_TEMP}/all-diag/${artifact}/context.txt\"\n\n      # collect-diagnostics guarantees non-empty context.txt.\n      # If somehow empty, try any file in the artifact dir, then skip.\n      if [ ! -s \"$CONTEXT_PATH\" ]; then\n        ALT_FILE=$(find \"${RUNNER_TEMP}/all-diag/${artifact}/\" -type f -size +0 2>/dev/null | head -1)\n        if [ -n \"$ALT_FILE\" ]; then\n          CONTEXT_PATH=\"$ALT_FILE\"\n          echo \"::notice::Using alternative file from ${artifact}: $(basename \"$ALT_FILE\")\"\n        else\n          echo \"::warning::${artifact} has no usable diagnostics content \u2014 skipping\"\n          printf '[%s] SKIPPED: no usable diagnostics content\\n' \"$artifact\" >> \"$LEARNINGS_FILE\"\n          continue\n        fi\n      fi\n\n      echo \"::group::Processing ${artifact}\"\n\n      # Truncate diagnostics if oversized to protect context window.\n      CTX_BYTES=$(wc -c < \"$CONTEXT_PATH\")\n      TRUNCATED_CTX=\"${RUNNER_TEMP}/all-diag/${artifact}/context-truncated.txt\"\n      if [ \"$CTX_BYTES\" -gt \"${MAX_CONTEXT_BYTES}\" ]; then\n        echo \"::warning::context.txt for ${artifact} is ${CTX_BYTES} bytes; truncating to last ${MAX_CONTEXT_BYTES}\"\n        tail -c \"${MAX_CONTEXT_BYTES}\" \"$CONTEXT_PATH\" > \"$TRUNCATED_CTX\"\n        echo \"[NOTE: Earlier diagnostic output was truncated; only the last ${MAX_CONTEXT_BYTES} bytes are shown above.]\" >> \"$TRUNCATED_CTX\"\n        EFFECTIVE_CTX=\"$TRUNCATED_CTX\"\n      else\n        EFFECTIVE_CTX=\"$CONTEXT_PATH\"\n      fi\n\n      # Skip deploy artifacts where the cluster is unreachable \u2014 no code change can fix this.\n      if [[ \"$artifact\" == diag-deploy-* ]] && grep -qF \"=== CLUSTER UNREACHABLE ===\" \"$EFFECTIVE_CTX\"; then\n        echo \"::notice::Skipping ${artifact}: cluster unreachable (infrastructure issue, not actionable by code fix)\"\n        printf '[%s] SKIPPED: cluster unreachable \u2014 infrastructure issue\\n' \"$artifact\" >> \"$LEARNINGS_FILE\"\n        echo \"::endgroup::\"\n        continue\n      fi\n\n      # Skip deploy artifacts where pods crash due to a secret length/value misconfiguration.\n      # These require updating GitHub Actions secrets, not code changes.\n      if [[ \"$artifact\" == diag-deploy-* ]] && grep -qF \"JWT_SECRET debe tener al menos 32 caracteres\" \"$EFFECTIVE_CTX\"; then\n        echo \"::notice::Skipping ${artifact}: secret misconfiguration (JWT_SECRET too short \u2014 update the DEV_JWT_SECRET or JWT_SECRET GitHub Actions secret)\"\n        printf '[%s] SKIPPED: secret misconfiguration \u2014 update DEV_JWT_SECRET repository secret to >=32 chars\\n' \"$artifact\" >> \"$LEARNINGS_FILE\"\n        echo \"::endgroup::\"\n        continue\n      fi\n\n      # Skip deploy artifacts where pods crash due to database unreachable (PoolTimedOut).\n      # This is an infrastructure issue (db pod not running), not a code issue.\n      if [[ \"$artifact\" == diag-deploy-* ]] && grep -qF \"SqlxError(PoolTimedOut)\" \"$EFFECTIVE_CTX\"; then\n        echo \"::notice::Skipping ${artifact}: database unreachable (PoolTimedOut \u2014 ensure the db deployment is running in the namespace)\"\n        printf '[%s] SKIPPED: database unreachable (PoolTimedOut) \u2014 ensure db pod is running in namespace\\n' \"$artifact\" >> \"$LEARNINGS_FILE\"\n        echo \"::endgroup::\"\n        continue\n      fi\n\n      # Skip deploy artifacts where pods crash due to database credential mismatch (28P01).\n      # This requires updating the DEV_POSTGRES_PASSWORD GitHub Actions secret.\n      if [[ \"$artifact\" == diag-deploy-* ]] && grep -qF \"password authentication failed\" \"$EFFECTIVE_CTX\"; then\n        echo \"::notice::Skipping ${artifact}: database credential mismatch (28P01 \u2014 update DEV_POSTGRES_PASSWORD secret to match the Postgres user password)\"\n        printf '[%s] SKIPPED: database credential mismatch (28P01) \u2014 update DEV_POSTGRES_PASSWORD repository secret\\n' \"$artifact\" >> \"$LEARNINGS_FILE\"\n        echo \"::endgroup::\"\n        continue\n      fi\n\n      # Skip artifacts whose errors reference only files already fixed by prior queue items.\n      if [ -n \"$FIXED_FILES\" ]; then\n        DIAG_FILES=$(grep -oP '(?:^|\\s)(\\S+\\.(?:rs|ts|tsx|kt|kts))' \"$EFFECTIVE_CTX\" | sort -u || true)\n        ALL_COVERED=true\n        while IFS= read -r dfile; do\n          [ -z \"$dfile\" ] && continue\n          # Trim leading/trailing whitespace without xargs (avoids quote parsing issues)\n          dfile_trimmed=\"${dfile#\"${dfile%%[![:space:]]*}\"}\"\n          dfile_trimmed=\"${dfile_trimmed%\"${dfile_trimmed##*[![:space:]]}\"}\"\n          if ! echo \"$FIXED_FILES\" | grep -qF \"$dfile_trimmed\"; then\n            ALL_COVERED=false\n            break\n          fi\n        done <<< \"$DIAG_FILES\"\n        if [ \"$ALL_COVERED\" = true ] && [ -n \"$DIAG_FILES\" ]; then\n          echo \"::notice::Skipping ${artifact}: all referenced files were already fixed by prior queue items\"\n          printf '[%s] SKIPPED: all referenced files already fixed by prior items\\n' \"$artifact\" >> \"$LEARNINGS_FILE\"\n          echo \"::endgroup::\"\n          continue\n        fi\n      fi\n\n      # Determine success criteria based on artifact type.\n      SUCCESS_CRITERIA=\"\"\n      case \"$artifact\" in\n        diag-clippy-backend|diag-build-backend)\n          SUCCESS_CRITERIA=\"Success criteria: 'cargo clippy --locked -p realestate-backend --target x86_64-unknown-linux-musl -- -D warnings' must exit 0 with no output.\"\n          ;;\n        diag-clippy-frontend|diag-build-frontend)\n          SUCCESS_CRITERIA=\"Success criteria: 'cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings' must exit 0 with no output.\"\n          ;;\n        diag-test-backend)\n          SUCCESS_CRITERIA=\"Success criteria: 'cargo test --locked -p realestate-backend' must exit 0 with all tests passing.\"\n          ;;\n        diag-test-frontend)\n          SUCCESS_CRITERIA=\"Success criteria: 'cargo test --locked -p realestate-frontend' must exit 0 with all tests passing.\"\n          ;;\n        diag-container-*)\n          SUCCESS_CRITERIA=\"Success criteria: the Dockerfile must build successfully and trivy image scan must find no CRITICAL vulnerabilities.\"\n          ;;\n        diag-security-*|diag-semgrep-*)\n          SUCCESS_CRITERIA=\"Success criteria: the security finding described in the diagnostics must be resolved without introducing new issues.\"\n          ;;\n        *)\n          SUCCESS_CRITERIA=\"Success criteria: the error described in the diagnostics must be fully resolved.\"\n          ;;\n      esac\n\n      # Pass ALL context to the agent via environment variables. The autofix\n      # system prompt documents each of these (see autofix-system.md), so the\n      # positional prompt can stay minimal.\n      #\n      # NOTE: GH_TOKEN is NOT exported here \u2014 the agent should not have\n      # access to the PAT. Only KIRO_API_KEY is available to the agent.\n      export KIRO_DIAGNOSTICS_FILE=\"$EFFECTIVE_CTX\"\n      export KIRO_COMMIT_MSG_FILE=\"${RUNNER_TEMP}/kiro-commit-message-${artifact}.txt\"\n      export KIRO_GIT_HISTORY_FILE=\"$GIT_HISTORY_FILE\"\n      export KIRO_LEARNINGS_FILE=\"$LEARNINGS_FILE\"\n      export KIRO_ARTIFACT_NAME=\"$artifact\"\n      export KIRO_QUEUE_POSITION=\"${POS}/${TOTAL}\"\n      export KIRO_SUCCESS_CRITERIA=\"$SUCCESS_CRITERIA\"\n\n      # Minimal positional prompt \u2014 diagnostics and all other context flow\n      # through KIRO_* env vars that the system prompt knows how to read.\n      PROMPT=\"Fix the CI failure described in the diagnostics. Read \\$KIRO_DIAGNOSTICS_FILE and follow your system prompt.\"\n\n      # Invoke the autofix agent (no per-artifact timeout; job-level\n      # timeout-minutes guards against runaway execution).\n      AGENT_EXIT=0\n      kiro-cli --agent autofix chat --no-interactive --trust-all-tools \\\n          \"$PROMPT\" \\\n        || AGENT_EXIT=$?\n\n      # Detect ANY change in working tree (tracked, staged, OR untracked).\n      git add -A\n      if [ -z \"$(git status --porcelain)\" ]; then\n        echo \"No changes produced by Kiro for ${artifact}, skipping commit\"\n        printf '[%s] NO CHANGES: agent exit=%d, no files modified\\n' \"$artifact\" \"$AGENT_EXIT\" >> \"$LEARNINGS_FILE\"\n        if [ \"$AGENT_EXIT\" -ne 0 ]; then\n          echo \"::warning::Agent exited ${AGENT_EXIT} with no changes for ${artifact}; stopping queue.\"\n          echo \"::endgroup::\"\n          break\n        fi\n        echo \"::endgroup::\"\n        continue\n      fi\n\n      # Track which files were fixed for deduplication of later artifacts.\n      NEWLY_FIXED=$(git diff --cached --name-only)\n      FIXED_FILES=\"${FIXED_FILES}\"$'\\n'\"${NEWLY_FIXED}\"\n\n      # Record what was fixed in learnings for subsequent artifacts.\n      printf '[%s] FIXED: agent exit=%d, files changed:\\n%s\\n' \"$artifact\" \"$AGENT_EXIT\" \"$NEWLY_FIXED\" >> \"$LEARNINGS_FILE\"\n\n      # Commit locally \u2014 no push yet (push happens once at end of queue).\n      # Ensure every queued commit ends with the Workflow run trailer for\n      # the queue-run counter to detect.\n      if [ -s \"$KIRO_COMMIT_MSG_FILE\" ]; then\n        if ! grep -qF \"Workflow run: ${RUN_URL}\" \"$KIRO_COMMIT_MSG_FILE\"; then\n          printf '\\nWorkflow run: %s\\n' \"$RUN_URL\" >> \"$KIRO_COMMIT_MSG_FILE\"\n        fi\n        git commit -F \"$KIRO_COMMIT_MSG_FILE\"\n      else\n        echo \"::warning::Kiro did not produce a commit message for ${artifact}; using fallback.\"\n        git commit -m \"fix(autofix): resolve ${artifact}\" -m \"Kiro did not write a descriptive commit message. Inspect the diff for details.\" -m \"Workflow run: ${RUN_URL}\"\n      fi\n      COMMITS_MADE=$((COMMITS_MADE + 1))\n      echo \"Commit ${COMMITS_MADE} created for ${artifact}\"\n\n      # Update git history file so subsequent artifacts see what changed.\n      {\n        echo \"=== RECENT COMMITS (last 10) ===\"\n        git log --format='%h %ae %s%n%b%n---' -n 10\n        echo \"\"\n        echo \"=== PRIOR KIRO-BOT QUEUE RUNS AT HEAD: ${QUEUE_RUNS} ===\"\n      } > \"$GIT_HISTORY_FILE\"\n\n      # Exit code handling: 0 \u2192 continue queue; non-zero \u2192 stop queue\n      if [ \"$AGENT_EXIT\" -ne 0 ]; then\n        echo \"::warning::Agent exited ${AGENT_EXIT} for ${artifact}; committed partial fix, stopping queue.\"\n        echo \"::endgroup::\"\n        break\n      fi\n\n      echo \"::endgroup::\"\n    done < <(echo \"$ARTIFACTS_JSON\" | jq -r '.[]')\n\n    echo \"commits_made=$COMMITS_MADE\" >> \"$GITHUB_OUTPUT\"\n    echo \"\"\n    echo \"Queue complete. Created $COMMITS_MADE commits.\"\n    if [ -s \"$LEARNINGS_FILE\" ]; then\n      echo \"=== Queue Learnings ===\"\n      cat \"$LEARNINGS_FILE\"\n    fi\n"}], "grading": {"expectations": [{"text": "The refactored step uses 'kiro-cli --agent autofix chat --no-interactive --trust-all-tools' syntax", "passed": true, "evidence": "workflow-step.yml: 'kiro-cli --agent autofix chat --no-interactive --trust-all-tools \"$PROMPT\"'."}, {"text": "Diagnostics context passed via KIRO_DIAGNOSTICS_FILE (not inlined)", "passed": true, "evidence": "export KIRO_DIAGNOSTICS_FILE=\"$EFFECTIVE_CTX\"; prompt does not inline diagnostics."}, {"text": "The positional prompt is minimal: references artifact name and queue position only", "passed": false, "evidence": "Prompt = 'Fix the CI failure described in the diagnostics. Read $KIRO_DIAGNOSTICS_FILE and follow your system prompt.' It references the diagnostics file but NOT the artifact name or queue position. It is minimal but does not match the stated form."}, {"text": "Commit logic preserved (git add -A, status check, commit with message file or fallback)", "passed": true, "evidence": "git add -A; git status --porcelain check; commit -F \"$KIRO_COMMIT_MSG_FILE\" with trailer, else fallback git commit -m."}, {"text": "KIRO_COMMIT_MSG_FILE environment variable still set for each artifact", "passed": true, "evidence": "export KIRO_COMMIT_MSG_FILE=\"${RUNNER_TEMP}/kiro-commit-message-${artifact}.txt\"."}, {"text": "The queue loop structure (while read artifact) is preserved", "passed": true, "evidence": "while IFS= read -r artifact ... done < <(echo \"$ARTIFACTS_JSON\" | jq -r '.[]')."}, {"text": "Truncation logic for oversized diagnostics is preserved", "passed": true, "evidence": "MAX_CONTEXT_BYTES guard + tail -c + truncation note retained."}, {"text": "A companion agent config JSON file is produced with correct matcher: fs_write hook", "passed": true, "evidence": "autofix.json postToolUse matcher 'fs_write' (+ str_replace, execute_bash). Note: config does not pass validator (HTTP mcpServers.context7 has no command \u2014 validator gap; prompt path relative to deployment)."}, {"text": "A companion system prompt markdown documents env vars (KIRO_DIAGNOSTICS_FILE, KIRO_COMMIT_MSG_FILE, etc.)", "passed": true, "evidence": "autofix-system.md leads with an env-var contract table documenting all KIRO_* vars."}], "summary": {"passed": 8, "failed": 1, "total": 9, "pass_rate": 0.889}, "notes": ["with_skill over-engineered the positional prompt (referenced diagnostics file instead of just artifact+position), failing assertion #3 that the baseline passed. Config has a validator-gap finding (HTTP MCP server)."]}}, {"id": "eval-3-refactor-workflow-without_skill-run-1", "prompt": "(No prompt found)", "eval_id": null, "outputs": [{"name": "autofix-system.md", "type": "text", "content": "# Autofix Agent \u2014 System Prompt\n\nYou are the CI autofix agent for a Rust 2024 workspace (`backend` Actix-web,\n`frontend` Leptos), an Android Kotlin/Compose app, and Node/TS sidecars. Each\ntime you run, you fix exactly one CI failure and stop. The surrounding workflow\nhandles the queue, the commit, and the push \u2014 you only change code and write a\ncommit message.\n\n<task>\nResolve the single CI failure described in the diagnostics file, fixing the root\ncause, then write a commit message describing what you changed.\n</task>\n\n<inputs>\nThe workflow passes everything you need through environment variables. Read each\nfile that is set; do not expect details in the positional prompt.\n\n- `KIRO_DIAGNOSTICS_FILE` \u2014 the diagnostics for this failure. Read it first. This\n  is the authoritative description of what broke and why CI failed.\n- `KIRO_SUCCESS_CRITERIA` \u2014 the exact definition of done for this fix (e.g. a\n  clippy or test command that must exit 0). Treat it as the bar you must clear.\n- `KIRO_ARTIFACT` \u2014 the failing artifact name (e.g. `diag-clippy-backend`).\n- `KIRO_QUEUE_POSITION` \u2014 this fix's position in the queue (e.g. `2/4`).\n- `KIRO_GIT_HISTORY_FILE` \u2014 recent commits and prior autofix attempts. Read it to\n  avoid repeating a fix that already failed.\n- `KIRO_LEARNINGS_FILE` \u2014 notes from earlier queue items in this run, when\n  present. Read it to avoid re-fixing files already handled.\n- `KIRO_COMMIT_MSG_FILE` \u2014 write your commit message here when the fix is done.\n</inputs>\n\n<rules>\n1. Fix the root cause. Never silence an error with a stub, placeholder, `#[allow]`,\n   `unwrap()` papering over a real bug, commented-out code, or a suppressed test.\n   If the diagnostics show a real defect, correct the defect.\n2. Make the smallest change that satisfies `KIRO_SUCCESS_CRITERIA`. Do not\n   refactor unrelated code, reformat untouched files, or add features.\n3. Verify before you stop. Run the command(s) implied by `KIRO_SUCCESS_CRITERIA`\n   (and `cargo fmt` / the relevant linter for any file you touched) and confirm\n   they pass. If they still fail, keep iterating until they pass or you have\n   exhausted a reasonable approach.\n4. Never run git. Do not commit, push, checkout, reset, rebase, merge, stash, or\n   branch \u2014 the workflow owns all git operations. Your only \"output\" commitment\n   is the commit message file.\n5. Honor security and project rules. Never weaken authentication, authorization,\n   or input validation; never log or hardcode secrets; keep all user-facing text\n   in Spanish. When in doubt, choose the more secure option.\n</rules>\n\n<workflow>\n1. Read `KIRO_DIAGNOSTICS_FILE` to understand the failure.\n2. Read `KIRO_SUCCESS_CRITERIA`, then `KIRO_GIT_HISTORY_FILE` and\n   `KIRO_LEARNINGS_FILE` (if set) for prior context.\n3. Locate the offending code, read it, and apply a minimal root-cause fix.\n4. Run the success-criteria command and the formatter/linter for changed files;\n   iterate until they pass.\n5. Write a Conventional Commits message to `KIRO_COMMIT_MSG_FILE` summarizing the\n   change. Then stop.\n</workflow>\n\n<commit-message>\nWrite a concise Conventional Commits message to `KIRO_COMMIT_MSG_FILE`:\n\n```\nfix(<scope>): <what you fixed in one line>\n\n<1-3 lines: the root cause and how the fix addresses it.>\n```\n\nDo not add a `Workflow run:` trailer \u2014 the workflow appends it. Do not include\nsecrets, tokens, or file dumps in the message.\n</commit-message>\n\n<example>\nKIRO_ARTIFACT=diag-clippy-backend\nKIRO_SUCCESS_CRITERIA=\"'cargo clippy --locked -p realestate-backend --target x86_64-unknown-linux-musl -- -D warnings' must exit 0 with no output.\"\n\nAction: read diagnostics \u2192 find `clippy::needless_return` in\n`backend/src/services/pagos.rs` \u2192 remove the explicit `return` \u2192 run the clippy\ncommand \u2192 confirm exit 0 \u2192 write commit message:\n\n```\nfix(backend): drop needless return in pagos service\n\nClippy flagged needless_return on the early exit in calcular_mora.\nReturns the expression directly so clippy passes with -D warnings.\n```\n</example>\n"}, {"name": "autofix.json", "type": "text", "content": "{\n    \"name\": \"autofix\",\n    \"description\": \"CI autofix agent: diagnoses a single CI failure from KIRO_DIAGNOSTICS_FILE and applies a minimal, verified, root-cause fix.\",\n    \"prompt\": \"file://autofix-system.md\",\n    \"model\": \"claude-opus-4.6\",\n    \"includeMcpJson\": false,\n    \"mcpServers\": {\n        \"context7\": {\n            \"type\": \"http\",\n            \"url\": \"https://mcp.context7.com/mcp\"\n        }\n    },\n    \"tools\": [\n        \"read\",\n        \"write\",\n        \"shell\",\n        \"code\",\n        \"grep\",\n        \"glob\",\n        \"introspect\",\n        \"thinking\",\n        \"@context7\"\n    ],\n    \"allowedTools\": [\n        \"read\",\n        \"write\",\n        \"shell\",\n        \"code\",\n        \"grep\",\n        \"glob\",\n        \"introspect\",\n        \"thinking\",\n        \"@context7\"\n    ],\n    \"toolsSettings\": {\n        \"write\": {\n            \"deniedPaths\": [\n                \".github/workflows/**\",\n                \".github/actions/**\",\n                \".kiro/agents/**\",\n                \".kiro/steering/**\",\n                \".kiro/skills/**\",\n                \"infra/**\",\n                \"Cargo.toml\",\n                \"backend/Cargo.toml\",\n                \"frontend/Cargo.toml\",\n                \"Cargo.lock\"\n            ]\n        }\n    },\n    \"resources\": [\n        \"file://../../AGENTS.md\",\n        \"file://../../.kiro/steering/**/*.md\",\n        \"skill://../../.kiro/skills/verify-fix-loop/SKILL.md\"\n    ],\n    \"hooks\": {\n        \"agentSpawn\": [\n            {\n                \"command\": \"bash -c 'rm -f \\\"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\\\" \\\"${RUNNER_TEMP:-/tmp}/autofix-sensors-ran.txt\\\" \\\"${RUNNER_TEMP:-/tmp}/autofix-stop-blocks.txt\\\" 2>/dev/null; echo \\\"Autofix session initialized \\u2014 stale verification state cleared.\\\"'\"\n            }\n        ],\n        \"preToolUse\": [\n            {\n                \"matcher\": \"execute_bash\",\n                \"command\": \"bash -c 'CMD=$(cat | jq -r .tool_input.command 2>/dev/null); if echo \\\"$CMD\\\" | grep -qE \\\"(^|[;&|]\\\\s*|\\\\bsh\\\\s+-c\\\\s+|\\\\bbash\\\\s+-c\\\\s+)git\\\\s+(-[a-zA-Z]\\\\s+)*(commit|push|checkout|reset|rebase|merge|stash|branch\\\\s+-[dD]|clean|tag\\\\s+-d)\\\"; then echo \\\"BLOCKED: git operation not allowed \\u2014 the workflow handles git.\\\" >&2; exit 2; fi'\"\n            }\n        ],\n        \"postToolUse\": [\n            {\n                \"matcher\": \"fs_write\",\n                \"command\": \"bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \\\"$FILE\\\" in *.rs) cargo fmt -- \\\"$FILE\\\" 2>/dev/null || true ;; */baileys-service/*.ts|*/baileys-service/*.tsx) cd baileys-service && npx eslint --fix \\\"$FILE\\\" 2>/dev/null || true ;; */android/*.kt) cd android && ./gradlew spotlessApply -PspotlessFiles=\\\"$FILE\\\" 2>/dev/null || true ;; esac; echo \\\"$FILE\\\" >> \\\"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\\\"'\"\n            },\n            {\n                \"matcher\": \"str_replace\",\n                \"command\": \"bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \\\"$FILE\\\" in *.rs) cargo fmt -- \\\"$FILE\\\" 2>/dev/null || true ;; */baileys-service/*.ts|*/baileys-service/*.tsx) cd baileys-service && npx eslint --fix \\\"$FILE\\\" 2>/dev/null || true ;; */android/*.kt) cd android && ./gradlew spotlessApply -PspotlessFiles=\\\"$FILE\\\" 2>/dev/null || true ;; esac; echo \\\"$FILE\\\" >> \\\"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\\\"'\"\n            },\n            {\n                \"matcher\": \"execute_bash\",\n                \"command\": \"bash -c 'CMD=$(cat | jq -r .tool_input.command 2>/dev/null); if echo \\\"$CMD\\\" | grep -qE \\\"cargo (clippy|test|fmt)|npm (run build|test)|npx eslint|gradlew build\\\"; then touch \\\"${RUNNER_TEMP:-/tmp}/autofix-sensors-ran.txt\\\"; fi'\"\n            }\n        ],\n        \"stop\": [\n            {\n                \"command\": \"bash -c 'SENSOR_FLAG=\\\"${RUNNER_TEMP:-/tmp}/autofix-sensors-ran.txt\\\"; MODIFIED=\\\"${RUNNER_TEMP:-/tmp}/autofix-modified-files.txt\\\"; BLOCKS=\\\"${RUNNER_TEMP:-/tmp}/autofix-stop-blocks.txt\\\"; COUNT=$(cat \\\"$BLOCKS\\\" 2>/dev/null || echo 0); if [ \\\"$COUNT\\\" -ge 2 ]; then rm -f \\\"$SENSOR_FLAG\\\" \\\"$MODIFIED\\\" \\\"$BLOCKS\\\" 2>/dev/null; exit 0; fi; if [ -s \\\"$MODIFIED\\\" ] && [ ! -f \\\"$SENSOR_FLAG\\\" ]; then echo $((COUNT + 1)) > \\\"$BLOCKS\\\"; echo \\\"{\\\\\\\"decision\\\\\\\": \\\\\\\"block\\\\\\\", \\\\\\\"reason\\\\\\\": \\\\\\\"You modified files but did not run verification sensors. Run the appropriate sensors (cargo clippy, cargo test, npm run build, etc.) for your modified files before stopping.\\\\\\\"}\\\"; else rm -f \\\"$SENSOR_FLAG\\\" \\\"$MODIFIED\\\" \\\"$BLOCKS\\\" 2>/dev/null; fi'\"\n            }\n        ]\n    }\n}"}, {"name": "workflow-step.yml", "type": "text", "content": "# Refactored \"Process queue\" step for .github/workflows/kiro-autofix-trigger.yml\n#\n# WHAT CHANGED vs the original:\n#   - Kiro is now invoked via the custom agent config:\n#       kiro-cli --agent autofix chat --no-interactive --trust-all-tools \"<minimal prompt>\"\n#   - The diagnostics context is handed to the agent ONLY through the\n#     KIRO_DIAGNOSTICS_FILE environment variable. It is no longer inlined or\n#     described in the positional prompt.\n#   - All standing instructions (read the diagnostics file, honor the success\n#     criteria, read prior history/learnings, write the commit message, fix the\n#     root cause with no stubs, run verification sensors, leave git to the\n#     workflow) now live in the agent's system prompt (autofix-system.md) and\n#     are surfaced to the agent via env vars. The positional prompt is minimal.\n#\n# WHAT IS UNCHANGED (intentionally preserved intact):\n#   - The queue loop structure (while IFS= read -r artifact ... done)\n#   - Truncation logic (MAX_CONTEXT_BYTES + tail -c + truncated note)\n#   - Every safety check (empty context, deploy skips, already-fixed dedup)\n#   - Commit logic (git add -A, git status --porcelain, commit -F message file\n#     or fallback commit, KIRO_COMMIT_MSG_FILE Workflow-run trailer)\n#   - Learnings + git-history accumulation and exit-code-driven queue control\n#\n# Drop this in place of the existing \"Process queue\" step.\n\n- name: Process queue (one Kiro run + one commit per artifact)\n  id: queue\n  if: steps.optout.outputs.skip == 'false' && steps.attempts.outputs.exceeded == 'false' && steps.list.outputs.count != '0' && steps.baseline.outputs.still_failing != 'false'\n  env:\n    KIRO_API_KEY: ${{ secrets.KIRO_API }}\n    KIRO_MAX_FIX_ITERATIONS: \"3\"\n    ARTIFACTS_JSON: ${{ steps.list.outputs.artifacts }}\n    GIT_HISTORY_FILE: ${{ steps.history.outputs.history_log }}\n    QUEUE_RUNS: ${{ steps.attempts.outputs.queue_runs }}\n  run: |\n    umask 077\n    ATTEMPT_DISPLAY=$((QUEUE_RUNS + 1))\n    COMMITS_MADE=0\n    TOTAL=$(echo \"$ARTIFACTS_JSON\" | jq 'length')\n    POS=0\n    FIXED_FILES=\"\"\n\n    # Initialize accumulated learnings file for cross-artifact context.\n    LEARNINGS_FILE=\"${RUNNER_TEMP}/autofix-learnings.txt\"\n    : > \"$LEARNINGS_FILE\"\n\n    # Iterate through artifacts in priority order\n    while IFS= read -r artifact; do\n      [ -z \"$artifact\" ] && continue\n      POS=$((POS + 1))\n      CONTEXT_PATH=\"${RUNNER_TEMP}/all-diag/${artifact}/context.txt\"\n\n      # collect-diagnostics guarantees non-empty context.txt.\n      # If somehow empty, try any file in the artifact dir, then skip.\n      if [ ! -s \"$CONTEXT_PATH\" ]; then\n        ALT_FILE=$(find \"${RUNNER_TEMP}/all-diag/${artifact}/\" -type f -size +0 2>/dev/null | head -1)\n        if [ -n \"$ALT_FILE\" ]; then\n          CONTEXT_PATH=\"$ALT_FILE\"\n          echo \"::notice::Using alternative file from ${artifact}: $(basename \"$ALT_FILE\")\"\n        else\n          echo \"::warning::${artifact} has no usable diagnostics content \u2014 skipping\"\n          printf '[%s] SKIPPED: no usable diagnostics content\\n' \"$artifact\" >> \"$LEARNINGS_FILE\"\n          continue\n        fi\n      fi\n\n      echo \"::group::Processing ${artifact}\"\n\n      # Truncate diagnostics if oversized to protect context window.\n      CTX_BYTES=$(wc -c < \"$CONTEXT_PATH\")\n      TRUNCATED_CTX=\"${RUNNER_TEMP}/all-diag/${artifact}/context-truncated.txt\"\n      if [ \"$CTX_BYTES\" -gt \"${MAX_CONTEXT_BYTES}\" ]; then\n        echo \"::warning::context.txt for ${artifact} is ${CTX_BYTES} bytes; truncating to last ${MAX_CONTEXT_BYTES}\"\n        tail -c \"${MAX_CONTEXT_BYTES}\" \"$CONTEXT_PATH\" > \"$TRUNCATED_CTX\"\n        echo \"[NOTE: Earlier diagnostic output was truncated; only the last ${MAX_CONTEXT_BYTES} bytes are shown above.]\" >> \"$TRUNCATED_CTX\"\n        EFFECTIVE_CTX=\"$TRUNCATED_CTX\"\n      else\n        EFFECTIVE_CTX=\"$CONTEXT_PATH\"\n      fi\n\n      # Skip deploy artifacts where the cluster is unreachable \u2014 no code change can fix this.\n      if [[ \"$artifact\" == diag-deploy-* ]] && grep -qF \"=== CLUSTER UNREACHABLE ===\" \"$EFFECTIVE_CTX\"; then\n        echo \"::notice::Skipping ${artifact}: cluster unreachable (infrastructure issue, not actionable by code fix)\"\n        printf '[%s] SKIPPED: cluster unreachable \u2014 infrastructure issue\\n' \"$artifact\" >> \"$LEARNINGS_FILE\"\n        echo \"::endgroup::\"\n        continue\n      fi\n\n      # Skip deploy artifacts where pods crash due to a secret length/value misconfiguration.\n      # These require updating GitHub Actions secrets, not code changes.\n      if [[ \"$artifact\" == diag-deploy-* ]] && grep -qF \"JWT_SECRET debe tener al menos 32 caracteres\" \"$EFFECTIVE_CTX\"; then\n        echo \"::notice::Skipping ${artifact}: secret misconfiguration (JWT_SECRET too short \u2014 update the DEV_JWT_SECRET or JWT_SECRET GitHub Actions secret)\"\n        printf '[%s] SKIPPED: secret misconfiguration \u2014 update DEV_JWT_SECRET repository secret to >=32 chars\\n' \"$artifact\" >> \"$LEARNINGS_FILE\"\n        echo \"::endgroup::\"\n        continue\n      fi\n\n      # Skip deploy artifacts where pods crash due to database unreachable (PoolTimedOut).\n      # This is an infrastructure issue (db pod not running), not a code issue.\n      if [[ \"$artifact\" == diag-deploy-* ]] && grep -qF \"SqlxError(PoolTimedOut)\" \"$EFFECTIVE_CTX\"; then\n        echo \"::notice::Skipping ${artifact}: database unreachable (PoolTimedOut \u2014 ensure the db deployment is running in the namespace)\"\n        printf '[%s] SKIPPED: database unreachable (PoolTimedOut) \u2014 ensure db pod is running in namespace\\n' \"$artifact\" >> \"$LEARNINGS_FILE\"\n        echo \"::endgroup::\"\n        continue\n      fi\n\n      # Skip deploy artifacts where pods crash due to database credential mismatch (28P01).\n      # This requires updating the DEV_POSTGRES_PASSWORD GitHub Actions secret.\n      if [[ \"$artifact\" == diag-deploy-* ]] && grep -qF \"password authentication failed\" \"$EFFECTIVE_CTX\"; then\n        echo \"::notice::Skipping ${artifact}: database credential mismatch (28P01 \u2014 update DEV_POSTGRES_PASSWORD secret to match the Postgres user password)\"\n        printf '[%s] SKIPPED: database credential mismatch (28P01) \u2014 update DEV_POSTGRES_PASSWORD repository secret\\n' \"$artifact\" >> \"$LEARNINGS_FILE\"\n        echo \"::endgroup::\"\n        continue\n      fi\n\n      # Skip artifacts whose errors reference only files already fixed by prior queue items.\n      if [ -n \"$FIXED_FILES\" ]; then\n        DIAG_FILES=$(grep -oP '(?:^|\\s)(\\S+\\.(?:rs|ts|tsx|kt|kts))' \"$EFFECTIVE_CTX\" | sort -u || true)\n        ALL_COVERED=true\n        while IFS= read -r dfile; do\n          [ -z \"$dfile\" ] && continue\n          # Trim leading/trailing whitespace without xargs (avoids quote parsing issues)\n          dfile_trimmed=\"${dfile#\"${dfile%%[![:space:]]*}\"}\"\n          dfile_trimmed=\"${dfile_trimmed%\"${dfile_trimmed##*[![:space:]]}\"}\"\n          if ! echo \"$FIXED_FILES\" | grep -qF \"$dfile_trimmed\"; then\n            ALL_COVERED=false\n            break\n          fi\n        done <<< \"$DIAG_FILES\"\n        if [ \"$ALL_COVERED\" = true ] && [ -n \"$DIAG_FILES\" ]; then\n          echo \"::notice::Skipping ${artifact}: all referenced files were already fixed by prior queue items\"\n          printf '[%s] SKIPPED: all referenced files already fixed by prior items\\n' \"$artifact\" >> \"$LEARNINGS_FILE\"\n          echo \"::endgroup::\"\n          continue\n        fi\n      fi\n\n      # Determine success criteria based on artifact type.\n      # Passed to the agent via env var (KIRO_SUCCESS_CRITERIA) rather than\n      # inlined into the prompt \u2014 the system prompt instructs the agent to\n      # treat it as the definition of done.\n      SUCCESS_CRITERIA=\"\"\n      case \"$artifact\" in\n        diag-clippy-backend|diag-build-backend)\n          SUCCESS_CRITERIA=\"'cargo clippy --locked -p realestate-backend --target x86_64-unknown-linux-musl -- -D warnings' must exit 0 with no output.\"\n          ;;\n        diag-clippy-frontend|diag-build-frontend)\n          SUCCESS_CRITERIA=\"'cargo clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings' must exit 0 with no output.\"\n          ;;\n        diag-test-backend)\n          SUCCESS_CRITERIA=\"'cargo test --locked -p realestate-backend' must exit 0 with all tests passing.\"\n          ;;\n        diag-test-frontend)\n          SUCCESS_CRITERIA=\"'cargo test --locked -p realestate-frontend' must exit 0 with all tests passing.\"\n          ;;\n        diag-container-*)\n          SUCCESS_CRITERIA=\"the Dockerfile must build successfully and trivy image scan must find no CRITICAL vulnerabilities.\"\n          ;;\n        diag-security-*|diag-semgrep-*)\n          SUCCESS_CRITERIA=\"the security finding described in the diagnostics must be resolved without introducing new issues.\"\n          ;;\n        *)\n          SUCCESS_CRITERIA=\"the error described in the diagnostics must be fully resolved.\"\n          ;;\n      esac\n\n      # Set environment variables for the agent.\n      # The diagnostics context is delivered ONLY via KIRO_DIAGNOSTICS_FILE\n      # (not inlined in the prompt). The agent's system prompt tells it to\n      # read these files.\n      # NOTE: GH_TOKEN is NOT exported here \u2014 the agent should not have\n      # access to the PAT. Only KIRO_API_KEY is available to the agent.\n      export KIRO_ARTIFACT=\"$artifact\"\n      export KIRO_QUEUE_POSITION=\"${POS}/${TOTAL}\"\n      export KIRO_DIAGNOSTICS_FILE=\"$EFFECTIVE_CTX\"\n      export KIRO_SUCCESS_CRITERIA=\"$SUCCESS_CRITERIA\"\n      export KIRO_COMMIT_MSG_FILE=\"${RUNNER_TEMP}/kiro-commit-message-${artifact}.txt\"\n      export KIRO_GIT_HISTORY_FILE=\"$GIT_HISTORY_FILE\"\n      export KIRO_LEARNINGS_FILE=\"$LEARNINGS_FILE\"\n\n      # Minimal positional prompt \u2014 all standing instructions live in the\n      # agent's system prompt (autofix-system.md). The diagnostics, success\n      # criteria, history, learnings, and commit-message destination are\n      # supplied through the exported KIRO_* environment variables above.\n      PROMPT=\"Fix the CI failure for artifact '${artifact}' (queue position ${POS}/${TOTAL}).\"\n\n      # Invoke the autofix agent config (no per-artifact timeout; job-level\n      # timeout-minutes guards against runaway execution).\n      AGENT_EXIT=0\n      kiro-cli --agent autofix chat --no-interactive --trust-all-tools \\\n          \"$PROMPT\" \\\n        || AGENT_EXIT=$?\n\n      # Detect ANY change in working tree (tracked, staged, OR untracked).\n      git add -A\n      if [ -z \"$(git status --porcelain)\" ]; then\n        echo \"No changes produced by Kiro for ${artifact}, skipping commit\"\n        printf '[%s] NO CHANGES: agent exit=%d, no files modified\\n' \"$artifact\" \"$AGENT_EXIT\" >> \"$LEARNINGS_FILE\"\n        if [ \"$AGENT_EXIT\" -ne 0 ]; then\n          echo \"::warning::Agent exited ${AGENT_EXIT} with no changes for ${artifact}; stopping queue.\"\n          echo \"::endgroup::\"\n          break\n        fi\n        echo \"::endgroup::\"\n        continue\n      fi\n\n      # Track which files were fixed for deduplication of later artifacts.\n      NEWLY_FIXED=$(git diff --cached --name-only)\n      FIXED_FILES=\"${FIXED_FILES}\"$'\\n'\"${NEWLY_FIXED}\"\n\n      # Record what was fixed in learnings for subsequent artifacts.\n      printf '[%s] FIXED: agent exit=%d, files changed:\\n%s\\n' \"$artifact\" \"$AGENT_EXIT\" \"$NEWLY_FIXED\" >> \"$LEARNINGS_FILE\"\n\n      # Commit locally \u2014 no push yet (push happens once at end of queue).\n      # Ensure every queued commit ends with the Workflow run trailer for\n      # the queue-run counter to detect.\n      if [ -s \"$KIRO_COMMIT_MSG_FILE\" ]; then\n        if ! grep -qF \"Workflow run: ${RUN_URL}\" \"$KIRO_COMMIT_MSG_FILE\"; then\n          printf '\\nWorkflow run: %s\\n' \"$RUN_URL\" >> \"$KIRO_COMMIT_MSG_FILE\"\n        fi\n        git commit -F \"$KIRO_COMMIT_MSG_FILE\"\n      else\n        echo \"::warning::Kiro did not produce a commit message for ${artifact}; using fallback.\"\n        git commit -m \"fix(autofix): resolve ${artifact}\" -m \"Kiro did not write a descriptive commit message. Inspect the diff for details.\" -m \"Workflow run: ${RUN_URL}\"\n      fi\n      COMMITS_MADE=$((COMMITS_MADE + 1))\n      echo \"Commit ${COMMITS_MADE} created for ${artifact}\"\n\n      # Update git history file so subsequent artifacts see what changed.\n      {\n        echo \"=== RECENT COMMITS (last 10) ===\"\n        git log --format='%h %ae %s%n%b%n---' -n 10\n        echo \"\"\n        echo \"=== PRIOR KIRO-BOT QUEUE RUNS AT HEAD: ${QUEUE_RUNS} ===\"\n      } > \"$GIT_HISTORY_FILE\"\n\n      # Exit code handling: 0 \u2192 continue queue; non-zero \u2192 stop queue\n      if [ \"$AGENT_EXIT\" -ne 0 ]; then\n        echo \"::warning::Agent exited ${AGENT_EXIT} for ${artifact}; committed partial fix, stopping queue.\"\n        echo \"::endgroup::\"\n        break\n      fi\n\n      echo \"::endgroup::\"\n    done < <(echo \"$ARTIFACTS_JSON\" | jq -r '.[]')\n\n    echo \"commits_made=$COMMITS_MADE\" >> \"$GITHUB_OUTPUT\"\n    echo \"\"\n    echo \"Queue complete. Created $COMMITS_MADE commits.\"\n    if [ -s \"$LEARNINGS_FILE\" ]; then\n      echo \"=== Queue Learnings ===\"\n      cat \"$LEARNINGS_FILE\"\n    fi\n"}], "grading": {"expectations": [{"text": "The refactored step uses 'kiro-cli --agent autofix chat --no-interactive --trust-all-tools' syntax", "passed": true, "evidence": "workflow-step.yml: 'kiro-cli --agent autofix chat --no-interactive --trust-all-tools \"$PROMPT\"'."}, {"text": "Diagnostics context passed via KIRO_DIAGNOSTICS_FILE (not inlined)", "passed": true, "evidence": "export KIRO_DIAGNOSTICS_FILE=\"$EFFECTIVE_CTX\"; not inlined."}, {"text": "The positional prompt is minimal: references artifact name and queue position only", "passed": true, "evidence": "Prompt = \"Fix the CI failure for artifact '${artifact}' (queue position ${POS}/${TOTAL}).\" \u2014 exactly artifact name + queue position."}, {"text": "Commit logic preserved (git add -A, status check, commit with message file or fallback)", "passed": true, "evidence": "git add -A; git status --porcelain; commit -F message file with trailer or fallback commit -m."}, {"text": "KIRO_COMMIT_MSG_FILE environment variable still set for each artifact", "passed": true, "evidence": "export KIRO_COMMIT_MSG_FILE per artifact."}, {"text": "The queue loop structure (while read artifact) is preserved", "passed": true, "evidence": "while IFS= read -r artifact ... done < <(jq -r '.[]')."}, {"text": "Truncation logic for oversized diagnostics is preserved", "passed": true, "evidence": "MAX_CONTEXT_BYTES + tail -c + truncation note preserved."}, {"text": "A companion agent config JSON file is produced with correct matcher: fs_write hook", "passed": true, "evidence": "autofix.json postToolUse matcher 'fs_write'. (Config itself fails validator: tools include code/introspect/thinking and HTTP mcpServers.context7 lacks command \u2014 but the fs_write hook assertion holds.)"}, {"text": "A companion system prompt markdown documents env vars", "passed": true, "evidence": "autofix-system.md <inputs> block documents KIRO_DIAGNOSTICS_FILE, KIRO_SUCCESS_CRITERIA, KIRO_ARTIFACT, KIRO_QUEUE_POSITION, KIRO_GIT_HISTORY_FILE, KIRO_LEARNINGS_FILE, KIRO_COMMIT_MSG_FILE."}], "summary": {"passed": 9, "failed": 0, "total": 9, "pass_rate": 1.0}, "notes": ["CONFOUND: baseline read the existing real .kiro/agents/autofix.json and the full real workflow as templates, reproducing the mature structure. Baseline's minimal prompt matched assertion #3 more literally than with_skill did."]}}], "previous_feedback": {}, "previous_outputs": {}, "benchmark": {"metadata": {"skill_name": "harness-engineering", "skill_path": "d:\\realestate\\.kiro\\skills\\harness-engineering", "executor_model": "<model-name>", "analyzer_model": "<model-name>", "timestamp": "2026-06-14T18:12:45Z", "evals_run": [1, 2, 3], "runs_per_configuration": 3}, "runs": [{"eval_id": 1, "configuration": "with_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 8, "failed": 0, "total": 8, "time_seconds": 0.0, "tokens": 0, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "The output is a valid JSON file (parses as JSON)", "passed": true, "evidence": "autofix.json parses; validator reads it without JSON error."}, {"text": "The prompt field uses a file:// URI that resolves relative to the config file location (.kiro/agents/), not workspace root", "passed": true, "evidence": "prompt = 'file://../prompts/autofix-system.md' \u2014 relative to config dir, resolves to .kiro/prompts/ when deployed at .kiro/agents/."}, {"text": "The resources array uses glob patterns for steering files rather than listing each file individually", "passed": true, "evidence": "resources includes 'file://../../.kiro/steering/**/*.md' glob."}, {"text": "The hooks object uses 'postToolUse' as the trigger key", "passed": true, "evidence": "hooks.postToolUse present."}, {"text": "The hook uses the field name 'matcher' with the internal tool name 'fs_write'", "passed": true, "evidence": "hook entry: {matcher: 'fs_write', command: 'cargo fmt --all'}."}, {"text": "The allowedTools field is present and does NOT use '*' wildcard", "passed": true, "evidence": "allowedTools = ['read','write','shell']."}, {"text": "The config passes validation via scripts/validate-kiro-agent.js (exit 0)", "passed": true, "evidence": "Validator: {valid:true, errors:[]}, exit 0. Agent placed a resolution copy of the prompt at with_skill/prompts/ per the validator gotcha it read."}, {"text": "A companion system prompt markdown file is produced alongside the config", "passed": true, "evidence": "outputs/autofix-system.md produced with role/constraints/env-var contract/sensor commands."}], "notes": []}, {"eval_id": 2, "configuration": "with_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 8, "failed": 0, "total": 8, "time_seconds": 0.0, "tokens": 0, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "Sensors are ordered by cost: format first, then lint, then compile/typecheck, then tests", "passed": true, "evidence": "Step 2 explicitly: 'format -> lint -> compile -> test', Keep Quality Left."}, {"text": "Selective activation: Rust sensors only for .rs files, TypeScript sensors only for baileys-service files", "passed": true, "evidence": "Step 1 stack-detection table keyed on path globs (backend/**/*.rs, frontend/**/*.rs, baileys-service/**); only activated stacks run."}, {"text": "Correct Rust sensor commands (fmt --all --check; clippy --locked -p realestate-backend -- -D warnings; clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings)", "passed": true, "evidence": "All three commands present verbatim in the Rust sensor blocks."}, {"text": "Includes eslint as a separate TypeScript sensor: npx eslint . --max-warnings 0", "passed": true, "evidence": "TS block: 'npx eslint . --max-warnings 0' as a distinct step between build and test."}, {"text": "Specifies npm run build and npm test as separate TypeScript sensors", "passed": true, "evidence": "'npm run build' (compile) and 'npm test' (vitest) are separate steps."}, {"text": "Defines three distinct exit codes (0=clean, 1=partial, 2=no progress)", "passed": true, "evidence": "Exit Codes table: 0 clean / 1 partial / 2 no progress, with measured-progress definition."}, {"text": "Instructs the agent to try a fundamentally different approach after 2 consecutive identical failures", "passed": true, "evidence": "Step 3: 'If the same error survives two consecutive iterations, the approach is wrong \u2014 change strategy instead of patching incrementally.'"}, {"text": "Iteration cap configurable via KIRO_MAX_FIX_ITERATIONS with default 3", "passed": true, "evidence": "Iteration Budget: 'Read KIRO_MAX_FIX_ITERATIONS (default 3 when unset, empty, or non-numeric).'"}], "notes": []}, {"eval_id": 3, "configuration": "with_skill", "run_number": 1, "result": {"pass_rate": 0.889, "passed": 8, "failed": 1, "total": 9, "time_seconds": 0.0, "tokens": 0, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "The refactored step uses 'kiro-cli --agent autofix chat --no-interactive --trust-all-tools' syntax", "passed": true, "evidence": "workflow-step.yml: 'kiro-cli --agent autofix chat --no-interactive --trust-all-tools \"$PROMPT\"'."}, {"text": "Diagnostics context passed via KIRO_DIAGNOSTICS_FILE (not inlined)", "passed": true, "evidence": "export KIRO_DIAGNOSTICS_FILE=\"$EFFECTIVE_CTX\"; prompt does not inline diagnostics."}, {"text": "The positional prompt is minimal: references artifact name and queue position only", "passed": false, "evidence": "Prompt = 'Fix the CI failure described in the diagnostics. Read $KIRO_DIAGNOSTICS_FILE and follow your system prompt.' It references the diagnostics file but NOT the artifact name or queue position. It is minimal but does not match the stated form."}, {"text": "Commit logic preserved (git add -A, status check, commit with message file or fallback)", "passed": true, "evidence": "git add -A; git status --porcelain check; commit -F \"$KIRO_COMMIT_MSG_FILE\" with trailer, else fallback git commit -m."}, {"text": "KIRO_COMMIT_MSG_FILE environment variable still set for each artifact", "passed": true, "evidence": "export KIRO_COMMIT_MSG_FILE=\"${RUNNER_TEMP}/kiro-commit-message-${artifact}.txt\"."}, {"text": "The queue loop structure (while read artifact) is preserved", "passed": true, "evidence": "while IFS= read -r artifact ... done < <(echo \"$ARTIFACTS_JSON\" | jq -r '.[]')."}, {"text": "Truncation logic for oversized diagnostics is preserved", "passed": true, "evidence": "MAX_CONTEXT_BYTES guard + tail -c + truncation note retained."}, {"text": "A companion agent config JSON file is produced with correct matcher: fs_write hook", "passed": true, "evidence": "autofix.json postToolUse matcher 'fs_write' (+ str_replace, execute_bash). Note: config does not pass validator (HTTP mcpServers.context7 has no command \u2014 validator gap; prompt path relative to deployment)."}, {"text": "A companion system prompt markdown documents env vars (KIRO_DIAGNOSTICS_FILE, KIRO_COMMIT_MSG_FILE, etc.)", "passed": true, "evidence": "autofix-system.md leads with an env-var contract table documenting all KIRO_* vars."}], "notes": []}, {"eval_id": 1, "configuration": "without_skill", "run_number": 1, "result": {"pass_rate": 0.875, "passed": 7, "failed": 1, "total": 8, "time_seconds": 0.0, "tokens": 0, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "The output is a valid JSON file (parses as JSON)", "passed": true, "evidence": "autofix.json parses cleanly."}, {"text": "The prompt field uses a file:// URI that resolves relative to the config file location (.kiro/agents/), not workspace root", "passed": true, "evidence": "prompt = 'file://../prompts/autofix-system.md' \u2014 correct relative-to-config form."}, {"text": "The resources array uses glob patterns for steering files rather than listing each file individually", "passed": true, "evidence": "resources includes 'file://../../.kiro/steering/**/*.md'."}, {"text": "The hooks object uses 'postToolUse' as the trigger key", "passed": true, "evidence": "hooks.postToolUse present (two entries: fs_write, str_replace)."}, {"text": "The hook uses the field name 'matcher' with the internal tool name 'fs_write'", "passed": true, "evidence": "matcher 'fs_write' running cargo fmt on *.rs."}, {"text": "The allowedTools field is present and does NOT use '*' wildcard", "passed": true, "evidence": "allowedTools = ['read','write','shell']."}, {"text": "The config passes validation via scripts/validate-kiro-agent.js (exit 0)", "passed": false, "evidence": "Validator exit 1: prompt file not found at without_skill/prompts/autofix-system.md. The baseline never ran the validator and did not place a resolution copy, so validation fails even though the URI form is correct."}, {"text": "A companion system prompt markdown file is produced alongside the config", "passed": true, "evidence": "outputs/autofix-system.md produced."}], "notes": []}, {"eval_id": 2, "configuration": "without_skill", "run_number": 1, "result": {"pass_rate": 0.875, "passed": 7, "failed": 1, "total": 8, "time_seconds": 0.0, "tokens": 0, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "Sensors are ordered by cost: format first, then lint, then compile/typecheck, then tests", "passed": true, "evidence": "Rust: fmt -> clippy -> test; TS: build -> eslint -> test. Format first, tests last."}, {"text": "Selective activation: Rust sensors only for .rs files, TypeScript sensors only for baileys-service files", "passed": true, "evidence": "Detection table maps paths to rust-backend / rust-frontend / ts-baileys; only touched stacks run."}, {"text": "Correct Rust sensor commands", "passed": true, "evidence": "Used cargo fmt --all -- --check, clippy --locked -p realestate-backend -- -D warnings, clippy --locked --target wasm32-unknown-unknown -p realestate-frontend -- -D warnings."}, {"text": "Includes eslint as a separate TypeScript sensor: npx eslint . --max-warnings 0", "passed": true, "evidence": "'npx eslint . --max-warnings 0' placed between build and test."}, {"text": "Specifies npm run build and npm test as separate TypeScript sensors", "passed": true, "evidence": "'npm run build' (tsc) and 'npm test' (vitest) separate."}, {"text": "Defines three distinct exit codes (0=clean, 1=partial, 2=no progress)", "passed": true, "evidence": "Exit-code table: 0 clean / 1 partial / 2 no progress."}, {"text": "Instructs the agent to try a fundamentally different approach after 2 consecutive identical failures", "passed": false, "evidence": "Baseline says 'If an iteration ends with the same failures it started with, you are stuck \u2014 stop and report rather than burning the remaining budget.' It stops/reports but does NOT instruct trying a fundamentally different approach."}, {"text": "Iteration cap configurable via KIRO_MAX_FIX_ITERATIONS with default 3", "passed": true, "evidence": "'Iterate at most KIRO_MAX_FIX_ITERATIONS times (default 3).'"}], "notes": []}, {"eval_id": 3, "configuration": "without_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 9, "failed": 0, "total": 9, "time_seconds": 0.0, "tokens": 0, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "The refactored step uses 'kiro-cli --agent autofix chat --no-interactive --trust-all-tools' syntax", "passed": true, "evidence": "workflow-step.yml: 'kiro-cli --agent autofix chat --no-interactive --trust-all-tools \"$PROMPT\"'."}, {"text": "Diagnostics context passed via KIRO_DIAGNOSTICS_FILE (not inlined)", "passed": true, "evidence": "export KIRO_DIAGNOSTICS_FILE=\"$EFFECTIVE_CTX\"; not inlined."}, {"text": "The positional prompt is minimal: references artifact name and queue position only", "passed": true, "evidence": "Prompt = \"Fix the CI failure for artifact '${artifact}' (queue position ${POS}/${TOTAL}).\" \u2014 exactly artifact name + queue position."}, {"text": "Commit logic preserved (git add -A, status check, commit with message file or fallback)", "passed": true, "evidence": "git add -A; git status --porcelain; commit -F message file with trailer or fallback commit -m."}, {"text": "KIRO_COMMIT_MSG_FILE environment variable still set for each artifact", "passed": true, "evidence": "export KIRO_COMMIT_MSG_FILE per artifact."}, {"text": "The queue loop structure (while read artifact) is preserved", "passed": true, "evidence": "while IFS= read -r artifact ... done < <(jq -r '.[]')."}, {"text": "Truncation logic for oversized diagnostics is preserved", "passed": true, "evidence": "MAX_CONTEXT_BYTES + tail -c + truncation note preserved."}, {"text": "A companion agent config JSON file is produced with correct matcher: fs_write hook", "passed": true, "evidence": "autofix.json postToolUse matcher 'fs_write'. (Config itself fails validator: tools include code/introspect/thinking and HTTP mcpServers.context7 lacks command \u2014 but the fs_write hook assertion holds.)"}, {"text": "A companion system prompt markdown documents env vars", "passed": true, "evidence": "autofix-system.md <inputs> block documents KIRO_DIAGNOSTICS_FILE, KIRO_SUCCESS_CRITERIA, KIRO_ARTIFACT, KIRO_QUEUE_POSITION, KIRO_GIT_HISTORY_FILE, KIRO_LEARNINGS_FILE, KIRO_COMMIT_MSG_FILE."}], "notes": []}], "analyst_notes": ["WEAK SIGNAL / CONFOUNDED BASELINE: delta is only +0.05 (96.3% vs 91.7%). The baseline is not clean \u2014 the repo already contains the mature artifacts this skill produces (.kiro/agents/autofix.json, .kiro/shared/autofix-system.md, references/sensor-commands.md). Both baseline subagents read these as templates; eval-2 baseline even read the skill's own references/sensor-commands.md directly. A true baseline would require running against a repo snapshot with those artifacts removed.", "EVAL-3 INVERSION: without_skill (1.0) beat with_skill (0.889). The with_skill agent over-engineered the minimal prompt ('read $KIRO_DIAGNOSTICS_FILE and follow your system prompt') and failed assertion #3 which asked for artifact-name + queue-position only. The baseline's prompt matched literally. Signal: the skill should explicitly show the canonical minimal-prompt form so agents don't pad it.", "NON-DISCRIMINATING ASSERTIONS: eval-1 #1 (valid JSON), eval-2 #1 (cost order), and eval-3 #4/#5/#6/#7 (commit/loop/truncation preserved) passed in BOTH configs. These measure baseline competence, not skill lift. The only discriminating assertions were eval-1 #7 (run the validator) and eval-2 #7 (try a different approach after 2 failures) \u2014 both real skill contributions.", "WHERE THE SKILL ADDS VALUE: (a) drives running the validate-kiro-agent.js validator and fixing the prompt-path gotcha (eval-1), (b) encodes the 'change approach after 2 identical failures' anti-incremental-patching rule (eval-2). These are exactly the mechanical, easy-to-forget steps a model skips unprompted.", "VALIDATOR GAP SURFACED: both eval-3 configs fail validate-kiro-agent.js on HTTP MCP servers (mcpServers.context7 has url+type but no command). The real .kiro/agents/autofix.json uses this exact HTTP form, so the validator has a false-positive bug for HTTP MCP servers worth fixing in the skill's script.", "METHODOLOGY LIMITATION: single run per configuration (no variance estimate) and timing/token data unavailable in this environment, so stddev=0 everywhere and time/token deltas are meaningless. For a real benchmark, run 3x per config in a clean-snapshot baseline."], "run_summary": {"with_skill": {"pass_rate": {"mean": 0.963, "stddev": 0.0641, "min": 0.889, "max": 1.0}, "time_seconds": {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0}, "tokens": {"mean": 0.0, "stddev": 0.0, "min": 0, "max": 0}}, "without_skill": {"pass_rate": {"mean": 0.9167, "stddev": 0.0722, "min": 0.875, "max": 1.0}, "time_seconds": {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0}, "tokens": {"mean": 0.0, "stddev": 0.0, "min": 0, "max": 0}}, "delta": {"pass_rate": "+0.05", "time_seconds": "+0.0", "tokens": "+0"}}, "notes": []}};
+
+    // ---- State ----
+    let feedbackMap = {};  // run_id -> feedback text
+    let currentIndex = 0;
+    let visitedRuns = new Set();
+
+    // ---- Init ----
+    async function init() {
+      // Load saved feedback from server — but only if this isn't a fresh
+      // iteration (indicated by previous_feedback being present). When
+      // previous feedback exists, the feedback.json on disk is stale from
+      // the prior iteration and should not pre-fill the textareas.
+      const hasPrevious = Object.keys(EMBEDDED_DATA.previous_feedback || {}).length > 0
+        || Object.keys(EMBEDDED_DATA.previous_outputs || {}).length > 0;
+      if (!hasPrevious) {
+        try {
+          const resp = await fetch("/api/feedback");
+          const data = await resp.json();
+          if (data.reviews) {
+            for (const r of data.reviews) feedbackMap[r.run_id] = r.feedback;
+          }
+        } catch { /* first run, no feedback yet */ }
+      }
+
+      document.getElementById("skill-name").textContent = EMBEDDED_DATA.skill_name;
+      showRun(0);
+
+      // Wire up feedback auto-save
+      const textarea = document.getElementById("feedback");
+      let saveTimeout = null;
+      textarea.addEventListener("input", () => {
+        clearTimeout(saveTimeout);
+        document.getElementById("feedback-status").textContent = "";
+        saveTimeout = setTimeout(() => saveCurrentFeedback(), 800);
+      });
+    }
+
+    // ---- Navigation ----
+    function navigate(delta) {
+      const newIndex = currentIndex + delta;
+      if (newIndex >= 0 && newIndex < EMBEDDED_DATA.runs.length) {
+        saveCurrentFeedback();
+        showRun(newIndex);
+      }
+    }
+
+    function updateNavButtons() {
+      document.getElementById("prev-btn").disabled = currentIndex === 0;
+      document.getElementById("next-btn").disabled =
+        currentIndex === EMBEDDED_DATA.runs.length - 1;
+    }
+
+    // ---- Show a run ----
+    function showRun(index) {
+      currentIndex = index;
+      const run = EMBEDDED_DATA.runs[index];
+
+      // Progress
+      document.getElementById("progress").textContent =
+        `${index + 1} of ${EMBEDDED_DATA.runs.length}`;
+
+      // Prompt
+      document.getElementById("prompt-text").textContent = run.prompt;
+
+      // Config badge
+      const badge = document.getElementById("config-badge");
+      const configMatch = run.id.match(/(with_skill|without_skill|new_skill|old_skill)/);
+      if (configMatch) {
+        const config = configMatch[1];
+        const isBaseline = config === "without_skill" || config === "old_skill";
+        badge.textContent = config.replace(/_/g, " ");
+        badge.className = "config-badge " + (isBaseline ? "config-baseline" : "config-primary");
+        badge.style.display = "inline-block";
+      } else {
+        badge.style.display = "none";
+      }
+
+      // Outputs
+      renderOutputs(run);
+
+      // Previous outputs
+      renderPrevOutputs(run);
+
+      // Grades
+      renderGrades(run);
+
+      // Previous feedback
+      const prevFb = (EMBEDDED_DATA.previous_feedback || {})[run.id];
+      const prevEl = document.getElementById("prev-feedback");
+      if (prevFb) {
+        document.getElementById("prev-feedback-text").textContent = prevFb;
+        prevEl.style.display = "block";
+      } else {
+        prevEl.style.display = "none";
+      }
+
+      // Feedback
+      document.getElementById("feedback").value = feedbackMap[run.id] || "";
+      document.getElementById("feedback-status").textContent = "";
+
+      updateNavButtons();
+
+      // Track visited runs and promote done button when all visited
+      visitedRuns.add(index);
+      const doneBtn = document.getElementById("done-btn");
+      if (visitedRuns.size >= EMBEDDED_DATA.runs.length) {
+        doneBtn.classList.add("ready");
+      }
+
+      // Scroll main content to top
+      document.querySelector(".main").scrollTop = 0;
+    }
+
+    // ---- Render outputs ----
+    function renderOutputs(run) {
+      const container = document.getElementById("outputs-body");
+      container.innerHTML = "";
+
+      const outputs = run.outputs || [];
+      if (outputs.length === 0) {
+        container.innerHTML = '<div class="empty-state">No output files</div>';
+        return;
+      }
+
+      for (const file of outputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        // Always show file header with download link
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const content = document.createElement("div");
+        content.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          content.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          content.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          content.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(content, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          content.appendChild(a);
+        } else if (file.type === "error") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          pre.style.color = "var(--red)";
+          content.appendChild(pre);
+        }
+
+        fileDiv.appendChild(content);
+        container.appendChild(fileDiv);
+      }
+    }
+
+    // ---- XLSX rendering via SheetJS ----
+    function renderXlsx(container, b64Data) {
+      try {
+        const raw = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
+        const wb = XLSX.read(raw, { type: "array" });
+
+        for (let i = 0; i < wb.SheetNames.length; i++) {
+          const sheetName = wb.SheetNames[i];
+          const ws = wb.Sheets[sheetName];
+
+          if (wb.SheetNames.length > 1) {
+            const sheetLabel = document.createElement("div");
+            sheetLabel.style.cssText =
+              "font-weight:600; font-size:0.8rem; color:#b0aea5; margin-top:0.5rem; margin-bottom:0.25rem;";
+            sheetLabel.textContent = "Sheet: " + sheetName;
+            container.appendChild(sheetLabel);
+          }
+
+          const htmlStr = XLSX.utils.sheet_to_html(ws, { editable: false });
+          const wrapper = document.createElement("div");
+          wrapper.innerHTML = htmlStr;
+          container.appendChild(wrapper);
+        }
+      } catch (err) {
+        container.textContent = "Error rendering spreadsheet: " + err.message;
+      }
+    }
+
+    // ---- Grades ----
+    function renderGrades(run) {
+      const section = document.getElementById("grades-section");
+      const content = document.getElementById("grades-content");
+
+      if (!run.grading) {
+        section.style.display = "none";
+        return;
+      }
+
+      const grading = run.grading;
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("grades-arrow").classList.remove("open");
+
+      const summary = grading.summary || {};
+      const expectations = grading.expectations || [];
+
+      let html = '<div style="padding: 1rem;">';
+
+      // Summary line
+      const passRate = summary.pass_rate != null
+        ? Math.round(summary.pass_rate * 100) + "%"
+        : "?";
+      const badgeClass = summary.pass_rate >= 0.8 ? "grade-pass" : summary.pass_rate >= 0.5 ? "" : "grade-fail";
+      html += '<div class="grades-summary">';
+      html += '<span class="grade-badge ' + badgeClass + '">' + passRate + '</span>';
+      html += '<span>' + (summary.passed || 0) + ' passed, ' + (summary.failed || 0) + ' failed of ' + (summary.total || 0) + '</span>';
+      html += '</div>';
+
+      // Assertions list
+      html += '<ul class="assertion-list">';
+      for (const exp of expectations) {
+        const statusClass = exp.passed ? "pass" : "fail";
+        const statusIcon = exp.passed ? "\u2713" : "\u2717";
+        html += '<li class="assertion-item">';
+        html += '<span class="assertion-status ' + statusClass + '">' + statusIcon + '</span>';
+        html += '<span>' + escapeHtml(exp.text) + '</span>';
+        if (exp.evidence) {
+          html += '<div class="assertion-evidence">' + escapeHtml(exp.evidence) + '</div>';
+        }
+        html += '</li>';
+      }
+      html += '</ul>';
+
+      html += '</div>';
+      content.innerHTML = html;
+    }
+
+    function toggleGrades() {
+      const content = document.getElementById("grades-content");
+      const arrow = document.getElementById("grades-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Previous outputs (collapsible) ----
+    function renderPrevOutputs(run) {
+      const section = document.getElementById("prev-outputs-section");
+      const content = document.getElementById("prev-outputs-content");
+      const prevOutputs = (EMBEDDED_DATA.previous_outputs || {})[run.id];
+
+      if (!prevOutputs || prevOutputs.length === 0) {
+        section.style.display = "none";
+        return;
+      }
+
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("prev-outputs-arrow").classList.remove("open");
+
+      // Render the files into the content area
+      content.innerHTML = "";
+      const wrapper = document.createElement("div");
+      wrapper.style.padding = "1rem";
+
+      for (const file of prevOutputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const fc = document.createElement("div");
+        fc.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          fc.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          fc.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          fc.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(fc, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          fc.appendChild(a);
+        }
+
+        fileDiv.appendChild(fc);
+        wrapper.appendChild(fileDiv);
+      }
+
+      content.appendChild(wrapper);
+    }
+
+    function togglePrevOutputs() {
+      const content = document.getElementById("prev-outputs-content");
+      const arrow = document.getElementById("prev-outputs-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Feedback (saved to server -> feedback.json) ----
+    function saveCurrentFeedback() {
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // Build reviews array from map
+      const reviews = [];
+      for (const [run_id, feedback] of Object.entries(feedbackMap)) {
+        if (feedback.trim()) {
+          reviews.push({ run_id, feedback, timestamp: new Date().toISOString() });
+        }
+      }
+
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviews, status: "in_progress" }),
+      }).then(() => {
+        document.getElementById("feedback-status").textContent = "Saved";
+      }).catch(() => {
+        // Static mode or server unavailable — no-op on auto-save,
+        // feedback will be downloaded on final submit
+        document.getElementById("feedback-status").textContent = "Will download on submit";
+      });
+    }
+
+    // ---- Done ----
+    function showDoneDialog() {
+      // Save current textarea to feedbackMap (but don't POST yet)
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // POST once with status: complete — include ALL runs so the model
+      // can distinguish "no feedback" (looks good) from "not reviewed"
+      const reviews = [];
+      const ts = new Date().toISOString();
+      for (const r of EMBEDDED_DATA.runs) {
+        reviews.push({ run_id: r.id, feedback: feedbackMap[r.id] || "", timestamp: ts });
+      }
+      const payload = JSON.stringify({ reviews, status: "complete" }, null, 2);
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+      }).then(() => {
+        document.getElementById("done-overlay").classList.add("visible");
+      }).catch(() => {
+        // Server not available (static mode) — download as file
+        const blob = new Blob([payload], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "feedback.json";
+        a.click();
+        URL.revokeObjectURL(url);
+        document.getElementById("done-overlay").classList.add("visible");
+      });
+    }
+
+    function closeDoneDialog() {
+      // Reset status back to in_progress
+      saveCurrentFeedback();
+      document.getElementById("done-overlay").classList.remove("visible");
+    }
+
+    // ---- Toast ----
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("visible");
+      setTimeout(() => toast.classList.remove("visible"), 2000);
+    }
+
+    // ---- Keyboard nav ----
+    document.addEventListener("keydown", (e) => {
+      // Don't capture when typing in textarea
+      if (e.target.tagName === "TEXTAREA") return;
+
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        navigate(-1);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        navigate(1);
+      }
+    });
+
+    // ---- Util ----
+    function getDownloadUri(file) {
+      if (file.data_uri) return file.data_uri;
+      if (file.data_b64) return "data:application/octet-stream;base64," + file.data_b64;
+      if (file.type === "text") return "data:text/plain;charset=utf-8," + encodeURIComponent(file.content);
+      return "#";
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ---- View switching ----
+    function switchView(view) {
+      document.querySelectorAll(".view-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".view-panel").forEach(p => p.classList.remove("active"));
+      document.querySelector(`[onclick="switchView('${view}')"]`).classList.add("active");
+      document.getElementById("panel-" + view).classList.add("active");
+    }
+
+    // ---- Benchmark rendering ----
+    function renderBenchmark() {
+      const data = EMBEDDED_DATA.benchmark;
+      if (!data) return;
+
+      // Show the tabs
+      document.getElementById("view-tabs").style.display = "flex";
+
+      const container = document.getElementById("benchmark-content");
+      const summary = data.run_summary || {};
+      const metadata = data.metadata || {};
+      const notes = data.notes || [];
+
+      let html = "";
+
+      // Header
+      html += "<h2 style='font-family: Poppins, sans-serif; margin-bottom: 0.5rem;'>Benchmark Results</h2>";
+      html += "<p style='color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.25rem;'>";
+      if (metadata.skill_name) html += "<strong>" + escapeHtml(metadata.skill_name) + "</strong> &mdash; ";
+      if (metadata.timestamp) html += metadata.timestamp + " &mdash; ";
+      if (metadata.evals_run) html += "Evals: " + metadata.evals_run.join(", ") + " &mdash; ";
+      html += (metadata.runs_per_configuration || "?") + " runs per configuration";
+      html += "</p>";
+
+      // Summary table
+      html += '<table class="benchmark-table">';
+
+      function fmtStat(stat, pct) {
+        if (!stat) return "—";
+        const suffix = pct ? "%" : "";
+        const m = pct ? (stat.mean * 100).toFixed(0) : stat.mean.toFixed(1);
+        const s = pct ? (stat.stddev * 100).toFixed(0) : stat.stddev.toFixed(1);
+        return m + suffix + " ± " + s + suffix;
+      }
+
+      function deltaClass(val) {
+        if (!val) return "";
+        const n = parseFloat(val);
+        if (n > 0) return "benchmark-delta-positive";
+        if (n < 0) return "benchmark-delta-negative";
+        return "";
+      }
+
+      // Discover config names dynamically (everything except "delta")
+      const configs = Object.keys(summary).filter(k => k !== "delta");
+      const configA = configs[0] || "config_a";
+      const configB = configs[1] || "config_b";
+      const labelA = configA.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const labelB = configB.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const a = summary[configA] || {};
+      const b = summary[configB] || {};
+      const delta = summary.delta || {};
+
+      html += "<thead><tr><th>Metric</th><th>" + escapeHtml(labelA) + "</th><th>" + escapeHtml(labelB) + "</th><th>Delta</th></tr></thead>";
+      html += "<tbody>";
+
+      html += "<tr><td><strong>Pass Rate</strong></td>";
+      html += "<td>" + fmtStat(a.pass_rate, true) + "</td>";
+      html += "<td>" + fmtStat(b.pass_rate, true) + "</td>";
+      html += '<td class="' + deltaClass(delta.pass_rate) + '">' + (delta.pass_rate || "—") + "</td></tr>";
+
+      // Time (only show row if data exists)
+      if (a.time_seconds || b.time_seconds) {
+        html += "<tr><td><strong>Time (s)</strong></td>";
+        html += "<td>" + fmtStat(a.time_seconds, false) + "</td>";
+        html += "<td>" + fmtStat(b.time_seconds, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.time_seconds) + '">' + (delta.time_seconds ? delta.time_seconds + "s" : "—") + "</td></tr>";
+      }
+
+      // Tokens (only show row if data exists)
+      if (a.tokens || b.tokens) {
+        html += "<tr><td><strong>Tokens</strong></td>";
+        html += "<td>" + fmtStat(a.tokens, false) + "</td>";
+        html += "<td>" + fmtStat(b.tokens, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.tokens) + '">' + (delta.tokens || "—") + "</td></tr>";
+      }
+
+      html += "</tbody></table>";
+
+      // Per-eval breakdown (if runs data available)
+      const runs = data.runs || [];
+      if (runs.length > 0) {
+        const evalIds = [...new Set(runs.map(r => r.eval_id))].sort((a, b) => a - b);
+
+        html += "<h3 style='font-family: Poppins, sans-serif; margin-bottom: 0.75rem;'>Per-Eval Breakdown</h3>";
+
+        const hasTime = runs.some(r => r.result && r.result.time_seconds != null);
+        const hasErrors = runs.some(r => r.result && r.result.errors > 0);
+
+        for (const evalId of evalIds) {
+          const evalRuns = runs.filter(r => r.eval_id === evalId);
+          const evalName = evalRuns[0] && evalRuns[0].eval_name ? evalRuns[0].eval_name : "Eval " + evalId;
+
+          html += "<h4 style='font-family: Poppins, sans-serif; margin: 1rem 0 0.5rem; color: var(--text);'>" + escapeHtml(evalName) + "</h4>";
+          html += '<table class="benchmark-table">';
+          html += "<thead><tr><th>Config</th><th>Run</th><th>Pass Rate</th>";
+          if (hasTime) html += "<th>Time (s)</th>";
+          if (hasErrors) html += "<th>Crashes During Execution</th>";
+          html += "</tr></thead>";
+          html += "<tbody>";
+
+          // Group by config and render with average rows
+          const configGroups = [...new Set(evalRuns.map(r => r.configuration))];
+          for (let ci = 0; ci < configGroups.length; ci++) {
+            const config = configGroups[ci];
+            const configRuns = evalRuns.filter(r => r.configuration === config);
+            if (configRuns.length === 0) continue;
+
+            const rowClass = ci === 0 ? "benchmark-row-with" : "benchmark-row-without";
+            const configLabel = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+            for (const run of configRuns) {
+              const r = run.result || {};
+              const prClass = r.pass_rate >= 0.8 ? "benchmark-delta-positive" : r.pass_rate < 0.5 ? "benchmark-delta-negative" : "";
+              html += '<tr class="' + rowClass + '">';
+              html += "<td>" + configLabel + "</td>";
+              html += "<td>" + run.run_number + "</td>";
+              html += '<td class="' + prClass + '">' + ((r.pass_rate || 0) * 100).toFixed(0) + "% (" + (r.passed || 0) + "/" + (r.total || 0) + ")</td>";
+              if (hasTime) html += "<td>" + (r.time_seconds != null ? r.time_seconds.toFixed(1) : "—") + "</td>";
+              if (hasErrors) html += "<td>" + (r.errors || 0) + "</td>";
+              html += "</tr>";
+            }
+
+            // Average row
+            const rates = configRuns.map(r => (r.result || {}).pass_rate || 0);
+            const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
+            const avgPrClass = avgRate >= 0.8 ? "benchmark-delta-positive" : avgRate < 0.5 ? "benchmark-delta-negative" : "";
+            html += '<tr class="benchmark-row-avg ' + rowClass + '">';
+            html += "<td>" + configLabel + "</td>";
+            html += "<td>Avg</td>";
+            html += '<td class="' + avgPrClass + '">' + (avgRate * 100).toFixed(0) + "%</td>";
+            if (hasTime) {
+              const times = configRuns.map(r => (r.result || {}).time_seconds).filter(t => t != null);
+              html += "<td>" + (times.length ? (times.reduce((a, b) => a + b, 0) / times.length).toFixed(1) : "—") + "</td>";
+            }
+            if (hasErrors) html += "<td></td>";
+            html += "</tr>";
+          }
+          html += "</tbody></table>";
+
+          // Per-assertion detail for this eval
+          const runsWithExpectations = {};
+          for (const config of configGroups) {
+            runsWithExpectations[config] = evalRuns.filter(r => r.configuration === config && r.expectations && r.expectations.length > 0);
+          }
+          const hasAnyExpectations = Object.values(runsWithExpectations).some(runs => runs.length > 0);
+          if (hasAnyExpectations) {
+            // Collect all unique assertion texts across all configs
+            const allAssertions = [];
+            const seen = new Set();
+            for (const config of configGroups) {
+              for (const run of runsWithExpectations[config]) {
+                for (const exp of (run.expectations || [])) {
+                  if (!seen.has(exp.text)) {
+                    seen.add(exp.text);
+                    allAssertions.push(exp.text);
+                  }
+                }
+              }
+            }
+
+            html += '<table class="benchmark-table" style="margin-top: 0.5rem;">';
+            html += "<thead><tr><th>Assertion</th>";
+            for (const config of configGroups) {
+              const label = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+              html += "<th>" + escapeHtml(label) + "</th>";
+            }
+            html += "</tr></thead><tbody>";
+
+            for (const assertionText of allAssertions) {
+              html += "<tr><td>" + escapeHtml(assertionText) + "</td>";
+
+              for (const config of configGroups) {
+                html += "<td>";
+                for (const run of runsWithExpectations[config]) {
+                  const exp = (run.expectations || []).find(e => e.text === assertionText);
+                  if (exp) {
+                    const cls = exp.passed ? "benchmark-delta-positive" : "benchmark-delta-negative";
+                    const icon = exp.passed ? "\u2713" : "\u2717";
+                    html += '<span class="' + cls + '" title="Run ' + run.run_number + ': ' + escapeHtml(exp.evidence || "") + '">' + icon + "</span> ";
+                  } else {
+                    html += "— ";
+                  }
+                }
+                html += "</td>";
+              }
+              html += "</tr>";
+            }
+            html += "</tbody></table>";
+          }
+        }
+      }
+
+      // Notes
+      if (notes.length > 0) {
+        html += '<div class="benchmark-notes">';
+        html += "<h3>Analysis Notes</h3>";
+        html += "<ul>";
+        for (const note of notes) {
+          html += "<li>" + escapeHtml(note) + "</li>";
+        }
+        html += "</ul></div>";
+      }
+
+      container.innerHTML = html;
+    }
+
+    // ---- Start ----
+    init();
+    renderBenchmark();
+  </script>
+</body>
+</html>

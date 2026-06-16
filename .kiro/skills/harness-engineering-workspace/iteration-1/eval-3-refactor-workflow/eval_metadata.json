@@ -1,0 +1,16 @@
+{
+    "eval_id": 3,
+    "eval_name": "refactor-workflow-to-agent",
+    "prompt": "The current kiro-autofix-trigger.yml workflow uses an inline prompt built with printf statements in a shell script. Refactor the 'Process queue' step to instead invoke a custom agent config using 'kiro-cli --agent autofix chat --no-interactive --trust-all-tools' with a minimal positional prompt. The diagnostics context should be passed via the KIRO_DIAGNOSTICS_FILE environment variable instead of being cat'd into the prompt. Keep the queue loop structure, commit logic, and all safety checks intact. Produce the complete package: refactored workflow step, agent config, and system prompt.",
+    "assertions": [
+        "The refactored step uses 'kiro-cli --agent autofix chat --no-interactive --trust-all-tools' command syntax",
+        "Diagnostics context is passed via KIRO_DIAGNOSTICS_FILE environment variable (not inlined in the prompt)",
+        "The positional prompt is minimal: references artifact name and queue position only",
+        "Commit logic preserved (git add -A, status check, commit with message file or fallback)",
+        "KIRO_COMMIT_MSG_FILE environment variable is still set for each artifact",
+        "The queue loop structure (while read artifact) is preserved",
+        "Truncation logic for oversized diagnostics is preserved",
+        "A companion agent config JSON file is produced with correct matcher: fs_write hook",
+        "A companion system prompt markdown file documents the env vars (KIRO_DIAGNOSTICS_FILE, KIRO_COMMIT_MSG_FILE, etc.)"
+    ]
+}

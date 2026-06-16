@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "vllm",
+  "owner": "zechenzhangagi",
+  "repo": "ai-research-skills",
+  "path": "12-inference-serving/vllm",
+  "branch": "main",
+  "sha": "8dc2e9a29d749d09878a89cc85bca3873412d779",
+  "source": "manual"
+}

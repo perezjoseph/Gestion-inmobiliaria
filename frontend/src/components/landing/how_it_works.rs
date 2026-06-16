@@ -1,26 +1,22 @@
 use yew::prelude::*;
 
 struct Step {
-    number: &'static str,
     title: &'static str,
     description: &'static str,
 }
 
 const STEPS: &[Step] = &[
     Step {
-        number: "1",
         title: "Registra tus propiedades",
-        description: "Añade tus inmuebles con dirección, unidades y precio. Todo organizado desde el inicio.",
+        description: "Añade inmuebles, unidades, y precios. La estructura se arma sola.",
     },
     Step {
-        number: "2",
-        title: "Organiza inquilinos y contratos",
-        description: "Asocia inquilinos a tus propiedades con contratos claros: fechas, montos y estado.",
+        title: "Conecta inquilinos",
+        description: "Crea contratos con fechas, montos, y asocia cada inquilino a su espacio.",
     },
     Step {
-        number: "3",
-        title: "Controla pagos y gastos",
-        description: "Registra cobros, da seguimiento a pagos atrasados y lleva el control de cada gasto.",
+        title: "Controla todo",
+        description: "Pagos, gastos, mantenimiento, reportes. Todo fluye desde un solo panel.",
     },
 ];
 
@@ -29,13 +25,11 @@ pub fn LandingHowItWorks() -> Html {
     html! {
         <section class="gi-l-how">
             <div class="gi-l-container">
-                <div class="gi-l-section-head">
-                    <h2 class="gi-l-section-title">{"Cómo funciona"}</h2>
-                </div>
+                <h2 class="gi-l-section-title">{"Tres pasos para empezar"}</h2>
                 <div class="gi-l-steps">
-                    { for STEPS.iter().map(|step| html! {
-                        <div class="gi-l-step">
-                            <span class="gi-l-step-num">{ step.number }</span>
+                    { for STEPS.iter().enumerate().map(|(i, step)| html! {
+                        <div class={classes!("gi-l-step", (i < STEPS.len() - 1).then_some("gi-l-step--connected"))}>
+                            <div class="gi-l-step-marker"></div>
                             <h3 class="gi-l-step-title">{ step.title }</h3>
                             <p class="gi-l-step-desc">{ step.description }</p>
                         </div>

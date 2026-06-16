@@ -7,18 +7,20 @@ use crate::types::chatbot::{
     CreateGuidanceRuleRequest, GuidanceCategory, GuidanceRule, UpdateGuidanceRuleRequest,
 };
 
-fn category_entries() -> Vec<(GuidanceCategory, &'static str)> {
+fn category_entries() -> Vec<(GuidanceCategory, &'static str, &'static str)> {
     vec![
         (
             GuidanceCategory::EstiloComunicacion,
             "Estilo de comunicación",
+            "💬",
         ),
         (
             GuidanceCategory::ContextoClarificacion,
             "Contexto y clarificación",
+            "🔍",
         ),
-        (GuidanceCategory::Escalamiento, "Escalamiento"),
-        (GuidanceCategory::Politicas, "Políticas"),
+        (GuidanceCategory::Escalamiento, "Escalamiento", "📢"),
+        (GuidanceCategory::Politicas, "Políticas", "📋"),
     ]
 }
 
@@ -31,30 +33,48 @@ pub struct GuidanceRulesStepProps {
 #[component]
 pub fn GuidanceRulesStep(props: &GuidanceRulesStepProps) -> Html {
     let active_count = props.rules.iter().filter(|r| r.enabled).count();
+    let total_count = props.rules.len();
 
     html! {
-        <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-5">
             <div class="flex items-center justify-between">
-                <h3 class="text-base font-semibold text-[var(--text-primary)]">
-                    <span aria-live="polite">
-                        {format!("Reglas del agente ({active_count}/30 activas)")}
+                <div class="flex items-center gap-3">
+                    <h3
+                        class="text-base font-semibold text-[var(--text-primary)]"
+                        style="font-family: var(--font-display);"
+                    >
+                        {"Reglas del agente"}
+                    </h3>
+                    <span
+                        class="gi-guidance-counter"
+                        aria-live="polite"
+                    >
+                        {format!("{active_count}/30")}
                     </span>
-                </h3>
-            </div>
-            {for category_entries().iter().map(|(cat, label)| {
-                let cat_rules: Vec<GuidanceRule> = props.rules.iter()
-                    .filter(|r| r.category == *cat)
-                    .cloned()
-                    .collect();
-                html! {
-                    <CategorySection
-                        category={cat.clone()}
-                        label={AttrValue::from(*label)}
-                        rules={cat_rules}
-                        on_change={props.on_change.clone()}
-                    />
+                </div>
+                if total_count > 0 {
+                    <span class="text-xs text-[var(--text-tertiary)]">
+                        {format!("{total_count} regla{}", if total_count == 1 { "" } else { "s" })}
+                    </span>
                 }
-            })}
+            </div>
+            <div class="flex flex-col gap-3">
+                {for category_entries().iter().map(|(cat, label, icon)| {
+                    let cat_rules: Vec<GuidanceRule> = props.rules.iter()
+                        .filter(|r| r.category == *cat)
+                        .cloned()
+                        .collect();
+                    html! {
+                        <CategorySection
+                            category={cat.clone()}
+                            label={AttrValue::from(*label)}
+                            icon={AttrValue::from(*icon)}
+                            rules={cat_rules}
+                            on_change={props.on_change.clone()}
+                        />
+                    }
+                })}
+            </div>
         </div>
     }
 }
@@ -63,6 +83,7 @@ pub fn GuidanceRulesStep(props: &GuidanceRulesStepProps) -> Html {
 struct CategorySectionProps {
     category: GuidanceCategory,
     label: AttrValue,
+    icon: AttrValue,
     rules: Vec<GuidanceRule>,
     on_change: Callback<()>,
 }
@@ -73,6 +94,7 @@ fn CategorySection(props: &CategorySectionProps) -> Html {
     let adding = use_state(|| false);
 
     let active_in_cat = props.rules.iter().filter(|r| r.enabled).count();
+    let total_in_cat = props.rules.len();
 
     let toggle_expand = {
         let expanded = expanded.clone();
@@ -117,41 +139,53 @@ fn CategorySection(props: &CategorySectionProps) -> Html {
         })
     };
 
-    let chevron = if *expanded { "▼" } else { "▶" };
     let section_id = format!(
         "category-header-{}",
         props.label.to_lowercase().replace(' ', "-")
     );
 
+    let has_rules = total_in_cat > 0;
+
     html! {
         <div
-            class="rounded-lg"
-            style="border: 1px solid var(--border-subtle); background: var(--surface-raised);"
+            class="gi-guidance-category"
             role="region"
             aria-labelledby={section_id.clone()}
         >
             <button
                 type="button"
                 id={section_id}
-                class="flex items-center gap-2 w-full px-4 py-3 text-left"
+                class="gi-guidance-category-header"
                 onclick={toggle_expand}
                 aria-expanded={(*expanded).to_string()}
             >
-                <span class="text-xs text-[var(--text-tertiary)]" aria-hidden="true">{chevron}</span>
-                <span class="text-sm font-medium text-[var(--text-primary)] flex-1">
-                    {format!("{} ({active_in_cat} activas)", &props.label)}
+                <span class="gi-guidance-category-icon" aria-hidden="true">
+                    {&props.icon}
+                </span>
+                <span class="gi-guidance-category-title">
+                    {&props.label}
+                </span>
+                if has_rules {
+                    <span class="gi-guidance-category-badge">
+                        {format!("{active_in_cat}/{total_in_cat}")}
+                    </span>
+                }
+                <span class="gi-guidance-chevron" aria-hidden="true" data-expanded={(*expanded).to_string()}>
+                    {"›"}
                 </span>
             </button>
             if *expanded {
-                <div class="flex flex-col gap-1 px-4 pb-3" role="list">
-                    {for props.rules.iter().map(|rule| {
-                        html! {
-                            <RuleRow
-                                rule={rule.clone()}
-                                on_change={props.on_change.clone()}
-                            />
-                        }
-                    })}
+                <div class="gi-guidance-category-body" role="list">
+                    if has_rules {
+                        {for props.rules.iter().map(|rule| {
+                            html! {
+                                <RuleRow
+                                    rule={rule.clone()}
+                                    on_change={props.on_change.clone()}
+                                />
+                            }
+                        })}
+                    }
                     if *adding {
                         <InlineRuleForm
                             on_save={on_add_save.clone()}
@@ -160,10 +194,11 @@ fn CategorySection(props: &CategorySectionProps) -> Html {
                     } else {
                         <button
                             type="button"
-                            class="text-xs text-[var(--color-primary-500)] hover:underline mt-1 self-start"
+                            class="gi-guidance-add-btn"
                             onclick={on_add_click}
                         >
-                            {"+ Agregar regla"}
+                            <span class="gi-guidance-add-icon" aria-hidden="true">{"+"}</span>
+                            {"Agregar regla"}
                         </button>
                     }
                 </div>
@@ -262,24 +297,34 @@ fn RuleRow(props: &RuleRowProps) -> Html {
         };
     }
 
+    let opacity_class = if props.rule.enabled {
+        ""
+    } else {
+        " gi-guidance-rule-disabled"
+    };
+
     html! {
-        <div class="flex items-start gap-2 py-1.5 group" role="listitem">
-            <ToggleSwitch
-                checked={props.rule.enabled}
-                on_toggle={on_toggle}
-                label={AttrValue::from(props.rule.instruction.clone())}
-            />
-            if props.rule.is_template {
-                <span class="text-xs mt-0.5" title="Regla predefinida" aria-hidden="true">{"🔒"}</span>
-            }
-            <span class="text-sm text-[var(--text-primary)] flex-1 leading-snug mt-0.5">
+        <div class={format!("gi-guidance-rule{opacity_class}")} role="listitem">
+            <div class="gi-guidance-rule-toggle">
+                <ToggleSwitch
+                    checked={props.rule.enabled}
+                    on_toggle={on_toggle}
+                    label={AttrValue::from(props.rule.instruction.clone())}
+                />
+            </div>
+            <span class="gi-guidance-rule-text">
                 {&props.rule.instruction}
             </span>
+            if props.rule.is_template {
+                <span class="gi-guidance-rule-lock" title="Regla predefinida" aria-label="Regla predefinida">
+                    {"🔒"}
+                </span>
+            }
             if !props.rule.is_template {
-                <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div class="gi-guidance-rule-actions">
                     <button
                         type="button"
-                        class="text-xs p-1 rounded hover:bg-[var(--surface-base)]"
+                        class="gi-guidance-action-btn"
                         title="Editar regla"
                         aria-label="Editar regla"
                         onclick={on_edit_click}
@@ -288,7 +333,7 @@ fn RuleRow(props: &RuleRowProps) -> Html {
                     </button>
                     <button
                         type="button"
-                        class="text-xs p-1 rounded hover:bg-[var(--surface-base)]"
+                        class="gi-guidance-action-btn gi-guidance-action-btn--danger"
                         title="Eliminar regla"
                         aria-label="Eliminar regla"
                         onclick={on_delete}
@@ -345,37 +390,42 @@ fn InlineRuleForm(props: &InlineRuleFormProps) -> Html {
         })
     };
 
+    let counter_class = if char_count >= 450 {
+        "gi-guidance-form-counter gi-guidance-form-counter--warn"
+    } else {
+        "gi-guidance-form-counter"
+    };
+
     html! {
         <div
-            class="flex flex-col gap-2 p-2 rounded-md"
-            style="background: var(--surface-base); border: 1px solid var(--border-subtle);"
+            class="gi-guidance-form"
             role="form"
             aria-label="Crear nueva regla"
         >
             <textarea
-                class="gi-input text-sm"
-                rows="2"
+                class="gi-input gi-guidance-form-textarea"
+                rows="3"
                 maxlength="500"
                 placeholder="Escribe la instrucción para el agente..."
                 aria-label="Instrucción de la regla"
                 value={(*text).clone()}
                 oninput={on_input}
             />
-            <div class="flex items-center justify-between">
-                <span class="text-xs text-[var(--text-tertiary)]">
+            <div class="gi-guidance-form-footer">
+                <span class={counter_class}>
                     {format!("{char_count}/500")}
                 </span>
-                <div class="flex gap-2">
+                <div class="gi-guidance-form-actions">
                     <button
                         type="button"
-                        class="text-xs px-2 py-1 rounded text-[var(--text-secondary)] hover:bg-[var(--surface-raised)]"
+                        class="gi-btn-secondary gi-guidance-form-btn"
                         onclick={on_cancel_click}
                     >
                         {"Cancelar"}
                     </button>
                     <button
                         type="button"
-                        class="text-xs px-2 py-1 rounded gi-btn-primary"
+                        class="gi-btn-primary gi-guidance-form-btn"
                         disabled={text.trim().is_empty()}
                         onclick={on_save_click}
                     >
