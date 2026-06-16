@@ -20,11 +20,16 @@ const IPC_STALE_DAYS: i64 = 90;
 pub async fn calcular_propuesta_renovacion(
     db: &DatabaseConnection,
     contrato_id: Uuid,
+    org_id: Uuid,
 ) -> Result<PropuestaRenovacion, AppError> {
     let contrato_record = contrato::Entity::find_by_id(contrato_id)
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
+
+    if contrato_record.organizacion_id != org_id {
+        return Err(AppError::NotFound("Contrato no encontrado".to_string()));
+    }
 
     if contrato_record.estado != "activo" {
         return Err(AppError::Validation(
@@ -71,6 +76,7 @@ pub async fn aprobar_renovacion(
     contrato_id: Uuid,
     monto_aprobado: Decimal,
     admin_id: Uuid,
+    org_id: Uuid,
 ) -> Result<contrato::Model, AppError> {
     let txn = db.begin().await?;
 
@@ -78,6 +84,10 @@ pub async fn aprobar_renovacion(
         .one(&txn)
         .await?
         .ok_or_else(|| AppError::NotFound("Contrato no encontrado".to_string()))?;
+
+    if original.organizacion_id != org_id {
+        return Err(AppError::NotFound("Contrato no encontrado".to_string()));
+    }
 
     if original.estado != "activo" {
         return Err(AppError::Validation(

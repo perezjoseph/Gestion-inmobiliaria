@@ -191,7 +191,7 @@ fn bug_condition_1_1_cross_org_propuesta_access() {
             .expect("ipc insert");
 
         // Org A calls propuesta for Org B's contrato — should be 404
-        let result = indexacion::calcular_propuesta_renovacion(&db, contrato_id).await;
+        let result = indexacion::calcular_propuesta_renovacion(&db, contrato_id, org_a).await;
 
         // EXPECTED BEHAVIOR: NotFound because caller (Org A) ≠ entity owner (Org B)
         // BUG: service accepts any contrato_id without verifying org ownership
@@ -278,7 +278,8 @@ fn bug_condition_1_2_cross_org_aprobar_renovacion() {
 
         // Org A admin approves Org B's contrato — should be 404
         let result =
-            indexacion::aprobar_renovacion(&db, contrato_id, monto_aprobado, admin_id_org_a).await;
+            indexacion::aprobar_renovacion(&db, contrato_id, monto_aprobado, admin_id_org_a, org_a)
+                .await;
 
         // EXPECTED: NotFound + no mutation
         assert!(
@@ -852,8 +853,8 @@ fn property_1_pbt_cross_org_access_denied() {
                 // Current function signature: (db, contrato_id) -> Result
                 // This signature CANNOT enforce org isolation because it has no
                 // knowledge of the caller's org.
-                let has_org_param_propuesta = false; // No org_id param exists
-                let has_org_param_aprobar = false; // aprobar_renovacion: (db, id, monto, admin_id)
+                let has_org_param_propuesta = true; // org_id param added
+                let has_org_param_aprobar = true; // org_id param added
                 let has_org_check_copropietarios = false; // obtener_copropietarios: (db, propiedad_id)
                 let has_org_check_confirm = false; // confirm_receipt: (db, extraction_id, user_id)
                 let has_org_check_reject = false; // reject_receipt: (db, extraction_id, user_id, reason)

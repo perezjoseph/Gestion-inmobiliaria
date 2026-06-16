@@ -220,7 +220,7 @@ fn preservation_3_1_same_org_propuesta() {
             .await;
         make_ipc_config(org).insert(&db).await.expect("ipc insert");
 
-        let result = indexacion::calcular_propuesta_renovacion(&db, contrato_id).await;
+        let result = indexacion::calcular_propuesta_renovacion(&db, contrato_id, org).await;
 
         assert!(
             result.is_ok(),
@@ -282,7 +282,7 @@ fn preservation_3_1b_same_org_aprobar() {
         let monto_aprobado = Decimal::new(26000_00, 2);
 
         let result =
-            indexacion::aprobar_renovacion(&db, contrato_id, monto_aprobado, admin_id).await;
+            indexacion::aprobar_renovacion(&db, contrato_id, monto_aprobado, admin_id, org).await;
 
         assert!(
             result.is_ok(),
@@ -690,7 +690,7 @@ fn preservation_pbt_same_org_access_all_endpoints() {
                         })?;
 
                         let propuesta =
-                            indexacion::calcular_propuesta_renovacion(&db, contrato_id).await;
+                            indexacion::calcular_propuesta_renovacion(&db, contrato_id, org).await;
                         prop_assert!(
                             propuesta.is_ok(),
                             "Same-org propuesta failed for org={org}, contrato={contrato_id}"

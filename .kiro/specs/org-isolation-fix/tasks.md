@@ -100,7 +100,7 @@ Fix IDOR vulnerability: six endpoints in `indexacion`, `ipi`, `chatbot` modules 
     - _Preservation: same-org configuracion reads/writes unchanged_
     - _Requirements: 2.7, 2.8, 3.7_
 
-  - [~] 3.3 Add org ownership check to indexacion service
+  - [x] 3.3 Add org ownership check to indexacion service
     - Add `org_id: Uuid` parameter to `calcular_propuesta_renovacion` and `aprobar_renovacion`
     - After fetching contrato by id, verify `contrato.organizacion_id == org_id`
     - Return `AppError::NotFound` if mismatch (404, no info leak)

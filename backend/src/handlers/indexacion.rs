@@ -10,11 +10,13 @@ use crate::services::indexacion;
 
 pub async fn obtener_propuesta(
     db: web::Data<sea_orm::DatabaseConnection>,
-    _user: WriteAccess,
+    user: WriteAccess,
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
     let contrato_id = path.into_inner();
-    let propuesta = indexacion::calcular_propuesta_renovacion(db.get_ref(), contrato_id).await?;
+    let org_id = user.0.organizacion_id;
+    let propuesta =
+        indexacion::calcular_propuesta_renovacion(db.get_ref(), contrato_id, org_id).await?;
     Ok(HttpResponse::Ok().json(propuesta))
 }
 
@@ -26,10 +28,16 @@ pub async fn aprobar_renovacion_handler(
 ) -> Result<HttpResponse, AppError> {
     let contrato_id = path.into_inner();
     let admin_id = user.0.sub;
+    let org_id = user.0.organizacion_id;
     let req = body.into_inner();
-    let new_contrato =
-        indexacion::aprobar_renovacion(db.get_ref(), contrato_id, req.monto_aprobado, admin_id)
-            .await?;
+    let new_contrato = indexacion::aprobar_renovacion(
+        db.get_ref(),
+        contrato_id,
+        req.monto_aprobado,
+        admin_id,
+        org_id,
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(new_contrato))
 }
 
