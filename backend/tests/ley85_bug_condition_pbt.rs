@@ -18,7 +18,7 @@
 use crate::common;
 use chrono::{Duration, Utc};
 use rust_decimal::Decimal;
-use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use uuid::Uuid;
 
 fn make_org(org_id: Uuid) -> realestate_backend::entities::organizacion::ActiveModel {
@@ -306,7 +306,8 @@ fn bug_condition_1b_integration_ipc_none_allows_unlimited_increase() {
         .await
         .expect("contrato insert");
 
-        let _ = configuracion::Entity::delete_by_id("ipc_banco_central")
+        let _ = configuracion::Entity::delete_many()
+            .filter(configuracion::Column::Clave.eq("ipc_banco_central"))
             .exec(&db)
             .await;
 

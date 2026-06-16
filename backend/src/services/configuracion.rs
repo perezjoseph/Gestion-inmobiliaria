@@ -36,8 +36,11 @@ pub struct UpdateRecargoDefectoRequest {
     pub porcentaje: Decimal,
 }
 
-pub async fn obtener_moneda(db: &DatabaseConnection) -> Result<MonedaConfig, AppError> {
-    let config = configuracion::Entity::find_by_id(CLAVE_TASA_CAMBIO)
+pub async fn obtener_moneda(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+) -> Result<MonedaConfig, AppError> {
+    let config = configuracion::Entity::find_by_id((CLAVE_TASA_CAMBIO.to_string(), org_id))
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("Configuración de moneda no encontrada".to_string()))?;
@@ -52,6 +55,7 @@ pub async fn actualizar_moneda(
     db: &DatabaseConnection,
     tasa: f64,
     updated_by: Uuid,
+    org_id: Uuid,
 ) -> Result<MonedaConfig, AppError> {
     let now = Utc::now();
     let valor = MonedaConfig {
@@ -61,12 +65,13 @@ pub async fn actualizar_moneda(
     let valor_json = serde_json::to_value(&valor)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error serializando config: {e}")))?;
 
-    let existing = configuracion::Entity::find_by_id(CLAVE_TASA_CAMBIO)
+    let existing = configuracion::Entity::find_by_id((CLAVE_TASA_CAMBIO.to_string(), org_id))
         .one(db)
         .await?;
 
     let model = configuracion::ActiveModel {
         clave: Set(CLAVE_TASA_CAMBIO.to_string()),
+        organizacion_id: Set(org_id),
         valor: Set(valor_json),
         updated_at: Set(now.into()),
         updated_by: Set(Some(updated_by)),
@@ -80,8 +85,11 @@ pub async fn actualizar_moneda(
     Ok(valor)
 }
 
-pub async fn obtener_recargo_defecto(db: &DatabaseConnection) -> Result<Option<Decimal>, AppError> {
-    let config = configuracion::Entity::find_by_id(CLAVE_RECARGO_DEFECTO)
+pub async fn obtener_recargo_defecto(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+) -> Result<Option<Decimal>, AppError> {
+    let config = configuracion::Entity::find_by_id((CLAVE_RECARGO_DEFECTO.to_string(), org_id))
         .one(db)
         .await?;
 
@@ -100,6 +108,7 @@ pub async fn actualizar_recargo_defecto(
     db: &DatabaseConnection,
     porcentaje: Decimal,
     updated_by: Uuid,
+    org_id: Uuid,
 ) -> Result<Decimal, AppError> {
     if porcentaje < Decimal::ZERO || porcentaje > Decimal::from(100) {
         return Err(AppError::Validation(
@@ -111,7 +120,7 @@ pub async fn actualizar_recargo_defecto(
     let valor_json = serde_json::to_value(porcentaje)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error serializando recargo: {e}")))?;
 
-    let existing = configuracion::Entity::find_by_id(CLAVE_RECARGO_DEFECTO)
+    let existing = configuracion::Entity::find_by_id((CLAVE_RECARGO_DEFECTO.to_string(), org_id))
         .one(db)
         .await?;
 
@@ -121,6 +130,7 @@ pub async fn actualizar_recargo_defecto(
 
     let model = configuracion::ActiveModel {
         clave: Set(CLAVE_RECARGO_DEFECTO.to_string()),
+        organizacion_id: Set(org_id),
         valor: Set(valor_json),
         updated_at: Set(now.into()),
         updated_by: Set(Some(updated_by)),

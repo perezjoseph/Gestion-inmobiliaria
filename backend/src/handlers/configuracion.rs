@@ -10,9 +10,9 @@ use crate::services::configuracion::{
 
 pub async fn obtener_moneda(
     db: web::Data<DatabaseConnection>,
-    _claims: crate::services::auth::Claims,
+    claims: crate::services::auth::Claims,
 ) -> Result<HttpResponse, AppError> {
-    let result = configuracion::obtener_moneda(db.get_ref()).await?;
+    let result = configuracion::obtener_moneda(db.get_ref(), claims.organizacion_id).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
@@ -32,15 +32,22 @@ pub async fn actualizar_moneda(
         ));
     }
 
-    let result = configuracion::actualizar_moneda(db.get_ref(), body.tasa, admin.0.sub).await?;
+    let result = configuracion::actualizar_moneda(
+        db.get_ref(),
+        body.tasa,
+        admin.0.sub,
+        admin.0.organizacion_id,
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
 pub async fn obtener_recargo_defecto(
     db: web::Data<DatabaseConnection>,
-    _claims: crate::services::auth::Claims,
+    claims: crate::services::auth::Claims,
 ) -> Result<HttpResponse, AppError> {
-    let result = configuracion::obtener_recargo_defecto(db.get_ref()).await?;
+    let result =
+        configuracion::obtener_recargo_defecto(db.get_ref(), claims.organizacion_id).await?;
     let response = RecargoDefectoResponse { porcentaje: result };
     Ok(HttpResponse::Ok().json(response))
 }
@@ -61,8 +68,12 @@ pub async fn actualizar_recargo_defecto(
         ));
     }
 
-    let result =
-        configuracion::actualizar_recargo_defecto(db.get_ref(), body.porcentaje, admin.0.sub)
-            .await?;
+    let result = configuracion::actualizar_recargo_defecto(
+        db.get_ref(),
+        body.porcentaje,
+        admin.0.sub,
+        admin.0.organizacion_id,
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(result))
 }

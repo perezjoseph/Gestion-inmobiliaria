@@ -124,7 +124,7 @@ fn make_contrato(
     }
 }
 
-fn make_ipc_config() -> realestate_backend::entities::configuracion::ActiveModel {
+fn make_ipc_config(org_id: Uuid) -> realestate_backend::entities::configuracion::ActiveModel {
     use realestate_backend::entities::configuracion;
     let now = Utc::now();
     let ipc_data = serde_json::json!({
@@ -134,6 +134,7 @@ fn make_ipc_config() -> realestate_backend::entities::configuracion::ActiveModel
     });
     configuracion::ActiveModel {
         clave: Set("ipc_banco_central".to_string()),
+        organizacion_id: Set(org_id),
         valor: Set(ipc_data),
         updated_at: Set(now.into()),
         updated_by: Set(None),
@@ -180,10 +181,14 @@ fn bug_condition_1_1_cross_org_propuesta_access() {
             .await
             .expect("contrato insert");
 
-        let _ = configuracion::Entity::delete_by_id("ipc_banco_central")
+        let _ = configuracion::Entity::delete_many()
+            .filter(configuracion::Column::Clave.eq("ipc_banco_central"))
             .exec(&db)
             .await;
-        make_ipc_config().insert(&db).await.expect("ipc insert");
+        make_ipc_config(org_b)
+            .insert(&db)
+            .await
+            .expect("ipc insert");
 
         // Org A calls propuesta for Org B's contrato — should be 404
         let result = indexacion::calcular_propuesta_renovacion(&db, contrato_id).await;
@@ -252,10 +257,14 @@ fn bug_condition_1_2_cross_org_aprobar_renovacion() {
             .await
             .expect("contrato insert");
 
-        let _ = configuracion::Entity::delete_by_id("ipc_banco_central")
+        let _ = configuracion::Entity::delete_many()
+            .filter(configuracion::Column::Clave.eq("ipc_banco_central"))
             .exec(&db)
             .await;
-        make_ipc_config().insert(&db).await.expect("ipc insert");
+        make_ipc_config(org_b)
+            .insert(&db)
+            .await
+            .expect("ipc insert");
 
         let monto_aprobado = Decimal::new(26000_00, 2);
 
@@ -765,17 +774,17 @@ fn bug_condition_1_7_1_8_configuracion_global_leak() {
         make_org(org_b).insert(&db).await.expect("org_b insert");
 
         // Org A sets tasa to 60.00
-        config_svc::actualizar_moneda(&db, 60.0, admin_a)
+        config_svc::actualizar_moneda(&db, 60.0, admin_a, org_a)
             .await
             .expect("org_a set tasa");
 
         // Org B sets tasa to 55.00
-        config_svc::actualizar_moneda(&db, 55.0, admin_b)
+        config_svc::actualizar_moneda(&db, 55.0, admin_b, org_b)
             .await
             .expect("org_b set tasa");
 
         // Org A reads tasa — should still be 60.00 (org-isolated)
-        let org_a_tasa = config_svc::obtener_moneda(&db)
+        let org_a_tasa = config_svc::obtener_moneda(&db, org_a)
             .await
             .expect("org_a read tasa");
 
@@ -794,7 +803,8 @@ fn bug_condition_1_7_1_8_configuracion_global_leak() {
         );
 
         // Cleanup
-        let _ = configuracion::Entity::delete_by_id("tasa_cambio_dop_usd")
+        let _ = configuracion::Entity::delete_many()
+            .filter(configuracion::Column::Clave.eq("tasa_cambio_dop_usd"))
             .exec(&db)
             .await;
         let _ = organizacion::Entity::delete_by_id(org_b).exec(&db).await;

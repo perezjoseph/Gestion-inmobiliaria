@@ -436,8 +436,9 @@ fn test_renovar_contrato_generates_pagos_for_new_period() {
         // Clear any IPC config from prior tests so renewal is not capped
         {
             use realestate_backend::entities::configuracion;
-            use sea_orm::EntityTrait;
-            let _ = configuracion::Entity::delete_by_id("ipc_banco_central")
+            use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+            let _ = configuracion::Entity::delete_many()
+                .filter(configuracion::Column::Clave.eq("ipc_banco_central"))
                 .exec(&db)
                 .await;
         }

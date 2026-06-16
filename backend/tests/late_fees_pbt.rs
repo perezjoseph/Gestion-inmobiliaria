@@ -310,7 +310,9 @@ mod pbt_async {
     }
 
     async fn clear_recargo_config(db: &DatabaseConnection) {
-        let _ = configuracion::Entity::delete_by_id("recargo_porcentaje_defecto")
+        use sea_orm::{ColumnTrait, QueryFilter};
+        let _ = configuracion::Entity::delete_many()
+            .filter(configuracion::Column::Clave.eq("recargo_porcentaje_defecto"))
             .exec(db)
             .await;
     }
@@ -371,7 +373,7 @@ mod pbt_async {
             let org_pct = Decimal::new(org_pct_hundredths, 2);
 
             // Set org default
-            config_service::actualizar_recargo_defecto(&db, org_pct, user_id)
+            config_service::actualizar_recargo_defecto(&db, org_pct, user_id, org_id)
                 .await
                 .expect("set org default");
 
@@ -418,7 +420,7 @@ mod pbt_async {
             let org_pct = Decimal::new(org_pct_hundredths, 2);
 
             // Set org default
-            config_service::actualizar_recargo_defecto(&db, org_pct, user_id)
+            config_service::actualizar_recargo_defecto(&db, org_pct, user_id, org_id)
                 .await
                 .expect("set org default");
 
@@ -517,7 +519,7 @@ mod pbt_async {
 
             // Test config update with invalid porcentaje
             let config_result =
-                config_service::actualizar_recargo_defecto(&db, invalid_pct, user_id).await;
+                config_service::actualizar_recargo_defecto(&db, invalid_pct, user_id, org_id).await;
             assert!(
                 config_result.is_err(),
                 "Expected error for invalid config porcentaje {invalid_pct}, got Ok"

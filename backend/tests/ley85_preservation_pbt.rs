@@ -135,7 +135,7 @@ fn make_inquilino(id: Uuid, org_id: Uuid) -> inquilino::ActiveModel {
     }
 }
 
-async fn insert_ipc_config(db: &sea_orm::DatabaseConnection, valor_ipc: Decimal) {
+async fn insert_ipc_config(db: &sea_orm::DatabaseConnection, valor_ipc: Decimal, org_id: Uuid) {
     use realestate_backend::models::ipc::IpcData;
     let data = IpcData {
         valor_ipc,
@@ -145,11 +145,12 @@ async fn insert_ipc_config(db: &sea_orm::DatabaseConnection, valor_ipc: Decimal)
     let valor_json = serde_json::to_value(&data).unwrap();
     let model = configuracion::ActiveModel {
         clave: Set("ipc_banco_central".to_string()),
+        organizacion_id: Set(org_id),
         valor: Set(valor_json),
         updated_at: Set(Utc::now().into()),
         updated_by: Set(None),
     };
-    let existing = configuracion::Entity::find_by_id("ipc_banco_central")
+    let existing = configuracion::Entity::find_by_id(("ipc_banco_central".to_string(), org_id))
         .one(db)
         .await
         .unwrap();
@@ -298,7 +299,7 @@ fn preservation_2b_ipc_configured_renewal_within_cap_succeeds() {
         .unwrap();
 
         let ipc_value = Decimal::new(500, 2); // 5%
-        insert_ipc_config(&db, ipc_value).await;
+        insert_ipc_config(&db, ipc_value, org_id).await;
 
         let max_allowed =
             realestate_backend::services::ipc::calcular_monto_maximo(monto_mensual, ipc_value);
@@ -383,7 +384,7 @@ fn preservation_2c_ipc_configured_renewal_exceeds_cap_rejected() {
         .unwrap();
 
         let ipc_value = Decimal::new(500, 2); // 5%
-        insert_ipc_config(&db, ipc_value).await;
+        insert_ipc_config(&db, ipc_value, org_id).await;
 
         let max_allowed =
             realestate_backend::services::ipc::calcular_monto_maximo(monto_mensual, ipc_value);

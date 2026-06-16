@@ -10,8 +10,13 @@ use crate::models::ipc::{IpcData, UpdateIpcRequest};
 
 const CLAVE_IPC: &str = "ipc_banco_central";
 
-pub async fn obtener_ipc_actual(db: &DatabaseConnection) -> Result<Option<IpcData>, AppError> {
-    let config = configuracion::Entity::find_by_id(CLAVE_IPC).one(db).await?;
+pub async fn obtener_ipc_actual(
+    db: &DatabaseConnection,
+    org_id: Uuid,
+) -> Result<Option<IpcData>, AppError> {
+    let config = configuracion::Entity::find_by_id((CLAVE_IPC.to_string(), org_id))
+        .one(db)
+        .await?;
 
     match config {
         Some(record) => {
@@ -28,6 +33,7 @@ pub async fn actualizar_ipc_manual(
     db: &DatabaseConnection,
     input: UpdateIpcRequest,
     updated_by: Uuid,
+    org_id: Uuid,
 ) -> Result<IpcData, AppError> {
     let now = Utc::now();
     let data = IpcData {
@@ -39,10 +45,13 @@ pub async fn actualizar_ipc_manual(
     let valor_json = serde_json::to_value(&data)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error serializando IPC: {e}")))?;
 
-    let existing = configuracion::Entity::find_by_id(CLAVE_IPC).one(db).await?;
+    let existing = configuracion::Entity::find_by_id((CLAVE_IPC.to_string(), org_id))
+        .one(db)
+        .await?;
 
     let model = configuracion::ActiveModel {
         clave: Set(CLAVE_IPC.to_string()),
+        organizacion_id: Set(org_id),
         valor: Set(valor_json),
         updated_at: Set(now.into()),
         updated_by: Set(Some(updated_by)),
@@ -132,22 +141,29 @@ pub async fn fetch_ipc_from_bcrd(db: &DatabaseConnection) -> Result<i64, AppErro
     let valor_json = serde_json::to_value(&data)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error serializando IPC: {e}")))?;
 
-    let existing = configuracion::Entity::find_by_id(CLAVE_IPC).one(db).await?;
+    use crate::entities::organizacion;
+    let orgs = organizacion::Entity::find().all(db).await?;
+    for org in &orgs {
+        let existing = configuracion::Entity::find_by_id((CLAVE_IPC.to_string(), org.id))
+            .one(db)
+            .await?;
 
-    let model = configuracion::ActiveModel {
-        clave: Set(CLAVE_IPC.to_string()),
-        valor: Set(valor_json),
-        updated_at: Set(now.into()),
-        updated_by: Set(None),
-    };
+        let model = configuracion::ActiveModel {
+            clave: Set(CLAVE_IPC.to_string()),
+            organizacion_id: Set(org.id),
+            valor: Set(valor_json.clone()),
+            updated_at: Set(now.into()),
+            updated_by: Set(None),
+        };
 
-    if existing.is_some() {
-        model.update(db).await?;
-    } else {
-        model.insert(db).await?;
+        if existing.is_some() {
+            model.update(db).await?;
+        } else {
+            model.insert(db).await?;
+        }
     }
 
-    Ok(1)
+    Ok(orgs.len() as i64)
 }
 
 const TOPE_LEGAL_PORCENTAJE: Decimal = Decimal::TEN;

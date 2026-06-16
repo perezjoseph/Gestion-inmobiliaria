@@ -32,11 +32,13 @@ pub async fn calcular_propuesta_renovacion(
         ));
     }
 
-    let ipc_data = ipc::obtener_ipc_actual(db).await?.ok_or_else(|| {
-        AppError::Internal(anyhow::anyhow!(
-            "Datos de IPC no disponibles. Actualice manualmente"
-        ))
-    })?;
+    let ipc_data = ipc::obtener_ipc_actual(db, contrato_record.organizacion_id)
+        .await?
+        .ok_or_else(|| {
+            AppError::Internal(anyhow::anyhow!(
+                "Datos de IPC no disponibles. Actualice manualmente"
+            ))
+        })?;
 
     let now = Utc::now();
     let days_since_fetch = (now - ipc_data.ultimo_fetch_exitoso).num_days();
@@ -98,7 +100,7 @@ pub async fn aprobar_renovacion(
         ));
     }
 
-    let ipc_data = ipc::obtener_ipc_actual(db).await?;
+    let ipc_data = ipc::obtener_ipc_actual(db, original.organizacion_id).await?;
     let ipc_porcentaje = ipc_data.as_ref().map_or(Decimal::ZERO, |d| d.valor_ipc);
 
     let porcentaje_aplicado = if original.monto_mensual > Decimal::ZERO {

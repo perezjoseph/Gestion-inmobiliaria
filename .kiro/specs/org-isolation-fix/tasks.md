@@ -89,7 +89,7 @@ Fix IDOR vulnerability: six endpoints in `indexacion`, `ipi`, `chatbot` modules 
     - _Preservation: existing configuracion values remain accessible per-org after migration_
     - _Requirements: 2.7, 2.8, 3.7_
 
-  - [~] 3.2 Update configuracion entity and service
+  - [x] 3.2 Update configuracion entity and service
     - Add `organizacion_id: Uuid` field to `configuracion` entity Model
     - Update PK definition to composite `(Clave, OrganizacionId)`
     - Add `org_id: Uuid` parameter to all configuracion service functions

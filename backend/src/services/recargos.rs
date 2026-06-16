@@ -19,9 +19,12 @@ pub async fn resolver_porcentaje_recargo<C: ConnectionTrait>(
         return Ok(Some(porcentaje));
     }
 
-    let config = configuracion::Entity::find_by_id(CLAVE_RECARGO_DEFECTO)
-        .one(db)
-        .await?;
+    let config = configuracion::Entity::find_by_id((
+        CLAVE_RECARGO_DEFECTO.to_string(),
+        contrato.organizacion_id,
+    ))
+    .one(db)
+    .await?;
 
     match config {
         Some(record) => {

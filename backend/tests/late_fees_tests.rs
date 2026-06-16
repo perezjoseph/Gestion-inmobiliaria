@@ -404,7 +404,9 @@ fn test_get_recargo_config_not_set_returns_null() {
 
         // Clean up any existing recargo config
         use realestate_backend::entities::configuracion;
-        let _ = configuracion::Entity::delete_by_id("recargo_porcentaje_defecto")
+        use sea_orm::{ColumnTrait, QueryFilter};
+        let _ = configuracion::Entity::delete_many()
+            .filter(configuracion::Column::Clave.eq("recargo_porcentaje_defecto"))
             .exec(&db)
             .await;
 
@@ -837,7 +839,9 @@ fn test_mark_overdue_both_null_recargo_stays_null() {
 
         // Ensure no org default recargo exists
         use realestate_backend::entities::configuracion;
-        let _ = configuracion::Entity::delete_by_id("recargo_porcentaje_defecto")
+        use sea_orm::{ColumnTrait as _, QueryFilter as _};
+        let _ = configuracion::Entity::delete_many()
+            .filter(configuracion::Column::Clave.eq("recargo_porcentaje_defecto"))
             .exec(&db)
             .await;
 

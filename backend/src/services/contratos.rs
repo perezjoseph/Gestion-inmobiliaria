@@ -695,7 +695,7 @@ pub async fn sugerir_renovacion(
         ));
     }
 
-    let ipc_data = super::ipc::obtener_ipc_actual(db).await?;
+    let ipc_data = super::ipc::obtener_ipc_actual(db, contrato_record.organizacion_id).await?;
 
     let (monto_maximo, ipc_porcentaje) = match ipc_data {
         Some(data) => {
@@ -751,7 +751,7 @@ pub async fn renovar(
         ));
     }
 
-    match super::ipc::obtener_ipc_actual(db).await? {
+    match super::ipc::obtener_ipc_actual(db, original.organizacion_id).await? {
         Some(ipc_data) => {
             let max_allowed =
                 super::ipc::calcular_monto_maximo(original.monto_mensual, ipc_data.valor_ipc);

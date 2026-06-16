@@ -123,7 +123,7 @@ fn make_contrato(
     }
 }
 
-fn make_ipc_config() -> configuracion::ActiveModel {
+fn make_ipc_config(org_id: Uuid) -> configuracion::ActiveModel {
     let now = Utc::now();
     let ipc_data = serde_json::json!({
         "valorIpc": "5.00",
@@ -132,6 +132,7 @@ fn make_ipc_config() -> configuracion::ActiveModel {
     });
     configuracion::ActiveModel {
         clave: Set("ipc_banco_central".to_string()),
+        organizacion_id: Set(org_id),
         valor: Set(ipc_data),
         updated_at: Set(now.into()),
         updated_by: Set(None),
@@ -213,10 +214,11 @@ fn preservation_3_1_same_org_propuesta() {
             .await
             .expect("contrato insert");
 
-        let _ = configuracion::Entity::delete_by_id("ipc_banco_central")
+        let _ = configuracion::Entity::delete_many()
+            .filter(configuracion::Column::Clave.eq("ipc_banco_central"))
             .exec(&db)
             .await;
-        make_ipc_config().insert(&db).await.expect("ipc insert");
+        make_ipc_config(org).insert(&db).await.expect("ipc insert");
 
         let result = indexacion::calcular_propuesta_renovacion(&db, contrato_id).await;
 
@@ -271,10 +273,11 @@ fn preservation_3_1b_same_org_aprobar() {
             .await
             .expect("contrato insert");
 
-        let _ = configuracion::Entity::delete_by_id("ipc_banco_central")
+        let _ = configuracion::Entity::delete_many()
+            .filter(configuracion::Column::Clave.eq("ipc_banco_central"))
             .exec(&db)
             .await;
-        make_ipc_config().insert(&db).await.expect("ipc insert");
+        make_ipc_config(org).insert(&db).await.expect("ipc insert");
 
         let monto_aprobado = Decimal::new(26000_00, 2);
 
@@ -604,7 +607,7 @@ fn preservation_3_7_same_org_configuracion() {
         make_org(org).insert(&db).await.expect("org insert");
 
         let tasa = 58.75;
-        let write_result = config_svc::actualizar_moneda(&db, tasa, admin_id).await;
+        let write_result = config_svc::actualizar_moneda(&db, tasa, admin_id, org).await;
         assert!(
             write_result.is_ok(),
             "Same-org configuracion write should succeed, got: {:?}",
@@ -613,7 +616,7 @@ fn preservation_3_7_same_org_configuracion() {
         let written = write_result.unwrap();
         assert!((written.tasa - tasa).abs() < f64::EPSILON);
 
-        let read_result = config_svc::obtener_moneda(&db).await;
+        let read_result = config_svc::obtener_moneda(&db, org).await;
         assert!(
             read_result.is_ok(),
             "Same-org configuracion read should succeed, got: {:?}",
@@ -678,10 +681,11 @@ fn preservation_pbt_same_org_access_all_endpoints() {
                                 proptest::test_runner::TestCaseError::Reject("db setup".into())
                             })?;
 
-                        let _ = configuracion::Entity::delete_by_id("ipc_banco_central")
+                        let _ = configuracion::Entity::delete_many()
+                            .filter(configuracion::Column::Clave.eq("ipc_banco_central"))
                             .exec(&db)
                             .await;
-                        make_ipc_config().insert(&db).await.map_err(|_| {
+                        make_ipc_config(org).insert(&db).await.map_err(|_| {
                             proptest::test_runner::TestCaseError::Reject("db setup".into())
                         })?;
 

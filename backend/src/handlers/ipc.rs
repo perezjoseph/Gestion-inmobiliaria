@@ -8,9 +8,9 @@ use crate::services::ipc;
 
 pub async fn obtener_ipc(
     db: web::Data<DatabaseConnection>,
-    _access: WriteAccess,
+    access: WriteAccess,
 ) -> Result<HttpResponse, AppError> {
-    let result = ipc::obtener_ipc_actual(db.get_ref()).await?;
+    let result = ipc::obtener_ipc_actual(db.get_ref(), access.0.organizacion_id).await?;
 
     result.map_or_else(
         || {
@@ -35,7 +35,13 @@ pub async fn actualizar_ipc(
     admin: AdminOnly,
     body: web::Json<UpdateIpcRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let data = ipc::actualizar_ipc_manual(db.get_ref(), body.into_inner(), admin.0.sub).await?;
+    let data = ipc::actualizar_ipc_manual(
+        db.get_ref(),
+        body.into_inner(),
+        admin.0.sub,
+        admin.0.organizacion_id,
+    )
+    .await?;
 
     let response = IpcResponse {
         valor_ipc: data.valor_ipc,

@@ -360,11 +360,12 @@ mod ipc_db_tests {
             ))
             .await;
 
-            // Delete any existing IPC config from prior tests (global, not per-org)
+            // Delete any existing IPC config from prior tests
             {
                 use realestate_backend::entities::configuracion;
-                use sea_orm::EntityTrait;
-                let _ = configuracion::Entity::delete_by_id("ipc_banco_central")
+                use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+                let _ = configuracion::Entity::delete_many()
+                    .filter(configuracion::Column::Clave.eq("ipc_banco_central"))
                     .exec(&db)
                     .await;
             }
