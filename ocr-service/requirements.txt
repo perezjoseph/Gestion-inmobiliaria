@@ -1,7 +1,7 @@
 # --- Web framework ---
 fastapi==0.136.1
 uvicorn==0.46.0
-python-multipart==0.0.27
+python-multipart==0.0.31
 prometheus-fastapi-instrumentator==8.0.0
 
 # --- Inference ---
