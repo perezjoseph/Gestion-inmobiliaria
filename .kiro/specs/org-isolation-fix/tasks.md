@@ -130,7 +130,7 @@ Fix IDOR vulnerability: six endpoints in `indexacion`, `ipi`, `chatbot` modules 
     - _Preservation: same-org confirm/reject unchanged_
     - _Requirements: 2.5, 2.6, 3.4_
 
-  - [~] 3.6 Verify bug condition exploration test now passes
+  - [x] 3.6 Verify bug condition exploration test now passes
     - **Property 1: Expected Behavior** - Cross-Org Access Denied
     - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
     - The test from task 1 encodes the expected behavior (404 for cross-org)
