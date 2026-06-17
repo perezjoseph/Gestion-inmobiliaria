@@ -184,7 +184,7 @@ pub fn validate_time_gap(
 ) -> Result<(), AppError> {
     let required_days: i64 = match (from, to) {
         ("iniciado", "en_progreso") => 30,
-        ("iniciado", "completado") | ("en_progreso", "completado") => 90,
+        ("iniciado" | "en_progreso", "completado") => 90,
         _ => return Ok(()),
     };
 

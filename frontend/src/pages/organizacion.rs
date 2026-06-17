@@ -84,7 +84,7 @@ pub fn OrganizacionPage() -> Html {
         let editing = editing.clone();
         let saving = saving.clone();
         let error = error.clone();
-        let reload = reload.clone();
+        let reload = reload;
         let nombre = nombre.clone();
         let telefono = telefono.clone();
         let email = email.clone();

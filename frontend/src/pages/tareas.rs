@@ -111,7 +111,7 @@ pub fn Tareas() -> Html {
     let on_ejecutar = {
         let selected_tarea = selected_tarea.clone();
         let error = error.clone();
-        let reload = reload.clone();
+        let reload = reload;
         let executing = executing.clone();
         Callback::from(move |_: MouseEvent| {
             let nombre = (*selected_tarea).clone();

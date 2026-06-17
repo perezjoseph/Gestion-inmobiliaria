@@ -65,7 +65,7 @@ fn make_propiedad(
         habitaciones: Set(None),
         banos: Set(None),
         area_m2: Set(None),
-        precio: Set(Decimal::new(20000_00, 2)),
+        precio: Set(Decimal::new(2_000_000, 2)),
         moneda: Set("DOP".to_string()),
         estado: Set(estado.to_string()),
         imagenes: Set(None),
@@ -114,8 +114,8 @@ fn make_inquilino(id: Uuid, org_id: Uuid) -> realestate_backend::entities::inqui
 /// EXPECTED TO FAIL on unfixed code.
 #[test]
 fn bug_condition_1a_deposit_1_5x_accepted_under_ley_85_25() {
-    let monto_mensual = Decimal::new(10000_00, 2); // 10,000.00
-    let deposito = Decimal::new(15000_00, 2); // 15,000.00 = 1.5×
+    let monto_mensual = Decimal::new(1_000_000, 2); // 10,000.00
+    let deposito = Decimal::new(1_500_000, 2); // 15,000.00 = 1.5×
 
     // Model the validation logic as it EXISTS in contratos::create line ~293
     // Current (buggy): deposito > monto_mensual → reject
@@ -173,8 +173,8 @@ fn bug_condition_1a_integration_deposit_rejected_with_ley_4314() {
             .await
             .expect("inquilino insert");
 
-        let monto_mensual = Decimal::new(10000_00, 2);
-        let deposito = Decimal::new(15000_00, 2);
+        let monto_mensual = Decimal::new(1_000_000, 2);
+        let deposito = Decimal::new(1_500_000, 2);
 
         let input = CreateContratoRequest {
             propiedad_id,
@@ -223,8 +223,8 @@ fn bug_condition_1a_integration_deposit_rejected_with_ley_4314() {
 /// EXPECTED TO FAIL on unfixed code.
 #[test]
 fn bug_condition_1b_ipc_none_15_percent_increase_rejected() {
-    let monto_original = Decimal::new(20000_00, 2); // 20,000.00
-    let monto_nuevo = Decimal::new(23000_00, 2); // 23,000.00 = 15% increase
+    let monto_original = Decimal::new(2_000_000, 2); // 20,000.00
+    let monto_nuevo = Decimal::new(2_300_000, 2); // 23,000.00 = 15% increase
     let ipc_configured = false; // IPC is None
 
     let max_allowed_without_ipc = monto_original * Decimal::new(110, 2); // original * 1.10
@@ -278,7 +278,7 @@ fn bug_condition_1b_integration_ipc_none_allows_unlimited_increase() {
             .await
             .expect("inquilino insert");
 
-        let monto_mensual = Decimal::new(20000_00, 2);
+        let monto_mensual = Decimal::new(2_000_000, 2);
 
         contrato::ActiveModel {
             id: Set(contrato_id),
@@ -311,7 +311,7 @@ fn bug_condition_1b_integration_ipc_none_allows_unlimited_increase() {
             .exec(&db)
             .await;
 
-        let new_monto = Decimal::new(23000_00, 2); // 15% increase
+        let new_monto = Decimal::new(2_300_000, 2); // 15% increase
         let input = RenovarContratoRequest {
             fecha_fin: chrono::NaiveDate::from_ymd_opt(2026, 12, 31).unwrap(),
             monto_mensual: new_monto,
@@ -423,7 +423,7 @@ fn bug_condition_1c_integration_instant_transition_allowed() {
             inquilino_id: Set(inquilino_id),
             fecha_inicio: Set(chrono::NaiveDate::from_ymd_opt(2025, 1, 1).unwrap()),
             fecha_fin: Set(chrono::NaiveDate::from_ymd_opt(2025, 12, 31).unwrap()),
-            monto_mensual: Set(Decimal::new(15000_00, 2)),
+            monto_mensual: Set(Decimal::new(1_500_000, 2)),
             deposito: Set(None),
             moneda: Set("DOP".to_string()),
             estado: Set("activo".to_string()),
@@ -511,8 +511,8 @@ fn bug_condition_1d_custodia_vencida_exposed_after_15_days() {
         inquilino_id: id,
         fecha_inicio: chrono::NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
         fecha_fin: chrono::NaiveDate::from_ymd_opt(2025, 12, 31).unwrap(),
-        monto_mensual: Decimal::new(18000_00, 2),
-        deposito: Some(Decimal::new(18000_00, 2)),
+        monto_mensual: Decimal::new(1_800_000, 2),
+        deposito: Some(Decimal::new(1_800_000, 2)),
         moneda: "DOP".to_string(),
         estado: "activo".to_string(),
         created_at: chrono::DateTime::from_timestamp(0, 0).unwrap(),

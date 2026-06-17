@@ -60,7 +60,7 @@ fn make_propiedad(id: Uuid, org_id: Uuid) -> realestate_backend::entities::propi
         habitaciones: Set(None),
         banos: Set(None),
         area_m2: Set(None),
-        precio: Set(Decimal::new(30000_00, 2)),
+        precio: Set(Decimal::new(3_000_000, 2)),
         moneda: Set("DOP".to_string()),
         estado: Set("ocupada".to_string()),
         imagenes: Set(None),
@@ -106,7 +106,7 @@ fn make_contrato(
         inquilino_id: Set(inquilino_id),
         fecha_inicio: Set(chrono::NaiveDate::from_ymd_opt(2025, 1, 1).unwrap()),
         fecha_fin: Set(chrono::NaiveDate::from_ymd_opt(2025, 12, 31).unwrap()),
-        monto_mensual: Set(Decimal::new(25000_00, 2)),
+        monto_mensual: Set(Decimal::new(2_500_000, 2)),
         deposito: Set(None),
         moneda: Set("DOP".to_string()),
         estado: Set("activo".to_string()),
@@ -266,7 +266,7 @@ fn bug_condition_1_2_cross_org_aprobar_renovacion() {
             .await
             .expect("ipc insert");
 
-        let monto_aprobado = Decimal::new(26000_00, 2);
+        let monto_aprobado = Decimal::new(2_600_000, 2);
 
         // Count contratos before
         let before_count = contrato::Entity::find()

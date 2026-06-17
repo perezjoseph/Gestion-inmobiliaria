@@ -44,8 +44,7 @@ fn ipc_percentage_strategy() -> impl Strategy<Value = Decimal> {
 }
 
 fn renewal_within_cap(monto_actual: Decimal, ipc_cap: Decimal) -> Decimal {
-    let max = realestate_backend::services::ipc::calcular_monto_maximo(monto_actual, ipc_cap);
-    max
+    realestate_backend::services::ipc::calcular_monto_maximo(monto_actual, ipc_cap)
 }
 
 fn valid_deposit_transitions() -> impl Strategy<Value = Vec<&'static str>> {
@@ -104,7 +103,7 @@ fn make_propiedad(id: Uuid, org_id: Uuid, estado: &str) -> propiedad::ActiveMode
         habitaciones: Set(None),
         banos: Set(None),
         area_m2: Set(None),
-        precio: Set(Decimal::new(30000_00, 2)),
+        precio: Set(Decimal::new(3_000_000, 2)),
         moneda: Set("DOP".to_string()),
         estado: Set(estado.to_string()),
         imagenes: Set(None),
@@ -210,8 +209,8 @@ fn preservation_2a_deposit_within_1x_accepted() {
             .await
             .unwrap();
 
-        let monto_mensual = Decimal::new(15000_00, 2);
-        let deposito = Decimal::new(10000_00, 2);
+        let monto_mensual = Decimal::new(1_500_000, 2);
+        let deposito = Decimal::new(1_000_000, 2);
 
         let input = CreateContratoRequest {
             propiedad_id,
@@ -270,7 +269,7 @@ fn preservation_2b_ipc_configured_renewal_within_cap_succeeds() {
             .await
             .unwrap();
 
-        let monto_mensual = Decimal::new(20000_00, 2);
+        let monto_mensual = Decimal::new(2_000_000, 2);
 
         contrato::ActiveModel {
             id: Set(contrato_id),
@@ -355,7 +354,7 @@ fn preservation_2c_ipc_configured_renewal_exceeds_cap_rejected() {
             .await
             .unwrap();
 
-        let monto_mensual = Decimal::new(20000_00, 2);
+        let monto_mensual = Decimal::new(2_000_000, 2);
 
         contrato::ActiveModel {
             id: Set(contrato_id),
@@ -506,7 +505,7 @@ fn preservation_2f_desahucio_creation_initializes_correctly() {
             inquilino_id: Set(inquilino_id),
             fecha_inicio: Set(NaiveDate::from_ymd_opt(2025, 1, 1).unwrap()),
             fecha_fin: Set(NaiveDate::from_ymd_opt(2025, 12, 31).unwrap()),
-            monto_mensual: Set(Decimal::new(15000_00, 2)),
+            monto_mensual: Set(Decimal::new(1_500_000, 2)),
             deposito: Set(None),
             moneda: Set("DOP".to_string()),
             estado: Set("activo".to_string()),

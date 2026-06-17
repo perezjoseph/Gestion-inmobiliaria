@@ -648,7 +648,11 @@ pub async fn test_chat_stream(
         }
     }
 
-    let mut streaming_response = streaming_response.unwrap();
+    let Some(mut streaming_response) = streaming_response else {
+        return Err(AppError::Internal(anyhow::anyhow!(
+            "No se obtuvo respuesta del servicio AI después de reintentos"
+        )));
+    };
 
     let sse_stream = async_stream::stream! {
         while let Some(chunk) = streaming_response.next().await {

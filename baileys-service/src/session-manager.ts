@@ -54,7 +54,7 @@ const SENT_IDS_MAX_SIZE = 500;
 function jidToPhone(jid: string | undefined | null): string | null {
   if (!jid) return null;
   const decoded = jidDecode(jid);
-  if (!decoded || decoded.server !== 's.whatsapp.net') return null;
+  if (decoded?.server !== 's.whatsapp.net') return null;
   return '+' + decoded.user;
 }
 
@@ -276,14 +276,14 @@ async function forwardToBackend(realmId: string, message: any): Promise<void> {
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) {
+    if (response.ok) {
+      incMessages(realmId, 'inbound', 'ok');
+    } else {
       logger.error(
         { realmId, status: response.status, senderPhone },
         'Backend webhook returned non-OK status'
       );
       incMessages(realmId, 'inbound', 'error');
-    } else {
-      incMessages(realmId, 'inbound', 'ok');
     }
   } catch (err: any) {
     logger.error({ realmId, err: err.message, senderPhone }, 'Failed to forward message to backend');

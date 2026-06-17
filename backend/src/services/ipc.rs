@@ -163,7 +163,7 @@ pub async fn fetch_ipc_from_bcrd(db: &DatabaseConnection) -> Result<i64, AppErro
         }
     }
 
-    Ok(orgs.len() as i64)
+    Ok(i64::try_from(orgs.len()).unwrap_or(i64::MAX))
 }
 
 const TOPE_LEGAL_PORCENTAJE: Decimal = Decimal::TEN;

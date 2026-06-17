@@ -61,7 +61,7 @@ fn make_propiedad(id: Uuid, org_id: Uuid) -> propiedad::ActiveModel {
         habitaciones: Set(None),
         banos: Set(None),
         area_m2: Set(None),
-        precio: Set(Decimal::new(30000_00, 2)),
+        precio: Set(Decimal::new(3_000_000, 2)),
         moneda: Set("DOP".to_string()),
         estado: Set("ocupada".to_string()),
         imagenes: Set(None),
@@ -105,7 +105,7 @@ fn make_contrato(
         inquilino_id: Set(inquilino_id),
         fecha_inicio: Set(chrono::NaiveDate::from_ymd_opt(2025, 1, 1).unwrap()),
         fecha_fin: Set(chrono::NaiveDate::from_ymd_opt(2025, 12, 31).unwrap()),
-        monto_mensual: Set(Decimal::new(25000_00, 2)),
+        monto_mensual: Set(Decimal::new(2_500_000, 2)),
         deposito: Set(None),
         moneda: Set("DOP".to_string()),
         estado: Set("activo".to_string()),
@@ -279,7 +279,7 @@ fn preservation_3_1b_same_org_aprobar() {
             .await;
         make_ipc_config(org).insert(&db).await.expect("ipc insert");
 
-        let monto_aprobado = Decimal::new(26000_00, 2);
+        let monto_aprobado = Decimal::new(2_600_000, 2);
 
         let result =
             indexacion::aprobar_renovacion(&db, contrato_id, monto_aprobado, admin_id, org).await;
@@ -339,7 +339,7 @@ fn preservation_3_2_same_org_copropietarios_list() {
             propiedad_id: Set(propiedad_id),
             nombre: Set("Same Org Owner".to_string()),
             cedula_rnc: Set(format!("PRES-CP-{}", Uuid::new_v4())),
-            porcentaje_propiedad: Set(Decimal::new(100_00, 2)),
+            porcentaje_propiedad: Set(Decimal::new(10_000, 2)),
             organizacion_id: Set(org),
             created_at: Set(now),
             updated_at: Set(now),
@@ -650,7 +650,7 @@ fn preservation_pbt_same_org_access_all_endpoints() {
         let db_clone = db.clone();
         runner
             .run(
-                &(prop::array::uniform4(any::<u128>()), 50_00i64..100_00i64),
+                &(prop::array::uniform4(any::<u128>()), 5_000i64..10_000i64),
                 |(uuids, porcentaje_raw)| {
                     let db = db_clone.clone();
                     let rt = tokio::runtime::Handle::current();
@@ -701,7 +701,7 @@ fn preservation_pbt_same_org_access_all_endpoints() {
                             &db,
                             org,
                             propiedad_id,
-                            format!("PBT Owner {}", org),
+                            format!("PBT Owner {org}"),
                             format!("PBT-{}", Uuid::new_v4()),
                             Decimal::new(porcentaje_raw, 2),
                         )

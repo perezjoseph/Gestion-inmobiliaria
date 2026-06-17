@@ -751,33 +751,30 @@ pub async fn renovar(
         ));
     }
 
-    match super::ipc::obtener_ipc_actual(db, original.organizacion_id).await? {
-        Some(ipc_data) => {
-            let max_allowed =
-                super::ipc::calcular_monto_maximo(original.monto_mensual, ipc_data.valor_ipc);
-            if input.monto_mensual > max_allowed {
-                return Err(AppError::ValidationWithFields {
-                    message: format!(
-                        "El monto mensual excede el máximo permitido por IPC: {max_allowed}"
-                    ),
-                    fields: serde_json::json!({
-                        "maxAllowed": max_allowed.to_string()
-                    }),
-                });
-            }
+    if let Some(ipc_data) = super::ipc::obtener_ipc_actual(db, original.organizacion_id).await? {
+        let max_allowed =
+            super::ipc::calcular_monto_maximo(original.monto_mensual, ipc_data.valor_ipc);
+        if input.monto_mensual > max_allowed {
+            return Err(AppError::ValidationWithFields {
+                message: format!(
+                    "El monto mensual excede el máximo permitido por IPC: {max_allowed}"
+                ),
+                fields: serde_json::json!({
+                    "maxAllowed": max_allowed.to_string()
+                }),
+            });
         }
-        None => {
-            let max_allowed = original.monto_mensual * Decimal::new(110, 2);
-            if input.monto_mensual > max_allowed {
-                return Err(AppError::ValidationWithFields {
-                    message: format!(
-                        "El monto mensual excede el máximo permitido (10% sin IPC): {max_allowed}"
-                    ),
-                    fields: serde_json::json!({
-                        "maxAllowed": max_allowed.to_string()
-                    }),
-                });
-            }
+    } else {
+        let max_allowed = original.monto_mensual * Decimal::new(110, 2);
+        if input.monto_mensual > max_allowed {
+            return Err(AppError::ValidationWithFields {
+                message: format!(
+                    "El monto mensual excede el máximo permitido (10% sin IPC): {max_allowed}"
+                ),
+                fields: serde_json::json!({
+                    "maxAllowed": max_allowed.to_string()
+                }),
+            });
         }
     }
 

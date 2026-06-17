@@ -146,7 +146,7 @@ Fix IDOR vulnerability: six endpoints in `indexacion`, `ipi`, `chatbot` modules 
     - **EXPECTED OUTCOME**: Tests PASS (confirms no regressions for same-org access)
     - Confirm all tests still pass after fix (no regressions)
 
-- [~] 4. Checkpoint - Ensure all tests pass
+- [x] 4. Checkpoint - Ensure all tests pass
   - Run full test suite: `cargo test` in backend
   - Verify no clippy warnings on changed files
   - Ensure migration applies cleanly on fresh DB
