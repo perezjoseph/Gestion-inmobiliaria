@@ -77,6 +77,8 @@ pub struct OvmsRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<serde_json::Value>,
     pub stream: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chat_template_kwargs: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -102,6 +104,8 @@ pub struct OvmsChoice {
 pub struct OvmsResponseMessage {
     pub role: String,
     pub content: Option<String>,
+    #[serde(default)]
+    pub reasoning_content: Option<String>,
     #[serde(default, deserialize_with = "deserialize_null_or_vec")]
     pub tool_calls: Vec<OvmsToolCall>,
 }
@@ -327,6 +331,7 @@ fn build_ovms_request(model_name: &str, request: &CompletionRequest) -> OvmsRequ
         tools,
         tool_choice,
         stream: false,
+        chat_template_kwargs: None,
     }
 }
 
@@ -438,6 +443,8 @@ struct OvmsStreamChoice {
 struct OvmsStreamDelta {
     #[serde(default)]
     content: Option<String>,
+    #[serde(default, rename = "reasoning_content")]
+    _reasoning_content: Option<String>,
 }
 
 fn parse_sse_chunk(
@@ -446,11 +453,9 @@ fn parse_sse_chunk(
     let chunk: OvmsStreamChunk = serde_json::from_str(data)
         .map_err(|e| CompletionError::ProviderError(format!("Error parseando chunk SSE: {e}")))?;
 
-    let text = chunk
-        .choices
-        .first()
-        .and_then(|c| c.delta.content.clone())
-        .unwrap_or_default();
+    let delta = chunk.choices.first().map(|c| &c.delta);
+
+    let text = delta.and_then(|d| d.content.clone()).unwrap_or_default();
 
     Ok(RawStreamingChoice::Message(text))
 }
