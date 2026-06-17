@@ -655,6 +655,7 @@ mod tests {
                 message: OvmsResponseMessage {
                     role: "assistant".to_string(),
                     content: Some("Hello!".to_string()),
+                    reasoning_content: None,
                     tool_calls: vec![],
                 },
                 finish_reason: Some("stop".to_string()),
@@ -683,6 +684,7 @@ mod tests {
                 message: OvmsResponseMessage {
                     role: "assistant".to_string(),
                     content: None,
+                    reasoning_content: None,
                     tool_calls: vec![OvmsToolCall {
                         id: "call_1".to_string(),
                         call_type: "function".to_string(),
