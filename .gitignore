@@ -48,6 +48,7 @@ __pycache__/
 *.pyo
 .hypothesis/
 .pytest_cache/
+.venv/
 
 # Graphify knowledge graph
 graphify-out/
@@ -63,14 +64,35 @@ android/local.properties
 
 # Editor / IDE / tooling caches
 .vscode/
+.idea/
+*.iml
+.fleet/
 .claude/
-.impeccable.md
+.cursor/
+.windsurf/
+*.code-workspace
 .playwright/
 .playwright-cli/
+
+# LSP / language server caches
+.rust-analyzer/
+rust-project.json
+.metals/
+.bsp/
+.ccls-cache/
+.clangd/
+.fallow/
+
+# Impeccable
+.impeccable*
+DESIGN.md
+DESIGN.json
+product.md
 .worktrees/
 /tools/
 
 # Kiro / skills / state
+skills-lock.json
 
 .kiro/settings/
 .kiro/specs/*/.tasks/

@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "Fallow Dead Code Analysis",
+  "description": "Runs fallow dead-code analysis on TypeScript/JavaScript files when edited, surfacing unused exports, files, and dependencies.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "baileys-service/**/*.ts",
+      "baileys-service/**/*.js"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Run fallow dead-code analysis on the edited file using the fallow MCP tool (analyze with file filter set to the edited file path relative to baileys-service/). Report any unused exports, unlisted dependencies, or other issues found. If clean, say so briefly."
+  }
+}
