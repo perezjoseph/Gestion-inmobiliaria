@@ -32,10 +32,7 @@ fn monto_mensual_strategy() -> impl Strategy<Value = Decimal> {
 }
 
 fn deposit_within_1x(monto: Decimal) -> impl Strategy<Value = Decimal> {
-    let max_cents = (monto * Decimal::from(100))
-        .to_string()
-        .parse::<i64>()
-        .unwrap_or(500_000);
+    let max_cents = monto.mantissa() as i64;
     (100i64..=max_cents).prop_map(|v| Decimal::new(v, 2))
 }
 
@@ -172,10 +169,7 @@ fn preservation_2a_deposit_within_1x_accepted() {
         });
 
         let strat = monto_mensual_strategy().prop_flat_map(|monto| {
-            let max_cents = (monto * Decimal::from(100))
-                .to_string()
-                .parse::<i64>()
-                .unwrap_or(500_000);
+            let max_cents = monto.mantissa() as i64;
             (
                 Just(monto),
                 (100i64..=max_cents).prop_map(|v| Decimal::new(v, 2)),

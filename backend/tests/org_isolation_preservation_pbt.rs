@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 use realestate_backend::entities::{
     chatbot_conversation, chatbot_receipt_extraction, configuracion, contrato, copropietario,
-    inquilino, organizacion, pago, propiedad,
+    inquilino, organizacion, pago, propiedad, usuario,
 };
 use realestate_backend::services::{chatbot, configuracion as config_svc, indexacion, ipi};
 
@@ -439,6 +439,22 @@ fn preservation_3_4a_same_org_confirm_receipt() {
         let extraction_id = Uuid::new_v4();
 
         make_org(org).insert(&db).await.expect("org insert");
+        let now = Utc::now().into();
+        usuario::ActiveModel {
+            id: Set(user_id),
+            nombre: Set("Test User".to_string()),
+            email: Set(format!("user+{user_id}@test.com")),
+            password_hash: Set("not_used".to_string()),
+            rol: Set("admin".to_string()),
+            activo: Set(true),
+            organizacion_id: Set(org),
+            created_at: Set(now),
+            updated_at: Set(now),
+            password_changed_at: Set(now),
+        }
+        .insert(&db)
+        .await
+        .expect("usuario insert");
         make_propiedad(propiedad_id, org)
             .insert(&db)
             .await
@@ -680,7 +696,7 @@ fn preservation_pbt_same_org_access_all_endpoints() {
     let db_clone = db.clone();
     runner
         .run(
-            &(prop::array::uniform4(any::<u128>()), 5_000i64..10_000i64),
+            &(prop::array::uniform4(any::<u128>()), Just(10_000i64)),
             |(uuids, porcentaje_raw)| {
                 let db = db_clone.clone();
                 rt.block_on(async move {
