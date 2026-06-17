@@ -1,0 +1,244 @@
+name: Runtime Alert Enricher
+
+# Receives a repository_dispatch from Grafana's webhook contact point,
+# queries Loki for recent error logs related to the alert, deduplicates
+# by alert fingerprint, and dispatches kiro-autofix-runtime.yml with
+# enriched context.
+#
+# Grafana webhook sends:
+#   POST /repos/{owner}/{repo}/dispatches
+#   {
+#     "event_type": "grafana-alert",
+#     "client_payload": {
+#       "alertname": "...",
+#       "severity": "critical|warning",
+#       "container": "backend|baileys|frontend",
+#       "namespace": "realestate|realestate-dev",
+#       "summary": "...",
+#       "description": "...",
+#       "fingerprint": "..."
+#     }
+#   }
+
+on:
+  repository_dispatch:
+    types: [grafana-alert]
+
+permissions: {}
+
+concurrency:
+  group: runtime-enricher-${{ github.event.client_payload.fingerprint }}
+  cancel-in-progress: true
+
+env:
+  LOKI_UID: "P8E80F9AEF21F6940"
+  GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
+
+jobs:
+  enrich-and-dispatch:
+    name: "Enrich alert & dispatch autofix"
+    runs-on: arc-runner-dind
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Validate secrets
+        env:
+          KIRO_GITHUB_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+          GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
+        run: |
+          umask 077
+          missing=()
+          [ -z "${KIRO_GITHUB_TOKEN}" ] && missing+=("KIRO_GITHUB_TOKEN")
+          [ -z "${GRAFANA_TOKEN}" ] && missing+=("GRAFANA_TOKEN")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing secret(s): ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Parse alert payload
+        id: alert
+        run: |
+          umask 077
+          ALERTNAME='${{ github.event.client_payload.alertname }}'
+          SEVERITY='${{ github.event.client_payload.severity }}'
+          CONTAINER='${{ github.event.client_payload.container }}'
+          NAMESPACE='${{ github.event.client_payload.namespace }}'
+          SUMMARY='${{ github.event.client_payload.summary }}'
+          FINGERPRINT='${{ github.event.client_payload.fingerprint }}'
+
+          echo "alertname=${ALERTNAME}" >> "$GITHUB_OUTPUT"
+          echo "severity=${SEVERITY}" >> "$GITHUB_OUTPUT"
+          echo "container=${CONTAINER}" >> "$GITHUB_OUTPUT"
+          echo "namespace=${NAMESPACE:-realestate}" >> "$GITHUB_OUTPUT"
+          echo "fingerprint=${FINGERPRINT}" >> "$GITHUB_OUTPUT"
+
+          # Determine mode from severity
+          if [ "$SEVERITY" = "critical" ]; then
+            echo "mode=yolo" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=pr" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "Alert: ${ALERTNAME} (${SEVERITY}) container=${CONTAINER} ns=${NAMESPACE}"
+
+      - name: Deduplicate by fingerprint (skip if dispatched in last 30 min)
+        id: dedup
+        env:
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+          FINGERPRINT: ${{ steps.alert.outputs.fingerprint }}
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            umask 077
+            if [ -z "$FINGERPRINT" ]; then
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            # Check recent runtime autofix runs for this fingerprint
+            RECENT=$(gh run list \
+              --repo "${{ github.repository }}" \
+              --workflow "kiro-autofix-runtime.yml" \
+              --json createdAt,status \
+              --jq '[.[] | select(.createdAt > (now - 1800 | todate))] | length' \
+              2>/dev/null || echo "0")
+
+            if [ "$RECENT" -gt 0 ]; then
+              echo "::notice::Skipping: autofix already dispatched within last 30 minutes"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+            fi
+
+      - name: Query Loki for recent error logs
+        id: logs
+        if: steps.dedup.outputs.skip != 'true'
+        env:
+          GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
+          CONTAINER: ${{ steps.alert.outputs.container }}
+          NAMESPACE: ${{ steps.alert.outputs.namespace }}
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            umask 077
+            LOGQL="{container=\"${CONTAINER}\", namespace=\"${NAMESPACE}\", level=~\"(?i)error|panic|fatal\"}"
+
+            END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            START=$(date -u -d '15 minutes ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-15M +%Y-%m-%dT%H:%M:%SZ)
+
+            RESPONSE=$(curl -sf \
+              -H "Authorization: Bearer ${GRAFANA_TOKEN}" \
+              -G "${GRAFANA_URL}/api/ds/query" \
+              --data-urlencode "ds_type=loki" \
+              --data-urlencode "ds_uid=${LOKI_UID}" \
+              -d "queries=[{\"refId\":\"A\",\"expr\":\"${LOGQL}\",\"queryType\":\"range\",\"datasource\":{\"uid\":\"${LOKI_UID}\",\"type\":\"loki\"},\"maxLines\":100}]" \
+              -d "from=$(date -d "$START" +%s%3N 2>/dev/null || echo '0')" \
+              -d "to=$(date -d "$END" +%s%3N 2>/dev/null || echo '0')" \
+              2>/dev/null || echo "")
+
+            # Fallback: use Loki HTTP API directly if Grafana proxy fails
+            if [ -z "$RESPONSE" ] || echo "$RESPONSE" | grep -q '"error"'; then
+              LOKI_URL="${GRAFANA_URL}/api/datasources/proxy/uid/${LOKI_UID}"
+              RESPONSE=$(curl -sf \
+                -H "Authorization: Bearer ${GRAFANA_TOKEN}" \
+                -G "${LOKI_URL}/loki/api/v1/query_range" \
+                --data-urlencode "query=${LOGQL}" \
+                --data-urlencode "start=${START}" \
+                --data-urlencode "end=${END}" \
+                --data-urlencode "limit=100" \
+                --data-urlencode "direction=backward" \
+                2>/dev/null || echo "")
+            fi
+
+            LOGS_FILE="${RUNNER_TEMP}/loki-errors.txt"
+
+            if [ -n "$RESPONSE" ] && echo "$RESPONSE" | jq -e '.data.result' >/dev/null 2>&1; then
+              echo "$RESPONSE" | jq -r '
+                .data.result[]
+                | .values[]
+                | .[1]
+              ' | tail -200 > "$LOGS_FILE"
+            else
+              echo "Failed to query Loki or no results. Raw response (if any):" > "$LOGS_FILE"
+              echo "$RESPONSE" | head -c 2000 >> "$LOGS_FILE"
+            fi
+
+            BYTE_COUNT=$(wc -c < "$LOGS_FILE")
+            echo "logs_file=${LOGS_FILE}" >> "$GITHUB_OUTPUT"
+            echo "Collected ${BYTE_COUNT} bytes of error logs"
+
+      - name: Build enriched error context
+        id: context
+        if: steps.dedup.outputs.skip != 'true'
+        env:
+          ALERTNAME: ${{ steps.alert.outputs.alertname }}
+          SEVERITY: ${{ steps.alert.outputs.severity }}
+          CONTAINER: ${{ steps.alert.outputs.container }}
+          NAMESPACE: ${{ steps.alert.outputs.namespace }}
+          SUMMARY: ${{ github.event.client_payload.summary }}
+          DESCRIPTION: ${{ github.event.client_payload.description }}
+          LOGS_FILE: ${{ steps.logs.outputs.logs_file }}
+        run: |
+          umask 077
+          CONTEXT_FILE="${RUNNER_TEMP}/enriched-context.txt"
+
+          {
+            echo "=== RUNTIME ALERT ==="
+            echo "Alert: ${ALERTNAME}"
+            echo "Severity: ${SEVERITY}"
+            echo "Container: ${CONTAINER}"
+            echo "Namespace: ${NAMESPACE}"
+            echo "Summary: ${SUMMARY}"
+            echo ""
+            if [ -n "$DESCRIPTION" ]; then
+              echo "Description: ${DESCRIPTION}"
+              echo ""
+            fi
+            echo "=== RECENT ERROR LOGS (last 15 min) ==="
+            if [ -s "$LOGS_FILE" ]; then
+              cat "$LOGS_FILE"
+            else
+              echo "(no error logs retrieved)"
+            fi
+          } > "$CONTEXT_FILE"
+
+          # Truncate to 60000 bytes to stay within GitHub dispatch limits
+          if [ "$(wc -c < "$CONTEXT_FILE")" -gt 60000 ]; then
+            tail -c 60000 "$CONTEXT_FILE" > "${CONTEXT_FILE}.tmp"
+            mv "${CONTEXT_FILE}.tmp" "$CONTEXT_FILE"
+            echo "[TRUNCATED: only last 60000 bytes shown]" >> "$CONTEXT_FILE"
+          fi
+
+          # Escape for JSON
+          ESCAPED=$(jq -Rs . < "$CONTEXT_FILE")
+          echo "context=${ESCAPED}" >> "$GITHUB_OUTPUT"
+          echo "Built enriched context: $(wc -c < "$CONTEXT_FILE") bytes"
+
+      - name: Dispatch kiro-autofix-runtime
+        if: steps.dedup.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
+          MODE: ${{ steps.alert.outputs.mode }}
+          CONTEXT: ${{ steps.context.outputs.context }}
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            umask 077
+            gh workflow run kiro-autofix-runtime.yml \
+              --repo "${{ github.repository }}" \
+              --ref main \
+              -f error-context="${CONTEXT}" \
+              -f mode="${MODE}" \
+              -f branch=main
+            echo "Dispatched kiro-autofix-runtime.yml (mode=${MODE})"

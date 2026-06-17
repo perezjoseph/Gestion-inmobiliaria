@@ -284,6 +284,13 @@ spec:
               value: "grafana-lokiexplore-app"
             - name: GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS
               value: "grafana-lokiexplore-app"
+            - name: GITHUB_DISPATCH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: alertmanager-github
+                  key: token
+            - name: GITHUB_REPO
+              value: "perezjoseph/Gestion-inmobiliaria"
           ports:
             - containerPort: 3000
           volumeMounts:
@@ -291,6 +298,8 @@ spec:
               mountPath: /etc/grafana/provisioning/datasources
             - name: dashboard-providers
               mountPath: /etc/grafana/provisioning/dashboards
+            - name: alerting-provisioning
+              mountPath: /etc/grafana/provisioning/alerting
             # Infrastructure dashboards
             - name: dashboard-xpum
               mountPath: /var/lib/grafana/dashboards/infrastructure/xpum-dashboard.json
@@ -352,6 +361,9 @@ spec:
         - name: dashboard-providers
           configMap:
             name: grafana-dashboard-providers
+        - name: alerting-provisioning
+          configMap:
+            name: grafana-alerting-provisioning
         - name: dashboard-xpum
           configMap:
             name: grafana-dashboard-xpum
