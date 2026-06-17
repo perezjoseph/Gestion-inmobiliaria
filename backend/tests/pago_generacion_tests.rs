@@ -478,7 +478,7 @@ fn test_renovar_contrato_generates_pagos_for_new_period() {
             .insert_header(("Authorization", format!("Bearer {token}")))
             .set_json(json!({
                 "fechaFin": renewal_fecha_fin,
-                "montoMensual": "18000.00"
+                "montoMensual": "16000.00"
             }))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
@@ -503,7 +503,7 @@ fn test_renovar_contrato_generates_pagos_for_new_period() {
             .unwrap();
         assert_eq!(new_pagos.len(), 2);
         for p in &new_pagos {
-            assert_eq!(p.monto, Decimal::new(1800000, 2));
+            assert_eq!(p.monto, Decimal::new(1600000, 2));
             assert_eq!(p.estado, "pendiente");
         }
 

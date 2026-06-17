@@ -74,11 +74,9 @@ proptest! {
         len in arb_sequence_len(),
     ) {
         let mut generated: Vec<i32> = Vec::with_capacity(len);
-        let mut siguiente_numero = start;
 
-        for _ in 0..len {
+        for siguiente_numero in start..start + i32::try_from(len).unwrap() {
             generated.push(siguiente_numero);
-            siguiente_numero += 1;
         }
 
         for i in 0..generated.len() - 1 {

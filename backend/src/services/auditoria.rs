@@ -60,8 +60,17 @@ pub async fn registrar_best_effort<C>(db: &C, entry: CreateAuditoriaEntry)
 where
     C: sea_orm::ConnectionTrait,
 {
+    let sp = format!("sp_audit_{}", Uuid::new_v4().simple());
+    let _ = db.execute_unprepared(&format!("SAVEPOINT {sp}")).await;
     if let Err(e) = registrar(db, entry).await {
         tracing::error!("Fallo al registrar auditoría (no fatal): {e}");
+        let _ = db
+            .execute_unprepared(&format!("ROLLBACK TO SAVEPOINT {sp}"))
+            .await;
+    } else {
+        let _ = db
+            .execute_unprepared(&format!("RELEASE SAVEPOINT {sp}"))
+            .await;
     }
 }
 

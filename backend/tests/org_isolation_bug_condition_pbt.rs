@@ -80,7 +80,7 @@ fn make_inquilino(id: Uuid, org_id: Uuid) -> realestate_backend::entities::inqui
         id: Set(id),
         nombre: Set("OrgIso".to_string()),
         apellido: Set("Tenant".to_string()),
-        cedula: Set(format!("ORGISO-{}", Uuid::new_v4())),
+        cedula: Set(format!("OI{}", &Uuid::new_v4().to_string()[..11])),
         telefono: Set(None),
         email: Set(None),
         contacto_emergencia: Set(None),
@@ -764,7 +764,7 @@ fn bug_condition_1_6_cross_org_reject_receipt() {
 #[test]
 fn bug_condition_1_7_1_8_configuracion_global_leak() {
     common::with_db(|db| async move {
-        use realestate_backend::entities::{configuracion, organizacion};
+        use realestate_backend::entities::{configuracion, organizacion, usuario};
         use realestate_backend::services::configuracion as config_svc;
 
         let org_a = Uuid::new_v4();
@@ -774,6 +774,38 @@ fn bug_condition_1_7_1_8_configuracion_global_leak() {
 
         make_org(org_a).insert(&db).await.expect("org_a insert");
         make_org(org_b).insert(&db).await.expect("org_b insert");
+
+        let now = Utc::now().into();
+        usuario::ActiveModel {
+            id: Set(admin_a),
+            nombre: Set("Admin A".to_string()),
+            email: Set(format!("admin_a+{admin_a}@test.com")),
+            password_hash: Set("not_used".to_string()),
+            rol: Set("admin".to_string()),
+            activo: Set(true),
+            organizacion_id: Set(org_a),
+            created_at: Set(now),
+            updated_at: Set(now),
+            password_changed_at: Set(now),
+        }
+        .insert(&db)
+        .await
+        .expect("admin_a insert");
+        usuario::ActiveModel {
+            id: Set(admin_b),
+            nombre: Set("Admin B".to_string()),
+            email: Set(format!("admin_b+{admin_b}@test.com")),
+            password_hash: Set("not_used".to_string()),
+            rol: Set("admin".to_string()),
+            activo: Set(true),
+            organizacion_id: Set(org_b),
+            created_at: Set(now),
+            updated_at: Set(now),
+            password_changed_at: Set(now),
+        }
+        .insert(&db)
+        .await
+        .expect("admin_b insert");
 
         // Org A sets tasa to 60.00
         config_svc::actualizar_moneda(&db, 60.0, admin_a, org_a)

@@ -80,7 +80,7 @@ fn make_inquilino(id: Uuid, org_id: Uuid) -> inquilino::ActiveModel {
         id: Set(id),
         nombre: Set("Preservation".to_string()),
         apellido: Set("Tenant".to_string()),
-        cedula: Set(format!("PRES-{}", Uuid::new_v4())),
+        cedula: Set(format!("PR{}", &Uuid::new_v4().to_string()[..11])),
         telefono: Set(None),
         email: Set(None),
         contacto_emergencia: Set(None),
@@ -602,10 +602,29 @@ fn preservation_3_4b_same_org_reject_receipt() {
 #[test]
 fn preservation_3_7_same_org_configuracion() {
     common::with_db(|db| async move {
+        use realestate_backend::entities::usuario;
+
         let org = Uuid::new_v4();
         let admin_id = Uuid::new_v4();
 
         make_org(org).insert(&db).await.expect("org insert");
+
+        let now = Utc::now().into();
+        usuario::ActiveModel {
+            id: Set(admin_id),
+            nombre: Set("Admin".to_string()),
+            email: Set(format!("admin+{admin_id}@test.com")),
+            password_hash: Set("not_used".to_string()),
+            rol: Set("admin".to_string()),
+            activo: Set(true),
+            organizacion_id: Set(org),
+            created_at: Set(now),
+            updated_at: Set(now),
+            password_changed_at: Set(now),
+        }
+        .insert(&db)
+        .await
+        .expect("admin insert");
 
         let tasa = 58.75;
         let write_result = config_svc::actualizar_moneda(&db, tasa, admin_id, org).await;
@@ -640,108 +659,117 @@ fn preservation_3_7_same_org_configuracion() {
 /// operations succeed with expected responses and mutations.
 #[test]
 fn preservation_pbt_same_org_access_all_endpoints() {
-    common::with_db(|db| async move {
-        let config = ProptestConfig {
-            cases: crate::pbt_cases(),
-            ..ProptestConfig::default()
-        };
-        let mut runner = TestRunner::new(config);
+    if common::db_url().is_empty() {
+        eprintln!("DATABASE_URL not set -- skipping DB integration test");
+        return;
+    }
+    let _guard = crate::GLOBAL_DB_SERIAL
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let Some((rt, db)) = common::shared_rt_and_db() else {
+        eprintln!("DB unavailable -- skipping DB integration test");
+        return;
+    };
 
-        let db_clone = db.clone();
-        runner
-            .run(
-                &(prop::array::uniform4(any::<u128>()), 5_000i64..10_000i64),
-                |(uuids, porcentaje_raw)| {
-                    let db = db_clone.clone();
-                    let rt = tokio::runtime::Handle::current();
-                    rt.block_on(async move {
-                        let org = Uuid::from_u128(uuids[0] | 1);
-                        let propiedad_id = Uuid::from_u128(uuids[1] | 1);
-                        let inquilino_id = Uuid::from_u128(uuids[2] | 1);
-                        let contrato_id = Uuid::from_u128(uuids[3] | 1);
+    let config = ProptestConfig {
+        cases: crate::pbt_cases(),
+        ..ProptestConfig::default()
+    };
+    let mut runner = TestRunner::new(config);
 
-                        make_org(org).insert(&db).await.map_err(|_| {
+    let db_clone = db.clone();
+    runner
+        .run(
+            &(prop::array::uniform4(any::<u128>()), 5_000i64..10_000i64),
+            |(uuids, porcentaje_raw)| {
+                let db = db_clone.clone();
+                rt.block_on(async move {
+                    let org = Uuid::from_u128(uuids[0] | 1);
+                    let propiedad_id = Uuid::from_u128(uuids[1] | 1);
+                    let inquilino_id = Uuid::from_u128(uuids[2] | 1);
+                    let contrato_id = Uuid::from_u128(uuids[3] | 1);
+
+                    make_org(org).insert(&db).await.map_err(|_| {
+                        proptest::test_runner::TestCaseError::Reject("db setup".into())
+                    })?;
+                    make_propiedad(propiedad_id, org)
+                        .insert(&db)
+                        .await
+                        .map_err(|_| {
                             proptest::test_runner::TestCaseError::Reject("db setup".into())
                         })?;
-                        make_propiedad(propiedad_id, org)
-                            .insert(&db)
-                            .await
-                            .map_err(|_| {
-                                proptest::test_runner::TestCaseError::Reject("db setup".into())
-                            })?;
-                        make_inquilino(inquilino_id, org)
-                            .insert(&db)
-                            .await
-                            .map_err(|_| {
-                                proptest::test_runner::TestCaseError::Reject("db setup".into())
-                            })?;
-                        make_contrato(contrato_id, propiedad_id, inquilino_id, org)
-                            .insert(&db)
-                            .await
-                            .map_err(|_| {
-                                proptest::test_runner::TestCaseError::Reject("db setup".into())
-                            })?;
-
-                        let _ = configuracion::Entity::delete_many()
-                            .filter(configuracion::Column::Clave.eq("ipc_banco_central"))
-                            .exec(&db)
-                            .await;
-                        make_ipc_config(org).insert(&db).await.map_err(|_| {
+                    make_inquilino(inquilino_id, org)
+                        .insert(&db)
+                        .await
+                        .map_err(|_| {
+                            proptest::test_runner::TestCaseError::Reject("db setup".into())
+                        })?;
+                    make_contrato(contrato_id, propiedad_id, inquilino_id, org)
+                        .insert(&db)
+                        .await
+                        .map_err(|_| {
                             proptest::test_runner::TestCaseError::Reject("db setup".into())
                         })?;
 
-                        let propuesta =
-                            indexacion::calcular_propuesta_renovacion(&db, contrato_id, org).await;
-                        prop_assert!(
-                            propuesta.is_ok(),
-                            "Same-org propuesta failed for org={org}, contrato={contrato_id}"
-                        );
-
-                        let coprop_result = ipi::crear_copropietario(
-                            &db,
-                            org,
-                            propiedad_id,
-                            format!("PBT Owner {org}"),
-                            format!("PBT-{}", Uuid::new_v4()),
-                            Decimal::new(porcentaje_raw, 2),
-                        )
+                    let _ = configuracion::Entity::delete_many()
+                        .filter(configuracion::Column::Clave.eq("ipc_banco_central"))
+                        .exec(&db)
                         .await;
-                        prop_assert!(
-                            coprop_result.is_ok(),
-                            "Same-org crear_copropietario failed for org={org}"
-                        );
+                    make_ipc_config(org).insert(&db).await.map_err(|_| {
+                        proptest::test_runner::TestCaseError::Reject("db setup".into())
+                    })?;
 
-                        let list_result = ipi::obtener_copropietarios(&db, propiedad_id, org).await;
-                        prop_assert!(
-                            list_result.is_ok(),
-                            "Same-org copropietarios list failed for org={org}"
-                        );
-                        let list = list_result.unwrap();
-                        prop_assert!(!list.is_empty(), "Copropietarios list should not be empty");
+                    let propuesta =
+                        indexacion::calcular_propuesta_renovacion(&db, contrato_id, org).await;
+                    prop_assert!(
+                        propuesta.is_ok(),
+                        "Same-org propuesta failed for org={org}, contrato={contrato_id}"
+                    );
 
-                        if let Ok(c) = &coprop_result {
-                            let _ = copropietario::Entity::delete_by_id(c.id).exec(&db).await;
-                        }
-                        let all_contratos = contrato::Entity::find()
-                            .filter(contrato::Column::PropiedadId.eq(propiedad_id))
-                            .all(&db)
-                            .await
-                            .unwrap_or_default();
-                        for c in &all_contratos {
-                            let _ = contrato::Entity::delete_by_id(c.id).exec(&db).await;
-                        }
-                        let _ = inquilino::Entity::delete_by_id(inquilino_id)
-                            .exec(&db)
-                            .await;
-                        let _ = propiedad::Entity::delete_by_id(propiedad_id)
-                            .exec(&db)
-                            .await;
-                        let _ = organizacion::Entity::delete_by_id(org).exec(&db).await;
+                    let coprop_result = ipi::crear_copropietario(
+                        &db,
+                        org,
+                        propiedad_id,
+                        format!("PBT Owner {org}"),
+                        format!("PBT-{}", Uuid::new_v4()),
+                        Decimal::new(porcentaje_raw, 2),
+                    )
+                    .await;
+                    prop_assert!(
+                        coprop_result.is_ok(),
+                        "Same-org crear_copropietario failed for org={org}"
+                    );
 
-                        Ok(())
-                    })
-                },
-            )
-            .expect("PBT: Same-org access should always succeed");
-    });
+                    let list_result = ipi::obtener_copropietarios(&db, propiedad_id, org).await;
+                    prop_assert!(
+                        list_result.is_ok(),
+                        "Same-org copropietarios list failed for org={org}"
+                    );
+                    let list = list_result.unwrap();
+                    prop_assert!(!list.is_empty(), "Copropietarios list should not be empty");
+
+                    if let Ok(c) = &coprop_result {
+                        let _ = copropietario::Entity::delete_by_id(c.id).exec(&db).await;
+                    }
+                    let all_contratos = contrato::Entity::find()
+                        .filter(contrato::Column::PropiedadId.eq(propiedad_id))
+                        .all(&db)
+                        .await
+                        .unwrap_or_default();
+                    for c in &all_contratos {
+                        let _ = contrato::Entity::delete_by_id(c.id).exec(&db).await;
+                    }
+                    let _ = inquilino::Entity::delete_by_id(inquilino_id)
+                        .exec(&db)
+                        .await;
+                    let _ = propiedad::Entity::delete_by_id(propiedad_id)
+                        .exec(&db)
+                        .await;
+                    let _ = organizacion::Entity::delete_by_id(org).exec(&db).await;
+
+                    Ok(())
+                })
+            },
+        )
+        .expect("PBT: Same-org access should always succeed");
 }

@@ -524,6 +524,14 @@ mod desahucios_db_tests {
             assert_eq!(body["estado"], "iniciado");
             assert_eq!(body["motivo"], "Falta de pago por 3 meses");
 
+            // Backdate updated_at to satisfy 30-day time gap requirement
+            use sea_orm::ConnectionTrait;
+            db.execute_unprepared(&format!(
+                "UPDATE desahucios SET updated_at = NOW() - INTERVAL '31 days' WHERE id = '{desahucio_id}'"
+            ))
+            .await
+            .expect("backdate desahucio");
+
             // Update state to en_progreso
             let req = test::TestRequest::put()
                 .uri(&format!("/api/v1/desahucios/{desahucio_id}"))

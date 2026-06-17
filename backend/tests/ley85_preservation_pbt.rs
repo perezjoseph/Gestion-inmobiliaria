@@ -122,7 +122,7 @@ fn make_inquilino(id: Uuid, org_id: Uuid) -> inquilino::ActiveModel {
         id: Set(id),
         nombre: Set("Preservation".to_string()),
         apellido: Set("Test".to_string()),
-        cedula: Set(format!("PRES-LEY85-{}", Uuid::new_v4())),
+        cedula: Set(format!("PL{}", &Uuid::new_v4().to_string()[..11])),
         telefono: Set(None),
         email: Set(None),
         contacto_emergencia: Set(None),

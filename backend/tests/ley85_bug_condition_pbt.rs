@@ -85,7 +85,7 @@ fn make_inquilino(id: Uuid, org_id: Uuid) -> realestate_backend::entities::inqui
         id: Set(id),
         nombre: Set("Test".to_string()),
         apellido: Set("Inquilino".to_string()),
-        cedula: Set(format!("PBT-LEY85-{}", Uuid::new_v4())),
+        cedula: Set(format!("BL{}", &Uuid::new_v4().to_string()[..11])),
         telefono: Set(None),
         email: Set(None),
         contacto_emergencia: Set(None),

@@ -508,7 +508,7 @@ mod contratos_dr_legal_db_tests {
                     "fechaFin": "2026-07-01",
                     "montoMensual": "25000",
                     "moneda": "DOP",
-                    "deposito": "30000",
+                    "deposito": "55000",
                     "diaCobro": 1
                 }))
                 .to_request();
