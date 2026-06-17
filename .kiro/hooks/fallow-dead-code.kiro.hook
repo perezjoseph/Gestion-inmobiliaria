@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "Fallow Dead Code Check",
+  "description": "After writing files in baileys-service, runs fallow dead-code analysis to catch unused exports and dependencies.",
+  "version": "1",
+  "when": {
+    "type": "postToolUse",
+    "toolTypes": ["write"]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "If the file just written is inside baileys-service/, run `fallow dead-code --format json --quiet 2>NUL || exit /b 0` with cwd set to baileys-service to check for unused exports, files, and dependencies. Summarize any issues found. If the file is not in baileys-service/, ignore this hook."
+  }
+}

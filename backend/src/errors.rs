@@ -1,6 +1,7 @@
 use actix_web::HttpResponse;
 use actix_web::http::StatusCode;
 use serde_json::json;
+use tracing::error;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
@@ -50,6 +51,9 @@ impl actix_web::error::ResponseError for AppError {
     }
 
     fn error_response(&self) -> HttpResponse {
+        if let Self::Internal(e) = self {
+            error!(error = %e, error_debug = ?e, "Internal server error");
+        }
         let body = if let Self::ValidationWithFields { message, fields } = self {
             let mut obj = json!({
                 "error": "validation",
