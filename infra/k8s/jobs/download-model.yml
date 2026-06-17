@@ -59,13 +59,13 @@ spec:
               echo "=== Installing huggingface_hub ==="
               pip install --no-cache-dir "huggingface_hub[cli]"
 
-              echo "=== Downloading Qwen/Qwen3-Coder-30B-A3B-Instruct ==="
-              hf download Qwen/Qwen3-Coder-30B-A3B-Instruct
+              echo "=== Downloading Qwen/Qwen3-14B ==="
+              hf download Qwen/Qwen3-14B
 
               echo "=== Download complete ==="
               echo "=== Verifying HuggingFace cache layout ==="
-              ls -la /models/hub/models--Qwen--Qwen3-Coder-30B-A3B-Instruct/ || true
-              du -sh /models/hub/models--Qwen--Qwen3-Coder-30B-A3B-Instruct/ || true
+              ls -la /models/hub/models--Qwen--Qwen3-14B/ || true
+              du -sh /models/hub/models--Qwen--Qwen3-14B/ || true
               df -h /models
               echo "=== Done ==="
           env:

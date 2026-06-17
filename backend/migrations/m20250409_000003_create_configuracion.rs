@@ -49,7 +49,7 @@ impl MigrationTrait for Migration {
 
         let db = manager.get_connection();
         db.execute_unprepared(
-            "INSERT INTO configuracion (clave, valor, updated_at) VALUES ('tasa_cambio_dop_usd', '{\"tasa\": 58.50, \"actualizado\": \"2025-01-01\"}', NOW())"
+            "INSERT INTO configuracion (clave, valor, updated_at) VALUES ('tasa_cambio_dop_usd', '{\"tasa\": 58.50, \"actualizado\": \"2025-01-01\"}', NOW()) ON CONFLICT (clave) DO NOTHING"
         ).await?;
 
         Ok(())

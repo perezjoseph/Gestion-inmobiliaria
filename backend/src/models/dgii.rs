@@ -36,10 +36,3 @@ pub struct ConsultaRncQuery {
 pub struct ConsultaNombreQuery {
     pub buscar: String,
 }
-
-#[derive(Debug, Deserialize)]
-pub struct MegaplusApiResponse {
-    pub data: Option<serde_json::Value>,
-    pub status: Option<String>,
-    pub message: Option<String>,
-}

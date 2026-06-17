@@ -187,6 +187,7 @@ Restore chatbot agent inference by fixing the two remaining infrastructure failu
 
 - The `intel/llm-scaler-vllm:0.14.0-b8.3.1` image is from [intel/llm-scaler](https://github.com/intel/llm-scaler) — Intel's optimized vLLM build for Arc Pro B60/B70 GPUs
 - The image bundles oneAPI, SYCL runtime, and the `vllm_int4_for_multi_arc.so` quantization library
-- `Qwen/Qwen3.6-27B` is a dense 27B parameter model — fits in the 12GB Arc Pro B60 VRAM with sym_int4 quantization and `--language-model-only` (skips vision encoder)
+- `Qwen/Qwen3-14B` is a dense 14.8B parameter model — fits in the 24GB Arc Pro B60 VRAM with sym_int4 quantization (~9GB weights + ~15GB KV cache)
+- Tool calling uses `--tool-call-parser hermes` (Qwen3 dense models use hermes format)
 - The download Job must run on the `inference` node because `vllm-models-pvc` uses `local-path` StorageClass (node-local storage)
 - Startup probe allows up to 30 minutes (60s initial + 30s×60 attempts) for model loading and quantization

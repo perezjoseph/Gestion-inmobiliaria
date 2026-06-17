@@ -16,6 +16,9 @@ impl MigrationTrait for Migration {
         db.execute_unprepared("ALTER TABLE configuracion ADD COLUMN organizacion_id UUID")
             .await?;
 
+        db.execute_unprepared("ALTER TABLE configuracion DROP CONSTRAINT configuracion_pkey")
+            .await?;
+
         db.execute_unprepared(
             "INSERT INTO configuracion (clave, valor, updated_at, updated_by, organizacion_id)
              SELECT c.clave, c.valor, c.updated_at, c.updated_by, o.id
@@ -32,9 +35,6 @@ impl MigrationTrait for Migration {
             "ALTER TABLE configuracion ALTER COLUMN organizacion_id SET NOT NULL",
         )
         .await?;
-
-        db.execute_unprepared("ALTER TABLE configuracion DROP CONSTRAINT configuracion_pkey")
-            .await?;
 
         db.execute_unprepared("ALTER TABLE configuracion ADD PRIMARY KEY (clave, organizacion_id)")
             .await?;

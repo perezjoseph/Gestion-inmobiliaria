@@ -4,9 +4,7 @@ use uuid::Uuid;
 
 use crate::entities::cache_dgii;
 use crate::errors::AppError;
-use crate::models::dgii::{
-    DgiiConsultaResponse, DgiiNombreItem, DgiiNombreResponse, MegaplusApiResponse,
-};
+use crate::models::dgii::{DgiiConsultaResponse, DgiiNombreItem, DgiiNombreResponse};
 
 fn normalize_rnc(rnc: &str) -> String {
     rnc.chars()
@@ -66,7 +64,7 @@ pub async fn consultar_rnc(
 
     let base_url = get_base_url();
     let client = build_client()?;
-    let url = format!("{base_url}/api/rnc?rnc={normalized}");
+    let url = format!("{base_url}/api/consulta?rnc={normalized}");
 
     let api_result = client.get(&url).send().await;
 
@@ -76,13 +74,19 @@ pub async fn consultar_rnc(
                 return try_stale_cache_or_error(db, organizacion_id, &normalized).await;
             }
 
-            let api_response: MegaplusApiResponse = response.json().await.map_err(|e| {
+            let data: serde_json::Value = response.json().await.map_err(|e| {
                 AppError::Internal(anyhow::anyhow!("Error parseando respuesta DGII: {e}"))
             })?;
 
-            let data = api_response.data.ok_or_else(|| {
-                AppError::NotFound("RNC/cédula no encontrado en DGII".to_string())
-            })?;
+            if data
+                .get("error")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false)
+            {
+                return Err(AppError::NotFound(
+                    "RNC/cédula no encontrado en DGII".to_string(),
+                ));
+            }
 
             let cedula_rnc = data
                 .get("cedula_rnc")
@@ -97,6 +101,7 @@ pub async fn consultar_rnc(
             let nombre_comercial = data
                 .get("nombre_comercial")
                 .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
                 .map(std::string::ToString::to_string);
             let estado = data
                 .get("estado")
@@ -106,10 +111,12 @@ pub async fn consultar_rnc(
             let regimen_de_pagos = data
                 .get("regimen_de_pagos")
                 .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
                 .map(std::string::ToString::to_string);
             let actividad_economica = data
                 .get("actividad_economica")
                 .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
                 .map(std::string::ToString::to_string);
 
             let cached_at = Utc::now().fixed_offset();
@@ -213,9 +220,9 @@ pub async fn consultar_nombre(buscar: &str) -> Result<DgiiNombreResponse, AppErr
     let base_url = get_base_url();
     let client = build_client()?;
 
-    let mut url = reqwest::Url::parse(&format!("{base_url}/api/rnc"))
+    let mut url = reqwest::Url::parse(&format!("{base_url}/api/consulta/nombres"))
         .map_err(|e| AppError::Internal(anyhow::anyhow!("URL inválida: {e}")))?;
-    url.query_pairs_mut().append_pair("name", trimmed);
+    url.query_pairs_mut().append_pair("buscar", trimmed);
 
     let response =
         client.get(url).send().await.map_err(|e| {
@@ -235,7 +242,7 @@ pub async fn consultar_nombre(buscar: &str) -> Result<DgiiNombreResponse, AppErr
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Error parseando respuesta DGII: {e}")))?;
 
     let items = body
-        .get("data")
+        .get("resultados")
         .and_then(|d| d.as_array())
         .map(|arr| {
             arr.iter()
@@ -246,6 +253,7 @@ pub async fn consultar_nombre(buscar: &str) -> Result<DgiiNombreResponse, AppErr
                     let nombre_comercial = item
                         .get("nombre_comercial")
                         .and_then(|v| v.as_str())
+                        .filter(|s| !s.is_empty())
                         .map(std::string::ToString::to_string);
                     let estado = item.get("estado")?.as_str()?.to_string();
                     Some(DgiiNombreItem {
