@@ -292,7 +292,7 @@ async function forwardToBackend(realmId: string, message: any): Promise<void> {
   }
 }
 
-export function getSession(realmId: string): SessionInfo | undefined {
+function getSession(realmId: string): SessionInfo | undefined {
   return sessions.get(realmId);
 }
 
@@ -309,7 +309,7 @@ export function getConnectionCounts(): ConnectionCounts {
   return counts;
 }
 
-export function getActiveConnectionCount(): number {
+function getActiveConnectionCount(): number {
   let count = 0;
   for (const session of sessions.values()) {
     if (session.status === 'connected' || session.status === 'qr_pending') {

@@ -2,14 +2,14 @@ import { childLogger } from './logger';
 
 const logger = childLogger('reconnect');
 
-export type ConnectionStatus =
+type ConnectionStatus =
   | 'disconnected'
   | 'qr_pending'
   | 'connected'
   | 'reconnecting'
   | 'logged_out';
 
-export const DisconnectReason = {
+const DisconnectReason = {
   connectionClosed: 428,
   connectionLost: 408,
   connectionReplaced: 440,
@@ -20,7 +20,7 @@ export const DisconnectReason = {
   badSession: 500,
 } as const;
 
-export interface ReconnectConfig {
+interface ReconnectConfig {
   initialDelayMs: number;
   maxDelayMs: number;
   maxAttempts: number;
@@ -36,7 +36,7 @@ const DEFAULT_CONFIG: Omit<ReconnectConfig, 'backendWebhookUrl' | 'internalToken
   maxQrRetries: 3,
 };
 
-export interface ReconnectState {
+interface ReconnectState {
   attempts: number;
   qrRetries: number;
   isReconnecting: boolean;
@@ -44,7 +44,7 @@ export interface ReconnectState {
   reconnectTimer: ReturnType<typeof setTimeout> | null;
 }
 
-export interface SessionCallbacks {
+interface SessionCallbacks {
   reconnect(realmId: string): Promise<void>;
   regenerateQr(realmId: string): Promise<void>;
   setStatus(realmId: string, status: ConnectionStatus): void;
@@ -61,7 +61,7 @@ export function isRecoverableDisconnect(statusCode: number): boolean {
   return recoverableCodes.includes(statusCode);
 }
 
-export function isRemoteLogout(statusCode: number): boolean {
+function isRemoteLogout(statusCode: number): boolean {
   return statusCode === DisconnectReason.loggedOut;
 }
 
@@ -76,7 +76,7 @@ export function calculateBackoffDelay(
   return clampedDelay + jitter;
 }
 
-export async function notifyBackend(
+async function notifyBackend(
   realmId: string,
   status: ConnectionStatus,
   config: Pick<ReconnectConfig, 'backendWebhookUrl' | 'internalToken'>,
@@ -109,7 +109,7 @@ export async function notifyBackend(
   }
 }
 
-export function createReconnectState(): ReconnectState {
+function createReconnectState(): ReconnectState {
   return {
     attempts: 0,
     qrRetries: 0,
@@ -119,7 +119,7 @@ export function createReconnectState(): ReconnectState {
   };
 }
 
-export function loadReconnectConfig(): ReconnectConfig {
+function loadReconnectConfig(): ReconnectConfig {
   const backendWebhookUrl = process.env.BACKEND_WEBHOOK_URL || 'http://backend:8080';
   const internalToken = process.env.BAILEYS_INTERNAL_TOKEN || '';
 
@@ -138,7 +138,7 @@ export function loadReconnectConfig(): ReconnectConfig {
   };
 }
 
-export class ReconnectHandler {
+class ReconnectHandler {
   private readonly states: Map<string, ReconnectState> = new Map();
   private readonly config: ReconnectConfig;
   private readonly callbacks: SessionCallbacks;

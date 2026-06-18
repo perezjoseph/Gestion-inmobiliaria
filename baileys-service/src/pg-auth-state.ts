@@ -50,7 +50,7 @@ export function decrypt(data: Buffer): Buffer {
 
 let pool: Pool | null = null;
 
-export function getPool(): Pool {
+function getPool(): Pool {
   if (!pool) {
     const connectionString = process.env.WA_DATABASE_URL;
     if (!connectionString) {
@@ -66,7 +66,7 @@ export function getPool(): Pool {
   return pool;
 }
 
-export async function closePool(): Promise<void> {
+async function closePool(): Promise<void> {
   if (pool) {
     await pool.end();
     pool = null;
