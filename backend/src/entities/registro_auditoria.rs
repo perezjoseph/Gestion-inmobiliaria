@@ -13,10 +13,24 @@ pub struct Model {
     pub accion: String,
     #[sea_orm(column_type = "JsonBinary")]
     pub cambios: Json,
+    pub organizacion_id: Option<Uuid>,
     pub created_at: DateTimeWithTimeZone,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(
+        belongs_to = "super::organizacion::Entity",
+        from = "Column::OrganizacionId",
+        to = "super::organizacion::Column::Id"
+    )]
+    Organizacion,
+}
+
+impl Related<super::organizacion::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Organizacion.def()
+    }
+}
 
 impl ActiveModelBehavior for ActiveModel {}

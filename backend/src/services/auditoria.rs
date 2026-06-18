@@ -49,6 +49,7 @@ where
         entity_id: Set(entry.entity_id),
         accion: Set(entry.accion),
         cambios: Set(entry.cambios),
+        organizacion_id: sea_orm::ActiveValue::NotSet,
         created_at: Set(Utc::now().into()),
     };
 
@@ -143,6 +144,7 @@ mod tests {
             entity_id: Uuid::new_v4(),
             accion: accion.to_string(),
             cambios: json!({"campo": "valor"}),
+            organizacion_id: None,
             created_at: Utc::now().fixed_offset(),
         }
     }

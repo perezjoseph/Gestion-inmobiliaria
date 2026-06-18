@@ -1,7 +1,7 @@
 use web_sys::window;
 
 use crate::services::api::api_post;
-use crate::types::usuario::{LoginRequest, LoginResponse, RegisterRequest, User};
+use crate::types::usuario::{LoginRequest, LoginResponse, RegisterRequest};
 
 const TOKEN_KEY: &str = "jwt_token";
 
@@ -51,6 +51,6 @@ pub async fn login(request: LoginRequest) -> Result<LoginResponse, String> {
 }
 
 #[allow(clippy::future_not_send)]
-pub async fn register(request: RegisterRequest) -> Result<User, String> {
+pub async fn register(request: RegisterRequest) -> Result<LoginResponse, String> {
     api_post("/auth/register", &request).await
 }

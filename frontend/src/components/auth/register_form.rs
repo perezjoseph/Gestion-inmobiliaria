@@ -5,7 +5,7 @@ use yew_router::prelude::*;
 use crate::app::Route;
 use crate::components::common::error_banner::ErrorBanner;
 use crate::services::auth;
-use crate::types::usuario::{LoginRequest, LoginResponse, RegisterRequest};
+use crate::types::usuario::{LoginResponse, RegisterRequest};
 
 pub fn validate_nombre(input: &str) -> Option<String> {
     if input.trim().is_empty() {
@@ -100,19 +100,12 @@ fn humanize_register_error(err: String) -> String {
 }
 
 #[allow(clippy::future_not_send)]
-async fn do_register_and_login(
-    request: RegisterRequest,
-    login_email: String,
-    login_password: String,
-) -> Result<LoginResponse, String> {
-    auth::register(request)
+async fn do_register_and_login(request: RegisterRequest) -> Result<LoginResponse, String> {
+    let response = auth::register(request)
         .await
         .map_err(humanize_register_error)?;
-    let login_req = LoginRequest {
-        email: login_email,
-        password: login_password,
-    };
-    auth::login(login_req).await
+    auth::set_token(&response.token);
+    Ok(response)
 }
 
 #[derive(Properties, PartialEq)]
@@ -319,15 +312,12 @@ pub fn RegisterForm(props: &RegisterFormProps) -> Html {
                 }
             };
 
-            let login_email = (*email).clone();
-            let login_password = (*password).clone();
+            loading.set(true);
+            let on_success = on_success.clone();
             let server_error = server_error.clone();
             let loading = loading.clone();
-            let on_success = on_success.clone();
-
-            loading.set(true);
             spawn_local(async move {
-                match do_register_and_login(request, login_email, login_password).await {
+                match do_register_and_login(request).await {
                     Ok(response) => on_success.emit(response),
                     Err(err) => {
                         server_error.set(Some(err));

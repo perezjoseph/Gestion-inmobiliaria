@@ -54,6 +54,7 @@ pub mod m20260609_000002_add_performance_indexes;
 pub mod m20260613_000001_add_overdue_payments_indexes;
 pub mod m20260614_000001_create_metrics_exporter_role;
 pub mod m20260615_000001_add_organizacion_id_to_configuracion;
+pub mod m20260617_000001_schema_health_fixes;
 
 use sea_orm_migration::prelude::*;
 
@@ -118,6 +119,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260613_000001_add_overdue_payments_indexes::Migration),
             Box::new(m20260614_000001_create_metrics_exporter_role::Migration),
             Box::new(m20260615_000001_add_organizacion_id_to_configuracion::Migration),
+            Box::new(m20260617_000001_schema_health_fixes::Migration),
         ]
     }
 }

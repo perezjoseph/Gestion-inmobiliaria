@@ -663,67 +663,95 @@ pub async fn list_conversations<C: ConnectionTrait>(
     page: u64,
     per_page: u64,
 ) -> Result<PaginatedResponse<ConversationListResponse>, AppError> {
-    use sea_orm::{DbBackend, FromQueryResult, Statement, Value};
+    use sea_orm::{FromQueryResult, PaginatorTrait, sea_query::Expr};
 
     #[derive(Debug, FromQueryResult)]
-    struct ConversationRow {
+    struct PhoneCount {
         sender_phone: String,
-        inquilino_id: Option<Uuid>,
-        last_message: String,
-        last_message_at: chrono::DateTime<Utc>,
         message_count: i64,
     }
 
+    #[derive(Debug, FromQueryResult)]
+    struct LatestMessage {
+        sender_phone: String,
+        inquilino_id: Option<Uuid>,
+        content: String,
+        created_at: chrono::DateTime<Utc>,
+    }
+
+    let total = chatbot_conversation::Entity::find()
+        .filter(chatbot_conversation::Column::OrganizacionId.eq(org_id))
+        .select_only()
+        .column_as(chatbot_conversation::Column::SenderPhone.count(), "count")
+        .group_by(chatbot_conversation::Column::SenderPhone)
+        .count(db)
+        .await?;
+
     let offset = (page - 1) * per_page;
 
-    let count_sql = "SELECT COUNT(DISTINCT sender_phone) as count FROM chatbot_conversation WHERE organizacion_id = $1";
-    let count_result: Option<i64> = db
-        .query_one(Statement::from_sql_and_values(
-            DbBackend::Postgres,
-            count_sql,
-            [Value::from(org_id)],
-        ))
-        .await?
-        .and_then(|r| r.try_get_by_index::<i64>(0).ok());
-    let total = count_result.unwrap_or(0) as u64;
-
-    let query_sql = "
-        SELECT DISTINCT ON (sender_phone)
-            sender_phone,
-            inquilino_id,
-            content as last_message,
-            created_at as last_message_at,
-            (SELECT COUNT(*) FROM chatbot_conversation c2
-             WHERE c2.organizacion_id = $1 AND c2.sender_phone = chatbot_conversation.sender_phone) as message_count
-        FROM chatbot_conversation
-        WHERE organizacion_id = $1
-        ORDER BY sender_phone, created_at DESC
-        LIMIT $2 OFFSET $3
-        ";
-
-    let rows: Vec<ConversationRow> =
-        ConversationRow::find_by_statement(Statement::from_sql_and_values(
-            DbBackend::Postgres,
-            query_sql,
-            [
-                Value::from(org_id),
-                Value::from(i64::try_from(per_page).unwrap_or(i64::MAX)),
-                Value::from(i64::try_from(offset).unwrap_or(i64::MAX)),
-            ],
-        ))
+    let phone_counts: Vec<PhoneCount> = chatbot_conversation::Entity::find()
+        .filter(chatbot_conversation::Column::OrganizacionId.eq(org_id))
+        .select_only()
+        .column(chatbot_conversation::Column::SenderPhone)
+        .column_as(
+            Expr::col(chatbot_conversation::Column::Id).count(),
+            "message_count",
+        )
+        .group_by(chatbot_conversation::Column::SenderPhone)
+        .order_by_asc(chatbot_conversation::Column::SenderPhone)
+        .limit(per_page)
+        .offset(offset)
+        .into_model::<PhoneCount>()
         .all(db)
         .await?;
 
-    let data = rows
-        .into_iter()
-        .map(|r| ConversationListResponse {
-            sender_phone: r.sender_phone,
-            inquilino_id: r.inquilino_id,
-            last_message: r.last_message,
-            last_message_at: r.last_message_at,
-            message_count: r.message_count,
-        })
+    if phone_counts.is_empty() {
+        return Ok(PaginatedResponse {
+            data: vec![],
+            total,
+            page,
+            per_page,
+        });
+    }
+
+    let phones: Vec<String> = phone_counts
+        .iter()
+        .map(|p| p.sender_phone.clone())
         .collect();
+    let count_map: HashMap<&str, i64> = phone_counts
+        .iter()
+        .map(|p| (p.sender_phone.as_str(), p.message_count))
+        .collect();
+
+    let latest_msgs: Vec<LatestMessage> = chatbot_conversation::Entity::find()
+        .filter(chatbot_conversation::Column::OrganizacionId.eq(org_id))
+        .filter(chatbot_conversation::Column::SenderPhone.is_in(&phones))
+        .select_only()
+        .column(chatbot_conversation::Column::SenderPhone)
+        .column(chatbot_conversation::Column::InquilinoId)
+        .column(chatbot_conversation::Column::Content)
+        .column(chatbot_conversation::Column::CreatedAt)
+        .order_by_desc(chatbot_conversation::Column::CreatedAt)
+        .into_model::<LatestMessage>()
+        .all(db)
+        .await?;
+
+    let mut seen = std::collections::HashSet::new();
+    let mut data: Vec<ConversationListResponse> = Vec::with_capacity(phones.len());
+    for msg in latest_msgs {
+        if seen.insert(msg.sender_phone.clone()) {
+            data.push(ConversationListResponse {
+                sender_phone: msg.sender_phone.clone(),
+                inquilino_id: msg.inquilino_id,
+                last_message: msg.content,
+                last_message_at: msg.created_at,
+                message_count: count_map
+                    .get(msg.sender_phone.as_str())
+                    .copied()
+                    .unwrap_or(0),
+            });
+        }
+    }
 
     Ok(PaginatedResponse {
         data,
