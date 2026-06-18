@@ -726,15 +726,19 @@ pub async fn list_conversations<C: ConnectionTrait>(
     let latest_msgs: Vec<LatestMessage> = {
         use sea_orm::{DbBackend, Statement};
 
-        let placeholders: Vec<String> = (0..phones.len()).map(|i| format!("${}", i + 2)).collect();
+        let placeholders: Vec<String> = (0..phones.len())
+            .map(|i| ["$", &(i + 2).to_string()].concat())
+            .collect();
         let in_clause = placeholders.join(", ");
 
-        let sql = format!(
+        let sql = [
             "SELECT DISTINCT ON (sender_phone) sender_phone, inquilino_id, content, created_at \
              FROM chatbot_conversation \
-             WHERE organizacion_id = $1 AND sender_phone IN ({in_clause}) \
-             ORDER BY sender_phone ASC, created_at DESC"
-        );
+             WHERE organizacion_id = $1 AND sender_phone IN (",
+            &in_clause,
+            ") ORDER BY sender_phone ASC, created_at DESC",
+        ]
+        .concat();
 
         let mut params: Vec<sea_orm::Value> = Vec::with_capacity(phones.len() + 1);
         params.push(org_id.into());

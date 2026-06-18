@@ -268,36 +268,53 @@ impl MigrationTrait for Migration {
         let db = manager.get_connection();
 
         db.execute_unprepared(
-            "ALTER TABLE contratos ADD CONSTRAINT chk_contratos_estado \
-             CHECK (estado IN ('activo', 'vencido', 'cancelado', 'finalizado', 'terminado'))",
+            "DO $$ BEGIN \
+             IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_contratos_estado') THEN \
+             ALTER TABLE contratos ADD CONSTRAINT chk_contratos_estado \
+             CHECK (estado IN ('activo', 'vencido', 'cancelado', 'finalizado', 'terminado')); \
+             END IF; END $$",
         )
         .await?;
 
         db.execute_unprepared(
-            "ALTER TABLE pagos ADD CONSTRAINT chk_pagos_estado \
-             CHECK (estado IN ('pendiente', 'pagado', 'atrasado', 'cancelado'))",
+            "DO $$ BEGIN \
+             IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_pagos_estado') THEN \
+             ALTER TABLE pagos ADD CONSTRAINT chk_pagos_estado \
+             CHECK (estado IN ('pendiente', 'pagado', 'atrasado', 'cancelado')); \
+             END IF; END $$",
         )
         .await?;
 
         db.execute_unprepared(
-            "ALTER TABLE gastos ADD CONSTRAINT chk_gastos_estado \
-             CHECK (estado IN ('pendiente', 'pagado', 'cancelado'))",
+            "DO $$ BEGIN \
+             IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_gastos_estado') THEN \
+             ALTER TABLE gastos ADD CONSTRAINT chk_gastos_estado \
+             CHECK (estado IN ('pendiente', 'pagado', 'cancelado')); \
+             END IF; END $$",
         )
         .await?;
 
         db.execute_unprepared(
-            "ALTER TABLE solicitudes_mantenimiento ADD CONSTRAINT chk_solicitudes_mant_estado \
-             CHECK (estado IN ('pendiente', 'en_progreso', 'completado'))",
+            "DO $$ BEGIN \
+             IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_solicitudes_mant_estado') THEN \
+             ALTER TABLE solicitudes_mantenimiento ADD CONSTRAINT chk_solicitudes_mant_estado \
+             CHECK (estado IN ('pendiente', 'en_progreso', 'completado')); \
+             END IF; END $$",
         )
         .await?;
 
-        db.execute_unprepared("ALTER TABLE registros_auditoria ADD COLUMN organizacion_id UUID")
-            .await?;
+        db.execute_unprepared(
+            "ALTER TABLE registros_auditoria ADD COLUMN IF NOT EXISTS organizacion_id UUID",
+        )
+        .await?;
 
         db.execute_unprepared(
-            "ALTER TABLE registros_auditoria \
+            "DO $$ BEGIN \
+             IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_registros_auditoria_organizacion') THEN \
+             ALTER TABLE registros_auditoria \
              ADD CONSTRAINT fk_registros_auditoria_organizacion \
-             FOREIGN KEY (organizacion_id) REFERENCES organizaciones(id) ON DELETE SET NULL",
+             FOREIGN KEY (organizacion_id) REFERENCES organizaciones(id) ON DELETE SET NULL; \
+             END IF; END $$",
         )
         .await?;
 
