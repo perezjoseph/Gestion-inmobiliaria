@@ -72,7 +72,7 @@ data:
             condition: C
             for: 0s
             noDataState: OK
-            execErrState: Alerting
+            execErrState: OK
             labels:
               autofix: "true"
               container: backend
@@ -121,7 +121,7 @@ data:
             condition: C
             for: 0s
             noDataState: OK
-            execErrState: Alerting
+            execErrState: OK
             labels:
               autofix: "true"
               container: baileys

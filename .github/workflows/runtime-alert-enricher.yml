@@ -175,9 +175,28 @@ jobs:
             echo "logs_file=${LOGS_FILE}" >> "$GITHUB_OUTPUT"
             echo "Collected ${BYTE_COUNT} bytes of error logs"
 
+      - name: Abort if Loki query failed (infra issue, not app error)
+        id: loki_health
+        if: steps.dedup.outputs.skip != 'true'
+        env:
+          LOGS_FILE: ${{ steps.logs.outputs.logs_file }}
+        run: |
+          umask 077
+          if [ ! -s "$LOGS_FILE" ]; then
+            echo "::notice::Loki returned no logs — cannot confirm real app errors. Aborting dispatch."
+            echo "abort=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if grep -qiE "connection refused|sse\\.dataQueryError|context deadline exceeded|dial tcp.*refused" "$LOGS_FILE"; then
+            echo "::notice::Loki query error detected in log output — alert likely fired due to exec_err_state, not real app errors. Aborting dispatch."
+            echo "abort=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "abort=false" >> "$GITHUB_OUTPUT"
+
       - name: Build enriched error context
         id: context
-        if: steps.dedup.outputs.skip != 'true'
+        if: steps.dedup.outputs.skip != 'true' && steps.loki_health.outputs.abort != 'true'
         env:
           ALERTNAME: ${{ steps.alert.outputs.alertname }}
           SEVERITY: ${{ steps.alert.outputs.severity }}
@@ -223,7 +242,7 @@ jobs:
           echo "Built enriched context: $(wc -c < "$CONTEXT_FILE") bytes"
 
       - name: Dispatch kiro-autofix-runtime
-        if: steps.dedup.outputs.skip != 'true'
+        if: steps.dedup.outputs.skip != 'true' && steps.loki_health.outputs.abort != 'true'
         env:
           GH_TOKEN: ${{ secrets.KIRO_GITHUB_TOKEN }}
           MODE: ${{ steps.alert.outputs.mode }}
