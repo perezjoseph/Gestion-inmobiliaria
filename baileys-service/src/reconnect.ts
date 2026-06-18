@@ -1,6 +1,6 @@
-import pino from 'pino';
+import { childLogger } from './logger';
 
-const logger = pino({ name: 'baileys-reconnect' });
+const logger = childLogger('reconnect');
 
 export type ConnectionStatus =
   | 'disconnected'

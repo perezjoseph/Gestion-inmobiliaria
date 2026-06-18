@@ -8,6 +8,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
+import { childLogger } from './logger';
 import { usePostgresAuthState, deleteAuthState, listStoredRealms } from './pg-auth-state';
 import { calculateBackoffDelay, isRecoverableDisconnect } from './reconnect';
 import { setConnectionUp, incMessages, incReconnect, incSessionRestore } from './metrics';
@@ -19,7 +20,7 @@ const RECONNECT_INITIAL_DELAY_MS = Number.parseInt(
 const RECONNECT_MAX_DELAY_MS = Number.parseInt(process.env.RECONNECT_MAX_DELAY_MS || '60000', 10);
 const RECONNECT_MAX_ATTEMPTS = Number.parseInt(process.env.RECONNECT_MAX_ATTEMPTS || '5', 10);
 
-const logger = pino({ name: 'session-manager' });
+const logger = childLogger('session-manager');
 
 export type ConnectionStatus = 'disconnected' | 'qr_pending' | 'connected' | 'logged_out';
 

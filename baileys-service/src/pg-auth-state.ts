@@ -8,9 +8,9 @@ import {
 } from '@whiskeysockets/baileys';
 import { Pool } from 'pg';
 import crypto from 'node:crypto';
-import pino from 'pino';
+import { childLogger } from './logger';
 
-const logger = pino({ name: 'pg-auth-state' });
+const logger = childLogger('pg-auth-state');
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;

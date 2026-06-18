@@ -1,5 +1,7 @@
 import io
+import logging
 import re
+import sys
 
 import fitz
 import numpy as np
@@ -12,6 +14,35 @@ from PIL import Image
 from ocr_engine import OpenVINOOCREngine
 from prometheus_fastapi_instrumentator import Instrumentator
 from metrics import ocr_documents_total, ocr_duration_seconds
+
+
+class JSONLogFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        import json
+        from datetime import datetime, timezone
+
+        entry = {
+            "ts": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "level": record.levelname.lower(),
+            "msg": record.getMessage(),
+            "service": "ocr-service",
+            "logger": record.name,
+        }
+        if record.exc_info and record.exc_info[0]:
+            entry["exception"] = self.formatException(record.exc_info)
+        return json.dumps(entry)
+
+
+def _setup_logging() -> None:
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(JSONLogFormatter())
+    logging.basicConfig(level=logging.INFO, handlers=[handler], force=True)
+    logging.getLogger("uvicorn.access").handlers = [handler]
+    logging.getLogger("uvicorn.error").handlers = [handler]
+
+
+_setup_logging()
+log = logging.getLogger("ocr-service")
 
 app = FastAPI(title="OCR Service")
 
@@ -263,6 +294,7 @@ async def ocr_extract(
     document_type: Optional[str] = Form(None),
 ):
     if image.content_type not in ALLOWED_CONTENT_TYPES:
+        log.warning("unsupported content type: %s", image.content_type)
         return JSONResponse(
             status_code=422,
             content={"detail": "Formato no soportado. Use archivos JPEG, PNG o PDF"},
@@ -271,6 +303,7 @@ async def ocr_extract(
     file_bytes = await image.read()
 
     if len(file_bytes) > MAX_FILE_SIZE:
+        log.warning("file too large: %d bytes", len(file_bytes))
         return JSONResponse(
             status_code=413,
             content={"detail": "El archivo excede el tamaño máximo de 10 MB"},
@@ -292,6 +325,7 @@ async def ocr_extract(
         structured_fields = _extract_structured_fields(lines, doc_type)
 
     ocr_documents_total.labels(doc_type=doc_type).inc()
+    log.info("ocr complete, doc_type=%s lines=%d", doc_type, len(lines))
 
     return JSONResponse(content={
         "document_type": doc_type,

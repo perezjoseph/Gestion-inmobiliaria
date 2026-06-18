@@ -210,13 +210,30 @@ data:
         }
       }
 
-      // Extract log level from log content
-      stage.regex {
-        expression = "(?i)(?P<level>(TRACE|DEBUG|INFO|WARN|ERROR|FATAL|CRITICAL))"
+      // Extract structured fields from JSON log lines (backend, baileys, ocr)
+      stage.json {
+        expressions = {
+          json_level   = "level",
+          service      = "service",
+          trace_id     = "trace_id",
+        }
       }
+
+      // Fallback: extract log level via regex for non-JSON lines (system logs)
+      stage.regex {
+        expression = "(?i)(?P<regex_level>(TRACE|DEBUG|INFO|WARN|ERROR|FATAL|CRITICAL))"
+      }
+
+      // Use JSON-extracted level if present, otherwise regex-extracted
+      stage.template {
+        source   = "level"
+        template = "{{ if .json_level }}{{ .json_level }}{{ else }}{{ .regex_level }}{{ end }}"
+      }
+
       stage.labels {
         values = {
-          level = "",
+          level   = "",
+          service = "",
         }
       }
 

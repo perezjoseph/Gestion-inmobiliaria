@@ -10,6 +10,7 @@ pub fn init_telemetry() -> OtelGuard {
     let env_filter = EnvFilter::from_default_env();
 
     let fmt_layer = tracing_subscriber::fmt::layer()
+        .json()
         .with_target(true)
         .with_thread_ids(false);
 

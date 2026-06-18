@@ -70,7 +70,7 @@ data:
           - uid: backend-error-rate-spike
             title: Backend Error Rate Spike
             condition: C
-            for: 5m
+            for: 0s
             noDataState: OK
             execErrState: Alerting
             labels:
@@ -80,9 +80,8 @@ data:
             annotations:
               summary: Backend error log rate exceeds threshold
               description: >-
-                The backend container is producing more than 25 error-level
-                log lines in 5 minutes. This indicates a runtime crash or
-                recurring panic.
+                The backend container is producing error-level log lines.
+                This indicates a runtime crash or recurring panic.
             data:
               - refId: A
                 datasourceUid: P8E80F9AEF21F6940
@@ -115,12 +114,12 @@ data:
                   conditions:
                     - evaluator:
                         type: gt
-                        params: [25]
+                        params: [0]
 
           - uid: baileys-error-rate-spike
             title: Baileys Error Rate Spike
             condition: C
-            for: 5m
+            for: 0s
             noDataState: OK
             execErrState: Alerting
             labels:
@@ -130,9 +129,9 @@ data:
             annotations:
               summary: Baileys error log rate exceeds threshold
               description: >-
-                The baileys WhatsApp sidecar container is producing elevated
-                error logs, indicating message processing failures or
-                connection issues.
+                The baileys WhatsApp sidecar container is producing error
+                logs, indicating message processing failures or connection
+                issues.
             data:
               - refId: A
                 datasourceUid: P8E80F9AEF21F6940
@@ -165,4 +164,4 @@ data:
                   conditions:
                     - evaluator:
                         type: gt
-                        params: [25]
+                        params: [0]

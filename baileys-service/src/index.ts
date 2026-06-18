@@ -1,11 +1,11 @@
 import express, { Request, Response, NextFunction } from 'express';
-import pino from 'pino';
 import QRCode, { QRCodeToDataURLOptions } from 'qrcode';
 import { getConnectionCounts, startSession, stopSession, getStatus, sendMessage, restoreSessions } from './session-manager';
 import { registry } from './metrics';
 import crypto from 'node:crypto';
+import { childLogger } from './logger';
 
-const logger = pino({ name: 'baileys-service' });
+const logger = childLogger('http');
 
 const PORT = Number.parseInt(process.env.PORT || '3100', 10);
 const INTERNAL_TOKEN = process.env.BAILEYS_INTERNAL_TOKEN || '';
