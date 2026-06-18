@@ -68,9 +68,6 @@ data:
             labels:
               node: "inference"
 
-      - job_name: "kube-state-metrics"
-        static_configs:
-          - targets: ["kube-state-metrics.monitoring.svc.cluster.local:8080"]
 
       - job_name: "traefik"
         metrics_path: "/metrics"

@@ -1,5 +1,5 @@
 # NetworkPolicy: restrict inter-pod communication to only what's needed.
-# - Backend can reach: db, ocr-service (shared ns), baileys, ovms (shared ns)
+# - Backend can reach: db, ocr-service (shared ns), baileys, vllm (shared ns)
 # - Frontend can reach: nothing (Caddy serves static files, Traefik proxies /api to backend)
 # - DB accepts only from: backend, baileys
 # - Deny all ingress/egress by default for pods without explicit policy
