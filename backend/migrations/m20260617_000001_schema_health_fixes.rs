@@ -275,7 +275,7 @@ impl MigrationTrait for Migration {
 
         db.execute_unprepared(
             "ALTER TABLE pagos ADD CONSTRAINT chk_pagos_estado \
-             CHECK (estado IN ('pendiente', 'pagado', 'atrasado'))",
+             CHECK (estado IN ('pendiente', 'pagado', 'atrasado', 'cancelado'))",
         )
         .await?;
 

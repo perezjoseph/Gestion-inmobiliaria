@@ -723,35 +723,47 @@ pub async fn list_conversations<C: ConnectionTrait>(
         .map(|p| (p.sender_phone.as_str(), p.message_count))
         .collect();
 
-    let latest_msgs: Vec<LatestMessage> = chatbot_conversation::Entity::find()
-        .filter(chatbot_conversation::Column::OrganizacionId.eq(org_id))
-        .filter(chatbot_conversation::Column::SenderPhone.is_in(&phones))
-        .select_only()
-        .column(chatbot_conversation::Column::SenderPhone)
-        .column(chatbot_conversation::Column::InquilinoId)
-        .column(chatbot_conversation::Column::Content)
-        .column(chatbot_conversation::Column::CreatedAt)
-        .order_by_desc(chatbot_conversation::Column::CreatedAt)
-        .into_model::<LatestMessage>()
-        .all(db)
-        .await?;
+    let latest_msgs: Vec<LatestMessage> = {
+        use sea_orm::{DbBackend, Statement};
 
-    let mut seen = std::collections::HashSet::new();
-    let mut data: Vec<ConversationListResponse> = Vec::with_capacity(phones.len());
-    for msg in latest_msgs {
-        if seen.insert(msg.sender_phone.clone()) {
-            data.push(ConversationListResponse {
-                sender_phone: msg.sender_phone.clone(),
-                inquilino_id: msg.inquilino_id,
-                last_message: msg.content,
-                last_message_at: msg.created_at,
-                message_count: count_map
-                    .get(msg.sender_phone.as_str())
-                    .copied()
-                    .unwrap_or(0),
-            });
+        let placeholders: Vec<String> = (0..phones.len()).map(|i| format!("${}", i + 2)).collect();
+        let in_clause = placeholders.join(", ");
+
+        let sql = format!(
+            "SELECT DISTINCT ON (sender_phone) sender_phone, inquilino_id, content, created_at \
+             FROM chatbot_conversation \
+             WHERE organizacion_id = $1 AND sender_phone IN ({in_clause}) \
+             ORDER BY sender_phone ASC, created_at DESC"
+        );
+
+        let mut params: Vec<sea_orm::Value> = Vec::with_capacity(phones.len() + 1);
+        params.push(org_id.into());
+        for phone in &phones {
+            params.push(phone.clone().into());
         }
-    }
+
+        LatestMessage::find_by_statement(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            &sql,
+            params,
+        ))
+        .all(db)
+        .await?
+    };
+
+    let data: Vec<ConversationListResponse> = latest_msgs
+        .into_iter()
+        .map(|msg| ConversationListResponse {
+            sender_phone: msg.sender_phone.clone(),
+            inquilino_id: msg.inquilino_id,
+            last_message: msg.content,
+            last_message_at: msg.created_at,
+            message_count: count_map
+                .get(msg.sender_phone.as_str())
+                .copied()
+                .unwrap_or(0),
+        })
+        .collect();
 
     Ok(PaginatedResponse {
         data,
