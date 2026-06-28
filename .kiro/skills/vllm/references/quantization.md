@@ -24,7 +24,7 @@
 **Recommendation**:
 - **NVIDIA production**: Use AWQ for 70B models
 - **H100 GPUs**: Use FP8 for best speed
-- **Intel Arc**: Use FP8 (best speed) or sym_int4 (more compression)
+- **Intel Arc**: Use FP8 (recommended — best speed, minimal quality loss) or sym_int4 (more compression, needs older llm-scaler image)
 - **Maximum compatibility**: Use GPTQ
 - **Extreme compression**: Use SqueezeLLM
 
@@ -158,7 +158,7 @@ model.save_quantized(quantized_name)
 
 **Requirements**:
 - NVIDIA: H100 or H800 GPU, CUDA 12.3+
-- Intel: Arc B60/A770 via llm-scaler-vllm Docker
+- Intel: Arc B60/A770 via intel/vllm Docker
 
 **NVIDIA — Enable FP8:**
 ```bash

@@ -8,7 +8,7 @@ fileMatchPattern: ["infra/**", ".github/workflows/deploy.yml", ".github/actions/
 ## Nodes
 
 - **coreos** (control-plane): 192.168.88.112, Fedora CoreOS, user `core`
-- **inference** (GPU worker): 192.168.88.115, Fedora CoreOS, user `core`, Intel Arc (xe driver)
+- **inference** (GPU worker): 192.168.88.115, Fedora CoreOS, user `core`, Intel Arc Pro B70 (32GB, xe driver)
 
 ## How to run commands
 

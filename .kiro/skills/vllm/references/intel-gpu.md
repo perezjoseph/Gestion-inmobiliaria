@@ -1,4 +1,4 @@
-# Intel Arc GPU Deployment (llm-scaler-vllm)
+# Intel Arc GPU Deployment (intel/vllm)
 
 ## Contents
 - Docker container setup
@@ -16,16 +16,11 @@
 
 ## Docker container setup
 
-llm-scaler-vllm is Intel's optimized vLLM fork for Arc B60/A770 GPUs. It ships as a Docker image on Docker Hub.
+`intel/vllm` is Intel's official vLLM build for Arc B-series GPUs. It ships as a Docker image on Docker Hub.
 
-**Pull the image** — use exact beta version, never `latest`:
+**Pull the image:**
 ```bash
-# Find latest version at:
-# https://github.com/intel/llm-scaler/blob/main/Releases.md/#latest-beta-release
-docker pull intel/llm-scaler-vllm:<VERSION>
-
-# Stable PV release: intel/llm-scaler-vllm:1.0
-# For Arc A770: intelanalytics/multi-arc-serving:latest
+docker pull intel/vllm:0.21.0-ubuntu24.04
 ```
 
 **Run the container:**
@@ -34,16 +29,12 @@ sudo docker run -td \
     --privileged \
     --net=host \
     --device=/dev/dri \
-    --name=lsv-container \
+    --name=vllm-container \
     -v /home/intel/LLM:/llm/models/ \
-    -e no_proxy=localhost,127.0.0.1 \
-    -e http_proxy=$http_proxy \
-    -e https_proxy=$https_proxy \
     --shm-size="32g" \
-    --entrypoint /bin/bash \
-    intel/llm-scaler-vllm:<VERSION>
+    intel/vllm:0.21.0-ubuntu24.04 bash
 
-docker exec -it lsv-container bash
+docker exec -it vllm-container bash
 ```
 
 **Device permissions** (for non-sudo Docker):
@@ -293,7 +284,7 @@ docker network create --driver overlay --attachable my-overlay
 ```bash
 sudo docker run -td --privileged --network=my-overlay --device=/dev/dri \
     --name=node-1 -v /model_path:/llm/models/ --shm-size="32g" \
-    --entrypoint /bin/bash intel/llm-scaler-vllm:<VERSION>
+    intel/vllm:0.21.0-ubuntu24.04 bash
 ```
 
 **3. Configure SSH** between containers (generate keys, `ssh-copy-id`).
@@ -446,7 +437,7 @@ Use [hf-mirror](https://hf-mirror.com/) or pre-download and volume-mount.
 
 ## Reference commands for Qwen3.5/3.6 models
 
-Recommended image: `intel/llm-scaler-vllm:0.14.0-b8.3.1`
+Recommended image: `intel/vllm:0.21.0-ubuntu24.04`
 
 ```bash
 export VLLM_ALLOW_LONG_MAX_MODEL_LEN=1

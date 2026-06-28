@@ -9,7 +9,7 @@ Project-specific types and patterns for our LLM Scaler-backed Rig integration. R
 
 ## Architecture
 
-All LLM calls go through `OvmsCompletionModel` (implements `rig::completion::CompletionModel`). No direct HTTP calls to LLM Scaler outside `ovms_provider.rs`. The inference endpoint is `/v1/chat/completions` (OpenAI-compatible API served by [intel/llm-scaler](https://github.com/intel/llm-scaler) vLLM on Intel Arc Pro GPUs). The K8s service is `vllm-inference.realestate.svc.cluster.local:8000`. Container image: `intel/llm-scaler-vllm`. `#[serde(default)]` on response `id` field kept for safety.
+All LLM calls go through `OvmsCompletionModel` (implements `rig::completion::CompletionModel`). No direct HTTP calls to vLLM outside `ovms_provider.rs`. The inference endpoint is `/v1/chat/completions` (OpenAI-compatible API served by vLLM on Intel Arc Pro GPUs). The K8s service is `vllm-inference.realestate.svc.cluster.local:8000`. Container image: `intel/vllm`. `#[serde(default)]` on response `id` field kept for safety.
 
 ## Key types
 

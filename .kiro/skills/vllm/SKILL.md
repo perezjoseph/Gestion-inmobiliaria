@@ -1,6 +1,6 @@
 ---
 name: serving-llms-vllm
-description: Serves LLMs with high throughput using vLLM's PagedAttention and continuous batching. Use when deploying production LLM APIs, optimizing inference latency/throughput, or serving models with limited GPU memory. Supports OpenAI-compatible endpoints, quantization (GPTQ/AWQ/FP8/INT4/MXFP4), tensor parallelism, data parallelism, Intel GPU (Arc B60/A770) via llm-scaler-vllm, multi-node distributed deployment, embeddings, rerankers, and multi-modal models. Make sure to use this skill whenever the user mentions vllm, inference serving, model deployment, LLM API, serving models, GPU inference, quantized serving, PagedAttention, continuous batching, Intel Arc GPU inference, llm-scaler, embeddings serving, reranker deployment, multi-modal serving, whisper transcription, or asks about high-throughput LLM serving — even if they don't explicitly say "vLLM".
+description: Serves LLMs with high throughput using vLLM's PagedAttention and continuous batching. Use when deploying production LLM APIs, optimizing inference latency/throughput, or serving models with limited GPU memory. Supports OpenAI-compatible endpoints, quantization (GPTQ/AWQ/FP8/INT4/MXFP4), tensor parallelism, data parallelism, Intel GPU (Arc B60/A770) via intel/vllm, multi-node distributed deployment, embeddings, rerankers, and multi-modal models. Make sure to use this skill whenever the user mentions vllm, inference serving, model deployment, LLM API, serving models, GPU inference, quantized serving, PagedAttention, continuous batching, Intel Arc GPU inference, llm-scaler, embeddings serving, reranker deployment, multi-modal serving, whisper transcription, or asks about high-throughput LLM serving — even if they don't explicitly say "vLLM".
 version: 2.0.0
 author: Orchestra Research
 license: MIT
@@ -19,7 +19,7 @@ Pick your path based on hardware:
 | Hardware | Image / Install | Key differences |
 |----------|----------------|-----------------|
 | NVIDIA (A10/A100/H100) | `pip install vllm` or `vllm/vllm-openai` Docker | Primary platform, widest feature support |
-| Intel Arc B60 | `intel/llm-scaler-vllm:<VERSION>` Docker | Requires `--enforce-eager`, `--block-size 64`, `--disable-sliding-window`; adds `--dp`, `sym_int4`, `mxfp4` |
+| Intel Arc B60 | `intel/vllm:<VERSION>-ubuntu24.04` Docker | Requires `--enforce-eager`, `--block-size 64`; supports FP8, `sym_int4`, `mxfp4` |
 | Intel Arc A770 | `intelanalytics/multi-arc-serving:latest` Docker | See [ipex-llm docs](https://github.com/intel/ipex-llm/blob/main/docs/mddocs/DockerGuides/vllm_docker_quickstart.md) |
 
 When working with Intel Arc GPUs, read [references/intel-gpu.md](references/intel-gpu.md) for the full deployment guide — it covers bare-metal setup, Docker container usage, quantization options, data parallelism, multi-node deployment, and load balancer solutions.
@@ -33,15 +33,14 @@ vllm serve meta-llama/Llama-3-8B-Instruct \
   --port 8000 --host 0.0.0.0
 ```
 
-**Intel Arc B60 — serve a model (inside llm-scaler-vllm container):**
+**Intel Arc B60 — serve a model (inside intel/vllm container):**
 ```bash
-VLLM_ALLOW_LONG_MAX_MODEL_LEN=1 \
 VLLM_WORKER_MULTIPROC_METHOD=spawn \
 vllm serve /llm/models/DeepSeek-R1-Distill-Qwen-7B \
   --served-model-name DeepSeek-R1-Distill-Qwen-7B \
   --dtype float16 --enforce-eager \
   --port 8000 --host 0.0.0.0 \
-  --trust-remote-code --disable-sliding-window \
+  --trust-remote-code \
   --gpu-memory-util 0.9 --max-num-batched-tokens 8192 \
   --max-model-len 8192 --block-size 64 \
   --quantization fp8 -tp 1

@@ -1,0 +1,164 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llama-cpp
+  namespace: realestate
+  labels:
+    app.kubernetes.io/name: llama-cpp
+spec:
+  replicas: 1
+  progressDeadlineSeconds: 600
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: llama-cpp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: llama-cpp
+        app.kubernetes.io/part-of: inference
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/hostname: inference
+      containers:
+        - name: llama-cpp
+          image: intel/vllm:0.21.0-ubuntu24.04
+          imagePullPolicy: IfNotPresent
+          command: ["bash", "-c"]
+          args:
+            - |
+              source /opt/intel/oneapi/setvars.sh --force
+              if [ ! -f /opt/llama-cpp/build/bin/llama-server ]; then
+                echo "Building llama-cpp-turboquant with SYCL + TurboQuant kernel patch..."
+                apt-get update && apt-get install -y git cmake build-essential
+                cd /tmp
+                git clone --depth 1 --branch feature/turboquant-kv-cache https://github.com/TheTom/llama-cpp-turboquant.git
+                cd llama-cpp-turboquant
+
+                echo "Applying SYCL TurboQuant kernel patch..."
+                SYCL_DIR="ggml/src/ggml-sycl"
+                cp /models/sycl-patch/turbo_quant.hpp   "$SYCL_DIR/"
+                cp /models/sycl-patch/turbo_dequant.hpp "$SYCL_DIR/"
+                cp /models/sycl-patch/turbo_fattn.hpp   "$SYCL_DIR/"
+                bash /models/sycl-patch/apply.sh "$SYCL_DIR"
+
+                echo "Patch applied. Building with SYCL..."
+                cmake -B build \
+                  -DGGML_SYCL=ON \
+                  -DGGML_SYCL_TARGET=INTEL \
+                  -DCMAKE_C_COMPILER=icx \
+                  -DCMAKE_CXX_COMPILER=icpx \
+                  -DCMAKE_BUILD_TYPE=Release \
+                  -DBUILD_SHARED_LIBS=OFF
+                cmake --build build -j$(nproc) --target llama-server
+                mkdir -p /opt/llama-cpp/build/bin
+                cp build/bin/llama-server /opt/llama-cpp/build/bin/
+                rm -rf /tmp/llama-cpp-turboquant
+                echo "Build complete."
+              fi
+              export ONEAPI_DEVICE_SELECTOR="level_zero:0"
+              export ZES_ENABLE_SYSMAN=1
+              export UR_L0_ENABLE_RELAXED_ALLOCATION_LIMITS=1
+              export GGML_SYCL_ENABLE_FLASH_ATTN=1
+
+              LLAMA_BIN="/opt/llama-cpp/build/bin/llama-server"
+              if [ ! -f "$LLAMA_BIN" ]; then
+                echo "ERROR: llama-server binary not found after build"
+                exit 1
+              fi
+              exec $LLAMA_BIN \
+                -m /models/gguf/Ornith-1.0-35B-Q4_K_M.gguf \
+                --device SYCL0 \
+                -ngl 999 \
+                --ctx-size 131072 \
+                --n-predict -1 \
+                --host 0.0.0.0 \
+                --port 8000 \
+                --flash-attn on \
+                --cache-type-k turbo4 \
+                --cache-type-v turbo3 \
+                --jinja \
+                --mlock \
+                --no-mmap \
+                --batch-size 2048 \
+                --ubatch-size 512 \
+                --threads 4 \
+                --prio 2 \
+                --poll 50 \
+                --defrag-thold 0.1 \
+                --parallel 1
+          ports:
+            - containerPort: 8000
+          env:
+            - name: HOME
+              value: /root
+          resources:
+            requests:
+              cpu: 4000m
+              memory: 16Gi
+              gpu.intel.com/xe: "1"
+            limits:
+              cpu: 8000m
+              memory: 24Gi
+              gpu.intel.com/xe: "1"
+          volumeMounts:
+            - name: models
+              mountPath: /models
+            - name: llama-bin
+              mountPath: /opt/llama-cpp
+            - name: shm
+              mountPath: /dev/shm
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 300
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: vllm-models-pvc
+        - name: llama-bin
+          emptyDir:
+            sizeLimit: 3Gi
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 4Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llama-cpp-inference
+  namespace: realestate
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: llama-cpp
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30801
+      protocol: TCP

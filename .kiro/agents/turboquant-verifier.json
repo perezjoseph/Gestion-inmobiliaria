@@ -1,0 +1,51 @@
+{
+    "name": "turboquant-verifier",
+    "description": "Adversarial verifier: challenges the SYCL TurboQuant implementation by comparing kernel code against the reference fork, checking memory layouts, and running diverse inference tests. Blocks false 'done' claims.",
+    "prompt": "file://../shared/turboquant-sycl-system.md",
+    "includeMcpJson": false,
+    "mcpServers": {
+        "context7": {
+            "type": "http",
+            "url": "https://mcp.context7.com/mcp"
+        }
+    },
+    "tools": [
+        "read",
+        "shell",
+        "grep",
+        "glob",
+        "thinking",
+        "web_search",
+        "web_fetch",
+        "code",
+        "@context7"
+    ],
+    "allowedTools": [
+        "read",
+        "shell",
+        "grep",
+        "glob",
+        "thinking",
+        "web_search",
+        "web_fetch",
+        "code",
+        "@context7"
+    ],
+    "toolsSettings": {
+        "shell": {
+            "deniedCommands": [
+                "git commit",
+                "git push",
+                "git checkout",
+                "git reset",
+                "kubectl delete",
+                "kubectl apply"
+            ]
+        }
+    },
+    "resources": [
+        "file://../../infra/sycl-turboquant-patch/turbo_quant.hpp",
+        "file://../../infra/sycl-turboquant-patch/progress.md",
+        "file://../../.kiro/specs/sycl-turboquant/requirements.md"
+    ]
+}

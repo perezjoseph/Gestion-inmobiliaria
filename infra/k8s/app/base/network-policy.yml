@@ -372,6 +372,37 @@ spec:
         - port: 3100
           protocol: TCP
 ---
+# vLLM egress: HuggingFace model downloads (HTTPS)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-vllm-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vllm
+  policyTypes:
+    - Egress
+  egress:
+    # HTTPS to HuggingFace (model downloads) — IPv4
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
+    # HTTPS to HuggingFace (model downloads) — IPv6
+    - to:
+        - ipBlock:
+            cidr: ::/0
+      ports:
+        - port: 443
+          protocol: TCP
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

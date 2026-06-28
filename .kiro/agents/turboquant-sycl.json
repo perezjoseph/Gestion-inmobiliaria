@@ -1,0 +1,85 @@
+{
+    "name": "turboquant-sycl",
+    "description": "Iterative repair agent: ports TurboQuant SET_ROWS kernels from Vulkan/CUDA to SYCL for Intel Arc GPUs. Spawns adversarial verifier after each kernel edit. Reads the reference fork, SYCL docs, and TurboQuant papers.",
+    "prompt": "file://../shared/turboquant-sycl-system.md",
+    "includeMcpJson": false,
+    "mcpServers": {
+        "context7": {
+            "type": "http",
+            "url": "https://mcp.context7.com/mcp"
+        }
+    },
+    "tools": [
+        "read",
+        "write",
+        "shell",
+        "grep",
+        "glob",
+        "thinking",
+        "web_search",
+        "web_fetch",
+        "code",
+        "@context7"
+    ],
+    "allowedTools": [
+        "read",
+        "write",
+        "shell",
+        "grep",
+        "glob",
+        "thinking",
+        "web_search",
+        "web_fetch",
+        "code",
+        "@context7"
+    ],
+    "toolsSettings": {
+        "write": {
+            "deniedPaths": [
+                ".github/**",
+                ".kiro/agents/**",
+                ".kiro/steering/**",
+                ".kiro/skills/**",
+                ".kiro/shared/**",
+                "backend/**",
+                "frontend/**",
+                "android/**",
+                "baileys-service/**",
+                "ocr-service/**",
+                "infra/k8s/app/base/**"
+            ]
+        },
+        "shell": {
+            "deniedCommands": [
+                "git commit",
+                "git push",
+                "git checkout",
+                "git reset",
+                "git rebase",
+                "kubectl delete namespace",
+                "kubectl apply -f infra/k8s/app/base"
+            ]
+        }
+    },
+    "resources": [
+        "file://../../infra/sycl-turboquant-patch/turbo_quant.hpp",
+        "file://../../infra/sycl-turboquant-patch/turbo_dequant.hpp",
+        "file://../../infra/sycl-turboquant-patch/turbo_fattn.hpp",
+        "file://../../infra/sycl-turboquant-patch/apply.sh",
+        "file://../../infra/sycl-turboquant-patch/progress.md",
+        "file://../../infra/k8s/app/shared/llama-cpp.yml",
+        "file://../../.kiro/specs/sycl-turboquant/requirements.md"
+    ],
+    "hooks": {
+        "postToolUse": [
+            {
+                "matcher": "fs_write",
+                "command": "bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \"$FILE\" in *turbo_quant.hpp) echo \"[VERIFIER] turbo_quant.hpp modified — spawning adversarial review...\"; kiro-cli chat --agent turboquant-verifier --trust-all-tools --no-interactive \"Verify the SYCL TurboQuant kernel in infra/sycl-turboquant-patch/turbo_quant.hpp. Fetch the reference source from the fork, compare line-by-line, and report PASS or FAIL with specific bugs found.\" 2>&1 | tail -80 ;; esac'"
+            },
+            {
+                "matcher": "str_replace",
+                "command": "bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \"$FILE\" in *turbo_quant.hpp) echo \"[VERIFIER] turbo_quant.hpp modified — spawning adversarial review...\"; kiro-cli chat --agent turboquant-verifier --trust-all-tools --no-interactive \"Verify the SYCL TurboQuant kernel in infra/sycl-turboquant-patch/turbo_quant.hpp. Fetch the reference source from the fork, compare line-by-line, and report PASS or FAIL with specific bugs found.\" 2>&1 | tail -80 ;; esac'"
+            }
+        ]
+    }
+}
