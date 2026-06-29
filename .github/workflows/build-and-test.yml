@@ -350,7 +350,7 @@ jobs:
 
       - name: Attest build provenance
         if: inputs.is-production
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
         with:
           subject-path: ${{ env.CARGO_TARGET_DIR || 'target' }}/x86_64-unknown-linux-musl/ci-release/realestate-backend
           push-to-registry: false
@@ -541,7 +541,7 @@ jobs:
 
       - name: Attest build provenance
         if: inputs.is-production
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
         with:
           subject-path: frontend/dist/
           push-to-registry: false
