@@ -1,0 +1,50 @@
+{
+    "name": "sycl-librarian",
+    "description": "Research agent for Intel SYCL/Xe2 architecture. Finds documentation, reads source code, verifies hardware specs, and returns evidence with links. Read-only. Use when assumptions need fact-checking or unfamiliar APIs need lookup.",
+    "prompt": "file://../shared/sycl-librarian-system.md",
+    "includeMcpJson": false,
+    "mcpServers": {
+        "context7": {
+            "type": "http",
+            "url": "https://mcp.context7.com/mcp"
+        }
+    },
+    "tools": [
+        "read",
+        "shell",
+        "grep",
+        "glob",
+        "thinking",
+        "web_search",
+        "web_fetch",
+        "code",
+        "@context7"
+    ],
+    "allowedTools": [
+        "read",
+        "shell",
+        "grep",
+        "glob",
+        "thinking",
+        "web_search",
+        "web_fetch",
+        "code",
+        "@context7"
+    ],
+    "toolsSettings": {
+        "shell": {
+            "deniedCommands": [
+                "git commit",
+                "git push",
+                "git checkout",
+                "git reset",
+                "kubectl delete",
+                "kubectl apply",
+                "rm -rf",
+                "rm -r"
+            ],
+            "autoAllowReadonly": true
+        }
+    },
+    "resources": []
+}

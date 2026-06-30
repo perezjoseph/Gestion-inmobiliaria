@@ -1,7 +1,7 @@
 {
     "name": "turboquant-verifier",
-    "description": "Adversarial verifier: challenges the SYCL TurboQuant implementation by comparing kernel code against the reference fork, checking memory layouts, and running diverse inference tests. Blocks false 'done' claims.",
-    "prompt": "file://../shared/turboquant-sycl-system.md",
+    "description": "Adversarial verification agent (read-only). Challenges SYCL optimizations across four dimensions: correctness, performance, test quality, task alignment. Cannot write code — only outputs structured verdicts.",
+    "prompt": "file://../shared/turboquant-verifier-system.md",
     "includeMcpJson": false,
     "mcpServers": {
         "context7": {
@@ -38,14 +38,29 @@
                 "git push",
                 "git checkout",
                 "git reset",
+                "git rebase",
+                "git stash",
+                "git branch -D",
+                "git branch -d",
+                "git clean",
+                "git add",
                 "kubectl delete",
-                "kubectl apply"
+                "kubectl apply",
+                "rm -rf",
+                "rm -r",
+                "rm ",
+                "mv ",
+                "cp ",
+                "truncate"
             ]
         }
     },
     "resources": [
-        "file://../../infra/sycl-turboquant-patch/turbo_quant.hpp",
-        "file://../../infra/sycl-turboquant-patch/progress.md",
-        "file://../../.kiro/specs/sycl-turboquant/requirements.md"
+        "file://../../infra/llama-cpp-turboquant/ggml/src/ggml-sycl/turbo_quant.hpp",
+        "file://../../infra/llama-cpp-turboquant/ggml/src/ggml-sycl/turbo_dequant.hpp",
+        "file://../../infra/llama-cpp-turboquant/ggml/src/ggml-sycl/mmvq.cpp",
+        "file://../../infra/llama-cpp-turboquant/ggml/src/ggml-common.h",
+        "file://../../infra/llama-cpp-turboquant/ggml/src/ggml-turbo-quant.c",
+        "file://../../infra/llama-cpp-turboquant/tests/test-backend-ops.cpp"
     ]
 }

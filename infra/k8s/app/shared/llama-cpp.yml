@@ -73,8 +73,7 @@ spec:
                 -m /models/gguf/Ornith-1.0-35B-Q4_K_M.gguf \
                 --device SYCL0 \
                 -ngl 999 \
-                -fit off \
-                --ctx-size 262144 \
+                --ctx-size 131072 \
                 --n-predict 16384 \
                 --host 0.0.0.0 \
                 --port 8000 \
@@ -91,7 +90,8 @@ spec:
                 --prio 2 \
                 --poll 50 \
                 --defrag-thold 0.1 \
-                --parallel 1
+                --parallel 1 \
+                --mtp 2
           ports:
             - containerPort: 8000
           env:

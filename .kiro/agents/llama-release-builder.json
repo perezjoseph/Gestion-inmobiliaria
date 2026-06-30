@@ -1,0 +1,47 @@
+{
+    "name": "llama-release-builder",
+    "description": "Builds and releases llama.cpp with SYCL TurboQuant support from perezjoseph/llama-cpp-turboquant using GitHub Actions. Creates release workflows, triggers builds, and publishes binaries.",
+    "prompt": "file://../shared/llama-release-builder-system.md",
+    "includeMcpJson": false,
+    "tools": [
+        "read",
+        "write",
+        "shell",
+        "grep",
+        "glob",
+        "thinking",
+        "web_search",
+        "web_fetch"
+    ],
+    "allowedTools": [
+        "read",
+        "write",
+        "shell",
+        "grep",
+        "glob",
+        "thinking",
+        "web_search",
+        "web_fetch"
+    ],
+    "toolsSettings": {
+        "write": {
+            "allowedPaths": [
+                "infra/llama-cpp-turboquant/.github/workflows/release-sycl.yml",
+                "infra/llama-cpp-turboquant-workflows/**",
+                "infra/k8s/app/shared/llama-cpp.yml"
+            ]
+        }
+    },
+    "hooks": {
+        "preToolUse": [
+            {
+                "matcher": "fs_write|str_replace",
+                "command": "bash -c 'INPUT=$(cat); FILE=$(echo \"$INPUT\" | jq -r \".tool_input.path // .tool_input.targetFile // \\\"\\\"\" 2>/dev/null); case \"$FILE\" in *release-sycl.yml) CONTENT=$(echo \"$INPUT\" | jq -r \".tool_input.text // .tool_input.newStr // \\\"\\\"\" 2>/dev/null); if echo \"$CONTENT\" | grep -q \"perezjoseph/llama-cpp-turboquant\"; then echo \"PASS: fork guard present\"; else echo \"DENIED: workflow file MUST contain if: github.repository == perezjoseph/llama-cpp-turboquant on the job. Add the fork guard.\"; fi ;; *) echo \"PASS\" ;; esac'"
+            }
+        ]
+    },
+    "resources": [
+        "file://../../infra/llama-cpp-turboquant/.github/workflows/release-sycl.yml",
+        "file://../../infra/k8s/app/shared/llama-cpp.yml"
+    ]
+}

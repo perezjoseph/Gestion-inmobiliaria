@@ -1,0 +1,46 @@
+{
+    "name": "turboquant-release",
+    "description": "Release engineer: builds via GitHub Actions, deploys to K3s, verifies inference. Read-only on kernel source. Does not stop until inference passes or a blocking failure is reported.",
+    "prompt": "file://../shared/turboquant-release-system.md",
+    "includeMcpJson": false,
+    "tools": [
+        "read",
+        "write",
+        "shell",
+        "grep",
+        "glob",
+        "thinking",
+        "web_fetch"
+    ],
+    "allowedTools": [
+        "read",
+        "write",
+        "shell",
+        "grep",
+        "glob",
+        "thinking",
+        "web_fetch"
+    ],
+    "toolsSettings": {
+        "write": {
+            "allowedPaths": [
+                "infra/k8s/app/shared/llama-cpp.yml"
+            ]
+        },
+        "shell": {
+            "deniedCommands": [
+                "kubectl delete namespace",
+                "kubectl apply -f infra/k8s/app/base",
+                "git add",
+                "git commit",
+                "git push",
+                "git reset",
+                "git rebase"
+            ]
+        }
+    },
+    "resources": [
+        "file://../../infra/k8s/app/shared/llama-cpp.yml",
+        "file://../../infra/llama-cpp-turboquant/.github/workflows/release-sycl.yml"
+    ]
+}

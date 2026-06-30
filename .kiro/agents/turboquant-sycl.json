@@ -1,6 +1,6 @@
 {
     "name": "turboquant-sycl",
-    "description": "Iterative repair agent: ports TurboQuant SET_ROWS kernels from Vulkan/CUDA to SYCL for Intel Arc GPUs. Spawns adversarial verifier after each kernel edit. Reads the reference fork, SYCL docs, and TurboQuant papers.",
+    "description": "SYCL kernel optimizer for Intel Arc Pro B70. Profile->test->optimize->measure loop. Mechanical gates enforce TDD + verifier + recording before push.",
     "prompt": "file://../shared/turboquant-sycl-system.md",
     "includeMcpJson": false,
     "mcpServers": {
@@ -19,6 +19,7 @@
         "web_search",
         "web_fetch",
         "code",
+        "subagent",
         "@context7"
     ],
     "allowedTools": [
@@ -31,54 +32,70 @@
         "web_search",
         "web_fetch",
         "code",
+        "subagent",
         "@context7"
     ],
     "toolsSettings": {
         "write": {
-            "deniedPaths": [
-                ".github/**",
-                ".kiro/agents/**",
-                ".kiro/steering/**",
-                ".kiro/skills/**",
-                ".kiro/shared/**",
-                "backend/**",
-                "frontend/**",
-                "android/**",
-                "baileys-service/**",
-                "ocr-service/**",
-                "infra/k8s/app/base/**"
+            "allowedPaths": [
+                "infra/llama-cpp-turboquant/**",
+                "infra/k8s/app/shared/llama-cpp.yml"
             ]
         },
         "shell": {
             "deniedCommands": [
-                "git commit",
-                "git push",
-                "git checkout",
-                "git reset",
-                "git rebase",
                 "kubectl delete namespace",
                 "kubectl apply -f infra/k8s/app/base"
+            ]
+        },
+        "subagent": {
+            "availableAgents": [
+                "turboquant-verifier",
+                "turboquant-release",
+                "sycl-librarian"
+            ],
+            "trustedAgents": [
+                "turboquant-verifier",
+                "turboquant-release",
+                "sycl-librarian"
             ]
         }
     },
     "resources": [
-        "file://../../infra/sycl-turboquant-patch/turbo_quant.hpp",
-        "file://../../infra/sycl-turboquant-patch/turbo_dequant.hpp",
-        "file://../../infra/sycl-turboquant-patch/turbo_fattn.hpp",
-        "file://../../infra/sycl-turboquant-patch/apply.sh",
-        "file://../../infra/sycl-turboquant-patch/progress.md",
+        "skill://.kiro/skills/verify-fix-loop/SKILL.md",
+        "skill://.kiro/skills/opensrc-inspect/SKILL.md",
+        "skill://.kiro/skills/diagnose/SKILL.md",
+        "file://../../infra/llama-cpp-turboquant/OPTIMIZATION_LOG.md",
         "file://../../infra/k8s/app/shared/llama-cpp.yml",
-        "file://../../.kiro/specs/sycl-turboquant/requirements.md"
+        "file://../../infra/llama-cpp-turboquant/ggml/src/ggml-sycl/presets.hpp",
+        "file://../../infra/llama-cpp-turboquant/ggml/src/ggml-sycl/turbo_quant.hpp",
+        "file://../../infra/llama-cpp-turboquant/ggml/src/ggml-sycl/turbo_dequant.hpp",
+        "file://../../infra/llama-cpp-turboquant/ggml/src/ggml-sycl/turbo_fattn.hpp"
     ],
     "hooks": {
-        "postToolUse": [
+        "agentSpawn": [
+            {
+                "command": "bash -c 'cd infra/llama-cpp-turboquant 2>/dev/null || exit 0; printf \"{\\\"optimization_log\\\": \"; if [ -f OPTIMIZATION_LOG.md ]; then jq -Rs . OPTIMIZATION_LOG.md; else echo \"\\\"No log yet. First task: measure baseline with llama-bench and populate OPTIMIZATION_LOG.md.\\\"\"; fi; printf \", \\\"git_state\\\": {\\\"branch\\\": \\\"%s\\\", \\\"last_commit\\\": \\\"%s\\\", \\\"unpushed\\\": %s}\" \"$(git branch --show-current 2>/dev/null)\" \"$(git log --oneline -1 2>/dev/null)\" \"$(git log --oneline origin/sycl-support..HEAD 2>/dev/null | wc -l | tr -d \" \")\"; UNPUSHED=$(git log --oneline origin/sycl-support..HEAD 2>/dev/null | wc -l | tr -d \" \"); if [ \"$UNPUSHED\" -gt 0 ]; then printf \", \\\"next_step\\\": \\\"You have %s unpushed commit(s). Resume: spawn turboquant-verifier subagent, then git push, then spawn turboquant-release subagent.\\\"}\" \"$UNPUSHED\"; else printf \", \\\"next_step\\\": \\\"Clean state. Start next iteration: read OPTIMIZATION_LOG.md, profile with llama-bench, identify bottleneck kernel.\\\"}\"; fi'"
+            }
+        ],
+        "preToolUse": [
+            {
+                "matcher": "execute_bash",
+                "command": "bash -c 'INPUT=$(cat); CMD=$(echo \"$INPUT\" | jq -r .tool_input.command 2>/dev/null); case \"$CMD\" in *git\\ push*) cd infra/llama-cpp-turboquant 2>/dev/null || exit 0; LAST_COMMITS=$(git log --oneline -5 --diff-filter=AM -- tests/ 2>/dev/null); if ! echo \"$LAST_COMMITS\" | grep -q \"test\\|bench\\|assert\"; then echo \"TDD violation. Commit a test under tests/ before pushing.\" >&2; exit 2; fi; LOG_UPDATED=$(git diff origin/sycl-support..HEAD --name-only 2>/dev/null | grep -c OPTIMIZATION_LOG.md); if [ \"$LOG_UPDATED\" -eq 0 ]; then echo \"Recording violation. Update OPTIMIZATION_LOG.md with iteration results before pushing.\" >&2; exit 2; fi; if [ ! -f /tmp/turboquant-verifier-passed ]; then echo \"Verifier not run. Spawn turboquant-verifier subagent and get OVERALL: PASS before pushing.\" >&2; exit 2; fi; rm -f /tmp/turboquant-verifier-passed ;; esac'"
+            },
             {
                 "matcher": "fs_write",
-                "command": "bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \"$FILE\" in *turbo_quant.hpp) echo \"[VERIFIER] turbo_quant.hpp modified — spawning adversarial review...\"; kiro-cli chat --agent turboquant-verifier --trust-all-tools --no-interactive \"Verify the SYCL TurboQuant kernel in infra/sycl-turboquant-patch/turbo_quant.hpp. Fetch the reference source from the fork, compare line-by-line, and report PASS or FAIL with specific bugs found.\" 2>&1 | tail -80 ;; esac'"
+                "command": "bash -c 'INPUT=$(cat); FILE=$(echo \"$INPUT\" | jq -r \".tool_input.path // .tool_input.targetFile\" 2>/dev/null); case \"$FILE\" in */ggml-sycl/*.cpp|*/ggml-sycl/*.hpp) cd infra/llama-cpp-turboquant 2>/dev/null || exit 0; RECENT_TEST=$(git log --oneline -3 --diff-filter=AM -- tests/ 2>/dev/null); if [ -z \"$RECENT_TEST\" ]; then echo \"No test committed yet. TDD requires failing test before kernel code.\" >&2; exit 1; fi ;; esac'"
             },
             {
                 "matcher": "str_replace",
-                "command": "bash -c 'FILE=$(cat | jq -r .tool_input.path 2>/dev/null); case \"$FILE\" in *turbo_quant.hpp) echo \"[VERIFIER] turbo_quant.hpp modified — spawning adversarial review...\"; kiro-cli chat --agent turboquant-verifier --trust-all-tools --no-interactive \"Verify the SYCL TurboQuant kernel in infra/sycl-turboquant-patch/turbo_quant.hpp. Fetch the reference source from the fork, compare line-by-line, and report PASS or FAIL with specific bugs found.\" 2>&1 | tail -80 ;; esac'"
+                "command": "bash -c 'INPUT=$(cat); FILE=$(echo \"$INPUT\" | jq -r .tool_input.path 2>/dev/null); case \"$FILE\" in */ggml-sycl/*.cpp|*/ggml-sycl/*.hpp) cd infra/llama-cpp-turboquant 2>/dev/null || exit 0; RECENT_TEST=$(git log --oneline -3 --diff-filter=AM -- tests/ 2>/dev/null); if [ -z \"$RECENT_TEST\" ]; then echo \"No test committed yet. TDD requires failing test before kernel code.\" >&2; exit 1; fi ;; esac'"
+            }
+        ],
+        "postToolUse": [
+            {
+                "matcher": "subagent",
+                "command": "bash -c 'INPUT=$(cat); RESULT=$(echo \"$INPUT\" | jq -r .tool_response.result 2>/dev/null); TOOL_INPUT=$(echo \"$INPUT\" | jq -r .tool_input 2>/dev/null); if echo \"$TOOL_INPUT\" | grep -q \"verifier\"; then if echo \"$RESULT\" | grep -q \"OVERALL: PASS\"; then touch /tmp/turboquant-verifier-passed; fi; fi'"
             }
         ]
     }
