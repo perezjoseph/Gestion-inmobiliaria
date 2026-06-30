@@ -30,33 +30,34 @@ spec:
           args:
             - |
               source /opt/intel/oneapi/setvars.sh --force
+              mkdir -p /opt/llama-cpp/build/bin
               if [ ! -f /opt/llama-cpp/build/bin/llama-server ]; then
-                echo "Building llama-cpp-turboquant with SYCL + TurboQuant kernel patch..."
-                apt-get update && apt-get install -y git cmake build-essential
-                cd /tmp
-                git clone --depth 1 --branch feature/turboquant-kv-cache https://github.com/TheTom/llama-cpp-turboquant.git
-                cd llama-cpp-turboquant
-
-                echo "Applying SYCL TurboQuant kernel patch..."
-                SYCL_DIR="ggml/src/ggml-sycl"
-                cp /models/sycl-patch/turbo_quant.hpp   "$SYCL_DIR/"
-                cp /models/sycl-patch/turbo_dequant.hpp "$SYCL_DIR/"
-                cp /models/sycl-patch/turbo_fattn.hpp   "$SYCL_DIR/"
-                bash /models/sycl-patch/apply.sh "$SYCL_DIR"
-
-                echo "Patch applied. Building with SYCL..."
-                cmake -B build \
-                  -DGGML_SYCL=ON \
-                  -DGGML_SYCL_TARGET=INTEL \
-                  -DCMAKE_C_COMPILER=icx \
-                  -DCMAKE_CXX_COMPILER=icpx \
-                  -DCMAKE_BUILD_TYPE=Release \
-                  -DBUILD_SHARED_LIBS=OFF
-                cmake --build build -j$(nproc) --target llama-server
-                mkdir -p /opt/llama-cpp/build/bin
-                cp build/bin/llama-server /opt/llama-cpp/build/bin/
-                rm -rf /tmp/llama-cpp-turboquant
-                echo "Build complete."
+                echo "Downloading pre-built llama-server from GitHub release..."
+                apt-get update && apt-get install -y curl jq
+                RELEASE_URL=$(curl -sL https://api.github.com/repos/perezjoseph/llama-cpp-turboquant/releases/latest | jq -r '.assets[] | select(.name=="llama-server-sycl-intel-arc.tar.gz") | .browser_download_url')
+                if [ -n "$RELEASE_URL" ] && [ "$RELEASE_URL" != "null" ] && curl -sL "$RELEASE_URL" | tar -xzf - -C /opt/llama-cpp/build/bin/; then
+                  echo "Using pre-built binary from release"
+                  chmod +x /opt/llama-cpp/build/bin/llama-server
+                else
+                  echo "Download failed, building from source..."
+                  apt-get install -y git cmake build-essential
+                  cd /tmp
+                  git clone --depth 1 --branch sycl-support https://github.com/perezjoseph/llama-cpp-turboquant.git
+                  cd llama-cpp-turboquant
+                  sed -i '/intel_gpu_bmg_g31/d' ggml/src/ggml-sycl/sycl_hw.cpp
+                  sed -i '/intel_gpu_wcl/d' ggml/src/ggml-sycl/sycl_hw.cpp
+                  cmake -B build \
+                    -DGGML_SYCL=ON \
+                    -DGGML_SYCL_TARGET=INTEL \
+                    -DCMAKE_C_COMPILER=icx \
+                    -DCMAKE_CXX_COMPILER=icpx \
+                    -DCMAKE_BUILD_TYPE=Release \
+                    -DBUILD_SHARED_LIBS=OFF
+                  cmake --build build -j$(nproc) --target llama-server
+                  cp build/bin/llama-server /opt/llama-cpp/build/bin/
+                  rm -rf /tmp/llama-cpp-turboquant
+                  echo "Source build complete."
+                fi
               fi
               export ONEAPI_DEVICE_SELECTOR="level_zero:0"
               export ZES_ENABLE_SYSMAN=1
@@ -72,18 +73,20 @@ spec:
                 -m /models/gguf/Ornith-1.0-35B-Q4_K_M.gguf \
                 --device SYCL0 \
                 -ngl 999 \
-                --ctx-size 131072 \
-                --n-predict -1 \
+                -fit off \
+                --ctx-size 262144 \
+                --n-predict 16384 \
                 --host 0.0.0.0 \
                 --port 8000 \
                 --flash-attn on \
                 --cache-type-k turbo4 \
                 --cache-type-v turbo3 \
                 --jinja \
-                --mlock \
+                -a "deepreinforce-ai/Ornith-1.0-35B" \
+                --reasoning-budget 1024 \
                 --no-mmap \
-                --batch-size 2048 \
-                --ubatch-size 512 \
+                --batch-size 4096 \
+                --ubatch-size 1024 \
                 --threads 4 \
                 --prio 2 \
                 --poll 50 \
