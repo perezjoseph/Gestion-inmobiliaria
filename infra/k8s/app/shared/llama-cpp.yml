@@ -34,9 +34,9 @@ spec:
               if [ ! -f /opt/llama-cpp/build/bin/llama-server ]; then
                 echo "Downloading pre-built llama-server from GitHub release..."
                 apt-get update && apt-get install -y curl jq
-                RELEASE_URL="https://github.com/perezjoseph/llama-cpp-turboquant/releases/download/sycl-v37/llama-server-sycl-intel-arc.tar.gz"
+                RELEASE_URL="https://github.com/perezjoseph/llama-cpp-turboquant/releases/download/sycl-v40/llama-server-sycl-intel-arc.tar.gz"
                 if curl -sL "$RELEASE_URL" | tar -xzf - -C /opt/llama-cpp/build/bin/; then
-                  echo "Using pre-built binary from sycl-v36 release"
+                  echo "Using pre-built binary from sycl-v40 release"
                   chmod +x /opt/llama-cpp/build/bin/llama-server
                 else
                   echo "Download failed, building from source..."
@@ -59,7 +59,7 @@ spec:
                   echo "Source build complete."
                 fi
               fi
-              export ONEAPI_DEVICE_SELECTOR="opencl:gpu"
+              export ONEAPI_DEVICE_SELECTOR="level_zero:0"
               export ZES_ENABLE_SYSMAN=1
               export UR_L0_ENABLE_RELAXED_ALLOCATION_LIMITS=1
               export GGML_SYCL_ENABLE_FLASH_ATTN=1
