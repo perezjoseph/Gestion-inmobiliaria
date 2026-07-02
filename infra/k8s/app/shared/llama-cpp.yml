@@ -34,9 +34,9 @@ spec:
               if [ ! -f /opt/llama-cpp/build/bin/llama-server ]; then
                 echo "Downloading pre-built llama-server from GitHub release..."
                 apt-get update && apt-get install -y curl jq
-                RELEASE_URL="https://github.com/perezjoseph/llama-cpp-turboquant/releases/download/sycl-v43/llama-server-sycl-intel-arc.tar.gz"
+                RELEASE_URL="https://github.com/perezjoseph/llama-cpp-turboquant/releases/download/sycl-v45/llama-server-sycl-intel-arc.tar.gz"
                 if curl -sL "$RELEASE_URL" | tar -xzf - -C /opt/llama-cpp/build/bin/; then
-                  echo "Using pre-built binary from sycl-v43 release"
+                  echo "Using pre-built binary from sycl-v45 release"
                   chmod +x /opt/llama-cpp/build/bin/llama-server
                 else
                   echo "Download failed, building from source..."
@@ -72,8 +72,9 @@ spec:
               export UR_L0_BATCH_SIZE=64
               # Reduce event overhead: only last command in batch needs host visibility
               export UR_L0_DEVICE_SCOPE_EVENTS=2
-              # Disable SYCL graph (incompatible with MUL_MAT_ID for MoE)
-              export GGML_SYCL_DISABLE_GRAPH=1
+              # Enable SYCL graph capture for reduced kernel launch overhead
+              # MUL_MAT_ID is now graph-compatible (fused MoE kernel, no host sync)
+              export GGML_SYCL_DISABLE_GRAPH=0
               # NOTE: Large-GRF env vars removed — they reduce max WG size from 1024→512
               # causing RMS_NORM crash. Use AOT-compiled large-GRF build instead (sycl-v16+).
 
@@ -86,24 +87,21 @@ spec:
                 -m /models/gguf/Ornith-1.0-35B-Q4_K_M.gguf \
                 --device SYCL0 \
                 -ngl 999 \
-                --ctx-size 65536 \
+                --ctx-size 1048576 \
                 --n-predict 8192 \
                 --host 0.0.0.0 \
                 --port 8000 \
                 --flash-attn on \
                 --cache-type-k turbo4 \
                 --cache-type-v turbo3 \
-                --jinja \
                 -a "deepreinforce-ai/Ornith-1.0-35B" \
-                --reasoning-budget 1024 \
                 --no-mmap \
                 --batch-size 4096 \
                 --ubatch-size 1024 \
                 --threads 8 \
                 --prio 2 \
                 --poll 50 \
-                --parallel 4 \
-                --repeat-penalty 1.1
+                --parallel 4 
           ports:
             - containerPort: 8000
           env:
