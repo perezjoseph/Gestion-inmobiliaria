@@ -34,9 +34,9 @@ spec:
               if [ ! -f /opt/llama-cpp/build/bin/llama-server ]; then
                 echo "Downloading pre-built llama-server from GitHub release..."
                 apt-get update && apt-get install -y curl jq
-                RELEASE_URL="https://github.com/perezjoseph/llama-cpp-turboquant/releases/download/sycl-v40/llama-server-sycl-intel-arc.tar.gz"
+                RELEASE_URL="https://github.com/perezjoseph/llama-cpp-turboquant/releases/download/sycl-v43/llama-server-sycl-intel-arc.tar.gz"
                 if curl -sL "$RELEASE_URL" | tar -xzf - -C /opt/llama-cpp/build/bin/; then
-                  echo "Using pre-built binary from sycl-v40 release"
+                  echo "Using pre-built binary from sycl-v43 release"
                   chmod +x /opt/llama-cpp/build/bin/llama-server
                 else
                   echo "Download failed, building from source..."
@@ -63,6 +63,17 @@ spec:
               export ZES_ENABLE_SYSMAN=1
               export UR_L0_ENABLE_RELAXED_ALLOCATION_LIMITS=1
               export GGML_SYCL_ENABLE_FLASH_ATTN=1
+              # Kernel dispatch optimization: batched regular command lists with driver in-order
+              # Benchmarked: BATCH_SIZE=64 gives 35.1-35.3 tok/s (best measured config)
+              # Immediate CL (default for Arc B on 2025.3): 34.0-34.9 tok/s
+              # BATCH_SIZE=128: 31.7 tok/s (too much batching adds latency)
+              export UR_L0_USE_IMMEDIATE_COMMANDLISTS=0
+              export UR_L0_USE_DRIVER_INORDER_LISTS=1
+              export UR_L0_BATCH_SIZE=64
+              # Reduce event overhead: only last command in batch needs host visibility
+              export UR_L0_DEVICE_SCOPE_EVENTS=2
+              # Disable SYCL graph (incompatible with MUL_MAT_ID for MoE)
+              export GGML_SYCL_DISABLE_GRAPH=1
               # NOTE: Large-GRF env vars removed — they reduce max WG size from 1024→512
               # causing RMS_NORM crash. Use AOT-compiled large-GRF build instead (sycl-v16+).
 
@@ -75,8 +86,8 @@ spec:
                 -m /models/gguf/Ornith-1.0-35B-Q4_K_M.gguf \
                 --device SYCL0 \
                 -ngl 999 \
-                --ctx-size 262144 \
-                --n-predict 16384 \
+                --ctx-size 65536 \
+                --n-predict 8192 \
                 --host 0.0.0.0 \
                 --port 8000 \
                 --flash-attn on \
@@ -88,10 +99,10 @@ spec:
                 --no-mmap \
                 --batch-size 4096 \
                 --ubatch-size 1024 \
-                --threads 4 \
+                --threads 8 \
                 --prio 2 \
                 --poll 50 \
-                --parallel 1 \
+                --parallel 4 \
                 --repeat-penalty 1.1
           ports:
             - containerPort: 8000
